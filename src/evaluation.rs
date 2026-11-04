@@ -346,8 +346,8 @@ pub struct EvaluationPolicy;
 impl SpacePolicy for EvaluationPolicy {
     fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
         WeightedEvaluationPolicy {
-            prior_weight: 1.0,
-            state_weight: 1.0,
+            prior_weight: 0.5,
+            state_weight: 2.0,
         }
         .select(obs, legal, rng)
     }
