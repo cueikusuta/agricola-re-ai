@@ -2,7 +2,8 @@ use agricola_re_ai::engine::{Action, Detail};
 use agricola_re_ai::model::{Config, Game, House, RoundCard, Space};
 
 fn game() -> Game {
-    Game::new(Config { players: 2,
+    Game::new(Config {
+        players: 2,
         seed: 51,
         additional_action_space_enabled: false,
     })

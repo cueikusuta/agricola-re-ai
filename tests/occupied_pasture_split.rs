@@ -17,7 +17,8 @@ fn reveal_fencing(game: &mut Game) {
 }
 
 fn surrounded_occupied_pasture(enabled: bool) -> Game {
-    let config = Config { players: 2,
+    let config = Config {
+        players: 2,
         seed: 441,
         additional_action_space_enabled: enabled,
     };

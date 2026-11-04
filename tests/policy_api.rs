@@ -19,7 +19,8 @@ impl DetailPolicy for CustomDetails {
 
 #[test]
 fn decision_strategies_receive_only_public_observations() {
-    let g = Game::new(Config { players: 2,
+    let g = Game::new(Config {
+        players: 2,
         seed: 15,
         additional_action_space_enabled: false,
     });

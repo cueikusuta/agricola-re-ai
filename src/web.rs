@@ -21,7 +21,11 @@ pub struct Session {
 }
 impl Session {
     pub fn new(config: Config) -> Result<Self, String> {
-        let mut session = Self { game: Game::new(config), mcts: false, budget: 8 };
+        let mut session = Self {
+            game: Game::new(config),
+            mcts: false,
+            budget: 8,
+        };
         session.advance_cpu()?;
         Ok(session)
     }
@@ -38,11 +42,18 @@ impl Session {
                 self.game.config.seed ^ event_index.wrapping_mul(0x9e37_79b9_7f4a_7c15),
             );
             let space = if self.mcts {
-                MctsPolicy { simulations: self.budget, tree_depth: 2 }.select(&obs, &legal, &mut rng)
+                MctsPolicy {
+                    simulations: self.budget,
+                    tree_depth: 2,
+                }
+                .select(&obs, &legal, &mut rng)
             } else {
                 EvaluationPolicy.select(&obs, &legal, &mut rng)
-            }.ok_or("CPU could not select an action")?;
-            let action = details.produce(&obs, space).ok_or("CPU could not make action details")?;
+            }
+            .ok_or("CPU could not select an action")?;
+            let action = details
+                .produce(&obs, space)
+                .ok_or("CPU could not make action details")?;
             self.game.apply(action)?;
         }
         Err("CPU turn count exceeded".into())
@@ -74,7 +85,10 @@ impl Session {
         let config = Config {
             players: players as usize,
             seed: input.get("seed").and_then(Value::as_u64).unwrap_or(42),
-            additional_action_space_enabled: input.get("extra").and_then(Value::as_bool).unwrap_or(false),
+            additional_action_space_enabled: input
+                .get("extra")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
         };
         let mut next = Self {
             game: Game::new(config),
@@ -89,9 +103,9 @@ impl Session {
         if self.game.public.finished || self.game.public.active_player != 0 {
             return Err("not the human player's turn".into());
         }
-        let space: Space = serde_json::from_value(
-            input.get("space").cloned().ok_or("space is required")?,
-        ).map_err(|e| e.to_string())?;
+        let space: Space =
+            serde_json::from_value(input.get("space").cloned().ok_or("space is required")?)
+                .map_err(|e| e.to_string())?;
         if !self.game.legal_spaces().contains(&space) {
             return Err("selected space is not legal".into());
         }
@@ -104,7 +118,10 @@ impl Session {
                 Some("stone") | None => Good::Stone,
                 _ => return Err("invalid 3-player resource choice".into()),
             };
-            action = Action { space, detail: Detail::MarketChoice(good) };
+            action = Action {
+                space,
+                detail: Detail::MarketChoice(good),
+            };
         }
         self.game.apply(action)?;
         self.advance_cpu()
@@ -117,14 +134,20 @@ fn response(stream: &mut TcpStream, status: &str, mime: &str, content: &str) -> 
         "HTTP/1.1 {status}\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n",
         bytes.len()
     );
-    stream.write_all(head.as_bytes()).map_err(|e| e.to_string())?;
+    stream
+        .write_all(head.as_bytes())
+        .map_err(|e| e.to_string())?;
     stream.write_all(bytes).map_err(|e| e.to_string())
 }
 fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
-    stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).map_err(|e| e.to_string())?;
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+        .map_err(|e| e.to_string())?;
     let mut reader = BufReader::new(stream.try_clone().map_err(|e| e.to_string())?);
     let mut request_line = String::new();
-    reader.read_line(&mut request_line).map_err(|e| e.to_string())?;
+    reader
+        .read_line(&mut request_line)
+        .map_err(|e| e.to_string())?;
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("");
     let path = parts.next().unwrap_or("");
@@ -133,19 +156,34 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
     loop {
         let mut line = String::new();
         reader.read_line(&mut line).map_err(|e| e.to_string())?;
-        if line.is_empty() || line == "\r\n" || line == "\n" { break; }
+        if line.is_empty() || line == "\r\n" || line == "\n" {
+            break;
+        }
         count += 1;
         if count > 80 {
-            return response(&mut stream, "431 Request Header Fields Too Large", "application/json", "{\"error\":\"too many headers\"}");
+            return response(
+                &mut stream,
+                "431 Request Header Fields Too Large",
+                "application/json",
+                "{\"error\":\"too many headers\"}",
+            );
         }
         if let Some((name, value)) = line.split_once(':') {
             if name.eq_ignore_ascii_case("content-length") {
-                length = value.trim().parse().map_err(|e: std::num::ParseIntError| e.to_string())?;
+                length = value
+                    .trim()
+                    .parse()
+                    .map_err(|e: std::num::ParseIntError| e.to_string())?;
             }
         }
     }
     if length > MAX_BODY {
-        return response(&mut stream, "413 Content Too Large", "application/json", "{\"error\":\"body too large\"}");
+        return response(
+            &mut stream,
+            "413 Content Too Large",
+            "application/json",
+            "{\"error\":\"body too large\"}",
+        );
     }
     let mut bytes = vec![0u8; length];
     reader.read_exact(&mut bytes).map_err(|e| e.to_string())?;
@@ -156,15 +194,28 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
         ("GET", "/api/state") => Ok(session.view()),
         ("POST", "/api/new") | ("POST", "/api/play") => {
             let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
-            if path == "/api/new" { session.reset(&value)?; } else { session.play(&value)?; }
+            if path == "/api/new" {
+                session.reset(&value)?;
+            } else {
+                session.play(&value)?;
+            }
             Ok(session.view())
         }
         _ => Err("endpoint not found".into()),
     })();
     match result {
-        Ok(value) => response(&mut stream, "200 OK", "application/json; charset=utf-8", &value.to_string()),
-        Err(error) => response(&mut stream, "400 Bad Request", "application/json; charset=utf-8",
-            &json!({"error": error}).to_string()),
+        Ok(value) => response(
+            &mut stream,
+            "200 OK",
+            "application/json; charset=utf-8",
+            &value.to_string(),
+        ),
+        Err(error) => response(
+            &mut stream,
+            "400 Bad Request",
+            "application/json; charset=utf-8",
+            &json!({"error": error}).to_string(),
+        ),
     }
 }
 pub fn serve(config: Config) -> Result<(), String> {
@@ -191,15 +242,23 @@ mod tests {
         let mut session = Session::new(Config::default()).unwrap();
         assert!(session.reset(&json!({"players":5})).is_err());
         assert!(session.play(&json!({"space":"not_a_space"})).is_err());
-        session.reset(&json!({"players":4,"seed":100,"extra":true})).unwrap();
+        session
+            .reset(&json!({"players":4,"seed":100,"extra":true}))
+            .unwrap();
         assert_eq!(session.game.public.players.len(), 4);
         session.game.validate().unwrap();
     }
     #[test]
     fn human_and_cpu_can_take_turns() {
-        let mut session = Session::new(Config { seed: 5, ..Config::default() }).unwrap();
+        let mut session = Session::new(Config {
+            seed: 5,
+            ..Config::default()
+        })
+        .unwrap();
         for _ in 0..3 {
-            if session.game.public.finished { break; }
+            if session.game.public.finished {
+                break;
+            }
             assert_eq!(session.game.public.active_player, 0);
             let space = session.game.legal_spaces()[0];
             session.play(&json!({"space":space})).unwrap();

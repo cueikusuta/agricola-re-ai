@@ -432,7 +432,12 @@ impl Space {
     }
     pub fn extra_for(players: usize) -> Vec<Self> {
         match players {
-            2 => vec![Self::Copse, Self::ResourceMarket, Self::AnimalMarket, Self::ModestFamilyGrowth],
+            2 => vec![
+                Self::Copse,
+                Self::ResourceMarket,
+                Self::AnimalMarket,
+                Self::ModestFamilyGrowth,
+            ],
             3 | 4 => vec![Self::AnimalMarket, Self::ModestFamilyGrowth],
             _ => vec![],
         }
@@ -837,11 +842,17 @@ impl Game {
         {
             return Err("disabled additional space used".into());
         }
-        if p.used.iter().filter(|s| s.additional_for(self.config.players)).count() > 1 {
+        if p.used
+            .iter()
+            .filter(|s| s.additional_for(self.config.players))
+            .count()
+            > 1
+        {
             return Err("multiple mutually-exclusive additional spaces used".into());
         }
-        let mut available: BTreeSet<_> =
-            Space::regular_for(self.config.players).into_iter().collect();
+        let mut available: BTreeSet<_> = Space::regular_for(self.config.players)
+            .into_iter()
+            .collect();
         available.extend(p.revealed.iter().copied().map(Space::from));
         if self.config.additional_action_space_enabled {
             available.extend(Space::extra_for(self.config.players));

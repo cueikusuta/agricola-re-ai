@@ -274,6 +274,7 @@ mod tests {
     fn returns_legal_and_seed_reproducible_choice() {
         for enabled in [false, true] {
             let game = Game::new(Config {
+                players: 2,
                 seed: 37,
                 additional_action_space_enabled: enabled,
             });

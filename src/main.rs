@@ -3,8 +3,8 @@ use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::mcts::MctsPolicy;
 use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
 use agricola_re_ai::score::standings;
-use agricola_re_ai::{Config, Game};
 use agricola_re_ai::web::serve;
+use agricola_re_ai::{Config, Game};
 use std::collections::BTreeMap;
 use std::time::Instant;
 fn main() {
@@ -40,7 +40,11 @@ fn main() {
             "--eval" => evaluated = true,
             "--web" => web = true,
             "--players" => {
-                config.players = it.next().expect("--players requires 2, 3 or 4").parse().expect("invalid player count");
+                config.players = it
+                    .next()
+                    .expect("--players requires 2, 3 or 4")
+                    .parse()
+                    .expect("invalid player count");
             }
             "--mcts" => mcts_budget = Some(48),
             "--mcts-simulations" => {

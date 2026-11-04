@@ -3,7 +3,8 @@ use agricola_re_ai::model::{Config, Game, Improvement, Space, Tile};
 use agricola_re_ai::policy::{play_to_end, RandomPolicy, SimpleDetails};
 
 fn game() -> Game {
-    Game::new(Config { players: 2,
+    Game::new(Config {
+        players: 2,
         seed: 993_714,
         additional_action_space_enabled: true,
     })
@@ -96,7 +97,8 @@ fn a_modified_early_replay_event_is_rejected_on_load() {
 #[test]
 fn full_games_save_and_replay_with_the_initial_snapshot() {
     for additional_action_space_enabled in [false, true] {
-        let config = Config { players: 2,
+        let config = Config {
+            players: 2,
             seed: 781,
             additional_action_space_enabled,
         };

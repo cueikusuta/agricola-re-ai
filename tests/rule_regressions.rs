@@ -6,7 +6,8 @@ use agricola_re_ai::model::{
 use agricola_re_ai::score::score;
 
 fn game(enabled: bool) -> Game {
-    Game::new(Config { players: 2,
+    Game::new(Config {
+        players: 2,
         seed: 17,
         additional_action_space_enabled: enabled,
     })

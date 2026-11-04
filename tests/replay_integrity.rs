@@ -3,7 +3,8 @@ use agricola_re_ai::model::{Config, Crop, Game, RoundCard, Space, Tile};
 use agricola_re_ai::policy::{play_to_end, RandomPolicy, SimpleDetails};
 
 fn played_game(enabled: bool) -> Game {
-    let mut game = Game::new(Config { players: 2,
+    let mut game = Game::new(Config {
+        players: 2,
         seed: 12345,
         additional_action_space_enabled: enabled,
     });

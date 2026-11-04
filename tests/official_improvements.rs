@@ -4,7 +4,8 @@ use agricola_re_ai::model::{Config, Game, Good, Improvement, Player, RoundCard, 
 use agricola_re_ai::score::score;
 
 fn major_game() -> Game {
-    let mut g = Game::new(Config { players: 2,
+    let mut g = Game::new(Config {
+        players: 2,
         seed: 7731,
         additional_action_space_enabled: false,
     });

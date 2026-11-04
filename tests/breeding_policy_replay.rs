@@ -30,7 +30,8 @@ impl HarvestDetailPolicy for ReturnOffspring {
 fn external_breeding_policy_is_logged_and_replayed_for_both_modes() {
     for additional_action_space_enabled in [false, true] {
         for seed in 0..20 {
-            let config = Config { players: 2,
+            let config = Config {
+                players: 2,
                 seed,
                 additional_action_space_enabled,
             };
