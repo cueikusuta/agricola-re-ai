@@ -1,6 +1,6 @@
 //! Transactional rule application. Detail policies live outside this module.
-use crate::harvest::{FeedingPlan, HarvestDetailPolicy, SimpleHarvestDetails};
 use crate::breeding::BreedingPlan;
+use crate::harvest::{FeedingPlan, HarvestDetailPolicy, SimpleHarvestDetails};
 use crate::model::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -415,7 +415,12 @@ impl Game {
                     if player != g.public.active_player {
                         return Err("replay player mismatch".into());
                     }
-                    g.apply_with_plans(action, harvest_plans, breeding_plans, &SimpleHarvestDetails)?
+                    g.apply_with_plans(
+                        action,
+                        harvest_plans,
+                        breeding_plans,
+                        &SimpleHarvestDetails,
+                    )?
                 }
                 RecordedAction::Free { player, action } => g.apply_free(player, action)?,
             }
@@ -425,7 +430,11 @@ impl Game {
         }
         Ok(g)
     }
-    fn next_worker_or_round(&mut self, feeding: Option<&[FeedingPlan]>, breeding: Option<&[BreedingPlan]>) -> Result<()> {
+    fn next_worker_or_round(
+        &mut self,
+        feeding: Option<&[FeedingPlan]>,
+        breeding: Option<&[BreedingPlan]>,
+    ) -> Result<()> {
         let n = self.public.players.len();
         let mut next = self.public.active_player;
         for _ in 0..n {
@@ -436,7 +445,10 @@ impl Game {
             }
         }
         if HARVEST_ROUNDS.contains(&self.public.round) {
-            self.harvest(feeding.ok_or("missing feeding decisions")?, breeding.ok_or("missing breeding decisions")?)?;
+            self.harvest(
+                feeding.ok_or("missing feeding decisions")?,
+                breeding.ok_or("missing breeding decisions")?,
+            )?;
         }
         if self.public.round == 14 {
             self.public.finished = true

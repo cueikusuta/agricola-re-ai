@@ -1,7 +1,7 @@
 //! Harvest operations, with external decisions specified in a replayable plan.
 //! Official order: field phase, feeding phase, breeding phase.
-use crate::engine::Result;
 use crate::breeding::BreedingPlan;
+use crate::engine::Result;
 use crate::model::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;

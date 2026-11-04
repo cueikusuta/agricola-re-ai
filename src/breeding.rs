@@ -46,11 +46,15 @@ impl BreedingPlan {
                 })
                 .map(|pasture| BirthDestination::Pasture(pasture.id))
                 .or_else(|| {
-                    preview.farm.iter().position(|cell| {
-                        cell.stable
-                            && matches!(cell.tile, Tile::Empty)
-                            && cell.stable_animal.is_none()
-                    }).map(BirthDestination::Stable)
+                    preview
+                        .farm
+                        .iter()
+                        .position(|cell| {
+                            cell.stable
+                                && matches!(cell.tile, Tile::Empty)
+                                && cell.stable_animal.is_none()
+                        })
+                        .map(BirthDestination::Stable)
                 })
                 .unwrap_or_else(|| {
                     if preview.pet.is_none() {
@@ -59,7 +63,10 @@ impl BreedingPlan {
                         BirthDestination::Discard
                     }
                 });
-            let choice = BirthChoice { species, destination: location };
+            let choice = BirthChoice {
+                species,
+                destination: location,
+            };
             apply_one(&mut preview, &choice).expect("simple placement must be legal");
             births.push(choice);
         }
@@ -87,7 +94,10 @@ impl BreedingPlan {
 fn apply_one(player: &mut Player, birth: &BirthChoice) -> Result<(), String> {
     match birth.destination {
         BirthDestination::Pasture(id) => {
-            let index = player.pastures.iter().position(|p| p.id == id)
+            let index = player
+                .pastures
+                .iter()
+                .position(|p| p.id == id)
                 .ok_or("birth pasture not found")?;
             let pasture = &player.pastures[index];
             if pasture.animal.is_some() && pasture.animal != Some(birth.species) {
@@ -102,9 +112,7 @@ fn apply_one(player: &mut Player, birth: &BirthChoice) -> Result<(), String> {
         }
         BirthDestination::Stable(index) => {
             let cell = player.farm.get_mut(index).ok_or("invalid stable index")?;
-            if !cell.stable || !matches!(cell.tile, Tile::Empty)
-                || cell.stable_animal.is_some()
-            {
+            if !cell.stable || !matches!(cell.tile, Tile::Empty) || cell.stable_animal.is_some() {
                 return Err("unfenced stable is not empty".into());
             }
             cell.stable_animal = Some(birth.species);
@@ -134,7 +142,10 @@ mod tests {
         p.farm[13].stable_animal = Some(Animal::Sheep);
         p.farm[14].stable = true;
         p.pastures.push(Pasture {
-            id: 0, cells: vec![12], animal: Some(Animal::Boar), quantity: 2,
+            id: 0,
+            cells: vec![12],
+            animal: Some(Animal::Boar),
+            quantity: 2,
         });
         p.farm[12].tile = Tile::Pasture { id: 0 };
         p
@@ -143,10 +154,18 @@ mod tests {
     #[test]
     fn birth_locations_are_policy_choices_not_fixed_priority() {
         let mut p = two_species();
-        let custom = BreedingPlan { births: vec![
-            BirthChoice { species: Animal::Sheep, destination: BirthDestination::Stable(14) },
-            BirthChoice { species: Animal::Boar, destination: BirthDestination::Discard },
-        ] };
+        let custom = BreedingPlan {
+            births: vec![
+                BirthChoice {
+                    species: Animal::Sheep,
+                    destination: BirthDestination::Stable(14),
+                },
+                BirthChoice {
+                    species: Animal::Boar,
+                    destination: BirthDestination::Discard,
+                },
+            ],
+        };
         custom.apply(&mut p).unwrap();
         assert_eq!(p.animal_count(Animal::Sheep), 3);
         assert_eq!(p.animal_count(Animal::Boar), 2);
@@ -157,17 +176,35 @@ mod tests {
     fn illegal_birth_choices_are_atomic() {
         let mut p = two_species();
         let before = p.clone();
-        let invalid = BreedingPlan { births: vec![
-            BirthChoice { species: Animal::Sheep, destination: BirthDestination::Pasture(0) },
-            BirthChoice { species: Animal::Boar, destination: BirthDestination::Discard },
-        ] };
+        let invalid = BreedingPlan {
+            births: vec![
+                BirthChoice {
+                    species: Animal::Sheep,
+                    destination: BirthDestination::Pasture(0),
+                },
+                BirthChoice {
+                    species: Animal::Boar,
+                    destination: BirthDestination::Discard,
+                },
+            ],
+        };
         assert!(invalid.apply(&mut p).is_err());
         assert_eq!(p, before);
         assert!(BreedingPlan { births: vec![] }.apply(&mut p).is_err());
-        assert!(BreedingPlan { births: vec![
-            BirthChoice { species: Animal::Sheep, destination: BirthDestination::Discard },
-            BirthChoice { species: Animal::Sheep, destination: BirthDestination::Discard },
-        ] }.apply(&mut p).is_err());
+        assert!(BreedingPlan {
+            births: vec![
+                BirthChoice {
+                    species: Animal::Sheep,
+                    destination: BirthDestination::Discard
+                },
+                BirthChoice {
+                    species: Animal::Sheep,
+                    destination: BirthDestination::Discard
+                },
+            ]
+        }
+        .apply(&mut p)
+        .is_err());
         assert_eq!(p, before);
     }
 }
