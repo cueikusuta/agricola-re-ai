@@ -8,7 +8,11 @@ fn game() -> Game {
         additional_action_space_enabled: false,
     });
     if g.public.revealed[0] != RoundCard::MajorImprovement {
-        let index = g.hidden_round_deck.iter().position(|&x| x == RoundCard::MajorImprovement).unwrap();
+        let index = g
+            .hidden_round_deck
+            .iter()
+            .position(|&x| x == RoundCard::MajorImprovement)
+            .unwrap();
         let old = g.public.revealed[0];
         g.public.revealed[0] = RoundCard::MajorImprovement;
         g.hidden_round_deck[index] = old;
@@ -42,16 +46,25 @@ fn buying_a_fireplace_spends_clay_and_depletes_the_market() {
     })
     .unwrap();
     assert_eq!(g.public.players[id].supply.clay, 0);
-    assert!(g.public.players[id].improvements.contains(&Improvement::Fireplace2));
-    assert!(!g.public.improvement_market.contains(&Improvement::Fireplace2));
+    assert!(g.public.players[id]
+        .improvements
+        .contains(&Improvement::Fireplace2));
+    assert!(!g
+        .public
+        .improvement_market
+        .contains(&Improvement::Fireplace2));
 }
 
 #[test]
 fn exchanging_a_fireplace_for_a_hearth_is_free() {
     let mut g = game();
     let id = g.public.active_player;
-    g.public.players[id].improvements.push(Improvement::Fireplace2);
-    g.public.improvement_market.retain(|&x| x != Improvement::Fireplace2);
+    g.public.players[id]
+        .improvements
+        .push(Improvement::Fireplace2);
+    g.public
+        .improvement_market
+        .retain(|&x| x != Improvement::Fireplace2);
     let initial_clay = g.public.players[id].supply.clay;
     g.apply(Action {
         space: Space::MajorImprovement,
@@ -62,7 +75,14 @@ fn exchanging_a_fireplace_for_a_hearth_is_free() {
     })
     .unwrap();
     assert_eq!(g.public.players[id].supply.clay, initial_clay);
-    assert!(g.public.players[id].improvements.contains(&Improvement::Hearth4));
-    assert!(!g.public.players[id].improvements.contains(&Improvement::Fireplace2));
-    assert!(g.public.improvement_market.contains(&Improvement::Fireplace2));
+    assert!(g.public.players[id]
+        .improvements
+        .contains(&Improvement::Hearth4));
+    assert!(!g.public.players[id]
+        .improvements
+        .contains(&Improvement::Fireplace2));
+    assert!(g
+        .public
+        .improvement_market
+        .contains(&Improvement::Fireplace2));
 }

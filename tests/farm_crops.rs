@@ -38,8 +38,14 @@ fn sow_grain_and_vegetable_exact_crop_stacks() {
         space: Space::GrainUtilization,
         detail: Detail::Sow {
             plantings: vec![
-                Plant { cell: 13, crop: Crop::Grain },
-                Plant { cell: 14, crop: Crop::Vegetable },
+                Plant {
+                    cell: 13,
+                    crop: Crop::Grain,
+                },
+                Plant {
+                    cell: 14,
+                    crop: Crop::Vegetable,
+                },
             ],
             bake: 0,
         },
@@ -74,15 +80,23 @@ fn sow_same_field_twice_rejected_atomically() {
     };
     g.public.players[id].supply.grain = 2;
     let before = g.state_hash();
-    assert!(g.apply(Action {
-        space: Space::GrainUtilization,
-        detail: Detail::Sow {
-            plantings: vec![
-                Plant { cell: 14, crop: Crop::Grain },
-                Plant { cell: 14, crop: Crop::Grain },
-            ],
-            bake: 0,
-        },
-    }).is_err());
+    assert!(g
+        .apply(Action {
+            space: Space::GrainUtilization,
+            detail: Detail::Sow {
+                plantings: vec![
+                    Plant {
+                        cell: 14,
+                        crop: Crop::Grain
+                    },
+                    Plant {
+                        cell: 14,
+                        crop: Crop::Grain
+                    },
+                ],
+                bake: 0,
+            },
+        })
+        .is_err());
     assert_eq!(g.state_hash(), before);
 }

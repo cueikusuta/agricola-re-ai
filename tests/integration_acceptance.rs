@@ -32,6 +32,9 @@ fn greedy_complete_game_replays_in_both_modes() {
         let mut g = Game::new(config.clone());
         play_to_end(&mut g, &GreedyPolicy, &SimpleDetails).unwrap();
         assert!(g.public.finished);
-        assert_eq!(Game::replay(config, &g.log.events).unwrap().state_hash(), g.state_hash());
+        assert_eq!(
+            Game::replay(config, &g.log.events).unwrap().state_hash(),
+            g.state_hash()
+        );
     }
 }

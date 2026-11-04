@@ -12,7 +12,11 @@ fn reveal_fencing(g: &mut Game) {
     if g.public.revealed.contains(&RoundCard::Fencing) {
         return;
     }
-    let at = g.hidden_round_deck.iter().position(|&x| x == RoundCard::Fencing).unwrap();
+    let at = g
+        .hidden_round_deck
+        .iter()
+        .position(|&x| x == RoundCard::Fencing)
+        .unwrap();
     let old = g.public.revealed[0];
     g.public.revealed[0] = RoundCard::Fencing;
     g.hidden_round_deck[at] = old;
@@ -68,10 +72,15 @@ fn rearranging_livestock_cannot_create_new_animals() {
     let id = g.public.active_player;
     g.public.players[id].pet = Some(Animal::Sheep);
     let before = g.state_hash();
-    assert!(g.apply_free(id, FreeAction::RearrangeAnimals {
-        pasture: vec![],
-        stables: vec![],
-        pet: None,
-    }).is_err());
+    assert!(g
+        .apply_free(
+            id,
+            FreeAction::RearrangeAnimals {
+                pasture: vec![],
+                stables: vec![],
+                pet: None,
+            }
+        )
+        .is_err());
     assert_eq!(g.state_hash(), before);
 }

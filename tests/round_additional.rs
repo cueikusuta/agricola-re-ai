@@ -23,7 +23,8 @@ fn copse_accumulation_survives_use_of_other_additional_space() {
         let active = g.public.active_player;
         let view = g.observation(active).unwrap();
         let space = g.legal_spaces()[0];
-        g.apply(SimpleDetails.produce(&view, space).unwrap()).unwrap();
+        g.apply(SimpleDetails.produce(&view, space).unwrap())
+            .unwrap();
     }
     assert_eq!(g.public.round, 2);
     assert_eq!(g.public.accumulations.get(&Space::Copse), Some(&2));
@@ -44,7 +45,10 @@ fn additional_mode_is_fixed_and_disabled_by_default() {
     let mut b = game(true);
     b.public.additional_action_space_enabled = false;
     assert!(b.validate().is_err());
-    assert!(b.public.players[0].farm.iter().any(|c| matches!(c.tile, Tile::Room)));
+    assert!(b.public.players[0]
+        .farm
+        .iter()
+        .any(|c| matches!(c.tile, Tile::Room)));
 }
 
 #[test]

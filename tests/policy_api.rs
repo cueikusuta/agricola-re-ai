@@ -36,6 +36,9 @@ fn decision_strategies_receive_only_public_observations() {
     }
     assert_eq!(
         CustomDetails.produce(&obs, Space::DayLaborer),
-        Some(Action { space: Space::DayLaborer, detail: Detail::None })
+        Some(Action {
+            space: Space::DayLaborer,
+            detail: Detail::None
+        })
     );
 }
