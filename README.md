@@ -16,7 +16,7 @@
 - Side Jobなし。職業・小改善カードなし。
 - 追加アクションタイルは `additional_action_space_enabled` でON/OFF（初期OFF）。
 - シード付き乱数を用途ごとに分離。AIへ非公開ラウンド順やシードを渡さない。
-- UIを実装しない。
+- M1ではUIを実装しない。M4ではローカルWeb UIを提供。
 
 ## M2：評価関数AIと対戦ベンチマーク
 
@@ -59,3 +59,22 @@ README・設計ドキュメントだけを初期コミットとして送りま�
 ## M1の統合検証ブランチ（履歴）
 
 最新版の統合実装は `issue/45-m1-final-stables-audit` に積み上げてあります。公式ルールを確認した修正（厩の建築場所を含む）を追加し、Rustfmt・Clippy・Cargo test・ON/OFF各100試合のGitHub Actionsが成功しています。M1統合PR #47はmainにマージ済みです。
+
+## M3：探索AI
+
+公開済みのラウンドカードだけを参照し、残りの公開前ラウンド順をプレイアウトごとに再抽選するMCTS。細部は既存SimpleDetails、プレイアウトはM2評価を併用。探索近似の制限は [M3](docs/m3-mcts.md) を参照。
+
+```sh
+cargo run --release -- --mcts --mcts-simulations 48 --seed 42
+```
+
+## M4：2〜4人戦と人間対CPUのブラウザUI
+
+```sh
+cargo run --release -- --web
+# ブラウザで http://127.0.0.1:8787/ を開く
+```
+
+ローカルホスト専用（外部公開なし）。画面で人数2〜4人、追加アクションタイルON/OFF、評価関数AI/MCTS、シードを選び「新しい対戦」。人間は1Pで、他のプレイヤーはCPU。アクションスペースはクリックで選択でき、配置・購入などの詳細は現在SimpleDetailsが生成する（すべての詳細を手動指定するUIは未実装）。CPUデフォルトは応答性の高い評価関数AI。
+
+CLIの人数指定は `--players 2|3|4`。2人戦のM2先後交代ベンチマークは`--players 2`限定。詳細は [M4](docs/m4-multiplayer.md)。

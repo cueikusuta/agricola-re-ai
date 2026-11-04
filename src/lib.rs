@@ -8,4 +8,5 @@ pub mod mcts;
 pub mod model;
 pub mod policy;
 pub mod score;
+pub mod web;
 pub use model::{Config, Game, Observation};
