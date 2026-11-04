@@ -23,7 +23,8 @@ fn major_game() -> Game {
 
 #[test]
 fn each_major_improvement_uses_its_official_cost_and_score() {
-    let cases: [(Improvement, &[(Good, u32)], i32); 10] = [
+    type MajorCase = (Improvement, &'static [(Good, u32)], i32);
+    let cases: [MajorCase; 10] = [
         (Improvement::Fireplace2, &[(Good::Clay, 2)], 1),
         (Improvement::Fireplace3, &[(Good::Clay, 3)], 1),
         (Improvement::Hearth4, &[(Good::Clay, 4)], 1),
