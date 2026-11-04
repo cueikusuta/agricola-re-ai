@@ -308,7 +308,7 @@ fn intermediate_save_resume_exact() {
 #[test]
 fn action_log_metadata_and_replay_information() {
     let mut g = game(222, true);
-    assert_eq!(g.log.log_version, 1);
+    assert_eq!(g.log.log_version, agricola_re_ai::model::LOG_VERSION);
     assert!(g.log.config.additional_action_space_enabled);
     assert_eq!(g.log.start_player, g.public.start_player);
     assert_eq!(g.log.initial_state_hash, g.state_hash());
