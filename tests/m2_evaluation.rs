@@ -1,9 +1,13 @@
 use agricola_re_ai::benchmark::compare_policies;
+use agricola_re_ai::engine::{Action, BakeAllocation, Detail};
 use agricola_re_ai::evaluation::{
-    action_value, evaluate_observation, evaluate_player, EvaluationPolicy,
+    action_value, action_value_with_details, evaluate_observation, evaluate_player,
+    DetailAwareEvaluationPolicy, EvaluationPolicy, WeightedEvaluationPolicy,
 };
-use agricola_re_ai::model::{Config, Game, Good, Player};
-use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
+use agricola_re_ai::model::{Config, Crop, Game, Good, Improvement, Observation, Player, Space, Tile};
+use agricola_re_ai::policy::{
+    play_to_end, DetailPolicy, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
+};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
@@ -25,6 +29,79 @@ fn growth_is_more_valuable_earlier() {
     let early = evaluate_player(&grown, 2).family_growth - evaluate_player(&p, 2).family_growth;
     let late = evaluate_player(&grown, 14).family_growth - evaluate_player(&p, 14).family_growth;
     assert!(early > late);
+    assert_eq!(early, 36.0);
+    assert_eq!(late, 0.0);
+}
+
+struct BakeInsteadOfSow;
+
+impl DetailPolicy for BakeInsteadOfSow {
+    fn produce(&self, obs: &Observation, space: Space) -> Option<Action> {
+        if space != Space::GrainUtilization {
+            return SimpleDetails.produce(obs, space);
+        }
+        Some(Action {
+            space,
+            detail: Detail::SowDetailed {
+                plantings: vec![],
+                baking: vec![BakeAllocation {
+                    improvement: Improvement::Hearth4,
+                    grain: 1,
+                }],
+            },
+        })
+    }
+}
+
+struct DeclineGrain;
+
+impl DetailPolicy for DeclineGrain {
+    fn produce(&self, obs: &Observation, space: Space) -> Option<Action> {
+        if space == Space::GrainUtilization {
+            None
+        } else {
+            SimpleDetails.produce(obs, space)
+        }
+    }
+}
+
+#[test]
+fn detail_aware_evaluation_uses_the_selected_action_plan() {
+    let game = Game::new(Config::default());
+    let mut obs = game.observation(game.public.active_player).unwrap();
+    let p = &mut obs.public.players[obs.player_id];
+    p.supply.grain = 1;
+    p.improvements.push(Improvement::Hearth4);
+    p.farm[1].tile = Tile::Field {
+        crop: None,
+        remaining: 0,
+    };
+
+    let sow = action_value(&obs, Space::GrainUtilization).unwrap();
+    let bake = action_value_with_details(&obs, Space::GrainUtilization, &BakeInsteadOfSow)
+        .unwrap();
+    assert_ne!(sow, bake);
+    assert_eq!(
+        sow,
+        action_value_with_details(&obs, Space::GrainUtilization, &SimpleDetails).unwrap()
+    );
+
+    let rejecting = DetailAwareEvaluationPolicy {
+        weights: WeightedEvaluationPolicy {
+            prior_weight: 0.5,
+            state_weight: 2.0,
+        },
+        details: &DeclineGrain,
+    };
+    let mut rng = ChaCha8Rng::seed_from_u64(1);
+    assert_eq!(
+        rejecting.select(
+            &obs,
+            &[Space::GrainUtilization, Space::DayLaborer],
+            &mut rng,
+        ),
+        Some(Space::DayLaborer)
+    );
 }
 
 #[test]
@@ -109,6 +186,18 @@ fn fixed_seed_m2_strength_ladder_holds_for_both_tile_modes() {
         assert!(
             upgraded.left_win_rate > 0.5,
             "evaluation should outperform greedy"
+        );
+    }
+}
+
+#[test]
+fn heldout_strength_check_for_both_tile_modes() {
+    // Not part of the calibration seeds (4200, 7100, 16800).
+    for enabled in [false, true] {
+        let result = compare_policies(&EvaluationPolicy, &GreedyPolicy, 20, 26000, enabled).unwrap();
+        assert!(
+            result.left_win_rate > 0.6,
+            "held-out seed failed for additional_action_space_enabled={enabled}: {result:?}"
         );
     }
 }
