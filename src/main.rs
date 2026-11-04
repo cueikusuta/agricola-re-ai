@@ -38,8 +38,13 @@ fn main() {
             "--eval" => evaluated = true,
             "--mcts" => mcts_budget = Some(48),
             "--mcts-simulations" => {
-                mcts_budget = Some(it.next().expect("--mcts-simulations requires N").parse().expect("invalid MCTS simulation count"));
-            },
+                mcts_budget = Some(
+                    it.next()
+                        .expect("--mcts-simulations requires N")
+                        .parse()
+                        .expect("invalid MCTS simulation count"),
+                );
+            }
             "--benchmark" => {
                 benchmark = Some(
                     it.next()
