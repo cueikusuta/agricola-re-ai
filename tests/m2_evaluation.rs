@@ -100,8 +100,15 @@ fn evaluation_policy_plays_balanced_head_to_head_matches() {
 fn fixed_seed_m2_strength_ladder_holds_for_both_tile_modes() {
     for enabled in [false, true] {
         let baseline = compare_policies(&GreedyPolicy, &RandomPolicy, 12, 7100, enabled).unwrap();
-        let upgraded = compare_policies(&EvaluationPolicy, &GreedyPolicy, 12, 7100, enabled).unwrap();
-        assert!(baseline.left_win_rate > 0.5, "greedy should outperform random");
-        assert!(upgraded.left_win_rate > 0.5, "evaluation should outperform greedy");
+        let upgraded =
+            compare_policies(&EvaluationPolicy, &GreedyPolicy, 12, 7100, enabled).unwrap();
+        assert!(
+            baseline.left_win_rate > 0.5,
+            "greedy should outperform random"
+        );
+        assert!(
+            upgraded.left_win_rate > 0.5,
+            "evaluation should outperform greedy"
+        );
     }
 }
