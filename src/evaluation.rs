@@ -496,6 +496,166 @@ pub fn action_value(obs: &Observation, space: Space) -> Option<f64> {
     Some(value)
 }
 
+
+#[cfg(test)]
+mod projection_tests {
+    use super::*;
+    use crate::engine::{AnimalPlan, BakeAllocation, PastureOccupancy};
+
+    fn observed(update: impl FnOnce(&mut Player)) -> Observation {
+        let game = Game::new(Config::default());
+        let mut obs = game.observation(game.public.active_player).unwrap();
+        update(&mut obs.public.players[obs.player_id]);
+        obs
+    }
+
+    #[test]
+    fn baking_uses_each_improvements_actual_food_rate() {
+        for (improvement, expected_food) in [
+            (Improvement::Fireplace2, 2),
+            (Improvement::Hearth4, 3),
+            (Improvement::ClayOven, 5),
+            (Improvement::StoneOven, 4),
+        ] {
+            let obs = observed(|p| {
+                p.improvements.push(improvement);
+                p.supply.grain = 1;
+            });
+            let initial = obs.public.players[obs.player_id].supply.food;
+            let action = Action {
+                space: Space::GrainUtilization,
+                detail: Detail::SowDetailed {
+                    plantings: vec![],
+                    baking: vec![BakeAllocation {
+                        improvement,
+                        grain: 1,
+                    }],
+                },
+            };
+            let next = project_action(&obs, &action).unwrap();
+            assert_eq!(next.supply.food, initial + expected_food, "{improvement:?}");
+            assert_eq!(next.supply.grain, 0);
+        }
+    }
+
+    #[test]
+    fn cooking_animals_uses_species_specific_rates() {
+        for (improvement, animal, rate) in [
+            (Improvement::Fireplace2, Animal::Sheep, 2),
+            (Improvement::Fireplace2, Animal::Boar, 2),
+            (Improvement::Fireplace2, Animal::Cattle, 3),
+            (Improvement::Hearth4, Animal::Sheep, 2),
+            (Improvement::Hearth4, Animal::Boar, 3),
+            (Improvement::Hearth4, Animal::Cattle, 4),
+        ] {
+            let obs = observed(|p| p.improvements.push(improvement));
+            let initial = obs.public.players[obs.player_id].supply.food;
+            let mut plan = AnimalPlan::discard_all(animal, 0);
+            plan.cook = 2;
+            let action = Action {
+                space: match animal {
+                    Animal::Sheep => Space::SheepMarket,
+                    Animal::Boar => Space::PigMarket,
+                    Animal::Cattle => Space::CattleMarket,
+                },
+                detail: Detail::Animals(plan),
+            };
+            let next = project_action(&obs, &action).unwrap();
+            assert_eq!(next.supply.food, initial + 2 * rate, "{animal:?}/{improvement:?}");
+        }
+    }
+
+    #[test]
+    fn hearth_exchange_removes_fireplace_without_spending_clay() {
+        let obs = observed(|p| {
+            p.supply.clay = 0;
+            p.improvements.push(Improvement::Fireplace2);
+        });
+        let action = Action {
+            space: Space::MajorImprovement,
+            detail: Detail::Buy {
+                improvement: Improvement::Hearth4,
+                instant_bake: 0,
+            },
+        };
+        let next = project_action(&obs, &action).unwrap();
+        assert_eq!(next.improvements, vec![Improvement::Hearth4]);
+        assert_eq!(next.supply.clay, 0);
+    }
+
+    #[test]
+    fn food_safety_includes_edible_grain_and_next_field_harvest() {
+        let mut p = Player::new(0, 0);
+        let starting = evaluate_player(&p, 14).food_safety;
+        p.supply.grain = 4;
+        let grain_safe = evaluate_player(&p, 14).food_safety;
+        assert!(grain_safe > starting);
+        p.supply.grain = 0;
+        for cell in [1, 2, 3, 4] {
+            p.farm[cell].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 2,
+            };
+        }
+        assert_eq!(evaluate_player(&p, 14).food_safety, grain_safe);
+
+        let mut vegetables = Player::new(0, 0);
+        vegetables.improvements.push(Improvement::Hearth4);
+        vegetables.supply.vegetable = 2;
+        assert!(evaluate_player(&vegetables, 14).food_safety > starting);
+    }
+
+    #[test]
+    fn well_future_food_diminishes_by_last_round() {
+        let base = Player::new(0, 4);
+        let mut improved = base.clone();
+        improved.improvements.push(Improvement::Well);
+        let early_gain =
+            evaluate_player(&improved, 3).total() - evaluate_player(&base, 3).total();
+        let late_gain =
+            evaluate_player(&improved, 14).total() - evaluate_player(&base, 14).total();
+        assert!(early_gain > late_gain + 10.0);
+    }
+
+    #[test]
+    fn internal_fence_split_tracks_new_segment_and_preserves_animals() {
+        let obs = observed(|p| {
+            p.supply.wood = 2;
+            p.farm[1].tile = Tile::Pasture { id: 0 };
+            p.farm[2].tile = Tile::Pasture { id: 0 };
+            p.pastures.push(Pasture {
+                id: 0,
+                cells: vec![1, 2],
+                animal: Some(Animal::Sheep),
+                quantity: 2,
+            });
+            p.fences = pasture_boundary(&[1, 2]);
+        });
+        let initial = &obs.public.players[obs.player_id];
+        let action = Action {
+            space: Space::Fencing,
+            detail: Detail::FenceDetailed {
+                pastures: vec![vec![1], vec![2]],
+                occupancy: vec![
+                    PastureOccupancy {
+                        animal: Some(Animal::Sheep),
+                        quantity: 2,
+                    },
+                    PastureOccupancy {
+                        animal: None,
+                        quantity: 0,
+                    },
+                ],
+            },
+        };
+        let next = project_action(&obs, &action).unwrap();
+        assert_eq!(next.pastures.len(), 2);
+        assert_eq!(next.fences.len(), initial.fences.len() + 1);
+        assert_eq!(next.supply.wood, initial.supply.wood - 1);
+        assert_eq!(next.animal_count(Animal::Sheep), 2);
+    }
+}
+
 /// Calibration-friendly blend of the M1 tactical prior and M2 state evaluation.
 #[derive(Clone, Copy, Debug)]
 pub struct WeightedEvaluationPolicy {
