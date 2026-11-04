@@ -55,7 +55,8 @@ fn animal_cooking_rate(p: &Player, animal: Animal) -> Option<u32> {
             Animal::Boar => 3,
             Animal::Cattle => 4,
         })
-    } else if p.improvements
+    } else if p
+        .improvements
         .iter()
         .any(|i| matches!(i, Improvement::Fireplace2 | Improvement::Fireplace3))
     {
@@ -284,7 +285,12 @@ fn fence(
     let added = edges.difference(&p.fences).count() as u32;
     p.supply.wood = p.supply.wood.saturating_sub(added);
 
-    let mut next_id = p.pastures.iter().map(|old| old.id).max().map_or(0, |n| n + 1);
+    let mut next_id = p
+        .pastures
+        .iter()
+        .map(|old| old.id)
+        .max()
+        .map_or(0, |n| n + 1);
     let mut assigned_ids = BTreeSet::new();
     let mut changed = Vec::new();
     for (ix, group) in groups.iter().enumerate() {
@@ -421,9 +427,9 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             // Buy with PurchaseMode::Auto: a Hearth exchanges an owned Fireplace
             // without paying the printed cost (engine::buy_improvement).
             let exchange = if matches!(improvement, Improvement::Hearth4 | Improvement::Hearth5) {
-                p.improvements
-                    .iter()
-                    .position(|card| matches!(card, Improvement::Fireplace2 | Improvement::Fireplace3))
+                p.improvements.iter().position(|card| {
+                    matches!(card, Improvement::Fireplace2 | Improvement::Fireplace3)
+                })
             } else {
                 None
             };
@@ -497,7 +503,6 @@ pub fn action_value(obs: &Observation, space: Space) -> Option<f64> {
     Some(value)
 }
 
-
 #[cfg(test)]
 mod projection_tests {
     use super::*;
@@ -562,7 +567,11 @@ mod projection_tests {
                 detail: Detail::Animals(plan),
             };
             let next = project_action(&obs, &action).unwrap();
-            assert_eq!(next.supply.food, initial + 2 * rate, "{animal:?}/{improvement:?}");
+            assert_eq!(
+                next.supply.food,
+                initial + 2 * rate,
+                "{animal:?}/{improvement:?}"
+            );
         }
     }
 
@@ -611,10 +620,8 @@ mod projection_tests {
         let base = Player::new(0, 4);
         let mut improved = base.clone();
         improved.improvements.push(Improvement::Well);
-        let early_gain =
-            evaluate_player(&improved, 3).total() - evaluate_player(&base, 3).total();
-        let late_gain =
-            evaluate_player(&improved, 14).total() - evaluate_player(&base, 14).total();
+        let early_gain = evaluate_player(&improved, 3).total() - evaluate_player(&base, 3).total();
+        let late_gain = evaluate_player(&improved, 14).total() - evaluate_player(&base, 14).total();
         assert!(early_gain > late_gain + 10.0);
     }
 
