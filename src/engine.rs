@@ -37,6 +37,16 @@ pub struct PastureOccupancy {
     pub animal: Option<Animal>,
     pub quantity: u32,
 }
+/// How a player acquires a major improvement. Paying its printed cost is
+/// legal even if an exchangeable Fireplace is already owned.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PurchaseMode {
+    /// Compatibility behavior for older M1 actions: exchange the first
+    /// owned Fireplace for a Cooking Hearth, otherwise pay the cost.
+    Auto,
+    Pay,
+    Exchange(Improvement),
+}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BakeAllocation {
     pub improvement: Improvement,
@@ -80,6 +90,12 @@ pub enum Detail {
     BuyDetailed {
         improvement: Improvement,
         instant_baking: Vec<BakeAllocation>,
+    },
+    /// Full decision: explicit cost payment or a specific Fireplace exchange.
+    BuyWithMode {
+        improvement: Improvement,
+        instant_baking: Vec<BakeAllocation>,
+        mode: PurchaseMode,
     },
     Renovate {
         bonus_improvement: Option<Improvement>,
@@ -526,6 +542,7 @@ impl Game {
                     *improvement,
                     *instant_bake,
                     None,
+                    PurchaseMode::Auto,
                 )?,
                 Detail::BuyDetailed {
                     improvement,
@@ -538,6 +555,21 @@ impl Game {
                     *improvement,
                     0,
                     Some(instant_baking),
+                    PurchaseMode::Auto,
+                )?,
+                Detail::BuyWithMode {
+                    improvement,
+                    instant_baking,
+                    mode,
+                } => buy_improvement(
+                    p,
+                    &mut self.public.improvement_market,
+                    &mut self.delayed_well,
+                    self.public.round,
+                    *improvement,
+                    0,
+                    Some(instant_baking),
+                    *mode,
                 )?,
                 _ => return Err("improvement required".into()),
             },
@@ -561,6 +593,7 @@ impl Game {
                             *i,
                             *instant_bake,
                             None,
+                            PurchaseMode::Auto,
                         )?
                     } else if *instant_bake > 0 {
                         return Err("instant bake without oven".into());
@@ -860,23 +893,31 @@ fn buy_improvement(
     item: Improvement,
     instant_bake: u32,
     allocation: Option<&[BakeAllocation]>,
+    mode: PurchaseMode,
 ) -> Result<()> {
     let pos = market
         .iter()
         .position(|&x| x == item)
         .ok_or("improvement unavailable")?;
-    let fireplace = p
-        .improvements
-        .iter()
-        .position(|i| matches!(i, Improvement::Fireplace2 | Improvement::Fireplace3));
-    let exchange =
-        matches!(item, Improvement::Hearth4 | Improvement::Hearth5) && fireplace.is_some();
-    if exchange {
-        let old = p.improvements.remove(fireplace.expect("fireplace checked"));
-        market.push(old)
+    let is_hearth = matches!(item, Improvement::Hearth4 | Improvement::Hearth5);
+    let exchange = match mode {
+        PurchaseMode::Pay => None,
+        PurchaseMode::Auto if is_hearth => p.improvements.iter().copied().find(|i| matches!(i, Improvement::Fireplace2 | Improvement::Fireplace3)),
+        PurchaseMode::Auto => None,
+        PurchaseMode::Exchange(old) => {
+            if !is_hearth || !matches!(old, Improvement::Fireplace2 | Improvement::Fireplace3) || !p.improvements.contains(&old) {
+                return Err("invalid Fireplace-to-Hearth exchange".into());
+            }
+            Some(old)
+        }
+    };
+    if let Some(old) = exchange {
+        let index = p.improvements.iter().position(|&i| i == old).expect("validated exchange");
+        p.improvements.remove(index);
+        market.push(old);
     } else {
         for (good, n) in item.cost() {
-            p.supply.pay(good, n)?
+            p.supply.pay(good, n)?;
         }
     }
     market.remove(pos);

@@ -23,3 +23,10 @@
 - **パン焼き時の設備選択**：公式ルールブック p.10・付録 p.2。交換はいつでも自由な「パン焼き」アクションがある時だけ。各Clay Ovenは1粒を食料5、Stone Ovenは最大2粒を各食料4にする。複数設備の選択は新しい `BakeAllocation` で外部ポリシーから明示できるようにする。
 - **追加したモデル**：`SowDetailed`・`BuyDetailed`。旧来の整数 `bake` はテスト互換のため残し、決定的な割当を実行する。
 - **未解決**：入手した動物をどの牧場に割り当てるかと繁殖後の移動のルール細部、カードフックと収穫ポリシーのログ完全再現性は引き続き受け入れ前の検証対象。
+
+
+## Issue #27: 大きな進歩の購入方法（2016改訂版）
+
+- 公式付録 p.2「Major Improvements」：全10枚の建築費・得点・工房変換。かまど（Fireplace）を保有していても、調理場（Cooking Hearth）を**建築費で購入**できる。既存のかまどを返却するのは代替手段であり強制ではない。
+- 新しい `Detail::BuyWithMode` は `PurchaseMode::Pay` と `PurchaseMode::Exchange(Fireplace2/Fireplace3)` を明示できる。従来の `Detail::Buy` は互換性のため自動交換を継続。
+- 2016年版の付録 p.2 は https://www.lookout-spiele.de/upload/en_agricolare.html_Appendix_Agricola-RE_EN.pdf 。カード本文や画像を公開リポジトリへ含めない。
