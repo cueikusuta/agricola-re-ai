@@ -326,8 +326,8 @@ impl SpacePolicy for WeightedEvaluationPolicy {
             let Some(state_delta) = action_value(obs, space) else {
                 continue;
             };
-            let value = self.state_weight * state_delta
-                + self.prior_weight * f64::from(weight(obs, space));
+            let value =
+                self.state_weight * state_delta + self.prior_weight * f64::from(weight(obs, space));
             if value > best + 1e-9 {
                 best = value;
                 candidates.clear();
@@ -339,7 +339,6 @@ impl SpacePolicy for WeightedEvaluationPolicy {
         candidates.choose(rng).copied()
     }
 }
-
 
 /// Default M2 policy, with reproducible, fixed calibration parameters.
 pub struct EvaluationPolicy;
