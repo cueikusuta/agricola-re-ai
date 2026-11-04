@@ -16,25 +16,47 @@ fn replay_fails_if_a_harvest_decision_is_missing() {
     for enabled in [false, true] {
         let original = played_game(enabled);
         let mut events = original.log.events.clone();
-        let event = events.iter_mut().find(|event| {
-            matches!(
-                serde_json::from_value::<RecordedAction>(event.payload.clone()),
-                Ok(RecordedAction::Work { harvest_plans: Some(_), .. })
-            )
-        }).expect("at least one harvest");
-        let payload = event.payload.get_mut("Work").unwrap().as_object_mut().unwrap();
+        let event = events
+            .iter_mut()
+            .find(|event| {
+                matches!(
+                    serde_json::from_value::<RecordedAction>(event.payload.clone()),
+                    Ok(RecordedAction::Work {
+                        harvest_plans: Some(_),
+                        ..
+                    })
+                )
+            })
+            .expect("at least one harvest");
+        let payload = event
+            .payload
+            .get_mut("Work")
+            .unwrap()
+            .as_object_mut()
+            .unwrap();
         assert!(payload.remove("breeding_plans").is_some());
         let error = Game::replay(original.config.clone(), &events).unwrap_err();
         assert!(error.contains("harvest decisions"), "{error}");
 
         let mut events = original.log.events.clone();
-        let event = events.iter_mut().find(|event| {
-            matches!(
-                serde_json::from_value::<RecordedAction>(event.payload.clone()),
-                Ok(RecordedAction::Work { harvest_plans: Some(_), .. })
-            )
-        }).unwrap();
-        event.payload.get_mut("Work").unwrap().as_object_mut().unwrap()
+        let event = events
+            .iter_mut()
+            .find(|event| {
+                matches!(
+                    serde_json::from_value::<RecordedAction>(event.payload.clone()),
+                    Ok(RecordedAction::Work {
+                        harvest_plans: Some(_),
+                        ..
+                    })
+                )
+            })
+            .unwrap();
+        event
+            .payload
+            .get_mut("Work")
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
             .remove("harvest_plans");
         assert!(Game::replay(original.config.clone(), &events).is_err());
     }
@@ -78,7 +100,10 @@ fn saved_state_must_match_logged_actions_and_versions() {
 fn malformed_public_state_is_rejected() {
     let mut g = Game::new(Config::default());
     let old = g.public.players[0].farm[14].tile;
-    g.public.players[0].farm[14].tile = Tile::Field { crop: Some(Crop::Grain), remaining: 4 };
+    g.public.players[0].farm[14].tile = Tile::Field {
+        crop: Some(Crop::Grain),
+        remaining: 4,
+    };
     assert!(g.validate().unwrap_err().contains("grain stack"));
     g.public.players[0].farm[14].tile = old;
 

@@ -566,7 +566,11 @@ impl Game {
         {
             return Err("saved game initial state mismatch".into());
         }
-        let expected_hash = result.log.events.last().map(|event| &event.after)
+        let expected_hash = result
+            .log
+            .events
+            .last()
+            .map(|event| &event.after)
             .unwrap_or(&result.log.initial_state_hash);
         if *expected_hash != result.state_hash() {
             return Err("saved game state does not match last logged action".into());
@@ -736,10 +740,18 @@ impl Game {
         if p.finished && (p.round != 14 || p.workers_placed != p.work_quota) {
             return Err("game ended before all workers were placed".into());
         }
-        if p.used.len() != p.workers_placed.iter().map(|&n| usize::from(n)).sum::<usize>() {
+        if p.used.len()
+            != p.workers_placed
+                .iter()
+                .map(|&n| usize::from(n))
+                .sum::<usize>()
+        {
             return Err("worker placements do not match used spaces".into());
         }
-        let all_cards = p.revealed.iter().copied()
+        let all_cards = p
+            .revealed
+            .iter()
+            .copied()
             .chain(self.hidden_round_deck.iter().copied())
             .collect::<BTreeSet<_>>();
         if all_cards != RoundCard::ALL.into_iter().collect() {

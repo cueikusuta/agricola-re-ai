@@ -414,7 +414,8 @@ impl Game {
                     harvest_plans,
                     breeding_plans,
                 } => {
-                    if event.kind != "work" || event.player != Some(player)
+                    if event.kind != "work"
+                        || event.player != Some(player)
                         || player != g.public.active_player
                     {
                         return Err("replay work metadata/player mismatch".into());
