@@ -28,9 +28,10 @@ fn weight_sweep() {
     }
 }
 
+// Calibration seeds are *not* held-out validation. This comparison is exploratory.
 #[test]
 #[ignore]
-fn heldout_validation() {
+fn known_seed_candidate_comparison() {
     for additional in [false, true] {
         for (prior, state) in [(1.0, 1.0), (1.0, 1.5), (0.5, 2.0)] {
             let policy = WeightedEvaluationPolicy {
