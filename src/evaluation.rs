@@ -144,7 +144,9 @@ pub fn evaluate_player(p: &Player, round: u8) -> Evaluation {
         + (f64::from(p.supply.food) - required).max(0.0) * 0.35;
     let unused_rooms = p.rooms().saturating_sub(p.family as usize) as f64;
     let housing = unused_rooms * if p.family < 5 { 12.0 + remaining } else { 2.0 };
-    let growing = (p.family.saturating_sub(2)) as f64 * 3.0 * remaining;
+    // Family members added during the current round can only act from the next round.
+    let future_action_rounds = f64::from(14u8.saturating_sub(round));
+    let growing = f64::from(p.family.saturating_sub(2)) * 3.0 * future_action_rounds;
     let planted = p
         .farm
         .iter()
@@ -489,8 +491,12 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
 
 /// Estimated change in the public-state evaluation after taking a legal space.
 /// The projection is advisory; legality and consequences come from Game::apply.
-pub fn action_value(obs: &Observation, space: Space) -> Option<f64> {
-    let action = SimpleDetails.produce(obs, space)?;
+pub fn action_value_with_details(
+    obs: &Observation,
+    space: Space,
+    details: &dyn DetailPolicy,
+) -> Option<f64> {
+    let action = details.produce(obs, space)?;
     let before = evaluate_observation(obs, obs.player_id)?.total();
     let after = project_action(obs, &action)?;
     let mut value = evaluate_player(&after, obs.public.round).total() - before;
@@ -501,6 +507,12 @@ pub fn action_value(obs: &Observation, space: Space) -> Option<f64> {
         value += 2.0;
     }
     Some(value)
+}
+
+/// Standard M2 evaluation with the same default detail policy used by the CLI.
+/// For a different detail policy, use `action_value_with_details`.
+pub fn action_value(obs: &Observation, space: Space) -> Option<f64> {
+    action_value_with_details(obs, space, &SimpleDetails)
 }
 
 #[cfg(test)]
@@ -671,12 +683,19 @@ pub struct WeightedEvaluationPolicy {
     pub state_weight: f64,
 }
 
-impl SpacePolicy for WeightedEvaluationPolicy {
-    fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
+impl WeightedEvaluationPolicy {
+    /// Use the same detail policy for estimating and executing each action.
+    pub fn select_with_details(
+        &self,
+        obs: &Observation,
+        legal: &[Space],
+        rng: &mut ChaCha8Rng,
+        details: &dyn DetailPolicy,
+    ) -> Option<Space> {
         let mut best = f64::NEG_INFINITY;
         let mut candidates = Vec::new();
         for &space in legal {
-            let Some(state_delta) = action_value(obs, space) else {
+            let Some(state_delta) = action_value_with_details(obs, space, details) else {
                 continue;
             };
             let value =
@@ -690,6 +709,25 @@ impl SpacePolicy for WeightedEvaluationPolicy {
             }
         }
         candidates.choose(rng).copied()
+    }
+}
+
+impl SpacePolicy for WeightedEvaluationPolicy {
+    fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
+        self.select_with_details(obs, legal, rng, &SimpleDetails)
+    }
+}
+
+/// A policy for M3 or custom rollouts, coupled to its actual detail generator.
+pub struct DetailAwareEvaluationPolicy<'a> {
+    pub weights: WeightedEvaluationPolicy,
+    pub details: &'a dyn DetailPolicy,
+}
+
+impl SpacePolicy for DetailAwareEvaluationPolicy<'_> {
+    fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
+        self.weights
+            .select_with_details(obs, legal, rng, self.details)
     }
 }
 
