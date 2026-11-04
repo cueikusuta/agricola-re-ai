@@ -540,9 +540,7 @@ impl Game {
                     &mut self.delayed_well,
                     self.public.round,
                     *improvement,
-                    *instant_bake,
-                    None,
-                    PurchaseMode::Auto,
+                    PurchaseArgs { instant_bake: *instant_bake, allocation: None, mode: PurchaseMode::Auto },
                 )?,
                 Detail::BuyDetailed {
                     improvement,
@@ -553,9 +551,7 @@ impl Game {
                     &mut self.delayed_well,
                     self.public.round,
                     *improvement,
-                    0,
-                    Some(instant_baking),
-                    PurchaseMode::Auto,
+                    PurchaseArgs { instant_bake: 0, allocation: Some(instant_baking), mode: PurchaseMode::Auto },
                 )?,
                 Detail::BuyWithMode {
                     improvement,
@@ -567,9 +563,7 @@ impl Game {
                     &mut self.delayed_well,
                     self.public.round,
                     *improvement,
-                    0,
-                    Some(instant_baking),
-                    *mode,
+                    PurchaseArgs { instant_bake: 0, allocation: Some(instant_baking), mode: *mode },
                 )?,
                 _ => return Err("improvement required".into()),
             },
@@ -591,9 +585,7 @@ impl Game {
                             &mut self.delayed_well,
                             self.public.round,
                             *i,
-                            *instant_bake,
-                            None,
-                            PurchaseMode::Auto,
+                            PurchaseArgs { instant_bake: *instant_bake, allocation: None, mode: PurchaseMode::Auto },
                         )?
                     } else if *instant_bake > 0 {
                         return Err("instant bake without oven".into());
@@ -885,16 +877,20 @@ fn bake_bread(p: &mut Player, amount: u32) -> Result<()> {
     }
     bake_allocated(p, &allocation)
 }
+struct PurchaseArgs<'a> {
+    instant_bake: u32,
+    allocation: Option<&'a [BakeAllocation]>,
+    mode: PurchaseMode,
+}
 fn buy_improvement(
     p: &mut Player,
     market: &mut Vec<Improvement>,
     well: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     item: Improvement,
-    instant_bake: u32,
-    allocation: Option<&[BakeAllocation]>,
-    mode: PurchaseMode,
+    options: PurchaseArgs<'_>,
 ) -> Result<()> {
+    let PurchaseArgs { instant_bake, allocation, mode } = options;
     let pos = market
         .iter()
         .position(|&x| x == item)
