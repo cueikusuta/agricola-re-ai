@@ -698,7 +698,9 @@ impl Game {
                             },
                         )?;
                     } else if !instant_baking.is_empty() || *purchase_mode != PurchaseMode::Auto {
-                        return Err("improvement detail supplied without a bonus improvement".into());
+                        return Err(
+                            "improvement detail supplied without a bonus improvement".into()
+                        );
                     }
                 }
                 _ => return Err("renovation details required".into()),
@@ -737,7 +739,7 @@ impl Game {
                     }
                 }
                 _ => return Err("renovation details required".into()),
-            }
+            },
             Space::SheepMarket | Space::PigMarket | Space::CattleMarket | Space::AnimalMarket => {
                 if let Detail::Animals(plan) = detail {
                     let species = match space {

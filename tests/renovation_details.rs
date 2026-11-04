@@ -1,6 +1,4 @@
-use agricola_re_ai::engine::{
-    Action, Detail, PastureOccupancy, PurchaseMode,
-};
+use agricola_re_ai::engine::{Action, Detail, PastureOccupancy, PurchaseMode};
 use agricola_re_ai::model::{
     Animal, Config, Game, Good, House, Improvement, Pasture, RoundCard, Space, Tile,
 };
@@ -12,8 +10,11 @@ fn revealed(target: RoundCard, additional: bool) -> Game {
         additional_action_space_enabled: additional,
     });
     if game.public.revealed[0] != target {
-        let index = game.hidden_round_deck.iter()
-            .position(|&card| card == target).unwrap();
+        let index = game
+            .hidden_round_deck
+            .iter()
+            .position(|&card| card == target)
+            .unwrap();
         let original = game.public.revealed[0];
         game.public.revealed[0] = target;
         game.hidden_round_deck[index] = original;
@@ -30,7 +31,9 @@ fn house_renovation_can_pay_for_hearth_instead_of_exchanging_owned_fireplace() {
         player.supply.clay = 7;
         player.supply.reed = 1;
         player.improvements.push(Improvement::Fireplace2);
-        game.public.improvement_market.retain(|&i| i != Improvement::Fireplace2);
+        game.public
+            .improvement_market
+            .retain(|&i| i != Improvement::Fireplace2);
         game.apply(Action {
             space: Space::HouseRedevelopment,
             detail: Detail::RenovateDetailed {
@@ -40,7 +43,8 @@ fn house_renovation_can_pay_for_hearth_instead_of_exchanging_owned_fireplace() {
                 pastures: vec![],
                 occupancy: None,
             },
-        }).unwrap();
+        })
+        .unwrap();
         let player = &game.public.players[actor];
         assert_eq!(player.house, House::Clay);
         assert_eq!(player.supply.clay, 1);
@@ -66,10 +70,8 @@ fn farm_renovation_can_split_an_occupied_pasture_with_explicit_conserving_alloca
             animal: Some(Animal::Sheep),
             quantity: 3,
         }];
-        player.fences = BTreeSet::from([
-            (15, 16), (16, 17), (15, 21),
-            (17, 23), (21, 22), (22, 23),
-        ]);
+        player.fences =
+            BTreeSet::from([(15, 16), (16, 17), (15, 21), (17, 23), (21, 22), (22, 23)]);
         game.validate().unwrap();
         game.apply(Action {
             space: Space::FarmRedevelopment,
@@ -79,11 +81,18 @@ fn farm_renovation_can_split_an_occupied_pasture_with_explicit_conserving_alloca
                 purchase_mode: PurchaseMode::Auto,
                 pastures: vec![vec![13], vec![14]],
                 occupancy: Some(vec![
-                    PastureOccupancy { animal: Some(Animal::Sheep), quantity: 2 },
-                    PastureOccupancy { animal: Some(Animal::Sheep), quantity: 1 },
+                    PastureOccupancy {
+                        animal: Some(Animal::Sheep),
+                        quantity: 2,
+                    },
+                    PastureOccupancy {
+                        animal: Some(Animal::Sheep),
+                        quantity: 1,
+                    },
                 ]),
             },
-        }).unwrap();
+        })
+        .unwrap();
         let player = &game.public.players[actor];
         assert_eq!(player.house, House::Clay);
         assert_eq!(player.supply.get(Good::Clay), 0);
@@ -101,16 +110,18 @@ fn invalid_redevelopment_followup_does_not_spend_renovation_resources() {
     game.public.players[actor].supply.clay = 8;
     game.public.players[actor].supply.reed = 1;
     let before = game.state_hash();
-    assert!(game.apply(Action {
-        space: Space::FarmRedevelopment,
-        detail: Detail::RenovateDetailed {
-            bonus_improvement: Some(Improvement::Hearth4),
-            instant_baking: vec![],
-            purchase_mode: PurchaseMode::Pay,
-            pastures: vec![],
-            occupancy: None,
-        },
-    }).is_err());
+    assert!(game
+        .apply(Action {
+            space: Space::FarmRedevelopment,
+            detail: Detail::RenovateDetailed {
+                bonus_improvement: Some(Improvement::Hearth4),
+                instant_baking: vec![],
+                purchase_mode: PurchaseMode::Pay,
+                pastures: vec![],
+                occupancy: None,
+            },
+        })
+        .is_err());
     assert_eq!(game.state_hash(), before);
 
     let mut game = revealed(RoundCard::HouseRedevelopment, false);
@@ -118,15 +129,20 @@ fn invalid_redevelopment_followup_does_not_spend_renovation_resources() {
     game.public.players[actor].supply.clay = 2;
     game.public.players[actor].supply.reed = 1;
     let before = game.state_hash();
-    assert!(game.apply(Action {
-        space: Space::HouseRedevelopment,
-        detail: Detail::RenovateDetailed {
-            bonus_improvement: None,
-            instant_baking: vec![],
-            purchase_mode: PurchaseMode::Auto,
-            pastures: vec![vec![13]],
-            occupancy: Some(vec![PastureOccupancy { animal: None, quantity: 0 }]),
-        },
-    }).is_err());
+    assert!(game
+        .apply(Action {
+            space: Space::HouseRedevelopment,
+            detail: Detail::RenovateDetailed {
+                bonus_improvement: None,
+                instant_baking: vec![],
+                purchase_mode: PurchaseMode::Auto,
+                pastures: vec![vec![13]],
+                occupancy: Some(vec![PastureOccupancy {
+                    animal: None,
+                    quantity: 0
+                }]),
+            },
+        })
+        .is_err());
     assert_eq!(game.state_hash(), before);
 }
