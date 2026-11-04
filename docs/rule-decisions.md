@@ -36,3 +36,10 @@
 - 公式ルールブック末尾の「Number of Components」は、各プレイヤーの**人5、厩4、柵15**だけを意図的な個数上限とし、それ以外の共有トークンが不足した場合はgoods tilesまたは代用品を使用できると明記する。
 - よって羊18/猪15/牛13、木30/粘土24等は同梱の物理的なコマの数であり、ゲーム内の獲得数の上限ではない。シミュレーターでは一般供給を有限化しない。Game::validate は個人コマの上限をチェックする。
 - 根拠：https://lookout-spiele.de/upload/en_agricolare.html_Rules_Agricola-RE_EN.pdf p.12、Number of Components。
+
+## Issue #45: 厩の設置場所（2016版ルールブック p.8）
+
+- 「Farm Expansion」で新しい厩を建設できるのは、部屋・畑・牧場タイルのない農場マスだけ。すでに牧場になったマスに厩を後付けするのは不可。
+- 逆方向（先にタイルのないマスに厩を建て、後からそのマスを柵で囲う）は合法。囲いの中の厩はその牧場の収容能力を倍増する。
+- `build_stable` は `Tile::Empty` のみ受け入れ、`build_pastures` は既存の厩を囲う処理を維持する。失敗時の不変性と順序の回帰テストを追加。
+- 根拠： https://lookout-spiele.de/upload/en_agricolare.html_Rules_Agricola-RE_EN.pdf p.8。
