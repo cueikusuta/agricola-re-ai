@@ -554,6 +554,23 @@ impl Game {
     pub fn load_json(text: &str) -> Result<Self, String> {
         let result: Self = serde_json::from_str(text).map_err(|e| e.to_string())?;
         result.validate()?;
+        if result.log.log_version != LOG_VERSION
+            || result.log.rules_version != RULES_VERSION
+            || result.log.engine_version != ENGINE_VERSION
+            || result.log.config != result.config
+        {
+            return Err("saved game metadata/version mismatch".into());
+        }
+        if result.log.start_player >= result.public.players.len()
+            || result.log.initial_state_hash != Game::new(result.config.clone()).state_hash()
+        {
+            return Err("saved game initial state mismatch".into());
+        }
+        let expected_hash = result.log.events.last().map(|event| &event.after)
+            .unwrap_or(&result.log.initial_state_hash);
+        if *expected_hash != result.state_hash() {
+            return Err("saved game state does not match last logged action".into());
+        }
         Ok(result)
     }
     pub fn start_round(&mut self) {
@@ -629,6 +646,9 @@ impl Game {
             let mut known_ids = BTreeSet::new();
             let mut required_fences = BTreeSet::new();
             for pasture in &player.pastures {
+                if (pasture.quantity == 0) != pasture.animal.is_none() {
+                    return Err("pasture species and quantity inconsistent".into());
+                }
                 if pasture.cells.is_empty() || pasture.cells.iter().any(|&i| i >= FARM_CELLS) {
                     return Err("pasture cells outside farm".into());
                 }
@@ -667,6 +687,20 @@ impl Game {
                 return Err("pasture boundaries and placed fences disagree".into());
             }
             for (cell_index, cell) in player.farm.iter().enumerate() {
+                if let Tile::Field { crop, remaining } = cell.tile {
+                    match crop {
+                        None if remaining != 0 => {
+                            return Err("empty field carries crops".into());
+                        }
+                        Some(Crop::Grain) if remaining == 0 || remaining > 3 => {
+                            return Err("invalid grain stack".into());
+                        }
+                        Some(Crop::Vegetable) if remaining == 0 || remaining > 2 => {
+                            return Err("invalid vegetable stack".into());
+                        }
+                        _ => (),
+                    }
+                }
                 if matches!(cell.tile, Tile::Pasture { .. }) && !covered.contains(&cell_index) {
                     return Err("pasture tile orphan".into());
                 }
@@ -701,6 +735,15 @@ impl Game {
         }
         if p.finished && (p.round != 14 || p.workers_placed != p.work_quota) {
             return Err("game ended before all workers were placed".into());
+        }
+        if p.used.len() != p.workers_placed.iter().map(|&n| usize::from(n)).sum::<usize>() {
+            return Err("worker placements do not match used spaces".into());
+        }
+        let all_cards = p.revealed.iter().copied()
+            .chain(self.hidden_round_deck.iter().copied())
+            .collect::<BTreeSet<_>>();
+        if all_cards != RoundCard::ALL.into_iter().collect() {
+            return Err("round deck contains duplicate or missing cards".into());
         }
         Ok(())
     }

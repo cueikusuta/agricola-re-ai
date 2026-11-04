@@ -414,8 +414,19 @@ impl Game {
                     harvest_plans,
                     breeding_plans,
                 } => {
-                    if player != g.public.active_player {
-                        return Err("replay player mismatch".into());
+                    if event.kind != "work" || event.player != Some(player)
+                        || player != g.public.active_player
+                    {
+                        return Err("replay work metadata/player mismatch".into());
+                    }
+                    let mut placements = g.public.workers_placed.clone();
+                    placements[player] += 1;
+                    let will_harvest = placements == g.public.work_quota
+                        && HARVEST_ROUNDS.contains(&g.public.round);
+                    if harvest_plans.is_some() != will_harvest
+                        || breeding_plans.is_some() != will_harvest
+                    {
+                        return Err("replay harvest decisions missing or unexpected".into());
                     }
                     g.apply_with_plans(
                         action,
@@ -424,7 +435,12 @@ impl Game {
                         &SimpleHarvestDetails,
                     )?
                 }
-                RecordedAction::Free { player, action } => g.apply_free(player, action)?,
+                RecordedAction::Free { player, action } => {
+                    if event.kind != "free" || event.player != Some(player) {
+                        return Err("replay free action metadata/player mismatch".into());
+                    }
+                    g.apply_free(player, action)?;
+                }
             }
             if g.state_hash() != event.after {
                 return Err("replay poststate hash mismatch".into());
