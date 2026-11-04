@@ -540,7 +540,11 @@ impl Game {
                     &mut self.delayed_well,
                     self.public.round,
                     *improvement,
-                    PurchaseArgs { instant_bake: *instant_bake, allocation: None, mode: PurchaseMode::Auto },
+                    PurchaseArgs {
+                        instant_bake: *instant_bake,
+                        allocation: None,
+                        mode: PurchaseMode::Auto,
+                    },
                 )?,
                 Detail::BuyDetailed {
                     improvement,
@@ -551,7 +555,11 @@ impl Game {
                     &mut self.delayed_well,
                     self.public.round,
                     *improvement,
-                    PurchaseArgs { instant_bake: 0, allocation: Some(instant_baking), mode: PurchaseMode::Auto },
+                    PurchaseArgs {
+                        instant_bake: 0,
+                        allocation: Some(instant_baking),
+                        mode: PurchaseMode::Auto,
+                    },
                 )?,
                 Detail::BuyWithMode {
                     improvement,
@@ -563,7 +571,11 @@ impl Game {
                     &mut self.delayed_well,
                     self.public.round,
                     *improvement,
-                    PurchaseArgs { instant_bake: 0, allocation: Some(instant_baking), mode: *mode },
+                    PurchaseArgs {
+                        instant_bake: 0,
+                        allocation: Some(instant_baking),
+                        mode: *mode,
+                    },
                 )?,
                 _ => return Err("improvement required".into()),
             },
@@ -585,7 +597,11 @@ impl Game {
                             &mut self.delayed_well,
                             self.public.round,
                             *i,
-                            PurchaseArgs { instant_bake: *instant_bake, allocation: None, mode: PurchaseMode::Auto },
+                            PurchaseArgs {
+                                instant_bake: *instant_bake,
+                                allocation: None,
+                                mode: PurchaseMode::Auto,
+                            },
                         )?
                     } else if *instant_bake > 0 {
                         return Err("instant bake without oven".into());
@@ -890,7 +906,11 @@ fn buy_improvement(
     item: Improvement,
     options: PurchaseArgs<'_>,
 ) -> Result<()> {
-    let PurchaseArgs { instant_bake, allocation, mode } = options;
+    let PurchaseArgs {
+        instant_bake,
+        allocation,
+        mode,
+    } = options;
     let pos = market
         .iter()
         .position(|&x| x == item)
@@ -898,17 +918,28 @@ fn buy_improvement(
     let is_hearth = matches!(item, Improvement::Hearth4 | Improvement::Hearth5);
     let exchange = match mode {
         PurchaseMode::Pay => None,
-        PurchaseMode::Auto if is_hearth => p.improvements.iter().copied().find(|i| matches!(i, Improvement::Fireplace2 | Improvement::Fireplace3)),
+        PurchaseMode::Auto if is_hearth => p
+            .improvements
+            .iter()
+            .copied()
+            .find(|i| matches!(i, Improvement::Fireplace2 | Improvement::Fireplace3)),
         PurchaseMode::Auto => None,
         PurchaseMode::Exchange(old) => {
-            if !is_hearth || !matches!(old, Improvement::Fireplace2 | Improvement::Fireplace3) || !p.improvements.contains(&old) {
+            if !is_hearth
+                || !matches!(old, Improvement::Fireplace2 | Improvement::Fireplace3)
+                || !p.improvements.contains(&old)
+            {
                 return Err("invalid Fireplace-to-Hearth exchange".into());
             }
             Some(old)
         }
     };
     if let Some(old) = exchange {
-        let index = p.improvements.iter().position(|&i| i == old).expect("validated exchange");
+        let index = p
+            .improvements
+            .iter()
+            .position(|&i| i == old)
+            .expect("validated exchange");
         p.improvements.remove(index);
         market.push(old);
     } else {
