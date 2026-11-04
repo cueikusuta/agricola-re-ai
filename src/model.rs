@@ -11,14 +11,11 @@ pub const RULES_VERSION: &str = "agricola-revised-2016-beginner";
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const LOG_VERSION: u32 = 1;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Config {
     pub seed: u64,
     #[serde(default)]
     pub additional_action_space_enabled: bool,
-}
-impl Default for Config {
-    fn default() -> Self { Self { seed: 0, additional_action_space_enabled: false } }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -80,7 +77,7 @@ impl Player {
     }
     pub fn pasture_capacity(&self,p:&Pasture)->u32 {
         let stables=p.cells.iter().filter(|&&i|self.farm[i].stable).count();
-        (2*p.cells.len() as u32).checked_mul(1u32<<stables).unwrap_or(u32::MAX)
+        (2*p.cells.len() as u32).saturating_mul(1u32<<stables)
     }
     pub fn total_crop(&self,kind:Crop)->u32 {
         let in_supply=match kind{Crop::Grain=>self.supply.grain,Crop::Vegetable=>self.supply.vegetable};
@@ -228,4 +225,13 @@ pub fn round_for_space(s:Space)->RoundCard {match s {
     Space::SheepMarket=>RoundCard::SheepMarket,Space::PigMarket=>RoundCard::PigMarket,Space::CattleMarket=>RoundCard::CattleMarket,_=>panic!("not an animal accumulation round space")}}
 
 /// orthogonal neighbors in 5 columns x 3 rows, 0-indexed.
-pub fn neighbors(cell:usize)->Vec<usize>{let x=cell%5;let y=cell/5;let mut out=Vec::new();if x>0 {out.push(cell-1)}if x<4 {out.push(cell+1)}if y>0 {out.push(cell-5)}if y<2 {out.push(cell+5)}out}
+pub fn neighbors(cell:usize)->Vec<usize>{
+    let x=cell%5;
+    let y=cell/5;
+    let mut out=Vec::new();
+    if x>0 {out.push(cell-1);}
+    if x<4 {out.push(cell+1);}
+    if y>0 {out.push(cell-5);}
+    if y<2 {out.push(cell+5);}
+    out
+}
