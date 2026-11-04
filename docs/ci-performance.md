@@ -14,11 +14,12 @@
 | `src/**`, `Cargo.toml`, `Cargo.lock` | 実行 | 実行 | 実行 | 実行 |
 | `.github/workflows/**`, ツールチェーン設定、`build.rs` | 実行 | 実行 | 実行 | 実行 |
 | `scripts/**` のみ | 実行 | 実行 | 実行 | スキップ |
+| 新規のソース・設定パス、その他のMarkdown以外の変更 | 実行 | 実行 | 実行 | 実行 |
 | 手動 `workflow_dispatch` | 実行 | 実行 | 実行 | 実行 |
 
 PR時はPRのベースブランチとの差分、main/developへのpush時は直前コミットとの差分を判定する。PRとpushの重複実行を避けるため、`issue/**` へのpushではなくPRでCIを走らせる。未公開PRブランチの検査が必要なら手動実行する。
 
-判定には `dorny/paths-filter@v4` を使用。ワークフロー自体を `paths` でスキップするとGitHubの必須ステータスがPendingのままになる場合があるため、ジョブ単位の `if` で分岐する。最後の `CI required` は必ず実行し、変更に対応するジョブがすべて成功したことを検証する。ブランチ保護の必須チェックには `CI required` を指定することを推奨。
+判定には `dorny/paths-filter@v4` を使用し、`predicate-quantifier: every` で除外規則を同じファイルに適用する。`docs/**` と `**/*.md` だけをRustチェック対象から除外し、`tests/**` と `scripts/**` だけをベンチマーク対象から追加除外する。未知の新規ソース・設定ファイルは安全側に倒して全ジョブを実行する。ワークフロー自体を `paths` でスキップするとGitHubの必須ステータスがPendingのままになる場合があるため、ジョブ単位の `if` で分岐する。最後の `CI required` は必ず実行し、変更に対応するジョブがすべて成功したことを検証する。ブランチ保護の必須チェックには `CI required` を指定することを推奨。
 
 ## 実行時間
 - 従来の `cargo test --locked --all-targets` はデバッグビルドで、400試合のテストに約90.6秒、別の再現テストに約39.8秒かかった。
@@ -32,6 +33,7 @@ PR時はPRのベースブランチとの差分、main/developへのpush時は直
 2. testsのみの変更PRでベンチマークだけがスキップされる。
 3. docsのみの変更PRでRustジョブがスキップされ、CI requiredが成功する。
 4. 手動実行で全ジョブが選択される。
-5. 冷・温キャッシュそれぞれの最遅ジョブとCI全体の時間を確認する。
+5. 新規の未登録パス（例 `examples/new.rs`）を変更したPRでも、Rustチェックとベンチマークの両方が実行される。
+6. 冷・温キャッシュそれぞれの最遅ジョブとCI全体の時間を確認する。
 
 公式の参考: [GitHub 必須チェックのスキップ仕様](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)、[dorny/paths-filter](https://github.com/dorny/paths-filter)、[Rust cache](https://github.com/Swatinem/rust-cache)、[Cargo test --release](https://doc.rust-lang.org/cargo/commands/cargo-test.html)。
