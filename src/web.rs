@@ -289,5 +289,4 @@ mod tests {
         let replay = Game::replay(session.game.config.clone(), &session.game.log.events).unwrap();
         assert_eq!(replay.state_hash(), session.game.state_hash());
     }
-
 }

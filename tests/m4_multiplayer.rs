@@ -128,8 +128,11 @@ fn four_player_mcts_selects_legal_move() {
     let obs = game.observation(game.public.active_player).unwrap();
     let legal = game.legal_spaces();
     let mut rng = ChaCha8Rng::seed_from_u64(42);
-    let selected = MctsPolicy { simulations: 4, tree_depth: 2 }
-        .select(&obs, &legal, &mut rng)
-        .unwrap();
+    let selected = MctsPolicy {
+        simulations: 4,
+        tree_depth: 2,
+    }
+    .select(&obs, &legal, &mut rng)
+    .unwrap();
     assert!(legal.contains(&selected));
 }
