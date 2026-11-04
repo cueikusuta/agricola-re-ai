@@ -1267,6 +1267,9 @@ fn build_pastures(
         return Err("fences cannot be demolished".into());
     }
     let cost = edges.difference(&p.fences).count();
+    if cost == 0 {
+        return Err("fencing must place at least one new fence".into());
+    }
     if edges.len() > 15 {
         return Err("fence limit 15".into());
     }
