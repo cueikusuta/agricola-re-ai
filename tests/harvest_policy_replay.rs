@@ -33,8 +33,10 @@ fn custom_harvest_policy_choices_are_recorded_and_replayed_without_policy() {
                 .events
                 .iter()
                 .filter(|event| {
-                    event.payload.to_string().contains("harvest_plans")
-                        && !event.payload.to_string().contains("harvest_plans\\\":null")
+                    event
+                        .payload
+                        .pointer("/Work/harvest_plans")
+                        .is_some_and(serde_json::Value::is_array)
                 })
                 .count();
             assert_eq!(logs, 6, "one feeding plan set for each of six harvests");
