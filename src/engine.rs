@@ -887,7 +887,7 @@ fn build_stable(p: &mut Player, i: usize) -> Result<()> {
     if i >= FARM_CELLS
         || p.occupied_stables() >= 4
         || p.farm[i].stable
-        || !matches!(p.farm[i].tile, Tile::Empty | Tile::Pasture { .. })
+        || !matches!(p.farm[i].tile, Tile::Empty)
     {
         return Err("stable location illegal".into());
     }
@@ -1792,5 +1792,42 @@ mod advanced_fencing_and_baking_tests {
         .unwrap();
         assert_eq!(player.supply.grain, 0);
         assert_eq!(player.supply.food, 22);
+    }
+}
+
+#[cfg(test)]
+mod stable_building_rule_tests {
+    use super::*;
+
+    #[test]
+    fn farm_expansion_cannot_put_stable_on_existing_pasture_tile() {
+        let mut player = Player::new(0, 0);
+        player.supply.wood = 20;
+        build_pastures(&mut player, &[vec![14]], None).unwrap();
+        let before = player.clone();
+        assert!(build_stable(&mut player, 14).is_err());
+        assert_eq!(player, before);
+    }
+
+    #[test]
+    fn previously_built_unfenced_stable_can_later_be_fenced() {
+        let mut player = Player::new(0, 0);
+        player.supply.wood = 20;
+        build_stable(&mut player, 14).unwrap();
+        assert_eq!(player.occupied_stables(), 1);
+        build_pastures(&mut player, &[vec![14]], None).unwrap();
+        assert!(player.farm[14].stable);
+        assert!(matches!(player.farm[14].tile, Tile::Pasture { .. }));
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 4);
+    }
+
+    #[test]
+    fn existing_stable_does_not_count_as_empty_room_or_field_site() {
+        let mut player = Player::new(0, 0);
+        player.supply.wood = 20;
+        player.supply.reed = 10;
+        build_stable(&mut player, 14).unwrap();
+        assert!(build_room(&mut player, 14).is_err());
+        assert!(plow(&mut player, 14).is_err());
     }
 }
