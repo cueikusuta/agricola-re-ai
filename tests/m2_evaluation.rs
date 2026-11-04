@@ -5,7 +5,7 @@ use agricola_re_ai::evaluation::{
     DetailAwareEvaluationPolicy, EvaluationPolicy, WeightedEvaluationPolicy,
 };
 use agricola_re_ai::model::{
-    Config, Crop, Game, Good, Improvement, Observation, Player, Space, Tile,
+    Config, Game, Good, Improvement, Observation, Player, Space, Tile,
 };
 use agricola_re_ai::policy::{
     play_to_end, DetailPolicy, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
@@ -80,8 +80,7 @@ fn detail_aware_evaluation_uses_the_selected_action_plan() {
     };
 
     let sow = action_value(&obs, Space::GrainUtilization).unwrap();
-    let bake =
-        action_value_with_details(&obs, Space::GrainUtilization, &BakeInsteadOfSow).unwrap();
+    let bake = action_value_with_details(&obs, Space::GrainUtilization, &BakeInsteadOfSow).unwrap();
     assert_ne!(sow, bake);
     assert_eq!(
         sow,
@@ -97,7 +96,11 @@ fn detail_aware_evaluation_uses_the_selected_action_plan() {
     };
     let mut rng = ChaCha8Rng::seed_from_u64(1);
     assert_eq!(
-        rejecting.select(&obs, &[Space::GrainUtilization, Space::DayLaborer], &mut rng),
+        rejecting.select(
+            &obs,
+            &[Space::GrainUtilization, Space::DayLaborer],
+            &mut rng
+        ),
         Some(Space::DayLaborer)
     );
 }
