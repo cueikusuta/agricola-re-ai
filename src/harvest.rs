@@ -41,12 +41,16 @@ impl FeedSource {
 pub struct FeedingPlan {
     pub priorities: Vec<FeedSource>,
     pub preserve_pairs_first: bool,
+    /// Voluntary use of workshop processing, even if the family is already fed.
+    #[serde(default)]
+    pub extra_crafting: Vec<Improvement>,
 }
 impl Default for FeedingPlan {
     fn default() -> Self {
         Self {
             priorities: FeedSource::ALL.to_vec(),
             preserve_pairs_first: true,
+            extra_crafting: vec![],
         }
     }
 }
@@ -57,6 +61,14 @@ impl FeedingPlan {
             || distinct != FeedSource::ALL.into_iter().collect()
         {
             return Err("feeding order must contain each source once".into());
+        }
+        let chosen: BTreeSet<_> = self.extra_crafting.iter().copied().collect();
+        if chosen.len() != self.extra_crafting.len()
+            || self.extra_crafting.iter().any(|card| !matches!(
+                card, Improvement::Joinery | Improvement::Pottery | Improvement::Basketry
+            ))
+        {
+            return Err("extra crafting must list each owned workshop at most once".into());
         }
         Ok(())
     }
@@ -216,6 +228,7 @@ fn feed_animals(p: &mut Player, owed: &mut u32, species: Animal, preserve_pair: 
 fn feed(p: &mut Player, plan: &FeedingPlan) -> Result<()> {
     plan.validate()?;
     let mut owed = (p.family - p.newborns) as u32 * 2 + p.newborns as u32;
+    let mut used_workshops = BTreeSet::new();
     for source in &plan.priorities {
         if owed == 0 {
             break;
@@ -235,6 +248,7 @@ fn feed(p: &mut Player, plan: &FeedingPlan) -> Result<()> {
                 if p.improvements.contains(&card) && p.supply.get(good) > 0 {
                     p.supply.pay(good, 1)?;
                     use_food(p, &mut owed, yield_food);
+                    used_workshops.insert(card);
                 }
             }
             FeedSource::Vegetables => {
@@ -283,6 +297,22 @@ fn feed(p: &mut Player, plan: &FeedingPlan) -> Result<()> {
                 _ => (),
             }
         }
+    }
+    // A workshop may process one resource per harvest whether or not the
+    // family still needs feeding. It may not process a second time.
+    for card in &plan.extra_crafting {
+        if used_workshops.contains(card) || !p.improvements.contains(card) {
+            return Err("craft workshop not owned or already used this harvest".into());
+        }
+        let (good, produced) = match card {
+            Improvement::Joinery => (Good::Wood, 2),
+            Improvement::Pottery => (Good::Clay, 2),
+            Improvement::Basketry => (Good::Reed, 3),
+            _ => return Err("invalid craft workshop".into()),
+        };
+        p.supply.pay(good, 1)?;
+        use_food(p, &mut owed, produced);
+        used_workshops.insert(*card);
     }
     p.begging += owed;
     Ok(())
