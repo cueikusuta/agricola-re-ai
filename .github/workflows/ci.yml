@@ -54,4 +54,4 @@ jobs:
       - name: Additional tile ON
         run: cargo run --release --locked -- --benchmark 12 --seed 7100 --additional-action-space
       - name: M2 parameter calibration (diagnostic)
-        run: cargo test --release --locked --test m2_tuning -- --ignored --nocapture
+        run: cargo test --release --locked --test m2_tuning heldout_validation -- --ignored --nocapture
