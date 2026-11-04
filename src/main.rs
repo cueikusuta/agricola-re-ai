@@ -1,3 +1,5 @@
+use agricola_re_ai::benchmark::compare_policies;
+use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
 use agricola_re_ai::score::standings;
 use agricola_re_ai::{Config, Game};
@@ -7,6 +9,8 @@ fn main() {
     let mut config = Config::default();
     let mut batch = 1usize;
     let mut greedy = false;
+    let mut evaluated = false;
+    let mut benchmark: Option<usize> = None;
     let mut log_file: Option<String> = None;
     let mut state_file: Option<String> = None;
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -29,12 +33,21 @@ fn main() {
             }
             "--additional-action-space" => config.additional_action_space_enabled = true,
             "--greedy" => greedy = true,
+            "--eval" => evaluated = true,
+            "--benchmark" => {
+                benchmark = Some(
+                    it.next()
+                        .expect("--benchmark requires seed count")
+                        .parse()
+                        .expect("invalid benchmark seed count"),
+                )
+            }
             "--log-file" => log_file = Some(it.next().expect("--log-file requires path").clone()),
             "--state-file" => {
                 state_file = Some(it.next().expect("--state-file requires path").clone())
             }
             "--help" | "-h" => {
-                println!("Usage: agricola-re-ai [--seed N] [--batch N] [--additional-action-space] [--greedy] [--log-file FILE] [--state-file FILE]");
+                println!("Usage: agricola-re-ai [--seed N] [--batch N] [--additional-action-space] [--greedy | --eval] [--benchmark N] [--log-file FILE] [--state-file FILE]");
                 return;
             }
             x => {
@@ -47,6 +60,42 @@ fn main() {
         eprintln!("--log-file and --state-file require --batch 1");
         std::process::exit(2)
     }
+    if greedy && evaluated {
+        eprintln!("--greedy and --eval cannot be combined");
+        std::process::exit(2)
+    }
+    if let Some(seeds) = benchmark {
+        if seeds == 0 || batch != 1 || log_file.is_some() || state_file.is_some() {
+            eprintln!("--benchmark requires N > 0 and cannot use --batch or state/log files");
+            std::process::exit(2)
+        }
+        let random = RandomPolicy;
+        let greedy_policy = GreedyPolicy;
+        let evaluation = EvaluationPolicy;
+        let pairs: [(&str, &dyn SpacePolicy, &str, &dyn SpacePolicy); 3] = [
+            ("greedy", &greedy_policy, "random", &random),
+            ("eval", &evaluation, "greedy", &greedy_policy),
+            ("eval", &evaluation, "random", &random),
+        ];
+        for (left_name, left, right_name, right) in pairs {
+            let result = compare_policies(
+                left,
+                right,
+                seeds,
+                config.seed,
+                config.additional_action_space_enabled,
+            )
+            .unwrap_or_else(|err| {
+                eprintln!("Benchmark failed: {err}");
+                std::process::exit(1)
+            });
+            println!(
+                "{left_name} vs {right_name}: {}",
+                serde_json::to_string(&result).expect("benchmark JSON")
+            );
+        }
+        return;
+    }
     let mut scores = Vec::new();
     let mut histogram: BTreeMap<i32, usize> = BTreeMap::new();
     let mut duration = 0f64;
@@ -56,7 +105,13 @@ fn main() {
             additional_action_space_enabled: config.additional_action_space_enabled,
         });
         let t = Instant::now();
-        let strategy: &dyn SpacePolicy = if greedy { &GreedyPolicy } else { &RandomPolicy };
+        let strategy: &dyn SpacePolicy = if evaluated {
+            &EvaluationPolicy
+        } else if greedy {
+            &GreedyPolicy
+        } else {
+            &RandomPolicy
+        };
         if let Err(err) = play_to_end(&mut game, strategy, &SimpleDetails) {
             eprintln!("Game {} failed: {}", n, err);
             std::process::exit(1)
