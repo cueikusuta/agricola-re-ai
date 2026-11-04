@@ -52,7 +52,9 @@ fn clay_oven_bakes_one_grain_per_action() {
     g.public.players[id]
         .improvements
         .push(Improvement::ClayOven);
-    g.public.improvement_market.retain(|&card| card != Improvement::ClayOven);
+    g.public
+        .improvement_market
+        .retain(|&card| card != Improvement::ClayOven);
     g.public.players[id].supply.grain = 3;
     let before = g.state_hash();
     assert!(g
@@ -91,7 +93,9 @@ fn stone_oven_bakes_at_most_two_grain() {
     g.public.players[id]
         .improvements
         .push(Improvement::StoneOven);
-    g.public.improvement_market.retain(|&card| card != Improvement::StoneOven);
+    g.public
+        .improvement_market
+        .retain(|&card| card != Improvement::StoneOven);
     g.public.players[id].supply.grain = 3;
     let before = g.public.players[id].supply.food;
     assert!(g
@@ -119,7 +123,9 @@ fn vegetable_conversion_uses_cooking_hearth_rate() {
     let id = g.public.active_player;
     g.public.players[id].supply.vegetable = 2;
     g.public.players[id].improvements.push(Improvement::Hearth4);
-    g.public.improvement_market.retain(|&card| card != Improvement::Hearth4);
+    g.public
+        .improvement_market
+        .retain(|&card| card != Improvement::Hearth4);
     let before = g.public.players[id].supply.food;
     g.apply_free(
         id,

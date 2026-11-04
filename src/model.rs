@@ -582,7 +582,7 @@ impl Game {
         // last event hash; otherwise earlier tampering could go unnoticed.
         let replayed = Game::replay(result.config.clone(), &result.log.events)?;
         if replayed.state_hash() != result.state_hash() {
-            return Err("saved game differs from its replayed event history".into());
+            return Err("saved game differs from logged action replay".into());
         }
         Ok(result)
     }
