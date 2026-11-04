@@ -648,9 +648,6 @@ impl Game {
                     return Err("pasture is not orthogonally connected".into());
                 }
                 required_fences.extend(pasture_border(&pasture.cells));
-                if pasture.cells.is_empty() {
-                    return Err("empty pasture".into());
-                }
                 if pasture.quantity > player.pasture_capacity(pasture) {
                     return Err("over capacity".into());
                 }
