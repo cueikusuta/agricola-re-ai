@@ -9,7 +9,7 @@ pub const FARM_CELLS: usize = 15;
 pub const HARVEST_ROUNDS: [u8; 6] = [4, 7, 9, 11, 13, 14];
 pub const RULES_VERSION: &str = "agricola-revised-2016-beginner";
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const LOG_VERSION: u32 = 2;
+pub const LOG_VERSION: u32 = 3;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Config {

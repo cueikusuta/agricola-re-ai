@@ -1,5 +1,6 @@
 //! Transactional rule application. Detail policies live outside this module.
 use crate::harvest::{FeedingPlan, HarvestDetailPolicy, SimpleHarvestDetails};
+use crate::breeding::BreedingPlan;
 use crate::model::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -148,6 +149,8 @@ pub enum RecordedAction {
         action: Action,
         #[serde(default)]
         harvest_plans: Option<Vec<FeedingPlan>>,
+        #[serde(default)]
+        breeding_plans: Option<Vec<BreedingPlan>>,
     },
     Free {
         player: usize,
@@ -288,12 +291,13 @@ impl Game {
         action: Action,
         policy: &dyn HarvestDetailPolicy,
     ) -> Result<()> {
-        self.apply_with_plans(action, None, policy)
+        self.apply_with_plans(action, None, None, policy)
     }
     fn apply_with_plans(
         &mut self,
         action: Action,
         forced: Option<Vec<FeedingPlan>>,
+        forced_breeding: Option<Vec<BreedingPlan>>,
         policy: &dyn HarvestDetailPolicy,
     ) -> Result<()> {
         let player = self.public.active_player;
@@ -307,7 +311,7 @@ impl Game {
         next.public.workers_placed[player] += 1;
         let will_harvest = next.public.workers_placed == next.public.work_quota
             && HARVEST_ROUNDS.contains(&next.public.round);
-        if !will_harvest && forced.is_some() {
+        if !will_harvest && (forced.is_some() || forced_breeding.is_some()) {
             return Err("harvest plans supplied on non-harvest move".into());
         }
         let harvest_plans = if will_harvest {
@@ -330,7 +334,28 @@ impl Game {
         } else {
             None
         };
-        next.next_worker_or_round(harvest_plans.as_deref())?;
+        let breeding_plans = if will_harvest {
+            let mut preview = next.clone();
+            preview.harvest_fields();
+            preview.feed_after_fields(harvest_plans.as_deref().expect("feeding plans"))?;
+            let plans = if let Some(value) = forced_breeding {
+                value
+            } else {
+                (0..preview.public.players.len())
+                    .map(|id| policy.plan_breeding(&preview.observation(id).expect("valid player")))
+                    .collect::<Vec<_>>()
+            };
+            if plans.len() != preview.public.players.len() {
+                return Err("breeding plan count mismatch".into());
+            }
+            for (player, plan) in preview.public.players.iter().zip(&plans) {
+                plan.apply(&mut player.clone())?;
+            }
+            Some(plans)
+        } else {
+            None
+        };
+        next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
         next.validate()?;
         let after = next.state_hash();
         next.log.events.push(Event {
@@ -340,6 +365,7 @@ impl Game {
                 player,
                 action,
                 harvest_plans,
+                breeding_plans,
             })
             .map_err(|e| e.to_string())?,
             before,
@@ -384,11 +410,12 @@ impl Game {
                     player,
                     action,
                     harvest_plans,
+                    breeding_plans,
                 } => {
                     if player != g.public.active_player {
                         return Err("replay player mismatch".into());
                     }
-                    g.apply_with_plans(action, harvest_plans, &SimpleHarvestDetails)?
+                    g.apply_with_plans(action, harvest_plans, breeding_plans, &SimpleHarvestDetails)?
                 }
                 RecordedAction::Free { player, action } => g.apply_free(player, action)?,
             }
@@ -398,7 +425,7 @@ impl Game {
         }
         Ok(g)
     }
-    fn next_worker_or_round(&mut self, harvest_plans: Option<&[FeedingPlan]>) -> Result<()> {
+    fn next_worker_or_round(&mut self, feeding: Option<&[FeedingPlan]>, breeding: Option<&[BreedingPlan]>) -> Result<()> {
         let n = self.public.players.len();
         let mut next = self.public.active_player;
         for _ in 0..n {
@@ -409,7 +436,7 @@ impl Game {
             }
         }
         if HARVEST_ROUNDS.contains(&self.public.round) {
-            self.harvest(harvest_plans.ok_or("missing harvest decisions")?)?;
+            self.harvest(feeding.ok_or("missing feeding decisions")?, breeding.ok_or("missing breeding decisions")?)?;
         }
         if self.public.round == 14 {
             self.public.finished = true

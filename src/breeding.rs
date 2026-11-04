@@ -35,8 +35,14 @@ impl BreedingPlan {
                 .pastures
                 .iter()
                 .find(|pasture| {
-                    (pasture.animal.is_none() || pasture.animal == Some(species))
+                    pasture.animal == Some(species)
                         && pasture.quantity < preview.pasture_capacity(pasture)
+                })
+                .or_else(|| {
+                    preview.pastures.iter().find(|pasture| {
+                        pasture.animal.is_none()
+                            && pasture.quantity < preview.pasture_capacity(pasture)
+                    })
                 })
                 .map(|pasture| BirthDestination::Pasture(pasture.id))
                 .or_else(|| {
