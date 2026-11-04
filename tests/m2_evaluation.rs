@@ -97,11 +97,7 @@ fn detail_aware_evaluation_uses_the_selected_action_plan() {
     };
     let mut rng = ChaCha8Rng::seed_from_u64(1);
     assert_eq!(
-        rejecting.select(
-            &obs,
-            &[Space::GrainUtilization, Space::DayLaborer],
-            &mut rng,
-        ),
+        rejecting.select(&obs, &[Space::GrainUtilization, Space::DayLaborer], &mut rng),
         Some(Space::DayLaborer)
     );
 }
