@@ -1314,9 +1314,7 @@ pub fn split_candidate(p: &Player) -> Option<Vec<Vec<usize>>> {
 }
 /// An occupied pasture may legally be divided by an internal fence.
 /// Supply an explicit, capacity-safe distribution of its existing animals.
-pub fn split_occupied_candidate(
-    p: &Player,
-) -> Option<(Vec<Vec<usize>>, Vec<PastureOccupancy>)> {
+pub fn split_occupied_candidate(p: &Player) -> Option<(Vec<Vec<usize>>, Vec<PastureOccupancy>)> {
     if p.fences.len() >= 15 {
         return None;
     }
@@ -1326,13 +1324,19 @@ pub fn split_occupied_candidate(
         }
         let species = pasture.animal?;
         for &isolated in &pasture.cells {
-            let rest = pasture.cells.iter().copied()
-                .filter(|&cell| cell != isolated).collect::<Vec<_>>();
+            let rest = pasture
+                .cells
+                .iter()
+                .copied()
+                .filter(|&cell| cell != isolated)
+                .collect::<Vec<_>>();
             if !connected(&rest) {
                 continue;
             }
             let new_edges = boundary(&[isolated])
-                .union(&boundary(&rest)).copied().collect::<BTreeSet<_>>();
+                .union(&boundary(&rest))
+                .copied()
+                .collect::<BTreeSet<_>>();
             let additional = new_edges.difference(&p.fences).count();
             if p.fences.len() + additional > 15 || additional > p.supply.wood as usize {
                 continue;

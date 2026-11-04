@@ -6,23 +6,33 @@ fn reveal_fencing(game: &mut Game) {
     if game.public.revealed.contains(&RoundCard::Fencing) {
         return;
     }
-    let index = game.hidden_round_deck.iter()
-        .position(|&card| card == RoundCard::Fencing).unwrap();
+    let index = game
+        .hidden_round_deck
+        .iter()
+        .position(|&card| card == RoundCard::Fencing)
+        .unwrap();
     let replaced = game.public.revealed[0];
     game.public.revealed[0] = RoundCard::Fencing;
     game.hidden_round_deck[index] = replaced;
 }
 
 fn surrounded_occupied_pasture(enabled: bool) -> Game {
-    let config = Config { seed: 441, additional_action_space_enabled: enabled };
+    let config = Config {
+        seed: 441,
+        additional_action_space_enabled: enabled,
+    };
     let mut staging = Game::new(config.clone());
     reveal_fencing(&mut staging);
     let id = staging.public.active_player;
     staging.public.players[id].supply.wood = 7;
-    staging.apply(Action {
-        space: Space::Fencing,
-        detail: Detail::Fence { pastures: vec![vec![13, 14]] },
-    }).unwrap();
+    staging
+        .apply(Action {
+            space: Space::Fencing,
+            detail: Detail::Fence {
+                pastures: vec![vec![13, 14]],
+            },
+        })
+        .unwrap();
 
     let mut game = Game::new(config);
     reveal_fencing(&mut game);
@@ -33,7 +43,10 @@ fn surrounded_occupied_pasture(enabled: bool) -> Game {
     // Leave no empty cell for a separate pasture. Only a split is possible.
     for cell in &mut player.farm {
         if matches!(cell.tile, Tile::Empty) {
-            cell.tile = Tile::Field { crop: None, remaining: 0 };
+            cell.tile = Tile::Field {
+                crop: None,
+                remaining: 0,
+            };
         }
     }
     game.public.players[id] = player;
