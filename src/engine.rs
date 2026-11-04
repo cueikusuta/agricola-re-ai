@@ -208,7 +208,9 @@ fn can_build(p: &Player) -> bool {
                 .any(|c| matches!(c.tile, Tile::Empty) && !c.stable))
 }
 fn can_fence(p: &Player) -> bool {
-    single_cell_pasture(p).is_some() || split_candidate(p).is_some()
+    single_cell_pasture(p).is_some()
+        || split_candidate(p).is_some()
+        || split_occupied_candidate(p).is_some()
 }
 fn can_sow(p: &Player) -> bool {
     p.farm
@@ -1310,6 +1312,63 @@ pub fn split_candidate(p: &Player) -> Option<Vec<Vec<usize>>> {
     }
     None
 }
+/// An occupied pasture may legally be divided by an internal fence.
+/// Supply an explicit, capacity-safe distribution of its existing animals.
+pub fn split_occupied_candidate(
+    p: &Player,
+) -> Option<(Vec<Vec<usize>>, Vec<PastureOccupancy>)> {
+    if p.fences.len() >= 15 {
+        return None;
+    }
+    for pasture in &p.pastures {
+        if pasture.cells.len() < 2 || pasture.quantity == 0 {
+            continue;
+        }
+        let species = pasture.animal?;
+        for &isolated in &pasture.cells {
+            let rest = pasture.cells.iter().copied()
+                .filter(|&cell| cell != isolated).collect::<Vec<_>>();
+            if !connected(&rest) {
+                continue;
+            }
+            let new_edges = boundary(&[isolated])
+                .union(&boundary(&rest)).copied().collect::<BTreeSet<_>>();
+            let additional = new_edges.difference(&p.fences).count();
+            if p.fences.len() + additional > 15 || additional > p.supply.wood as usize {
+                continue;
+            }
+            let remaining_area = Pasture {
+                id: pasture.id,
+                cells: rest.clone(),
+                animal: Some(species),
+                quantity: 0,
+            };
+            let single_area = Pasture {
+                id: pasture.id,
+                cells: vec![isolated],
+                animal: Some(species),
+                quantity: 0,
+            };
+            let capacity_rest = p.pasture_capacity(&remaining_area);
+            let capacity_single = p.pasture_capacity(&single_area);
+            let amount_rest = pasture.quantity.min(capacity_rest);
+            let amount_single = pasture.quantity - amount_rest;
+            if amount_single > capacity_single {
+                continue;
+            }
+            let occupancy = [amount_rest, amount_single]
+                .into_iter()
+                .map(|quantity| PastureOccupancy {
+                    animal: if quantity == 0 { None } else { Some(species) },
+                    quantity,
+                })
+                .collect::<Vec<_>>();
+            return Some((vec![rest, vec![isolated]], occupancy));
+        }
+    }
+    None
+}
+
 fn cook_value(p: &Player, animal: Animal) -> Option<u32> {
     if p.improvements
         .iter()

@@ -281,12 +281,15 @@ impl DetailPolicy for SimpleDetails {
                     return None;
                 }
             }
-            Space::Fencing => Detail::Fence {
-                pastures: if let Some(group) = small_pasture(p) {
-                    vec![group]
+            Space::Fencing => {
+                if let Some(group) = small_pasture(p) {
+                    Detail::Fence { pastures: vec![group] }
+                } else if let Some(pastures) = crate::engine::split_candidate(p) {
+                    Detail::Fence { pastures }
                 } else {
-                    crate::engine::split_candidate(p)?
-                },
+                    let (pastures, occupancy) = crate::engine::split_occupied_candidate(p)?;
+                    Detail::FenceDetailed { pastures, occupancy }
+                }
             },
             Space::GrainUtilization => {
                 let plant = plantings(p, None);
