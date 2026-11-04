@@ -375,8 +375,10 @@ mod craft_option_tests {
         let mut player = Player::new(0, 4);
         player.improvements.push(Improvement::Joinery);
         player.supply.wood = 2;
-        let mut plan = FeedingPlan::default();
-        plan.extra_crafting.push(Improvement::Joinery);
+        let plan = FeedingPlan {
+            extra_crafting: vec![Improvement::Joinery],
+            ..FeedingPlan::default()
+        };
         feed(&mut player, &plan).unwrap();
         assert_eq!(player.begging, 0);
         assert_eq!(player.supply.wood, 1);
@@ -401,12 +403,14 @@ mod craft_option_tests {
         player.supply.wood = 1;
         player.supply.clay = 1;
         player.supply.reed = 1;
-        let mut plan = FeedingPlan::default();
-        plan.extra_crafting = vec![
-            Improvement::Joinery,
-            Improvement::Pottery,
-            Improvement::Basketry,
-        ];
+        let plan = FeedingPlan {
+            extra_crafting: vec![
+                Improvement::Joinery,
+                Improvement::Pottery,
+                Improvement::Basketry,
+            ],
+            ..FeedingPlan::default()
+        };
         feed(&mut player, &plan).unwrap();
         assert_eq!(player.supply.food, 7);
         assert_eq!(player.supply.wood, 0);
@@ -419,20 +423,26 @@ mod craft_option_tests {
         let mut player = Player::new(0, 0);
         player.improvements.push(Improvement::Joinery);
         player.supply.wood = 2;
-        let mut plan = FeedingPlan::default();
-        plan.extra_crafting = vec![Improvement::Joinery];
+        let plan = FeedingPlan {
+            extra_crafting: vec![Improvement::Joinery],
+            ..FeedingPlan::default()
+        };
         assert!(feed(&mut player, &plan).is_err());
 
-        let mut plan = FeedingPlan::default();
-        plan.extra_crafting = vec![Improvement::Joinery, Improvement::Joinery];
+        let mut plan = FeedingPlan {
+            extra_crafting: vec![Improvement::Joinery, Improvement::Joinery],
+            ..FeedingPlan::default()
+        };
         assert!(plan.validate().is_err());
         plan.extra_crafting = vec![Improvement::Hearth4];
         assert!(plan.validate().is_err());
 
         let mut player = Player::new(0, 4);
         player.supply.wood = 1;
-        let mut plan = FeedingPlan::default();
-        plan.extra_crafting.push(Improvement::Joinery);
+        let plan = FeedingPlan {
+            extra_crafting: vec![Improvement::Joinery],
+            ..FeedingPlan::default()
+        };
         assert!(feed(&mut player, &plan).is_err());
     }
 
