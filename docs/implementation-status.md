@@ -46,3 +46,14 @@ Rust環境上で`cargo fmt --all`, `cargo test --all-targets`, `cargo clippy --a
 - CIのformat/clippy/testを独立ジョブに分離し、フォーマット違反がコンパイル検証を妨げないよう変更。
 
 上記はRustコンパイラで未検証。実行済みであるかのように表記しないこと。
+
+
+## 2026-11-04 GitHub実測と進捗（追記）
+
+- GitHub public repo `cueikusuta/agricola-re-ai` に Issue #1～#11 を登録済み。
+- 各Issue対応のドラフトPR #12～#22 を作成済み（積み上げ式、未マージ）。
+- 最終統合ブランチ `issue/11-replay-benchmark` で GitHub Actions `rustfmt` / `clippy` / `cargo test` / `M1 100-game performance` の4ジョブが成功。
+- RandomPolicyで100試合ずつ実測：追加タイルOFFは平均1.351ms/試合、200人平均得点-2.51（範囲 -35〜17）。ONは平均1.378ms/試合、200人平均得点-3.86（範囲 -42〜17）。
+- 100試合×両設定の完走・再現・復元テストをCIで実行。ただし全ルール分岐の正確性を保証する結果ではない。
+- **M1は未受け入れ**。柵内部分割、複数パン焼き設備の詳細配分、収穫決定の差し替え、カードフック、公式ルールとの全件照合が未完。
+- PR #12に統合ドラフトを収録し、PR #13～#22で主に回帰テストを追加した。設計指定の機能別完全分離と全PR独立受け入れは未完了。
