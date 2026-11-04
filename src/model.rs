@@ -573,10 +573,13 @@ impl Game {
         {
             return Err("saved game initial state mismatch".into());
         }
-        if let Some(snapshot) = &result.log.initial_public_state {
-            if *snapshot != initial.public {
-                return Err("saved game initial state snapshot mismatch".into());
-            }
+        let snapshot = result
+            .log
+            .initial_public_state
+            .as_ref()
+            .ok_or("saved game initial state snapshot missing")?;
+        if *snapshot != initial.public {
+            return Err("saved game initial state snapshot mismatch".into());
         }
         // Check the complete event chain, rather than trusting only the
         // last event hash; otherwise earlier tampering could go unnoticed.
