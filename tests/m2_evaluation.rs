@@ -4,7 +4,9 @@ use agricola_re_ai::evaluation::{
     action_value, action_value_with_details, evaluate_observation, evaluate_player,
     DetailAwareEvaluationPolicy, EvaluationPolicy, WeightedEvaluationPolicy,
 };
-use agricola_re_ai::model::{Config, Crop, Game, Good, Improvement, Observation, Player, Space, Tile};
+use agricola_re_ai::model::{
+    Config, Crop, Game, Good, Improvement, Observation, Player, Space, Tile,
+};
 use agricola_re_ai::policy::{
     play_to_end, DetailPolicy, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
 };
@@ -78,8 +80,8 @@ fn detail_aware_evaluation_uses_the_selected_action_plan() {
     };
 
     let sow = action_value(&obs, Space::GrainUtilization).unwrap();
-    let bake = action_value_with_details(&obs, Space::GrainUtilization, &BakeInsteadOfSow)
-        .unwrap();
+    let bake =
+        action_value_with_details(&obs, Space::GrainUtilization, &BakeInsteadOfSow).unwrap();
     assert_ne!(sow, bake);
     assert_eq!(
         sow,
@@ -194,7 +196,8 @@ fn fixed_seed_m2_strength_ladder_holds_for_both_tile_modes() {
 fn heldout_strength_check_for_both_tile_modes() {
     // Not part of the calibration seeds (4200, 7100, 16800).
     for enabled in [false, true] {
-        let result = compare_policies(&EvaluationPolicy, &GreedyPolicy, 20, 26000, enabled).unwrap();
+        let result =
+            compare_policies(&EvaluationPolicy, &GreedyPolicy, 20, 26000, enabled).unwrap();
         assert!(
             result.left_win_rate > 0.6,
             "held-out seed failed for additional_action_space_enabled={enabled}: {result:?}"
