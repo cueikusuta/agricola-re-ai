@@ -288,8 +288,15 @@ impl DetailPolicy for SimpleDetails {
                     }
                 } else if let Some(pastures) = crate::engine::split_candidate(p) {
                     Detail::Fence { pastures }
+                } else if let Some((pastures, occupancy)) =
+                    crate::engine::split_occupied_candidate(p)
+                {
+                    Detail::FenceDetailed {
+                        pastures,
+                        occupancy,
+                    }
                 } else {
-                    let (pastures, occupancy) = crate::engine::split_occupied_candidate(p)?;
+                    let (pastures, occupancy) = crate::engine::general_split_candidate(p)?;
                     Detail::FenceDetailed {
                         pastures,
                         occupancy,

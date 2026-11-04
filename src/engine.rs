@@ -220,6 +220,7 @@ fn can_fence(p: &Player) -> bool {
     single_cell_pasture(p).is_some()
         || split_candidate(p).is_some()
         || split_occupied_candidate(p).is_some()
+        || general_split_candidate(p).is_some()
 }
 fn can_sow(p: &Player) -> bool {
     p.farm
@@ -1385,6 +1386,74 @@ pub fn split_candidate(p: &Player) -> Option<Vec<Vec<usize>>> {
 }
 /// An occupied pasture may legally be divided by an internal fence.
 /// Supply an explicit, capacity-safe distribution of its existing animals.
+/// Exhaustive but bounded fallback for a pasture whose valid split is not
+/// obtained by isolating a single cell (e.g. two 2x2 components joined at one edge).
+/// Called only when the cheaper, common-case candidates fail.
+pub fn general_split_candidate(
+    player: &Player,
+) -> Option<(Vec<Vec<usize>>, Vec<PastureOccupancy>)> {
+    if player.fences.len() >= 15 || player.supply.wood == 0 {
+        return None;
+    }
+    for pasture in &player.pastures {
+        let count = pasture.cells.len();
+        if count < 2 {
+            continue;
+        }
+        for mask in 1..((1usize << count) - 1) {
+            // One orientation per unordered partition.
+            if mask & 1 == 0 {
+                continue;
+            }
+            let (first, second): (Vec<_>, Vec<_>) = pasture
+                .cells
+                .iter()
+                .copied()
+                .enumerate()
+                .partition::<Vec<_>, _>(|&(i, _)| mask & (1usize << i) != 0);
+            let first = first.into_iter().map(|(_, cell)| cell).collect::<Vec<_>>();
+            let second = second.into_iter().map(|(_, cell)| cell).collect::<Vec<_>>();
+            if first.is_empty() || second.is_empty()
+                || !connected(&first) || !connected(&second)
+            {
+                continue;
+            }
+            let mut edges = boundary(&first);
+            edges.extend(boundary(&second));
+            let added = edges.difference(&player.fences).count();
+            if player.fences.len() + added > 15 || added > player.supply.wood as usize {
+                continue;
+            }
+            let first_capacity = player.pasture_capacity(&Pasture {
+                id: pasture.id,
+                cells: first.clone(),
+                animal: pasture.animal,
+                quantity: 0,
+            });
+            let second_capacity = player.pasture_capacity(&Pasture {
+                id: pasture.id,
+                cells: second.clone(),
+                animal: pasture.animal,
+                quantity: 0,
+            });
+            let a = pasture.quantity.min(first_capacity);
+            let b = pasture.quantity - a;
+            if b > second_capacity {
+                continue;
+            }
+            let allocations = [a, b]
+                .into_iter()
+                .map(|quantity| PastureOccupancy {
+                    animal: if quantity == 0 { None } else { pasture.animal },
+                    quantity,
+                })
+                .collect();
+            return Some((vec![first, second], allocations));
+        }
+    }
+    None
+}
+
 pub fn split_occupied_candidate(p: &Player) -> Option<(Vec<Vec<usize>>, Vec<PastureOccupancy>)> {
     if p.fences.len() >= 15 {
         return None;
