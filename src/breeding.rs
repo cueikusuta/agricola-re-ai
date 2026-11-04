@@ -18,9 +18,20 @@ pub struct BirthChoice {
     pub destination: BirthDestination,
 }
 
+/// Optional legal rearrangement of existing animals after feeding and
+/// before breeding. This is not a second worker action.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AnimalRearrangement {
+    pub pasture: Vec<(u8, Option<Animal>, u32)>,
+    pub stables: Vec<(usize, Animal)>,
+    pub pet: Option<Animal>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BreedingPlan {
     pub births: Vec<BirthChoice>,
+    #[serde(default)]
+    pub before_birth: Option<AnimalRearrangement>,
 }
 
 impl BreedingPlan {
@@ -70,7 +81,7 @@ impl BreedingPlan {
             apply_one(&mut preview, &choice).expect("simple placement must be legal");
             births.push(choice);
         }
-        Self { births }
+        Self { births, before_birth: None }
     }
 
     pub fn apply(&self, player: &mut Player) -> Result<(), String> {
@@ -83,6 +94,14 @@ impl BreedingPlan {
             return Err("one birth decision required for each breeding species".into());
         }
         let mut changed = player.clone();
+        if let Some(arrange) = &self.before_birth {
+            crate::engine::rearrange_animals(
+                &mut changed,
+                &arrange.pasture,
+                &arrange.stables,
+                arrange.pet,
+            )?;
+        }
         for birth in &self.births {
             apply_one(&mut changed, birth)?;
         }
@@ -165,6 +184,7 @@ mod tests {
                     destination: BirthDestination::Discard,
                 },
             ],
+            before_birth: None,
         };
         custom.apply(&mut p).unwrap();
         assert_eq!(p.animal_count(Animal::Sheep), 3);
@@ -187,10 +207,13 @@ mod tests {
                     destination: BirthDestination::Discard,
                 },
             ],
+            before_birth: None,
         };
         assert!(invalid.apply(&mut p).is_err());
         assert_eq!(p, before);
-        assert!(BreedingPlan { births: vec![] }.apply(&mut p).is_err());
+        assert!(BreedingPlan { births: vec![],
+            before_birth: None,
+        }.apply(&mut p).is_err());
         assert!(BreedingPlan {
             births: vec![
                 BirthChoice {
@@ -201,10 +224,74 @@ mod tests {
                     species: Animal::Sheep,
                     destination: BirthDestination::Discard
                 },
-            ]
+            ],
+            before_birth: None,
         }
         .apply(&mut p)
         .is_err());
         assert_eq!(p, before);
+    }
+}
+
+#[cfg(test)]
+mod animal_relocation_before_birth {
+    use super::*;
+
+    #[test]
+    fn can_move_a_parent_to_make_room_for_a_newborn() {
+        let mut player = Player::new(0, 0);
+        player.pet = Some(Animal::Sheep);
+        player.farm[14].stable = true;
+        player.farm[14].stable_animal = Some(Animal::Sheep);
+        player.farm[13].tile = Tile::Pasture { id: 0 };
+        player.pastures.push(crate::model::Pasture {
+            id: 0, cells: vec![13], animal: None, quantity: 0,
+        });
+        let plan = BreedingPlan {
+            before_birth: Some(AnimalRearrangement {
+                pasture: vec![(0, Some(Animal::Sheep), 1)],
+                stables: vec![(14, Animal::Sheep)],
+                pet: None,
+            }),
+            births: vec![BirthChoice {
+                species: Animal::Sheep,
+                destination: BirthDestination::Pet,
+            }],
+        };
+        plan.apply(&mut player).unwrap();
+        assert_eq!(player.animal_count(Animal::Sheep), 3);
+        assert_eq!(player.pastures[0].quantity, 1);
+        assert_eq!(player.pet, Some(Animal::Sheep));
+    }
+
+    #[test]
+    fn illegal_parent_rearrangement_is_atomic() {
+        let mut player = Player::new(0, 0);
+        player.pet = Some(Animal::Sheep);
+        player.farm[14].stable = true;
+        player.farm[14].stable_animal = Some(Animal::Sheep);
+        let before = player.clone();
+        let plan = BreedingPlan {
+            before_birth: Some(AnimalRearrangement {
+                pasture: vec![],
+                stables: vec![],
+                pet: None,
+            }),
+            births: vec![BirthChoice {
+                species: Animal::Sheep,
+                destination: BirthDestination::Discard,
+            }],
+        };
+        assert!(plan.apply(&mut player).is_err());
+        assert_eq!(player, before);
+    }
+
+    #[test]
+    fn old_breeding_plan_json_defaults_to_no_pre_birth_rearrangement() {
+        let original = BreedingPlan { births: vec![], before_birth: None };
+        let mut value = serde_json::to_value(original).unwrap();
+        value.as_object_mut().unwrap().remove("before_birth");
+        let restored: BreedingPlan = serde_json::from_value(value).unwrap();
+        assert_eq!(restored.before_birth, None);
     }
 }

@@ -21,6 +21,7 @@ impl HarvestDetailPolicy for ReturnOffspring {
                     destination: BirthDestination::Discard,
                 })
                 .collect(),
+            before_birth: None,
         }
     }
 }

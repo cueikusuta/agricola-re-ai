@@ -1559,7 +1559,7 @@ fn place_animals(p: &mut Player, plan: &AnimalPlan, n: u32) -> Result<()> {
     }
     Ok(())
 }
-fn rearrange_animals(
+pub(crate) fn rearrange_animals(
     p: &mut Player,
     pasture: &[(u8, Option<Animal>, u32)],
     stables: &[(usize, Animal)],
