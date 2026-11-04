@@ -68,7 +68,10 @@ fn beginner_meeting_place_gains_accumulated_food_and_claims_start_player() {
     let mut game = game(false);
     let player = game.public.active_player;
     let start_food = game.public.players[player].supply.food;
-    assert_eq!(game.public.accumulations.get(&Space::MeetingPlace), Some(&1));
+    assert_eq!(
+        game.public.accumulations.get(&Space::MeetingPlace),
+        Some(&1)
+    );
     game.apply(Action {
         space: Space::MeetingPlace,
         detail: Detail::None,
