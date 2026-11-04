@@ -34,25 +34,21 @@ jobs:
           # On push, compare with the previous commit on this branch.
           # On pull_request, paths-filter uses the PR base via the GitHub API.
           base: ${{ github.ref }}
+          # Fail closed for newly introduced source/config paths: only explicit
+          # documentation, test, and script exceptions can skip expensive jobs.
+          # Every rule must match the same changed file for exclusions to work.
+          predicate-quantifier: every
           filters: |
             rust:
-              - 'src/**'
-              - 'tests/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - 'rust-toolchain*'
-              - '.cargo/**'
-              - '.github/workflows/**'
-              - 'build.rs'
-              - 'scripts/**'
+              - '**'
+              - '!docs/**'
+              - '!**/*.md'
             runtime:
-              - 'src/**'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-              - 'rust-toolchain*'
-              - '.cargo/**'
-              - '.github/workflows/**'
-              - 'build.rs'
+              - '**'
+              - '!docs/**'
+              - '!**/*.md'
+              - '!tests/**'
+              - '!scripts/**'
 
   format:
     name: rustfmt
