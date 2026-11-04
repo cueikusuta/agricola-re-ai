@@ -1,3 +1,5 @@
+pub mod benchmark;
+pub mod evaluation;
 pub mod breeding;
 pub mod engine;
 pub mod harvest;
