@@ -4,6 +4,7 @@ pub mod engine;
 pub mod evaluation;
 pub mod harvest;
 pub mod hooks;
+pub mod mcts;
 pub mod model;
 pub mod policy;
 pub mod score;
