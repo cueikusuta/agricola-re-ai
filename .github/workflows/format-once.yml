@@ -1,28 +1,25 @@
-name: Temporary rustfmt for review branch
+name: Temporary Rustfmt source export
 on:
   pull_request:
     types: [opened, reopened, synchronize]
 permissions:
-  contents: write
+  contents: read
 jobs:
   rustfmt:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: issue/02-legal-validators
-          persist-credentials: true
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - run: cargo fmt --all
-      - name: Commit formatted Rust source
+      - name: Emit formatted changed source
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src tests
-          if ! git diff --cached --quiet; then
-            git commit -m 'style: apply rustfmt to issue 2'
-            git push origin HEAD:issue/02-legal-validators
-          fi
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          paths = ["src/model.rs","tests/legal_invariants.rs"]
+          print("FORMATTED_CONTENT_JSON:" + json.dumps([{"path":p,"content":Path(p).read_text()} for p in paths],ensure_ascii=True))
+          PY
