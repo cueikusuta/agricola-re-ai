@@ -7,7 +7,10 @@ fn assert_complete(config: Config, policy: &dyn SpacePolicy) {
     let encoded = serde_json::to_value(&opening_observation).unwrap();
     let public_json = serde_json::to_string(&encoded).unwrap();
     for forbidden in ["hidden_round_deck", "rng", "round_seed", "action_seed"] {
-        assert!(!public_json.contains(forbidden), "AI observation leaked {forbidden}");
+        assert!(
+            !public_json.contains(forbidden),
+            "AI observation leaked {forbidden}"
+        );
     }
     let original_opening = original.state_hash();
     let saved_opening = original.save_json().unwrap();
@@ -18,7 +21,10 @@ fn assert_complete(config: Config, policy: &dyn SpacePolicy) {
     play_to_end(&mut original, policy, &SimpleDetails).unwrap();
     assert!(original.public.finished);
     assert_eq!(original.public.round, 14);
-    assert!(!original.log.events.is_empty(), "completed games must log placements");
+    assert!(
+        !original.log.events.is_empty(),
+        "completed games must log placements"
+    );
     let replay = Game::replay(config, &original.log.events).unwrap();
     assert_eq!(replay.state_hash(), original.state_hash());
     let loaded = Game::load_json(&original.save_json().unwrap()).unwrap();
