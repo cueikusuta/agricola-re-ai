@@ -81,7 +81,10 @@ impl BreedingPlan {
             apply_one(&mut preview, &choice).expect("simple placement must be legal");
             births.push(choice);
         }
-        Self { births, before_birth: None }
+        Self {
+            births,
+            before_birth: None,
+        }
     }
 
     pub fn apply(&self, player: &mut Player) -> Result<(), String> {
@@ -211,9 +214,12 @@ mod tests {
         };
         assert!(invalid.apply(&mut p).is_err());
         assert_eq!(p, before);
-        assert!(BreedingPlan { births: vec![],
+        assert!(BreedingPlan {
+            births: vec![],
             before_birth: None,
-        }.apply(&mut p).is_err());
+        }
+        .apply(&mut p)
+        .is_err());
         assert!(BreedingPlan {
             births: vec![
                 BirthChoice {
@@ -245,7 +251,10 @@ mod animal_relocation_before_birth {
         player.farm[14].stable_animal = Some(Animal::Sheep);
         player.farm[13].tile = Tile::Pasture { id: 0 };
         player.pastures.push(crate::model::Pasture {
-            id: 0, cells: vec![13], animal: None, quantity: 0,
+            id: 0,
+            cells: vec![13],
+            animal: None,
+            quantity: 0,
         });
         let plan = BreedingPlan {
             before_birth: Some(AnimalRearrangement {
@@ -288,7 +297,10 @@ mod animal_relocation_before_birth {
 
     #[test]
     fn old_breeding_plan_json_defaults_to_no_pre_birth_rearrangement() {
-        let original = BreedingPlan { births: vec![], before_birth: None };
+        let original = BreedingPlan {
+            births: vec![],
+            before_birth: None,
+        };
         let mut value = serde_json::to_value(original).unwrap();
         value.as_object_mut().unwrap().remove("before_birth");
         let restored: BreedingPlan = serde_json::from_value(value).unwrap();
