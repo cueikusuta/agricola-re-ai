@@ -64,9 +64,12 @@ impl FeedingPlan {
         }
         let chosen: BTreeSet<_> = self.extra_crafting.iter().copied().collect();
         if chosen.len() != self.extra_crafting.len()
-            || self.extra_crafting.iter().any(|card| !matches!(
-                card, Improvement::Joinery | Improvement::Pottery | Improvement::Basketry
-            ))
+            || self.extra_crafting.iter().any(|card| {
+                !matches!(
+                    card,
+                    Improvement::Joinery | Improvement::Pottery | Improvement::Basketry
+                )
+            })
         {
             return Err("extra crafting must list each owned workshop at most once".into());
         }
