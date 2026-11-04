@@ -1,6 +1,7 @@
 use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
 use agricola_re_ai::score::standings;
 use agricola_re_ai::{Config, Game};
+use std::collections::BTreeMap;
 use std::time::Instant;
 fn main() {
     let mut config = Config::default();
@@ -47,6 +48,7 @@ fn main() {
         std::process::exit(2)
     }
     let mut scores = Vec::new();
+    let mut histogram: BTreeMap<i32, usize> = BTreeMap::new();
     let mut duration = 0f64;
     for n in 0..batch {
         let mut game = Game::new(Config {
@@ -82,12 +84,19 @@ fn main() {
                 });
             }
         }
-        scores.extend(result.scores.iter().map(|s| s.total as f64));
+        for player_score in &result.scores {
+            scores.push(player_score.total as f64);
+            *histogram.entry(player_score.total).or_default() += 1;
+        }
     }
     if batch > 1 {
         let mean = scores.iter().sum::<f64>() / scores.len() as f64;
         let min = scores.iter().copied().fold(f64::INFINITY, f64::min);
         let max = scores.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         println!("games: {batch}, additional_action_space_enabled: {}, mean_game_seconds: {:.6}, score_mean: {:.2}, score_min: {min}, score_max: {max}",config.additional_action_space_enabled,duration/batch as f64,mean);
+        println!(
+            "score_histogram: {}",
+            serde_json::to_string(&histogram).expect("histogram JSON")
+        );
     }
 }
