@@ -6,6 +6,7 @@ use crate::policy::{weight, DetailPolicy, SimpleDetails, SpacePolicy};
 use crate::score::score;
 use rand::seq::SliceRandom;
 use rand_chacha::ChaCha8Rng;
+use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Evaluation {
@@ -32,6 +33,97 @@ fn marginal(n: u32, threshold: u32, first: f64, later: f64) -> f64 {
     n.min(threshold) as f64 * first + n.saturating_sub(threshold) as f64 * later
 }
 
+/// Food conversion factors match the M1 baking rules in engine::bake_allocated.
+fn baking_rate(improvement: Improvement) -> Option<u32> {
+    match improvement {
+        Improvement::Fireplace2 | Improvement::Fireplace3 => Some(2),
+        Improvement::Hearth4 | Improvement::Hearth5 => Some(3),
+        Improvement::ClayOven => Some(5),
+        Improvement::StoneOven => Some(4),
+        _ => None,
+    }
+}
+
+/// Food conversion factors match engine::cook_value / harvest::animal_food.
+fn animal_cooking_rate(p: &Player, animal: Animal) -> Option<u32> {
+    if p.improvements
+        .iter()
+        .any(|i| matches!(i, Improvement::Hearth4 | Improvement::Hearth5))
+    {
+        Some(match animal {
+            Animal::Sheep => 2,
+            Animal::Boar => 3,
+            Animal::Cattle => 4,
+        })
+    } else if p.improvements
+        .iter()
+        .any(|i| matches!(i, Improvement::Fireplace2 | Improvement::Fireplace3))
+    {
+        Some(match animal {
+            Animal::Sheep | Animal::Boar => 2,
+            Animal::Cattle => 3,
+        })
+    } else {
+        None
+    }
+}
+
+/// Upper bound on meals available for the next harvest, including one crop per
+/// planted field and resources that the harvest policy can convert. This is a
+/// safety estimate, not a simulation of the feeding order or future production.
+fn next_harvest_food_capacity(p: &Player) -> u32 {
+    let mut grain = p.supply.grain;
+    let mut vegetables = p.supply.vegetable;
+    for cell in &p.farm {
+        match cell.tile {
+            Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: n,
+            } if n > 0 => grain = grain.saturating_add(1),
+            Tile::Field {
+                crop: Some(Crop::Vegetable),
+                remaining: n,
+            } if n > 0 => vegetables = vegetables.saturating_add(1),
+            _ => {}
+        }
+    }
+    let vegetable_rate = if p
+        .improvements
+        .iter()
+        .any(|i| matches!(i, Improvement::Hearth4 | Improvement::Hearth5))
+    {
+        3
+    } else if p
+        .improvements
+        .iter()
+        .any(|i| matches!(i, Improvement::Fireplace2 | Improvement::Fireplace3))
+    {
+        2
+    } else {
+        1
+    };
+    let mut available = p
+        .supply
+        .food
+        .saturating_add(grain)
+        .saturating_add(vegetables.saturating_mul(vegetable_rate));
+    for (card, stock, yield_food) in [
+        (Improvement::Joinery, p.supply.wood, 2),
+        (Improvement::Pottery, p.supply.clay, 2),
+        (Improvement::Basketry, p.supply.reed, 3),
+    ] {
+        if p.improvements.contains(&card) && stock > 0 {
+            available = available.saturating_add(yield_food);
+        }
+    }
+    for animal in [Animal::Sheep, Animal::Boar, Animal::Cattle] {
+        if let Some(rate) = animal_cooking_rate(p, animal) {
+            available = available.saturating_add(p.animal_count(animal).saturating_mul(rate));
+        }
+    }
+    available
+}
+
 /// A transparent, deterministic heuristic. It depends on public data only;
 /// its units are heuristic utility, not victory probabilities.
 pub fn evaluate_player(p: &Player, round: u8) -> Evaluation {
@@ -43,12 +135,12 @@ pub fn evaluate_player(p: &Player, round: u8) -> Evaluation {
         .unwrap_or(14);
     let distance = next_harvest.saturating_sub(round) as f64;
     let urgency = 1.0 / (1.0 + 0.45 * distance);
-    let required = (2 * i32::from(p.family) - i32::from(p.newborns)).max(0);
-    let food = p.supply.food as i32;
-    let shortage = (required - food).max(0);
-    let safety = -shortage as f64 * 10.0 * urgency
-        + food.min(required) as f64 * 1.7 * urgency
-        + (food - required).max(0) as f64 * 0.35;
+    let required = (2 * i32::from(p.family) - i32::from(p.newborns)).max(0) as f64;
+    let usable_food = f64::from(next_harvest_food_capacity(p));
+    let shortage = (required - usable_food).max(0.0);
+    let safety = -shortage * 10.0 * urgency
+        + usable_food.min(required) * 1.7 * urgency
+        + (f64::from(p.supply.food) - required).max(0.0) * 0.35;
     let unused_rooms = p.rooms().saturating_sub(p.family as usize) as f64;
     let housing = unused_rooms * if p.family < 5 { 12.0 + remaining } else { 2.0 };
     let growing = (p.family.saturating_sub(2)) as f64 * 3.0 * remaining;
@@ -81,7 +173,13 @@ pub fn evaluate_player(p: &Player, round: u8) -> Evaluation {
     } else {
         0.0
     };
-    let farm = planted + pasture_capacity + cooking;
+    // A well delivers one food at the start of each of the next five rounds.
+    let future_well = if p.improvements.contains(&Improvement::Well) {
+        f64::from(14u8.saturating_sub(round).min(5)) * 3.0
+    } else {
+        0.0
+    };
+    let farm = planted + pasture_capacity + cooking + future_well;
     let wood = marginal(
         p.supply.wood,
         if p.family < 5 && p.rooms() <= p.family as usize && round <= 9 {
@@ -141,37 +239,105 @@ fn sow(p: &mut Player, plantings: &[crate::engine::Plant]) {
     }
 }
 
-fn fence(p: &mut Player, groups: &[Vec<usize>]) {
-    for group in groups {
-        let id = p
-            .pastures
-            .iter()
-            .map(|pasture| pasture.id)
-            .max()
-            .unwrap_or(0)
-            .saturating_add(1);
-        let new_cells = group
-            .iter()
-            .filter(|&&cell| matches!(p.farm[cell].tile, Tile::Empty))
-            .copied()
-            .collect::<Vec<_>>();
-        if new_cells.is_empty() {
-            continue;
+/// Same perimeter representation as engine::boundary. The symmetric
+/// difference cancels edges shared by cells in the same pasture.
+fn pasture_boundary(cells: &[usize]) -> BTreeSet<(u8, u8)> {
+    let mut edges = BTreeSet::new();
+    for &cell in cells {
+        let x = (cell % 5) as u8;
+        let y = (cell / 5) as u8;
+        let a = y * 6 + x;
+        let b = a + 1;
+        let c = a + 6;
+        let d = c + 1;
+        for edge in [(a, b), (a, c), (b, d), (c, d)] {
+            if !edges.insert(edge) {
+                edges.remove(&edge);
+            }
         }
-        for &cell in &new_cells {
-            p.farm[cell].tile = Tile::Pasture { id };
-        }
-        p.pastures.push(Pasture {
-            id,
-            cells: new_cells.clone(),
-            animal: None,
-            quantity: 0,
-        });
-        p.supply.wood = p
-            .supply
-            .wood
-            .saturating_sub((2 * new_cells.len() + 2) as u32);
     }
+    edges
+}
+
+/// Project exact fence additions, affected pasture regions and animal
+/// relocation for the legal details supplied by SimpleDetails.
+fn fence(
+    p: &mut Player,
+    groups: &[Vec<usize>],
+    occupancy: Option<&[crate::engine::PastureOccupancy]>,
+) {
+    let affected = groups
+        .iter()
+        .flatten()
+        .filter_map(|&cell| match p.farm[cell].tile {
+            Tile::Pasture { id } => Some(id),
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
+    let mut edges = BTreeSet::new();
+    for previous in p.pastures.iter().filter(|old| !affected.contains(&old.id)) {
+        edges.extend(pasture_boundary(&previous.cells));
+    }
+    for group in groups {
+        edges.extend(pasture_boundary(group));
+    }
+    let added = edges.difference(&p.fences).count() as u32;
+    p.supply.wood = p.supply.wood.saturating_sub(added);
+
+    let mut next_id = p.pastures.iter().map(|old| old.id).max().map_or(0, |n| n + 1);
+    let mut assigned_ids = BTreeSet::new();
+    let mut changed = Vec::new();
+    for (ix, group) in groups.iter().enumerate() {
+        let old_ids = group
+            .iter()
+            .filter_map(|&cell| match p.farm[cell].tile {
+                Tile::Pasture { id } => Some(id),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        let id = if old_ids.len() == 1
+            && !assigned_ids.contains(old_ids.iter().next().expect("one id"))
+        {
+            *old_ids.iter().next().expect("one id")
+        } else {
+            let id = next_id;
+            next_id += 1;
+            id
+        };
+        assigned_ids.insert(id);
+        let (animal, quantity) = if let Some(values) = occupancy {
+            (values[ix].animal, values[ix].quantity)
+        } else {
+            let mut animal = None;
+            let mut quantity = 0;
+            for old in &p.pastures {
+                if old.quantity > 0 && old.cells.iter().all(|cell| group.contains(cell)) {
+                    animal = old.animal;
+                    quantity += old.quantity;
+                }
+            }
+            for &cell in group {
+                if let Some(species) = p.farm[cell].stable_animal {
+                    animal = Some(species);
+                    quantity += 1;
+                }
+            }
+            (animal, quantity)
+        };
+        changed.push(Pasture {
+            id,
+            cells: group.clone(),
+            animal,
+            quantity,
+        });
+        for &cell in group {
+            p.farm[cell].tile = Tile::Pasture { id };
+            p.farm[cell].stable_animal = None;
+        }
+    }
+    p.pastures.retain(|old| !affected.contains(&old.id));
+    p.pastures.extend(changed);
+    p.fences = edges;
 }
 
 /// Approximate only the immediate *public* effects of an action.
@@ -227,15 +393,19 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                 p.supply.wood = p.supply.wood.saturating_sub(2);
             }
         }
-        (Space::Fencing, Detail::Fence { pastures }) => fence(&mut p, pastures),
-        (Space::Fencing, Detail::FenceDetailed { pastures, .. }) => {
-            fence(&mut p, pastures);
-        }
+        (Space::Fencing, Detail::Fence { pastures }) => fence(&mut p, pastures, None),
+        (
+            Space::Fencing,
+            Detail::FenceDetailed {
+                pastures,
+                occupancy,
+            },
+        ) => fence(&mut p, pastures, Some(occupancy)),
         (Space::GrainUtilization, Detail::SowDetailed { plantings, baking }) => {
             sow(&mut p, plantings);
             for allocation in baking {
                 p.supply.grain = p.supply.grain.saturating_sub(allocation.grain);
-                p.supply.food += allocation.grain * 2;
+                p.supply.food += allocation.grain * baking_rate(allocation.improvement)?;
             }
         }
         (Space::Cultivation, Detail::Cultivate { plow, plantings }) => {
@@ -248,9 +418,22 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             sow(&mut p, plantings);
         }
         (Space::MajorImprovement, Detail::Buy { improvement, .. }) => {
-            for (good, n) in improvement.cost() {
-                let stock = p.supply.get(good);
-                p.supply.set(good, stock.saturating_sub(n));
+            // Buy with PurchaseMode::Auto: a Hearth exchanges an owned Fireplace
+            // without paying the printed cost (engine::buy_improvement).
+            let exchange = if matches!(improvement, Improvement::Hearth4 | Improvement::Hearth5) {
+                p.improvements
+                    .iter()
+                    .position(|card| matches!(card, Improvement::Fireplace2 | Improvement::Fireplace3))
+            } else {
+                None
+            };
+            if let Some(index) = exchange {
+                p.improvements.remove(index);
+            } else {
+                for (good, n) in improvement.cost() {
+                    let stock = p.supply.get(good);
+                    p.supply.set(good, stock.saturating_sub(n));
+                }
             }
             p.improvements.push(*improvement);
         }
@@ -288,7 +471,9 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             for &cell in &plan.to_stables {
                 p.farm[cell].stable_animal = Some(plan.animal);
             }
-            p.supply.food += 2 * plan.cook;
+            if plan.cook > 0 {
+                p.supply.food += plan.cook * animal_cooking_rate(&p, plan.animal)?;
+            }
         }
         _ => return None,
     }
