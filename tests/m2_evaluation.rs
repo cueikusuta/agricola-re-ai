@@ -4,9 +4,7 @@ use agricola_re_ai::evaluation::{
     action_value, action_value_with_details, evaluate_observation, evaluate_player,
     DetailAwareEvaluationPolicy, EvaluationPolicy, WeightedEvaluationPolicy,
 };
-use agricola_re_ai::model::{
-    Config, Game, Good, Improvement, Observation, Player, Space, Tile,
-};
+use agricola_re_ai::model::{Config, Game, Good, Improvement, Observation, Player, Space, Tile};
 use agricola_re_ai::policy::{
     play_to_end, DetailPolicy, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
 };
