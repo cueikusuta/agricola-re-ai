@@ -27,3 +27,28 @@ fn weight_sweep() {
         }
     }
 }
+
+#[test]
+#[ignore]
+fn heldout_validation() {
+    for additional in [false, true] {
+        for (prior, state) in [(1.0, 1.0), (1.0, 1.5), (0.5, 2.0)] {
+            let policy = WeightedEvaluationPolicy {
+                prior_weight: prior,
+                state_weight: state,
+            };
+            for seed in [4200, 7100] {
+                let result =
+                    compare_policies(&policy, &GreedyPolicy, 50, seed, additional).unwrap();
+                println!(
+                    "holdout additional={additional} prior={prior} state={state} seed={seed} wins={} loss={} ties={} rate={:.3} margin={:.2}",
+                    result.left_wins,
+                    result.right_wins,
+                    result.ties,
+                    result.left_win_rate,
+                    result.left_mean_margin
+                );
+            }
+        }
+    }
+}
