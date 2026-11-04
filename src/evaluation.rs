@@ -472,7 +472,8 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                 p.farm[cell].stable_animal = Some(plan.animal);
             }
             if plan.cook > 0 {
-                p.supply.food += plan.cook * animal_cooking_rate(&p, plan.animal)?;
+                let cooked_food = plan.cook * animal_cooking_rate(&p, plan.animal)?;
+                p.supply.food += cooked_food;
             }
         }
         _ => return None,
