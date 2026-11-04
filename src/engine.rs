@@ -297,9 +297,18 @@ fn build_pastures(p:&mut Player,pastures:&[Vec<usize>])->Result<()> {
         if p.fences.len()+fresh>15{return Err("fence limit 15".into())}
         p.supply.pay(Good::Wood,fresh as u32)?;
         p.fences.extend(segments);
+        // Animals occupying an unfenced stable inside the new enclosure now
+        // occupy that pasture. No animal may be lost during fencing.
+        let species: BTreeSet<Animal> = group.iter().filter_map(|&i|p.farm[i].stable_animal).collect();
+        if species.len()>1{return Err("new pasture would mix animal species".into())}
+        let quantity=group.iter().filter(|&&i|p.farm[i].stable_animal.is_some()).count() as u32;
+        let animal=species.iter().next().copied();
         let id=p.pastures.iter().map(|p|p.id).max().map(|x|x+1).unwrap_or(0);
-        for &i in group{p.farm[i].tile=Tile::Pasture{id}}
-        p.pastures.push(Pasture{id,cells:group.clone(),animal:None,quantity:0});
+        for &i in group{
+            p.farm[i].tile=Tile::Pasture{id};
+            p.farm[i].stable_animal=None;
+        }
+        p.pastures.push(Pasture{id,cells:group.clone(),animal,quantity});
     }Ok(())
 }
 fn cook_value(p:&Player,animal:Animal)->Option<u32>{
@@ -345,7 +354,7 @@ fn rearrange_animals(p:&mut Player,pasture:&[(u8,Option<Animal>,u32)],stables:&[
         pasture.iter().map(|(id,_,_)|*id).collect::<BTreeSet<_>>().len()!=pasture.len(){
         return Err("must name each pasture exactly once".into())
     }
-    for old in &mut p.pastures {let (_,kind,n)=pasture.iter().find(|(id,_,_)|*id==old.id).ok_or("missing pasture id")?;if (*n>0)!=kind.is_some(){return Err("invalid pasture species/count".into())}old.animal=*kind;old.quantity=*n;}
+    for old in &mut p.pastures {let (_,kind,n)=pasture.iter().find(|(id,_,_)|*id==old.id).ok_or("missing pasture id")?;if (*n>0)!=kind.is_some(){return Err("invalid pasture species/count".into())}old.animal = *kind; old.quantity = *n;}
     for c in &mut p.farm{c.stable_animal=None;}
     let mut used=BTreeSet::new();for (i,kind) in stables {if *i>=FARM_CELLS||!used.insert(*i)||!p.farm[*i].stable||!matches!(p.farm[*i].tile,Tile::Empty){return Err("bad unfenced stable".into())}p.farm[*i].stable_animal=Some(*kind);}
     p.pet=pet;
