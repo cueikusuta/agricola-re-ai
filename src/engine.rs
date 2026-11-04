@@ -1413,9 +1413,7 @@ pub fn general_split_candidate(
                 .partition::<Vec<_>, _>(|&(i, _)| mask & (1usize << i) != 0);
             let first = first.into_iter().map(|(_, cell)| cell).collect::<Vec<_>>();
             let second = second.into_iter().map(|(_, cell)| cell).collect::<Vec<_>>();
-            if first.is_empty() || second.is_empty()
-                || !connected(&first) || !connected(&second)
-            {
+            if first.is_empty() || second.is_empty() || !connected(&first) || !connected(&second) {
                 continue;
             }
             let mut edges = boundary(&first);

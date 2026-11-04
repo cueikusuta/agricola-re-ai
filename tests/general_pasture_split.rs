@@ -8,8 +8,11 @@ fn bridged_pasture(enabled: bool) -> Game {
         additional_action_space_enabled: enabled,
     });
     if game.public.revealed[0] != RoundCard::Fencing {
-        let index = game.hidden_round_deck.iter()
-            .position(|&c| c == RoundCard::Fencing).unwrap();
+        let index = game
+            .hidden_round_deck
+            .iter()
+            .position(|&c| c == RoundCard::Fencing)
+            .unwrap();
         let original = game.public.revealed[0];
         game.public.revealed[0] = RoundCard::Fencing;
         game.hidden_round_deck[index] = original;
@@ -21,7 +24,8 @@ fn bridged_pasture(enabled: bool) -> Game {
         detail: Detail::Fence {
             pastures: vec![vec![1, 2, 6, 7, 8, 9, 13, 14]],
         },
-    }).unwrap();
+    })
+    .unwrap();
     assert_eq!(game.public.players[id].fences.len(), 14);
 
     // The only possible extra fence is a bridge between two non-singleton
@@ -29,12 +33,16 @@ fn bridged_pasture(enabled: bool) -> Game {
     let player = &mut game.public.players[id];
     for cell in &mut player.farm {
         if matches!(cell.tile, Tile::Empty) {
-            cell.tile = Tile::Field { crop: None, remaining: 0 };
+            cell.tile = Tile::Field {
+                crop: None,
+                remaining: 0,
+            };
         }
     }
     player.supply.wood = 1;
     game.public.used.clear();
     game.public.workers_placed[id] = 0;
+    game.public.active_player = id;
     game.validate().unwrap();
     game
 }
