@@ -42,3 +42,14 @@ jobs:
         run: cargo run --release --locked -- --batch 100 --seed 4200
       - name: 100 games with additional tile ON
         run: cargo run --release --locked -- --batch 100 --seed 4200 --additional-action-space
+
+  m2_benchmark:
+    name: M2 seeded head-to-head smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Additional tile OFF
+        run: cargo run --release --locked -- --benchmark 12 --seed 7100
+      - name: Additional tile ON
+        run: cargo run --release --locked -- --benchmark 12 --seed 7100 --additional-action-space
