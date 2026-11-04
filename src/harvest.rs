@@ -1,6 +1,7 @@
 //! Harvest operations, with external decisions specified in a replayable plan.
 //! Official order: field phase, feeding phase, breeding phase.
 use crate::engine::Result;
+use crate::breeding::BreedingPlan;
 use crate::model::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -65,6 +66,9 @@ impl FeedingPlan {
 /// the engine logs all resulting plans for deterministic action-only replay.
 pub trait HarvestDetailPolicy {
     fn plan_feeding(&self, obs: &Observation) -> FeedingPlan;
+    fn plan_breeding(&self, obs: &Observation) -> BreedingPlan {
+        BreedingPlan::simple(&obs.public.players[obs.player_id])
+    }
 }
 pub struct SimpleHarvestDetails;
 impl HarvestDetailPolicy for SimpleHarvestDetails {
@@ -103,20 +107,33 @@ impl Game {
             }
         }
     }
-    pub(crate) fn harvest(&mut self, plans: &[FeedingPlan]) -> Result<()> {
-        if !HARVEST_ROUNDS.contains(&self.public.round) {
-            return Err("harvest in non-harvest round".into());
-        }
+    /// Called only on the preview AFTER field harvesting, to generate
+    /// breeding decisions from the actual post-feeding public state.
+    pub(crate) fn feed_after_fields(&mut self, plans: &[FeedingPlan]) -> Result<()> {
         if plans.len() != self.public.players.len() {
             return Err("feeding plan per player required".into());
         }
-        for plan in plans {
-            plan.validate()?;
+        for (player, plan) in self.public.players.iter_mut().zip(plans) {
+            feed(player, plan)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn harvest(
+        &mut self,
+        feeding: &[FeedingPlan],
+        breeding: &[BreedingPlan],
+    ) -> Result<()> {
+        if !HARVEST_ROUNDS.contains(&self.public.round) {
+            return Err("harvest in non-harvest round".into());
+        }
+        if breeding.len() != self.public.players.len() {
+            return Err("breeding plan per player required".into());
         }
         self.harvest_fields();
-        for (p, plan) in self.public.players.iter_mut().zip(plans) {
-            feed(p, plan)?;
-            breed(p)?;
+        self.feed_after_fields(feeding)?;
+        for (player, plan) in self.public.players.iter_mut().zip(breeding) {
+            plan.apply(player)?;
         }
         Ok(())
     }
@@ -270,41 +287,6 @@ fn feed(p: &mut Player, plan: &FeedingPlan) -> Result<()> {
     p.begging += owed;
     Ok(())
 }
-fn breed(p: &mut Player) -> Result<()> {
-    for species in [Animal::Sheep, Animal::Boar, Animal::Cattle] {
-        if p.animal_count(species) < 2 {
-            continue;
-        }
-        if let Some(index) = p
-            .pastures
-            .iter()
-            .position(|q| q.animal == Some(species) && q.quantity < p.pasture_capacity(q))
-        {
-            p.pastures[index].quantity += 1;
-            continue;
-        }
-        if let Some(index) = p
-            .pastures
-            .iter()
-            .position(|q| q.animal.is_none() && q.quantity == 0)
-        {
-            p.pastures[index].animal = Some(species);
-            p.pastures[index].quantity = 1;
-            continue;
-        }
-        if let Some(cell) = p.farm.iter_mut().find(|c| {
-            c.stable && !matches!(c.tile, Tile::Pasture { .. }) && c.stable_animal.is_none()
-        }) {
-            cell.stable_animal = Some(species);
-            continue;
-        }
-        if p.pet.is_none() {
-            p.pet = Some(species);
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
