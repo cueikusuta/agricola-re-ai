@@ -1,43 +1,116 @@
 name: Rust CI
+
+# Feature branches are checked by pull_request; avoid duplicate push + PR runs.
+# Keep the workflow running on documentation-only PRs so required checks are reported.
 on:
   push:
-    branches: [main, develop, 'issue/**']
+    branches: [main, develop]
   pull_request:
+  workflow_dispatch:
+
 permissions:
   contents: read
+  pull-requests: read
+
+concurrency:
+  group: rust-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    name: Detect changed files
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      runtime: ${{ steps.filter.outputs.runtime }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v4
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        id: filter
+        with:
+          # On push, compare with the previous commit on this branch.
+          # On pull_request, paths-filter uses the PR base via the GitHub API.
+          base: ${{ github.ref }}
+          filters: |
+            rust:
+              - 'src/**'
+              - 'tests/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain*'
+              - '.cargo/**'
+              - '.github/workflows/**'
+              - 'build.rs'
+              - 'scripts/**'
+            runtime:
+              - 'src/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain*'
+              - '.cargo/**'
+              - '.github/workflows/**'
+              - 'build.rs'
+
   format:
     name: rustfmt
+    needs: changes
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
       - run: cargo fmt --all -- --check
+
   lint:
     name: clippy
+    needs: changes
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: clippy
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
   test:
     name: cargo test
+    needs: changes
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --locked --all-targets
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+          add-job-id-key: 'false'
+          cache-on-failure: 'true'
+      # The old debug test suite spent 90s + 40s in two simulation tests.
+      # Optimized test artifacts preserve every assertion and every test case.
+      - run: cargo test --release --locked --all-targets
 
   benchmark:
     name: M1 100-game performance
+    needs: changes
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+          add-job-id-key: 'false'
+          save-if: 'false'
       - name: 100 games with additional tile OFF
         run: cargo run --release --locked -- --batch 100 --seed 4200
       - name: 100 games with additional tile ON
@@ -45,10 +118,17 @@ jobs:
 
   m2_benchmark:
     name: M2 seeded head-to-head smoke test
+    needs: changes
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+          add-job-id-key: 'false'
+          save-if: 'false'
       - name: Additional tile OFF
         run: cargo run --release --locked -- --benchmark 50 --seed 7100
       - name: Additional tile ON
@@ -57,3 +137,33 @@ jobs:
         run: cargo run --release --locked -- --benchmark 20 --seed 26000
       - name: Held-out seed 26000 with additional tile ON
         run: cargo run --release --locked -- --benchmark 20 --seed 26000 --additional-action-space
+
+  gate:
+    name: CI required
+    if: ${{ always() }}
+    needs: [changes, format, lint, test, benchmark, m2_benchmark]
+    runs-on: ubuntu-latest
+    env:
+      CHANGES: ${{ needs.changes.result }}
+      RUST: ${{ needs.changes.outputs.rust }}
+      RUNTIME: ${{ needs.changes.outputs.runtime }}
+      FORCE: ${{ github.event_name == 'workflow_dispatch' }}
+      FORMAT: ${{ needs.format.result }}
+      LINT: ${{ needs.lint.result }}
+      TEST: ${{ needs.test.result }}
+      M1: ${{ needs.benchmark.result }}
+      M2: ${{ needs.m2_benchmark.result }}
+    steps:
+      - name: Require every applicable check to pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "changed-files=$CHANGES rust=$RUST runtime=$RUNTIME"
+          echo "rustfmt=$FORMAT clippy=$LINT test=$TEST m1=$M1 m2=$M2"
+          [[ "$CHANGES" == success ]] || exit 1
+          if [[ "$RUST" == true || "$FORCE" == true ]]; then
+            [[ "$FORMAT" == success && "$LINT" == success && "$TEST" == success ]] || exit 1
+          fi
+          if [[ "$RUNTIME" == true || "$FORCE" == true ]]; then
+            [[ "$M1" == success && "$M2" == success ]] || exit 1
+          fi
