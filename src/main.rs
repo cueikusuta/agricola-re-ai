@@ -13,6 +13,7 @@ fn main() {
     let mut greedy = false;
     let mut evaluated = false;
     let mut web = false;
+    let mut player_option_supplied = false;
     let mut mcts_budget: Option<usize> = None;
     let mut benchmark: Option<usize> = None;
     let mut log_file: Option<String> = None;
@@ -40,6 +41,7 @@ fn main() {
             "--eval" => evaluated = true,
             "--web" => web = true,
             "--players" => {
+                player_option_supplied = true;
                 config.players = it
                     .next()
                     .expect("--players requires 2, 3 or 4")
@@ -82,6 +84,9 @@ fn main() {
         std::process::exit(2);
     }
     if web {
+        if !player_option_supplied {
+            config.players = 4;
+        }
         if let Err(error) = serve(config) {
             eprintln!("web UI error: {error}");
             std::process::exit(1);

@@ -18,7 +18,7 @@ input[type=number]{width:88px}.minor{font-size:14px;color:#bdc6ca}
 .actions{align-items:stretch;max-height:185px;overflow:auto}.actions button{flex:1 1 145px;min-width:125px}
 #notice{color:#f6cf8d;min-height:24px}#history{color:#b0bcc6;font-size:14px}
 footer{color:#b5c0c8;font-size:13px}
-@media(max-width:680px){.screen{padding:8px;gap:8px}.panel{padding:9px}.cell{height:44px;font-size:12px}.actions{max-height:145px}.stat{padding:5px;font-size:14px}}
+@media(max-width:680px){.screen{padding:8px;gap:8px}.panel{padding:9px}.cell{height:44px;font-size:14px}.actions{max-height:145px}.stat{padding:5px;font-size:14px}}
 </style></head>
 <body><div class="screen">
 <header><h1>アグリコラ <span class="minor">Revised 2016 / 人間 vs CPU</span></h1><span class="minor">ローカル専用・職業カードなし</span></header>
@@ -39,9 +39,9 @@ const names={forest:"森林",clay_pit:"粘土坑",reed_bank:"葦の土手",fishi
 const goods={wood:"木",clay:"粘土",reed:"葦",stone:"石",food:"食料",grain:"麦",vegetable:"野菜"};
 let state=null,viewPlayer=0,busy=false;
 const $=id=>document.getElementById(id);
-function tileName(cell){const t=cell.tile;const v=typeof t==="string"?t:Object.keys(t||{})[0];
+function tileName(cell){const t=cell.tile;const v=(typeof t==="string"?t:(Object.keys(t||{})[0]||"")).toLowerCase();
 if(v==="room")return ["部屋","room"];if(v==="pasture")return ["牧場","pasture"];
-if(v==="field"){const f=t.field;return [f.crop==="grain"?"麦畑":f.crop==="vegetable"?"野菜畑":"畑","field-tile"];}
+if(v==="field"){const f=t.Field||t.field;const crop=(f.crop||"").toLowerCase();return [crop==="grain"?"麦畑":crop==="vegetable"?"野菜畑":"畑","field-tile"];}
 return [cell.stable?"厩":"空き",""];}
 function putStats(label,value){const d=document.createElement("div");d.className="stat";d.textContent=label+" "+value;$("stats").append(d);}
 function render(){if(!state)return;const p=state.public,scores=state.standings;
@@ -52,7 +52,7 @@ for(const pl of p.players){const b=document.createElement("button");b.className=
 const pl=p.players[viewPlayer];$("farmName").textContent=(viewPlayer+1)+"Pの農場（家族"+pl.family+"人）";$("farm").replaceChildren();
 for(const cell of pl.farm){const [label,cls]=tileName(cell);const d=document.createElement("div");d.className="cell "+cls;d.textContent=label+(cell.stable?" ▣":"");$("farm").append(d);}
 $("stats").replaceChildren();for(const [good,label] of Object.entries(goods))putStats(label,pl.supply[good]);
-putStats("部屋",pl.farm.filter(c=>c.tile==="room").length);putStats("柵",pl.fences.length);
+putStats("部屋",pl.farm.filter(c=>c.tile==="Room").length);putStats("柵",pl.fences.length);
 $("improvements").textContent="大きな進歩: "+(pl.improvements.length?pl.improvements.join(" / "):"なし");
 $("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
 $("actions").replaceChildren();if(p.finished){$("notice").textContent="最終順位: "+scores.rank.map((r,i)=>(i+1)+"P "+r+"位").join("、");return;}
@@ -60,7 +60,7 @@ $("notice").textContent="1Pの手番です。";
 for(const key of state.legal){const b=document.createElement("button");b.textContent=names[key]||key;b.disabled=busy;b.onclick=()=>play(key);$("actions").append(b);}
 }
 async function request(path,payload){busy=true;try{const options=payload===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)};
-const resp=await fetch(path,options);const result=await resp.json();if(!resp.ok)throw new Error(result.error||"通信エラー");state=result;viewPlayer=Math.min(viewPlayer,state.public.players.length-1);$("notice").textContent="";render();
+const resp=await fetch(path,options);const result=await resp.json();if(!resp.ok)throw new Error(result.error||"通信エラー");const first=state===null;state=result;if(first){$("players").value=String(state.public.players.length);$("extra").checked=state.public.additional_action_space_enabled;$("ai").value=state.mcts?"mcts":"eval";$("seed").value=String(state.seed);}viewPlayer=Math.min(viewPlayer,state.public.players.length-1);$("notice").textContent="";render();
 }catch(e){$("notice").textContent=e.message;}finally{busy=false;}}
 async function play(space){let market="stone";if(space==="resource_market"&&state.public.players.length===3){market=confirm("資材市場：葦を選びますか？\nOK=葦 / キャンセル=石")?"reed":"stone";}await request("/api/play",{space,market});}
 $("new").onclick=async()=>{viewPlayer=0;await request("/api/new",{players:Number($("players").value),extra:$("extra").checked,ai:$("ai").value,seed:Number($("seed").value),budget:8});};

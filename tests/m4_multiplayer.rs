@@ -117,3 +117,19 @@ fn replay_and_save_restore_for_all_modes() {
         }
     }
 }
+
+#[test]
+fn four_player_mcts_selects_legal_move() {
+    use agricola_re_ai::mcts::MctsPolicy;
+    use agricola_re_ai::policy::SpacePolicy;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+    let game = Game::new(config(4, true));
+    let obs = game.observation(game.public.active_player).unwrap();
+    let legal = game.legal_spaces();
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let selected = MctsPolicy { simulations: 4, tree_depth: 2 }
+        .select(&obs, &legal, &mut rng)
+        .unwrap();
+    assert!(legal.contains(&selected));
+}

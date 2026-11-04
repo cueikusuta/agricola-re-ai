@@ -71,6 +71,7 @@ impl Session {
                     .and_then(|a| a.get("space")),
             })).collect::<Vec<_>>(),
             "mcts": self.mcts,
+            "seed": self.game.config.seed,
         })
     }
     pub fn reset(&mut self, input: &Value) -> Result<(), String> {
@@ -265,4 +266,28 @@ mod tests {
             session.game.validate().unwrap();
         }
     }
+    #[test]
+    fn complete_four_player_human_vs_cpu_match() {
+        let mut session = Session::new(Config {
+            seed: 103,
+            players: 4,
+            additional_action_space_enabled: true,
+        })
+        .unwrap();
+        for turn in 0..120 {
+            if session.game.public.finished {
+                break;
+            }
+            assert_eq!(session.game.public.active_player, 0, "turn {turn}");
+            let obs = session.game.observation(0).unwrap();
+            let legal = session.game.legal_spaces();
+            let mut rng = ChaCha8Rng::seed_from_u64(turn);
+            let space = EvaluationPolicy.select(&obs, &legal, &mut rng).unwrap();
+            session.play(&json!({"space": space})).unwrap();
+        }
+        assert!(session.game.public.finished);
+        let replay = Game::replay(session.game.config.clone(), &session.game.log.events).unwrap();
+        assert_eq!(replay.state_hash(), session.game.state_hash());
+    }
+
 }
