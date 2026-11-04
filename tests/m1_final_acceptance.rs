@@ -36,7 +36,7 @@ fn assert_complete(config: Config, policy: &dyn SpacePolicy) {
 fn both_policies_are_replayable_for_100_seeds_in_both_modes() {
     for additional_action_space_enabled in [false, true] {
         for seed in 1000..1100 {
-            let config = Config {
+            let config = Config { players: 2,
                 seed,
                 additional_action_space_enabled,
             };

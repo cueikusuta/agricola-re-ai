@@ -105,7 +105,7 @@ fn detail_aware_evaluation_uses_the_selected_action_plan() {
 
 #[test]
 fn evaluation_and_actions_depend_only_on_public_observation() {
-    let mut game = Game::new(Config {
+    let mut game = Game::new(Config { players: 2,
         seed: 912,
         additional_action_space_enabled: true,
     });
@@ -136,7 +136,7 @@ fn evaluation_and_actions_depend_only_on_public_observation() {
 fn evaluation_ai_finishes_and_replays_both_tile_settings() {
     for enabled in [false, true] {
         for seed in 40..45 {
-            let mut game = Game::new(Config {
+            let mut game = Game::new(Config { players: 2,
                 seed,
                 additional_action_space_enabled: enabled,
             });

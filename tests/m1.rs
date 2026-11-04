@@ -4,7 +4,7 @@ use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDeta
 use agricola_re_ai::score::standings;
 
 fn game(seed: u64, enabled: bool) -> Game {
-    Game::new(Config {
+    Game::new(Config { players: 2,
         seed,
         additional_action_space_enabled: enabled,
     })
@@ -202,7 +202,7 @@ fn full_game_replay_and_resume_both_variants() {
             let resumed = Game::load_json(&original.save_json().unwrap()).unwrap();
             assert_eq!(resumed.state_hash(), original.state_hash());
             let replayed = Game::replay(
-                Config {
+                Config { players: 2,
                     seed,
                     additional_action_space_enabled: enabled,
                 },
@@ -318,7 +318,7 @@ fn action_log_metadata_and_replay_information() {
     assert_eq!(g.log.events[0].before, before);
     assert_eq!(g.log.events[0].after, g.state_hash());
     let replay = Game::replay(
-        Config {
+        Config { players: 2,
             seed: 222,
             additional_action_space_enabled: true,
         },

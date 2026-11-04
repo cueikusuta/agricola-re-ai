@@ -3,7 +3,7 @@ use agricola_re_ai::model::{Config, Game, Improvement, RoundCard, Space};
 use std::collections::BTreeSet;
 
 fn game() -> Game {
-    let mut g = Game::new(Config {
+    let mut g = Game::new(Config { players: 2,
         seed: 412,
         additional_action_space_enabled: false,
     });

@@ -116,6 +116,7 @@ fn main() {
     let mut duration = 0f64;
     for n in 0..batch {
         let mut game = Game::new(Config {
+            players: config.players,
             seed: config.seed + n as u64,
             additional_action_space_enabled: config.additional_action_space_enabled,
         });

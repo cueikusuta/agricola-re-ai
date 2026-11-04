@@ -10,7 +10,7 @@ fn only_the_six_official_rounds_have_harvest() {
 fn full_games_apply_harvest_without_violating_invariants() {
     for enabled in [false, true] {
         for seed in 0..25 {
-            let mut g = Game::new(Config {
+            let mut g = Game::new(Config { players: 2,
                 seed,
                 additional_action_space_enabled: enabled,
             });

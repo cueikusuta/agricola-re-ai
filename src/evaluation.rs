@@ -361,7 +361,10 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             | Space::MeetingPlace
             | Space::WesternQuarry
             | Space::EasternQuarry
-            | Space::Copse,
+            | Space::Copse
+            | Space::Grove
+            | Space::Hollow
+            | Space::TravelingPlayers,
             Detail::None,
         ) => add_accumulation(obs, &mut p, action.space),
         (Space::DayLaborer, Detail::None) => p.supply.food += 2,
@@ -369,6 +372,16 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
         (Space::VegetableSeeds, Detail::None) => p.supply.vegetable += 1,
         (Space::ResourceMarket, Detail::None) => {
             p.supply.stone += 1;
+            if obs.public.players.len() == 4 {
+                p.supply.reed += 1;
+            }
+            p.supply.food += 1;
+        }
+        (Space::ResourceMarket, Detail::MarketChoice(good)) if obs.public.players.len() == 3 => {
+            if !matches!(good, Good::Reed | Good::Stone) {
+                return None;
+            }
+            p.supply.gain(*good, 1);
             p.supply.food += 1;
         }
         (

@@ -16,7 +16,7 @@ impl HarvestDetailPolicy for GrainPreservingHarvest {
 fn custom_harvest_policy_choices_are_recorded_and_replayed_without_policy() {
     for enabled in [false, true] {
         for seed in 0..15 {
-            let config = Config {
+            let config = Config { players: 2,
                 seed,
                 additional_action_space_enabled: enabled,
             };

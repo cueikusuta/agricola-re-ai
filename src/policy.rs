@@ -25,6 +25,9 @@ pub(crate) fn weight(obs: &Observation, space: Space) -> i32 {
     match space {
         Space::Forest
         | Space::Copse
+        | Space::Grove
+        | Space::Hollow
+        | Space::TravelingPlayers
         | Space::ClayPit
         | Space::ReedBank
         | Space::WesternQuarry
@@ -33,10 +36,10 @@ pub(crate) fn weight(obs: &Observation, space: Space) -> i32 {
         | Space::MeetingPlace => {
             let stored = obs.public.accumulations.get(&space).copied().unwrap_or(0) as i32;
             let value = match space {
-                Space::Forest | Space::Copse => 3,
+                Space::Forest | Space::Copse | Space::Grove => 3,
                 Space::ReedBank => 4,
                 Space::WesternQuarry | Space::EasternQuarry => 4,
-                Space::Fishing | Space::MeetingPlace => 5,
+                Space::Fishing | Space::MeetingPlace | Space::TravelingPlayers => 5,
                 _ => 3,
             };
             stored * value
@@ -240,10 +243,19 @@ impl DetailPolicy for SimpleDetails {
             | Space::WesternQuarry
             | Space::EasternQuarry
             | Space::Copse
-            | Space::ResourceMarket
+            | Space::Grove
+            | Space::Hollow
+            | Space::TravelingPlayers
             | Space::FamilyGrowthWithRoom
             | Space::ModestFamilyGrowth
             | Space::FamilyGrowthNoRoom => Detail::None,
+            Space::ResourceMarket => {
+                if obs.public.players.len() == 3 {
+                    Detail::MarketChoice(Good::Stone)
+                } else {
+                    Detail::None
+                }
+            }
             Space::Farmland => Detail::Plow {
                 cell: empty_field_target(p)?,
             },
@@ -395,7 +407,7 @@ pub fn play_to_end_with_harvest_policy(
     detail_policy: &dyn DetailPolicy,
     harvest_policy: &dyn HarvestDetailPolicy,
 ) -> Result<(), String> {
-    for _ in 0..250 {
+    for _ in 0..320 {
         if game.public.finished {
             return Ok(());
         }

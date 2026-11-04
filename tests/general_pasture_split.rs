@@ -3,7 +3,7 @@ use agricola_re_ai::model::{Config, Game, RoundCard, Space};
 use agricola_re_ai::policy::{DetailPolicy, SimpleDetails};
 
 fn bridged_pasture(enabled: bool) -> Game {
-    let mut game = Game::new(Config {
+    let mut game = Game::new(Config { players: 2,
         seed: 4971,
         additional_action_space_enabled: enabled,
     });
