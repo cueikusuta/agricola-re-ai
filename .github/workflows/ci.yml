@@ -53,3 +53,7 @@ jobs:
         run: cargo run --release --locked -- --benchmark 50 --seed 7100
       - name: Additional tile ON
         run: cargo run --release --locked -- --benchmark 50 --seed 7100 --additional-action-space
+      - name: Held-out seed 26000 with additional tile OFF
+        run: cargo run --release --locked -- --benchmark 20 --seed 26000
+      - name: Held-out seed 26000 with additional tile ON
+        run: cargo run --release --locked -- --benchmark 20 --seed 26000 --additional-action-space
