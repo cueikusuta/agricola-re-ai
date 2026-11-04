@@ -19,7 +19,7 @@ impl SpacePolicy for RandomPolicy {
         legal.choose(rng).copied()
     }
 }
-fn weight(obs: &Observation, space: Space) -> i32 {
+pub(crate) fn weight(obs: &Observation, space: Space) -> i32 {
     let p = &obs.public.players[obs.player_id];
     let r = obs.public.round;
     match space {
