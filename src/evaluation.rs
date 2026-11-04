@@ -2,7 +2,7 @@
 //! These projections rank actions; the rules engine remains the only authority.
 use crate::engine::{Action, Detail};
 use crate::model::*;
-use crate::policy::{DetailPolicy, SimpleDetails, SpacePolicy};
+use crate::policy::{weight, DetailPolicy, SimpleDetails, SpacePolicy};
 use crate::score::score;
 use rand::seq::SliceRandom;
 use rand_chacha::ChaCha8Rng;
@@ -76,7 +76,11 @@ pub fn evaluate_player(p: &Player, round: u8) -> Evaluation {
         })
         .sum::<f64>();
     let cookers = p.improvements.iter().filter(|i| i.is_cooking()).count();
-    let cooking = if cookers > 0 { 7.0 + remaining * 0.5 } else { 0.0 };
+    let cooking = if cookers > 0 {
+        7.0 + remaining * 0.5
+    } else {
+        0.0
+    };
     let farm = planted + pasture_capacity + cooking;
     let wood = marginal(
         p.supply.wood,
@@ -194,9 +198,7 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             p.supply.food += 1;
         }
         (
-            Space::FamilyGrowthWithRoom
-            | Space::ModestFamilyGrowth
-            | Space::FamilyGrowthNoRoom,
+            Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth | Space::FamilyGrowthNoRoom,
             Detail::None,
         ) => {
             p.family += 1;
@@ -258,10 +260,8 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                 House::Clay => (House::Stone, Good::Stone),
                 House::Stone => return None,
             };
-            p.supply.set(
-                good,
-                p.supply.get(good).saturating_sub(p.rooms() as u32),
-            );
+            p.supply
+                .set(good, p.supply.get(good).saturating_sub(p.rooms() as u32));
             p.supply.reed = p.supply.reed.saturating_sub(1);
             p.house = new_house;
         }
@@ -311,17 +311,23 @@ pub fn action_value(obs: &Observation, space: Space) -> Option<f64> {
     Some(value)
 }
 
-/// Deterministic tie-breaking uses only the caller-supplied decision RNG.
-pub struct EvaluationPolicy;
+/// Calibration-friendly blend of the M1 tactical prior and M2 state evaluation.
+#[derive(Clone, Copy, Debug)]
+pub struct WeightedEvaluationPolicy {
+    pub prior_weight: f64,
+    pub state_weight: f64,
+}
 
-impl SpacePolicy for EvaluationPolicy {
+impl SpacePolicy for WeightedEvaluationPolicy {
     fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
         let mut best = f64::NEG_INFINITY;
         let mut candidates = Vec::new();
         for &space in legal {
-            let Some(value) = action_value(obs, space) else {
+            let Some(state_delta) = action_value(obs, space) else {
                 continue;
             };
+            let value = self.state_weight * state_delta
+                + self.prior_weight * f64::from(weight(obs, space));
             if value > best + 1e-9 {
                 best = value;
                 candidates.clear();
@@ -331,5 +337,19 @@ impl SpacePolicy for EvaluationPolicy {
             }
         }
         candidates.choose(rng).copied()
+    }
+}
+
+
+/// Default M2 policy, with reproducible, fixed calibration parameters.
+pub struct EvaluationPolicy;
+
+impl SpacePolicy for EvaluationPolicy {
+    fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
+        WeightedEvaluationPolicy {
+            prior_weight: 1.0,
+            state_weight: 1.0,
+        }
+        .select(obs, legal, rng)
     }
 }
