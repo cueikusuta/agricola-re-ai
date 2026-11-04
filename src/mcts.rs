@@ -5,7 +5,7 @@ use crate::evaluation::EvaluationPolicy;
 use crate::model::{Config, Game, Observation, RoundCard, Space};
 use crate::policy::{DetailPolicy, GreedyPolicy, SimpleDetails, SpacePolicy};
 use crate::score::standings;
-use rand::{seq::SliceRandom, Rng, SeedableRng};
+use rand::{seq::SliceRandom, Rng};
 use rand_chacha::ChaCha8Rng;
 use std::collections::BTreeMap;
 
@@ -104,7 +104,9 @@ fn rollout(game: &mut Game, rng: &mut ChaCha8Rng) -> Result<(), String> {
         let space = policy
             .select(&obs, &legal, rng)
             .ok_or("rollout policy failed")?;
-        let action = details.produce(&obs, space).ok_or("rollout detail failed")?;
+        let action = details
+            .produce(&obs, space)
+            .ok_or("rollout detail failed")?;
         game.apply(action)?;
     }
     Err("rollout move limit reached".into())
@@ -224,7 +226,10 @@ impl SpacePolicy for MctsPolicy {
                 nodes[child].wins[obs.player_id] / f64::from(n),
                 nodes[child].margins[obs.player_id] / f64::from(n),
             );
-            if best.as_ref().is_none_or(|(_, previous)| equivalent_better(value, *previous)) {
+            if best
+                .as_ref()
+                .is_none_or(|(_, previous)| equivalent_better(value, *previous))
+            {
                 best = Some((space, value));
             }
         }
@@ -236,6 +241,7 @@ impl SpacePolicy for MctsPolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
 
     #[test]
     fn sampler_obeys_public_state_and_stage_boundaries() {
