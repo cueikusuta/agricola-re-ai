@@ -61,9 +61,11 @@ fn saving_uses_a_verifiable_initial_state_snapshot() {
             .state_hash(),
         game.state_hash()
     );
-    let mut missing: serde_json::Value =
-        serde_json::from_str(&game.save_json().unwrap()).unwrap();
-    missing["log"].as_object_mut().unwrap().remove("initial_public_state");
+    let mut missing: serde_json::Value = serde_json::from_str(&game.save_json().unwrap()).unwrap();
+    missing["log"]
+        .as_object_mut()
+        .unwrap()
+        .remove("initial_public_state");
     let error = Game::load_json(&serde_json::to_string(&missing).unwrap()).unwrap_err();
     assert!(error.contains("snapshot missing"), "{error}");
 
