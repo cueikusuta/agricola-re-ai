@@ -103,6 +103,15 @@ pub enum Detail {
         instant_bake: u32,
         pastures: Vec<Vec<usize>>,
     },
+    /// Explicit detail policy for the mandatory renovation followed by a
+    /// distinct optional follow-up action on the correct card.
+    RenovateDetailed {
+        bonus_improvement: Option<Improvement>,
+        instant_baking: Vec<BakeAllocation>,
+        purchase_mode: PurchaseMode,
+        pastures: Vec<Vec<usize>>,
+        occupancy: Option<Vec<PastureOccupancy>>,
+    },
     Animals(AnimalPlan),
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -637,13 +646,12 @@ impl Game {
                 )?,
                 _ => return Err("improvement required".into()),
             },
-            Space::HouseRedevelopment => {
-                if let Detail::Renovate {
+            Space::HouseRedevelopment => match detail {
+                Detail::Renovate {
                     bonus_improvement,
                     instant_bake,
                     pastures,
-                } = detail
-                {
+                } => {
                     if !pastures.is_empty() {
                         return Err("no fences on house redevelopment".into());
                     }
@@ -660,31 +668,75 @@ impl Game {
                                 allocation: None,
                                 mode: PurchaseMode::Auto,
                             },
-                        )?
+                        )?;
                     } else if *instant_bake > 0 {
                         return Err("instant bake without oven".into());
                     }
-                } else {
-                    return Err("renovation details required".into());
                 }
-            }
-            Space::FarmRedevelopment => {
-                if let Detail::Renovate {
+                Detail::RenovateDetailed {
+                    bonus_improvement,
+                    instant_baking,
+                    purchase_mode,
+                    pastures,
+                    occupancy,
+                } => {
+                    if !pastures.is_empty() || occupancy.is_some() {
+                        return Err("fencing is not allowed on house redevelopment".into());
+                    }
+                    renovate(p)?;
+                    if let Some(improvement) = bonus_improvement {
+                        buy_improvement(
+                            p,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            self.public.round,
+                            *improvement,
+                            PurchaseArgs {
+                                instant_bake: 0,
+                                allocation: Some(instant_baking),
+                                mode: *purchase_mode,
+                            },
+                        )?;
+                    } else if !instant_baking.is_empty() || *purchase_mode != PurchaseMode::Auto {
+                        return Err("improvement detail supplied without a bonus improvement".into());
+                    }
+                }
+                _ => return Err("renovation details required".into()),
+            },
+            Space::FarmRedevelopment => match detail {
+                Detail::Renovate {
                     bonus_improvement,
                     instant_bake,
                     pastures,
-                } = detail
-                {
+                } => {
                     if bonus_improvement.is_some() || *instant_bake > 0 {
                         return Err("no improvement on farm redevelopment".into());
                     }
                     renovate(p)?;
                     if !pastures.is_empty() {
-                        build_pastures(p, pastures, None)?
+                        build_pastures(p, pastures, None)?;
                     }
-                } else {
-                    return Err("renovation details required".into());
                 }
+                Detail::RenovateDetailed {
+                    bonus_improvement,
+                    instant_baking,
+                    purchase_mode,
+                    pastures,
+                    occupancy,
+                } => {
+                    if bonus_improvement.is_some()
+                        || !instant_baking.is_empty()
+                        || *purchase_mode != PurchaseMode::Auto
+                        || (pastures.is_empty() && occupancy.is_some())
+                    {
+                        return Err("only fencing follows farm redevelopment".into());
+                    }
+                    renovate(p)?;
+                    if !pastures.is_empty() {
+                        build_pastures(p, pastures, occupancy.as_deref())?;
+                    }
+                }
+                _ => return Err("renovation details required".into()),
             }
             Space::SheepMarket | Space::PigMarket | Space::CattleMarket | Space::AnimalMarket => {
                 if let Detail::Animals(plan) = detail {
