@@ -2,6 +2,8 @@ name: One-time Rustfmt for M1 draft
 on:
   push:
     branches: ['issue/01-m1-engine-draft']
+  pull_request:
+    types: [opened, reopened, synchronize]
 permissions:
   contents: write
 jobs:
