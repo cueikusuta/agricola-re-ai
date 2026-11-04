@@ -15,7 +15,7 @@
 
 - パン焼きに複数の改善を同時利用する場合の細部指定を、現在の`bake: u32`から改善ごとの割当へ拡張すること。
 - 柵の内部仕切り・牧場の拡張と分割の一般形を実装すること。
-- 牛・羊・猪の物理トークン総数、一般供給の有限在庫と保有計算を完全に反映すること。
+- [確認済み] 動物・資源・作物の一般供給は、物理トークンが不足したら代用品を使える。ルール上の有限上限にはしない。
 
 ## 2026-11-04 M1追加検証：柵とパン焼き
 
@@ -30,3 +30,9 @@
 - 公式付録 p.2「Major Improvements」：全10枚の建築費・得点・工房変換。かまど（Fireplace）を保有していても、調理場（Cooking Hearth）を**建築費で購入**できる。既存のかまどを返却するのは代替手段であり強制ではない。
 - 新しい `Detail::BuyWithMode` は `PurchaseMode::Pay` と `PurchaseMode::Exchange(Fireplace2/Fireplace3)` を明示できる。従来の `Detail::Buy` は互換性のため自動交換を継続。
 - 2016年版の付録 p.2 は https://www.lookout-spiele.de/upload/en_agricolare.html_Appendix_Agricola-RE_EN.pdf 。カード本文や画像を公開リポジトリへ含めない。
+
+## 2026-11-04 公式ルールブックp.12：一般供給の有限性
+
+- 公式ルールブック末尾の「Number of Components」は、各プレイヤーの**人5、厩4、柵15**だけを意図的な個数上限とし、それ以外の共有トークンが不足した場合はgoods tilesまたは代用品を使用できると明記する。
+- よって羊18/猪15/牛13、木30/粘土24等は同梱の物理的なコマの数であり、ゲーム内の獲得数の上限ではない。シミュレーターでは一般供給を有限化しない。Game::validate は個人コマの上限をチェックする。
+- 根拠：https://lookout-spiele.de/upload/en_agricolare.html_Rules_Agricola-RE_EN.pdf p.12、Number of Components。
