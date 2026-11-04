@@ -3,9 +3,7 @@ use agricola_re_ai::evaluation::{
     action_value, evaluate_observation, evaluate_player, EvaluationPolicy,
 };
 use agricola_re_ai::model::{Config, Game, Good, Player};
-use agricola_re_ai::policy::{
-    play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
-};
+use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 
@@ -24,10 +22,8 @@ fn growth_is_more_valuable_earlier() {
     let p = Player::new(0, 4);
     let mut grown = p.clone();
     grown.family += 1;
-    let early = evaluate_player(&grown, 2).family_growth
-        - evaluate_player(&p, 2).family_growth;
-    let late = evaluate_player(&grown, 14).family_growth
-        - evaluate_player(&p, 14).family_growth;
+    let early = evaluate_player(&grown, 2).family_growth - evaluate_player(&p, 2).family_growth;
+    let late = evaluate_player(&grown, 14).family_growth - evaluate_player(&p, 14).family_growth;
     assert!(early > late);
 }
 
