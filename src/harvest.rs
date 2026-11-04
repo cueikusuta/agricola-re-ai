@@ -335,3 +335,83 @@ mod tests {
         assert!(plan.validate().is_err());
     }
 }
+
+#[cfg(test)]
+mod craft_option_tests {
+    use super::*;
+
+    #[test]
+    fn craft_processing_is_optional_even_after_all_meals_paid() {
+        let mut player = Player::new(0, 4);
+        player.improvements.push(Improvement::Joinery);
+        player.supply.wood = 2;
+        let mut plan = FeedingPlan::default();
+        plan.extra_crafting.push(Improvement::Joinery);
+        feed(&mut player, &plan).unwrap();
+        assert_eq!(player.begging, 0);
+        assert_eq!(player.supply.wood, 1);
+        assert_eq!(player.supply.food, 2);
+
+        let mut player = Player::new(0, 4);
+        player.improvements.push(Improvement::Joinery);
+        player.supply.wood = 2;
+        feed(&mut player, &FeedingPlan::default()).unwrap();
+        assert_eq!(player.supply.wood, 2);
+        assert_eq!(player.supply.food, 0);
+    }
+
+    #[test]
+    fn each_owned_craft_workshop_may_process_once_per_harvest() {
+        let mut player = Player::new(0, 4);
+        player.improvements.extend([
+            Improvement::Joinery,
+            Improvement::Pottery,
+            Improvement::Basketry,
+        ]);
+        player.supply.wood = 1;
+        player.supply.clay = 1;
+        player.supply.reed = 1;
+        let mut plan = FeedingPlan::default();
+        plan.extra_crafting = vec![
+            Improvement::Joinery,
+            Improvement::Pottery,
+            Improvement::Basketry,
+        ];
+        feed(&mut player, &plan).unwrap();
+        assert_eq!(player.supply.food, 7);
+        assert_eq!(player.supply.wood, 0);
+        assert_eq!(player.supply.clay, 0);
+        assert_eq!(player.supply.reed, 0);
+    }
+
+    #[test]
+    fn invalid_workshop_reuse_and_unowned_conversion_are_rejected() {
+        let mut player = Player::new(0, 0);
+        player.improvements.push(Improvement::Joinery);
+        player.supply.wood = 2;
+        let mut plan = FeedingPlan::default();
+        plan.extra_crafting = vec![Improvement::Joinery];
+        assert!(feed(&mut player, &plan).is_err());
+
+        let mut plan = FeedingPlan::default();
+        plan.extra_crafting = vec![Improvement::Joinery, Improvement::Joinery];
+        assert!(plan.validate().is_err());
+        plan.extra_crafting = vec![Improvement::Hearth4];
+        assert!(plan.validate().is_err());
+
+        let mut player = Player::new(0, 4);
+        player.supply.wood = 1;
+        let mut plan = FeedingPlan::default();
+        plan.extra_crafting.push(Improvement::Joinery);
+        assert!(feed(&mut player, &plan).is_err());
+    }
+
+    #[test]
+    fn old_feeding_plan_json_defaults_extra_crafting_to_no_processing() {
+        let serialized = serde_json::to_string(&FeedingPlan::default()).unwrap();
+        let mut value: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+        value.as_object_mut().unwrap().remove("extra_crafting");
+        let recovered: FeedingPlan = serde_json::from_value(value).unwrap();
+        assert!(recovered.extra_crafting.is_empty());
+    }
+}
