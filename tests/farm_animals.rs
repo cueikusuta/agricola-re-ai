@@ -84,3 +84,37 @@ fn rearranging_livestock_cannot_create_new_animals() {
         .is_err());
     assert_eq!(g.state_hash(), before);
 }
+
+#[test]
+fn fencing_rejects_a_no_op_without_spending_a_worker() {
+    for enabled in [false, true] {
+        let mut g = game(enabled);
+        reveal_fencing(&mut g);
+        let id = g.public.active_player;
+        g.public.players[id].supply.wood = 8;
+        let pasture = vec![vec![14]];
+        g.apply(Action {
+            space: Space::Fencing,
+            detail: Detail::Fence {
+                pastures: pasture.clone(),
+            },
+        })
+        .unwrap();
+
+        // Allow another fencing turn in this fixed test without advancing rounds.
+        g.public.used.remove(&Space::Fencing);
+        g.public.workers_placed[id] -= 1;
+        g.public.active_player = id;
+        g.validate().unwrap();
+
+        let before = g.state_hash();
+        let err = g
+            .apply(Action {
+                space: Space::Fencing,
+                detail: Detail::Fence { pastures: pasture },
+            })
+            .unwrap_err();
+        assert!(err.contains("at least one new fence"), "{err}");
+        assert_eq!(g.state_hash(), before, "a rejected action must be atomic");
+    }
+}
