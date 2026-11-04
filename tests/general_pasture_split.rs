@@ -1,5 +1,5 @@
 use agricola_re_ai::engine::{Action, Detail};
-use agricola_re_ai::model::{Config, Game, RoundCard, Space, Tile};
+use agricola_re_ai::model::{Config, Game, RoundCard, Space};
 use agricola_re_ai::policy::{DetailPolicy, SimpleDetails};
 
 fn bridged_pasture(enabled: bool) -> Game {
@@ -28,17 +28,8 @@ fn bridged_pasture(enabled: bool) -> Game {
     .unwrap();
     assert_eq!(game.public.players[id].fences.len(), 14);
 
-    // The only possible extra fence is a bridge between two non-singleton
-    // components. Each singleton isolation would need at least two fences.
+    // The only affordable extra fence divides the existing pasture.
     let player = &mut game.public.players[id];
-    for cell in &mut player.farm {
-        if matches!(cell.tile, Tile::Empty) {
-            cell.tile = Tile::Field {
-                crop: None,
-                remaining: 0,
-            };
-        }
-    }
     player.supply.wood = 1;
     game.public.used.clear();
     game.public.workers_placed[id] = 0;

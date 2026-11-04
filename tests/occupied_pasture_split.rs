@@ -1,5 +1,5 @@
 use agricola_re_ai::engine::{Action, Detail};
-use agricola_re_ai::model::{Animal, Config, Game, RoundCard, Space, Tile};
+use agricola_re_ai::model::{Animal, Config, Game, RoundCard, Space};
 use agricola_re_ai::policy::{DetailPolicy, SimpleDetails};
 
 fn reveal_fencing(game: &mut Game) {
@@ -40,15 +40,7 @@ fn surrounded_occupied_pasture(enabled: bool) -> Game {
     let mut player = staging.public.players[id].clone();
     player.pastures[0].animal = Some(Animal::Sheep);
     player.pastures[0].quantity = 3;
-    // Leave no empty cell for a separate pasture. Only a split is possible.
-    for cell in &mut player.farm {
-        if matches!(cell.tile, Tile::Empty) {
-            cell.tile = Tile::Field {
-                crop: None,
-                remaining: 0,
-            };
-        }
-    }
+    // With one wood left, no new one-cell pasture can be enclosed.
     game.public.players[id] = player;
     game.validate().unwrap();
     game

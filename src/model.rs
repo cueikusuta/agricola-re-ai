@@ -457,6 +457,8 @@ pub struct GameLog {
     pub config: Config,
     pub start_player: usize,
     pub initial_state_hash: String,
+    #[serde(default)]
+    pub initial_public_state: Option<PublicState>,
     pub round_seed: u64,
     pub action_seed: u64,
     pub events: Vec<Event>,
@@ -511,6 +513,7 @@ impl Game {
             config: config.clone(),
             start_player,
             initial_state_hash: String::new(),
+            initial_public_state: None,
             round_seed,
             action_seed,
             events: vec![],
@@ -525,6 +528,7 @@ impl Game {
         };
         result.start_round();
         result.log.initial_state_hash = result.state_hash();
+        result.log.initial_public_state = Some(result.public.clone());
         result
     }
     pub fn observation(&self, player_id: usize) -> Result<Observation, String> {
@@ -561,19 +565,24 @@ impl Game {
         {
             return Err("saved game metadata/version mismatch".into());
         }
-        if result.log.start_player >= result.public.players.len()
-            || result.log.initial_state_hash != Game::new(result.config.clone()).state_hash()
+        let initial = Game::new(result.config.clone());
+        if result.log.start_player != initial.public.start_player
+            || result.log.initial_state_hash != initial.state_hash()
+            || result.log.round_seed != initial.log.round_seed
+            || result.log.action_seed != initial.log.action_seed
         {
             return Err("saved game initial state mismatch".into());
         }
-        let expected_hash = result
-            .log
-            .events
-            .last()
-            .map(|event| &event.after)
-            .unwrap_or(&result.log.initial_state_hash);
-        if *expected_hash != result.state_hash() {
-            return Err("saved game state does not match last logged action".into());
+        if let Some(snapshot) = &result.log.initial_public_state {
+            if *snapshot != initial.public {
+                return Err("saved game initial state snapshot mismatch".into());
+            }
+        }
+        // Check the complete event chain, rather than trusting only the
+        // last event hash; otherwise earlier tampering could go unnoticed.
+        let replayed = Game::replay(result.config.clone(), &result.log.events)?;
+        if replayed.state_hash() != result.state_hash() {
+            return Err("saved game differs from its replayed event history".into());
         }
         Ok(result)
     }
@@ -633,6 +642,24 @@ impl Game {
         if p.work_quota.len() != p.players.len() || p.workers_placed.len() != p.players.len() {
             return Err("worker array mismatch".into());
         }
+        // A physical major improvement has exactly one location: market
+        // or a player's table, never both or duplicated.
+        let cards = p
+            .improvement_market
+            .iter()
+            .copied()
+            .chain(
+                p.players
+                    .iter()
+                    .flat_map(|player| player.improvements.iter().copied()),
+            )
+            .collect::<Vec<_>>();
+        if cards.len() != Improvement::ALL.len()
+            || cards.iter().copied().collect::<BTreeSet<_>>()
+                != Improvement::ALL.into_iter().collect()
+        {
+            return Err("major improvement duplicated or missing".into());
+        }
         for (i, player) in p.players.iter().enumerate() {
             if player.id != i || player.farm.len() != FARM_CELLS {
                 return Err("farm shape/player mismatch".into());
@@ -684,6 +711,35 @@ impl Game {
                         || player.farm[cell].tile != (Tile::Pasture { id: pasture.id })
                     {
                         return Err("pasture cell invalid".into());
+                    }
+                }
+            }
+            // All rooms and all fields must form one orthogonally connected
+            // group; a disconnected serialized farm is not a legal state.
+            for category in [0u8, 1u8] {
+                let tiles = player
+                    .farm
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, cell)| match (category, cell.tile) {
+                        (0, Tile::Room) | (1, Tile::Field { .. }) => Some(index),
+                        _ => None,
+                    })
+                    .collect::<BTreeSet<_>>();
+                if !tiles.is_empty() {
+                    let mut explored = BTreeSet::new();
+                    let mut stack = vec![*tiles.iter().next().expect("nonempty tiles")];
+                    while let Some(index) = stack.pop() {
+                        if explored.insert(index) {
+                            stack.extend(
+                                neighbors(index)
+                                    .into_iter()
+                                    .filter(|neighbor| tiles.contains(neighbor)),
+                            );
+                        }
+                    }
+                    if explored != tiles {
+                        return Err("rooms or fields are not connected".into());
                     }
                 }
             }
