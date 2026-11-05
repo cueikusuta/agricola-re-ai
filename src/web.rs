@@ -1,8 +1,8 @@
 //! Loopback-only, single-user web UI. No external services or accounts.
 use crate::breeding::BreedingPlan;
 use crate::engine::{Action, Detail, FreeAction};
-use crate::harvest::FeedingPlan;
 use crate::evaluation::EvaluationPolicy;
+use crate::harvest::FeedingPlan;
 use crate::mcts::MctsPolicy;
 use crate::model::{Config, Game, Space};
 use crate::policy::{DetailPolicy, SimpleDetails, SpacePolicy};
@@ -162,7 +162,10 @@ impl Session {
     }
     pub fn harvest_preview(&self, input: &Value) -> Result<Value, String> {
         let feeding: FeedingPlan = serde_json::from_value(
-            input.get("feeding").cloned().ok_or("feeding choices required")?,
+            input
+                .get("feeding")
+                .cloned()
+                .ok_or("feeding choices required")?,
         )
         .map_err(|e| e.to_string())?;
         let action = self.pending_harvest.as_ref().ok_or("no harvest pending")?;
@@ -177,12 +180,16 @@ impl Session {
         )
         .map_err(|e| e.to_string())?;
         let breeding: BreedingPlan = serde_json::from_value(
-            input.get("breeding").cloned().ok_or("breeding choices required")?,
+            input
+                .get("breeding")
+                .cloned()
+                .ok_or("breeding choices required")?,
         )
         .map_err(|e| e.to_string())?;
         let mut next = self.clone();
         let action = next.pending_harvest.take().ok_or("no harvest pending")?;
-        next.game.apply_with_human_harvest(action, 0, feeding, breeding)?;
+        next.game
+            .apply_with_human_harvest(action, 0, feeding, breeding)?;
         next.advance_cpu()?;
         *self = next;
         Ok(())
@@ -384,10 +391,10 @@ mod tests {
         // Test fixture obtains a legal plan by applying the pending action to
         // a copy; production web actions never call this automatic policy.
         let mut copy = session.game.clone();
-        copy.apply(session.pending_harvest.clone().unwrap()).unwrap();
+        copy.apply(session.pending_harvest.clone().unwrap())
+            .unwrap();
         let last = &copy.log.events.last().unwrap().payload;
-        let record: crate::engine::RecordedAction =
-            serde_json::from_value(last.clone()).unwrap();
+        let record: crate::engine::RecordedAction = serde_json::from_value(last.clone()).unwrap();
         if let crate::engine::RecordedAction::Work {
             harvest_plans: Some(feeding),
             breeding_plans: Some(breeding),
@@ -410,7 +417,7 @@ mod tests {
         assert!(session.play(&json!({"space":space})).is_err());
         assert_eq!(session.game.state_hash(), before);
         assert!(session
-            .free(&json!({"action":{"ConvertCrop":{"good":"Grain","quantity":0}}}))
+            .free(&json!({"action":{"ConvertCrop":{"good":"grain","quantity":0}}}))
             .is_err());
         assert_eq!(session.game.state_hash(), before);
     }
