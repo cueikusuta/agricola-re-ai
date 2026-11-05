@@ -480,9 +480,7 @@ fn card_priority(card: &crate::cards::CardDefinition, round: u8) -> i64 {
             }
             CardEffect::Passive { .. } => horizon * 5,
             CardEffect::EndGameBonus { .. } => 12,
-            CardEffect::AfterHarvestBakeGain { amount } => {
-                i64::from(*amount) * horizon
-            }
+            CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
             CardEffect::Prerequisite { .. } => 0,
         };
     }
@@ -662,7 +660,10 @@ mod card_choice_tests {
         let obs = game.observation(game.public.active_player).unwrap();
         assert!(CardChoiceDetails.produce(&obs, Space::Lessons).is_none());
         assert_eq!(
-            CardChoiceDetails.produce(&obs, Space::MeetingPlace).unwrap().detail,
+            CardChoiceDetails
+                .produce(&obs, Space::MeetingPlace)
+                .unwrap()
+                .detail,
             Detail::None
         );
     }
