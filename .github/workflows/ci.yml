@@ -90,9 +90,13 @@ jobs:
           shared-key: release
           add-job-id-key: 'false'
           cache-on-failure: 'true'
-      # Keep the full optimized suite. This restores the measured faster
-      # shared release compilation cache for tests and benchmarks.
-      - run: cargo test --release --locked --all-targets
+      - name: Install nextest (prebuilt v0.9.151)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest@0.9.151
+      # All --all-targets tests are executed, across test binaries in parallel.
+      # The previous cargo test --all-targets also excluded doctests.
+      - run: cargo nextest run --release --locked --all-targets
       - name: Check inline browser JavaScript syntax
         run: |
           sed -n '/<script>/,/<\/script>/p' web/index.html | sed '1d;$d' > /tmp/agricola-web.js
