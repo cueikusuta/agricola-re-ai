@@ -102,7 +102,7 @@ jobs:
           node --check /tmp/agricola-web.js
 
   benchmark:
-    name: M1 100-game performance
+    name: M1/M2/M7 seeded performance
     needs: changes
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true' }}
     runs-on: ubuntu-24.04
@@ -114,41 +114,31 @@ jobs:
           shared-key: release
           add-job-id-key: 'false'
           save-if: 'false'
-      - name: 100 games with additional tile OFF
-        run: cargo run --release --locked -- --batch 100 --seed 4200
-      - name: 100 games with additional tile ON
-        run: cargo run --release --locked -- --batch 100 --seed 4200 --additional-action-space
-
-  m2_benchmark:
-    name: M2 seeded head-to-head smoke test
-    needs: changes
-    if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true' }}
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: release
-          add-job-id-key: 'false'
-          save-if: 'false'
-      - name: Additional tile OFF
-        run: cargo run --release --locked -- --benchmark 50 --seed 7100
-      - name: Additional tile ON
-        run: cargo run --release --locked -- --benchmark 50 --seed 7100 --additional-action-space
-      - name: Held-out seed 26000 with additional tile OFF
-        run: cargo run --release --locked -- --benchmark 20 --seed 26000
-      - name: Held-out seed 26000 with additional tile ON
-        run: cargo run --release --locked -- --benchmark 20 --seed 26000 --additional-action-space
+      # Compile the release binary once: M1, M2 and M7 previously built the
+      # same binary independently on separate runners, wasting build time.
+      - name: Build shared release benchmark binary
+        run: cargo build --release --locked
+      - name: M1 100 games, additional tile OFF
+        run: ./target/release/agricola-re-ai --batch 100 --seed 4200
+      - name: M1 100 games, additional tile ON
+        run: ./target/release/agricola-re-ai --batch 100 --seed 4200 --additional-action-space
+      - name: M2 seed 7100, additional tile OFF
+        run: ./target/release/agricola-re-ai --benchmark 50 --seed 7100
+      - name: M2 seed 7100, additional tile ON
+        run: ./target/release/agricola-re-ai --benchmark 50 --seed 7100 --additional-action-space
+      - name: M2 held-out seed 26000, tile OFF
+        run: ./target/release/agricola-re-ai --benchmark 20 --seed 26000
+      - name: M2 held-out seed 26000, tile ON
+        run: ./target/release/agricola-re-ai --benchmark 20 --seed 26000 --additional-action-space
       - name: M7 card-mode paired comparison OFF
-        run: cargo run --release --locked -- --benchmark-cards 1 --seed 901
+        run: ./target/release/agricola-re-ai --benchmark-cards 1 --seed 901
       - name: M7 card-mode paired comparison ON
-        run: cargo run --release --locked -- --benchmark-cards 1 --seed 901 --additional-action-space
+        run: ./target/release/agricola-re-ai --benchmark-cards 1 --seed 901 --additional-action-space
 
   gate:
     name: CI required
     if: ${{ always() }}
-    needs: [changes, format, lint, test, benchmark, m2_benchmark]
+    needs: [changes, format, lint, test, benchmark]
     runs-on: ubuntu-24.04
     env:
       CHANGES: ${{ needs.changes.result }}
@@ -158,19 +148,18 @@ jobs:
       FORMAT: ${{ needs.format.result }}
       LINT: ${{ needs.lint.result }}
       TEST: ${{ needs.test.result }}
-      M1: ${{ needs.benchmark.result }}
-      M2: ${{ needs.m2_benchmark.result }}
+      PERFORMANCE: ${{ needs.benchmark.result }}
     steps:
       - name: Require every applicable check to pass
         shell: bash
         run: |
           set -euo pipefail
           echo "changed-files=$CHANGES rust=$RUST runtime=$RUNTIME"
-          echo "rustfmt=$FORMAT clippy=$LINT test=$TEST m1=$M1 m2=$M2"
+          echo "rustfmt=$FORMAT clippy=$LINT test=$TEST benchmark=$PERFORMANCE"
           [[ "$CHANGES" == success ]] || exit 1
           if [[ "$RUST" == true || "$FORCE" == true ]]; then
             [[ "$FORMAT" == success && "$LINT" == success && "$TEST" == success ]] || exit 1
           fi
           if [[ "$RUNTIME" == true || "$FORCE" == true ]]; then
-            [[ "$M1" == success && "$M2" == success ]] || exit 1
+            [[ "$PERFORMANCE" == success ]] || exit 1
           fi
