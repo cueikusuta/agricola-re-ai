@@ -445,6 +445,133 @@ impl DetailPolicy for SimpleDetails {
     }
 }
 
+/// A card-aware detail policy for M7 search. Unlike SimpleDetails (which
+/// takes the first playable card), this scores only the observing player's
+/// known hand and makes a deterministic choice. It never reads hidden Game.
+pub struct CardChoiceDetails;
+
+fn card_good_value(good: Good) -> i64 {
+    match good {
+        Good::Food => 3,
+        Good::Grain | Good::Vegetable => 4,
+        Good::Wood | Good::Clay | Good::Reed | Good::Stone => 3,
+    }
+}
+
+fn card_priority(card: &crate::cards::CardDefinition, round: u8) -> i64 {
+    use crate::cards::CardEffect;
+    let horizon = i64::from(15u8.saturating_sub(round)).min(5);
+    let mut value = i64::from(card.points) * 6;
+    for effect in &card.effects {
+        value += match effect {
+            CardEffect::OnPlayGain { good, amount }
+            | CardEffect::OnPlayGainPerStored { good, amount, .. }
+            | CardEffect::OnPlayGainIfHouse { good, amount, .. } => {
+                card_good_value(*good) * i64::from(*amount)
+            }
+            CardEffect::AfterWorkerGain { good, amount, .. }
+            | CardEffect::StartRoundGain { good, amount, .. } => {
+                card_good_value(*good) * i64::from(*amount) * horizon
+            }
+            CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
+            | CardEffect::HarvestFieldGain { good, amount, .. }
+            | CardEffect::AfterClayConstructionGain { good, amount } => {
+                card_good_value(*good) * i64::from(*amount) * horizon / 2
+            }
+            CardEffect::Passive { .. } => horizon * 5,
+            CardEffect::EndGameBonus { .. } => 12,
+            CardEffect::AfterHarvestBakeGain { amount } => {
+                i64::from(*amount) * horizon
+            }
+            CardEffect::Prerequisite { .. } => 0,
+        };
+    }
+    for (good, amount) in &card.cost {
+        value -= card_good_value(*good) * i64::from(*amount);
+    }
+    value
+}
+
+fn preferred_card(
+    obs: &Observation,
+    kind: crate::cards::CardKind,
+    fee: u32,
+) -> Option<(String, i64)> {
+    let player = obs.public.players.get(obs.player_id)?;
+    let set = crate::cards::CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
+    obs.hand
+        .iter()
+        .filter_map(|id| {
+            let card = set.definition(id)?;
+            if card.kind != kind || !crate::cards::can_play(&set, card, player, fee) {
+                return None;
+            }
+            Some((id, card_priority(card, obs.public.round)))
+        })
+        .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(a.0)))
+        .map(|(id, priority)| (id.clone(), priority))
+}
+
+impl DetailPolicy for CardChoiceDetails {
+    fn produce(&self, obs: &Observation, space: Space) -> Option<Action> {
+        use crate::cards::CardKind;
+        match space {
+            Space::Lessons | Space::ExtraLessons => {
+                let p = obs.public.players.get(obs.player_id)?;
+                let played = p
+                    .played_cards
+                    .iter()
+                    .filter(|id| {
+                        obs.card_definitions
+                            .iter()
+                            .any(|card| card.id == **id && card.kind == CardKind::Occupation)
+                    })
+                    .count();
+                let fee = if space == Space::Lessons {
+                    u32::from(played > 0)
+                } else if obs.public.players.len() == 3 || played >= 2 {
+                    2
+                } else {
+                    1
+                };
+                let (card_id, _) = preferred_card(obs, CardKind::Occupation, fee)?;
+                return Some(Action {
+                    space,
+                    detail: Detail::PlayOccupation { card_id },
+                });
+            }
+            Space::MeetingPlace | Space::MajorImprovement => {
+                if let Some((card_id, priority)) =
+                    preferred_card(obs, CardKind::MinorImprovement, 0)
+                {
+                    if priority >= 12 {
+                        return Some(Action {
+                            space,
+                            detail: Detail::PlayMinor { card_id },
+                        });
+                    }
+                }
+            }
+            Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth => {
+                if let Some((card_id, priority)) =
+                    preferred_card(obs, CardKind::MinorImprovement, 0)
+                {
+                    if priority >= 12 {
+                        return Some(Action {
+                            space,
+                            detail: Detail::GrowWithMinor { card_id },
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+        SimpleDetails.produce(obs, space)
+    }
+}
+
 pub fn play_to_end(
     game: &mut Game,
     space_policy: &dyn SpacePolicy,
@@ -489,5 +616,54 @@ pub fn play_to_end_with_harvest_policy(
         Ok(())
     } else {
         Err("move limit exceeded".into())
+    }
+}
+
+#[cfg(test)]
+mod card_choice_tests {
+    use super::*;
+    use crate::cards::{CardDefinition, CardEffect, CardKind};
+
+    #[test]
+    fn card_choice_uses_best_affordable_known_card_not_first() {
+        let game = crate::model::Game::new(crate::model::Config::default());
+        let mut obs = game.observation(game.public.active_player).unwrap();
+        for (id, food) in [("weak", 1), ("strong", 3)] {
+            obs.card_definitions.push(CardDefinition {
+                id: id.into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: food,
+                }],
+            });
+            obs.hand.push(id.into());
+        }
+        let action = CardChoiceDetails.produce(&obs, Space::Lessons).unwrap();
+        assert_eq!(
+            action.detail,
+            Detail::PlayOccupation {
+                card_id: "strong".into()
+            }
+        );
+        assert_eq!(
+            SimpleDetails.produce(&obs, Space::Lessons).unwrap().detail,
+            Detail::PlayOccupation {
+                card_id: "weak".into()
+            }
+        );
+    }
+
+    #[test]
+    fn no_hand_means_no_occupation_and_meeting_place_fallback() {
+        let game = Game::new(Config::default());
+        let obs = game.observation(game.public.active_player).unwrap();
+        assert!(CardChoiceDetails.produce(&obs, Space::Lessons).is_none());
+        assert_eq!(
+            CardChoiceDetails.produce(&obs, Space::MeetingPlace).unwrap().detail,
+            Detail::None
+        );
     }
 }
