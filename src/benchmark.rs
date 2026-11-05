@@ -1,7 +1,7 @@
 //! Seed-paired, seat-balanced M2 policy benchmarking.
 use crate::cards::CardSet;
 use crate::model::{Config, Game, Observation, Space};
-use crate::policy::{play_to_end, SimpleDetails, SpacePolicy};
+use crate::policy::{play_to_end, CardChoiceDetails, SimpleDetails, SpacePolicy};
 use crate::score::standings;
 use rand_chacha::ChaCha8Rng;
 use serde::Serialize;
@@ -110,7 +110,11 @@ fn compare_policies_in_mode(
                     seats: [left, right],
                 }
             };
-            play_to_end(&mut game, &seats, &SimpleDetails)?;
+            if card_set.is_some() {
+                play_to_end(&mut game, &seats, &CardChoiceDetails)?;
+            } else {
+                play_to_end(&mut game, &seats, &SimpleDetails)?;
+            }
             let result = standings(&game.public.players);
             let left_id = usize::from(swapped);
             let right_id = 1 - left_id;
