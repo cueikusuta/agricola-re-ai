@@ -372,6 +372,12 @@ impl Game {
             &mut next.public.players[player],
             action.space,
         )?;
+        crate::cards::after_worker_if_used(
+            &next.card_set,
+            &mut next.public.players[player],
+            action.space,
+            &next.public.used,
+        )?;
         next.public.used.insert(action.space);
         next.public.workers_placed[player] += 1;
         let will_harvest = next.public.workers_placed == next.public.work_quota

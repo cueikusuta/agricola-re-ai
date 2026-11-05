@@ -730,6 +730,10 @@ impl Game {
                 self.public.players[id].supply.food += 1
             }
         }
+        for player in &mut self.public.players {
+            crate::cards::start_round_rewards(&self.card_set, player)
+                .expect("validated card round reward");
+        }
     }
     pub fn validate(&self) -> Result<(), String> {
         let p = &self.public;
