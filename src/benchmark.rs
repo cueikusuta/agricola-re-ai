@@ -1,4 +1,5 @@
 //! Seed-paired, seat-balanced M2 policy benchmarking.
+use crate::cards::CardSet;
 use crate::model::{Config, Game, Observation, Space};
 use crate::policy::{play_to_end, SimpleDetails, SpacePolicy};
 use crate::score::standings;
@@ -39,8 +40,49 @@ pub fn compare_policies(
     first_seed: u64,
     additional_action_space_enabled: bool,
 ) -> Result<MatchSummary, String> {
+    compare_policies_in_mode(
+        left,
+        right,
+        seeds,
+        first_seed,
+        additional_action_space_enabled,
+        None,
+    )
+}
+
+/// Same paired seats and fixed seeds as M2, with the supplied implemented
+/// cards. Both players are controlled using Observation, not private Game.
+pub fn compare_policies_with_cards(
+    left: &dyn SpacePolicy,
+    right: &dyn SpacePolicy,
+    seeds: usize,
+    first_seed: u64,
+    additional_action_space_enabled: bool,
+    card_set: &CardSet,
+) -> Result<MatchSummary, String> {
+    compare_policies_in_mode(
+        left,
+        right,
+        seeds,
+        first_seed,
+        additional_action_space_enabled,
+        Some(card_set),
+    )
+}
+
+fn compare_policies_in_mode(
+    left: &dyn SpacePolicy,
+    right: &dyn SpacePolicy,
+    seeds: usize,
+    first_seed: u64,
+    additional_action_space_enabled: bool,
+    card_set: Option<&CardSet>,
+) -> Result<MatchSummary, String> {
     if seeds == 0 {
         return Err("benchmark needs at least one seed".into());
+    }
+    if let Some(set) = card_set {
+        set.validate(2)?;
     }
     let mut left_wins = 0usize;
     let mut right_wins = 0usize;
@@ -49,11 +91,16 @@ pub fn compare_policies(
     let mut sum_right = 0i64;
     for n in 0..seeds {
         for swapped in [false, true] {
-            let mut game = Game::new(Config {
+            let config = Config {
                 players: 2,
                 seed: first_seed.wrapping_add(n as u64),
                 additional_action_space_enabled,
-            });
+            };
+            let mut game = if let Some(set) = card_set {
+                Game::with_cards(config, set.clone())?
+            } else {
+                Game::new(config)
+            };
             let seats = if swapped {
                 SeatPolicies {
                     seats: [right, left],
@@ -90,4 +137,50 @@ pub fn compare_policies(
         left_mean_margin: (sum_left - sum_right) as f64 / denominator,
         left_win_rate: (left_wins as f64 + ties as f64 * 0.5) / denominator,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cards::verified_basic_card_set;
+    use crate::evaluation::EvaluationPolicy;
+    use crate::policy::GreedyPolicy;
+
+    #[test]
+    fn card_matches_are_seat_balanced_seeded_and_keep_margin_separate() {
+        let set = verified_basic_card_set(2).unwrap();
+        let run = || {
+            compare_policies_with_cards(
+                &EvaluationPolicy,
+                &GreedyPolicy,
+                1,
+                901,
+                false,
+                &set,
+            )
+            .unwrap()
+        };
+        let first = run();
+        assert_eq!(first, run());
+        assert_eq!(first.games, 2);
+        assert_eq!(first.left_wins + first.right_wins + first.ties, 2);
+        assert_eq!(
+            first.left_mean_margin,
+            first.left_mean_score - first.right_mean_score
+        );
+    }
+
+    #[test]
+    fn invalid_or_empty_benchmark_is_rejected() {
+        let set = verified_basic_card_set(2).unwrap();
+        assert!(compare_policies_with_cards(
+            &EvaluationPolicy,
+            &GreedyPolicy,
+            0,
+            0,
+            false,
+            &set,
+        )
+        .is_err());
+    }
 }
