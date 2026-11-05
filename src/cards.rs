@@ -95,6 +95,112 @@ impl CardSet {
     }
 }
 
+/// A strictly implemented-only slice of the 2016 Revised base A/B cards.
+///
+/// This is an incomplete catalogue: until seven occupations and seven minor
+/// improvements are available for *each* player, Game::with_cards deliberately
+/// refuses a standard seven-card hand. We do not pad it with invented or
+/// unimplemented cards.
+pub fn implemented_base_ab_cards() -> CardSet {
+    let gain = |space, good| CardEffect::AfterWorkerGain {
+        space,
+        good,
+        amount: 1,
+    };
+    CardSet {
+        definitions: vec![
+            CardDefinition {
+                id: "a-corn-scoop".into(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![(Good::Wood, 1)],
+                points: 0,
+                effects: vec![gain(Space::GrainSeeds, Good::Grain)],
+            },
+            CardDefinition {
+                id: "a-firewood-collector".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![
+                    gain(Space::Farmland, Good::Wood),
+                    gain(Space::GrainSeeds, Good::Wood),
+                    gain(Space::GrainUtilization, Good::Wood),
+                    gain(Space::Cultivation, Good::Wood),
+                ],
+            },
+            CardDefinition {
+                id: "b-greengrocer".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![gain(Space::GrainSeeds, Good::Vegetable)],
+            },
+        ],
+    }
+}
+
+#[cfg(test)]
+mod verified_ab_card_tests {
+    use super::*;
+
+    fn play_card(id: &str) -> (CardSet, Player) {
+        let set = implemented_base_ab_cards();
+        let card = set.definition(id).expect("verified card id");
+        let mut player = Player::new(0, 3);
+        player.supply.wood = 2;
+        let mut hand = vec![id.to_string()];
+        play(&set, &mut hand, &mut player, id, card.kind, 0).unwrap();
+        assert!(hand.is_empty());
+        assert_eq!(player.played_cards, vec![id]);
+        (set, player)
+    }
+
+    #[test]
+    fn a_corn_scoop_gives_one_extra_grain_on_grain_seeds() {
+        let (set, mut player) = play_card("a-corn-scoop");
+        assert_eq!(player.supply.wood, 1);
+        let old = player.supply.grain;
+        after_worker(&set, &mut player, Space::GrainSeeds).unwrap();
+        assert_eq!(player.supply.grain, old + 1);
+        after_worker(&set, &mut player, Space::Farmland).unwrap();
+        assert_eq!(player.supply.grain, old + 1);
+    }
+
+    #[test]
+    fn b_greengrocer_gives_vegetable_only_on_grain_seeds() {
+        let (set, mut player) = play_card("b-greengrocer");
+        after_worker(&set, &mut player, Space::GrainSeeds).unwrap();
+        assert_eq!(player.supply.vegetable, 1);
+        after_worker(&set, &mut player, Space::VegetableSeeds).unwrap();
+        assert_eq!(player.supply.vegetable, 1);
+    }
+
+    #[test]
+    fn a_firewood_collector_triggers_at_each_named_space_once() {
+        let (set, mut player) = play_card("a-firewood-collector");
+        let old = player.supply.wood;
+        for space in [
+            Space::Farmland,
+            Space::GrainSeeds,
+            Space::GrainUtilization,
+            Space::Cultivation,
+        ] {
+            after_worker(&set, &mut player, space).unwrap();
+        }
+        assert_eq!(player.supply.wood, old + 4);
+        after_worker(&set, &mut player, Space::Forest).unwrap();
+        assert_eq!(player.supply.wood, old + 4);
+    }
+
+    #[test]
+    fn partial_catalogue_is_never_dealt_as_complete_hands() {
+        let set = implemented_base_ab_cards();
+        assert_eq!(set.definitions.len(), 3);
+        assert!(set.validate(2).is_err());
+        assert!(set.validate(4).is_err());
+    }
+}
+
 /// Private: must never be serialized into a player's Observation.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CardState {
