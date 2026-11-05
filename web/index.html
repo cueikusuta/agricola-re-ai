@@ -201,7 +201,7 @@ const response=await fetch(path,opts),result=await response.json();if(!response.
 const first=state===null;state=result;if(first){$("players").value=String(state.public.players.length);$("extra").checked=state.public.additional_action_space_enabled;$("ai").value=state.mcts?"mcts":"eval";$("seed").value=String(state.seed);}
 viewPlayer=Math.min(viewPlayer,state.public.players.length-1);if(path!=="/api/state")actionPage=0;render();return true;
 }catch(e){$("notice").textContent=e.message;$("editorHint").textContent=e.message;return false;
-}finally{busy=false;$("new").disabled=false;$("confirm").disabled=false;}
+}finally{busy=false;$("new").disabled=false;$("confirm").disabled=false;if(state)render();}
 }
 $("detailForm").onsubmit=async e=>{e.preventDefault();try{const payload=mode==="work"?{space:selectedSpace,detail:workDetail(selectedSpace)}:mode==="free"?{action:freeAction()}:harvestPayload();
 const path=mode==="work"?"/api/play":mode==="free"?"/api/free":"/api/harvest";if(await request(path,payload))$("editor").close();}catch(err){$("editorHint").textContent=err.message;}};
