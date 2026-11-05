@@ -463,11 +463,7 @@ impl Game {
         let mut next = self.clone();
         let id = next.public.active_player;
         next.execute_work(id, action)?;
-        crate::cards::after_worker(
-            &next.card_set,
-            &mut next.public.players[id],
-            action.space,
-        )?;
+        crate::cards::after_worker(&next.card_set, &mut next.public.players[id], action.space)?;
         next.public.used.insert(action.space);
         next.public.workers_placed[id] += 1;
         next.harvest_fields();
