@@ -139,12 +139,8 @@ impl Session {
 
 fn local_request_allowed(host: Option<&str>, origin: Option<&str>) -> bool {
     let local_host = matches!(host, Some("127.0.0.1:8787" | "localhost:8787"));
-    let local_origin = origin.is_none_or(|value| {
-        matches!(
-            value,
-            "http://127.0.0.1:8787" | "http://localhost:8787"
-        )
-    });
+    let local_origin = origin
+        .is_none_or(|value| matches!(value, "http://127.0.0.1:8787" | "http://localhost:8787"));
     local_host && local_origin
 }
 
