@@ -2,9 +2,9 @@
 //! A fresh hidden round order is sampled from the public revealed cards for
 //! each simulation. No Game reference (or hidden RNG) enters SpacePolicy.
 use crate::cards::{CardKind, CardSet, CardState};
-use crate::evaluation::EvaluationPolicy;
+use crate::evaluation::{DetailAwareEvaluationPolicy, WeightedEvaluationPolicy};
 use crate::model::{Config, Game, Observation, RoundCard, Space};
-use crate::policy::{DetailPolicy, GreedyPolicy, SimpleDetails, SpacePolicy};
+use crate::policy::{CardChoiceDetails, DetailPolicy, GreedyPolicy, SpacePolicy};
 use crate::score::standings;
 use rand::{seq::SliceRandom, Rng};
 use rand_chacha::ChaCha8Rng;
@@ -178,8 +178,14 @@ fn best_root_action(candidates: &[(Space, (f64, f64))]) -> Option<Space> {
 }
 
 fn rollout(game: &mut Game, rng: &mut ChaCha8Rng) -> Result<(), String> {
-    let details = SimpleDetails;
-    let evaluation = EvaluationPolicy;
+    let details = CardChoiceDetails;
+    let evaluation = DetailAwareEvaluationPolicy {
+        weights: WeightedEvaluationPolicy {
+            prior_weight: 0.5,
+            state_weight: 2.0,
+        },
+        details: &details,
+    };
     let greedy = GreedyPolicy;
     for _ in 0..320 {
         if game.public.finished {
@@ -218,7 +224,7 @@ impl SpacePolicy for MctsPolicy {
         }
         let player_count = obs.public.players.len();
         let mut nodes = vec![Node::new(player_count)];
-        let detail_policy = SimpleDetails;
+        let detail_policy = CardChoiceDetails;
         for _ in 0..self.simulations {
             let Some(mut game) = sample_game(obs, rng) else {
                 continue;
@@ -326,7 +332,17 @@ impl SpacePolicy for MctsPolicy {
             );
             candidates.push((space, value));
         }
-        best_root_action(&candidates).or_else(|| EvaluationPolicy.select(obs, legal, rng))
+        best_root_action(&candidates).or_else(|| {
+            let details = CardChoiceDetails;
+            DetailAwareEvaluationPolicy {
+                weights: WeightedEvaluationPolicy {
+                    prior_weight: 0.5,
+                    state_weight: 2.0,
+                },
+                details: &details,
+            }
+            .select(obs, legal, rng)
+        })
     }
 }
 
