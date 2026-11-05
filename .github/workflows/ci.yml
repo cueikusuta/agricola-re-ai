@@ -104,7 +104,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: release
+          key: workspace-v1
           add-job-id-key: 'false'
+          cache-workspace-crates: 'true'
           cache-on-failure: 'true'
       # rust-cache prunes the sparse registry index. Restore a separate
       # lockfile-keyed index so locked builds can avoid slow registry refreshes.
@@ -157,7 +159,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: release
+          key: workspace-v1
           add-job-id-key: 'false'
+          cache-workspace-crates: 'true'
           save-if: 'false'
       # rust-cache prunes the sparse registry index. Restore a separate
       # lockfile-keyed index so locked builds can avoid slow registry refreshes.
