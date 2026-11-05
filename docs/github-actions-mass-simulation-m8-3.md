@@ -21,7 +21,7 @@
 | `players` | `4` | 2/3/4（#108の合格モードのみ） |
 | `cards` | `none` | `none/verified`、未対応を拒否 |
 | `additional_action_space` | `false` | bool |
-| `draft_mode` | `deal_7` | #104実装前はカードなし時 `none` のみ |
+| `draft_mode` | `none` | #104実装前はカードなし時 `none` のみ。`deal_7` はカードありモード実装後 |
 | `candidate_ai`, `baseline_ai`, `opponent_profile` | `M7` / `eval` / `eval×3` | **実装されたAI識別子のみ** |
 | `seed_start` | `420000` | u64、連続範囲のオーバーフロー拒否 |
 | `shards` | `4` | 1〜設定上限。実行枠と試合数から選択 |
