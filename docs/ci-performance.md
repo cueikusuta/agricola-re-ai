@@ -44,8 +44,11 @@ PR時はPRのベースブランチとの差分、main/developへのpush時は直
 | `906f5d8` | M7追加MCTS通しテスト・本番release nextest | 62秒 | 全ゲート成功。Clippyの事前バージョン照会に5秒など短縮余地が残る |
 | `215e466` | version-probeだけ除去した全テスト | 102秒 | 全ゲート成功、依存キャッシュはhitだが本体releaseコンパイル53秒 |
 | `90466cd` | 初回sccache試験、バージョンprobe除去 | 82秒 | 全ゲート成功、sccache 1件miss・1件write（自作ライブラリ）。温キャッシュ確認前 |
+| `0c5fc72` | 次回sccache再利用（テストのみ） | 71秒 | 全ゲート成功。sccache 1/1 hit、自作libのreleaseビルド17.6秒 |
+| `43d0cea` | ベンチマークのリリースコンパイルにもsccache | 97秒 | 全成功。2ジョブとも1/1 cache hitだが、テストでCargo index待機約27秒 |
+| `1740e3e` | オフラインCargo事前判定を試験 | 79秒 | 全成功。cache hitでもoffline fetch判定は失敗し、オンライン実行へフォールバックした。方法を撤回 |
 
-M1/M2のリリースビルド統合は成功した。コンパイル成果物の再利用策として、`mozilla-actions/sccache-action@v0.0.11` をnextestのreleaseビルドだけに適用して試験する。初回は1件のコンパイルがcache missになり、次のコード変更なし実行で同じ成果物が再利用されるか確認する。CI軽量化Issue #97では、Ubuntu 24.04に組込み済みRustのバージョン照会ステップだけを削除する。Rust本体、rustfmt、clippy、nextest、全ベンチマークおよび最終ゲートは維持する。削減量の正確な判断はPRのCI成功後の実測に基づく。`ci-fast` は冷・温キャッシュの両方で60秒を超え、release方式の最速50秒に及ばなかったため撤回した。releaseキャッシュ共有とUbuntu同梱のRustツール利用を採用。最終構成の時間は最終CIログで確認する。GitHub-hostedランナーの割当てやキュー待機はリポジトリ内の設定だけで常時60秒以内に保証できない。CIの所要時間を報告するときはコミットとrun URLを付ける。
+M1/M2のリリースビルド統合は成功した。コンパイル成果物の再利用策として、`mozilla-actions/sccache-action@v0.0.11` をnextestと統合ベンチマークのreleaseビルドだけに適用した。初回は1件cache missだったが温キャッシュでは両ジョブで各1件hitを記録し、自作libの再コンパイルは短縮した。`cargo fetch --locked --offline` の事前判定はキャッシュ復元後でも失敗するため、本CIでは採用しない。CI軽量化Issue #97では、Ubuntu 24.04に組込み済みRustのバージョン照会ステップだけを削除する。Rust本体、rustfmt、clippy、nextest、全ベンチマークおよび最終ゲートは維持する。削減量の正確な判断はPRのCI成功後の実測に基づく。`ci-fast` は冷・温キャッシュの両方で60秒を超え、release方式の最速50秒に及ばなかったため撤回した。releaseキャッシュ共有とUbuntu同梱のRustツール利用を採用。最終構成の時間は最終CIログで確認する。GitHub-hostedランナーの割当てやキュー待機はリポジトリ内の設定だけで常時60秒以内に保証できない。CIの所要時間を報告するときはコミットとrun URLを付ける。
 
 ## 確認項目
 1. コード変更PRでrustfmt/clippy/nextest/release全テストとM1/M2/M7統合性能計測が実行され、CI requiredが成功する。
