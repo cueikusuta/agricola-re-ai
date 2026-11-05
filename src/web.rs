@@ -147,9 +147,13 @@ impl Session {
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
         };
-        let card_set: CardSet = match input.get("card_set") {
-            Some(value) => serde_json::from_value(value.clone()).map_err(|e| e.to_string())?,
-            None => CardSet::default(),
+        let card_set: CardSet = match input.get("preset").and_then(Value::as_str) {
+            Some("verified") => crate::cards::verified_basic_card_set(config.players)?,
+            Some(_) => return Err("unknown card preset".into()),
+            None => match input.get("card_set") {
+                Some(value) => serde_json::from_value(value.clone()).map_err(|e| e.to_string())?,
+                None => CardSet::default(),
+            },
         };
         let mut next = Self {
             game: Game::with_cards(config, card_set)?,

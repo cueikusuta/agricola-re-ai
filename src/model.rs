@@ -163,6 +163,22 @@ pub struct Player {
     pub played_cards: Vec<String>,
     #[serde(default)]
     pub card_points: i32,
+    #[serde(default)]
+    pub pasture_capacity_bonus: u32,
+    #[serde(default)]
+    pub free_fence_wood: u32,
+    #[serde(default)]
+    pub improvement_wood_discount: u32,
+    #[serde(default)]
+    pub wooden_room_cost: Option<u32>,
+    #[serde(default)]
+    pub room_material_cost: Option<u32>,
+    #[serde(default)]
+    pub major_stone_discount_by_rooms: bool,
+    #[serde(default)]
+    pub stone_cost_discount: u32,
+    #[serde(default)]
+    pub extra_housing: u8,
     pub begging: u32,
 }
 impl Player {
@@ -186,6 +202,14 @@ impl Player {
             improvements: vec![],
             played_cards: vec![],
             card_points: 0,
+            pasture_capacity_bonus: 0,
+            free_fence_wood: 0,
+            improvement_wood_discount: 0,
+            wooden_room_cost: None,
+            room_material_cost: None,
+            major_stone_discount_by_rooms: false,
+            stone_cost_discount: 0,
+            extra_housing: 0,
             begging: 0,
         }
     }
@@ -221,7 +245,9 @@ impl Player {
     }
     pub fn pasture_capacity(&self, p: &Pasture) -> u32 {
         let stables = p.cells.iter().filter(|&&i| self.farm[i].stable).count();
-        (2 * p.cells.len() as u32).saturating_mul(1u32 << stables)
+        (2 * p.cells.len() as u32)
+            .saturating_mul(1u32 << stables)
+            .saturating_add(self.pasture_capacity_bonus)
     }
     pub fn total_crop(&self, kind: Crop) -> u32 {
         let in_supply = match kind {
@@ -729,6 +755,10 @@ impl Game {
             for id in recipients {
                 self.public.players[id].supply.food += 1
             }
+        }
+        for player in &mut self.public.players {
+            crate::cards::start_round_rewards(&self.card_set, player)
+                .expect("validated card round reward");
         }
     }
     pub fn validate(&self) -> Result<(), String> {

@@ -43,6 +43,52 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    StartRoundGain {
+        good: Good,
+        amount: u32,
+        house: Option<House>,
+        rooms: Option<u8>,
+    },
+    HarvestFieldGain {
+        rule: HarvestFieldRule,
+        good: Good,
+        amount: u32,
+    },
+    AfterWorkerGainIfUsed {
+        space: Space,
+        required_space: Space,
+        good: Good,
+        amount: u32,
+    },
+    Passive {
+        rule: PassiveRule,
+    },
+    AfterClayConstructionGain {
+        good: Good,
+        amount: u32,
+    },
+    AfterHarvestBakeGain {
+        amount: u32,
+    },
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PassiveRule {
+    PastureCapacity(u32),
+    FenceWoodDiscount(u32),
+    ImprovementWoodDiscount(u32),
+    WoodenRoomCost(u32),
+    RoomCost(u32),
+    MajorStoneDiscountByRooms,
+    StoneDiscount(u32),
+    HousingSpace(u8),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HarvestFieldRule {
+    Animals { sheep_per: u32, cattle_per: u32 },
+    MixedFields,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -116,14 +162,29 @@ impl CardSet {
                     let amount = match effect {
                         CardEffect::OnPlayGain { amount, .. }
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
-                        CardEffect::EndGameBonus { .. } | CardEffect::Prerequisite { .. } => 1,
+                        CardEffect::EndGameBonus { .. }
+                        | CardEffect::Prerequisite { .. }
+                        | CardEffect::Passive { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
-                        | CardEffect::OnPlayGainIfHouse { amount, .. } => *amount,
+                        | CardEffect::OnPlayGainIfHouse { amount, .. }
+                        | CardEffect::StartRoundGain { amount, .. }
+                        | CardEffect::HarvestFieldGain { amount, .. }
+                        | CardEffect::AfterWorkerGainIfUsed { amount, .. }
+                        | CardEffect::AfterClayConstructionGain { amount, .. }
+                        | CardEffect::AfterHarvestBakeGain { amount } => *amount,
                     };
                     amount == 0 || amount > 30
                 })
                 || card.effects.iter().any(|effect| {
                     matches!(effect, CardEffect::OnPlayGainPerStored { divisor: 0, .. })
+                        || matches!(
+                            effect,
+                            CardEffect::HarvestFieldGain {
+                                rule: HarvestFieldRule::Animals { sheep_per: 0, .. }
+                                    | HarvestFieldRule::Animals { cattle_per: 0, .. },
+                                ..
+                            }
+                        )
                 })
             {
                 return Err("unsupported card cost, points, or effect".into());
@@ -230,13 +291,30 @@ impl CardState {
 }
 
 /// Verify card affordability using aggregate costs (including occupation fees).
-pub fn affordable(card: &CardDefinition, player: &Player, extra_food: u32) -> bool {
+fn card_costs(
+    card: &CardDefinition,
+    player: &Player,
+    extra_food: u32,
+) -> std::collections::BTreeMap<Good, u32> {
     let mut amounts = std::collections::BTreeMap::<Good, u32>::new();
     for &(good, amount) in &card.cost {
         *amounts.entry(good).or_default() += amount;
     }
+    if card.kind == CardKind::MinorImprovement {
+        if let Some(wood) = amounts.get_mut(&Good::Wood) {
+            *wood = wood.saturating_sub(player.improvement_wood_discount);
+        }
+    }
+    if card.kind == CardKind::MinorImprovement {
+        if let Some(stone) = amounts.get_mut(&Good::Stone) {
+            *stone = stone.saturating_sub(player.stone_cost_discount);
+        }
+    }
     *amounts.entry(Good::Food).or_default() += extra_food;
     amounts
+}
+pub fn affordable(card: &CardDefinition, player: &Player, extra_food: u32) -> bool {
+    card_costs(card, player, extra_food)
         .iter()
         .all(|(&good, &amount)| player.supply.get(good) >= amount)
 }
@@ -297,11 +375,8 @@ pub fn play(
     if !can_play(set, card, player, extra_food) {
         return Err("cannot pay card costs or prerequisites are unmet".into());
     }
-    for &(good, amount) in &card.cost {
+    for (good, amount) in card_costs(card, player, extra_food) {
         player.supply.pay(good, amount)?;
-    }
-    if extra_food > 0 {
-        player.supply.pay(Good::Food, extra_food)?;
     }
     let next_points = player
         .card_points
@@ -331,6 +406,18 @@ pub fn play(
             } if player.house == *house && player.rooms() == usize::from(*rooms) => {
                 safe_gain(player, *good, *amount)?;
             }
+            CardEffect::Passive { rule } => match rule {
+                PassiveRule::PastureCapacity(n) => player.pasture_capacity_bonus += n,
+                PassiveRule::FenceWoodDiscount(n) => player.free_fence_wood += n,
+                PassiveRule::ImprovementWoodDiscount(n) => player.improvement_wood_discount += n,
+                PassiveRule::WoodenRoomCost(n) => player.wooden_room_cost = Some(*n),
+                PassiveRule::RoomCost(n) => player.room_material_cost = Some(*n),
+                PassiveRule::MajorStoneDiscountByRooms => {
+                    player.major_stone_discount_by_rooms = true
+                }
+                PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
+                PassiveRule::HousingSpace(n) => player.extra_housing += n,
+            },
             _ => {}
         }
     }
@@ -1135,5 +1222,726 @@ mod verified_worker_bonus_tests {
         let player = applied("B142", &[Space::GrainSeeds, Space::Farmland]);
         assert_eq!(player.supply.vegetable, 1);
         assert_eq!(player.supply.grain, 0);
+    }
+}
+
+/// Deterministic public start-of-round rewards. Evaluates the owner's state
+/// when the round begins, not when the card was originally played.
+pub fn start_round_rewards(set: &CardSet, player: &mut Player) -> Result<(), String> {
+    for id in player.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            if let CardEffect::StartRoundGain {
+                good,
+                amount,
+                house,
+                rooms,
+            } = effect
+            {
+                if house.is_none_or(|h| player.house == h)
+                    && rooms.is_none_or(|r| player.rooms() == usize::from(r))
+                {
+                    safe_gain(player, *good, *amount)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Called before taking crops from fields; livestock and field layouts still
+/// represent the state at the start of the field phase.
+pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), String> {
+    for id in player.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            if let CardEffect::HarvestFieldGain { rule, good, amount } = effect {
+                let multiplier = match rule {
+                    HarvestFieldRule::Animals {
+                        sheep_per,
+                        cattle_per,
+                    } => (player.animal_count(Animal::Sheep) / *sheep_per)
+                        .checked_add(player.animal_count(Animal::Cattle) / *cattle_per)
+                        .ok_or("harvest animal bonus overflow")?,
+                    HarvestFieldRule::MixedFields => {
+                        let has = |crop: Option<Crop>| {
+                            player.farm.iter().any(|cell| {
+                            matches!(cell.tile, Tile::Field { crop: found, .. } if found == crop)
+                        })
+                        };
+                        u32::from(has(Some(Crop::Grain)) && has(Some(Crop::Vegetable)) && has(None))
+                    }
+                };
+                safe_gain(
+                    player,
+                    *good,
+                    multiplier
+                        .checked_mul(*amount)
+                        .ok_or("harvest bonus overflow")?,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Work-phase rewards that depend on a different space already being occupied.
+pub fn after_worker_if_used(
+    set: &CardSet,
+    player: &mut Player,
+    space: Space,
+    used: &BTreeSet<Space>,
+) -> Result<(), String> {
+    for id in player.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            if let CardEffect::AfterWorkerGainIfUsed {
+                space: trigger,
+                required_space,
+                good,
+                amount,
+            } = effect
+            {
+                if *trigger == space && used.contains(required_space) {
+                    safe_gain(player, *good, *amount)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Additional basic 2016 A/B cards with fully deterministic timing hooks.
+pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
+    let minor = CardKind::MinorImprovement;
+    let occupation = CardKind::Occupation;
+    vec![
+        CardDefinition {
+            id: "B050".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MaximumOccupations(3),
+                },
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::Animals {
+                        sheep_per: 3,
+                        cattle_per: 2,
+                    },
+                    good: Good::Food,
+                    amount: 1,
+                },
+            ],
+        },
+        CardDefinition {
+            id: "B057".into(),
+            kind: minor,
+            cost: vec![(Good::Clay, 1), (Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::StartRoundGain {
+                good: Good::Food,
+                amount: 1,
+                house: Some(House::Wood),
+                rooms: None,
+            }],
+        },
+        CardDefinition {
+            id: "B061".into(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::HarvestFieldGain {
+                rule: HarvestFieldRule::MixedFields,
+                good: Good::Food,
+                amount: 3,
+            }],
+        },
+        CardDefinition {
+            id: "B062".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::AfterWorkerGainIfUsed {
+                space: Space::GrainSeeds,
+                required_space: Space::Farmland,
+                good: Good::Food,
+                amount: 3,
+            }],
+        },
+        CardDefinition {
+            id: "B118".into(),
+            kind: occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::StartRoundGain {
+                good: Good::Wood,
+                amount: 1,
+                house: None,
+                rooms: Some(2),
+            }],
+        },
+    ]
+}
+
+#[cfg(test)]
+mod round_and_harvest_card_tests {
+    use super::*;
+    fn set() -> CardSet {
+        CardSet {
+            definitions: verified_round_and_harvest_cards(),
+        }
+    }
+    #[test]
+    fn b050_counts_sheep_in_threes_and_cattle_in_pairs() {
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B050".into());
+        p.pastures.push(crate::model::Pasture {
+            id: 0,
+            cells: vec![2, 3, 4],
+            animal: Some(Animal::Sheep),
+            quantity: 6,
+        });
+        p.pastures.push(crate::model::Pasture {
+            id: 1,
+            cells: vec![6, 7],
+            animal: Some(Animal::Cattle),
+            quantity: 3,
+        });
+        harvest_field_rewards(&set(), &mut p).unwrap();
+        assert_eq!(p.supply.food, 3);
+    }
+    #[test]
+    fn b057_works_only_in_wooden_house() {
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B057".into());
+        start_round_rewards(&set(), &mut p).unwrap();
+        assert_eq!(p.supply.food, 1);
+        p.house = House::Clay;
+        start_round_rewards(&set(), &mut p).unwrap();
+        assert_eq!(p.supply.food, 1);
+    }
+    #[test]
+    fn b061_requires_three_different_field_states() {
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B061".into());
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        p.farm[3].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        harvest_field_rewards(&set(), &mut p).unwrap();
+        assert_eq!(p.supply.food, 0);
+        p.farm[4].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        harvest_field_rewards(&set(), &mut p).unwrap();
+        assert_eq!(p.supply.food, 3);
+    }
+    #[test]
+    fn b062_checks_other_space_occupied_in_same_round() {
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B062".into());
+        after_worker_if_used(&set(), &mut p, Space::GrainSeeds, &BTreeSet::new()).unwrap();
+        assert_eq!(p.supply.food, 0);
+        after_worker_if_used(
+            &set(),
+            &mut p,
+            Space::GrainSeeds,
+            &BTreeSet::from([Space::Farmland]),
+        )
+        .unwrap();
+        assert_eq!(p.supply.food, 3);
+    }
+    #[test]
+    fn b118_requires_exactly_two_physical_rooms() {
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B118".into());
+        start_round_rewards(&set(), &mut p).unwrap();
+        assert_eq!(p.supply.wood, 1);
+        p.farm[1].tile = Tile::Room;
+        start_round_rewards(&set(), &mut p).unwrap();
+        assert_eq!(p.supply.wood, 1);
+    }
+}
+
+/// Purely code-defined basic A/B passive modifiers; no card text or artwork.
+pub fn verified_passive_cards() -> Vec<CardDefinition> {
+    fn card(
+        id: &str,
+        kind: CardKind,
+        cost: Vec<(Good, u32)>,
+        effect: PassiveRule,
+    ) -> CardDefinition {
+        CardDefinition {
+            id: id.into(),
+            kind,
+            cost,
+            points: 0,
+            effects: vec![CardEffect::Passive { rule: effect }],
+        }
+    }
+    vec![
+        card(
+            "A012",
+            CardKind::MinorImprovement,
+            vec![(Good::Clay, 1)],
+            PassiveRule::PastureCapacity(2),
+        ),
+        CardDefinition {
+            id: "A075".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Stone, 2)],
+            points: 2,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MaximumOccupations(3),
+                },
+                CardEffect::Passive {
+                    rule: PassiveRule::ImprovementWoodDiscount(1),
+                },
+            ],
+        },
+        card(
+            "B013",
+            CardKind::MinorImprovement,
+            vec![(Good::Stone, 1), (Good::Wood, 1)],
+            PassiveRule::WoodenRoomCost(2),
+        ),
+        card(
+            "A088",
+            CardKind::Occupation,
+            vec![],
+            PassiveRule::FenceWoodDiscount(3),
+        ),
+        card(
+            "B095",
+            CardKind::Occupation,
+            vec![],
+            PassiveRule::MajorStoneDiscountByRooms,
+        ),
+        card(
+            "B126",
+            CardKind::Occupation,
+            vec![],
+            PassiveRule::RoomCost(3),
+        ),
+    ]
+}
+#[cfg(test)]
+mod passive_cards_tests {
+    use super::*;
+    fn activate(id: &str, p: &mut Player) {
+        let set = CardSet {
+            definitions: verified_passive_cards(),
+        };
+        let mut hand = vec![id.into()];
+        let kind = set.definition(id).unwrap().kind;
+        play(&set, &mut hand, p, id, kind, 0).unwrap();
+    }
+    #[test]
+    fn a012_pasture_extra_two_including_stable() {
+        let mut p = Player::new(0, 0);
+        p.supply.clay = 1;
+        let q = crate::model::Pasture {
+            id: 0,
+            cells: vec![2],
+            animal: None,
+            quantity: 0,
+        };
+        activate("A012", &mut p);
+        assert_eq!(p.pasture_capacity(&q), 4);
+        p.farm[2].stable = true;
+        assert_eq!(p.pasture_capacity(&q), 6);
+    }
+    #[test]
+    fn a075_minor_wood_cost_discount() {
+        let mut p = Player::new(0, 0);
+        p.supply.stone = 2;
+        activate("A075", &mut p);
+        assert_eq!(p.card_points, 2);
+        let mut set = CardSet {
+            definitions: verified_passive_cards(),
+        };
+        set.definitions.push(CardDefinition {
+            id: "sample".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![],
+        });
+        play(
+            &set,
+            &mut vec!["sample".into()],
+            &mut p,
+            "sample",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.supply.wood, 0);
+    }
+    #[test]
+    fn b013_wooden_room_two_wood() {
+        let mut p = Player::new(0, 0);
+        p.supply.stone = 1;
+        p.supply.wood = 1;
+        activate("B013", &mut p);
+        assert_eq!(p.wooden_room_cost, Some(2));
+    }
+    #[test]
+    fn a088_fence_discount_three() {
+        let mut p = Player::new(0, 0);
+        activate("A088", &mut p);
+        assert_eq!(p.free_fence_wood, 3);
+    }
+    #[test]
+    fn b095_major_stone_discount() {
+        let mut p = Player::new(0, 0);
+        activate("B095", &mut p);
+        assert!(p.major_stone_discount_by_rooms);
+    }
+    #[test]
+    fn b126_room_cost_three() {
+        let mut p = Player::new(0, 0);
+        activate("B126", &mut p);
+        assert_eq!(p.room_material_cost, Some(3));
+    }
+    #[test]
+    fn b050_limits_occupation_count() {
+        let mut set = CardSet {
+            definitions: verified_round_and_harvest_cards(),
+        };
+        for i in 0..4 {
+            set.definitions.push(CardDefinition {
+                id: format!("occ{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        assert!(can_play(&set, set.definition("B050").unwrap(), &p, 0));
+        p.played_cards.extend((0..4).map(|i| format!("occ{i}")));
+        assert!(!can_play(&set, set.definition("B050").unwrap(), &p, 0));
+    }
+}
+
+/// One-time reward on the completion of qualifying clay construction.
+pub fn after_clay_construction(
+    set: &CardSet,
+    previous: &Player,
+    current: &mut Player,
+) -> Result<(), String> {
+    let qualifies = (previous.house == House::Clay && current.rooms() > previous.rooms())
+        || (previous.house == House::Clay && current.house == House::Stone);
+    if !qualifies {
+        return Ok(());
+    }
+    for id in current.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            if let CardEffect::AfterClayConstructionGain { good, amount } = effect {
+                safe_gain(current, *good, *amount)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Additional A/B occupations with unambiguous fixed, public-state effects.
+/// Consultant's immediate option here applies to the two-player starter pool.
+pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
+    let mut result = vec![
+        CardDefinition {
+            id: "A110".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterClayConstructionGain {
+                good: Good::Food,
+                amount: 3,
+            }],
+        },
+        CardDefinition {
+            id: "B107".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::StartRoundGain {
+                good: Good::Food,
+                amount: 3,
+                house: Some(House::Stone),
+                rooms: None,
+            }],
+        },
+    ];
+    if players == 2 {
+        result.push(CardDefinition {
+            id: "B102".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Clay,
+                amount: 3,
+            }],
+        });
+    }
+    result
+}
+
+/// Includes ONLY cards whose effects are actually implemented. The official
+/// 7+7 hands require 14 cards of each kind at two players.
+pub fn verified_basic_card_set(players: usize) -> Result<CardSet, String> {
+    if players != 2 {
+        return Err("built-in A/B card pool currently supports two players only".into());
+    }
+    let mut definitions = Vec::new();
+    definitions.extend(verified_scoring_cards(players));
+    definitions.extend(verified_minor_worker_cards(players));
+    definitions.extend(verified_immediate_resource_cards());
+    definitions.extend(verified_worker_bonus_cards(players));
+    definitions.extend(verified_round_and_harvest_cards());
+    definitions.extend(verified_passive_cards());
+    definitions.extend(verified_simple_occupations(players));
+    definitions.extend(verified_extra_simple_cards());
+    let set = CardSet { definitions };
+    set.validate(players)?;
+    Ok(set)
+}
+
+#[cfg(test)]
+mod simple_occupation_tests {
+    use super::*;
+    #[test]
+    fn a110_triggers_once_for_clay_room_or_stone_renovation() {
+        let set = CardSet {
+            definitions: verified_simple_occupations(2),
+        };
+        let mut old = Player::new(0, 0);
+        old.house = House::Clay;
+        old.played_cards.push("A110".into());
+        let mut built = old.clone();
+        built.farm[1].tile = Tile::Room;
+        after_clay_construction(&set, &old, &mut built).unwrap();
+        assert_eq!(built.supply.food, 3);
+        let mut stone = old.clone();
+        stone.house = House::Stone;
+        after_clay_construction(&set, &old, &mut stone).unwrap();
+        assert_eq!(stone.supply.food, 3);
+        let mut not_clay = old.clone();
+        not_clay.house = House::Wood;
+        let mut extra = not_clay.clone();
+        extra.farm[1].tile = Tile::Room;
+        after_clay_construction(&set, &not_clay, &mut extra).unwrap();
+        assert_eq!(extra.supply.food, 0);
+    }
+    #[test]
+    fn b107_starts_payments_only_once_in_stone_house() {
+        let set = CardSet {
+            definitions: verified_simple_occupations(2),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B107".into());
+        start_round_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 0);
+        p.house = House::Stone;
+        start_round_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 3);
+    }
+    #[test]
+    fn b102_gains_three_clay_only_in_two_player_subset() {
+        let set = CardSet {
+            definitions: verified_simple_occupations(2),
+        };
+        let mut p = Player::new(0, 0);
+        play(
+            &set,
+            &mut vec!["B102".into()],
+            &mut p,
+            "B102",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.supply.clay, 3);
+        assert!(!verified_simple_occupations(3)
+            .iter()
+            .any(|c| c.id == "B102"));
+    }
+    #[test]
+    fn only_implemented_cards_are_in_two_player_preset() {
+        let set = verified_basic_card_set(2).unwrap();
+        assert_eq!(set.definitions.len(), 30);
+        assert_eq!(
+            set.definitions
+                .iter()
+                .filter(|x| x.kind == CardKind::MinorImprovement)
+                .count(),
+            16
+        );
+        assert_eq!(
+            set.definitions
+                .iter()
+                .filter(|x| x.kind == CardKind::Occupation)
+                .count(),
+            14
+        );
+        assert!(verified_basic_card_set(3).is_err());
+    }
+}
+
+pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
+    vec![
+        CardDefinition {
+            id: "B010".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 3), (Good::Food, 3)],
+            points: 0,
+            effects: vec![CardEffect::Passive {
+                rule: PassiveRule::HousingSpace(1),
+            }],
+        },
+        CardDefinition {
+            id: "A063".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 2), (Good::Stone, 2)],
+            points: 2,
+            effects: vec![CardEffect::AfterHarvestBakeGain { amount: 3 }],
+        },
+    ]
+}
+pub fn verified_multiplayer_passive_cards(players: usize) -> Vec<CardDefinition> {
+    if players < 3 {
+        return vec![];
+    }
+    vec![CardDefinition {
+        id: "A143".into(),
+        kind: CardKind::Occupation,
+        cost: vec![],
+        points: 0,
+        effects: vec![
+            CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumPlayers(3),
+            },
+            CardEffect::Passive {
+                rule: PassiveRule::StoneDiscount(1),
+            },
+        ],
+    }]
+}
+#[cfg(test)]
+mod m6_extra_passive_tests {
+    use super::*;
+    #[test]
+    fn b010_adds_housing_without_extra_tile() {
+        let set = CardSet {
+            definitions: verified_extra_simple_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 3;
+        p.supply.food = 3;
+        play(
+            &set,
+            &mut vec!["B010".into()],
+            &mut p,
+            "B010",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.extra_housing, 1);
+        assert_eq!(p.rooms(), 2);
+    }
+    #[test]
+    fn a143_only_three_plus_and_reduces_stone() {
+        assert!(verified_multiplayer_passive_cards(2).is_empty());
+        let set = CardSet {
+            definitions: verified_multiplayer_passive_cards(3),
+        };
+        let mut p = Player::new(0, 0);
+        play(
+            &set,
+            &mut vec!["A143".into()],
+            &mut p,
+            "A143",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.stone_cost_discount, 1);
+    }
+}
+
+/// Extra food when a player takes Bake Bread in a round directly following a
+/// harvest round. The work action is already validated and applied.
+pub fn after_harvest_baking(
+    set: &CardSet,
+    player: &mut Player,
+    round: u8,
+    baked: bool,
+) -> Result<(), String> {
+    if !baked || round < 2 || !crate::model::HARVEST_ROUNDS.contains(&(round - 1)) {
+        return Ok(());
+    }
+    for id in player.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            if let CardEffect::AfterHarvestBakeGain { amount } = effect {
+                safe_gain(player, Good::Food, *amount)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod a063_baking_tests {
+    use super::*;
+    #[test]
+    fn after_harvest_bread_action_only_and_exact_three_food() {
+        let set = CardSet {
+            definitions: verified_extra_simple_cards(),
+        };
+        let mut player = Player::new(0, 0);
+        player.played_cards.push("A063".into());
+        after_harvest_baking(&set, &mut player, 4, true).unwrap();
+        after_harvest_baking(&set, &mut player, 5, false).unwrap();
+        after_harvest_baking(&set, &mut player, 6, true).unwrap();
+        assert_eq!(player.supply.food, 0);
+        for round in [5, 8, 10, 12, 14] {
+            after_harvest_baking(&set, &mut player, round, true).unwrap();
+        }
+        assert_eq!(player.supply.food, 15);
+    }
+    #[test]
+    fn correct_improvement_cost_and_card_points() {
+        let set = CardSet {
+            definitions: verified_extra_simple_cards(),
+        };
+        let mut player = Player::new(0, 0);
+        player.supply.wood = 2;
+        player.supply.stone = 2;
+        let mut hand = vec!["A063".into()];
+        play(
+            &set,
+            &mut hand,
+            &mut player,
+            "A063",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(player.card_points, 2);
+        assert_eq!(player.supply.wood, 0);
+        assert_eq!(player.supply.stone, 0);
     }
 }
