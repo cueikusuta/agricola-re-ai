@@ -85,3 +85,15 @@ M8-3の初期1000試合は**各候補AIにつき1000**の意味。4人 × 250 se
 5. `CI required` の60秒目標と大量実行のRunを分離したまま、通常CIに性能低下・待ち行列への影響がないか監査。
 
 **未完了**：`evaluate-shard` CLI、実ジョブ、Artifact、性能測定、CIリンク、1000試合の結果はまだ存在しない。本PRの文書にそれらの合格実績を記入しない。
+
+## 9. 実行できる先行ステップ：カードなし大量完走スモーク（Issue #121）
+
+標準CPUランナーで起動できる最小実行経路を `.github/workflows/mass-batch-smoke.yml` に実装する。これは従来CLIの `--batch` を用いる**ルールの安定性・平均実行速度の予備測定**に限る。大きなM8-3の勝率比較/95%区間/1試合1行JSONL/再演ハッシュ/カードあり4人戦を満たすものではない。
+
+- Actions → `Cardless Mass Batch Smoke` → `Run workflow`、人数2/3/4、total games（4分割可能な8〜20,000）、初期seed、`random/greedy/eval`、追加タイルON/OFFを指定。
+- `unit` → `validate` → `shard` 4並列 → `aggregate` の順で実行。通常PRの `CI required` に大量対戦を組み込まない。
+- シャードは `seed_start + shard_index*(games/4)` から `games/4` 件。各試合でRust CLIがさらにseedを1ずつ増加。重複seedや集約欠落を拒否。
+- 各シャードのstdout/stderrと構成JSONはArtifactに保存。集約はゲーム数、得点ヒストグラムのサンプル数、設定・SHAの一致を検証。**首位率を推定したとは表示しない**。
+- GitHub Actionsが実際に成功したらRun URLを#121へ残す。手動起動できる定義だけでは実走完了とみなさない。
+
+この先行スモークの結果だけで「公式ルール完全再現」「カード/ドラフトの対応」「新AIの+5pp改善」を主張しない。正式なM8-3の完成条件は本書1〜8節とIssue #110に残る。
