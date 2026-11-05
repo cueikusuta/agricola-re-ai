@@ -312,12 +312,23 @@ pub fn play(
             CardEffect::OnPlayGain { good, amount } => {
                 safe_gain(player, *good, *amount)?;
             }
-            CardEffect::OnPlayGainPerStored { stored, divisor, good, amount } => {
+            CardEffect::OnPlayGainPerStored {
+                stored,
+                divisor,
+                good,
+                amount,
+            } => {
                 let bonus = (player.supply.get(*stored) / *divisor)
-                    .checked_mul(*amount).ok_or("on-play card bonus overflow")?;
+                    .checked_mul(*amount)
+                    .ok_or("on-play card bonus overflow")?;
                 safe_gain(player, *good, bonus)?;
             }
-            CardEffect::OnPlayGainIfHouse { house, rooms, good, amount } => {
+            CardEffect::OnPlayGainIfHouse {
+                house,
+                rooms,
+                good,
+                amount,
+            } => {
                 if player.house == *house && player.rooms() == usize::from(*rooms) {
                     safe_gain(player, *good, *amount)?;
                 }
@@ -912,7 +923,10 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
             cost: vec![(Good::Food, 1)],
             points: 0,
             effects: vec![CardEffect::OnPlayGainPerStored {
-                stored: Good::Clay, divisor: 2, good: Good::Clay, amount: 1,
+                stored: Good::Clay,
+                divisor: 2,
+                good: Good::Clay,
+                amount: 1,
             }],
         },
         CardDefinition {
@@ -922,13 +936,22 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
             points: 0,
             effects: vec![
                 CardEffect::OnPlayGainIfHouse {
-                    house: House::Clay, rooms: 2, good: Good::Clay, amount: 3,
+                    house: House::Clay,
+                    rooms: 2,
+                    good: Good::Clay,
+                    amount: 3,
                 },
                 CardEffect::OnPlayGainIfHouse {
-                    house: House::Clay, rooms: 2, good: Good::Reed, amount: 2,
+                    house: House::Clay,
+                    rooms: 2,
+                    good: Good::Reed,
+                    amount: 2,
                 },
                 CardEffect::OnPlayGainIfHouse {
-                    house: House::Clay, rooms: 2, good: Good::Stone, amount: 2,
+                    house: House::Clay,
+                    rooms: 2,
+                    good: Good::Stone,
+                    amount: 2,
                 },
             ],
         },
@@ -939,7 +962,9 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
 mod verified_immediate_resource_tests {
     use super::*;
     fn play_card(id: &str, player: &mut Player) -> Result<(), String> {
-        let set = CardSet { definitions: verified_immediate_resource_cards() };
+        let set = CardSet {
+            definitions: verified_immediate_resource_cards(),
+        };
         let mut hand = vec![id.to_string()];
         let kind = set.definition(id).unwrap().kind;
         play(&set, &mut hand, player, id, kind, 0)
@@ -965,10 +990,16 @@ mod verified_immediate_resource_tests {
         let mut right = Player::new(0, 1);
         right.house = House::Clay;
         play_card("A125", &mut right).unwrap();
-        assert_eq!((right.supply.clay,right.supply.reed,right.supply.stone),(3,2,2));
+        assert_eq!(
+            (right.supply.clay, right.supply.reed, right.supply.stone),
+            (3, 2, 2)
+        );
         let mut wrong = Player::new(0, 1);
         wrong.house = House::Wood;
         play_card("A125", &mut wrong).unwrap();
-        assert_eq!((wrong.supply.clay,wrong.supply.reed,wrong.supply.stone),(0,0,0));
+        assert_eq!(
+            (wrong.supply.clay, wrong.supply.reed, wrong.supply.stone),
+            (0, 0, 0)
+        );
     }
 }
