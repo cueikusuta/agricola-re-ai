@@ -31,6 +31,18 @@ pub enum CardEffect {
     Prerequisite {
         rule: CardRequirement,
     },
+    OnPlayGainPerStored {
+        stored: Good,
+        divisor: u32,
+        good: Good,
+        amount: u32,
+    },
+    OnPlayGainIfHouse {
+        house: House,
+        rooms: u8,
+        good: Good,
+        amount: u32,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -105,8 +117,13 @@ impl CardSet {
                         CardEffect::OnPlayGain { amount, .. }
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         CardEffect::EndGameBonus { .. } | CardEffect::Prerequisite { .. } => 1,
+                        CardEffect::OnPlayGainPerStored { amount, .. }
+                        | CardEffect::OnPlayGainIfHouse { amount, .. } => *amount,
                     };
                     amount == 0 || amount > 30
+                })
+                || card.effects.iter().any(|effect| {
+                    matches!(effect, CardEffect::OnPlayGainPerStored { divisor: 0, .. })
                 })
             {
                 return Err("unsupported card cost, points, or effect".into());
@@ -291,8 +308,21 @@ pub fn play(
         .checked_add(card.points)
         .ok_or("card points overflow")?;
     for effect in &card.effects {
-        if let CardEffect::OnPlayGain { good, amount } = effect {
-            safe_gain(player, *good, *amount)?;
+        match effect {
+            CardEffect::OnPlayGain { good, amount } => {
+                safe_gain(player, *good, *amount)?;
+            }
+            CardEffect::OnPlayGainPerStored { stored, divisor, good, amount } => {
+                let bonus = (player.supply.get(*stored) / *divisor)
+                    .checked_mul(*amount).ok_or("on-play card bonus overflow")?;
+                safe_gain(player, *good, bonus)?;
+            }
+            CardEffect::OnPlayGainIfHouse { house, rooms, good, amount } => {
+                if player.house == *house && player.rooms() == usize::from(*rooms) {
+                    safe_gain(player, *good, *amount)?;
+                }
+            }
+            _ => {}
         }
     }
     hand.retain(|x| x != id);
@@ -870,5 +900,75 @@ mod verified_minor_worker_tests {
         let three = owner("B121", 3, &[Space::Forest, Space::ReedBank, Space::ClayPit]);
         assert_eq!(two.supply.clay, 2);
         assert_eq!(three.supply.clay, 3);
+    }
+}
+
+/** Verified deterministic on-play effects for the 2016 A/B starter cards. */
+pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
+    vec![
+        CardDefinition {
+            id: "A005".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGainPerStored {
+                stored: Good::Clay, divisor: 2, good: Good::Clay, amount: 1,
+            }],
+        },
+        CardDefinition {
+            id: "A125".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGainIfHouse {
+                    house: House::Clay, rooms: 2, good: Good::Clay, amount: 3,
+                },
+                CardEffect::OnPlayGainIfHouse {
+                    house: House::Clay, rooms: 2, good: Good::Reed, amount: 2,
+                },
+                CardEffect::OnPlayGainIfHouse {
+                    house: House::Clay, rooms: 2, good: Good::Stone, amount: 2,
+                },
+            ],
+        },
+    ]
+}
+
+#[cfg(test)]
+mod verified_immediate_resource_tests {
+    use super::*;
+    fn play_card(id: &str, player: &mut Player) -> Result<(), String> {
+        let set = CardSet { definitions: verified_immediate_resource_cards() };
+        let mut hand = vec![id.to_string()];
+        let kind = set.definition(id).unwrap().kind;
+        play(&set, &mut hand, player, id, kind, 0)
+    }
+
+    #[test]
+    fn a005_clay_bonus_tracks_two_clay_per_reward() {
+        let mut player = Player::new(0, 1);
+        player.supply.clay = 5;
+        play_card("A005", &mut player).unwrap();
+        assert_eq!(player.supply.clay, 7);
+        assert_eq!(player.supply.food, 0);
+        assert_eq!(player.played_cards, vec!["A005"]);
+        let mut player = Player::new(0, 0);
+        player.supply.clay = 5;
+        let old = player.clone();
+        assert!(play_card("A005", &mut player).is_err());
+        assert_eq!(player, old);
+    }
+
+    #[test]
+    fn a125_three_goods_only_in_two_room_clay_home() {
+        let mut right = Player::new(0, 1);
+        right.house = House::Clay;
+        play_card("A125", &mut right).unwrap();
+        assert_eq!((right.supply.clay,right.supply.reed,right.supply.stone),(3,2,2));
+        let mut wrong = Player::new(0, 1);
+        wrong.house = House::Wood;
+        play_card("A125", &mut wrong).unwrap();
+        assert_eq!((wrong.supply.clay,wrong.supply.reed,wrong.supply.stone),(0,0,0));
     }
 }
