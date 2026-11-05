@@ -299,7 +299,7 @@ impl Game {
             })
             .count();
         let can_minor = own_cards.iter().any(|c| {
-            c.kind == crate::cards::CardKind::MinorImprovement && crate::cards::affordable(c, me, 0)
+            c.kind == crate::cards::CardKind::MinorImprovement && crate::cards::can_play(&self.card_set, c, me, 0)
         });
         list.retain(|&s| {
             if self.public.used.contains(&s)
@@ -317,7 +317,7 @@ impl Game {
                 }
                 Space::Lessons => own_cards.iter().any(|c| {
                     c.kind == crate::cards::CardKind::Occupation
-                        && crate::cards::affordable(c, me, u32::from(occupations > 0))
+                        && crate::cards::can_play(&self.card_set, c, me, u32::from(occupations > 0))
                 }),
                 Space::ExtraLessons => {
                     let fee = if players == 3 || occupations >= 2 {
@@ -327,7 +327,7 @@ impl Game {
                     };
                     own_cards.iter().any(|c| {
                         c.kind == crate::cards::CardKind::Occupation
-                            && crate::cards::affordable(c, me, fee)
+                            && crate::cards::can_play(&self.card_set, c, me, fee)
                     })
                 }
                 Space::FamilyGrowthWithRoom => me.family < 5 && me.rooms() > me.family as usize,
