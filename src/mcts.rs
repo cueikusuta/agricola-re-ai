@@ -460,6 +460,28 @@ mod tests {
     }
 
     #[test]
+    fn sampled_card_game_can_finish_a_real_rollout() {
+        use crate::cards::verified_basic_card_set;
+        use rand::SeedableRng;
+
+        let game = Game::with_cards(
+            Config {
+                seed: 77,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+        let obs = game.observation(game.public.active_player).unwrap();
+        let mut rng = ChaCha8Rng::seed_from_u64(5);
+        let mut sampled = sample_game(&obs, &mut rng).unwrap();
+        rollout(&mut sampled, &mut rng).unwrap();
+        assert!(sampled.public.finished);
+        assert_eq!(sampled.public.round, 14);
+        sampled.validate().unwrap();
+    }
+
+    #[test]
     fn mcts_can_select_a_legal_move_with_private_cards() {
         use crate::cards::verified_basic_card_set;
         use rand::SeedableRng;
