@@ -46,7 +46,9 @@ fn played_conditional_score_matches_full_match_and_replay() {
         .clone();
     game.apply(Action {
         space: Space::MeetingPlace,
-        detail: Detail::PlayMinor { card_id: chosen.clone() },
+        detail: Detail::PlayMinor {
+            card_id: chosen.clone(),
+        },
     })
     .unwrap();
     assert!(game.public.players[first].played_cards.contains(&chosen));
