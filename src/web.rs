@@ -123,7 +123,10 @@ impl Session {
             .produce(&self.game.observation(0)?, space)
             .ok_or("no detailed action available")?;
         if let Some(card_id) = input.get("card_id") {
-            let card_id = card_id.as_str().ok_or("card_id must be a string")?.to_string();
+            let card_id = card_id
+                .as_str()
+                .ok_or("card_id must be a string")?
+                .to_string();
             action.detail = match space {
                 Space::Lessons | Space::ExtraLessons => Detail::PlayOccupation { card_id },
                 Space::MeetingPlace | Space::MajorImprovement => Detail::PlayMinor { card_id },
@@ -307,38 +310,64 @@ mod tests {
     #[test]
     fn card_ui_only_exposes_own_hand_and_rejects_invalid_card_selection() {
         use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
-        let seed = (0..100).find(|seed| Game::new(Config {
-            seed: *seed, ..Config::default()
-        }).public.start_player == 0).unwrap();
+        let seed = (0..100)
+            .find(|seed| {
+                Game::new(Config {
+                    seed: *seed,
+                    ..Config::default()
+                })
+                .public
+                .start_player
+                    == 0
+            })
+            .unwrap();
         let mut definitions = vec![];
         for i in 0..14 {
             definitions.push(CardDefinition {
-                id: format!("occupation_{i}"), kind: CardKind::Occupation,
-                cost: vec![], points: 0, effects: vec![],
+                id: format!("occupation_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
             });
             definitions.push(CardDefinition {
-                id: format!("minor_{i}"), kind: CardKind::MinorImprovement,
-                cost: vec![], points: 1,
-                effects: vec![CardEffect::OnPlayGain { good: Good::Wood, amount: 1 }],
+                id: format!("minor_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![CardEffect::OnPlayGain {
+                    good: Good::Wood,
+                    amount: 1,
+                }],
             });
         }
         let cards = CardSet { definitions };
         let mut session = Session::new(Config::default()).unwrap();
-        session.reset(&json!({"players":2,"seed":seed,"card_set":cards})).unwrap();
+        session
+            .reset(&json!({"players":2,"seed":seed,"card_set":cards}))
+            .unwrap();
         let view = session.view();
         assert_eq!(view["card_mode"], true);
         assert_eq!(view["hand"].as_array().unwrap().len(), 14);
-        assert_eq!(view["hand_counts"], json!([14,14]));
+        assert_eq!(view["hand_counts"], json!([14, 14]));
         assert!(view.get("hands").is_none());
         assert!(view.get("undealt").is_none());
         assert!(view["public"]["players"][1].get("hand").is_none());
-        let owned = view["hand"].as_array().unwrap().iter()
+        let owned = view["hand"]
+            .as_array()
+            .unwrap()
+            .iter()
             .find_map(|item| item.as_str().filter(|s| s.starts_with("occupation_")))
-            .unwrap().to_string();
+            .unwrap()
+            .to_string();
         let before = session.game.state_hash();
-        assert!(session.play(&json!({"space":"lessons","card_id":"not_owned"})).is_err());
+        assert!(session
+            .play(&json!({"space":"lessons","card_id":"not_owned"}))
+            .is_err());
         assert_eq!(session.game.state_hash(), before);
-        session.play(&json!({"space":"lessons","card_id":owned})).unwrap();
+        session
+            .play(&json!({"space":"lessons","card_id":owned}))
+            .unwrap();
         assert_eq!(session.game.public.players[0].played_cards.len(), 1);
         session.game.validate().unwrap();
         let saved = session.game.save_json().unwrap();
