@@ -97,6 +97,7 @@ impl Game {
     /// beginning of the harvest. The real field phase happens in harvest().
     pub(crate) fn harvest_fields(&mut self) {
         for p in &mut self.public.players {
+            crate::cards::at_field_harvest(&self.card_set, p)?;
             for cell in &mut p.farm {
                 if let Tile::Field {
                     crop: Some(kind),
