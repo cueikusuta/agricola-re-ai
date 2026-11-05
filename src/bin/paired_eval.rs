@@ -2,9 +2,7 @@
 //! A JSONL row is one completed game. Each seed block contains every
 //! candidate seat for both comparison arms. This is NOT M7 MCTS evaluation.
 use agricola_re_ai::evaluation::EvaluationPolicy;
-use agricola_re_ai::policy::{
-    play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
-};
+use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
 use agricola_re_ai::score::standings;
 use agricola_re_ai::{Config, Game, Observation};
 use rand_chacha::ChaCha8Rng;
@@ -27,10 +25,7 @@ struct Options {
     output: String,
 }
 
-fn option<'a>(
-    values: &'a BTreeMap<String, String>,
-    key: &str,
-) -> Result<&'a str, String> {
+fn option<'a>(values: &'a BTreeMap<String, String>, key: &str) -> Result<&'a str, String> {
     values
         .get(key)
         .map(String::as_str)
@@ -203,20 +198,20 @@ fn run(options: &Options) -> Result<(), String> {
                     decision_ns: RefCell::new(Vec::new()),
                 };
                 let game_start = Instant::now();
-                play_to_end(&mut game, &selector, &SimpleDetails).map_err(|error| {
-                    format!("seed {seed} arm {arm_id} seat {seat}: {error}")
-                })?;
+                play_to_end(&mut game, &selector, &SimpleDetails)
+                    .map_err(|error| format!("seed {seed} arm {arm_id} seat {seat}: {error}"))?;
                 if !game.public.finished {
                     return Err(format!("seed {seed}: game did not finish"));
                 }
                 let summary = standings(&game.public.players);
                 let hash = game.state_hash();
-                let replay =
-                    Game::replay(config, &game.log.events).map_err(|error| {
-                        format!("seed {seed} arm {arm_id} seat {seat} replay: {error}")
-                    })?;
+                let replay = Game::replay(config, &game.log.events).map_err(|error| {
+                    format!("seed {seed} arm {arm_id} seat {seat} replay: {error}")
+                })?;
                 if replay.state_hash() != hash {
-                    return Err(format!("seed {seed} arm {arm_id} seat {seat}: replay mismatch"));
+                    return Err(format!(
+                        "seed {seed} arm {arm_id} seat {seat}: replay mismatch"
+                    ));
                 }
                 let scores = summary
                     .scores
@@ -224,11 +219,11 @@ fn run(options: &Options) -> Result<(), String> {
                     .map(|score| score.total)
                     .collect::<Vec<_>>();
                 let own_score = scores[seat];
-                let others_mean = (scores.iter().sum::<i32>() - own_score) as f64
-                    / (options.players - 1) as f64;
+                let others_mean =
+                    (scores.iter().sum::<i32>() - own_score) as f64 / (options.players - 1) as f64;
                 let decision_ns = selector.decision_ns.borrow();
-                let max_decision_ms = decision_ns.iter().copied().max().unwrap_or(0) as f64
-                    / 1_000_000.0;
+                let max_decision_ms =
+                    decision_ns.iter().copied().max().unwrap_or(0) as f64 / 1_000_000.0;
                 let record = json!({
                     "schema_version": 1,
                     "block_index": block_index,
@@ -254,8 +249,7 @@ fn run(options: &Options) -> Result<(), String> {
                     "replay_hash": hash,
                     "replay_verified": true,
                 });
-                serde_json::to_writer(&mut writer, &record)
-                    .map_err(|error| error.to_string())?;
+                serde_json::to_writer(&mut writer, &record).map_err(|error| error.to_string())?;
                 writer.write_all(b"\n").map_err(|error| error.to_string())?;
             }
         }
