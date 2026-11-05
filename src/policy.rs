@@ -526,7 +526,10 @@ fn preferred_card(
             if card.kind != kind || !crate::cards::can_play(&set, card, player, fee) {
                 return None;
             }
-            Some((id, card_priority(&set, card, player, fee, obs.public.round)?))
+            Some((
+                id,
+                card_priority(&set, card, player, fee, obs.public.round)?,
+            ))
         })
         .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(a.0)))
         .map(|(id, priority)| (id.clone(), priority))
