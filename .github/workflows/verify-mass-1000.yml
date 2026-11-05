@@ -1,0 +1,77 @@
+name: One-time verification - 1000 cardless games
+
+# Branch-scoped verification job. This file is deliberately not merged to main.
+# Main's mass-batch-smoke.yml remains manual-only.
+on:
+  push:
+    branches: [verify/mass-1000-20261106]
+    paths: [.github/workflows/verify-mass-1000.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 -m unittest discover -s tests -p test_mass_batch_smoke.py -v
+
+  shard:
+    needs: unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked
+      - name: Simulate 250 distinct seeds for 4 players, no cards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/mass_batch_smoke.py shard \
+            --games 1000 --players 4 --seed-start 420000 \
+            --policy random --sha "$GITHUB_SHA" \
+            --shard "${{ matrix.shard }}" \
+            --binary ./target/release/agricola-re-ai \
+            --out "results/mass-smoke-shard-${{ matrix.shard }}"
+      - name: Upload shard logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mass-smoke-shard-${{ matrix.shard }}
+          path: results/mass-smoke-shard-${{ matrix.shard }}/
+          if-no-files-found: error
+          retention-days: 7
+
+  aggregate:
+    if: always()
+    needs: [unit, shard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mass-smoke-shard-*
+          path: results
+      - name: Check four shards, seeds, 1000 completions, histograms
+        run: |
+          set -euo pipefail
+          python3 scripts/mass_batch_smoke.py aggregate \
+            --games 1000 --players 4 --seed-start 420000 \
+            --policy random --sha "$GITHUB_SHA" --out results
+          echo '4-player 1000-game cardless completion and throughput ONLY, no winner CI or replay proof.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Persist verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cardless-1000-aggregate
+          path: results/summary.json
+          if-no-files-found: error
+          retention-days: 7
