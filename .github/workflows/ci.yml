@@ -103,7 +103,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: release-workspace-v2
+          shared-key: release-test-v3
           add-job-id-key: 'false'
           cache-workspace-crates: 'true'
           cache-on-failure: 'true'
@@ -157,10 +157,10 @@ jobs:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: release-workspace-v2
+          shared-key: release-benchmark-v3
           add-job-id-key: 'false'
           cache-workspace-crates: 'true'
-          save-if: 'false'
+          cache-on-failure: 'true'
       # rust-cache prunes the sparse registry index. Restore a separate
       # lockfile-keyed index so locked builds can avoid slow registry refreshes.
       # This job restores without saving; the test job writes.
