@@ -1,0 +1,157 @@
+name: Cardless Mass Batch Smoke
+
+# This is a throughput/completion smoke, NOT a win-rate or replay-hash test.
+# Existing --batch emits only aggregated scores and does not support 95% CIs.
+on:
+  pull_request:
+    paths:
+      - 'scripts/mass_batch_smoke.py'
+      - 'tests/test_mass_batch_smoke.py'
+      - '.github/workflows/mass-batch-smoke.yml'
+  workflow_dispatch:
+    inputs:
+      games:
+        description: 'Total games, 8..20000 and divisible by 4'
+        type: number
+        required: true
+        default: 1000
+      players:
+        description: 'Number of players (cardless only)'
+        type: choice
+        options: ['2', '3', '4']
+        default: '4'
+        required: true
+      policy:
+        description: 'Single policy for all seats'
+        type: choice
+        options: ['random', 'greedy', 'eval']
+        default: 'random'
+        required: true
+      seed_start:
+        description: 'First game seed (0..999999980000)'
+        type: string
+        default: '420000'
+        required: true
+      extra:
+        description: 'Enable additional action space'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cardless-mass-batch-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  unit:
+    name: Validate batch partition/aggregator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 -m unittest discover -s tests -p test_mass_batch_smoke.py -v
+
+  validate:
+    name: Validate experiment settings
+    if: github.event_name == 'workflow_dispatch'
+    needs: [unit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GAME_COUNT: ${{ inputs.games }}
+      PLAYER_COUNT: ${{ inputs.players }}
+      SEED_START: ${{ inputs.seed_start }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: |
+          python3 - <<'PY'
+          import os
+          from scripts.mass_batch_smoke import plan
+          games = int(os.environ["GAME_COUNT"])
+          players = int(os.environ["PLAYER_COUNT"])
+          seed_start = int(os.environ["SEED_START"])
+          for i in range(4):
+              print(f"shard {i}:", plan(games, players, seed_start, i))
+          PY
+
+  shard:
+    name: Simulate shard ${{ matrix.shard }}
+    if: github.event_name == 'workflow_dispatch'
+    needs: [validate]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      GAME_COUNT: ${{ inputs.games }}
+      PLAYER_COUNT: ${{ inputs.players }}
+      SEED_START: ${{ inputs.seed_start }}
+      POLICY: ${{ inputs.policy }}
+      EXTRA: ${{ inputs.extra }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked
+      - name: Run deterministic cardless games
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          if [[ "$EXTRA" == "true" ]]; then FLAGS+=(--extra); fi
+          python3 scripts/mass_batch_smoke.py shard \
+            --games "$GAME_COUNT" --players "$PLAYER_COUNT" \
+            --seed-start "$SEED_START" --policy "$POLICY" \
+            --sha "$GITHUB_SHA" --shard "${{ matrix.shard }}" \
+            --binary ./target/release/agricola-re-ai \
+            --out "results/mass-smoke-shard-${{ matrix.shard }}" "${FLAGS[@]}"
+      - name: Preserve shard results, including failure logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mass-smoke-shard-${{ matrix.shard }}
+          path: results/mass-smoke-shard-${{ matrix.shard }}/
+          if-no-files-found: warn
+          retention-days: 7
+
+  aggregate:
+    name: Aggregate completion/throughput
+    if: ${{ always() && github.event_name == 'workflow_dispatch' }}
+    needs: [unit, validate, shard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GAME_COUNT: ${{ inputs.games }}
+      PLAYER_COUNT: ${{ inputs.players }}
+      SEED_START: ${{ inputs.seed_start }}
+      POLICY: ${{ inputs.policy }}
+      EXTRA: ${{ inputs.extra }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mass-smoke-shard-*
+          path: results
+          merge-multiple: false
+      - name: Verify every shard and aggregate
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          if [[ "$EXTRA" == "true" ]]; then FLAGS+=(--extra); fi
+          python3 scripts/mass_batch_smoke.py aggregate \
+            --games "$GAME_COUNT" --players "$PLAYER_COUNT" \
+            --seed-start "$SEED_START" --policy "$POLICY" \
+            --sha "$GITHUB_SHA" --out results "${FLAGS[@]}"
+          echo "Cardless game completion and speed only; no winner-rate inference." >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve aggregate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mass-smoke-aggregate
+          path: results/summary.json
+          if-no-files-found: warn
+          retention-days: 7
