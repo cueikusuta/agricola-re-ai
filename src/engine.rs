@@ -408,7 +408,10 @@ impl Game {
         Ok(())
     }
     pub fn replay(config: Config, events: &[Event]) -> Result<Self> {
-        let mut g = Game::new(config);
+        Self::replay_with_cards(config, crate::cards::CardSet::default(), events)
+    }
+    pub fn replay_with_cards(config: Config, cards: crate::cards::CardSet, events: &[Event]) -> Result<Self> {
+        let mut g = Game::with_cards(config, cards)?;
         for event in events {
             if g.state_hash() != event.before {
                 return Err("replay prestate hash mismatch".into());

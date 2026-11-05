@@ -1,4 +1,5 @@
 pub mod benchmark;
+pub mod cards;
 pub mod breeding;
 pub mod engine;
 pub mod evaluation;
