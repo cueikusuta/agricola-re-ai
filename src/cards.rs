@@ -707,31 +707,71 @@ mod card_prerequisite_tests {
  */
 pub fn verified_minor_worker_cards(players: usize) -> Vec<CardDefinition> {
     fn gain(space: Space, good: Good, amount: u32) -> CardEffect {
-        CardEffect::AfterWorkerGain { space, good, amount }
+        CardEffect::AfterWorkerGain {
+            space,
+            good,
+            amount,
+        }
     }
-    fn card(id: &str, kind: CardKind, cost: Vec<(Good, u32)>, points: i32, effects: Vec<CardEffect>) -> CardDefinition {
-        CardDefinition { id: id.to_string(), kind, cost, points, effects }
+    fn card(
+        id: &str,
+        kind: CardKind,
+        cost: Vec<(Good, u32)>,
+        points: i32,
+        effects: Vec<CardEffect>,
+    ) -> CardDefinition {
+        CardDefinition {
+            id: id.to_string(),
+            kind,
+            cost,
+            points,
+            effects,
+        }
     }
     let minor = CardKind::MinorImprovement;
     let mut result = vec![
-        card("A067", minor, vec![(Good::Wood, 1)], 0,
-            vec![gain(Space::GrainSeeds, Good::Grain, 1)]),
-        card("A078", minor, vec![(Good::Wood, 2)], 1,
+        card(
+            "A067",
+            minor,
+            vec![(Good::Wood, 1)],
+            0,
+            vec![gain(Space::GrainSeeds, Good::Grain, 1)],
+        ),
+        card(
+            "A078",
+            minor,
+            vec![(Good::Wood, 2)],
+            1,
             vec![
-                CardEffect::Prerequisite { rule: CardRequirement::MinimumOccupations(1) },
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(1),
+                },
                 gain(Space::Fishing, Good::Food, 1),
                 gain(Space::Fishing, Good::Reed, 1),
-            ]),
-        card("A080", minor, vec![(Good::Wood, 1)], 0,
+            ],
+        ),
+        card(
+            "A080",
+            minor,
+            vec![(Good::Wood, 1)],
+            0,
             vec![
                 gain(Space::WesternQuarry, Good::Stone, 1),
                 gain(Space::EasternQuarry, Good::Stone, 1),
-            ]),
-        card("B077", minor, vec![(Good::Food, 1)], 1,
+            ],
+        ),
+        card(
+            "B077",
+            minor,
+            vec![(Good::Food, 1)],
+            1,
             vec![
-                CardEffect::Prerequisite { rule: CardRequirement::MinimumOccupations(3) },
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(3),
+                },
                 gain(Space::DayLaborer, Good::Clay, 3),
-            ]),
+            ],
+        ),
     ];
     let mut geologist = vec![
         gain(Space::Forest, Good::Clay, 1),
@@ -749,7 +789,9 @@ mod verified_minor_worker_tests {
     use super::*;
 
     fn owner(id: &str, players: usize, actions: &[Space]) -> Player {
-        let set = CardSet { definitions: verified_minor_worker_cards(players) };
+        let set = CardSet {
+            definitions: verified_minor_worker_cards(players),
+        };
         let mut player = Player::new(0, 0);
         player.played_cards.push(id.to_string());
         for &space in actions {
@@ -767,9 +809,16 @@ mod verified_minor_worker_tests {
         let p = owner("A078", 2, &[Space::Fishing, Space::ReedBank]);
         assert_eq!(p.supply.food, 1);
         assert_eq!(p.supply.reed, 1);
-        let mut set = CardSet { definitions: verified_minor_worker_cards(2) };
-        set.definitions.push(CardDefinition { id:"test_occ".into(), kind:CardKind::Occupation,
-            cost:vec![], points:0, effects:vec![] });
+        let mut set = CardSet {
+            definitions: verified_minor_worker_cards(2),
+        };
+        set.definitions.push(CardDefinition {
+            id: "test_occ".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        });
         let card = set.definition("A078").unwrap();
         let mut p = Player::new(0, 0);
         p.supply.wood = 2;
@@ -780,27 +829,40 @@ mod verified_minor_worker_tests {
     }
     #[test]
     fn a080_only_stone_accumulation_actions_trigger() {
-        let p = owner("A080", 3, &[
-            Space::WesternQuarry, Space::EasternQuarry, Space::ResourceMarket
-        ]);
+        let p = owner(
+            "A080",
+            3,
+            &[
+                Space::WesternQuarry,
+                Space::EasternQuarry,
+                Space::ResourceMarket,
+            ],
+        );
         assert_eq!(p.supply.stone, 2);
     }
     #[test]
     fn b077_requires_three_occupations_and_grants_clay() {
         let p = owner("B077", 2, &[Space::DayLaborer, Space::Forest]);
         assert_eq!(p.supply.clay, 3);
-        let mut set = CardSet { definitions: verified_minor_worker_cards(2) };
+        let mut set = CardSet {
+            definitions: verified_minor_worker_cards(2),
+        };
         for i in 1..=3 {
-            set.definitions.push(CardDefinition { id:format!("occ{i}"), kind:CardKind::Occupation,
-                cost:vec![], points:0, effects:vec![] });
+            set.definitions.push(CardDefinition {
+                id: format!("occ{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
         }
         let card = set.definition("B077").unwrap();
-        let mut p=Player::new(0,1);
-        p.played_cards.extend(["occ1".into(),"occ2".into()]);
+        let mut p = Player::new(0, 1);
+        p.played_cards.extend(["occ1".into(), "occ2".into()]);
         assert!(!can_play(&set, card, &p, 0));
         p.played_cards.push("occ3".into());
         assert!(can_play(&set, card, &p, 0));
-        assert_eq!(card.points,1);
+        assert_eq!(card.points, 1);
     }
     #[test]
     fn b121_uses_third_space_only_at_three_or_more_players() {
