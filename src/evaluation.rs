@@ -285,7 +285,10 @@ fn fence(
         edges.extend(pasture_boundary(group));
     }
     let added = edges.difference(&p.fences).count() as u32;
-    p.supply.wood = p.supply.wood.saturating_sub(added);
+    p.supply.wood = p
+        .supply
+        .wood
+        .saturating_sub(added.saturating_sub(p.free_fence_wood));
 
     let mut next_id = p
         .pastures
@@ -471,10 +474,16 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                 House::Clay => Good::Clay,
                 House::Stone => Good::Stone,
             };
+            let normal = p.room_material_cost.unwrap_or(5);
+            let room_cost = match p.house {
+                House::Wood => normal.min(p.wooden_room_cost.unwrap_or(5)),
+                House::Stone => normal.saturating_sub(p.stone_cost_discount),
+                House::Clay => normal,
+            };
             for &cell in rooms {
                 p.farm[cell].tile = Tile::Room;
                 let n = p.supply.get(room_good);
-                p.supply.set(room_good, n.saturating_sub(5));
+                p.supply.set(room_good, n.saturating_sub(room_cost));
                 p.supply.reed = p.supply.reed.saturating_sub(2);
             }
             for &cell in stables {
@@ -520,8 +529,22 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                 p.improvements.remove(index);
             } else {
                 for (good, n) in improvement.cost() {
+                    let cost = match good {
+                        Good::Wood => n.saturating_sub(p.improvement_wood_discount),
+                        Good::Stone => {
+                            let room_discount = if p.major_stone_discount_by_rooms {
+                                p.rooms().saturating_sub(2) as u32
+                            } else {
+                                0
+                            };
+                            n.saturating_sub(
+                                p.stone_cost_discount.saturating_add(room_discount),
+                            )
+                        }
+                        _ => n,
+                    };
                     let stock = p.supply.get(good);
-                    p.supply.set(good, stock.saturating_sub(n));
+                    p.supply.set(good, stock.saturating_sub(cost));
                 }
             }
             p.improvements.push(*improvement);
@@ -532,8 +555,14 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                 House::Clay => (House::Stone, Good::Stone),
                 House::Stone => return None,
             };
+            let discount = if good == Good::Stone {
+                p.stone_cost_discount
+            } else {
+                0
+            };
+            let cost = (p.rooms() as u32).saturating_sub(discount);
             p.supply
-                .set(good, p.supply.get(good).saturating_sub(p.rooms() as u32));
+                .set(good, p.supply.get(good).saturating_sub(cost));
             p.supply.reed = p.supply.reed.saturating_sub(1);
             p.house = new_house;
         }
@@ -665,6 +694,36 @@ mod projection_tests {
             },
         )
         .is_none());
+    }
+
+    #[test]
+    fn card_room_discount_matches_wooden_build_cost() {
+        let obs = observed(|p| {
+            p.supply.wood = 10;
+            p.supply.reed = 2;
+            p.wooden_room_cost = Some(2);
+        });
+        let action = SimpleDetails.produce(&obs, Space::FarmExpansion).unwrap();
+        let after = project_action(&obs, &action).unwrap();
+        assert_eq!(after.supply.wood, 8);
+        assert_eq!(after.supply.reed, 0);
+        assert_eq!(
+            after.rooms(),
+            obs.public.players[obs.player_id].rooms() + 1
+        );
+    }
+
+    #[test]
+    fn fencing_projection_applies_free_wood_per_action() {
+        let obs = observed(|p| {
+            p.supply.wood = 5;
+            p.free_fence_wood = 3;
+        });
+        let action = SimpleDetails.produce(&obs, Space::Fencing).unwrap();
+        let before = obs.public.players[obs.player_id].supply.wood;
+        let after = project_action(&obs, &action).unwrap();
+        assert_eq!(before - after.supply.wood, 1);
+        assert_eq!(after.pastures.len(), 1);
     }
 
     #[test]
