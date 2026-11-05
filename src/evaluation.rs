@@ -588,6 +588,16 @@ pub fn action_value_with_details(
     let before = evaluate_observation(obs, obs.player_id)?.total();
     let after = project_action(obs, &action)?;
     let mut value = evaluate_player(&after, obs.public.round).total() - before;
+    // Card end-game bonuses are intentionally not included in score(Player)
+    // because their value depends on the public, externally defined card set.
+    // They contribute 3 utility units per point, just like score(Player).
+    let set = crate::cards::CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
+    let player_before = obs.public.players.get(obs.player_id)?;
+    let card_bonus_delta = crate::cards::end_game_bonus(&set, &after)
+        - crate::cards::end_game_bonus(&set, player_before);
+    value += f64::from(card_bonus_delta) * 3.0;
     if space == Space::MeetingPlace && obs.public.start_player != obs.player_id {
         value += if obs.public.round < 10 { 4.0 } else { 1.0 };
     }
@@ -655,6 +665,25 @@ mod projection_tests {
             },
         )
         .is_none());
+    }
+
+    #[test]
+    fn card_end_game_bonus_affects_occupation_action_value() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, ScoreBonusRule};
+        let mut obs = observed(|_| {});
+        obs.card_definitions.push(CardDefinition {
+            id: "bonus".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::HouseMaterial,
+            }],
+        });
+        obs.hand.push("bonus".into());
+        let value = action_value_with_details(&obs, Space::Lessons, &SimpleDetails).unwrap();
+        // A wooden home gives three end-game points; normal card score remains 0.
+        assert_eq!(value, 9.0);
     }
 
     #[test]
