@@ -746,6 +746,16 @@ impl Game {
         }
         self.card_set.validate(self.config.players)?;
         self.cards.validate(&self.card_set, &p.players)?;
+        for player in &p.players {
+            let expected = if p.finished {
+                crate::cards::end_game_bonus(&self.card_set, player)?
+            } else {
+                0
+            };
+            if player.card_bonus_points != expected {
+                return Err("conditional endgame card score mismatch".into());
+            }
+        }
         if self.config.additional_action_space_enabled != p.additional_action_space_enabled {
             return Err("setting mutated".into());
         }
