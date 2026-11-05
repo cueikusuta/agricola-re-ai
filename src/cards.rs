@@ -16,8 +16,15 @@ pub enum CardKind {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CardEffect {
-    OnPlayGain { good: Good, amount: u32 },
-    AfterWorkerGain { space: Space, good: Good, amount: u32 },
+    OnPlayGain {
+        good: Good,
+        amount: u32,
+    },
+    AfterWorkerGain {
+        space: Space,
+        good: Good,
+        amount: u32,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,13 +59,19 @@ impl CardSet {
         for card in &self.definitions {
             if card.id.is_empty()
                 || card.id.len() > 64
-                || !card.id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+                || !card
+                    .id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
                 || !ids.insert(card.id.clone())
             {
                 return Err("invalid or duplicate card id".into());
             }
             if !(-10..=20).contains(&card.points)
-                || card.cost.iter().any(|(_, quantity)| *quantity == 0 || *quantity > 30)
+                || card
+                    .cost
+                    .iter()
+                    .any(|(_, quantity)| *quantity == 0 || *quantity > 30)
                 || card.effects.iter().any(|effect| {
                     let amount = match effect {
                         CardEffect::OnPlayGain { amount, .. }
@@ -73,7 +86,9 @@ impl CardSet {
         for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
             let count = self.definitions.iter().filter(|c| c.kind == kind).count();
             if count < 7 * players {
-                return Err("implemented card set needs seven cards of each kind per player".into());
+                return Err(
+                    "implemented card set needs seven cards of each kind per player".into(),
+                );
             }
         }
         Ok(())
@@ -93,7 +108,9 @@ impl CardState {
         let mut hands = vec![Vec::new(); players];
         let mut undealt = Vec::new();
         for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
-            let mut pool = set.definitions.iter()
+            let mut pool = set
+                .definitions
+                .iter()
                 .filter(|c| c.kind == kind)
                 .map(|c| c.id.clone())
                 .collect::<Vec<_>>();
@@ -113,7 +130,9 @@ impl CardState {
             return Err("card hand count mismatch".into());
         }
         let mut all = BTreeSet::new();
-        for id in self.undealt.iter()
+        for id in self
+            .undealt
+            .iter()
             .chain(self.hands.iter().flat_map(|hand| hand.iter()))
             .chain(players.iter().flat_map(|player| player.played_cards.iter()))
         {
@@ -127,13 +146,20 @@ impl CardState {
         for (hand, player) in self.hands.iter().zip(players) {
             let own = hand.iter().chain(player.played_cards.iter());
             for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
-                let count = own.clone().filter(|id| set.definition(id).is_some_and(|c| c.kind == kind)).count();
+                let count = own
+                    .clone()
+                    .filter(|id| set.definition(id).is_some_and(|c| c.kind == kind))
+                    .count();
                 if count != if set.enabled() { 7 } else { 0 } {
                     return Err("player has incorrect original card allocation".into());
                 }
             }
-            let points: i32 = player.played_cards.iter().filter_map(|id| set.definition(id))
-                .map(|card| card.points).sum();
+            let points: i32 = player
+                .played_cards
+                .iter()
+                .filter_map(|id| set.definition(id))
+                .map(|card| card.points)
+                .sum();
             if points != player.card_points {
                 return Err("card score mismatch".into());
             }
@@ -142,7 +168,6 @@ impl CardState {
     }
 }
 
-
 /// Verify card affordability using aggregate costs (including occupation fees).
 pub fn affordable(card: &CardDefinition, player: &Player, extra_food: u32) -> bool {
     let mut amounts = std::collections::BTreeMap::<Good, u32>::new();
@@ -150,11 +175,17 @@ pub fn affordable(card: &CardDefinition, player: &Player, extra_food: u32) -> bo
         *amounts.entry(good).or_default() += amount;
     }
     *amounts.entry(Good::Food).or_default() += extra_food;
-    amounts.iter().all(|(&good, &amount)| player.supply.get(good) >= amount)
+    amounts
+        .iter()
+        .all(|(&good, &amount)| player.supply.get(good) >= amount)
 }
 
 fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String> {
-    let next = player.supply.get(good).checked_add(amount).ok_or("card resource overflow")?;
+    let next = player
+        .supply
+        .get(good)
+        .checked_add(amount)
+        .ok_or("card resource overflow")?;
     player.supply.set(good, next);
     Ok(())
 }
@@ -181,7 +212,10 @@ pub fn play(
     if extra_food > 0 {
         player.supply.pay(Good::Food, extra_food)?;
     }
-    let next_points = player.card_points.checked_add(card.points).ok_or("card points overflow")?;
+    let next_points = player
+        .card_points
+        .checked_add(card.points)
+        .ok_or("card points overflow")?;
     for effect in &card.effects {
         if let CardEffect::OnPlayGain { good, amount } = effect {
             safe_gain(player, *good, *amount)?;
@@ -198,7 +232,12 @@ pub fn after_worker(set: &CardSet, player: &mut Player, space: Space) -> Result<
     for id in player.played_cards.clone() {
         let card = set.definition(&id).ok_or("unknown played card")?;
         for effect in &card.effects {
-            if let CardEffect::AfterWorkerGain { space: trigger, good, amount } = effect {
+            if let CardEffect::AfterWorkerGain {
+                space: trigger,
+                good,
+                amount,
+            } = effect
+            {
                 if *trigger == space {
                     safe_gain(player, *good, *amount)?;
                 }

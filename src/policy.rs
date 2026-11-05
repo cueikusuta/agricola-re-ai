@@ -234,9 +234,33 @@ impl DetailPolicy for SimpleDetails {
         let p = &obs.public.players[obs.player_id];
         let detail = match space {
             Space::Lessons | Space::ExtraLessons => {
-                let count = p.played_cards.iter().filter(|id| obs.card_definitions.iter().any(|c| c.id == **id && c.kind == crate::cards::CardKind::Occupation)).count();
-                let fee = if space == Space::Lessons { u32::from(count > 0) } else if obs.public.players.len() == 3 || count >= 2 { 2 } else { 1 };
-                let card_id = obs.hand.iter().find(|id| obs.card_definitions.iter().any(|card| card.id == **id && card.kind == crate::cards::CardKind::Occupation && crate::cards::affordable(card, p, fee)))?.clone();
+                let count = p
+                    .played_cards
+                    .iter()
+                    .filter(|id| {
+                        obs.card_definitions
+                            .iter()
+                            .any(|c| c.id == **id && c.kind == crate::cards::CardKind::Occupation)
+                    })
+                    .count();
+                let fee = if space == Space::Lessons {
+                    u32::from(count > 0)
+                } else if obs.public.players.len() == 3 || count >= 2 {
+                    2
+                } else {
+                    1
+                };
+                let card_id = obs
+                    .hand
+                    .iter()
+                    .find(|id| {
+                        obs.card_definitions.iter().any(|card| {
+                            card.id == **id
+                                && card.kind == crate::cards::CardKind::Occupation
+                                && crate::cards::affordable(card, p, fee)
+                        })
+                    })?
+                    .clone();
                 Detail::PlayOccupation { card_id }
             }
             Space::Forest
@@ -374,12 +398,25 @@ impl DetailPolicy for SimpleDetails {
             }
             Space::MajorImprovement => {
                 if let Some(improvement) = improvement_choice(obs) {
-                    Detail::Buy { improvement, instant_bake: 0 }
+                    Detail::Buy {
+                        improvement,
+                        instant_bake: 0,
+                    }
                 } else {
-                    let card_id = obs.hand.iter().find(|id| obs.card_definitions.iter().any(|card| card.id == **id && card.kind == crate::cards::CardKind::MinorImprovement && crate::cards::affordable(card, p, 0)))?.clone();
+                    let card_id = obs
+                        .hand
+                        .iter()
+                        .find(|id| {
+                            obs.card_definitions.iter().any(|card| {
+                                card.id == **id
+                                    && card.kind == crate::cards::CardKind::MinorImprovement
+                                    && crate::cards::affordable(card, p, 0)
+                            })
+                        })?
+                        .clone();
                     Detail::PlayMinor { card_id }
                 }
-            },
+            }
             Space::HouseRedevelopment | Space::FarmRedevelopment => Detail::Renovate {
                 bonus_improvement: None,
                 instant_bake: 0,
