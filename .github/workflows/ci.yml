@@ -93,6 +93,10 @@ jobs:
       # The old debug test suite spent 90s + 40s in two simulation tests.
       # Optimized test artifacts preserve every assertion and every test case.
       - run: cargo test --release --locked --all-targets
+      - name: Check inline browser JavaScript syntax
+        run: |
+          sed -n '/<script>/,/<\/script>/p' web/index.html | sed '1d;$d' > /tmp/agricola-web.js
+          node --check /tmp/agricola-web.js
 
   benchmark:
     name: M1 100-game performance

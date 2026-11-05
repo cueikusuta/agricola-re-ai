@@ -133,3 +133,32 @@ pub fn standings(players: &[Player]) -> Standings {
     }
     Standings { scores, rank }
 }
+
+/// Full public score when a declared implemented card set is in use.
+/// The ordinary cardless score remains byte-for-byte compatible with M1-M4.
+pub fn score_with_cards(player: &Player, cards: &crate::cards::CardSet) -> Score {
+    let mut result = score(player);
+    let extra = crate::cards::end_game_bonus(cards, player);
+    result.categories.insert("card_bonus".to_owned(), extra);
+    result.total += extra;
+    result
+}
+
+pub fn standings_with_cards(players: &[Player], cards: &crate::cards::CardSet) -> Standings {
+    let scores = players
+        .iter()
+        .map(|p| score_with_cards(p, cards))
+        .collect::<Vec<_>>();
+    let mut rank = vec![1; players.len()];
+    for i in 0..players.len() {
+        rank[i] = 1 + scores
+            .iter()
+            .filter(|other| {
+                other.total > scores[i].total
+                    || (other.total == scores[i].total
+                        && other.tiebreak_resources > scores[i].tiebreak_resources)
+            })
+            .count();
+    }
+    Standings { scores, rank }
+}
