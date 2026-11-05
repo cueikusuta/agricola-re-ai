@@ -1,6 +1,6 @@
 use agricola_re_ai::benchmark::{compare_policies, compare_policies_with_cards};
 use agricola_re_ai::cards::verified_basic_card_set;
-use agricola_re_ai::evaluation::EvaluationPolicy;
+use agricola_re_ai::evaluation::{DetailAwareEvaluationPolicy, EvaluationPolicy, WeightedEvaluationPolicy};
 use agricola_re_ai::mcts::MctsPolicy;
 use agricola_re_ai::policy::{play_to_end, CardChoiceDetails, DetailPolicy, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
 use agricola_re_ai::score::standings;
@@ -136,13 +136,26 @@ fn main() {
             simulations: mcts_budget.unwrap_or(8),
             tree_depth: 2,
         };
+        let card_details = CardChoiceDetails;
+        let card_evaluation = DetailAwareEvaluationPolicy {
+            weights: WeightedEvaluationPolicy {
+                prior_weight: 0.5,
+                state_weight: 2.0,
+            },
+            details: &card_details,
+        };
+        let eval_strategy: &dyn SpacePolicy = if card_set.is_some() {
+            &card_evaluation
+        } else {
+            &evaluation
+        };
         let mut pairs: Vec<(&str, &dyn SpacePolicy, &str, &dyn SpacePolicy)> = vec![
             ("greedy", &greedy_policy, "random", &random),
-            ("eval", &evaluation, "greedy", &greedy_policy),
-            ("eval", &evaluation, "random", &random),
+            ("eval", eval_strategy, "greedy", &greedy_policy),
+            ("eval", eval_strategy, "random", &random),
         ];
         if card_set.is_some() && mcts_budget.is_some() {
-            pairs.push(("mcts", &mcts_benchmark, "eval", &evaluation));
+            pairs.push(("mcts", &mcts_benchmark, "eval", eval_strategy));
         }
         for (left_name, left, right_name, right) in pairs {
             let result = if let Some(set) = &card_set {
