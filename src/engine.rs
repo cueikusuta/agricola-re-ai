@@ -633,6 +633,10 @@ impl Game {
             )?;
         }
         if self.public.round == 14 {
+            for player in &mut self.public.players {
+                player.card_bonus_points =
+                    crate::cards::end_game_bonus(&self.card_set, player)?;
+            }
             self.public.finished = true
         } else {
             self.start_round()
