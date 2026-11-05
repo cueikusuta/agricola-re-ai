@@ -1,0 +1,56 @@
+name: Browser UI Full Game
+
+# M9 Issue #92 is intentionally separated from the required, short smoke gate.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tests/e2e/full-game.cjs'
+      - '.github/workflows/web-full-game.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  browser-full-game:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: web-e2e
+      - name: Install browser driver without downloading Chrome
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Build local server
+        run: cargo build --locked
+      - name: Start server
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./target/debug/agricola-re-ai --web > /tmp/agricola-web-full.log 2>&1 &
+          for i in $(seq 1 80); do
+            if curl -fsS http://127.0.0.1:8787/ >/dev/null; then exit 0; fi
+            sleep 0.25
+          done
+          cat /tmp/agricola-web-full.log
+          exit 1
+      - name: Run actual Chromium 14-round tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node --test tests/e2e/full-game.cjs 2>&1 | tee artifacts/full-game-run.log
+      - name: Preserve browser evidence and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-full-game-evidence
+          path: |
+            artifacts/
+            /tmp/agricola-web-full.log
+          if-no-files-found: ignore
+          retention-days: 7
