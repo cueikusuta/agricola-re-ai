@@ -158,7 +158,7 @@ async function runGame(page, options) {
   const coverage = {
     seed: options.seed, extra: options.extra, visitedRounds: [],
     workerActions: 0, feeding: 0, breeding: 0,
-    feedOrderChanged: false, freeAction: false,
+    feedOrderChanged: false, freeAction: false, pageReloadResumed: false,
     invalidInputRejected: false, manualPlow: false, cardPlayed: false
   };
 
@@ -194,7 +194,21 @@ async function runGame(page, options) {
       return coverage;
     }
     const round = turn.match(/^ラウンド (\d+)\/14/);
-    if (round) visitedRounds.add(Number(round[1]));
+    if (round) {
+      visitedRounds.add(Number(round[1]));
+      if (Number(round[1]) === 7 && !coverage.pageReloadResumed) {
+        // This only verifies reconnecting to a *running server*; it is not
+        // equivalent to a serialized save/restore after a server restart.
+        const handBeforeReload = await page.locator("#hand").innerText();
+        await page.reload();
+        await page.waitForFunction(expected =>
+          document.querySelector("#turn")?.textContent === expected, turn);
+        assert.equal(await page.locator("#hand").innerText(), handBeforeReload,
+          "reloaded browser recovers the currently active session and own hand");
+        coverage.pageReloadResumed = true;
+        continue;
+      }
+    }
     if (turn.includes("収穫の詳細")) {
       await doHarvest(page, coverage);
       continue;
