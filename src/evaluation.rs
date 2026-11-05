@@ -285,7 +285,10 @@ fn fence(
         edges.extend(pasture_boundary(group));
     }
     let added = edges.difference(&p.fences).count() as u32;
-    p.supply.wood = p.supply.wood.saturating_sub(added);
+    p.supply.wood = p
+        .supply
+        .wood
+        .saturating_sub(added.saturating_sub(p.free_fence_wood));
 
     let mut next_id = p
         .pastures
@@ -348,6 +351,23 @@ fn fence(
     p.fences = edges;
 }
 
+/// Apply a card to the observer's own projected state. The hand and card
+/// definitions are included in Observation; no opponent hand is consulted.
+fn project_play_card(
+    obs: &Observation,
+    player: &mut Player,
+    id: &str,
+    kind: crate::cards::CardKind,
+    fee: u32,
+) -> Option<()> {
+    let set = crate::cards::CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
+    let mut hand = obs.hand.clone();
+    crate::cards::play(&set, &mut hand, player, id, kind, fee).ok()?;
+    Some(())
+}
+
 /// Approximate only the immediate *public* effects of an action.
 /// No hidden deck, RNG, or future round information is sampled.
 fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
@@ -367,6 +387,43 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             | Space::TravelingPlayers,
             Detail::None,
         ) => add_accumulation(obs, &mut p, action.space),
+        (Space::Lessons | Space::ExtraLessons, Detail::PlayOccupation { card_id }) => {
+            let count = p
+                .played_cards
+                .iter()
+                .filter(|id| {
+                    obs.card_definitions.iter().any(|card| {
+                        card.id == **id && card.kind == crate::cards::CardKind::Occupation
+                    })
+                })
+                .count();
+            let fee = if action.space == Space::Lessons {
+                u32::from(count > 0)
+            } else if obs.public.players.len() == 3 || count >= 2 {
+                2
+            } else {
+                1
+            };
+            project_play_card(
+                obs,
+                &mut p,
+                card_id,
+                crate::cards::CardKind::Occupation,
+                fee,
+            )?;
+        }
+        (Space::MeetingPlace | Space::MajorImprovement, Detail::PlayMinor { card_id }) => {
+            project_play_card(
+                obs,
+                &mut p,
+                card_id,
+                crate::cards::CardKind::MinorImprovement,
+                0,
+            )?;
+            if action.space == Space::MeetingPlace {
+                add_accumulation(obs, &mut p, action.space);
+            }
+        }
         (Space::DayLaborer, Detail::None) => p.supply.food += 2,
         (Space::GrainSeeds, Detail::None) => p.supply.grain += 1,
         (Space::VegetableSeeds, Detail::None) => p.supply.vegetable += 1,
@@ -391,6 +448,20 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             p.family += 1;
             p.newborns += 1;
         }
+        (
+            Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth,
+            Detail::GrowWithMinor { card_id },
+        ) => {
+            p.family += 1;
+            p.newborns += 1;
+            project_play_card(
+                obs,
+                &mut p,
+                card_id,
+                crate::cards::CardKind::MinorImprovement,
+                0,
+            )?;
+        }
         (Space::Farmland, Detail::Plow { cell }) => {
             p.farm[*cell].tile = Tile::Field {
                 crop: None,
@@ -403,10 +474,16 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                 House::Clay => Good::Clay,
                 House::Stone => Good::Stone,
             };
+            let normal = p.room_material_cost.unwrap_or(5);
+            let room_cost = match p.house {
+                House::Wood => normal.min(p.wooden_room_cost.unwrap_or(5)),
+                House::Stone => normal.saturating_sub(p.stone_cost_discount),
+                House::Clay => normal,
+            };
             for &cell in rooms {
                 p.farm[cell].tile = Tile::Room;
                 let n = p.supply.get(room_good);
-                p.supply.set(room_good, n.saturating_sub(5));
+                p.supply.set(room_good, n.saturating_sub(room_cost));
                 p.supply.reed = p.supply.reed.saturating_sub(2);
             }
             for &cell in stables {
@@ -452,8 +529,20 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                 p.improvements.remove(index);
             } else {
                 for (good, n) in improvement.cost() {
+                    let cost = match good {
+                        Good::Wood => n.saturating_sub(p.improvement_wood_discount),
+                        Good::Stone => {
+                            let room_discount = if p.major_stone_discount_by_rooms {
+                                p.rooms().saturating_sub(2) as u32
+                            } else {
+                                0
+                            };
+                            n.saturating_sub(p.stone_cost_discount.saturating_add(room_discount))
+                        }
+                        _ => n,
+                    };
                     let stock = p.supply.get(good);
-                    p.supply.set(good, stock.saturating_sub(n));
+                    p.supply.set(good, stock.saturating_sub(cost));
                 }
             }
             p.improvements.push(*improvement);
@@ -464,8 +553,13 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                 House::Clay => (House::Stone, Good::Stone),
                 House::Stone => return None,
             };
-            p.supply
-                .set(good, p.supply.get(good).saturating_sub(p.rooms() as u32));
+            let discount = if good == Good::Stone {
+                p.stone_cost_discount
+            } else {
+                0
+            };
+            let cost = (p.rooms() as u32).saturating_sub(discount);
+            p.supply.set(good, p.supply.get(good).saturating_sub(cost));
             p.supply.reed = p.supply.reed.saturating_sub(1);
             p.house = new_house;
         }
@@ -499,6 +593,13 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
         }
         _ => return None,
     }
+    let set = crate::cards::CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
+    crate::cards::after_worker(&set, &mut p, action.space).ok()?;
+    // The engine applies conditional worker rewards before occupying this
+    // action space, so the trigger sees only *previously* used spaces.
+    crate::cards::after_worker_if_used(&set, &mut p, action.space, &obs.public.used).ok()?;
     Some(p)
 }
 
@@ -513,6 +614,16 @@ pub fn action_value_with_details(
     let before = evaluate_observation(obs, obs.player_id)?.total();
     let after = project_action(obs, &action)?;
     let mut value = evaluate_player(&after, obs.public.round).total() - before;
+    // Card end-game bonuses are intentionally not included in score(Player)
+    // because their value depends on the public, externally defined card set.
+    // They contribute 3 utility units per point, just like score(Player).
+    let set = crate::cards::CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
+    let player_before = obs.public.players.get(obs.player_id)?;
+    let card_bonus_delta = crate::cards::end_game_bonus(&set, &after)
+        - crate::cards::end_game_bonus(&set, player_before);
+    value += f64::from(card_bonus_delta) * 3.0;
     if space == Space::MeetingPlace && obs.public.start_player != obs.player_id {
         value += if obs.public.round < 10 { 4.0 } else { 1.0 };
     }
@@ -538,6 +649,122 @@ mod projection_tests {
         let mut obs = game.observation(game.public.active_player).unwrap();
         update(&mut obs.public.players[obs.player_id]);
         obs
+    }
+
+    #[test]
+    fn projecting_a_known_occupation_uses_only_own_hand() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind};
+
+        let mut obs = observed(|_| {});
+        obs.card_definitions.push(CardDefinition {
+            id: "sample_occ".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 1,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Wood,
+                amount: 2,
+            }],
+        });
+        obs.hand.push("sample_occ".into());
+        let original = &obs.public.players[obs.player_id];
+        let next = project_action(
+            &obs,
+            &Action {
+                space: Space::Lessons,
+                detail: Detail::PlayOccupation {
+                    card_id: "sample_occ".into(),
+                },
+            },
+        )
+        .unwrap();
+        assert_eq!(next.supply.wood, original.supply.wood + 2);
+        assert_eq!(next.card_points, original.card_points + 1);
+        assert!(next.played_cards.contains(&"sample_occ".to_owned()));
+        assert!(project_action(
+            &obs,
+            &Action {
+                space: Space::Lessons,
+                detail: Detail::PlayOccupation {
+                    card_id: "unknown".into(),
+                },
+            },
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn card_room_discount_matches_wooden_build_cost() {
+        let obs = observed(|p| {
+            p.supply.wood = 10;
+            p.supply.reed = 2;
+            p.wooden_room_cost = Some(2);
+        });
+        let action = SimpleDetails.produce(&obs, Space::FarmExpansion).unwrap();
+        let after = project_action(&obs, &action).unwrap();
+        assert_eq!(after.supply.wood, 8);
+        assert_eq!(after.supply.reed, 0);
+        assert_eq!(after.rooms(), obs.public.players[obs.player_id].rooms() + 1);
+    }
+
+    #[test]
+    fn fencing_projection_applies_free_wood_per_action() {
+        let obs = observed(|p| {
+            p.supply.wood = 5;
+            p.free_fence_wood = 3;
+        });
+        let action = SimpleDetails.produce(&obs, Space::Fencing).unwrap();
+        let before = obs.public.players[obs.player_id].supply.wood;
+        let after = project_action(&obs, &action).unwrap();
+        assert_eq!(before - after.supply.wood, 1);
+        assert_eq!(after.pastures.len(), 1);
+    }
+
+    #[test]
+    fn card_end_game_bonus_affects_occupation_action_value() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, ScoreBonusRule};
+        let mut obs = observed(|_| {});
+        obs.card_definitions.push(CardDefinition {
+            id: "bonus".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::HouseMaterial,
+            }],
+        });
+        obs.hand.push("bonus".into());
+        let value = action_value_with_details(&obs, Space::Lessons, &SimpleDetails).unwrap();
+        // A wooden home gives three end-game points; normal card score remains 0.
+        assert_eq!(value, 9.0);
+    }
+
+    #[test]
+    fn projection_matches_conditional_worker_card_trigger_timing() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind};
+        let mut obs = observed(|p| p.played_cards.push("conditional".into()));
+        obs.card_definitions.push(CardDefinition {
+            id: "conditional".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterWorkerGainIfUsed {
+                space: Space::GrainSeeds,
+                required_space: Space::Farmland,
+                good: Good::Food,
+                amount: 2,
+            }],
+        });
+        let action = Action {
+            space: Space::GrainSeeds,
+            detail: Detail::None,
+        };
+        let original = obs.public.players[obs.player_id].supply.food;
+        let before = project_action(&obs, &action).unwrap();
+        assert_eq!(before.supply.food, original);
+        obs.public.used.insert(Space::Farmland);
+        let after = project_action(&obs, &action).unwrap();
+        assert_eq!(after.supply.food, original + 2);
     }
 
     #[test]

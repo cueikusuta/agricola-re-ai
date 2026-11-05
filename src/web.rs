@@ -4,10 +4,10 @@ use crate::cards::CardSet;
 use crate::engine::{Action, Detail, FreeAction};
 use crate::harvest::{FeedingPlan, HarvestDetailPolicy};
 
-use crate::evaluation::EvaluationPolicy;
+use crate::evaluation::{DetailAwareEvaluationPolicy, WeightedEvaluationPolicy};
 use crate::mcts::MctsPolicy;
 use crate::model::{Config, Game, Observation, Space};
-use crate::policy::{DetailPolicy, SimpleDetails, SpacePolicy};
+use crate::policy::{CardChoiceDetails, DetailPolicy, SimpleDetails, SpacePolicy};
 use crate::score::standings_with_cards;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -66,7 +66,18 @@ impl Session {
     }
 
     pub fn advance_cpu(&mut self) -> Result<(), String> {
-        let details = SimpleDetails;
+        let details: &dyn DetailPolicy = if self.game.card_set.enabled() {
+            &CardChoiceDetails
+        } else {
+            &SimpleDetails
+        };
+        let evaluation = DetailAwareEvaluationPolicy {
+            weights: WeightedEvaluationPolicy {
+                prior_weight: 0.5,
+                state_weight: 2.0,
+            },
+            details,
+        };
         for _ in 0..320 {
             if self.pending.is_some()
                 || self.game.public.finished
@@ -87,7 +98,7 @@ impl Session {
                 }
                 .select(&obs, &legal, &mut rng)
             } else {
-                EvaluationPolicy.select(&obs, &legal, &mut rng)
+                evaluation.select(&obs, &legal, &mut rng)
             }
             .ok_or("CPU could not select an action")?;
             let action = details
@@ -414,6 +425,8 @@ pub fn serve(config: Config) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::evaluation::EvaluationPolicy;
+
     #[test]
     fn local_api_rejects_cross_site_and_simple_form_posts() {
         assert!(local_request_allowed(Some("127.0.0.1:8787"), None));
