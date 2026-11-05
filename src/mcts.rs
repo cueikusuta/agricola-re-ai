@@ -5,7 +5,7 @@ use crate::cards::{CardKind, CardSet, CardState};
 use crate::evaluation::{DetailAwareEvaluationPolicy, WeightedEvaluationPolicy};
 use crate::model::{Config, Game, Observation, RoundCard, Space};
 use crate::policy::{CardChoiceDetails, DetailPolicy, GreedyPolicy, SpacePolicy};
-use crate::score::standings;
+use crate::score::standings_with_cards;
 use rand::{seq::SliceRandom, Rng};
 use rand_chacha::ChaCha8Rng;
 use std::collections::{BTreeMap, BTreeSet};
@@ -296,7 +296,7 @@ impl SpacePolicy for MctsPolicy {
             if !valid || rollout(&mut game, rng).is_err() {
                 continue;
             }
-            let ranks = standings(&game.public.players);
+            let ranks = standings_with_cards(&game.public.players, &game.card_set);
             let top_count = ranks.rank.iter().filter(|&&rank| rank == 1).count() as f64;
             for &index in &path {
                 let node = &mut nodes[index];
