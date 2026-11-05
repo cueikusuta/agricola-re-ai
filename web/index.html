@@ -6,9 +6,9 @@
 h1{margin:0;font-size:22px}h2{font-size:17px;margin:0 0 8px}p{margin:4px 0}
 header,.setting,.status,.tabs,.actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
 header,.status{justify-content:space-between}.panel{background:#202932;border:1px solid #364452;border-radius:10px;padding:12px}
-button,select,input{font:inherit;border:1px solid #536270;border-radius:7px;background:#283843;color:#f0f5f4;padding:6px 10px;min-height:37px}
+button,select,input,textarea{font:inherit;border:1px solid #536270;border-radius:7px;background:#283843;color:#f0f5f4;padding:6px 10px;min-height:37px}
 button{cursor:pointer}button:hover{background:#395465}button.active{background:#487f73;border-color:#8fc6ab}button:disabled{opacity:.4;cursor:default}
-input[type=number]{width:88px}.minor{font-size:14px;color:#bdc6ca}
+textarea{background:#283843;color:#f0f5f4;border:1px solid #536270;border-radius:7px;padding:8px;min-width:100%;max-width:100%;font-size:14px}details{width:100%}summary{cursor:pointer}.hand{display:flex;gap:6px;flex-wrap:wrap}.hand button{font-size:14px;min-height:32px;padding:5px 8px}.minor{font-size:14px;color:#bdc6ca}
 .tabs button{min-width:102px}.field{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;max-width:625px}
 .cell{height:61px;border-radius:6px;background:#33434c;display:grid;place-items:center;text-align:center;padding:5px;font-size:14px}
 .cell.room{background:#685a45}.cell.field-tile{background:#565e32}.cell.pasture{background:#315b4f}
@@ -21,30 +21,65 @@ footer{color:#b5c0c8;font-size:13px}
 @media(max-width:680px){.screen{padding:8px;gap:8px}.panel{padding:9px}.cell{height:44px;font-size:14px}.actions button{flex-basis:calc(50% - 9px)}.stat{padding:5px;font-size:14px}}
 </style></head>
 <body><div class="screen">
-<header><h1>アグリコラ <span class="minor">Revised 2016 / 人間 vs CPU</span></h1><span class="minor">ローカル専用・職業カードなし</span></header>
+<header><h1>アグリコラ <span class="minor">Revised 2016 / 人間 vs CPU</span></h1><span class="minor">ローカル専用・カードセット任意</span></header>
 <section class="panel setting">
 <label>人数 <select id="players"><option value="2">2人</option><option value="3">3人</option><option value="4" selected>4人</option></select></label>
 <label><input id="extra" type="checkbox">追加タイル</label>
 <label>CPU <select id="ai"><option value="eval">評価関数</option><option value="mcts">MCTS</option></select></label>
 <label>シード <input id="seed" type="number" value="42" min="0" step="1"></label>
-<button id="new">新しい対戦</button></section>
+<button id="new">新しい対戦</button><details><summary>カードセット設定（任意・JSON）</summary>
+<p class="minor">外部定義を貼り付けます。未入力なら従来の手札なしモードです。公式カード本文は収録していません。</p>
+<textarea id="cardSet" rows="3" placeholder='{"definitions":[]}'></textarea>
+<button id="demo" type="button">検証用の架空カードを生成</button></details></section>
 <section class="panel status"><strong id="turn">読み込み中...</strong><span id="summary" class="minor"></span></section>
 <section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
 <div class="stats"><h2>資源・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p><p id="history"></p></div></div></section>
+<section id="cardSection" class="panel" hidden><h2>自分の手札 <span id="cardCount" class="minor"></span></h2>
+<p class="minor">カードを選択してから対応するアクションを選択。ここではカードIDだけを表示します。</p>
+<div id="hand" class="hand"></div><div id="handNav" class="tabs"></div></section>
 <section class="panel"><h2>使えるアクション <span class="minor">（配置などの細部は自動決定）</span></h2><div id="notice"></div><div class="actions" id="actions"></div><div class="tabs" id="actionNav"></div></section>
 <footer>人間は1P。2P〜4PはCPU。人数・追加タイルは「新しい対戦」から変更できます。</footer>
 </div>
 <script>
 const names={forest:"森林",clay_pit:"粘土坑",reed_bank:"葦の土手",fishing:"漁",day_laborer:"日雇い",grain_seeds:"穀物",farmland:"畑",farm_expansion:"部屋・厩",meeting_place:"スタート",major_improvement:"大きな進歩",fencing:"柵",grain_utilization:"種まき・パン",sheep_market:"羊",family_growth_with_room:"家族を増やす",house_redevelopment:"改築",western_quarry:"採石場",vegetable_seeds:"野菜",pig_market:"猪",cattle_market:"牛",eastern_quarry:"採石場2",family_growth_no_room:"家族増員",cultivation:"耕作",farm_redevelopment:"改築・柵",copse:"林",resource_market:"資材市場",animal_market:"家畜市場",modest_family_growth:"追加家族増員",grove:"林地",hollow:"粘土の採取",traveling_players:"旅芸人"};
 const goods={wood:"木",clay:"粘土",reed:"葦",stone:"石",food:"食料",grain:"麦",vegetable:"野菜"};
-let state=null,viewPlayer=0,busy=false,actionPage=0;
+let state=null,viewPlayer=0,busy=false,actionPage=0,handPage=0,selectedCard=null;
 const $=id=>document.getElementById(id);
 function tileName(cell){const t=cell.tile;const v=(typeof t==="string"?t:(Object.keys(t||{})[0]||"")).toLowerCase();
 if(v==="room")return ["部屋","room"];if(v==="pasture")return ["牧場","pasture"];
 if(v==="field"){const f=t.Field||t.field;const crop=(f.crop||"").toLowerCase();return [crop==="grain"?"麦畑":crop==="vegetable"?"野菜畑":"畑","field-tile"];}
 return [cell.stable?"厩":"空き",""];}
 function putStats(label,value){const d=document.createElement("div");d.className="stat";d.textContent=label+" "+value;$("stats").append(d);}
+function renderHand(){
+$("cardSection").hidden=!state.card_mode;
+if(!state.card_mode)return;
+const hand=state.hand||[];if(selectedCard&&!hand.includes(selectedCard))selectedCard=null;
+$("cardCount").textContent=hand.length+"枚（相手の手札は非公開）";
+const pages=Math.max(1,Math.ceil(hand.length/7));handPage=Math.min(handPage,pages-1);
+$("hand").replaceChildren();
+for(const id of hand.slice(handPage*7,(handPage+1)*7)){
+const data=(state.card_definitions||[]).find(c=>c.id===id);
+const kind=data&&data.kind==="occupation"?"職業":"小改善";
+const btn=document.createElement("button");btn.textContent=kind+" "+id;
+btn.className=selectedCard===id?"active":"";
+btn.disabled=busy;btn.onclick=()=>{selectedCard=selectedCard===id?null:id;render();};
+$("hand").append(btn);
+}
+$("handNav").replaceChildren();
+if(pages>1){
+for(const [label,index] of [["前へ",handPage-1],["次へ",handPage+1]]){
+const btn=document.createElement("button");btn.textContent=label;
+btn.disabled=busy||index<0||index>=pages;btn.onclick=()=>{handPage=index;render();};
+$("handNav").append(btn);
+}
+const count=document.createElement("span");count.className="minor";
+count.textContent=(handPage+1)+" / "+pages;$("handNav").append(count);
+}
+if(selectedCard){const clear=document.createElement("button");clear.textContent="選択解除";
+clear.onclick=()=>{selectedCard=null;render();};$("handNav").append(clear);}
+}
 function render(){if(!state)return;const p=state.public,scores=state.standings;
+renderHand();
 $("turn").textContent=p.finished?"対戦終了":"ラウンド "+p.round+"/14・"+(p.active_player+1)+"Pの手番";
 $("summary").textContent=p.players.length+"人戦 / 追加タイル "+(p.additional_action_space_enabled?"ON":"OFF")+" / "+(p.finished?"最終結果":"途中経過");
 $("tabs").replaceChildren();
@@ -56,15 +91,44 @@ putStats("部屋",pl.farm.filter(c=>c.tile==="Room").length);putStats("柵",pl.f
 $("improvements").textContent="大きな進歩: "+(pl.improvements.length?pl.improvements.join(" / "):"なし");
 $("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
 $("actions").replaceChildren();$("actionNav").replaceChildren();if(p.finished){$("notice").textContent="最終順位: "+scores.rank.map((r,i)=>(i+1)+"P "+r+"位").join("、");return;}
-$("notice").textContent="1Pの手番です。";
+$("notice").textContent="1Pの手番です。"+(selectedCard?" 選択中: "+selectedCard:"");
 const pageSize=8,pages=Math.max(1,Math.ceil(state.legal.length/pageSize));actionPage=Math.min(actionPage,pages-1);
 for(const key of state.legal.slice(actionPage*pageSize,(actionPage+1)*pageSize)){const b=document.createElement("button");b.textContent=names[key]||key;b.disabled=busy;b.onclick=()=>play(key);$("actions").append(b);}
 if(pages>1){for(const [label,next,disabled] of [["前へ",actionPage-1,actionPage===0],["次へ",actionPage+1,actionPage===pages-1]]){const b=document.createElement("button");b.textContent=label;b.disabled=busy||disabled;b.onclick=()=>{actionPage=next;render();};$("actionNav").append(b);}const counter=document.createElement("span");counter.className="minor";counter.textContent=(actionPage+1)+" / "+pages;$("actionNav").append(counter);}
 }
 async function request(path,payload){if(busy)return;busy=true;$("new").disabled=true;for(const b of document.querySelectorAll("#actions button,#actionNav button"))b.disabled=true;try{const options=payload===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)};
-const resp=await fetch(path,options);const result=await resp.json();if(!resp.ok)throw new Error(result.error||"通信エラー");const first=state===null;state=result;if(first){$("players").value=String(state.public.players.length);$("extra").checked=state.public.additional_action_space_enabled;$("ai").value=state.mcts?"mcts":"eval";$("seed").value=String(state.seed);}viewPlayer=Math.min(viewPlayer,state.public.players.length-1);if(path!=="/api/state")actionPage=0;$("notice").textContent="";busy=false;render();
+const resp=await fetch(path,options);const result=await resp.json();if(!resp.ok)throw new Error(result.error||"通信エラー");const first=state===null;state=result;if(first){$("players").value=String(state.public.players.length);$("extra").checked=state.public.additional_action_space_enabled;$("ai").value=state.mcts?"mcts":"eval";$("seed").value=String(state.seed);}viewPlayer=Math.min(viewPlayer,state.public.players.length-1);if(path!=="/api/state"){actionPage=0;handPage=0;}$("notice").textContent="";busy=false;render();
 }catch(e){$("notice").textContent=e.message;}finally{busy=false;$("new").disabled=false;for(const b of document.querySelectorAll("#actions button,#actionNav button"))b.disabled=false;}}
-async function play(space){let market="stone";if(space==="resource_market"&&state.public.players.length===3){market=confirm("資材市場：葦を選びますか？\nOK=葦 / キャンセル=石")?"reed":"stone";}await request("/api/play",{space,market});}
-$("new").onclick=async()=>{viewPlayer=0;await request("/api/new",{players:Number($("players").value),extra:$("extra").checked,ai:$("ai").value,seed:Number($("seed").value),budget:8});};
+async function play(space){
+let market="stone";if(space==="resource_market"&&state.public.players.length===3){
+market=confirm("資材市場：葦を選びますか？\nOK=葦 / キャンセル=石")?"reed":"stone";
+}
+const payload={space,market};
+const kind=(state.card_definitions||[]).find(c=>c.id===selectedCard)?.kind;
+if((kind==="occupation"&&["lessons","extra_lessons"].includes(space))||
+(kind==="minor_improvement"&&["meeting_place","major_improvement","family_growth_with_room","modest_family_growth"].includes(space))){
+payload.card_id=selectedCard;
+}
+await request("/api/play",payload);
+}
+$("new").onclick=async()=>{
+viewPlayer=0;selectedCard=null;
+const payload={players:Number($("players").value),extra:$("extra").checked,
+ai:$("ai").value,seed:Number($("seed").value),budget:8};
+const value=$("cardSet").value.trim();
+if(value){try{payload.card_set=JSON.parse(value);}catch(e){$("notice").textContent="カードセットのJSONが不正です";return;}}
+await request("/api/new",payload);
+};
+$("demo").onclick=()=>{
+const players=Number($("players").value),definitions=[];
+for(let i=0;i<7*players;i++){
+definitions.push({id:"sample_occ_"+i,kind:"occupation",cost:[],points:0,
+effects:[{"AfterWorkerGain":{space:"grain_seeds",good:"food",amount:1}}]});
+definitions.push({id:"sample_minor_"+i,kind:"minor_improvement",cost:[],points:1,
+effects:[{"OnPlayGain":{good:"wood",amount:1}}]});
+}
+$("cardSet").value=JSON.stringify({definitions},null,2);
+$("notice").textContent="検証用の架空カードを設定しました。新しい対戦を押してください。";
+};
 request("/api/state");
 </script></body></html>
