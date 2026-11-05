@@ -109,7 +109,8 @@ jobs:
         with:
           shared-key: release
           add-job-id-key: 'false'
-          save-if: 'false'
+          # With CI tests using a separate profile, this job is the release
+          # cache writer. M2 and M7 smoke benchmarks are read-only clients.
       - name: 100 games with additional tile OFF
         run: cargo run --release --locked -- --batch 100 --seed 4200
       - name: 100 games with additional tile ON
