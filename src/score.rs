@@ -151,11 +151,14 @@ pub fn standings_with_cards(players: &[Player], cards: &crate::cards::CardSet) -
         .collect::<Vec<_>>();
     let mut rank = vec![1; players.len()];
     for i in 0..players.len() {
-        rank[i] = 1 + scores.iter().filter(|other| {
-            other.total > scores[i].total
-                || (other.total == scores[i].total
-                    && other.tiebreak_resources > scores[i].tiebreak_resources)
-        }).count();
+        rank[i] = 1 + scores
+            .iter()
+            .filter(|other| {
+                other.total > scores[i].total
+                    || (other.total == scores[i].total
+                        && other.tiebreak_resources > scores[i].tiebreak_resources)
+            })
+            .count();
     }
     Standings { scores, rank }
 }
