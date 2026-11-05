@@ -1,7 +1,7 @@
 //! Card-set metadata is supplied by callers; copyrighted card text is never bundled.
 //! This is a deliberately small deterministic effect vocabulary, not a claim that
 //! the full Agricola Revised deck has been implemented.
-use crate::model::{Good, Player, Space};
+use crate::model::{Good, Player, Space, Tile};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,13 @@ pub enum CardKind {
     MinorImprovement,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ScoreMetric {
+    PastureCells,
+    UnfencedStables,
+    Improvements,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CardEffect {
     OnPlayGain {
@@ -24,6 +31,15 @@ pub enum CardEffect {
         space: Space,
         good: Good,
         amount: u32,
+    },
+    /// The highest applicable threshold is awarded once at the final score.
+    EndScoreThresholds {
+        metric: ScoreMetric,
+        thresholds: Vec<(u32, i32)>,
+    },
+    EndScorePerUnit {
+        metric: ScoreMetric,
+        points: i32,
     },
 }
 
@@ -72,12 +88,20 @@ impl CardSet {
                     .cost
                     .iter()
                     .any(|(_, quantity)| *quantity == 0 || *quantity > 30)
-                || card.effects.iter().any(|effect| {
-                    let amount = match effect {
-                        CardEffect::OnPlayGain { amount, .. }
-                        | CardEffect::AfterWorkerGain { amount, .. } => *amount,
-                    };
-                    amount == 0 || amount > 30
+                || card.effects.iter().any(|effect| match effect {
+                    CardEffect::OnPlayGain { amount, .. }
+                    | CardEffect::AfterWorkerGain { amount, .. } => *amount == 0 || *amount > 30,
+                    CardEffect::EndScoreThresholds { thresholds, .. } => {
+                        thresholds.is_empty()
+                            || thresholds.len() > 10
+                            || thresholds
+                                .windows(2)
+                                .any(|pair| pair[0].0 >= pair[1].0 || pair[0].1 >= pair[1].1)
+                            || thresholds
+                                .iter()
+                                .any(|&(required, points)| required == 0 || !(1..=20).contains(&points))
+                    }
+                    CardEffect::EndScorePerUnit { points, .. } => !(1..=10).contains(points),
                 })
             {
                 return Err("unsupported card cost, points, or effect".into());
@@ -137,6 +161,36 @@ pub fn implemented_base_ab_cards() -> CardSet {
                     gain(Space::GrainUtilization, Good::Wood),
                     gain(Space::Cultivation, Good::Wood),
                 ],
+            },
+            CardDefinition {
+                id: "a-manger".into(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![(Good::Wood, 2)],
+                points: 0,
+                effects: vec![CardEffect::EndScoreThresholds {
+                    metric: ScoreMetric::PastureCells,
+                    thresholds: vec![(6, 1), (7, 2), (8, 3), (10, 4)],
+                }],
+            },
+            CardDefinition {
+                id: "a-stable-architect".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::EndScorePerUnit {
+                    metric: ScoreMetric::UnfencedStables,
+                    points: 1,
+                }],
+            },
+            CardDefinition {
+                id: "a-braggart".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::EndScoreThresholds {
+                    metric: ScoreMetric::Improvements,
+                    thresholds: vec![(5, 2), (6, 3), (7, 4), (8, 5), (9, 7), (10, 9)],
+                }],
             },
             CardDefinition {
                 id: "b-greengrocer".into(),
@@ -214,11 +268,109 @@ mod verified_ab_card_tests {
     }
 
     #[test]
+    fn a_manger_scores_only_the_highest_pasture_area_tier() {
+        let (set, mut player) = play_card("a-manger");
+        assert_eq!(end_game_bonus(&set, &player).unwrap(), 0);
+        player.pastures = vec![crate::model::Pasture {
+            id: 0,
+            cells: (0..8).collect(),
+            animal: None,
+            quantity: 0,
+        }];
+        assert_eq!(end_game_bonus(&set, &player).unwrap(), 3);
+        player.pastures[0].cells = (0..10).collect();
+        assert_eq!(end_game_bonus(&set, &player).unwrap(), 4);
+    }
+
+    #[test]
+    fn a_stable_architect_scores_only_unfenced_stables() {
+        let (set, mut player) = play_card("a-stable-architect");
+        player.farm[3].stable = true;
+        player.farm[4].stable = true;
+        player.farm[4].tile = Tile::Pasture { id: 0 };
+        assert_eq!(end_game_bonus(&set, &player).unwrap(), 1);
+    }
+
+    #[test]
+    fn a_braggart_counts_majors_and_minors_but_not_occupations() {
+        let (set, mut player) = play_card("a-braggart");
+        player.improvements = vec![
+            crate::model::Improvement::Well,
+            crate::model::Improvement::Fireplace2,
+            crate::model::Improvement::Fireplace3,
+            crate::model::Improvement::ClayOven,
+        ];
+        assert_eq!(end_game_bonus(&set, &player).unwrap(), 0);
+        player.played_cards.push("a-corn-scoop".into());
+        assert_eq!(end_game_bonus(&set, &player).unwrap(), 2);
+        player.improvements.push(crate::model::Improvement::Hearth4);
+        assert_eq!(end_game_bonus(&set, &player).unwrap(), 3);
+    }
+
+    #[test]
     fn partial_catalogue_is_never_dealt_as_complete_hands() {
         let set = implemented_base_ab_cards();
-        assert_eq!(set.definitions.len(), 4);
+        assert_eq!(set.definitions.len(), 7);
         assert!(set.validate(2).is_err());
         assert!(set.validate(4).is_err());
+    }
+}
+
+/// Recalculate a player's conditional card score from final public data.
+/// Does not mutate state; the engine writes the result to card_bonus_points once.
+pub fn end_game_bonus(set: &CardSet, player: &Player) -> Result<i32, String> {
+    let mut bonus = 0i32;
+    for id in &player.played_cards {
+        let card = set.definition(id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            let contribution = match effect {
+                CardEffect::EndScoreThresholds { metric, thresholds } => {
+                    let value = score_metric(*metric, set, player);
+                    thresholds
+                        .iter()
+                        .filter(|&&(required, _)| value >= required)
+                        .map(|&(_, points)| points)
+                        .last()
+                        .unwrap_or(0)
+                }
+                CardEffect::EndScorePerUnit { metric, points } => {
+                    let value = i32::try_from(score_metric(*metric, set, player))
+                        .map_err(|_| "card metric overflow")?;
+                    value.checked_mul(*points).ok_or("card score overflow")?
+                }
+                _ => 0,
+            };
+            bonus = bonus
+                .checked_add(contribution)
+                .ok_or("total card bonus overflow")?;
+        }
+    }
+    Ok(bonus)
+}
+
+fn score_metric(metric: ScoreMetric, set: &CardSet, player: &Player) -> u32 {
+    match metric {
+        ScoreMetric::PastureCells => player
+            .pastures
+            .iter()
+            .map(|pasture| pasture.cells.len() as u32)
+            .sum(),
+        ScoreMetric::UnfencedStables => player
+            .farm
+            .iter()
+            .filter(|cell| cell.stable && matches!(cell.tile, Tile::Empty))
+            .count() as u32,
+        ScoreMetric::Improvements => {
+            let minor = player
+                .played_cards
+                .iter()
+                .filter(|id| {
+                    set.definition(id)
+                        .is_some_and(|card| card.kind == CardKind::MinorImprovement)
+                })
+                .count();
+            (player.improvements.len() + minor) as u32
+        }
     }
 }
 
