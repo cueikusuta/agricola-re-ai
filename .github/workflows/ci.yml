@@ -136,6 +136,10 @@ jobs:
         run: cargo run --release --locked -- --benchmark 20 --seed 26000
       - name: Held-out seed 26000 with additional tile ON
         run: cargo run --release --locked -- --benchmark 20 --seed 26000 --additional-action-space
+      - name: M7 card-mode paired comparison OFF
+        run: cargo run --release --locked -- --benchmark-cards 1 --seed 901
+      - name: M7 card-mode paired comparison ON
+        run: cargo run --release --locked -- --benchmark-cards 1 --seed 901 --additional-action-space
 
   gate:
     name: CI required
