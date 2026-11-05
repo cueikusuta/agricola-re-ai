@@ -117,6 +117,16 @@ pub fn implemented_base_ab_cards() -> CardSet {
                 effects: vec![gain(Space::GrainSeeds, Good::Grain)],
             },
             CardDefinition {
+                id: "a-stone-tongs".into(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![(Good::Wood, 1)],
+                points: 0,
+                effects: vec![
+                    gain(Space::WesternQuarry, Good::Stone),
+                    gain(Space::EasternQuarry, Good::Stone),
+                ],
+            },
+            CardDefinition {
                 id: "a-firewood-collector".into(),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -193,9 +203,20 @@ mod verified_ab_card_tests {
     }
 
     #[test]
+    fn a_stone_tongs_triggers_only_on_stone_accumulation() {
+        let (set, mut player) = play_card("a-stone-tongs");
+        for space in [Space::WesternQuarry, Space::EasternQuarry] {
+            after_worker(&set, &mut player, space).unwrap();
+        }
+        assert_eq!(player.supply.stone, 2);
+        after_worker(&set, &mut player, Space::ResourceMarket).unwrap();
+        assert_eq!(player.supply.stone, 2);
+    }
+
+    #[test]
     fn partial_catalogue_is_never_dealt_as_complete_hands() {
         let set = implemented_base_ab_cards();
-        assert_eq!(set.definitions.len(), 3);
+        assert_eq!(set.definitions.len(), 4);
         assert!(set.validate(2).is_err());
         assert!(set.validate(4).is_err());
     }
