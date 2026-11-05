@@ -26,7 +26,13 @@ async function chooseAction(page, priorities) {
     currentPage++;
   }
   const picked = priorities.map(name => available.find(item => item.name === name)).find(Boolean);
-  if (!picked) return null;
+  if (!picked) {
+    while (currentPage > 0) {
+      await page.locator("#actionNav").getByRole("button", { name: "前へ", exact: true }).click();
+      currentPage--;
+    }
+    return null;
+  }
   while (currentPage > picked.page) {
     await page.locator("#actionNav").getByRole("button", { name: "前へ", exact: true }).click();
     currentPage--;
@@ -34,6 +40,18 @@ async function chooseAction(page, priorities) {
   await page.locator("#actions").getByRole("button", { name: picked.name, exact: true }).click();
   await page.locator("#editor").waitFor({ state: "visible" });
   return picked.name;
+}
+
+async function playAndObserveResponse(page) {
+  // Observing the result is allowed; submitting the move still uses the actual UI.
+  const responsePromise = page.waitForResponse(response =>
+    new URL(response.url()).pathname === "/api/play"
+      && response.request().method() === "POST", { timeout: 15000 });
+  await page.locator("#confirm").click();
+  const response = await responsePromise;
+  if (response.ok()) await page.locator("#editor").waitFor({ state: "hidden", timeout: 15000 });
+  else await page.waitForFunction(() => !document.querySelector("#confirm").disabled);
+  return response.ok();
 }
 
 async function submitAndRequireSuccess(page, purpose) {
@@ -69,8 +87,7 @@ async function manuallyPlow(page, verifyInvalid) {
   const emptyCells = tiles.map((s, index) => s.includes("空き") ? index : -1).filter(n => n >= 0);
   for (const cell of emptyCells) {
     await page.locator("#cell").fill(String(cell));
-    await page.locator("#confirm").click();
-    if (await page.locator("#editor").isHidden()) return true;
+    if (await playAndObserveResponse(page)) return true;
   }
   throw new Error("No UI-entered empty farm cell was accepted: "
     + await page.locator("#editorHint").innerText());
@@ -83,8 +100,7 @@ async function attemptOccupation(page) {
   assert.ok(cardIds.length > 0, "verified-card mode offers occupation cards in the UI");
   for (const id of cardIds) {
     await page.locator("#occupation").selectOption(id);
-    await page.locator("#confirm").click();
-    if (await page.locator("#editor").isHidden()) {
+    if (await playAndObserveResponse(page)) {
       console.log("browser_card_play_success=" + id);
       return true;
     }
@@ -164,7 +180,7 @@ async function runGame(page, options) {
   coverage.cardPlayed = await attemptOccupation(page);
   if (coverage.cardPlayed) coverage.workerActions++;
 
-  const visitedRounds = new Set();
+  const visitedRounds = new Set([1]);
   for (let step = 0; step < 240; step++) {
     const turn = (await page.locator("#turn").innerText()).trim();
     if (turn === "対戦終了") {
