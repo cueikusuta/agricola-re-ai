@@ -433,9 +433,7 @@ mod tests {
             .unwrap()
             .hand
             .into_iter()
-            .find(|id| {
-                game.card_set.definition(id).unwrap().kind == CardKind::Occupation
-            })
+            .find(|id| game.card_set.definition(id).unwrap().kind == CardKind::Occupation)
             .unwrap();
         game.apply(Action {
             space: Space::Lessons,
