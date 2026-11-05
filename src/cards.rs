@@ -252,7 +252,7 @@ pub fn after_worker(set: &CardSet, player: &mut Player, space: Space) -> Result<
  * completion hook. Only effect logic and opaque card IDs are stored here.
  * This subset alone is not a full playable 7+7-card deal.
  */
-pub fn verified_worker_bonus_cards() -> Vec<CardDefinition> {
+pub fn verified_worker_bonus_cards(players: usize) -> Vec<CardDefinition> {
     fn occupation(id: &str, effects: Vec<CardEffect>) -> CardDefinition {
         CardDefinition {
             id: id.into(),
@@ -269,7 +269,7 @@ pub fn verified_worker_bonus_cards() -> Vec<CardDefinition> {
             amount,
         }
     }
-    vec![
+    let mut cards = vec![
         occupation(
             "A116",
             [Space::Forest, Space::Copse, Space::Grove]
@@ -289,15 +289,20 @@ pub fn verified_worker_bonus_cards() -> Vec<CardDefinition> {
             .map(|space| gain(space, Good::Wood, 1))
             .collect(),
         ),
-        occupation(
+    ];
+    if players >= 4 {
+        cards.push(occupation(
             "A155",
             vec![
                 gain(Space::TravelingPlayers, Good::Wood, 1),
                 gain(Space::TravelingPlayers, Good::Grain, 1),
             ],
-        ),
-        occupation("B142", vec![gain(Space::GrainSeeds, Good::Vegetable, 1)]),
-    ]
+        ));
+    }
+    if players >= 3 {
+        cards.push(occupation("B142", vec![gain(Space::GrainSeeds, Good::Vegetable, 1)]));
+    }
+    cards
 }
 
 #[cfg(test)]
@@ -305,7 +310,7 @@ mod verified_worker_bonus_tests {
     use super::*;
 
     fn applied(card_id: &str, spaces: &[Space]) -> Player {
-        let definitions = verified_worker_bonus_cards();
+        let definitions = verified_worker_bonus_cards(4);
         let mut player = Player::new(0, 0);
         player.played_cards.push(card_id.to_string());
         for &space in spaces {
@@ -319,6 +324,19 @@ mod verified_worker_bonus_tests {
             .unwrap();
         }
         player
+    }
+
+    #[test]
+    fn base_deck_player_counts_exclude_multiplayer_only_cards() {
+        let two = verified_worker_bonus_cards(2);
+        let three = verified_worker_bonus_cards(3);
+        let four = verified_worker_bonus_cards(4);
+        assert_eq!(two.len(), 2);
+        assert!(!two.iter().any(|c| c.id == "A155" || c.id == "B142"));
+        assert_eq!(three.len(), 3);
+        assert!(three.iter().any(|c| c.id == "B142"));
+        assert!(!three.iter().any(|c| c.id == "A155"));
+        assert_eq!(four.len(), 4);
     }
 
     #[test]
