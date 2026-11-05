@@ -68,9 +68,9 @@ function cardEffectLabel(effect){
  if(t==="AfterWorkerGainIfUsed")return space(v.space)+"使用後："+space(v.required_space)+"の使用条件で"+good(v.good)+v.amount+"個";
  if(t==="AfterClayConstructionGain")return "建築・改築の条件達成後："+good(v.good)+v.amount+"個";
  if(t==="AfterHarvestBakeGain")return "収穫後のパン焼きで食料"+v.amount+"追加";
- if(t==="Prerequisite"){const [k,n]=enumValue(v.rule);const r={MinimumOccupations:"職業"+n+"枚以上",MaximumOccupations:"職業"+n+"枚以下",MinimumPlayers:n+"人以上",MinimumAnimals:n?.number+"頭以上の"+good(n?.animal),MinimumCropFields:n?.number+"畑以上の"+good(n?.crop)};return "使用条件："+(r[k]||"条件あり");}
- if(t==="EndGameBonus"){const [k]=enumValue(v.rule);const r={PastureArea:"牧場面積",HouseMaterial:"家の材質",UnfencedStables:"柵の外の厩",ImprovementCount:"進歩枚数",SparePastureCapacity:"牧場の空き容量",LaterOccupations:"後から出した職業"};return "終了時の追加得点："+(r[k]||"条件あり");}
- if(t==="Passive"){const [k,n]=enumValue(v.rule);const r={PastureCapacity:"牧場の収容数＋"+n,FenceWoodDiscount:"柵の木材コスト軽減",ImprovementWoodDiscount:"進歩の木材コスト軽減",WoodenRoomCost:"木の部屋のコスト変更",RoomCost:"部屋のコスト変更",MajorStoneDiscountByRooms:"大進歩の石材を割引",StoneDiscount:"石材コスト軽減",HousingSpace:"居住人数＋"+n};return "継続効果："+(r[k]||"条件あり");}
+ if(t==="Prerequisite"){const [k,n]=enumValue(v.rule);const r={minimum_occupations:"職業"+n+"枚以上",maximum_occupations:"職業"+n+"枚以下",minimum_players:n+"人以上",minimum_animals:n?.number+"頭以上の"+good(n?.animal),minimum_crop_fields:n?.number+"畑以上の"+good(n?.crop)};return "使用条件："+(r[k]||"条件あり");}
+ if(t==="EndGameBonus"){const [k]=enumValue(v.rule);const r={pasture_area:"牧場面積",house_material:"家の材質",unfenced_stables:"柵の外の厩",improvement_count:"進歩枚数",spare_pasture_capacity:"牧場の空き容量",later_occupations:"後から出した職業"};return "終了時の追加得点："+(r[k]||"条件あり");}
+ if(t==="Passive"){const [k,n]=enumValue(v.rule);const r={pasture_capacity:"牧場の収容数＋"+n,fence_wood_discount:"柵の木材コスト軽減",improvement_wood_discount:"進歩の木材コスト軽減",wooden_room_cost:"木の部屋のコスト変更",room_cost:"部屋のコスト変更",major_stone_discount_by_rooms:"大進歩の石材を割引",stone_discount:"石材コスト軽減",housing_space:"居住人数＋"+n};return "継続効果："+(r[k]||"条件あり");}
  return "効果あり";
 }
 function cardSummary(id){
