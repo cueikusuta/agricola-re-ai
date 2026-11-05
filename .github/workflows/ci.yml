@@ -87,11 +87,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ci-test
+          shared-key: release
+          add-job-id-key: 'false'
           cache-on-failure: 'true'
-      # Custom release-inheriting profile uses more codegen units for faster
-      # test artifact compilation, preserving all assertions and all cases.
-      - run: cargo test --profile ci-test --locked --all-targets
+      # Keep the full optimized suite. This restores the measured faster
+      # shared release compilation cache for tests and benchmarks.
+      - run: cargo test --release --locked --all-targets
       - name: Check inline browser JavaScript syntax
         run: |
           sed -n '/<script>/,/<\/script>/p' web/index.html | sed '1d;$d' > /tmp/agricola-web.js
@@ -109,8 +110,7 @@ jobs:
         with:
           shared-key: release
           add-job-id-key: 'false'
-          # With CI tests using a separate profile, this job is the release
-          # cache writer. M2 and M7 smoke benchmarks are read-only clients.
+          save-if: 'false'
       - name: 100 games with additional tile OFF
         run: cargo run --release --locked -- --batch 100 --seed 4200
       - name: 100 games with additional tile ON
