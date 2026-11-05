@@ -15,6 +15,9 @@ const simpleActions = [
 ];
 
 async function chooseAction(page, priorities) {
+  // Canceling a dialog does not reset the active action-page index.
+  const previous = page.locator("#actionNav").getByRole("button", { name: "前へ", exact: true });
+  while (await previous.count() > 0 && await previous.isEnabled()) await previous.click();
   const available = [];
   let currentPage = 0;
   for (let p = 0; p < 10; p++) {
@@ -137,6 +140,36 @@ async function doHarvest(page, coverage) {
   await submitAndRequireSuccess(page, "harvest: " + title);
 }
 
+async function inspectAvailableEditors(page, coverage) {
+  // This checks only field rendering and cancel behavior, not legality of an
+  // actual room/fence/animal transaction. Report coverage accordingly.
+  const editors = {
+    "部屋・厩": ["rooms", "stables"],
+    "柵": ["pastures", "fenceAnimals"],
+    "種まき・パン": ["plants", "baking"],
+    "羊": ["animalPastures", "animalStables", "cook"],
+    "猪": ["animalPastures", "animalStables", "cook"],
+    "牛": ["animalPastures", "animalStables", "cook"],
+    "改善": ["buyKind", "buy"],
+    "改築": ["buy", "mode"],
+    "改築・柵": ["pastures", "fenceAnimals"],
+    "耕作": ["plow", "plants"],
+    "職業": ["occupation"],
+    "スタート": ["minor"]
+  };
+  for (const [name, ids] of Object.entries(editors)) {
+    if (coverage.dialogsObserved.includes(name)) continue;
+    if (!await chooseAction(page, [name])) continue;
+    for (const id of ids) {
+      assert.equal(await page.locator("#fields #" + id).count(), 1,
+        name + " dialog renders " + id);
+    }
+    await page.locator("#cancel").click();
+    await page.locator("#editor").waitFor({ state: "hidden" });
+    coverage.dialogsObserved.push(name);
+  }
+}
+
 async function runGame(page, options) {
   await page.goto(baseUrl);
   await page.locator("#players").selectOption("2");
@@ -159,8 +192,11 @@ async function runGame(page, options) {
     seed: options.seed, extra: options.extra, visitedRounds: [],
     workerActions: 0, feeding: 0, breeding: 0,
     feedOrderChanged: false, freeAction: false, pageReloadResumed: false,
+    dialogsObserved: [],
     invalidInputRejected: false, manualPlow: false, cardPlayed: false
   };
+
+  await inspectAvailableEditors(page, coverage);
 
   // Free action: user enters a real discard operation into the modal.
   // The starting food supply is positive, independent of the starting seat.
@@ -181,6 +217,7 @@ async function runGame(page, options) {
   if (coverage.cardPlayed) coverage.workerActions++;
 
   const visitedRounds = new Set([1]);
+  const inspectedRounds = new Set();
   for (let step = 0; step < 240; step++) {
     const turn = (await page.locator("#turn").innerText()).trim();
     if (turn === "対戦終了") {
@@ -196,6 +233,11 @@ async function runGame(page, options) {
     const round = turn.match(/^ラウンド (\d+)\/14/);
     if (round) {
       visitedRounds.add(Number(round[1]));
+      if ([4, 8, 12, 14].includes(Number(round[1])) &&
+          !inspectedRounds.has(Number(round[1]))) {
+        await inspectAvailableEditors(page, coverage);
+        inspectedRounds.add(Number(round[1]));
+      }
       if (Number(round[1]) === 7 && !coverage.pageReloadResumed) {
         // This only verifies reconnecting to a *running server*; it is not
         // equivalent to a serialized save/restore after a server restart.
