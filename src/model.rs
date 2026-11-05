@@ -175,6 +175,10 @@ pub struct Player {
     pub room_material_cost: Option<u32>,
     #[serde(default)]
     pub major_stone_discount_by_rooms: bool,
+    #[serde(default)]
+    pub stone_cost_discount: u32,
+    #[serde(default)]
+    pub extra_housing: u8,
     pub begging: u32,
 }
 impl Player {
@@ -204,6 +208,8 @@ impl Player {
             wooden_room_cost: None,
             room_material_cost: None,
             major_stone_discount_by_rooms: false,
+            stone_cost_discount: 0,
+            extra_housing: 0,
             begging: 0,
         }
     }

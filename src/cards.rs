@@ -77,6 +77,8 @@ pub enum PassiveRule {
     WoodenRoomCost(u32),
     RoomCost(u32),
     MajorStoneDiscountByRooms,
+    StoneDiscount(u32),
+    HousingSpace(u8),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -299,6 +301,11 @@ fn card_costs(
             *wood = wood.saturating_sub(player.improvement_wood_discount);
         }
     }
+    if card.kind == CardKind::MinorImprovement {
+        if let Some(stone) = amounts.get_mut(&Good::Stone) {
+            *stone = stone.saturating_sub(player.stone_cost_discount);
+        }
+    }
     *amounts.entry(Good::Food).or_default() += extra_food;
     amounts
 }
@@ -404,6 +411,8 @@ pub fn play(
                 PassiveRule::MajorStoneDiscountByRooms => {
                     player.major_stone_discount_by_rooms = true
                 }
+                PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
+                PassiveRule::HousingSpace(n) => player.extra_housing += n,
             },
             _ => {}
         }
@@ -1699,6 +1708,7 @@ pub fn verified_basic_card_set(players: usize) -> Result<CardSet, String> {
     definitions.extend(verified_round_and_harvest_cards());
     definitions.extend(verified_passive_cards());
     definitions.extend(verified_simple_occupations(players));
+    definitions.extend(verified_extra_simple_cards());
     let set = CardSet { definitions };
     set.validate(players)?;
     Ok(set)
@@ -1766,13 +1776,13 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 28);
+        assert_eq!(set.definitions.len(), 29);
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::MinorImprovement)
                 .count(),
-            14
+            15
         );
         assert_eq!(
             set.definitions
@@ -1782,5 +1792,41 @@ mod simple_occupation_tests {
             14
         );
         assert!(verified_basic_card_set(3).is_err());
+    }
+}
+
+
+pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
+    vec![CardDefinition {
+        id: "B010".into(), kind: CardKind::MinorImprovement,
+        cost: vec![(Good::Wood,3),(Good::Food,3)], points:0,
+        effects: vec![CardEffect::Passive {rule:PassiveRule::HousingSpace(1)}],
+    }]
+}
+pub fn verified_multiplayer_passive_cards(players:usize) -> Vec<CardDefinition> {
+    if players<3{return vec![];}
+    vec![CardDefinition {
+        id:"A143".into(),kind:CardKind::Occupation,cost:vec![],points:0,
+        effects:vec![
+            CardEffect::Prerequisite {rule:CardRequirement::MinimumPlayers(3)},
+            CardEffect::Passive {rule:PassiveRule::StoneDiscount(1)},
+        ],
+    }]
+}
+#[cfg(test)]
+mod m6_extra_passive_tests {
+    use super::*;
+    #[test] fn b010_adds_housing_without_extra_tile() {
+        let set=CardSet {definitions:verified_extra_simple_cards()};
+        let mut p=Player::new(0,0);p.supply.wood=3;p.supply.food=3;
+        play(&set,&mut vec!["B010".into()],&mut p,"B010",CardKind::MinorImprovement,0).unwrap();
+        assert_eq!(p.extra_housing,1);assert_eq!(p.rooms(),2);
+    }
+    #[test] fn a143_only_three_plus_and_reduces_stone() {
+        assert!(verified_multiplayer_passive_cards(2).is_empty());
+        let set=CardSet {definitions:verified_multiplayer_passive_cards(3)};
+        let mut p=Player::new(0,0);
+        play(&set,&mut vec!["A143".into()],&mut p,"A143",CardKind::Occupation,0).unwrap();
+        assert_eq!(p.stone_cost_discount,1);
     }
 }

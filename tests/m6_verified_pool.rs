@@ -7,7 +7,7 @@ use agricola_re_ai::{Config, Game};
 #[test]
 fn verified_pool_has_fourteen_unique_occupations_and_minors() {
     let set = verified_basic_card_set(2).unwrap();
-    assert_eq!(set.definitions.len(), 28);
+    assert_eq!(set.definitions.len(), 29);
     assert_eq!(
         set.definitions
             .iter()
@@ -20,7 +20,7 @@ fn verified_pool_has_fourteen_unique_occupations_and_minors() {
             .iter()
             .filter(|c| c.kind == CardKind::MinorImprovement)
             .count(),
-        14
+        15
     );
     assert!(verified_basic_card_set(3).is_err());
 }
