@@ -2,7 +2,7 @@ use agricola_re_ai::benchmark::{compare_policies, compare_policies_with_cards};
 use agricola_re_ai::cards::verified_basic_card_set;
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::mcts::MctsPolicy;
-use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
+use agricola_re_ai::policy::{play_to_end, CardChoiceDetails, DetailPolicy, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
 use agricola_re_ai::score::standings;
 use agricola_re_ai::web::serve;
 use agricola_re_ai::{Config, Game};
@@ -197,7 +197,12 @@ fn main() {
         } else {
             &RandomPolicy
         };
-        if let Err(err) = play_to_end(&mut game, strategy, &SimpleDetails) {
+        let details: &dyn DetailPolicy = if mcts_budget.is_some() {
+            &CardChoiceDetails
+        } else {
+            &SimpleDetails
+        };
+        if let Err(err) = play_to_end(&mut game, strategy, details) {
             eprintln!("Game {} failed: {}", n, err);
             std::process::exit(1)
         }
