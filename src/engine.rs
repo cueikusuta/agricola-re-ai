@@ -1070,7 +1070,8 @@ fn build_room(p: &mut Player, i: usize) -> Result<()> {
         return Err("room location illegal".into());
     }
     let material = room_material(p);
-    p.supply.pay(material, room_build_cost(p))?;
+    let room_cost = room_build_cost(p);
+    p.supply.pay(material, room_cost)?;
     p.supply.pay(Good::Reed, 2)?;
     p.farm[i].tile = Tile::Room;
     Ok(())
