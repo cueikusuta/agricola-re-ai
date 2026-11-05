@@ -68,9 +68,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+      # Ubuntu 24.04 includes Rust, cargo and clippy; avoid extra rustup traffic.
+      - run: rustc --version && cargo clippy --version
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: clippy
@@ -83,10 +82,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
+      - run: rustc --version && cargo --version
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ci-fast
+          shared-key: release
+          add-job-id-key: 'false'
           cache-on-failure: 'true'
       - name: Install nextest (prebuilt v0.9.151)
         uses: taiki-e/install-action@v2
@@ -94,9 +94,8 @@ jobs:
           tool: nextest@0.9.151
       # All --all-targets tests are executed, across test binaries in parallel.
       # The previous cargo test --all-targets also excluded doctests.
-      # Cargo ci-fast inherits release semantics, with quicker opt2 codegen.
-      # Compare warm/cold cache durations; restore --release if it regresses.
-      - run: cargo nextest run --cargo-profile ci-fast --locked --all-targets
+      # Use the measured faster release profile; complete all target tests.
+      - run: cargo nextest run --release --locked --all-targets
       - name: Check inline browser JavaScript syntax
         run: |
           sed -n '/<script>/,/<\/script>/p' web/index.html | sed '1d;$d' > /tmp/agricola-web.js
@@ -109,11 +108,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
+      - run: rustc --version && cargo --version
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: release
           add-job-id-key: 'false'
+          save-if: 'false'
       # Compile the release binary once: M1, M2 and M7 previously built the
       # same binary independently on separate runners, wasting build time.
       - name: Build shared release benchmark binary
