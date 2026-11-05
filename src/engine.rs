@@ -438,6 +438,45 @@ impl Game {
         *self = next;
         Ok(())
     }
+    /// Does the current placement finish a round that includes a harvest?
+    /// The UI uses this to pause before the harvest choices are committed.
+    pub fn will_harvest_after_work(&self) -> bool {
+        if self.public.finished {
+            return false;
+        }
+        let mut placed = self.public.workers_placed.clone();
+        placed[self.public.active_player] += 1;
+        placed == self.public.work_quota && HARVEST_ROUNDS.contains(&self.public.round)
+    }
+
+    /// Read-only harvest preview for an explicitly chosen final placement.
+    /// The result contains public information only; the internal preview
+    /// retains hidden data but is never sent to the browser.
+    pub fn preview_harvest(
+        &self,
+        action: &Action,
+        feeding: Option<&[FeedingPlan]>,
+    ) -> Result<PublicState> {
+        if !self.will_harvest_after_work() || !self.legal_spaces().contains(&action.space) {
+            return Err("not a legal last placement before harvest".into());
+        }
+        let mut next = self.clone();
+        let id = next.public.active_player;
+        next.execute_work(id, action)?;
+        crate::cards::after_worker(
+            &next.card_set,
+            &mut next.public.players[id],
+            action.space,
+        )?;
+        next.public.used.insert(action.space);
+        next.public.workers_placed[id] += 1;
+        next.harvest_fields();
+        if let Some(plans) = feeding {
+            next.feed_after_fields(plans)?;
+        }
+        Ok(next.public)
+    }
+
     pub fn apply_free(&mut self, player: usize, free: FreeAction) -> Result<()> {
         if self.public.finished || player >= self.public.players.len() {
             return Err("not an active game/player".into());
