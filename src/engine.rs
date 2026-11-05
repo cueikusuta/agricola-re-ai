@@ -342,6 +342,74 @@ impl Game {
         });
         list
     }
+    /// True when this worker placement will close a harvest round.
+    /// The UI uses this before collecting explicit human harvest decisions.
+    pub fn will_harvest_after_work(&self) -> bool {
+        if self.public.finished || !HARVEST_ROUNDS.contains(&self.public.round) {
+            return false;
+        }
+        let mut placed = self.public.workers_placed.clone();
+        placed[self.public.active_player] += 1;
+        placed == self.public.work_quota
+    }
+
+    /// An explicit human plan replaces only that player's harvest decisions.
+    /// The other players' plans remain CPU-driven. All plans are validated
+    /// and logged through the same transactional work/replay path.
+    pub fn apply_with_human_harvest(
+        &mut self,
+        action: Action,
+        human: usize,
+        feeding: FeedingPlan,
+        breeding: BreedingPlan,
+    ) -> Result<()> {
+        if !self.will_harvest_after_work() || human >= self.config.players {
+            return Err("explicit harvest is only allowed on the final harvest move".into());
+        }
+        if !self.legal_spaces().contains(&action.space) {
+            return Err("illegal final harvest action".into());
+        }
+        feeding.validate()?;
+        let mut preview = self.clone();
+        let active = preview.public.active_player;
+        preview.execute_work(active, &action)?;
+        crate::cards::after_worker(
+            &preview.card_set,
+            &mut preview.public.players[active],
+            action.space,
+        )?;
+        preview.harvest_fields();
+        let feeding_plans = (0..self.config.players)
+            .map(|id| {
+                if id == human {
+                    feeding.clone()
+                } else {
+                    FeedingPlan::default()
+                }
+            })
+            .collect::<Vec<_>>();
+        preview.feed_after_fields(&feeding_plans)?;
+        let breeding_plans = preview
+            .public
+            .players
+            .iter()
+            .enumerate()
+            .map(|(id, player)| {
+                if id == human {
+                    breeding.clone()
+                } else {
+                    BreedingPlan::simple(player)
+                }
+            })
+            .collect::<Vec<_>>();
+        self.apply_with_plans(
+            action,
+            Some(feeding_plans),
+            Some(breeding_plans),
+            &SimpleHarvestDetails,
+        )
+    }
+
     pub fn apply(&mut self, action: Action) -> Result<()> {
         self.apply_with_harvest_policy(action, &SimpleHarvestDetails)
     }
