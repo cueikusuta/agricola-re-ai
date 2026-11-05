@@ -150,15 +150,8 @@ mod tests {
     fn card_matches_are_seat_balanced_seeded_and_keep_margin_separate() {
         let set = verified_basic_card_set(2).unwrap();
         let run = || {
-            compare_policies_with_cards(
-                &EvaluationPolicy,
-                &GreedyPolicy,
-                1,
-                901,
-                false,
-                &set,
-            )
-            .unwrap()
+            compare_policies_with_cards(&EvaluationPolicy, &GreedyPolicy, 1, 901, false, &set)
+                .unwrap()
         };
         let first = run();
         assert_eq!(first, run());
@@ -173,14 +166,9 @@ mod tests {
     #[test]
     fn invalid_or_empty_benchmark_is_rejected() {
         let set = verified_basic_card_set(2).unwrap();
-        assert!(compare_policies_with_cards(
-            &EvaluationPolicy,
-            &GreedyPolicy,
-            0,
-            0,
-            false,
-            &set,
-        )
-        .is_err());
+        assert!(
+            compare_policies_with_cards(&EvaluationPolicy, &GreedyPolicy, 0, 0, false, &set,)
+                .is_err()
+        );
     }
 }
