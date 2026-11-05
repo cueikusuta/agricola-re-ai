@@ -358,6 +358,76 @@ mod tests {
     }
 
     #[test]
+    fn sampler_keeps_own_hand_and_never_reads_real_opponent_hand() {
+        use crate::cards::{verified_basic_card_set, CardKind};
+        use rand::SeedableRng;
+
+        let game = Game::with_cards(
+            Config {
+                seed: 40,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+        let observed = game.observation(0).unwrap();
+        let mut changed_hidden = game.clone();
+        let old_index = changed_hidden.cards.hands[1]
+            .iter()
+            .position(|id| {
+                changed_hidden.card_set.definition(id).unwrap().kind
+                    == CardKind::MinorImprovement
+            })
+            .unwrap();
+        let replacement = changed_hidden.cards.undealt[0].clone();
+        let old = std::mem::replace(&mut changed_hidden.cards.hands[1][old_index], replacement);
+        changed_hidden.cards.undealt[0] = old;
+        changed_hidden.validate().unwrap();
+        assert_eq!(changed_hidden.observation(0).unwrap(), observed);
+
+        let mut first_rng = ChaCha8Rng::seed_from_u64(99);
+        let mut second_rng = ChaCha8Rng::seed_from_u64(99);
+        for _ in 0..5 {
+            let first = sample_game(&observed, &mut first_rng).unwrap();
+            let second = sample_game(&changed_hidden.observation(0).unwrap(), &mut second_rng)
+                .unwrap();
+            first.validate().unwrap();
+            second.validate().unwrap();
+            assert_eq!(first.public, observed.public);
+            assert_eq!(first.cards.hands[0], observed.hand);
+            assert_eq!(first.cards, second.cards);
+            assert_eq!(first.hidden_round_deck, second.hidden_round_deck);
+        }
+        assert_ne!(game.cards, changed_hidden.cards);
+    }
+
+    #[test]
+    fn mcts_can_select_a_legal_move_with_private_cards() {
+        use crate::cards::verified_basic_card_set;
+        use rand::SeedableRng;
+
+        let game = Game::with_cards(
+            Config {
+                seed: 52,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+        let obs = game.observation(game.public.active_player).unwrap();
+        let legal = game.legal_spaces();
+        let policy = MctsPolicy {
+            simulations: 4,
+            tree_depth: 2,
+        };
+        let mut rng_a = ChaCha8Rng::seed_from_u64(6);
+        let mut rng_b = ChaCha8Rng::seed_from_u64(6);
+        let selected = policy.select(&obs, &legal, &mut rng_a);
+        assert_eq!(selected, policy.select(&obs, &legal, &mut rng_b));
+        assert!(legal.contains(&selected.unwrap()));
+    }
+
+    #[test]
     fn score_margin_only_breaks_nearly_equal_win_rates() {
         let clear_winner = [
             (Space::Forest, (0.6, -10.0)),
