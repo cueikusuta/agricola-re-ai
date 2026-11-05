@@ -1,0 +1,171 @@
+name: Paired AI Evaluation (cardless)
+
+on:
+  pull_request:
+    paths:
+      - 'src/bin/paired_eval.rs'
+      - 'scripts/paired_eval_stats.py'
+      - 'tests/test_paired_eval_stats.py'
+      - '.github/workflows/paired-eval.yml'
+  workflow_dispatch:
+    inputs:
+      players:
+        description: 'Cardless players 2/3/4'
+        type: choice
+        options: ['2', '3', '4']
+        default: '4'
+        required: true
+      blocks:
+        description: 'Seed blocks (250 blocks x 4 seats = 1000 games per arm)'
+        type: number
+        default: 250
+        required: true
+      seed_start:
+        description: 'Start of independent seed block range'
+        type: string
+        default: '500000'
+        required: true
+      candidate:
+        type: choice
+        options: ['eval', 'greedy', 'random']
+        default: 'eval'
+        required: true
+      baseline:
+        type: choice
+        options: ['random', 'greedy', 'eval']
+        default: 'greedy'
+        required: true
+      opponent:
+        type: choice
+        options: ['random', 'greedy', 'eval']
+        default: 'greedy'
+        required: true
+      extra:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+      - name: Build and unit-test evaluation
+        run: |
+          cargo test --release --locked --bin paired_eval
+          cargo build --release --locked --bin paired_eval
+          python3 -m unittest discover -s tests -p test_paired_eval_stats.py -v
+      - name: Real smoke (2 blocks x 2 seats x 2 arms)
+        run: |
+          set -euo pipefail
+          mkdir -p demo/shard-0
+          ./target/release/paired_eval \
+            --players 2 --seed-start 60000 --block-start 0 --blocks 2 \
+            --candidate eval --baseline random --opponent greedy \
+            --additional-action-space false \
+            --output demo/shard-0/matches.jsonl
+          python3 scripts/paired_eval_stats.py \
+            --root demo --players 2 --seed-start 60000 --blocks 2 \
+            --candidate eval --baseline random --opponent greedy \
+            --output demo/report.json
+      - name: Save smoke output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paired-eval-pr-smoke
+          path: demo/
+          if-no-files-found: warn
+          retention-days: 7
+
+  shard:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      PLAYERS: ${{ inputs.players }}
+      BLOCKS: ${{ inputs.blocks }}
+      SEED_START: ${{ inputs.seed_start }}
+      CANDIDATE: ${{ inputs.candidate }}
+      BASELINE: ${{ inputs.baseline }}
+      OPPONENT: ${{ inputs.opponent }}
+      EXTRA: ${{ inputs.extra }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bin paired_eval
+      - name: Evaluate distinct complete seed blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          INDEX=${{ matrix.shard }}
+          test "$BLOCKS" -ge 4
+          test "$BLOCKS" -le 1000
+          test "$SEED_START" -ge 0
+          test "$CANDIDATE" != "$BASELINE"
+          BLOCK_START=$(( BLOCKS * INDEX / 4 ))
+          BLOCK_END=$(( BLOCKS * (INDEX + 1) / 4 ))
+          COUNT=$(( BLOCK_END - BLOCK_START ))
+          mkdir -p "results/shard-$INDEX"
+          ./target/release/paired_eval \
+            --players "$PLAYERS" --seed-start "$SEED_START" \
+            --block-start "$BLOCK_START" --blocks "$COUNT" \
+            --candidate "$CANDIDATE" --baseline "$BASELINE" \
+            --opponent "$OPPONENT" --additional-action-space "$EXTRA" \
+            --output "results/shard-$INDEX/matches.jsonl"
+      - name: Save results and failure artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          path: results/shard-${{ matrix.shard }}/
+          if-no-files-found: warn
+          retention-days: 7
+
+  aggregate:
+    if: ${{ always() && github.event_name == 'workflow_dispatch' }}
+    needs: [test, shard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PLAYERS: ${{ inputs.players }}
+      BLOCKS: ${{ inputs.blocks }}
+      SEED_START: ${{ inputs.seed_start }}
+      CANDIDATE: ${{ inputs.candidate }}
+      BASELINE: ${{ inputs.baseline }}
+      OPPONENT: ${{ inputs.opponent }}
+      EXTRA: ${{ inputs.extra }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shard-*
+          path: results
+      - name: Verify all games and bootstrap blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          if [[ "$EXTRA" == "true" ]]; then FLAGS+=(--extra); fi
+          python3 scripts/paired_eval_stats.py \
+            --root results --players "$PLAYERS" --seed-start "$SEED_START" \
+            --blocks "$BLOCKS" --candidate "$CANDIDATE" \
+            --baseline "$BASELINE" --opponent "$OPPONENT" \
+            --output results/report.json "${FLAGS[@]}"
+          echo 'Paired seeded seat-block comparison; NOT M7-MCTS or 10s full-decision enforcement.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Save confidence interval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paired-eval-report
+          path: results/report.json
+          if-no-files-found: error
+          retention-days: 7
