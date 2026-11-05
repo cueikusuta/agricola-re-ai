@@ -151,7 +151,7 @@ def review_ledger(
         "deck_counts": dict(sorted(deck_counts.items())),
         "review_status_counts": dict(sorted(verified_count.items())),
         "verified_eligible_by_players": eligible,
-        "verified_4p_10_7_ready": (
+        "verified_4p_card_count_gate": (
             eligible["4"]["occupation"] >= 40
             and eligible["4"]["minor_improvement"] >= 40
         ),
