@@ -99,7 +99,8 @@ impl Session {
     }
     pub fn view(&self) -> Value {
         let human_turn = self.pending.is_none()
-            && !self.game.public.finished && self.game.public.active_player == 0;
+            && !self.game.public.finished
+            && self.game.public.active_player == 0;
         let harvest = match &self.pending {
             None => Value::Null,
             Some(PendingHarvest::Feeding(action)) => json!({
@@ -162,7 +163,8 @@ impl Session {
     }
     pub fn play(&mut self, input: &Value) -> Result<(), String> {
         if self.pending.is_some()
-            || self.game.public.finished || self.game.public.active_player != 0
+            || self.game.public.finished
+            || self.game.public.active_player != 0
         {
             return Err("not the human player's turn".into());
         }
@@ -174,8 +176,12 @@ impl Session {
         }
         // Human input is always explicit. SimpleDetails remains CPU-only.
         let detail: Detail = serde_json::from_value(
-            input.get("detail").cloned().ok_or("manual detail is required")?
-        ).map_err(|e| format!("invalid detail: {e}"))?;
+            input
+                .get("detail")
+                .cloned()
+                .ok_or("manual detail is required")?,
+        )
+        .map_err(|e| format!("invalid detail: {e}"))?;
         let mut next = self.clone();
         next.queue_or_apply(Action { space, detail })?;
         next.advance_cpu()?;
@@ -188,8 +194,12 @@ impl Session {
             return Err("free action not available during harvest/final results".into());
         }
         let action: FreeAction = serde_json::from_value(
-            input.get("action").cloned().ok_or("free action is required")?
-        ).map_err(|e| e.to_string())?;
+            input
+                .get("action")
+                .cloned()
+                .ok_or("free action is required")?,
+        )
+        .map_err(|e| e.to_string())?;
         let mut next = self.clone();
         next.game.apply_free(0, action)?;
         *self = next;
@@ -204,8 +214,9 @@ impl Session {
         match pending {
             PendingHarvest::Feeding(action) => {
                 let plan: FeedingPlan = serde_json::from_value(
-                    input.get("feeding").cloned().ok_or("feeding is required")?
-                ).map_err(|e| e.to_string())?;
+                    input.get("feeding").cloned().ok_or("feeding is required")?,
+                )
+                .map_err(|e| e.to_string())?;
                 plan.validate()?;
                 let mut plans = vec![FeedingPlan::default(); next.game.config.players];
                 plans[0] = plan;
@@ -214,13 +225,26 @@ impl Session {
             }
             PendingHarvest::Breeding(action, feeding) => {
                 let choice: BreedingPlan = serde_json::from_value(
-                    input.get("breeding").cloned().ok_or("breeding is required")?
-                ).map_err(|e| e.to_string())?;
+                    input
+                        .get("breeding")
+                        .cloned()
+                        .ok_or("breeding is required")?,
+                )
+                .map_err(|e| e.to_string())?;
                 let preview = next.game.preview_harvest(&action, Some(&feeding))?;
                 choice.apply(&mut preview.players[0].clone())?;
-                let breeding = preview.players.iter().enumerate().map(|(i, player)| {
-                    if i == 0 { choice.clone() } else { BreedingPlan::simple(player) }
-                }).collect();
+                let breeding = preview
+                    .players
+                    .iter()
+                    .enumerate()
+                    .map(|(i, player)| {
+                        if i == 0 {
+                            choice.clone()
+                        } else {
+                            BreedingPlan::simple(player)
+                        }
+                    })
+                    .collect();
                 let policy = ManualHarvest { feeding, breeding };
                 next.game.apply_with_harvest_policy(action, &policy)?;
                 next.pending = None;
@@ -334,8 +358,10 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
     }
     let result: Result<Value, String> = (|| match (method, path) {
         ("GET", "/api/state") => Ok(session.view()),
-        ("POST", "/api/new") | ("POST", "/api/play")
-        | ("POST", "/api/free") | ("POST", "/api/harvest") => {
+        ("POST", "/api/new")
+        | ("POST", "/api/play")
+        | ("POST", "/api/free")
+        | ("POST", "/api/harvest") => {
             let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
             if path == "/api/new" {
                 session.reset(&value)?;
@@ -417,15 +443,23 @@ mod tests {
         session.game.validate().unwrap();
     }
     fn play_simple(session: &mut Session, space: Space) {
-        let detail = SimpleDetails.produce(&session.game.observation(0).unwrap(), space)
-            .expect("test policy detail").detail;
-        session.play(&json!({"space": space, "detail": detail})).unwrap();
+        let detail = SimpleDetails
+            .produce(&session.game.observation(0).unwrap(), space)
+            .expect("test policy detail")
+            .detail;
+        session
+            .play(&json!({"space": space, "detail": detail}))
+            .unwrap();
         while let Some(pending) = session.pending.clone() {
             match pending {
-                PendingHarvest::Feeding(_) =>
-                    session.harvest(&json!({"feeding": FeedingPlan::default()})).unwrap(),
+                PendingHarvest::Feeding(_) => session
+                    .harvest(&json!({"feeding": FeedingPlan::default()}))
+                    .unwrap(),
                 PendingHarvest::Breeding(action, feeding) => {
-                    let preview = session.game.preview_harvest(&action, Some(&feeding)).unwrap();
+                    let preview = session
+                        .game
+                        .preview_harvest(&action, Some(&feeding))
+                        .unwrap();
                     let choice = BreedingPlan::simple(&preview.players[0]);
                     session.harvest(&json!({"breeding": choice})).unwrap();
                 }
