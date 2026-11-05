@@ -1,7 +1,7 @@
 //! Card-set metadata is supplied by callers; copyrighted card text is never bundled.
 //! This is a deliberately small deterministic effect vocabulary, not a claim that
 //! the full Agricola Revised deck has been implemented.
-use crate::model::{Good, House, Player, Space, Tile};
+use crate::model::{Animal, Crop, Good, House, Player, Space, Tile};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -28,6 +28,19 @@ pub enum CardEffect {
     EndGameBonus {
         rule: ScoreBonusRule,
     },
+    Prerequisite {
+        rule: CardRequirement,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CardRequirement {
+    MinimumOccupations(u8),
+    MaximumOccupations(u8),
+    MinimumAnimals { animal: Animal, number: u32 },
+    MinimumCropFields { crop: Crop, number: u8 },
+    MinimumPlayers(u8),
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -91,12 +104,23 @@ impl CardSet {
                     let amount = match effect {
                         CardEffect::OnPlayGain { amount, .. }
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
-                        CardEffect::EndGameBonus { .. } => 1,
+                        CardEffect::EndGameBonus { .. } | CardEffect::Prerequisite { .. } => 1,
                     };
                     amount == 0 || amount > 30
                 })
             {
                 return Err("unsupported card cost, points, or effect".into());
+            }
+        }
+        for card in &self.definitions {
+            for effect in &card.effects {
+                if let CardEffect::Prerequisite { rule } = effect {
+                    if let CardRequirement::MinimumPlayers(min) = rule {
+                        if *min == 0 || *min as usize > players {
+                            return Err(format!("card {} is not eligible for this player count", card.id));
+                        }
+                    }
+                }
             }
         }
         for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
@@ -196,6 +220,31 @@ pub fn affordable(card: &CardDefinition, player: &Player, extra_food: u32) -> bo
         .all(|(&good, &amount)| player.supply.get(good) >= amount)
 }
 
+fn occupation_count(set: &CardSet, player: &Player) -> usize {
+    player.played_cards.iter().filter(|id| {
+        set.definition(id).is_some_and(|card| card.kind == CardKind::Occupation)
+    }).count()
+}
+
+pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_food: u32) -> bool {
+    if !affordable(card, player, extra_food) {
+        return false;
+    }
+    let occupations = occupation_count(set, player);
+    card.effects.iter().all(|effect| {
+        let CardEffect::Prerequisite { rule } = effect else { return true; };
+        match rule {
+            CardRequirement::MinimumOccupations(min) => occupations >= usize::from(*min),
+            CardRequirement::MaximumOccupations(max) => occupations <= usize::from(*max),
+            CardRequirement::MinimumAnimals { animal, number } => player.animal_count(*animal) >= *number,
+            CardRequirement::MinimumCropFields { crop, number } => player.farm.iter().filter(|cell| {
+                matches!(cell.tile, Tile::Field { crop: Some(found), .. } if found == *crop)
+            }).count() >= usize::from(*number),
+            CardRequirement::MinimumPlayers(_) => true,
+        }
+    })
+}
+
 fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String> {
     let next = player
         .supply
@@ -219,8 +268,8 @@ pub fn play(
     if card.kind != kind || !hand.iter().any(|x| x == id) {
         return Err("card is not in the player's hand or is the wrong kind".into());
     }
-    if !affordable(card, player, extra_food) {
-        return Err("cannot pay card costs".into());
+    if !can_play(set, card, player, extra_food) {
+        return Err("cannot pay card costs or prerequisites are unmet".into());
     }
     for &(good, amount) in &card.cost {
         player.supply.pay(good, amount)?;
@@ -291,6 +340,7 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
             vec![],
             ScoreBonusRule::HouseMaterial,
         ),
+
         scoring(
             "A098",
             CardKind::Occupation,
@@ -310,13 +360,20 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
             ScoreBonusRule::LaterOccupations,
         ),
     ];
+    if let Some(card) = cards.iter_mut().find(|card| card.id == "A038") {
+        card.effects.push(CardEffect::Prerequisite {
+            rule: CardRequirement::MinimumAnimals { animal: Animal::Sheep, number: 5 },
+        });
+    }
     if players >= 3 {
-        cards.push(scoring(
+        let mut card = scoring(
             "A133",
             CardKind::Occupation,
             vec![],
             ScoreBonusRule::ImprovementCount,
-        ));
+        );
+        card.effects.push(CardEffect::Prerequisite { rule: CardRequirement::MinimumPlayers(3) });
+        cards.push(card);
     }
     cards
 }
@@ -529,5 +586,75 @@ mod verified_scoring_card_tests {
             "after_occ".into(),
         ];
         assert_eq!(end_game_bonus(&set, &player), 1);
+    }
+}
+
+#[cfg(test)]
+mod card_prerequisite_tests {
+    use super::*;
+
+    fn prerequisite_card(rule: CardRequirement) -> (CardSet, CardDefinition) {
+        let card = CardDefinition {
+            id: "check".into(), kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)], points: 0,
+            effects: vec![CardEffect::Prerequisite { rule }],
+        };
+        (CardSet { definitions: vec![card.clone()] }, card)
+    }
+
+    #[test]
+    fn occupations_minimum_and_maximum_are_exact() {
+        let (mut set, card) = prerequisite_card(CardRequirement::MinimumOccupations(2));
+        set.definitions.extend(["one", "two"].into_iter().map(|id| CardDefinition {
+            id: id.into(), kind: CardKind::Occupation,
+            cost: vec![], points: 0, effects: vec![],
+        }));
+        let mut p = Player::new(0,0);
+        p.supply.wood=1;
+        p.played_cards.push("one".into());
+        assert!(!can_play(&set, &card, &p, 0));
+        p.played_cards.push("two".into());
+        assert!(can_play(&set, &card, &p, 0));
+        let (_, too_many) = prerequisite_card(CardRequirement::MaximumOccupations(1));
+        assert!(!can_play(&set, &too_many, &p, 0));
+    }
+
+    #[test]
+    fn five_sheep_required_for_a038() {
+        let set = CardSet { definitions: verified_scoring_cards(2) };
+        let card = set.definition("A038").unwrap();
+        let mut p = Player::new(0,0);
+        p.pet = Some(Animal::Sheep);
+        assert!(!can_play(&set, card, &p, 0));
+        p.pastures.push(crate::model::Pasture {
+            id:0,cells:vec![2,3,4],animal:Some(Animal::Sheep),quantity:4
+        });
+        assert!(can_play(&set, card, &p, 0));
+    }
+
+    #[test]
+    fn crop_field_prerequisite_counts_only_planted_type() {
+        let (set, card) = prerequisite_card(
+            CardRequirement::MinimumCropFields { crop: Crop::Grain, number:2 },
+        );
+        let mut p = Player::new(0,0);
+        p.supply.wood=1;
+        p.farm[2].tile=Tile::Field {crop:Some(Crop::Grain),remaining:1};
+        p.farm[3].tile=Tile::Field {crop:Some(Crop::Vegetable),remaining:1};
+        assert!(!can_play(&set, &card, &p,0));
+        p.farm[3].tile=Tile::Field {crop:Some(Crop::Grain),remaining:1};
+        assert!(can_play(&set, &card, &p,0));
+    }
+
+    #[test]
+    fn player_count_requirement_rejected_by_card_set() {
+        let mut cards = verified_scoring_cards(3);
+        cards.push(CardDefinition { id:"extra".into(), kind:CardKind::MinorImprovement,
+            cost:vec![], points:0, effects:vec![CardEffect::Prerequisite{
+                rule: CardRequirement::MinimumPlayers(3)
+            }]
+        });
+        let set=CardSet{definitions:cards};
+        assert!(set.validate(2).is_err());
     }
 }
