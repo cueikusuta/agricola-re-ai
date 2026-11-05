@@ -38,7 +38,10 @@ fn fixed_seed_cards_complete_and_preserve_hashes_and_hidden_hands() {
         let human = game.observation(0).unwrap();
         assert_eq!(human.hand, game.cards.hands[0]);
         assert_eq!(human.hand_counts, vec![14, 14]);
-        assert!(human.hand.iter().all(|id| !game.cards.hands[1].contains(id)));
+        assert!(human
+            .hand
+            .iter()
+            .all(|id| !game.cards.hands[1].contains(id)));
         let observed_json = serde_json::to_value(human).unwrap();
         assert!(observed_json.get("hands").is_none());
         assert!(observed_json.get("undealt").is_none());

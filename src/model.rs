@@ -239,7 +239,8 @@ impl Player {
     }
     pub fn pasture_capacity(&self, p: &Pasture) -> u32 {
         let stables = p.cells.iter().filter(|&&i| self.farm[i].stable).count();
-        (2 * p.cells.len() as u32).saturating_mul(1u32 << stables)
+        (2 * p.cells.len() as u32)
+            .saturating_mul(1u32 << stables)
             .saturating_add(self.pasture_capacity_bonus)
     }
     pub fn total_crop(&self, kind: Crop) -> u32 {

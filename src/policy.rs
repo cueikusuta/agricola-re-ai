@@ -232,7 +232,9 @@ fn improvement_choice(obs: &Observation) -> Option<Improvement> {
 impl DetailPolicy for SimpleDetails {
     fn produce(&self, obs: &Observation, space: Space) -> Option<Action> {
         let p = &obs.public.players[obs.player_id];
-        let card_set = crate::cards::CardSet { definitions: obs.card_definitions.clone() };
+        let card_set = crate::cards::CardSet {
+            definitions: obs.card_definitions.clone(),
+        };
         let detail = match space {
             Space::Lessons | Space::ExtraLessons => {
                 let count = p

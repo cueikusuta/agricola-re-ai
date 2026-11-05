@@ -220,10 +220,16 @@ fn available_field(p: &Player) -> bool {
 }
 fn room_build_cost(p: &Player) -> u32 {
     let normal = p.room_material_cost.unwrap_or(5);
-    if p.house == House::Wood { normal.min(p.wooden_room_cost.unwrap_or(5)) } else { normal }
+    if p.house == House::Wood {
+        normal.min(p.wooden_room_cost.unwrap_or(5))
+    } else {
+        normal
+    }
 }
 fn can_build(p: &Player) -> bool {
-    (p.supply.reed >= 2 && p.supply.get(room_material(p)) >= room_build_cost(p) && available_room(p))
+    (p.supply.reed >= 2
+        && p.supply.get(room_material(p)) >= room_build_cost(p)
+        && available_room(p))
         || (p.occupied_stables() < 4
             && p.supply.wood >= 2
             && p.farm
@@ -267,17 +273,24 @@ fn can_buy(p: &Player, market: &[Improvement]) -> bool {
     })
 }
 fn major_cost(p: &Player, i: Improvement) -> Vec<(Good, u32)> {
-    i.cost().into_iter().map(|(good, amount)| {
-        (good, match good {
-            Good::Wood => amount.saturating_sub(p.improvement_wood_discount),
-            Good::Stone if p.major_stone_discount_by_rooms =>
-                amount.saturating_sub(p.rooms().saturating_sub(2) as u32),
-            _ => amount
+    i.cost()
+        .into_iter()
+        .map(|(good, amount)| {
+            (
+                good,
+                match good {
+                    Good::Wood => amount.saturating_sub(p.improvement_wood_discount),
+                    Good::Stone if p.major_stone_discount_by_rooms => {
+                        amount.saturating_sub(p.rooms().saturating_sub(2) as u32)
+                    }
+                    _ => amount,
+                },
+            )
         })
-    }).collect()
+        .collect()
 }
 fn affordable(p: &Player, i: Improvement) -> bool {
-    major_cost(p,i).iter().all(|&(g, n)| p.supply.get(g) >= n)
+    major_cost(p, i).iter().all(|&(g, n)| p.supply.get(g) >= n)
 }
 
 impl Game {
@@ -1254,7 +1267,7 @@ fn buy_improvement(
         p.improvements.remove(index);
         market.push(old);
     } else {
-        for (good, n) in major_cost(p,item) {
+        for (good, n) in major_cost(p, item) {
             p.supply.pay(good, n)?;
         }
     }
@@ -1321,7 +1334,8 @@ pub fn single_cell_pasture(p: &Player) -> Option<usize> {
         }
         let edges = boundary(&[i]);
         let extra = edges.difference(&p.fences).count();
-        extra <= (p.supply.wood.saturating_add(p.free_fence_wood)) as usize && p.fences.len() + extra <= 15
+        extra <= (p.supply.wood.saturating_add(p.free_fence_wood)) as usize
+            && p.fences.len() + extra <= 15
     })
 }
 fn connected(cells: &[usize]) -> bool {
@@ -1471,7 +1485,8 @@ fn build_pastures(
     if edges.len() > 15 {
         return Err("fence limit 15".into());
     }
-    p.supply.pay(Good::Wood, (cost as u32).saturating_sub(p.free_fence_wood))?;
+    p.supply
+        .pay(Good::Wood, (cost as u32).saturating_sub(p.free_fence_wood))?;
     let mut next_id = p.pastures.iter().map(|q| q.id).max().map_or(0, |n| n + 1);
     let mut assigned_ids = BTreeSet::new();
     let mut updated = Vec::new();
@@ -1578,7 +1593,9 @@ pub fn split_candidate(p: &Player) -> Option<Vec<Vec<usize>>> {
                 .union(&boundary(&rest))
                 .filter(|e| !p.fences.contains(e))
                 .count();
-            if cost <= (p.supply.wood.saturating_add(p.free_fence_wood)) as usize && p.fences.len() + cost <= 15 {
+            if cost <= (p.supply.wood.saturating_add(p.free_fence_wood)) as usize
+                && p.fences.len() + cost <= 15
+            {
                 return Some(vec![rest, vec![one]]);
             }
         }
@@ -1620,7 +1637,9 @@ pub fn general_split_candidate(
             let mut edges = boundary(&first);
             edges.extend(boundary(&second));
             let added = edges.difference(&player.fences).count();
-            if player.fences.len() + added > 15 || added > (player.supply.wood.saturating_add(player.free_fence_wood)) as usize {
+            if player.fences.len() + added > 15
+                || added > (player.supply.wood.saturating_add(player.free_fence_wood)) as usize
+            {
                 continue;
             }
             let first_capacity = player.pasture_capacity(&Pasture {
@@ -1677,7 +1696,9 @@ pub fn split_occupied_candidate(p: &Player) -> Option<(Vec<Vec<usize>>, Vec<Past
                 .copied()
                 .collect::<BTreeSet<_>>();
             let additional = new_edges.difference(&p.fences).count();
-            if p.fences.len() + additional > 15 || additional > (p.supply.wood.saturating_add(p.free_fence_wood)) as usize {
+            if p.fences.len() + additional > 15
+                || additional > (p.supply.wood.saturating_add(p.free_fence_wood)) as usize
+            {
                 continue;
             }
             let remaining_area = Pasture {
@@ -2033,45 +2054,78 @@ mod stable_building_rule_tests {
     }
 }
 
-
 #[cfg(test)]
 mod m6_passive_engine_tests {
     use super::*;
-    use crate::cards::{play, CardSet, verified_passive_cards};
+    use crate::cards::{play, verified_passive_cards, CardSet};
     fn activate(id: &str, p: &mut Player) {
-        let set=CardSet {definitions:verified_passive_cards()};
-        let mut hand=vec![id.into()];
-        play(&set,&mut hand,p,id,set.definition(id).unwrap().kind,0).unwrap();
+        let set = CardSet {
+            definitions: verified_passive_cards(),
+        };
+        let mut hand = vec![id.into()];
+        play(&set, &mut hand, p, id, set.definition(id).unwrap().kind, 0).unwrap();
     }
-    #[test] fn a012_capacity_with_stable() {
-        let mut p=Player::new(0,0);p.supply.clay=1;activate("A012",&mut p);
-        p.farm[2].stable=true;
-        let pasture=Pasture {id:0,cells:vec![2,3],animal:None,quantity:0};
-        assert_eq!(p.pasture_capacity(&pasture),10);
+    #[test]
+    fn a012_capacity_with_stable() {
+        let mut p = Player::new(0, 0);
+        p.supply.clay = 1;
+        activate("A012", &mut p);
+        p.farm[2].stable = true;
+        let pasture = Pasture {
+            id: 0,
+            cells: vec![2, 3],
+            animal: None,
+            quantity: 0,
+        };
+        assert_eq!(p.pasture_capacity(&pasture), 10);
     }
-    #[test] fn a075_discount_wood_in_major_cost() {
-        let mut p=Player::new(0,0);p.supply.stone=2;activate("A075",&mut p);
-        assert!(major_cost(&p,Improvement::Well).contains(&(Good::Wood,0)));
+    #[test]
+    fn a075_discount_wood_in_major_cost() {
+        let mut p = Player::new(0, 0);
+        p.supply.stone = 2;
+        activate("A075", &mut p);
+        assert!(major_cost(&p, Improvement::Well).contains(&(Good::Wood, 0)));
     }
-    #[test] fn b013_wooden_rooms_only() {
-        let mut p=Player::new(0,0);p.supply.stone=1;p.supply.wood=20;p.supply.reed=4;
-        activate("B013",&mut p);assert_eq!(room_build_cost(&p),2);
-        let old=p.supply.wood;build_room(&mut p,1).unwrap();assert_eq!(p.supply.wood,old-2);
-        p.house=House::Clay;assert_eq!(room_build_cost(&p),5);
+    #[test]
+    fn b013_wooden_rooms_only() {
+        let mut p = Player::new(0, 0);
+        p.supply.stone = 1;
+        p.supply.wood = 20;
+        p.supply.reed = 4;
+        activate("B013", &mut p);
+        assert_eq!(room_build_cost(&p), 2);
+        let old = p.supply.wood;
+        build_room(&mut p, 1).unwrap();
+        assert_eq!(p.supply.wood, old - 2);
+        p.house = House::Clay;
+        assert_eq!(room_build_cost(&p), 5);
     }
-    #[test] fn a088_fence_discount_per_action() {
-        let mut p=Player::new(0,0);activate("A088",&mut p);p.supply.wood=1;
+    #[test]
+    fn a088_fence_discount_per_action() {
+        let mut p = Player::new(0, 0);
+        activate("A088", &mut p);
+        p.supply.wood = 1;
         assert!(single_cell_pasture(&p).is_some());
-        build_pastures(&mut p,&[vec![14]],None).unwrap();assert_eq!(p.supply.wood,0);
+        build_pastures(&mut p, &[vec![14]], None).unwrap();
+        assert_eq!(p.supply.wood, 0);
     }
-    #[test] fn b095_stone_cost_tracks_new_rooms() {
-        let mut p=Player::new(0,0);activate("B095",&mut p);
-        p.farm[1].tile=Tile::Room;p.farm[6].tile=Tile::Room;
-        assert!(major_cost(&p,Improvement::Well).contains(&(Good::Stone,1)));
+    #[test]
+    fn b095_stone_cost_tracks_new_rooms() {
+        let mut p = Player::new(0, 0);
+        activate("B095", &mut p);
+        p.farm[1].tile = Tile::Room;
+        p.farm[6].tile = Tile::Room;
+        assert!(major_cost(&p, Improvement::Well).contains(&(Good::Stone, 1)));
     }
-    #[test] fn b126_clay_room_cost_three() {
-        let mut p=Player::new(0,0);activate("B126",&mut p);
-        p.house=House::Clay;p.supply.clay=5;p.supply.reed=2;
-        assert_eq!(room_build_cost(&p),3);build_room(&mut p,1).unwrap();assert_eq!(p.supply.clay,2);
+    #[test]
+    fn b126_clay_room_cost_three() {
+        let mut p = Player::new(0, 0);
+        activate("B126", &mut p);
+        p.house = House::Clay;
+        p.supply.clay = 5;
+        p.supply.reed = 2;
+        assert_eq!(room_build_cost(&p), 3);
+        build_room(&mut p, 1).unwrap();
+        assert_eq!(p.supply.clay, 2);
     }
 }
