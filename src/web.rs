@@ -176,7 +176,10 @@ impl Session {
     }
     pub fn harvest(&mut self, input: &Value) -> Result<(), String> {
         let feeding: FeedingPlan = serde_json::from_value(
-            input.get("feeding").cloned().ok_or("feeding choices required")?,
+            input
+                .get("feeding")
+                .cloned()
+                .ok_or("feeding choices required")?,
         )
         .map_err(|e| e.to_string())?;
         let breeding: BreedingPlan = serde_json::from_value(
