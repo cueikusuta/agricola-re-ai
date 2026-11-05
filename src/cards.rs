@@ -309,9 +309,14 @@ mod verified_worker_bonus_tests {
         let mut player = Player::new(0, 0);
         player.played_cards.push(card_id.to_string());
         for &space in spaces {
-            after_worker(&CardSet {
-                definitions: definitions.clone(),
-            }, &mut player, space).unwrap();
+            after_worker(
+                &CardSet {
+                    definitions: definitions.clone(),
+                },
+                &mut player,
+                space,
+            )
+            .unwrap();
         }
         player
     }
