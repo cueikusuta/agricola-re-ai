@@ -19,9 +19,29 @@ input[type=number]{width:88px}.minor{font-size:14px;color:#bdc6ca}
 #notice{color:#f6cf8d;min-height:24px}#history{color:#b0bcc6;font-size:14px}
 footer{color:#b5c0c8;font-size:13px}
 @media(max-width:680px){.screen{padding:8px;gap:8px}.panel{padding:9px}.cell{height:44px;font-size:14px}.actions button{flex-basis:calc(50% - 9px)}.stat{padding:5px;font-size:14px}}
+</style>
+<style>
+dialog{width:min(760px,96vw);max-height:91vh;overflow:auto;padding:16px;color:#e7e8e5;background:#202932;border:1px solid #586d77;border-radius:12px}
+dialog::backdrop{background:#000b}
+dialog h2{margin:0 0 12px}.editGrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:6px 0 12px}
+.pickCell{font-size:14px;border:1px solid #536270;border-radius:5px;padding:5px;display:grid;gap:3px;text-align:center;min-height:52px}
+.pickCell input{margin:auto}.editRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+.editRow label{display:grid;gap:4px;flex:1 1 135px}
+.editRow input,.editRow select{width:100%}
+.editGroup{padding:9px;margin:8px 0;border:1px solid #475665;border-radius:8px}
+.editGroup h3{margin:0 0 5px;font-size:16px}
+.editGroup textarea{width:100%;min-height:66px;background:#283843;color:#f0f5f4;font:inherit;border:1px solid #536270;border-radius:6px;padding:8px}
+.editGroup .rowAction{display:flex;gap:5px;margin:4px 0}
+#harvestPanel[hidden],#manualFree[hidden]{display:none}
+#harvestPanel button{margin:3px}
+#feedOrder{display:grid;gap:4px}
+.feedLine{display:flex;align-items:center;justify-content:space-between;border:1px solid #3d505c;border-radius:6px;padding:4px}
+.feedLine button{min-height:31px}
+#breedingArea{display:grid;gap:9px}
+.note{font-size:14px;color:#c4cbd0}
 </style></head>
 <body><div class="screen">
-<header><h1>アグリコラ <span class="minor">Revised 2016 / 人間 vs CPU</span></h1><span class="minor">ローカル専用・職業カードなし</span></header>
+<header><h1>アグリコラ <span class="minor">Revised 2016 / 人間 vs CPU</span></h1><span class="minor">ローカル専用・手動操作</span></header>
 <section class="panel setting">
 <label>人数 <select id="players"><option value="2">2人</option><option value="3">3人</option><option value="4" selected>4人</option></select></label>
 <label><input id="extra" type="checkbox">追加タイル</label>
@@ -31,9 +51,20 @@ footer{color:#b5c0c8;font-size:13px}
 <section class="panel status"><strong id="turn">読み込み中...</strong><span id="summary" class="minor"></span></section>
 <section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
 <div class="stats"><h2>資源・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p><p id="history"></p></div></div></section>
-<section class="panel"><h2>使えるアクション <span class="minor">（配置などの細部は自動決定）</span></h2><div id="notice"></div><div class="actions" id="actions"></div><div class="tabs" id="actionNav"></div></section>
+<section class="panel"><h2>使えるアクション <span class="minor">（場所・費用・配置を自分で選択）</span></h2><div id="notice"></div><div class="actions" id="actions"></div><div class="tabs" id="actionNav"></div><div class="tabs"><button id="freeOpen">フリーアクション（変換・家畜移動など）</button></div><div id="handArea" class="minor"></div></section>
+<section class="panel" id="harvestPanel" hidden>
+<h2>収穫：給餌と繁殖を手動で決める</h2>
+<p class="note">給餌の優先順と工房加工を設定し、給餌後の状態を確認してから子家畜の配置を決めます。</p>
+<div class="editGroup"><h3>給餌の優先順</h3><div id="feedOrder"></div>
+<label><input type="checkbox" id="preservePairs" checked>できるだけ繁殖用のペアを維持する</label>
+<div id="craftOptions"></div></div>
+<button id="harvestPreview">給餌後の盤面を確認</button>
+<div id="breedingArea"></div>
+<button id="harvestSubmit" disabled>収穫を確定</button>
+</section>
 <footer>人間は1P。2P〜4PはCPU。人数・追加タイルは「新しい対戦」から変更できます。</footer>
 </div>
+<dialog id="choiceEditor" aria-labelledby="editorTitle"><h2 id="editorTitle">詳細選択</h2><p id="editorHint" class="note"></p><div id="editorFields"></div><div class="tabs"><button id="editorSubmit">実行する</button><button id="editorCancel">キャンセル</button><button id="rawToggle">JSONで詳細編集</button></div><div id="rawArea" hidden class="editGroup"><p class="note">上級者向け。入力はすべてルールエンジンが検証します。</p><textarea id="rawDetail" rows="7" style="width:100%;background:#283843;color:white"></textarea></div></dialog>
 <script>
 const names={forest:"森林",clay_pit:"粘土坑",reed_bank:"葦の土手",fishing:"漁",day_laborer:"日雇い",grain_seeds:"穀物",farmland:"畑",farm_expansion:"部屋・厩",meeting_place:"スタート",major_improvement:"大きな進歩",fencing:"柵",grain_utilization:"種まき・パン",sheep_market:"羊",family_growth_with_room:"家族を増やす",house_redevelopment:"改築",western_quarry:"採石場",vegetable_seeds:"野菜",pig_market:"猪",cattle_market:"牛",eastern_quarry:"採石場2",family_growth_no_room:"家族増員",cultivation:"耕作",farm_redevelopment:"改築・柵",copse:"林",resource_market:"資材市場",animal_market:"家畜市場",modest_family_growth:"追加家族増員",grove:"林地",hollow:"粘土の採取",traveling_players:"旅芸人"};
 const goods={wood:"木",clay:"粘土",reed:"葦",stone:"石",food:"食料",grain:"麦",vegetable:"野菜"};
@@ -67,4 +98,97 @@ const resp=await fetch(path,options);const result=await resp.json();if(!resp.ok)
 async function play(space){let market="stone";if(space==="resource_market"&&state.public.players.length===3){market=confirm("資材市場：葦を選びますか？\nOK=葦 / キャンセル=石")?"reed":"stone";}await request("/api/play",{space,market});}
 $("new").onclick=async()=>{viewPlayer=0;await request("/api/new",{players:Number($("players").value),extra:$("extra").checked,ai:$("ai").value,seed:Number($("seed").value),budget:8});};
 request("/api/state");
-</script></body></html>
+</script>
+<script>
+// Human input adapters. These never invoke the CPU detail policy.
+const E=id=>document.getElementById(id);
+const editor=E("choiceEditor"), fields=E("editorFields");
+let currentBuild=null, currentMode="worker", currentSpace=null;
+let feedOrder=["StoredFood","Joinery","Pottery","Basketry","Vegetables","Grain","Sheep","Boar","Cattle"];
+let previewPlayer=null, breedingBuilder=null, feedingReady=false;
+const animalNames={Sheep:"羊",Boar:"猪",Cattle:"牛"};
+const feedNames={StoredFood:"手元の食料",Joinery:"家具製作所",Pottery:"製陶所",Basketry:"かご製作所",Vegetables:"野菜",Grain:"麦",Sheep:"羊",Boar:"猪",Cattle:"牛"};
+const impNames={Fireplace2:"かまど(2)",Fireplace3:"かまど(3)",Hearth4:"調理場(4)",Hearth5:"調理場(5)",ClayOven:"レンガ窯",StoneOven:"石窯",Well:"井戸",Joinery:"家具製作所",Pottery:"製陶所",Basketry:"かご製作所"};
+function node(tag,txt,cls){const e=document.createElement(tag);if(txt!==undefined)e.textContent=txt;if(cls)e.className=cls;return e;}
+function group(label,to=fields){const e=node("div",undefined,"editGroup");if(label)e.append(node("h3",label));to.append(e);return e;}
+function line(to=fields){const e=node("div",undefined,"editRow");to.append(e);return e;}
+function select(to,label,options,chosen){const wrap=node("label");wrap.append(document.createTextNode(label));const e=node("select");for(const [value,text] of options){const o=node("option",text);o.value=String(value);e.append(o);}if(chosen!==undefined)e.value=String(chosen);wrap.append(e);to.append(wrap);return e;}
+function num(to,label,value=0,max=100){const wrap=node("label");wrap.append(document.createTextNode(label));const e=node("input");e.type="number";e.min="0";e.max=String(max);e.step="1";e.value=String(value);wrap.append(e);to.append(wrap);return e;}
+function chk(to,label,checked=false){const w=node("label");const c=node("input");c.type="checkbox";c.checked=checked;w.append(c,document.createTextNode(" "+label));to.append(w);return c;}
+function textArea(to,label,example=""){const e=node("textarea");e.placeholder=label;e.value=example;to.append(node("p",label,"note"),e);return e;}
+function integer(input){const n=Number(input.value);if(!Number.isSafeInteger(n)||n<0)throw Error("0以上の整数を入力してください");return n;}
+function own(){return state.public.players[0];}
+function cellLabel(i,p=own()){const x=p.farm[i];const [t]=tileName(x);return i+" "+t+(x.stable?" 厩":"");}
+function cellPicker(to,label,selected=[],p=own()){const wrap=group(label,to);const grid=node("div",undefined,"editGrid");wrap.append(grid);const inputs=[];p.farm.forEach((c,i)=>{const w=node("label",undefined,"pickCell");const box=node("input");box.type="checkbox";box.checked=selected.includes(i);w.append(box,node("span",cellLabel(i,p)));grid.append(w);inputs.push(box);});return ()=>inputs.flatMap((box,i)=>box.checked?[i]:[]);}
+function siteChoice(to,label,allowNone=true,p=own()){const items=Array.from({length:p.farm.length},(_,i)=>[i,cellLabel(i,p)]);if(allowNone)items.unshift(["","なし"]);return select(to,label,items);}
+function improvementOptions(withNone=true){const ret=state.public.improvement_market.map(i=>[i,impNames[i]||i]);if(withNone)ret.unshift(["","選ばない"]);return ret;}
+function costMode(to){const options=[["Auto","自動交換（旧方式）"],["Pay","費用を支払う"]];if(own().improvements.includes("Fireplace2"))options.push(["Fireplace2","かまど2と交換"]);if(own().improvements.includes("Fireplace3"))options.push(["Fireplace3","かまど3と交換"]);const s=select(to,"購入方法",options);return ()=>s.value==="Fireplace2"||s.value==="Fireplace3"?{"Exchange":s.value}:s.value;}
+function baking(to){const wrap=group("パン焼き（道具ごとの麦数。0は使用しない）",to);const oven=own().improvements.filter(i=>["ClayOven","StoneOven","Fireplace2","Fireplace3","Hearth4","Hearth5"].includes(i));const entries=oven.map(improvement=>[improvement,num(line(wrap),impNames[improvement]||improvement,0,20)]);if(!entries.length)wrap.append(node("p","焼ける道具なし","note"));return ()=>entries.flatMap(([improvement,input])=>integer(input)>0?[{improvement,grain:integer(input)}]:[]);}
+function plantEditor(to){const wrap=group("種をまく畑と作物を選ぶ（1つの畑に種1つ）",to);const rows=node("div");wrap.append(rows);const entry=[];function add(){const r=line(rows);const sites=Array.from({length:15},(_,i)=>[i,cellLabel(i)]);const cell=select(r,"畑",sites);const crop=select(r,"作物",[["Grain","麦"],["Vegetable","野菜"]]);const remove=node("button","削除");remove.type="button";remove.onclick=()=>{r.remove();const i=entry.findIndex(x=>x.r===r);if(i>=0)entry.splice(i,1);};r.append(remove);entry.push({r,cell,crop});}const b=node("button","種まきを追加");b.type="button";b.onclick=add;wrap.append(b);return ()=>entry.map(x=>({cell:integer(x.cell),crop:x.crop.value}));}
+function pastureEditor(to,initial=true){const outer=group("牧場の形と収容する家畜（全牧場を記入）",to);const all=node("div");outer.append(all);const entries=[];function add(cells=[],animal="",qty=0){const wrap=group("牧場 "+(entries.length+1),all);const get=cellPicker(wrap,"囲うマス",cells);const row=line(wrap);const kind=select(row,"家畜種",[["","なし"],["Sheep","羊"],["Boar","猪"],["Cattle","牛"]],animal);const amount=num(row,"頭数",qty,100);const del=node("button","この牧場を削除");del.type="button";del.onclick=()=>{wrap.remove();const i=entries.findIndex(x=>x.wrap===wrap);if(i>=0)entries.splice(i,1);};wrap.append(del);entries.push({wrap,get,kind,amount});}
+if(initial){for(const p of own().pastures)add(p.cells,p.animal||"",p.quantity);}
+const b=node("button","牧場を追加");b.type="button";b.onclick=()=>add();outer.append(b);return ()=>{const rows=entries.map(x=>({cells:x.get(),animal:x.kind.value||null,quantity:integer(x.amount)})).filter(x=>x.cells.length);return {pastures:rows.map(x=>x.cells),occupancy:rows.map(x=>({animal:x.animal,quantity:x.quantity}))};};}
+function cardOptions(kind){const definitions=new Map((state.card_definitions||[]).map(c=>[c.id,c]));return (state.hand||[]).filter(id=>definitions.get(id)?.kind===kind).map(id=>[id,id]);}
+function cardChoice(to,kind,allowNone=false){const options=cardOptions(kind);if(allowNone)options.unshift(["","使わない"]);return select(to,kind==="occupation"?"職業":"小改善",options);}
+function animalCounts(p){const out={Sheep:0,Boar:0,Cattle:0};for(const pas of p.pastures){if(pas.animal)out[pas.animal]+=pas.quantity;}for(const c of p.farm)if(c.stable_animal)out[c.stable_animal]+=1;if(p.pet)out[p.pet]+=1;return out;}
+function animalForm(to,space){const row=line(to);const animal=select(row,"種類",[["Sheep","羊"],["Boar","猪"],["Cattle","牛"]],space==="pig_market"?"Boar":space==="cattle_market"?"Cattle":"Sheep");animal.disabled=space!=="animal_market";const outs=own().pastures.map(p=>[p.id,num(line(to),"牧場 "+p.id+" へ",0,100)]);const stable=cellPicker(to,"厩に入れる場所",[]);const r=line(to);const pet=chk(r,"家で1頭を飼う");const cook=num(r,"調理する頭数",0,100);const discard=num(r,"返却する頭数",0,100);
+return ()=>({Animals:{animal:animal.value,to_pastures:outs.flatMap(([id,n])=>integer(n)>0?[[id,integer(n)]]:[]),to_stables:stable(),pet:pet.checked,cook:integer(cook),discard:integer(discard)}});}
+function rearrangeEditor(to,p=own()){const wrap=group("今いる家畜の配置を指定",to);const ps=p.pastures.map(x=>{const r=line(wrap);const animal=select(r,"牧場 "+x.id,[["","なし"],...Object.entries(animalNames).map(([k,v])=>[k,v])],x.animal||"");const quantity=num(r,"頭数",x.quantity,100);return {id:x.id,animal,quantity};});
+const st=p.farm.flatMap((c,i)=>c.stable?[{i,c}]:[]).map(({i,c})=>{const r=line(wrap);const animal=select(r,"厩 "+i,[["","なし"],...Object.entries(animalNames).map(([k,v])=>[k,v])],c.stable_animal||"");return {i,animal};});
+const pet=select(line(wrap),"家のペット",[["","なし"],...Object.entries(animalNames).map(([k,v])=>[k,v])],p.pet||"");
+return ()=>({pasture:ps.map(x=>[x.id,x.animal.value||null,integer(x.quantity)]),stables:st.flatMap(x=>x.animal.value?[[x.i,x.animal.value]]:[]),pet:pet.value||null});}
+function submitAction(detail){return request("/api/play",{space:currentSpace,detail});}
+function buildWorker(space){
+const p=own();const row=line();currentSpace=space;
+if(space==="farmland"){const c=siteChoice(row,"耕すマス",false);return ()=>({Plow:{cell:integer(c)}});}
+if(space==="farm_expansion"){const rooms=cellPicker(fields,"部屋を建てるマス");const stables=cellPicker(fields,"厩を建てるマス");return ()=>({Build:{rooms:rooms(),stables:stables()}});}
+if(space==="fencing"){const pasture=pastureEditor(fields);return ()=>({FenceDetailed:pasture()});}
+if(space==="grain_utilization"){const plants=plantEditor(fields),bake=baking(fields);return ()=>({SowDetailed:{plantings:plants(),baking:bake()}});}
+if(space==="cultivation"){const plow=siteChoice(row,"耕すマス（任意）");const plants=plantEditor(fields);return ()=>({Cultivate:{plow:plow.value===""?null:integer(plow),plantings:plants()}});}
+if(space==="major_improvement"){const type=select(row,"購入対象",[["major","主要改善"],["minor","小改善"]]);const major=select(row,"主要改善",improvementOptions(false));const minor=cardChoice(row,"minor_improvement");const mode=costMode(line(fields));const bake=baking(fields);return ()=>type.value==="minor"?({PlayMinor:{card_id:minor.value}}):({BuyWithMode:{improvement:major.value,instant_baking:bake(),mode:mode()}});}
+if(space==="house_redevelopment"){const bonus=select(row,"改築後の主要改善",improvementOptions());const mode=costMode(line(fields));const bake=baking(fields);return ()=>({RenovateDetailed:{bonus_improvement:bonus.value||null,instant_baking:bonus.value?bake():[],purchase_mode:bonus.value?mode():"Auto",pastures:[],occupancy:null}});}
+if(space==="farm_redevelopment"){const pastures=pastureEditor(fields);return ()=>{const x=pastures();return {RenovateDetailed:{bonus_improvement:null,instant_baking:[],purchase_mode:"Auto",pastures:x.pastures,occupancy:x.pastures.length?x.occupancy:null}};};}
+if(["sheep_market","pig_market","cattle_market","animal_market"].includes(space))return animalForm(fields,space);
+if(["lessons","extra_lessons"].includes(space)){const c=cardChoice(row,"occupation");return ()=>({PlayOccupation:{card_id:c.value}});}
+if(["meeting_place","family_growth_with_room","modest_family_growth"].includes(space)){const c=cardChoice(row,"minor_improvement",true);return ()=>c.value?({"PlayMinor":{card_id:c.value}}):"None";}
+if(space==="resource_market"&&state.public.players.length===3){const c=select(row,"取得する資源",[["Stone","石"],["Reed","葦"]]);return ()=>({MarketChoice:c.value});}
+return ()=>"None";
+}
+function buildFree(){
+const row=line();const type=select(row,"フリーアクション",[["ConvertCrop","作物を食料に"],["CookAnimal","家畜を料理"],["DiscardGood","資源を捨てる"],["DiscardAnimal","家畜を返す"],["RearrangeAnimals","家畜の再配置"]]);
+const body=group("",fields);let getDetail;
+function refresh(){body.replaceChildren();const r=line(body),key=type.value;
+if(key==="ConvertCrop"){const good=select(r,"作物",[["Grain","麦"],["Vegetable","野菜"]]);const quantity=num(r,"個数",1);getDetail=()=>({ConvertCrop:{good:good.value,quantity:integer(quantity)}});}
+else if(key==="DiscardGood"){const good=select(r,"資源",Object.keys(goods).map(k=>[k.charAt(0).toUpperCase()+k.slice(1),goods[k]]));const quantity=num(r,"個数",1);getDetail=()=>({DiscardGood:{good:good.value,quantity:integer(quantity)}});}
+else if(key==="RearrangeAnimals"){const rearrange=rearrangeEditor(body);getDetail=()=>({RearrangeAnimals:rearrange()});}
+else {const animal=select(r,"種類",Object.entries(animalNames).map(([k,v])=>[k,v]));const locations=[["Pet","家"],...own().pastures.map(p=>["Pasture:"+p.id,"牧場 "+p.id]),...own().farm.flatMap((c,i)=>c.stable?[["Stable:"+i,"厩 "+i]]:[])];const source=select(r,"元の場所",locations);const quantity=num(r,"頭数",1);getDetail=()=>({[key]:{animal:animal.value,source:source.value==="Pet"?"Pet":{[source.value.split(":")[0]]:Number(source.value.split(":")[1])},quantity:integer(quantity)}});}
+}
+type.onchange=refresh;refresh();return ()=>getDetail();}
+function showEditor(title,mode,builder){fields.replaceChildren();currentMode=mode;E("editorTitle").textContent=title;E("editorHint").textContent="決定した内容をそのまま送信します。不正な配置は確定されません。";E("rawArea").hidden=true;currentBuild=builder;const detail=builder();E("rawDetail").value=JSON.stringify(detail(),null,2);editor.showModal();}
+play=function(space){currentSpace=space;showEditor(names[space]||space,"worker",()=>buildWorker(space));};
+E("freeOpen").onclick=()=>{currentSpace=null;showEditor("フリーアクション","free",buildFree);};
+E("editorCancel").onclick=()=>editor.close();
+E("rawToggle").onclick=()=>{E("rawArea").hidden=!E("rawArea").hidden;if(!E("rawArea").hidden){try{E("rawDetail").value=JSON.stringify(currentBuild(),null,2);}catch(e){E("rawDetail").value="{}";}}};
+E("editorSubmit").onclick=async()=>{
+try{const payload=E("rawArea").hidden?currentBuild():JSON.parse(E("rawDetail").value);const previous=state;if(currentMode==="worker"){await request("/api/play",{space:currentSpace,detail:payload});}else{await request("/api/free",{action:payload});}if(state!==previous)editor.close();}
+catch(e){E("notice").textContent=e.message;}
+};
+function renderFeedOrder(){const host=E("feedOrder");host.replaceChildren();feedOrder.forEach((key,i)=>{const r=node("div",undefined,"feedLine");r.append(node("span",feedNames[key]));const controls=node("div");for(const [label,offset] of [["↑",-1],["↓",1]]){const b=node("button",label);b.disabled=i+offset<0||i+offset>=feedOrder.length;b.onclick=()=>{const j=i+offset;[feedOrder[i],feedOrder[j]]=[feedOrder[j],feedOrder[i]];feedingReady=false;E("harvestSubmit").disabled=true;renderFeedOrder();};controls.append(b);}r.append(controls);host.append(r);});}
+function makeFeeding(){return {priorities:[...feedOrder],preserve_pairs_first:E("preservePairs").checked,extra_crafting:["Joinery","Pottery","Basketry"].filter(k=>E("craft_"+k)?.checked)};}
+function beginHarvest(){previewPlayer=null;feedingReady=false;E("harvestSubmit").disabled=true;E("breedingArea").replaceChildren();feedOrder=["StoredFood","Joinery","Pottery","Basketry","Vegetables","Grain","Sheep","Boar","Cattle"];renderFeedOrder();E("craftOptions").replaceChildren();for(const k of ["Joinery","Pottery","Basketry"]){if(own().improvements.includes(k)){const c=chk(E("craftOptions"),"追加加工: "+impNames[k]);c.id="craft_"+k;}}}
+function birthOptions(p){return [["Discard","返却する"],["Pet","家で飼う"],...p.pastures.map(x=>["Pasture:"+x.id,"牧場 "+x.id]),...p.farm.flatMap((c,i)=>c.stable&&c.tile==="Empty"?[["Stable:"+i,"厩 "+i]]:[])];}
+function buildBreeding(p){const area=E("breedingArea");area.replaceChildren();area.append(node("h3","給餌後の繁殖先を選択"));const counts=animalCounts(p),entries=[];for(const [species,total] of Object.entries(counts)){if(total<2)continue;const r=line(area),choice=select(r,animalNames[species]+"（"+total+"頭）",birthOptions(p));entries.push({species,choice});}if(!entries.length)area.append(node("p","繁殖できる家畜はいません。","note"));const adv=group("繁殖前の家畜の再配置（必要な場合）",area);const enabled=chk(adv,"繁殖前に家畜を移動する");const rearrange=rearrangeEditor(adv,p);return ()=>({births:entries.map(({species,choice})=>({species,destination:choice.value==="Discard"?"Discard":choice.value==="Pet"?"Pet":{[choice.value.split(":")[0]]:Number(choice.value.split(":")[1])}})),before_birth:enabled.checked?rearrange():null});}
+let lastHarvestRound=null;
+function renderManual(){if(!state)return;const pending=!!state.harvest_pending;E("harvestPanel").hidden=!pending;E("freeOpen").disabled=busy||state.public.finished;if(pending){E("notice").textContent="収穫直前です。給餌を決め、続けて繁殖先を指定してください。";if(lastHarvestRound!==state.public.round){lastHarvestRound=state.public.round;beginHarvest();}}else{lastHarvestRound=null;}
+E("handArea").textContent=(state.hand||[]).length?"手札: "+state.hand.join(" / "):"手札なし";if(pending)E("actions").replaceChildren();}
+const baseRender=render;
+render=function(){baseRender();renderManual();};
+E("harvestPreview").onclick=async()=>{
+try{feedingReady=false;E("harvestSubmit").disabled=true;const res=await fetch("/api/harvest-preview",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({feeding:makeFeeding()})});const result=await res.json();if(!res.ok)throw Error(result.error||"収穫プレビュー失敗");previewPlayer=result.public.players[0];breedingBuilder=buildBreeding(previewPlayer);feedingReady=true;E("harvestSubmit").disabled=false;E("notice").textContent="給餌後の状態から繁殖先を選んでください。";}
+catch(e){E("notice").textContent=e.message;}
+};
+E("harvestSubmit").onclick=async()=>{if(!feedingReady||!breedingBuilder)return;try{const previous=state;await request("/api/harvest",{feeding:makeFeeding(),breeding:breedingBuilder()});if(state!==previous){feedingReady=false;previewPlayer=null;}}catch(e){E("notice").textContent=e.message;}};
+E("preservePairs").onchange=()=>{feedingReady=false;E("harvestSubmit").disabled=true;};
+E("craftOptions").onchange=()=>{feedingReady=false;E("harvestSubmit").disabled=true;};
+</script>
+</body></html>
