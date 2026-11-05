@@ -299,7 +299,8 @@ impl Game {
             })
             .count();
         let can_minor = own_cards.iter().any(|c| {
-            c.kind == crate::cards::CardKind::MinorImprovement && crate::cards::can_play(&self.card_set, c, me, 0)
+            c.kind == crate::cards::CardKind::MinorImprovement
+                && crate::cards::can_play(&self.card_set, c, me, 0)
         });
         list.retain(|&s| {
             if self.public.used.contains(&s)
