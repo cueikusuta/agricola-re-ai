@@ -571,6 +571,9 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
         definitions: obs.card_definitions.clone(),
     };
     crate::cards::after_worker(&set, &mut p, action.space).ok()?;
+    // The engine applies conditional worker rewards before occupying this
+    // action space, so the trigger sees only *previously* used spaces.
+    crate::cards::after_worker_if_used(&set, &mut p, action.space, &obs.public.used).ok()?;
     Some(p)
 }
 
@@ -652,6 +655,34 @@ mod projection_tests {
             },
         )
         .is_none());
+    }
+
+    #[test]
+    fn projection_matches_conditional_worker_card_trigger_timing() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind};
+        let mut obs = observed(|p| p.played_cards.push("conditional".into()));
+        obs.card_definitions.push(CardDefinition {
+            id: "conditional".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterWorkerGainIfUsed {
+                space: Space::GrainSeeds,
+                required_space: Space::Farmland,
+                good: Good::Food,
+                amount: 2,
+            }],
+        });
+        let action = Action {
+            space: Space::GrainSeeds,
+            detail: Detail::None,
+        };
+        let original = obs.public.players[obs.player_id].supply.food;
+        let before = project_action(&obs, &action).unwrap();
+        assert_eq!(before.supply.food, original);
+        obs.public.used.insert(Space::Farmland);
+        let after = project_action(&obs, &action).unwrap();
+        assert_eq!(after.supply.food, original + 2);
     }
 
     #[test]
