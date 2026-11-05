@@ -1484,7 +1484,7 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
             id: "A075".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Stone, 2)],
-            points: 0,
+            points: 2,
             effects: vec![
                 CardEffect::Prerequisite {
                     rule: CardRequirement::MaximumOccupations(3),
@@ -1551,6 +1551,7 @@ mod passive_cards_tests {
         let mut p = Player::new(0, 0);
         p.supply.stone = 2;
         activate("A075", &mut p);
+        assert_eq!(p.card_points, 2);
         let mut set = CardSet {
             definitions: verified_passive_cards(),
         };
