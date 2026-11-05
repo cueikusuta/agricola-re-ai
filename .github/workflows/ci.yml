@@ -19,7 +19,7 @@ concurrency:
 jobs:
   changes:
     name: Detect changed files
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       rust: ${{ steps.filter.outputs.rust }}
       runtime: ${{ steps.filter.outputs.runtime }}
@@ -54,19 +54,18 @@ jobs:
     name: rustfmt
     needs: changes
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.rust == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - run: cargo fmt --all -- --check
+      # Official Ubuntu images already include rustfmt. Avoid a redundant
+      # rustup install that can stall on network/toolchain updates.
+      - run: rustfmt --version && cargo fmt --all -- --check
 
   lint:
     name: clippy
     needs: changes
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.rust == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
@@ -81,7 +80,7 @@ jobs:
     name: cargo test
     needs: changes
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.rust == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
@@ -106,7 +105,7 @@ jobs:
     name: M1 100-game performance
     needs: changes
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
@@ -124,7 +123,7 @@ jobs:
     name: M2 seeded head-to-head smoke test
     needs: changes
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.runtime == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
@@ -150,7 +149,7 @@ jobs:
     name: CI required
     if: ${{ always() }}
     needs: [changes, format, lint, test, benchmark, m2_benchmark]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       CHANGES: ${{ needs.changes.result }}
       RUST: ${{ needs.changes.outputs.rust }}
