@@ -1,4 +1,5 @@
 //! Public model types and private game state. No card text is bundled.
+use crate::cards::{CardDefinition, CardSet, CardState};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ pub const FARM_CELLS: usize = 15;
 pub const HARVEST_ROUNDS: [u8; 6] = [4, 7, 9, 11, 13, 14];
 pub const RULES_VERSION: &str = "agricola-revised-2016-beginner";
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const LOG_VERSION: u32 = 4;
+pub const LOG_VERSION: u32 = 5;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Config {
@@ -158,6 +159,10 @@ pub struct Player {
     pub pet: Option<Animal>,
     pub fences: BTreeSet<(u8, u8)>,
     pub improvements: Vec<Improvement>,
+    #[serde(default)]
+    pub played_cards: Vec<String>,
+    #[serde(default)]
+    pub card_points: i32,
     pub begging: u32,
 }
 impl Player {
@@ -179,6 +184,8 @@ impl Player {
             pet: None,
             fences: BTreeSet::new(),
             improvements: vec![],
+            played_cards: vec![],
+            card_points: 0,
             begging: 0,
         }
     }
@@ -353,6 +360,8 @@ pub enum Space {
     Farmland,
     FarmExpansion,
     MeetingPlace,
+    Lessons,
+    ExtraLessons,
     MajorImprovement,
     Fencing,
     GrainUtilization,
@@ -497,6 +506,10 @@ pub struct Game {
     pub hidden_round_deck: Vec<RoundCard>,
     pub rng: RngStreams,
     pub delayed_well: BTreeMap<u8, Vec<usize>>,
+    #[serde(default)]
+    pub card_set: CardSet,
+    #[serde(default)]
+    pub cards: CardState,
     pub log: GameLog,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -519,22 +532,36 @@ pub struct GameLog {
     pub initial_public_state: Option<PublicState>,
     pub round_seed: u64,
     pub action_seed: u64,
+    #[serde(default)]
+    pub card_set: CardSet,
     pub events: Vec<Event>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Observation {
     pub player_id: usize,
     pub public: PublicState,
+    /// Only this viewer's own cards. Neither opponent hands nor undealt IDs appear.
+    pub hand: Vec<String>,
+    pub hand_counts: Vec<usize>,
+    /// The implemented card vocabulary is public; its randomized locations are not.
+    pub card_definitions: Vec<CardDefinition>,
 }
 impl Game {
     pub fn new(config: Config) -> Self {
+        Self::with_cards(config, CardSet::default()).expect("default cardless setup")
+    }
+    pub fn with_cards(config: Config, card_set: CardSet) -> Result<Self, String> {
+        if !(2..=4).contains(&config.players) {
+            return Err("players must be 2..=4".into());
+        }
+        card_set.validate(config.players)?;
+        let cards = CardState::deal(&card_set, config.seed, config.players);
         let round_seed = config.seed ^ 0x38DB_3BE3_DF45_3FAF;
         let action_seed = config.seed ^ 0x6A09_E667_F3BC_C909;
         let mut rng = RngStreams {
             round: ChaCha8Rng::seed_from_u64(round_seed),
             ai: ChaCha8Rng::seed_from_u64(action_seed),
         };
-        assert!((2..=4).contains(&config.players), "players must be 2..=4");
         let start_player = rng.round.gen_range(0..config.players);
         let mut deck = Vec::new();
         for stage in 1..=6 {
@@ -575,6 +602,7 @@ impl Game {
             initial_public_state: None,
             round_seed,
             action_seed,
+            card_set: card_set.clone(),
             events: vec![],
         };
         let mut result = Self {
@@ -583,12 +611,14 @@ impl Game {
             hidden_round_deck: deck,
             rng,
             delayed_well: BTreeMap::new(),
+            card_set,
+            cards,
             log,
         };
         result.start_round();
         result.log.initial_state_hash = result.state_hash();
         result.log.initial_public_state = Some(result.public.clone());
-        result
+        Ok(result)
     }
     pub fn observation(&self, player_id: usize) -> Result<Observation, String> {
         if player_id >= self.public.players.len() {
@@ -597,6 +627,9 @@ impl Game {
         Ok(Observation {
             player_id,
             public: self.public.clone(),
+            hand: self.cards.hands[player_id].clone(),
+            hand_counts: self.cards.hands.iter().map(Vec::len).collect(),
+            card_definitions: self.card_set.definitions.clone(),
         })
     }
     pub fn state_hash(&self) -> String {
@@ -607,6 +640,8 @@ impl Game {
             &self.hidden_round_deck,
             &self.rng,
             &self.delayed_well,
+            &self.card_set,
+            &self.cards,
         ))
         .expect("state serialization");
         format!("{:x}", Sha256::digest(&data))
@@ -621,10 +656,11 @@ impl Game {
             || result.log.rules_version != RULES_VERSION
             || result.log.engine_version != ENGINE_VERSION
             || result.log.config != result.config
+            || result.log.card_set != result.card_set
         {
             return Err("saved game metadata/version mismatch".into());
         }
-        let initial = Game::new(result.config.clone());
+        let initial = Game::with_cards(result.config.clone(), result.card_set.clone())?;
         if result.log.start_player != initial.public.start_player
             || result.log.initial_state_hash != initial.state_hash()
             || result.log.round_seed != initial.log.round_seed
@@ -642,7 +678,11 @@ impl Game {
         }
         // Check the complete event chain, rather than trusting only the
         // last event hash; otherwise earlier tampering could go unnoticed.
-        let replayed = Game::replay(result.config.clone(), &result.log.events)?;
+        let replayed = Game::replay_with_cards(
+            result.config.clone(),
+            result.card_set.clone(),
+            &result.log.events,
+        )?;
         if replayed.state_hash() != result.state_hash() {
             return Err("saved game differs from logged action replay".into());
         }
@@ -666,7 +706,16 @@ impl Game {
         if self.config.additional_action_space_enabled {
             spaces.extend(Space::extra_for(players));
         }
+        if self.card_set.enabled() {
+            spaces.push(Space::Lessons);
+            if players >= 3 {
+                spaces.push(Space::ExtraLessons);
+            }
+        }
         for space in spaces {
+            if space == Space::MeetingPlace && self.card_set.enabled() {
+                continue;
+            }
             if let Some((_, n)) = space.accumulation_for(players) {
                 *self.public.accumulations.entry(space).or_default() += n
             }
@@ -687,6 +736,8 @@ impl Game {
         if !(2..=4).contains(&self.config.players) || p.players.len() != self.config.players {
             return Err("player count mismatch".into());
         }
+        self.card_set.validate(self.config.players)?;
+        self.cards.validate(&self.card_set, &p.players)?;
         if self.config.additional_action_space_enabled != p.additional_action_space_enabled {
             return Err("setting mutated".into());
         }
@@ -853,6 +904,12 @@ impl Game {
         let mut available: BTreeSet<_> = Space::regular_for(self.config.players)
             .into_iter()
             .collect();
+        if self.card_set.enabled() {
+            available.insert(Space::Lessons);
+            if self.config.players >= 3 {
+                available.insert(Space::ExtraLessons);
+            }
+        }
         available.extend(p.revealed.iter().copied().map(Space::from));
         if self.config.additional_action_space_enabled {
             available.extend(Space::extra_for(self.config.players));
