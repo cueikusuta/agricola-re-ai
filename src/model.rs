@@ -730,6 +730,10 @@ impl Game {
                 self.public.players[id].supply.food += 1
             }
         }
+        for player in &mut self.public.players {
+            crate::cards::at_round_start(&self.card_set, player)
+                .expect("valid card round-start effect must fit resource counter");
+        }
     }
     pub fn validate(&self) -> Result<(), String> {
         let p = &self.public;
