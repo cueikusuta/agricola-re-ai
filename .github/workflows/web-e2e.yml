@@ -4,6 +4,11 @@ name: Browser UI E2E
 # is measured and the 60-second target can be preserved.
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tests/e2e/**'
+      - 'package.json'
+      - '.github/workflows/web-e2e.yml'
 
 permissions:
   contents: read
