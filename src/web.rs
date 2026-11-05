@@ -1,8 +1,12 @@
 //! Loopback-only, single-user web UI. No external services or accounts.
-use crate::engine::{Action, Detail};
+use crate::breeding::BreedingPlan;
+use crate::cards::CardSet;
+use crate::engine::{Action, Detail, FreeAction};
+use crate::harvest::{FeedingPlan, HarvestDetailPolicy};
+
 use crate::evaluation::EvaluationPolicy;
 use crate::mcts::MctsPolicy;
-use crate::model::{Config, Game, Good, Space};
+use crate::model::{Config, Game, Observation, Space};
 use crate::policy::{DetailPolicy, SimpleDetails, SpacePolicy};
 use crate::score::standings_with_cards;
 use rand::SeedableRng;
@@ -14,10 +18,31 @@ use std::net::{TcpListener, TcpStream};
 const INDEX: &str = include_str!("../web/index.html");
 const MAX_BODY: usize = 65_536;
 
+#[derive(Clone)]
 pub struct Session {
     game: Game,
     mcts: bool,
     budget: usize,
+    pending: Option<PendingHarvest>,
+}
+
+#[derive(Clone)]
+enum PendingHarvest {
+    Feeding(Action),
+    Breeding(Action, Vec<FeedingPlan>),
+}
+
+struct ManualHarvest {
+    feeding: Vec<FeedingPlan>,
+    breeding: Vec<BreedingPlan>,
+}
+impl HarvestDetailPolicy for ManualHarvest {
+    fn plan_feeding(&self, obs: &Observation) -> FeedingPlan {
+        self.feeding[obs.player_id].clone()
+    }
+    fn plan_breeding(&self, obs: &Observation) -> BreedingPlan {
+        self.breeding[obs.player_id].clone()
+    }
 }
 impl Session {
     pub fn new(config: Config) -> Result<Self, String> {
@@ -25,14 +50,28 @@ impl Session {
             game: Game::new(config),
             mcts: false,
             budget: 8,
+            pending: None,
         };
         session.advance_cpu()?;
         Ok(session)
     }
+    fn queue_or_apply(&mut self, action: Action) -> Result<(), String> {
+        if self.game.will_harvest_after_work() {
+            self.game.preview_harvest(&action, None)?;
+            self.pending = Some(PendingHarvest::Feeding(action));
+        } else {
+            self.game.apply(action)?;
+        }
+        Ok(())
+    }
+
     pub fn advance_cpu(&mut self) -> Result<(), String> {
         let details = SimpleDetails;
         for _ in 0..320 {
-            if self.game.public.finished || self.game.public.active_player == 0 {
+            if self.pending.is_some()
+                || self.game.public.finished
+                || self.game.public.active_player == 0
+            {
                 return Ok(());
             }
             let obs = self.game.observation(self.game.public.active_player)?;
@@ -54,13 +93,30 @@ impl Session {
             let action = details
                 .produce(&obs, space)
                 .ok_or("CPU could not make action details")?;
-            self.game.apply(action)?;
+            self.queue_or_apply(action)?;
         }
         Err("CPU turn count exceeded".into())
     }
     pub fn view(&self) -> Value {
-        let human_turn = !self.game.public.finished && self.game.public.active_player == 0;
+        let human_turn = self.pending.is_none()
+            && !self.game.public.finished
+            && self.game.public.active_player == 0;
+        let harvest = match &self.pending {
+            None => Value::Null,
+            Some(PendingHarvest::Feeding(action)) => json!({
+                "phase": "feeding",
+                "preview": self.game.preview_harvest(action, None).expect("validated action"),
+            }),
+            Some(PendingHarvest::Breeding(action, feeding)) => json!({
+                "phase": "breeding",
+                "preview": self.game.preview_harvest(action, Some(feeding)).expect("validated plans"),
+            }),
+        };
         json!({
+            "harvest": harvest,
+            "hand": &self.game.cards.hands[0],
+            "card_definitions": &self.game.card_set.definitions,
+            "card_enabled": self.game.card_set.enabled(),
             "public": &self.game.public,
             "legal": if human_turn { self.game.legal_spaces() } else { vec![] },
             "standings": standings_with_cards(&self.game.public.players, &self.game.card_set),
@@ -91,17 +147,25 @@ impl Session {
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
         };
+        let card_set: CardSet = match input.get("card_set") {
+            Some(value) => serde_json::from_value(value.clone()).map_err(|e| e.to_string())?,
+            None => CardSet::default(),
+        };
         let mut next = Self {
-            game: Game::new(config),
+            game: Game::with_cards(config, card_set)?,
             mcts: input.get("ai").and_then(Value::as_str) == Some("mcts"),
             budget: budget as usize,
+            pending: None,
         };
         next.advance_cpu()?;
         *self = next;
         Ok(())
     }
     pub fn play(&mut self, input: &Value) -> Result<(), String> {
-        if self.game.public.finished || self.game.public.active_player != 0 {
+        if self.pending.is_some()
+            || self.game.public.finished
+            || self.game.public.active_player != 0
+        {
             return Err("not the human player's turn".into());
         }
         let space: Space =
@@ -110,28 +174,83 @@ impl Session {
         if !self.game.legal_spaces().contains(&space) {
             return Err("selected space is not legal".into());
         }
-        let mut action = SimpleDetails
-            .produce(&self.game.observation(0)?, space)
-            .ok_or("no detailed action available")?;
-        if space == Space::ResourceMarket && self.game.config.players == 3 {
-            let good = match input.get("market").and_then(Value::as_str) {
-                Some("reed") => Good::Reed,
-                Some("stone") | None => Good::Stone,
-                _ => return Err("invalid 3-player resource choice".into()),
-            };
-            action = Action {
-                space,
-                detail: Detail::MarketChoice(good),
-            };
-        }
-        // Do not commit the human move unless the subsequent CPU moves succeed.
-        let mut next = Self {
-            game: self.game.clone(),
-            mcts: self.mcts,
-            budget: self.budget,
-        };
-        next.game.apply(action)?;
+        // Human input is always explicit. SimpleDetails remains CPU-only.
+        let detail: Detail = serde_json::from_value(
+            input
+                .get("detail")
+                .cloned()
+                .ok_or("manual detail is required")?,
+        )
+        .map_err(|e| format!("invalid detail: {e}"))?;
+        let mut next = self.clone();
+        next.queue_or_apply(Action { space, detail })?;
         next.advance_cpu()?;
+        *self = next;
+        Ok(())
+    }
+
+    pub fn free(&mut self, input: &Value) -> Result<(), String> {
+        if self.game.public.finished || self.pending.is_some() {
+            return Err("free action not available during harvest/final results".into());
+        }
+        let action: FreeAction = serde_json::from_value(
+            input
+                .get("action")
+                .cloned()
+                .ok_or("free action is required")?,
+        )
+        .map_err(|e| e.to_string())?;
+        let mut next = self.clone();
+        next.game.apply_free(0, action)?;
+        *self = next;
+        Ok(())
+    }
+
+    /// A human approves food/workshop choices first, then sees the exact
+    /// post-feeding state before choosing animal births. CPU uses its default.
+    pub fn harvest(&mut self, input: &Value) -> Result<(), String> {
+        let mut next = self.clone();
+        let pending = next.pending.clone().ok_or("harvest is not pending")?;
+        match pending {
+            PendingHarvest::Feeding(action) => {
+                let plan: FeedingPlan = serde_json::from_value(
+                    input.get("feeding").cloned().ok_or("feeding is required")?,
+                )
+                .map_err(|e| e.to_string())?;
+                plan.validate()?;
+                let mut plans = vec![FeedingPlan::default(); next.game.config.players];
+                plans[0] = plan;
+                next.game.preview_harvest(&action, Some(&plans))?;
+                next.pending = Some(PendingHarvest::Breeding(action, plans));
+            }
+            PendingHarvest::Breeding(action, feeding) => {
+                let choice: BreedingPlan = serde_json::from_value(
+                    input
+                        .get("breeding")
+                        .cloned()
+                        .ok_or("breeding is required")?,
+                )
+                .map_err(|e| e.to_string())?;
+                let preview = next.game.preview_harvest(&action, Some(&feeding))?;
+                choice.apply(&mut preview.players[0].clone())?;
+                let breeding = preview
+                    .players
+                    .iter()
+                    .enumerate()
+                    .map(|(i, player)| {
+                        if i == 0 {
+                            choice.clone()
+                        } else {
+                            BreedingPlan::simple(player)
+                        }
+                    })
+                    .collect();
+                let policy = ManualHarvest { feeding, breeding };
+                next.game.apply_with_harvest_policy(action, &policy)?;
+                next.pending = None;
+                next.advance_cpu()?;
+            }
+        }
         *self = next;
         Ok(())
     }
@@ -239,12 +358,19 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
     }
     let result: Result<Value, String> = (|| match (method, path) {
         ("GET", "/api/state") => Ok(session.view()),
-        ("POST", "/api/new") | ("POST", "/api/play") => {
+        ("POST", "/api/new")
+        | ("POST", "/api/play")
+        | ("POST", "/api/free")
+        | ("POST", "/api/harvest") => {
             let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
             if path == "/api/new" {
                 session.reset(&value)?;
-            } else {
+            } else if path == "/api/play" {
                 session.play(&value)?;
+            } else if path == "/api/free" {
+                session.free(&value)?;
+            } else {
+                session.harvest(&value)?;
             }
             Ok(session.view())
         }
@@ -316,6 +442,100 @@ mod tests {
         assert_eq!(session.game.public.players.len(), 4);
         session.game.validate().unwrap();
     }
+    fn play_simple(session: &mut Session, space: Space) {
+        let detail = SimpleDetails
+            .produce(&session.game.observation(0).unwrap(), space)
+            .expect("test policy detail")
+            .detail;
+        session
+            .play(&json!({"space": space, "detail": detail}))
+            .unwrap();
+        while let Some(pending) = session.pending.clone() {
+            match pending {
+                PendingHarvest::Feeding(_) => session
+                    .harvest(&json!({"feeding": FeedingPlan::default()}))
+                    .unwrap(),
+                PendingHarvest::Breeding(action, feeding) => {
+                    let preview = session
+                        .game
+                        .preview_harvest(&action, Some(&feeding))
+                        .unwrap();
+                    let choice = BreedingPlan::simple(&preview.players[0]);
+                    session.harvest(&json!({"breeding": choice})).unwrap();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn manual_details_required_and_preview_does_not_commit() {
+        let mut session = Session::new(Config::default()).unwrap();
+        if session.game.public.active_player != 0 {
+            session.advance_cpu().unwrap();
+        }
+        let legal = session.game.legal_spaces();
+        let first = legal[0];
+        let hash = session.game.state_hash();
+        assert!(session.play(&json!({"space": first})).is_err());
+        assert_eq!(session.game.state_hash(), hash);
+    }
+
+    #[test]
+    fn manual_free_action_is_logged_and_replays() {
+        let mut session = Session::new(Config {
+            seed: 34,
+            ..Config::default()
+        })
+        .unwrap();
+        let before = session.game.public.players[0].supply.food;
+        session
+            .free(&json!({"action": {"DiscardGood": {"good": "food", "quantity": 1}}}))
+            .unwrap();
+        assert_eq!(session.game.public.players[0].supply.food, before - 1);
+        let replay = Game::replay(session.game.config.clone(), &session.game.log.events).unwrap();
+        assert_eq!(replay.state_hash(), session.game.state_hash());
+    }
+
+    #[test]
+    fn harvest_decisions_require_human_and_replay() {
+        let mut session = Session::new(Config {
+            seed: 123,
+            ..Config::default()
+        })
+        .unwrap();
+        for _ in 0..80 {
+            if let Some(PendingHarvest::Feeding(action)) = session.pending.clone() {
+                let before = session.game.state_hash();
+                let preview = session.game.preview_harvest(&action, None).unwrap();
+                assert_eq!(preview.round, 4);
+                let mut plan = FeedingPlan::default();
+                plan.priorities.reverse();
+                session.harvest(&json!({"feeding": plan})).unwrap();
+                assert_eq!(session.game.state_hash(), before);
+                let (action, plans) = match session.pending.clone().unwrap() {
+                    PendingHarvest::Breeding(action, plans) => (action, plans),
+                    _ => panic!("breeding choice must follow feeding choice"),
+                };
+                let after_feeding = session.game.preview_harvest(&action, Some(&plans)).unwrap();
+                let choice = BreedingPlan::simple(&after_feeding.players[0]);
+                session.harvest(&json!({"breeding": choice})).unwrap();
+                let replay =
+                    Game::replay(session.game.config.clone(), &session.game.log.events).unwrap();
+                assert_eq!(replay.state_hash(), session.game.state_hash());
+                return;
+            }
+            let space = session.game.legal_spaces()[0];
+            let detail = SimpleDetails
+                .produce(&session.game.observation(0).unwrap(), space)
+                .unwrap()
+                .detail;
+            session
+                .play(&json!({"space": space, "detail": detail}))
+                .unwrap();
+        }
+        panic!("harvest was never reached");
+    }
+
     #[test]
     fn human_and_cpu_can_take_turns() {
         let mut session = Session::new(Config {
@@ -329,7 +549,7 @@ mod tests {
             }
             assert_eq!(session.game.public.active_player, 0);
             let space = session.game.legal_spaces()[0];
-            session.play(&json!({"space":space})).unwrap();
+            play_simple(&mut session, space);
             session.game.validate().unwrap();
         }
     }
@@ -350,7 +570,7 @@ mod tests {
             let legal = session.game.legal_spaces();
             let mut rng = ChaCha8Rng::seed_from_u64(turn);
             let space = EvaluationPolicy.select(&obs, &legal, &mut rng).unwrap();
-            session.play(&json!({"space": space})).unwrap();
+            play_simple(&mut session, space);
         }
         assert!(session.game.public.finished);
         let replay = Game::replay(session.game.config.clone(), &session.game.log.events).unwrap();

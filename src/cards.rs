@@ -1001,3 +1001,139 @@ mod verified_immediate_resource_tests {
         );
     }
 }
+
+/**
+ * Verified 2016 base A/B occupations expressible entirely through the worker
+ * completion hook. Only effect logic and opaque card IDs are stored here.
+ * This subset alone is not a full playable 7+7-card deal.
+ */
+pub fn verified_worker_bonus_cards(players: usize) -> Vec<CardDefinition> {
+    fn occupation(id: &str, effects: Vec<CardEffect>) -> CardDefinition {
+        CardDefinition {
+            id: id.into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects,
+        }
+    }
+    fn gain(space: Space, good: Good, amount: u32) -> CardEffect {
+        CardEffect::AfterWorkerGain {
+            space,
+            good,
+            amount,
+        }
+    }
+    let mut cards = vec![
+        occupation(
+            "A116",
+            [Space::Forest, Space::Copse, Space::Grove]
+                .into_iter()
+                .map(|space| gain(space, Good::Wood, 1))
+                .collect(),
+        ),
+        occupation(
+            "A119",
+            [
+                Space::Farmland,
+                Space::GrainSeeds,
+                Space::GrainUtilization,
+                Space::Cultivation,
+            ]
+            .into_iter()
+            .map(|space| gain(space, Good::Wood, 1))
+            .collect(),
+        ),
+    ];
+    if players >= 4 {
+        cards.push(occupation(
+            "A155",
+            vec![
+                gain(Space::TravelingPlayers, Good::Wood, 1),
+                gain(Space::TravelingPlayers, Good::Grain, 1),
+            ],
+        ));
+    }
+    if players >= 3 {
+        cards.push(occupation(
+            "B142",
+            vec![gain(Space::GrainSeeds, Good::Vegetable, 1)],
+        ));
+    }
+    cards
+}
+
+#[cfg(test)]
+mod verified_worker_bonus_tests {
+    use super::*;
+
+    fn applied(card_id: &str, spaces: &[Space]) -> Player {
+        let definitions = verified_worker_bonus_cards(4);
+        let mut player = Player::new(0, 0);
+        player.played_cards.push(card_id.to_string());
+        for &space in spaces {
+            after_worker(
+                &CardSet {
+                    definitions: definitions.clone(),
+                },
+                &mut player,
+                space,
+            )
+            .unwrap();
+        }
+        player
+    }
+
+    #[test]
+    fn base_deck_player_counts_exclude_multiplayer_only_cards() {
+        let two = verified_worker_bonus_cards(2);
+        let three = verified_worker_bonus_cards(3);
+        let four = verified_worker_bonus_cards(4);
+        assert_eq!(two.len(), 2);
+        assert!(!two.iter().any(|c| c.id == "A155" || c.id == "B142"));
+        assert_eq!(three.len(), 3);
+        assert!(three.iter().any(|c| c.id == "B142"));
+        assert!(!three.iter().any(|c| c.id == "A155"));
+        assert_eq!(four.len(), 4);
+    }
+
+    #[test]
+    fn a116_wood_from_wood_accumulations_only() {
+        let player = applied(
+            "A116",
+            &[Space::Forest, Space::Copse, Space::Grove, Space::ClayPit],
+        );
+        assert_eq!(player.supply.wood, 3);
+        assert_eq!(player.supply.clay, 0);
+    }
+
+    #[test]
+    fn a119_wood_from_four_crop_related_actions_only() {
+        let player = applied(
+            "A119",
+            &[
+                Space::Farmland,
+                Space::GrainSeeds,
+                Space::GrainUtilization,
+                Space::Cultivation,
+                Space::Fishing,
+            ],
+        );
+        assert_eq!(player.supply.wood, 4);
+    }
+
+    #[test]
+    fn a155_grain_and_wood_from_traveling_players() {
+        let player = applied("A155", &[Space::TravelingPlayers, Space::Fishing]);
+        assert_eq!(player.supply.wood, 1);
+        assert_eq!(player.supply.grain, 1);
+        assert_eq!(player.supply.food, 0);
+    }
+
+    #[test]
+    fn b142_vegetable_from_grain_seeds_only() {
+        let player = applied("B142", &[Space::GrainSeeds, Space::Farmland]);
+        assert_eq!(player.supply.vegetable, 1);
+        assert_eq!(player.supply.grain, 0);
+    }
+}
