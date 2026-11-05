@@ -1,4 +1,5 @@
-use agricola_re_ai::benchmark::compare_policies;
+use agricola_re_ai::benchmark::{compare_policies, compare_policies_with_cards};
+use agricola_re_ai::cards::verified_basic_card_set;
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::mcts::MctsPolicy;
 use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
@@ -16,6 +17,7 @@ fn main() {
     let mut player_option_supplied = false;
     let mut mcts_budget: Option<usize> = None;
     let mut benchmark: Option<usize> = None;
+    let mut benchmark_cards: Option<usize> = None;
     let mut log_file: Option<String> = None;
     let mut state_file: Option<String> = None;
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -65,12 +67,20 @@ fn main() {
                         .expect("invalid benchmark seed count"),
                 )
             }
+            "--benchmark-cards" => {
+                benchmark_cards = Some(
+                    it.next()
+                        .expect("--benchmark-cards requires seed count")
+                        .parse()
+                        .expect("invalid benchmark seed count"),
+                )
+            }
             "--log-file" => log_file = Some(it.next().expect("--log-file requires path").clone()),
             "--state-file" => {
                 state_file = Some(it.next().expect("--state-file requires path").clone())
             }
             "--help" | "-h" => {
-                println!("Usage: agricola-re-ai [--seed N] [--players 2|3|4] [--web] [--batch N] [--additional-action-space] [--greedy | --eval | --mcts | --mcts-simulations N] [--benchmark N] [--log-file FILE] [--state-file FILE]");
+                println!("Usage: agricola-re-ai [--seed N] [--players 2|3|4] [--web] [--batch N] [--additional-action-space] [--greedy | --eval | --mcts | --mcts-simulations N] [--benchmark N | --benchmark-cards N] [--log-file FILE] [--state-file FILE]");
                 return;
             }
             x => {
@@ -101,7 +111,11 @@ fn main() {
         eprintln!("choose one of --greedy, --eval, --mcts");
         std::process::exit(2)
     }
-    if let Some(seeds) = benchmark {
+    if benchmark.is_some() && benchmark_cards.is_some() {
+        eprintln!("choose only one of --benchmark and --benchmark-cards");
+        std::process::exit(2);
+    }
+    if let Some(seeds) = benchmark.or(benchmark_cards) {
         if config.players != 2 {
             eprintln!("--benchmark supports exactly 2 players");
             std::process::exit(2);
@@ -113,19 +127,42 @@ fn main() {
         let random = RandomPolicy;
         let greedy_policy = GreedyPolicy;
         let evaluation = EvaluationPolicy;
-        let pairs: [(&str, &dyn SpacePolicy, &str, &dyn SpacePolicy); 3] = [
+        let card_set = if benchmark_cards.is_some() {
+            Some(verified_basic_card_set(2).expect("verified two-player card set"))
+        } else {
+            None
+        };
+        let mcts_benchmark = MctsPolicy {
+            simulations: mcts_budget.unwrap_or(8),
+            tree_depth: 2,
+        };
+        let mut pairs: Vec<(&str, &dyn SpacePolicy, &str, &dyn SpacePolicy)> = vec![
             ("greedy", &greedy_policy, "random", &random),
             ("eval", &evaluation, "greedy", &greedy_policy),
             ("eval", &evaluation, "random", &random),
         ];
+        if card_set.is_some() && mcts_budget.is_some() {
+            pairs.push(("mcts", &mcts_benchmark, "eval", &evaluation));
+        }
         for (left_name, left, right_name, right) in pairs {
-            let result = compare_policies(
-                left,
-                right,
-                seeds,
-                config.seed,
-                config.additional_action_space_enabled,
-            )
+            let result = if let Some(set) = &card_set {
+                compare_policies_with_cards(
+                    left,
+                    right,
+                    seeds,
+                    config.seed,
+                    config.additional_action_space_enabled,
+                    set,
+                )
+            } else {
+                compare_policies(
+                    left,
+                    right,
+                    seeds,
+                    config.seed,
+                    config.additional_action_space_enabled,
+                )
+            }
             .unwrap_or_else(|err| {
                 eprintln!("Benchmark failed: {err}");
                 std::process::exit(1)
