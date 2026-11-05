@@ -425,6 +425,8 @@ pub fn serve(config: Config) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::evaluation::EvaluationPolicy;
+
     #[test]
     fn local_api_rejects_cross_site_and_simple_form_posts() {
         assert!(local_request_allowed(Some("127.0.0.1:8787"), None));
