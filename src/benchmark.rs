@@ -168,6 +168,32 @@ mod tests {
     }
 
     #[test]
+    fn card_mcts_finishes_a_seat_swapped_benchmark() {
+        use crate::evaluation::{DetailAwareEvaluationPolicy, WeightedEvaluationPolicy};
+        use crate::mcts::MctsPolicy;
+        use crate::policy::CardChoiceDetails;
+
+        let set = verified_basic_card_set(2).unwrap();
+        let details = CardChoiceDetails;
+        let baseline = DetailAwareEvaluationPolicy {
+            weights: WeightedEvaluationPolicy {
+                prior_weight: 0.5,
+                state_weight: 2.0,
+            },
+            details: &details,
+        };
+        let mcts = MctsPolicy {
+            simulations: 2,
+            tree_depth: 2,
+        };
+        let summary = compare_policies_with_cards(&mcts, &baseline, 1, 901, false, &set).unwrap();
+        assert_eq!(summary.games, 2);
+        assert_eq!(summary.left_wins + summary.right_wins + summary.ties, 2);
+        assert!((0.0..=1.0).contains(&summary.left_win_rate));
+        assert!(summary.left_mean_margin.is_finite());
+    }
+
+    #[test]
     fn invalid_or_empty_benchmark_is_rejected() {
         let set = verified_basic_card_set(2).unwrap();
         assert!(
