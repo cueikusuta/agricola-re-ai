@@ -49,6 +49,16 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    AtHarvestField {
+        rule: HarvestBonusRule,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HarvestBonusRule {
+    AnimalCounts,
+    ThreeFieldVarieties,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,7 +132,8 @@ impl CardSet {
                     let amount = match effect {
                         CardEffect::OnPlayGain { amount, .. }
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
-                        CardEffect::EndGameBonus { .. } | CardEffect::Prerequisite { .. } => 1,
+                        CardEffect::EndGameBonus { .. } | CardEffect::Prerequisite { .. }
+                        | CardEffect::AtHarvestField { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
                         | CardEffect::OnPlayGainIfHouse { amount, .. }
                         | CardEffect::AtRoundStart { amount, .. } => *amount,
@@ -1078,5 +1089,92 @@ mod verified_round_start_tests {
         player.farm[2].tile=Tile::Room;
         at_round_start(&set,&mut player).unwrap();
         assert_eq!(player.supply.wood,2);
+    }
+}
+
+/** Called at the beginning of the field phase, before removing crop tokens. */
+pub fn at_field_harvest(set: &CardSet, player: &mut Player) -> Result<(), String> {
+    for id in player.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            match effect {
+                CardEffect::AtHarvestField { rule: HarvestBonusRule::AnimalCounts } => {
+                    let quantity = player.animal_count(Animal::Sheep) / 3
+                        + player.animal_count(Animal::Cattle) / 2;
+                    safe_gain(player, Good::Food, quantity)?;
+                },
+                CardEffect::AtHarvestField { rule: HarvestBonusRule::ThreeFieldVarieties } => {
+                    let has = |want: Option<Crop>| player.farm.iter().any(|cell| {
+                        matches!(cell.tile, Tile::Field { crop, .. } if crop == want)
+                    });
+                    if has(Some(Crop::Grain)) && has(Some(Crop::Vegetable)) && has(None) {
+                        safe_gain(player, Good::Food, 3)?;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn verified_harvest_bonus_cards() -> Vec<CardDefinition> {
+    vec![
+        CardDefinition {
+            id: "B050".into(), kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)], points: 1,
+            effects: vec![
+                CardEffect::Prerequisite { rule: CardRequirement::MaximumOccupations(3) },
+                CardEffect::AtHarvestField { rule: HarvestBonusRule::AnimalCounts },
+            ],
+        },
+        CardDefinition {
+            id: "B061".into(), kind: CardKind::MinorImprovement,
+            cost: vec![], points: 0,
+            effects: vec![
+                CardEffect::Prerequisite { rule: CardRequirement::MinimumOccupations(3) },
+                CardEffect::AtHarvestField { rule: HarvestBonusRule::ThreeFieldVarieties },
+            ],
+        },
+    ]
+}
+
+#[cfg(test)]
+mod verified_harvest_bonus_tests {
+    use super::*;
+    use crate::model::Pasture;
+
+    #[test]
+    fn b050_animal_food_at_threshold_and_play_condition() {
+        let set = CardSet { definitions: verified_harvest_bonus_cards() };
+        let card = set.definition("B050").unwrap();
+        let mut p = Player::new(0,0);
+        p.supply.wood = 1;
+        assert!(can_play(&set, card, &p, 0));
+        p.played_cards.push("B050".into());
+        p.pastures.push(Pasture {
+            id:0, cells:vec![1,2,3,4],animal:Some(Animal::Sheep),quantity:4
+        });
+        p.pastures.push(Pasture {
+            id:1, cells:vec![6,7,8,9],animal:Some(Animal::Cattle),quantity:3
+        });
+        at_field_harvest(&set,&mut p).unwrap();
+        assert_eq!(p.supply.food,2); // 4/3 + 3/2
+    }
+
+    #[test]
+    fn b061_requires_planting_and_a_vacant_field() {
+        let set = CardSet { definitions: verified_harvest_bonus_cards() };
+        let mut p = Player::new(0,0);
+        p.played_cards.push("B061".into());
+        p.farm[1].tile=Tile::Field {crop:Some(Crop::Grain),remaining:2};
+        p.farm[2].tile=Tile::Field {crop:Some(Crop::Vegetable),remaining:2};
+        p.farm[3].tile=Tile::Field {crop:None,remaining:0};
+        at_field_harvest(&set,&mut p).unwrap();
+        assert_eq!(p.supply.food,3);
+        p.farm[3].tile=Tile::Empty;
+        at_field_harvest(&set,&mut p).unwrap();
+        assert_eq!(p.supply.food,3);
+        assert!(!can_play(&set,set.definition("B061").unwrap(),&Player::new(0,0),0));
     }
 }
