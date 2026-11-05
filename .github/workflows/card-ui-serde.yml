@@ -1,0 +1,25 @@
+name: Card Japanese Effect Labels
+
+on:
+  pull_request:
+    paths:
+      - web/index.html
+      - tests/test_card_effect_labels.cjs
+      - .github/workflows/card-ui-serde.yml
+  push:
+    branches: [main]
+    paths:
+      - web/index.html
+      - tests/test_card_effect_labels.cjs
+      - .github/workflows/card-ui-serde.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - run: node tests/test_card_effect_labels.cjs
