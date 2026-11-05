@@ -328,10 +328,8 @@ pub fn play(
                 rooms,
                 good,
                 amount,
-            } => {
-                if player.house == *house && player.rooms() == usize::from(*rooms) {
-                    safe_gain(player, *good, *amount)?;
-                }
+            } if player.house == *house && player.rooms() == usize::from(*rooms) => {
+                safe_gain(player, *good, *amount)?;
             }
             _ => {}
         }
