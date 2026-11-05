@@ -54,36 +54,70 @@ impl Node {
 /// of Observation, so pending Well rewards cannot be reconstructed.
 fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(CardSet, CardState)> {
     let players = obs.public.players.len();
-    let set = CardSet { definitions: obs.card_definitions.clone() };
+    let set = CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
     set.validate(players).ok()?;
-    if obs.player_id >= players || obs.hand_counts.len() != players { return None; }
+    if obs.player_id >= players || obs.hand_counts.len() != players {
+        return None;
+    }
     if !set.enabled() {
-        if obs.hand_counts.iter().any(|&n| n != 0) || !obs.hand.is_empty() { return None; }
-        return Some((set, CardState { hands: vec![vec![]; players], undealt: vec![] }));
+        if obs.hand_counts.iter().any(|&n| n != 0) || !obs.hand.is_empty() {
+            return None;
+        }
+        return Some((
+            set,
+            CardState {
+                hands: vec![vec![]; players],
+                undealt: vec![],
+            },
+        ));
     }
     let mut known = BTreeSet::new();
-    for id in obs.public.players.iter().flat_map(|p| p.played_cards.iter()).chain(obs.hand.iter()) {
-        if set.definition(id).is_none() || !known.insert(id.clone()) { return None; }
+    for id in obs
+        .public
+        .players
+        .iter()
+        .flat_map(|p| p.played_cards.iter())
+        .chain(obs.hand.iter())
+    {
+        if set.definition(id).is_none() || !known.insert(id.clone()) {
+            return None;
+        }
     }
     let mut hands = vec![vec![]; players];
     hands[obs.player_id] = obs.hand.clone();
     let mut undealt = vec![];
     for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
-        let mut pool = set.definitions.iter()
+        let mut pool = set
+            .definitions
+            .iter()
             .filter(|c| c.kind == kind && !known.contains(&c.id))
-            .map(|c| c.id.clone()).collect::<Vec<_>>();
+            .map(|c| c.id.clone())
+            .collect::<Vec<_>>();
         pool.shuffle(rng);
         for (id, player) in obs.public.players.iter().enumerate() {
-            if id == obs.player_id { continue; }
-            let played = player.played_cards.iter()
-                .filter(|id| set.definition(id).is_some_and(|c| c.kind == kind)).count();
+            if id == obs.player_id {
+                continue;
+            }
+            let played = player
+                .played_cards
+                .iter()
+                .filter(|id| set.definition(id).is_some_and(|c| c.kind == kind))
+                .count();
             let needed = 7usize.checked_sub(played)?;
-            if pool.len() < needed { return None; }
-            for _ in 0..needed { hands[id].push(pool.pop()?); }
+            if pool.len() < needed {
+                return None;
+            }
+            for _ in 0..needed {
+                hands[id].push(pool.pop()?);
+            }
         }
         undealt.extend(pool);
     }
-    if hands.iter().map(Vec::len).collect::<Vec<_>>() != obs.hand_counts { return None; }
+    if hands.iter().map(Vec::len).collect::<Vec<_>>() != obs.hand_counts {
+        return None;
+    }
     let cards = CardState { hands, undealt };
     cards.validate(&set, &obs.public.players).ok()?;
     Some((set, cards))
@@ -92,11 +126,15 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
 fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     let seed: u64 = rng.gen();
     let (set, cards) = sample_private_cards(obs, rng)?;
-    let mut game = Game::with_cards(Config {
-        seed,
-        additional_action_space_enabled: obs.public.additional_action_space_enabled,
-        players: obs.public.players.len(),
-    }, set).ok()?;
+    let mut game = Game::with_cards(
+        Config {
+            seed,
+            additional_action_space_enabled: obs.public.additional_action_space_enabled,
+            players: obs.public.players.len(),
+        },
+        set,
+    )
+    .ok()?;
     game.public = obs.public.clone();
     game.cards = cards;
     let mut deck = Vec::new();
@@ -177,7 +215,9 @@ impl SpacePolicy for MctsPolicy {
         let mut nodes = vec![Node::new(player_count)];
         let detail_policy = SimpleDetails;
         for _ in 0..self.simulations {
-            let Some(mut game) = sample_game(obs, rng) else { continue; };
+            let Some(mut game) = sample_game(obs, rng) else {
+                continue;
+            };
             let mut path = vec![0usize];
             let mut node_id = 0usize;
             let mut valid = true;
@@ -315,16 +355,32 @@ mod tests {
         use crate::model::Good;
         let mut definitions = Vec::new();
         for i in 0..24 {
-            definitions.push(CardDefinition { id: format!("occ_{i}"),
-                kind: CardKind::Occupation, cost: vec![], points: 0, effects: vec![] });
-            definitions.push(CardDefinition { id: format!("minor_{i}"),
-                kind: CardKind::MinorImprovement, cost: vec![], points: 0,
-                effects: vec![CardEffect::OnPlayGain { good: Good::Wood, amount: 1 }] });
+            definitions.push(CardDefinition {
+                id: format!("occ_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+            definitions.push(CardDefinition {
+                id: format!("minor_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::OnPlayGain {
+                    good: Good::Wood,
+                    amount: 1,
+                }],
+            });
         }
         let game = Game::with_cards(
-            Config { seed: 32, ..Config::default() },
+            Config {
+                seed: 32,
+                ..Config::default()
+            },
             CardSet { definitions },
-        ).unwrap();
+        )
+        .unwrap();
         let obs = game.observation(0).unwrap();
         let mut rng = ChaCha8Rng::seed_from_u64(99);
         let mut unique = BTreeSet::new();
@@ -339,15 +395,37 @@ mod tests {
         }
         assert!(unique.len() > 1);
         let mut modified = game.clone();
-        let replacement = modified.cards.undealt.iter().find(|id| id.starts_with("minor_")).unwrap().clone();
-        let old = modified.cards.hands[1].iter().find(|id| id.starts_with("minor_")).unwrap().clone();
-        *modified.cards.hands[1].iter_mut().find(|id| **id == old).unwrap() = replacement.clone();
-        *modified.cards.undealt.iter_mut().find(|id| **id == replacement).unwrap() = old;
+        let replacement = modified
+            .cards
+            .undealt
+            .iter()
+            .find(|id| id.starts_with("minor_"))
+            .unwrap()
+            .clone();
+        let old = modified.cards.hands[1]
+            .iter()
+            .find(|id| id.starts_with("minor_"))
+            .unwrap()
+            .clone();
+        *modified.cards.hands[1]
+            .iter_mut()
+            .find(|id| **id == old)
+            .unwrap() = replacement.clone();
+        *modified
+            .cards
+            .undealt
+            .iter_mut()
+            .find(|id| **id == replacement)
+            .unwrap() = old;
         assert_eq!(modified.observation(0).unwrap(), obs);
         let mut first = ChaCha8Rng::seed_from_u64(103);
         let mut second = ChaCha8Rng::seed_from_u64(103);
-        assert_eq!(sample_game(&obs, &mut first).unwrap().cards,
-            sample_game(&modified.observation(0).unwrap(), &mut second).unwrap().cards);
+        assert_eq!(
+            sample_game(&obs, &mut first).unwrap().cards,
+            sample_game(&modified.observation(0).unwrap(), &mut second)
+                .unwrap()
+                .cards
+        );
     }
 
     #[test]

@@ -351,10 +351,15 @@ fn fence(
 /// Approximate only the immediate *public* effects of an action.
 /// No hidden deck, RNG, or future round information is sampled.
 fn project_play_card(
-    obs: &Observation, player: &mut Player, id: &str,
-    kind: crate::cards::CardKind, fee: u32,
+    obs: &Observation,
+    player: &mut Player,
+    id: &str,
+    kind: crate::cards::CardKind,
+    fee: u32,
 ) -> Option<()> {
-    let set = crate::cards::CardSet { definitions: obs.card_definitions.clone() };
+    let set = crate::cards::CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
     let mut hand = obs.hand.clone();
     crate::cards::play(&set, &mut hand, player, id, kind, fee).ok()?;
     Some(())
@@ -378,15 +383,41 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             Detail::None,
         ) => add_accumulation(obs, &mut p, action.space),
         (Space::Lessons | Space::ExtraLessons, Detail::PlayOccupation { card_id }) => {
-            let played = p.played_cards.iter().filter(|id| obs.card_definitions.iter().any(
-                |card| card.id == **id && card.kind == crate::cards::CardKind::Occupation)).count();
-            let fee = if action.space == Space::Lessons { u32::from(played > 0) }
-                else if obs.public.players.len() == 3 || played >= 2 { 2 } else { 1 };
-            project_play_card(obs, &mut p, card_id, crate::cards::CardKind::Occupation, fee)?;
+            let played = p
+                .played_cards
+                .iter()
+                .filter(|id| {
+                    obs.card_definitions.iter().any(|card| {
+                        card.id == **id && card.kind == crate::cards::CardKind::Occupation
+                    })
+                })
+                .count();
+            let fee = if action.space == Space::Lessons {
+                u32::from(played > 0)
+            } else if obs.public.players.len() == 3 || played >= 2 {
+                2
+            } else {
+                1
+            };
+            project_play_card(
+                obs,
+                &mut p,
+                card_id,
+                crate::cards::CardKind::Occupation,
+                fee,
+            )?;
         }
         (Space::MeetingPlace | Space::MajorImprovement, Detail::PlayMinor { card_id }) => {
-            project_play_card(obs, &mut p, card_id, crate::cards::CardKind::MinorImprovement, 0)?;
-            if action.space == Space::MeetingPlace { add_accumulation(obs, &mut p, action.space); }
+            project_play_card(
+                obs,
+                &mut p,
+                card_id,
+                crate::cards::CardKind::MinorImprovement,
+                0,
+            )?;
+            if action.space == Space::MeetingPlace {
+                add_accumulation(obs, &mut p, action.space);
+            }
         }
         (Space::DayLaborer, Detail::None) => p.supply.food += 2,
         (Space::GrainSeeds, Detail::None) => p.supply.grain += 1,
@@ -412,10 +443,19 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             p.family += 1;
             p.newborns += 1;
         }
-        (Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth, Detail::GrowWithMinor { card_id }) => {
+        (
+            Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth,
+            Detail::GrowWithMinor { card_id },
+        ) => {
             p.family += 1;
             p.newborns += 1;
-            project_play_card(obs, &mut p, card_id, crate::cards::CardKind::MinorImprovement, 0)?;
+            project_play_card(
+                obs,
+                &mut p,
+                card_id,
+                crate::cards::CardKind::MinorImprovement,
+                0,
+            )?;
         }
         (Space::Farmland, Detail::Plow { cell }) => {
             p.farm[*cell].tile = Tile::Field {
@@ -525,7 +565,9 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
         }
         _ => return None,
     }
-    let set = crate::cards::CardSet { definitions: obs.card_definitions.clone() };
+    let set = crate::cards::CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
     crate::cards::after_worker(&set, &mut p, action.space).ok()?;
     Some(p)
 }
