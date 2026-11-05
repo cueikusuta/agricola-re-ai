@@ -1,6 +1,10 @@
-# Agricola Revised AI — M1 / M2
+# Agricola Revised AI
 
-アグリコラ（2016年改訂版）の2人対戦AIを目指すRustプロジェクト。M1の2人戦ルールエンジンはmainへ統合済み。M2では交換可能な評価関数AIと勝率比較を追加します。
+アグリコラ（2016年改訂版）の**2〜4人対戦と強い対戦AI**を目指すRustプロジェクト。M1〜M7のルール・評価関数・MCTS・カード対応は段階的に統合済み。全カード実装やブラウザ14ラウンド操作検証は今後の課題です。
+
+**現在の開発計画（2026-11-06）**：[M7以降の長期ロードマップ（完成版）](docs/roadmap-m7-onward.md)。新M8はルール正確性・合法詳細行動API・評価基盤、M9は日本語UIとPlaywright、M10は4人カードプール、M11は7-7/10-7ドラフト、M12〜M15はAIの測定・探索・学習強化。既存のM1〜M7番号は変更しません。
+
+現在の作業入口：[M7-C #107](https://github.com/cueikusuta/agricola-re-ai/issues/107)／[M8-1 #108](https://github.com/cueikusuta/agricola-re-ai/issues/108)／[M8-2 #109](https://github.com/cueikusuta/agricola-re-ai/issues/109)／[M8-3 #110](https://github.com/cueikusuta/agricola-re-ai/issues/110)。カード・ドラフトは既存の [#105](https://github.com/cueikusuta/agricola-re-ai/issues/105)／[#104](https://github.com/cueikusuta/agricola-re-ai/issues/104) を再利用します。
 
 - M1: 2人戦ルールの正確な14ラウンド・再現性テスト
 - M2: 評価関数AI
@@ -8,12 +12,12 @@
 - M4: 3–4人・対戦UI
 - M5: カード・非公開情報
 
-設計の正本: `docs/design.md`、依頼: `docs/implementation-request.md`。
+基本設計の正本: `docs/design.md`、**M7以降の工程は `docs/roadmap-m7-onward.md`**、過去の実装依頼: `docs/implementation-request.md`。
 
 ## 仕様の固定値
 
 - Rust Stable + Cargo、Windows 11で開発、UbuntuでGitHub Actions。
-- Side Jobなし。職業・小改善カードなし。
+- Side Jobなし。職業・小改善カードはM5以降で実装した**検証済みの一部だけ**を使用。未実装カードを混ぜない。
 - 追加アクションタイルは `additional_action_space_enabled` でON/OFF（初期OFF）。
 - シード付き乱数を用途ごとに分離。AIへ非公開ラウンド順やシードを渡さない。
 - M1ではUIを実装しない。M4ではローカルWeb UIを提供。
@@ -75,6 +79,6 @@ cargo run --release -- --web
 # ブラウザで http://127.0.0.1:8787/ を開く
 ```
 
-ローカルホスト専用（外部公開なし）。画面で人数2〜4人、追加アクションタイルON/OFF、評価関数AI/MCTS、シードを選び「新しい対戦」。人間は1Pで、他のプレイヤーはCPU。アクションスペースはクリックで選択でき、配置・購入などの詳細は現在SimpleDetailsが生成する（すべての詳細を手動指定するUIは未実装）。CPUデフォルトは応答性の高い評価関数AI。
+ローカルホスト専用（外部公開なし）。画面で人数2〜4人、追加アクションタイルON/OFF、評価関数AI/MCTS、シードを選び「新しい対戦」。人間は1Pで、他のプレイヤーはCPU。アクションスペースはクリックで選択できる。M6で手動詳細入力APIを追加したが、実ブラウザ14ラウンド完走・操作性の受け入れ検証は [#92](https://github.com/cueikusuta/agricola-re-ai/issues/92) に残る。CPUデフォルトは応答性の高い評価関数AI。
 
 CLIの人数指定は `--players 2|3|4`。2人戦のM2先後交代ベンチマークは`--players 2`限定。詳細は [M4](docs/m4-multiplayer.md)。
