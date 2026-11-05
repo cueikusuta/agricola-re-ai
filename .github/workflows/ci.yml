@@ -131,9 +131,9 @@ jobs:
       - name: M2 held-out seed 26000, tile ON
         run: ./target/release/agricola-re-ai --benchmark 20 --seed 26000 --additional-action-space
       - name: M7 card-mode paired comparison OFF
-        run: ./target/release/agricola-re-ai --benchmark-cards 1 --seed 901
+        run: ./target/release/agricola-re-ai --benchmark-cards 10 --seed 901
       - name: M7 card-mode paired comparison ON
-        run: ./target/release/agricola-re-ai --benchmark-cards 1 --seed 901 --additional-action-space
+        run: ./target/release/agricola-re-ai --benchmark-cards 10 --seed 901 --additional-action-space
 
   gate:
     name: CI required
