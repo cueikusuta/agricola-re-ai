@@ -103,8 +103,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: release
-          key: workspace-v1
+          shared-key: release-workspace-v2
           add-job-id-key: 'false'
           cache-workspace-crates: 'true'
           cache-on-failure: 'true'
@@ -158,8 +157,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: release
-          key: workspace-v1
+          shared-key: release-workspace-v2
           add-job-id-key: 'false'
           cache-workspace-crates: 'true'
           save-if: 'false'
