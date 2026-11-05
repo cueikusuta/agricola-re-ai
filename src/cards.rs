@@ -97,9 +97,9 @@ impl CardSet {
                             || thresholds
                                 .windows(2)
                                 .any(|pair| pair[0].0 >= pair[1].0 || pair[0].1 >= pair[1].1)
-                            || thresholds
-                                .iter()
-                                .any(|&(required, points)| required == 0 || !(1..=20).contains(&points))
+                            || thresholds.iter().any(|&(required, points)| {
+                                required == 0 || !(1..=20).contains(&points)
+                            })
                     }
                     CardEffect::EndScorePerUnit { points, .. } => !(1..=10).contains(points),
                 })
@@ -330,7 +330,7 @@ pub fn end_game_bonus(set: &CardSet, player: &Player) -> Result<i32, String> {
                         .iter()
                         .filter(|&&(required, _)| value >= required)
                         .map(|&(_, points)| points)
-                        .last()
+                        .next_back()
                         .unwrap_or(0)
                 }
                 CardEffect::EndScorePerUnit { metric, points } => {
