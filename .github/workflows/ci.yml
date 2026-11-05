@@ -72,6 +72,26 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: clippy
+      # rust-cache prunes the sparse registry index. Restore a separate
+      # lockfile-keyed index so locked builds can avoid slow registry refreshes.
+      # This job restores without saving; the test job writes.
+      - name: Restore Cargo registry index
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cargo/registry/index
+          key: cargo-index-v1-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-index-v1-${{ runner.os }}-
+      - name: Use offline Cargo only when its dependency cache is complete
+        shell: bash
+        run: |
+          if cargo fetch --locked --offline > /tmp/cargo-offline-probe.log 2>&1; then
+            echo "CARGO_NET_OFFLINE=true" >> "$GITHUB_ENV"
+            echo "Cargo offline dependency check passed"
+          else
+            echo "Cargo offline cache incomplete; retaining online fallback"
+            cat /tmp/cargo-offline-probe.log
+          fi
       - run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
   test:
@@ -83,9 +103,30 @@ jobs:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: release
+          shared-key: release-test-v3
           add-job-id-key: 'false'
+          cache-workspace-crates: 'true'
           cache-on-failure: 'true'
+      # rust-cache prunes the sparse registry index. Restore a separate
+      # lockfile-keyed index so locked builds can avoid slow registry refreshes.
+      # Only the test job saves it; other jobs restore read-only.
+      - name: Restore Cargo registry index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry/index
+          key: cargo-index-v1-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-index-v1-${{ runner.os }}-
+      - name: Use offline Cargo only when its dependency cache is complete
+        shell: bash
+        run: |
+          if cargo fetch --locked --offline > /tmp/cargo-offline-probe.log 2>&1; then
+            echo "CARGO_NET_OFFLINE=true" >> "$GITHUB_ENV"
+            echo "Cargo offline dependency check passed"
+          else
+            echo "Cargo offline cache incomplete; retaining online fallback"
+            cat /tmp/cargo-offline-probe.log
+          fi
       # rust-cache retains dependencies by default, not workspace code.
       # Test cross-run reuse of compiled workspace objects with sccache.
       - name: Install compiler cache (sccache)
@@ -116,9 +157,30 @@ jobs:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: release
+          shared-key: release-benchmark-v3
           add-job-id-key: 'false'
-          save-if: 'false'
+          cache-workspace-crates: 'true'
+          cache-on-failure: 'true'
+      # rust-cache prunes the sparse registry index. Restore a separate
+      # lockfile-keyed index so locked builds can avoid slow registry refreshes.
+      # This job restores without saving; the test job writes.
+      - name: Restore Cargo registry index
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cargo/registry/index
+          key: cargo-index-v1-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-index-v1-${{ runner.os }}-
+      - name: Use offline Cargo only when its dependency cache is complete
+        shell: bash
+        run: |
+          if cargo fetch --locked --offline > /tmp/cargo-offline-probe.log 2>&1; then
+            echo "CARGO_NET_OFFLINE=true" >> "$GITHUB_ENV"
+            echo "Cargo offline dependency check passed"
+          else
+            echo "Cargo offline cache incomplete; retaining online fallback"
+            cat /tmp/cargo-offline-probe.log
+          fi
       - name: Install compiler cache for benchmark
         uses: mozilla-actions/sccache-action@v0.0.11
       # Compile the release binary once: M1, M2 and M7 previously built the
