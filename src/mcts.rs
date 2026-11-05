@@ -274,10 +274,7 @@ mod tests {
             (Space::ClayPit, (0.5, 100.0)),
         ];
         assert_eq!(best_root_action(&clear_winner), Some(Space::Forest));
-        let close = [
-            (Space::Forest, (0.50, 4.0)),
-            (Space::ClayPit, (0.51, 1.0)),
-        ];
+        let close = [(Space::Forest, (0.50, 4.0)), (Space::ClayPit, (0.51, 1.0))];
         assert_eq!(best_root_action(&close), Some(Space::Forest));
     }
 
