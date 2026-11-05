@@ -537,9 +537,7 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                             } else {
                                 0
                             };
-                            n.saturating_sub(
-                                p.stone_cost_discount.saturating_add(room_discount),
-                            )
+                            n.saturating_sub(p.stone_cost_discount.saturating_add(room_discount))
                         }
                         _ => n,
                     };
@@ -561,8 +559,7 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
                 0
             };
             let cost = (p.rooms() as u32).saturating_sub(discount);
-            p.supply
-                .set(good, p.supply.get(good).saturating_sub(cost));
+            p.supply.set(good, p.supply.get(good).saturating_sub(cost));
             p.supply.reed = p.supply.reed.saturating_sub(1);
             p.house = new_house;
         }
@@ -707,10 +704,7 @@ mod projection_tests {
         let after = project_action(&obs, &action).unwrap();
         assert_eq!(after.supply.wood, 8);
         assert_eq!(after.supply.reed, 0);
-        assert_eq!(
-            after.rooms(),
-            obs.public.players[obs.player_id].rooms() + 1
-        );
+        assert_eq!(after.rooms(), obs.public.players[obs.player_id].rooms() + 1);
     }
 
     #[test]
