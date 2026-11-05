@@ -1,8 +1,13 @@
 use agricola_re_ai::benchmark::{compare_policies, compare_policies_with_cards};
 use agricola_re_ai::cards::verified_basic_card_set;
-use agricola_re_ai::evaluation::{DetailAwareEvaluationPolicy, EvaluationPolicy, WeightedEvaluationPolicy};
+use agricola_re_ai::evaluation::{
+    DetailAwareEvaluationPolicy, EvaluationPolicy, WeightedEvaluationPolicy,
+};
 use agricola_re_ai::mcts::MctsPolicy;
-use agricola_re_ai::policy::{play_to_end, CardChoiceDetails, DetailPolicy, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
+use agricola_re_ai::policy::{
+    play_to_end, CardChoiceDetails, DetailPolicy, GreedyPolicy, RandomPolicy, SimpleDetails,
+    SpacePolicy,
+};
 use agricola_re_ai::score::standings;
 use agricola_re_ai::web::serve;
 use agricola_re_ai::{Config, Game};
