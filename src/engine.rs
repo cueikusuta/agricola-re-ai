@@ -177,15 +177,28 @@ pub enum RecordedAction {
     },
 }
 
-
 fn is_bake_bread_detail(detail: &Detail) -> bool {
     match detail {
-        Detail::Sow { bake, .. } | Detail::Buy { instant_bake: bake, .. }
-        | Detail::Renovate { instant_bake: bake, .. } => *bake > 0,
+        Detail::Sow { bake, .. }
+        | Detail::Buy {
+            instant_bake: bake, ..
+        }
+        | Detail::Renovate {
+            instant_bake: bake, ..
+        } => *bake > 0,
         Detail::SowDetailed { baking, .. }
-        | Detail::BuyDetailed { instant_baking: baking, .. }
-        | Detail::BuyWithMode { instant_baking: baking, .. }
-        | Detail::RenovateDetailed { instant_baking: baking, .. } => !baking.is_empty(),
+        | Detail::BuyDetailed {
+            instant_baking: baking,
+            ..
+        }
+        | Detail::BuyWithMode {
+            instant_baking: baking,
+            ..
+        }
+        | Detail::RenovateDetailed {
+            instant_baking: baking,
+            ..
+        } => !baking.is_empty(),
         _ => false,
     }
 }
@@ -210,7 +223,11 @@ fn next_house(h: House) -> Option<(House, Good)> {
 fn can_renovate(p: &Player) -> bool {
     next_house(p.house)
         .map(|(_, g)| {
-            let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {p.stone_cost_discount} else {0});
+            let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
+                p.stone_cost_discount
+            } else {
+                0
+            });
             p.supply.reed >= 1 && p.supply.get(g) >= cost
         })
         .unwrap_or(false)
@@ -299,7 +316,11 @@ fn major_cost(p: &Player, i: Improvement) -> Vec<(Good, u32)> {
                 match good {
                     Good::Wood => amount.saturating_sub(p.improvement_wood_discount),
                     Good::Stone => {
-                        let bonus = if p.major_stone_discount_by_rooms {p.rooms().saturating_sub(2) as u32} else {0};
+                        let bonus = if p.major_stone_discount_by_rooms {
+                            p.rooms().saturating_sub(2) as u32
+                        } else {
+                            0
+                        };
                         amount.saturating_sub(p.stone_cost_discount.saturating_add(bonus))
                     }
                     _ => amount,
@@ -377,10 +398,14 @@ impl Game {
                             && crate::cards::can_play(&self.card_set, c, me, fee)
                     })
                 }
-                Space::FamilyGrowthWithRoom => me.family < 5 && me.rooms() + usize::from(me.extra_housing) > me.family as usize,
+                Space::FamilyGrowthWithRoom => {
+                    me.family < 5 && me.rooms() + usize::from(me.extra_housing) > me.family as usize
+                }
                 Space::FamilyGrowthNoRoom => me.family < 5,
                 Space::ModestFamilyGrowth => {
-                    self.public.round >= 5 && me.family < 5 && me.rooms() + usize::from(me.extra_housing) > me.family as usize
+                    self.public.round >= 5
+                        && me.family < 5
+                        && me.rooms() + usize::from(me.extra_housing) > me.family as usize
                 }
                 Space::Cultivation => available_field(me) || can_sow(me),
                 Space::HouseRedevelopment | Space::FarmRedevelopment => can_renovate(me),
@@ -1141,7 +1166,11 @@ fn grow(p: &mut Player, room_only: bool) -> Result<()> {
 }
 fn renovate(p: &mut Player) -> Result<()> {
     let (new, g) = next_house(p.house).ok_or("stone is final house")?;
-    let cost=(p.rooms() as u32).saturating_sub(if g==Good::Stone {p.stone_cost_discount} else {0});
+    let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
+        p.stone_cost_discount
+    } else {
+        0
+    });
     p.supply.pay(g, cost)?;
     p.supply.pay(Good::Reed, 1)?;
     p.house = new;
@@ -2156,28 +2185,58 @@ mod m6_passive_engine_tests {
     }
 }
 
-
 #[cfg(test)]
 mod m6_extra_passive_engine_tests {
     use super::*;
-    use crate::cards::{play,CardKind,CardSet,verified_extra_simple_cards,verified_multiplayer_passive_cards};
-    #[test] fn b010_enables_family_growth_without_physical_room() {
-        let set=CardSet {definitions:verified_extra_simple_cards()};
-        let mut p=Player::new(0,0);p.supply.wood=3;p.supply.food=3;
-        assert!(grow(&mut p.clone(),true).is_err());
-        play(&set,&mut vec!["B010".into()],&mut p,"B010",CardKind::MinorImprovement,0).unwrap();
-        grow(&mut p,true).unwrap();assert_eq!(p.family,3);assert_eq!(p.rooms(),2);
+    use crate::cards::{
+        play, verified_extra_simple_cards, verified_multiplayer_passive_cards, CardKind, CardSet,
+    };
+    #[test]
+    fn b010_enables_family_growth_without_physical_room() {
+        let set = CardSet {
+            definitions: verified_extra_simple_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 3;
+        p.supply.food = 3;
+        assert!(grow(&mut p.clone(), true).is_err());
+        play(
+            &set,
+            &mut vec!["B010".into()],
+            &mut p,
+            "B010",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        grow(&mut p, true).unwrap();
+        assert_eq!(p.family, 3);
+        assert_eq!(p.rooms(), 2);
     }
-    #[test] fn a143_discount_on_major_and_renovation() {
-        let set=CardSet {definitions:verified_multiplayer_passive_cards(3)};
-        let mut p=Player::new(0,0);
-        play(&set,&mut vec!["A143".into()],&mut p,"A143",CardKind::Occupation,0).unwrap();
-        assert!(major_cost(&p,Improvement::Well).contains(&(Good::Stone,2)));
-        p.house=House::Clay;p.supply.reed=1;p.supply.stone=1;
-        assert!(can_renovate(&p));renovate(&mut p).unwrap();assert_eq!(p.house,House::Stone);
+    #[test]
+    fn a143_discount_on_major_and_renovation() {
+        let set = CardSet {
+            definitions: verified_multiplayer_passive_cards(3),
+        };
+        let mut p = Player::new(0, 0);
+        play(
+            &set,
+            &mut vec!["A143".into()],
+            &mut p,
+            "A143",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        assert!(major_cost(&p, Improvement::Well).contains(&(Good::Stone, 2)));
+        p.house = House::Clay;
+        p.supply.reed = 1;
+        p.supply.stone = 1;
+        assert!(can_renovate(&p));
+        renovate(&mut p).unwrap();
+        assert_eq!(p.house, House::Stone);
     }
 }
-
 
 #[cfg(test)]
 mod m6_bake_detection_tests {
@@ -2185,11 +2244,20 @@ mod m6_bake_detection_tests {
     #[test]
     fn detects_only_real_bake_bread_choices() {
         assert!(!is_bake_bread_detail(&Detail::None));
-        assert!(!is_bake_bread_detail(&Detail::Sow { plantings: vec![], bake: 0 }));
-        assert!(is_bake_bread_detail(&Detail::Sow { plantings: vec![], bake: 1 }));
+        assert!(!is_bake_bread_detail(&Detail::Sow {
+            plantings: vec![],
+            bake: 0
+        }));
+        assert!(is_bake_bread_detail(&Detail::Sow {
+            plantings: vec![],
+            bake: 1
+        }));
         assert!(is_bake_bread_detail(&Detail::SowDetailed {
             plantings: vec![],
-            baking: vec![BakeAllocation { improvement: Improvement::ClayOven, grain: 1 }],
+            baking: vec![BakeAllocation {
+                improvement: Improvement::ClayOven,
+                grain: 1
+            }],
         }));
         assert!(!is_bake_bread_detail(&Detail::BuyDetailed {
             improvement: Improvement::ClayOven,

@@ -1799,7 +1799,6 @@ mod simple_occupation_tests {
     }
 }
 
-
 pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
     vec![
         CardDefinition {
@@ -1820,34 +1819,67 @@ pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
         },
     ]
 }
-pub fn verified_multiplayer_passive_cards(players:usize) -> Vec<CardDefinition> {
-    if players<3{return vec![];}
+pub fn verified_multiplayer_passive_cards(players: usize) -> Vec<CardDefinition> {
+    if players < 3 {
+        return vec![];
+    }
     vec![CardDefinition {
-        id:"A143".into(),kind:CardKind::Occupation,cost:vec![],points:0,
-        effects:vec![
-            CardEffect::Prerequisite {rule:CardRequirement::MinimumPlayers(3)},
-            CardEffect::Passive {rule:PassiveRule::StoneDiscount(1)},
+        id: "A143".into(),
+        kind: CardKind::Occupation,
+        cost: vec![],
+        points: 0,
+        effects: vec![
+            CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumPlayers(3),
+            },
+            CardEffect::Passive {
+                rule: PassiveRule::StoneDiscount(1),
+            },
         ],
     }]
 }
 #[cfg(test)]
 mod m6_extra_passive_tests {
     use super::*;
-    #[test] fn b010_adds_housing_without_extra_tile() {
-        let set=CardSet {definitions:verified_extra_simple_cards()};
-        let mut p=Player::new(0,0);p.supply.wood=3;p.supply.food=3;
-        play(&set,&mut vec!["B010".into()],&mut p,"B010",CardKind::MinorImprovement,0).unwrap();
-        assert_eq!(p.extra_housing,1);assert_eq!(p.rooms(),2);
+    #[test]
+    fn b010_adds_housing_without_extra_tile() {
+        let set = CardSet {
+            definitions: verified_extra_simple_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 3;
+        p.supply.food = 3;
+        play(
+            &set,
+            &mut vec!["B010".into()],
+            &mut p,
+            "B010",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.extra_housing, 1);
+        assert_eq!(p.rooms(), 2);
     }
-    #[test] fn a143_only_three_plus_and_reduces_stone() {
+    #[test]
+    fn a143_only_three_plus_and_reduces_stone() {
         assert!(verified_multiplayer_passive_cards(2).is_empty());
-        let set=CardSet {definitions:verified_multiplayer_passive_cards(3)};
-        let mut p=Player::new(0,0);
-        play(&set,&mut vec!["A143".into()],&mut p,"A143",CardKind::Occupation,0).unwrap();
-        assert_eq!(p.stone_cost_discount,1);
+        let set = CardSet {
+            definitions: verified_multiplayer_passive_cards(3),
+        };
+        let mut p = Player::new(0, 0);
+        play(
+            &set,
+            &mut vec!["A143".into()],
+            &mut p,
+            "A143",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.stone_cost_discount, 1);
     }
 }
-
 
 /// Extra food when a player takes Bake Bread in a round directly following a
 /// harvest round. The work action is already validated and applied.
@@ -1876,7 +1908,9 @@ mod a063_baking_tests {
     use super::*;
     #[test]
     fn after_harvest_bread_action_only_and_exact_three_food() {
-        let set = CardSet { definitions: verified_extra_simple_cards() };
+        let set = CardSet {
+            definitions: verified_extra_simple_cards(),
+        };
         let mut player = Player::new(0, 0);
         player.played_cards.push("A063".into());
         after_harvest_baking(&set, &mut player, 4, true).unwrap();
@@ -1890,12 +1924,22 @@ mod a063_baking_tests {
     }
     #[test]
     fn correct_improvement_cost_and_card_points() {
-        let set = CardSet { definitions: verified_extra_simple_cards() };
+        let set = CardSet {
+            definitions: verified_extra_simple_cards(),
+        };
         let mut player = Player::new(0, 0);
         player.supply.wood = 2;
         player.supply.stone = 2;
         let mut hand = vec!["A063".into()];
-        play(&set, &mut hand, &mut player, "A063", CardKind::MinorImprovement, 0).unwrap();
+        play(
+            &set,
+            &mut hand,
+            &mut player,
+            "A063",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
         assert_eq!(player.card_points, 2);
         assert_eq!(player.supply.wood, 0);
         assert_eq!(player.supply.stone, 0);
