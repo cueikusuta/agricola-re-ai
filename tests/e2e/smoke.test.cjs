@@ -12,9 +12,15 @@ const simpleActions = new Set([
 
 test("ローカルWeb UIを実ブラウザで検証", async (t) => {
   // System Chrome is preinstalled on GitHub-hosted Ubuntu, avoiding browser downloads.
+  const launchStarted = Date.now();
   const browser = await chromium.launch({ channel: "chrome", headless: true });
+  console.log("browser_launch_ms=" + (Date.now() - launchStarted));
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: "ja-JP" });
-  t.after(async () => browser.close());
+  t.after(async () => {
+    const closeStarted = Date.now();
+    await browser.close();
+    console.log("browser_close_ms=" + (Date.now() - closeStarted));
+  });
 
   async function scenario(name, run) {
     await t.test(name, async () => {
