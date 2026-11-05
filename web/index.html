@@ -183,7 +183,15 @@ function countAnimal(p,species){return p.pastures.filter(x=>x.animal===species).
 function openHarvest(){const phase=state.harvest.phase;openEditor(phase==="feeding"?"収穫：給餌・加工":"収穫：繁殖","今回の収穫に使う指定はログにも残り、再演時に同じ結果になります。",phase,null);if(phase==="feeding")feedingFields();else breedingFields();}
 function harvestPayload(){
 if(mode==="feeding")return {feeding:{priorities:feedOrder,preserve_pairs_first:checked("preserve"),extra_crafting:["joinery","pottery","basketry"].filter(id=>checked("craft_"+id))}};
-const births=$("fields").dataset.eligible.split(",").filter(Boolean).map(species=>{const v=val("birth_"+species");const destination=v.includes(":")?{[v.split(":")[0]]:Number(v.split(":")[1])}:v;return {species,destination};});
+const births=$("fields").dataset.eligible.split(",").filter(Boolean).map(species=>{
+  const selected=val("birth_"+species);
+  let destination=selected;
+  if(selected.includes(":")){
+    const [kind,index]=selected.split(":");
+    destination={[kind]:Number(index)};
+  }
+  return {species,destination};
+});
 return {breeding:{births,before_birth:checked("arrange")?getArrangement():null}};
 }
 async function request(path,payload){
