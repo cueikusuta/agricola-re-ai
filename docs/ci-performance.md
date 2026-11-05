@@ -56,8 +56,11 @@ M1/M2のリリースビルド統合は成功した。コンパイル成果物の
 | --- | --- | ---: | --- |
 | main `607f813`（変更前） | [42067107964](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42067107964) | 89秒 | 全ゲート成功。Cargo index更新に約11秒、nextest step 53秒 |
 | PR #100 `be51501`（索引キャッシュ初回） | [42070243738](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42070243738) | **64秒** | 全ゲート成功。初回は索引キャッシュなしで `rand` のoffline解決ができず、通常オンライン実行へフォールバック。次のCI実行で温キャッシュを検証 |
+| PR #100 `8407f41`（索引キャッシュ温） | [42070567795](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42070567795) | 188秒 | 全ゲート成功、オフライン成功。ただしrunner/ビルドが遅く、sccache missも発生 |
+| PR #100 `bb612c2`（workspace key誤設定） | [42071397625](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42071397625) | 117秒 | 全ゲート成功。追加`key`が共有キーの設定に反映されなかったため、専用キャッシュを形成できず |
+| PR #100 `b90fe527`（workspace共有キー分離） | [42071839344](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42071839344) | **55秒** | **60秒以内を実測達成**。203 Rustテスト成功（2 ignored）、rustfmt・Clippy・M1/M2/M7性能ジョブ・CI required成功。
 
-`actions/cache` で `~/.cargo/registry/index` を `Cargo.lock` ハッシュ別に保存する。Rustテストのjobだけが保存し、Clippy・統合ベンチマークのjobは読み取り専用にする。各jobで `cargo fetch --locked --offline` が成功した場合だけ後続のCargoをオフライン動作させる。索引またはパッケージが不足している場合は**必ずオンラインへ戻す**ため、ネットワークを理由にテストを省略しない。変更前のCI品質ゲートはすべて維持する。
+`actions/cache` で `~/.cargo/registry/index` を `Cargo.lock` ハッシュ別に保存する。Rustテストのjobだけが保存し、Clippy・統合ベンチマークのjobは読み取り専用にする。各jobで `cargo fetch --locked --offline` が成功した場合だけ後続のCargoをオフライン動作させる。索引またはパッケージが不足している場合は**必ずオンラインへ戻す**ため、ネットワークを理由にテストを省略しない。変更前のCI品質ゲートはすべて維持する。 `Swatinem/rust-cache` の `cache-workspace-crates: true` をreleaseテスト・性能ベンチマークに導入し、共有キャッシュ名を `release-workspace-v2` に分離した。キャッシュ書込みはテストのみ、性能計測は読取り専用。コンパイル済み自作クレートも保存するが、ソースが更新された場合はCargoのフィンガープリントで再ビルドされる。**runnerの割当て待ち、ネットワーク、cache missなどの外部要因で60秒を超える場合があるため、継続的な全回保証ではない**。
 
 ## 確認項目
 1. コード変更PRでrustfmt/clippy/nextest/release全テストとM1/M2/M7統合性能計測が実行され、CI requiredが成功する。
