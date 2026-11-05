@@ -1,0 +1,41 @@
+name: Card Catalog Audit
+
+on:
+  pull_request:
+    paths:
+      - 'docs/card-catalog-ae-*.csv'
+      - 'docs/card-catalog-audit-method.md'
+      - 'scripts/validate_card_catalog.py'
+      - 'tests/test_card_catalog_validator.py'
+      - '.github/workflows/card-catalog-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/card-catalog-ae-*.csv'
+      - 'docs/card-catalog-audit-method.md'
+      - 'scripts/validate_card_catalog.py'
+      - 'tests/test_card_catalog_validator.py'
+      - '.github/workflows/card-catalog-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-catalog:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate CSV structure, provenance, and eligibility
+        run: python3 scripts/validate_card_catalog.py --report "$RUNNER_TEMP/card-catalog-audit-report.json"
+      - name: Unit tests (no external dependencies)
+        run: python3 -m unittest discover -s tests -p test_card_catalog_validator.py -v
+      - name: Save validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: card-catalog-audit-report
+          path: ${{ runner.temp }}/card-catalog-audit-report.json
+          if-no-files-found: ignore
+          retention-days: 7
