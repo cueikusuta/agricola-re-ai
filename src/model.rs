@@ -147,6 +147,10 @@ pub struct Pasture {
     pub animal: Option<Animal>,
     pub quantity: u32,
 }
+fn zero_card_bonus(points: &i32) -> bool {
+    *points == 0
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Player {
     pub id: usize,
@@ -163,6 +167,9 @@ pub struct Player {
     pub played_cards: Vec<String>,
     #[serde(default)]
     pub card_points: i32,
+    /// Conditional points recorded once at game end; separate from printed points.
+    #[serde(default, skip_serializing_if = "zero_card_bonus")]
+    pub card_bonus_points: i32,
     pub begging: u32,
 }
 impl Player {
@@ -186,6 +193,7 @@ impl Player {
             improvements: vec![],
             played_cards: vec![],
             card_points: 0,
+            card_bonus_points: 0,
             begging: 0,
         }
     }
