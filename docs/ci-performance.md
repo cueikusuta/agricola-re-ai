@@ -50,6 +50,15 @@ PR時はPRのベースブランチとの差分、main/developへのpush時は直
 
 M1/M2のリリースビルド統合は成功した。コンパイル成果物の再利用策として、`mozilla-actions/sccache-action@v0.0.11` をnextestと統合ベンチマークのreleaseビルドだけに適用した。初回は1件cache missだったが温キャッシュでは両ジョブで各1件hitを記録し、自作libの再コンパイルは短縮した。`cargo fetch --locked --offline` の事前判定はキャッシュ復元後でも失敗するため、本CIでは採用しない。CI軽量化Issue #97では、Ubuntu 24.04に組込み済みRustのバージョン照会ステップだけを削除する。Rust本体、rustfmt、clippy、nextest、全ベンチマークおよび最終ゲートは維持する。削減量の正確な判断はPRのCI成功後の実測に基づく。`ci-fast` は冷・温キャッシュの両方で60秒を超え、release方式の最速50秒に及ばなかったため撤回した。releaseキャッシュ共有とUbuntu同梱のRustツール利用を採用。最終構成の時間は最終CIログで確認する。GitHub-hostedランナーの割当てやキュー待機はリポジトリ内の設定だけで常時60秒以内に保証できない。CIの所要時間を報告するときはコミットとrun URLを付ける。
 
+## #99 Cargo registry索引キャッシュ検証（2026-11-06）
+
+| 対象 | GitHub Actions run | 実測 | 結果 |
+| --- | --- | ---: | --- |
+| main `607f813`（変更前） | [42067107964](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42067107964) | 89秒 | 全ゲート成功。Cargo index更新に約11秒、nextest step 53秒 |
+| PR #100 `be51501`（索引キャッシュ初回） | [42070243738](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42070243738) | **64秒** | 全ゲート成功。初回は索引キャッシュなしで `rand` のoffline解決ができず、通常オンライン実行へフォールバック。次のCI実行で温キャッシュを検証 |
+
+`actions/cache` で `~/.cargo/registry/index` を `Cargo.lock` ハッシュ別に保存する。Rustテストのjobだけが保存し、Clippy・統合ベンチマークのjobは読み取り専用にする。各jobで `cargo fetch --locked --offline` が成功した場合だけ後続のCargoをオフライン動作させる。索引またはパッケージが不足している場合は**必ずオンラインへ戻す**ため、ネットワークを理由にテストを省略しない。変更前のCI品質ゲートはすべて維持する。
+
 ## 確認項目
 1. コード変更PRでrustfmt/clippy/nextest/release全テストとM1/M2/M7統合性能計測が実行され、CI requiredが成功する。
 2. testsのみの変更PRで統合ベンチマークだけがスキップされる。
