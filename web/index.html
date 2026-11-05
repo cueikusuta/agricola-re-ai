@@ -22,23 +22,23 @@ dialog{border:1px solid #607782;border-radius:12px;background:#1b2a31;color:#eff
 dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px 0}
 .details>label{display:grid;gap:5px}.details small{color:#c6d1d5}
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chips label{padding:5px;border:1px solid #526976;border-radius:7px}
-footer{color:#b7c5c8;font-size:14px}
-@media(max-width:700px){.screen{padding:8px}.panel{padding:9px}.cell{min-height:45px;font-size:13px}}
+.cardEntry{margin:8px 0;font-size:14px;line-height:1.6}#cardHelp summary{cursor:pointer}footer{color:#b7c5c8;font-size:14px}
+@media(max-width:700px){.screen{padding:8px}.panel{padding:9px}.cell{min-height:45px;font-size:14px}}
 </style></head>
 <body><div class="screen">
 <header><h1>アグリコラ <span class="minor">Revised / 手動対戦</span></h1><span class="minor">ローカル専用</span></header>
 <section class="panel settings">
 <label>人数 <select id="players"><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option></select></label>
-<label><input id="extra" type="checkbox">追加タイル</label>
-<label>CPU <select id="ai"><option value="eval">評価関数</option><option value="mcts">MCTS</option></select></label>
-<label>シード <input id="seed" type="number" value="42" min="0" step="1"></label>
+<label><input id="extra" type="checkbox">追加アクション</label>
+<label>対戦AI <select id="ai"><option value="eval">評価関数</option><option value="mcts">MCTS</option></select></label>
+<label>乱数シード <input id="seed" type="number" value="42" min="0" step="1"></label>
 <button id="new">新しい対戦</button>
 <label>カード <select id="cards"><option value="none">カードなし</option><option value="verified">A/B実装済み（2人戦）</option><option value="json">外部定義JSON</option></select></label>
 <details><summary>外部カード定義JSONを読み込む</summary><textarea id="cardJson" placeholder='{"definitions":[]}'></textarea><p class="minor">空欄ならカードなし。原文や画像は不要です。公式カードを自動収録する機能はありません。</p></details>
 </section>
 <section class="panel status"><strong id="turn">読み込み中...</strong><span id="summary" class="minor"></span></section>
 <section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
-<div class="stats"><h2>資源・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p><p id="hand" class="minor"></p><p id="history"></p></div></div></section>
+<div class="stats"><h2>資源・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p><p id="hand" class="minor"></p><details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details><p id="history"></p></div></div></section>
 <section class="panel"><h2 id="actionTitle">アクションの詳細を手動指定</h2><div id="notice"></div><div class="actions" id="actions"></div><div class="buttons" id="actionNav"></div></section>
 <section class="panel"><h2>任意の操作</h2><button id="free">食料変換・動物の配置換え・廃棄</button><p class="minor">ワーカーを使わない操作。エンジンが合法性を判定します。</p></section>
 <footer>1Pが人間、残りはCPU。畑は左上から0〜14番です。種まきは1畑につき種1個を使います。無効な指定は適用されず、内容を直して再送信できます。</footer>
@@ -51,7 +51,38 @@ footer{color:#b7c5c8;font-size:14px}
 const names={forest:"森林",clay_pit:"粘土坑",reed_bank:"葦",fishing:"漁",day_laborer:"日雇い",grain_seeds:"穀物",farmland:"畑",farm_expansion:"部屋・厩",meeting_place:"スタート",major_improvement:"改善",fencing:"柵",grain_utilization:"種まき・パン",sheep_market:"羊",family_growth_with_room:"家族を増やす",house_redevelopment:"改築",western_quarry:"採石場",vegetable_seeds:"野菜",pig_market:"猪",cattle_market:"牛",eastern_quarry:"採石場2",family_growth_no_room:"家族増員",cultivation:"耕作",farm_redevelopment:"改築・柵",copse:"林",resource_market:"資材市場",animal_market:"家畜市場",modest_family_growth:"追加家族増員",grove:"林地",hollow:"粘土の採取",traveling_players:"旅芸人",lessons:"職業",extra_lessons:"職業（追加）"};
 const goods={wood:"木",clay:"粘土",reed:"葦",stone:"石",food:"食料",grain:"麦",vegetable:"野菜"};
 const animals={sheep:"羊",boar:"猪",cattle:"牛"};
+function animalId(label){return Object.entries(animals).find(([,ja])=>ja===label)?.[0]||label;}
 const improvements={fireplace2:"かまど2",fireplace3:"かまど3",hearth4:"調理場4",hearth5:"調理場5",clay_oven:"レンガ暖炉",stone_oven:"石の暖炉",well:"井戸",joinery:"製材所",pottery:"製陶所",basketry:"かご製作所"};
+
+const cardNames={"A005":"粘土積み場","A012":"水飲み場","A032":"かいば桶","A038":"羊の毛布","A063":"オランダ式風車","A067":"穀物スコップ","A075":"木挽水車","A078":"カヌー","A080":"石ばさみ","A088":"生け垣管理人","A098":"厩建築士","A110":"仕立屋","A116":"木こり","A119":"薪集め","A125":"聖職者","A133":"ほら吹き","A143":"石切り","A155":"奇術師","B010":"移動住宅","B013":"家具職人小屋","B050":"撹乳器","B057":"食器洗い場","B061":"三圃式農業","B062":"フォーク型くわ","B077":"粘土層の窪地","B095":"レンガ積み職人","B098":"有機農業者","B099":"家庭教師","B102":"女性顧問","B107":"召使","B118":"小作人","B121":"地質学者","B126":"大工","B142":"八百屋"};
+function cardLabel(id){return cardNames[id]?cardNames[id]+"（"+id+"）":id;}
+function enumValue(x){return typeof x==="string"?[x,null]:Object.entries(x||{})[0]||["",null];}
+function cardEffectLabel(effect){
+ const [t,v]=enumValue(effect),good=g=>goods[g]||animals[g]||g,space=s=>names[s]||s;
+ if(t==="OnPlayGain")return "使用時："+good(v.good)+v.amount+"個";
+ if(t==="AfterWorkerGain")return space(v.space)+"使用後："+good(v.good)+v.amount+"個";
+ if(t==="OnPlayGainPerStored")return "使用時："+good(v.stored)+v.divisor+"個ごとに"+good(v.good)+v.amount+"個";
+ if(t==="OnPlayGainIfHouse")return "使用時：家の材質・部屋数条件で"+good(v.good)+v.amount+"個";
+ if(t==="StartRoundGain")return "ラウンド開始："+good(v.good)+v.amount+"個"+(v.house||v.rooms?"（条件付き）":"");
+ if(t==="HarvestFieldGain")return "収穫時："+good(v.good)+v.amount+"個（畑・家畜条件あり）";
+ if(t==="AfterWorkerGainIfUsed")return space(v.space)+"使用後："+space(v.required_space)+"の使用条件で"+good(v.good)+v.amount+"個";
+ if(t==="AfterClayConstructionGain")return "建築・改築の条件達成後："+good(v.good)+v.amount+"個";
+ if(t==="AfterHarvestBakeGain")return "収穫後のパン焼きで食料"+v.amount+"追加";
+ if(t==="Prerequisite"){const [k,n]=enumValue(v.rule);const r={minimum_occupations:"職業"+n+"枚以上",maximum_occupations:"職業"+n+"枚以下",minimum_players:n+"人以上",minimum_animals:n?.number+"頭以上の"+good(n?.animal),minimum_crop_fields:n?.number+"畑以上の"+good(n?.crop)};return "使用条件："+(r[k]||"条件あり");}
+ if(t==="EndGameBonus"){const [k]=enumValue(v.rule);const r={pasture_area:"牧場面積",house_material:"家の材質",unfenced_stables:"柵の外の厩",improvement_count:"進歩枚数",spare_pasture_capacity:"牧場の空き容量",later_occupations:"後から出した職業"};return "終了時の追加得点："+(r[k]||"条件あり");}
+ if(t==="Passive"){const [k,n]=enumValue(v.rule);const r={pasture_capacity:"牧場の収容数＋"+n,fence_wood_discount:"柵の木材コスト軽減",improvement_wood_discount:"進歩の木材コスト軽減",wooden_room_cost:"木の部屋のコスト変更",room_cost:"部屋のコスト変更",major_stone_discount_by_rooms:"大進歩の石材を割引",stone_discount:"石材コスト軽減",housing_space:"居住人数＋"+n};return "継続効果："+(r[k]||"条件あり");}
+ return "効果あり";
+}
+function cardSummary(id){
+ const c=state.card_definitions.find(x=>x.id===id);if(!c)return "カード情報なし";
+ return "費用："+(c.cost.map(([g,n])=>(goods[g]||g)+n).join("・")||"なし")+" / "+c.points+"点 / "+(c.effects.map(cardEffectLabel).join("、")||"追加効果なし");
+}
+function renderCardHelp(player){
+ const container=$("cardHelpBody");container.replaceChildren();
+ const ids=[...(viewPlayer===0?state.hand:[]),...(player.played_cards||[])];
+ $("cardHelp").hidden=ids.length===0;
+ for(const id of ids){const item=document.createElement("p");item.className="cardEntry";item.textContent=cardLabel(id)+" — "+cardSummary(id);container.append(item);}
+}
 const feeds={stored_food:"所持食料",joinery:"製材所",pottery:"製陶所",basketry:"かご製作所",vegetables:"野菜",grain:"麦",sheep:"羊",boar:"猪",cattle:"牛"};
 let state=null,viewPlayer=0,busy=false,actionPage=0,mode=null,selectedSpace=null,feedOrder=Object.keys(feeds);
 const $=id=>document.getElementById(id);
@@ -78,9 +109,9 @@ const pl=shown.players[viewPlayer];$("farmName").textContent=(viewPlayer+1)+"P�
 for(let i=0;i<pl.farm.length;i++){const cell=pl.farm[i],[label,cls]=tileName(cell),d=document.createElement("div");d.className="cell "+cls;d.textContent=i+" "+label+(cell.stable?" ▣":"");$("farm").append(d);}
 $("stats").replaceChildren();for(const [good,label] of Object.entries(goods))putStats(label,pl.supply[good]);
 putStats("部屋",pl.farm.filter(c=>c.tile==="Room").length);putStats("柵",pl.fences.length);
-$("improvements").textContent="主要改善: "+(pl.improvements.map(x=>improvements[x]||x).join(" / ")||"なし")+" / 職業・小改善: "+(pl.played_cards||[]).join(" / ");
-$("hand").textContent=viewPlayer===0?"手札: "+(state.hand.join(" / ")||"なし"):"手札: 非公開";
-$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
+$("improvements").textContent="主要改善: "+(pl.improvements.map(x=>improvements[x]||x).join(" / ")||"なし")+" / 職業・小改善: "+(pl.played_cards||[]).map(cardLabel).join(" / ");
+$("hand").textContent=viewPlayer===0?"手札: "+(state.hand.map(cardLabel).join(" / ")||"なし"):"手札: 非公開";
+renderCardHelp(pl);$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
 $("actions").replaceChildren();$("actionNav").replaceChildren();$("free").disabled=busy||!!harvest||p.finished;
 if(p.finished){$("notice").textContent="最終順位: "+scores.rank.map((r,i)=>(i+1)+"P "+r+"位").join("、");return;}
 if(harvest){$("notice").textContent=harvest.phase==="feeding"?"収穫：給餌順と工房加工を選択":"収穫：繁殖する子の置き場所を選択";const b=document.createElement("button");b.textContent="収穫の詳細を指定";b.onclick=()=>openHarvest();$("actions").append(b);return;}
@@ -100,12 +131,12 @@ for(const [key,value] of values){const o=document.createElement("option");o.valu
 }
 function choiceCards(kind,optional){
 const ids=state.hand.filter(id=>state.card_definitions.some(c=>c.id===id&&c.kind===kind));
-return (optional?[["","使用しない"]]:[]).concat(ids.map(id=>[id,id]));
+return (optional?[["","使用しない"]]:[]).concat(ids.map(id=>[id,cardLabel(id)]));
 }
-function plantFields(){add("種まき（例：3:grain,4:vegetable）","plants","text","","1つの畑に1種。空欄なら種まきなし");}
-function bakeFields(){add("パン焼き（例：clay_oven:1,hearth4:2）","baking","text","","改善名:麦の個数。空欄なら焼かない");}
-function fenceFields(){add("牧場のマス（例：2,3;7,8）","pastures","text","","牧場ごとに ; で区切る。既存牧場を含む場合も新しい全区画を指定");add("移動後の家畜（例：sheep:2;none:0）","fenceAnimals","text","","指定した牧場順。空欄なら従来の配置を維持");}
-function buyFields(prefix){select("買う主要改善",prefix+"buy",[["","買わない"]].concat(Object.entries(improvements)));select("支払い方法",prefix+"mode",[["Auto","通常（自動交換）"],["Pay","材料で支払う"]].concat(["fireplace2","fireplace3"].map(x=>["exchange_"+x,"手持ちの"+improvements[x]+"を交換"])));add("購入直後のパン焼き",prefix+"baking","text","","改善名:麦の個数");}
+function plantFields(){add("種まき（例：3:小麦,4:野菜）","plants","text","","1つの畑に1種。空欄なら種まきなし");}
+function bakeFields(){add("パン焼き（例：レンガ暖炉:1,調理場4:2）","baking","text","","改善名:麦の個数（日本語名または内部ID）。空欄なら焼かない");}
+function fenceFields(){add("牧場のマス（例：2,3;7,8）","pastures","text","","牧場ごとに ; で区切る。既存牧場を含む場合も新しい全区画を指定");add("移動後の家畜（例：羊:2;なし:0）","fenceAnimals","text","","指定した牧場順。空欄なら従来の配置を維持");}
+function buyFields(prefix){select("買う主要改善",prefix+"buy",[["","買わない"]].concat(Object.entries(improvements)));select("支払い方法",prefix+"mode",[["Auto","通常（自動交換）"],["Pay","材料で支払う"]].concat(["fireplace2","fireplace3"].map(x=>["exchange_"+x,"手持ちの"+improvements[x]+"を交換"])));add("購入直後のパン焼き",prefix+"baking","text","","改善名:麦の個数（日本語名または内部ID）");}
 function workFields(space){
 const none=["forest","clay_pit","reed_bank","fishing","day_laborer","grain_seeds","vegetable_seeds","western_quarry","eastern_quarry","copse","grove","hollow","traveling_players","family_growth_no_room"];
 if(none.includes(space)){add("追加の指定はありません","nothing","text","None").disabled=true;return;}
@@ -126,9 +157,9 @@ case "lessons":case "extra_lessons":select("使う職業","occupation",choiceCar
 case "meeting_place":case "family_growth_with_room":case "modest_family_growth":select("使う小改善","minor",choiceCards("minor_improvement",true));break;
 default:throw Error("未対応アクション: "+space);
 }}
-function parsePlant(){return pairs("plants").map(([cell,crop])=>({cell:Number(cell),crop}));}
-function parseBaking(id="baking"){return pairs(id).map(([improvement,grain])=>({improvement,grain:Number(grain)}));}
-function parseOccupancy(){return val("fenceAnimals").split(";").map(x=>x.trim()).filter(Boolean).map(x=>{const [animal,quantity]=x.split(":").map(y=>y.trim());return {animal:animal==="none"?null:animal,quantity:Number(quantity)};});}
+function parsePlant(){return pairs("plants").map(([cell,crop])=>({cell:Number(cell),crop:crop==="小麦"?"grain":crop==="野菜"?"vegetable":crop}));}
+function parseBaking(id="baking"){return pairs(id).map(([improvement,grain])=>({improvement:Object.entries(improvements).find(([,ja])=>ja===improvement)?.[0]||improvement,grain:Number(grain)}));}
+function parseOccupancy(){return val("fenceAnimals").split(";").map(x=>x.trim()).filter(Boolean).map(x=>{const [animal,quantity]=x.split(":").map(y=>y.trim());return {animal:animal==="none"||animal==="なし"?null:animalId(animal),quantity:Number(quantity)};});}
 function purchaseMode(id="mode"){const m=val(id);return m.startsWith("exchange_")?{"Exchange":m.slice(9)}:m;}
 function workDetail(space){
 switch(space){
@@ -152,10 +183,10 @@ function openWork(space){openEditor(names[space]||space,"各選択は任意で�
 function sourceField(){
 select("動物の場所","sourceType",[["Pet","家"],["Pasture","牧場"],["Stable","厩"]]);add("牧場ID / 厩マス（家なら不要）","sourceIndex","number",0);
 }
-function arrangeFields(){add("各牧場の家畜（例：0:boar:2;1:none:0）","arrPastures","text","","全牧場を列挙する");add("厩の家畜（例：3:sheep,6:boar）","arrStables","text");select("家に置く1匹","arrPet",[["none","なし"]].concat(Object.entries(animals)));}
+function arrangeFields(){add("各牧場の家畜（例：0:猪:2;1:なし:0）","arrPastures","text","","全牧場を列挙する");add("厩の家畜（例：3:羊,6:猪）","arrStables","text");select("家に置く1匹","arrPet",[["none","なし"]].concat(Object.entries(animals)));}
 function getArrangement(){
-const pasture=val("arrPastures").split(";").map(x=>x.trim()).filter(Boolean).map(x=>{const [id,animal,quantity]=x.split(":");return [Number(id),animal==="none"?null:animal,Number(quantity)];});
-const stables=pairs("arrStables").map(([cell,animal])=>[Number(cell),animal]);return {pasture,stables,pet:val("arrPet")==="none"?null:val("arrPet")};}
+const pasture=val("arrPastures").split(";").map(x=>x.trim()).filter(Boolean).map(x=>{const [id,animal,quantity]=x.split(":");return [Number(id),animal==="none"||animal==="なし"?null:animalId(animal),Number(quantity)];});
+const stables=pairs("arrStables").map(([cell,animal])=>[Number(cell),animalId(animal)]);return {pasture,stables,pet:val("arrPet")==="none"?null:val("arrPet")};}
 function openFree(){
 openEditor("任意の操作","ワーカーを使わない操作です。","free",null);
 select("操作","freeKind",[["ConvertCrop","作物を食料へ"],["CookAnimal","家畜を調理"],["DiscardGood","資源を返す"],["DiscardAnimal","家畜を返す"],["RearrangeAnimals","家畜を配置換え"]]);
