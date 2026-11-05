@@ -458,17 +458,41 @@ fn card_good_value(good: Good) -> i64 {
     }
 }
 
-fn card_priority(card: &crate::cards::CardDefinition, round: u8) -> i64 {
+/// Score the card's actual immediate resource/point change after payments,
+/// then add a bounded forecast for explicitly recurring or passive effects.
+/// This avoids treating conditional on-play rewards as unconditional.
+fn card_priority(
+    set: &crate::cards::CardSet,
+    card: &crate::cards::CardDefinition,
+    player: &Player,
+    fee: u32,
+    round: u8,
+) -> Option<i64> {
     use crate::cards::CardEffect;
+    let mut after = player.clone();
+    let mut hand = vec![card.id.clone()];
+    crate::cards::play(set, &mut hand, &mut after, &card.id, card.kind, fee).ok()?;
+    let mut value = i64::from(after.card_points - player.card_points) * 6;
+    for good in [
+        Good::Food,
+        Good::Wood,
+        Good::Clay,
+        Good::Reed,
+        Good::Stone,
+        Good::Grain,
+        Good::Vegetable,
+    ] {
+        value += card_good_value(good)
+            * (i64::from(after.supply.get(good)) - i64::from(player.supply.get(good)));
+    }
     let horizon = i64::from(15u8.saturating_sub(round)).min(5);
-    let mut value = i64::from(card.points) * 6;
     for effect in &card.effects {
         value += match effect {
-            CardEffect::OnPlayGain { good, amount }
-            | CardEffect::OnPlayGainPerStored { good, amount, .. }
-            | CardEffect::OnPlayGainIfHouse { good, amount, .. } => {
-                card_good_value(*good) * i64::from(*amount)
-            }
+            // Exact gains and discounted costs were simulated above.
+            CardEffect::OnPlayGain { .. }
+            | CardEffect::OnPlayGainPerStored { .. }
+            | CardEffect::OnPlayGainIfHouse { .. }
+            | CardEffect::Prerequisite { .. } => 0,
             CardEffect::AfterWorkerGain { good, amount, .. }
             | CardEffect::StartRoundGain { good, amount, .. } => {
                 card_good_value(*good) * i64::from(*amount) * horizon
@@ -481,13 +505,9 @@ fn card_priority(card: &crate::cards::CardDefinition, round: u8) -> i64 {
             CardEffect::Passive { .. } => horizon * 5,
             CardEffect::EndGameBonus { .. } => 12,
             CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
-            CardEffect::Prerequisite { .. } => 0,
         };
     }
-    for (good, amount) in &card.cost {
-        value -= card_good_value(*good) * i64::from(*amount);
-    }
-    value
+    Some(value)
 }
 
 fn preferred_card(
@@ -506,7 +526,7 @@ fn preferred_card(
             if card.kind != kind || !crate::cards::can_play(&set, card, player, fee) {
                 return None;
             }
-            Some((id, card_priority(card, obs.public.round)))
+            Some((id, card_priority(&set, card, player, fee, obs.public.round)?))
         })
         .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(a.0)))
         .map(|(id, priority)| (id.clone(), priority))
@@ -650,6 +670,57 @@ mod card_choice_tests {
             SimpleDetails.produce(&obs, Space::Lessons).unwrap().detail,
             Detail::PlayOccupation {
                 card_id: "weak".into()
+            }
+        );
+    }
+
+    #[test]
+    fn card_choice_does_not_count_unmet_conditional_gains() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind};
+        let game = crate::model::Game::new(crate::model::Config::default());
+        let mut obs = game.observation(game.public.active_player).unwrap();
+        obs.card_definitions = vec![
+            CardDefinition {
+                id: "bait".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::OnPlayGainPerStored {
+                    stored: Good::Wood,
+                    divisor: 2,
+                    good: Good::Food,
+                    amount: 5,
+                }],
+            },
+            CardDefinition {
+                id: "house_bait".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::OnPlayGainIfHouse {
+                    house: House::Stone,
+                    rooms: 2,
+                    good: Good::Food,
+                    amount: 5,
+                }],
+            },
+            CardDefinition {
+                id: "sure_food".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 1,
+                }],
+            },
+        ];
+        obs.hand = vec!["bait".into(), "house_bait".into(), "sure_food".into()];
+        let action = CardChoiceDetails.produce(&obs, Space::Lessons).unwrap();
+        assert_eq!(
+            action.detail,
+            Detail::PlayOccupation {
+                card_id: "sure_food".into()
             }
         );
     }
