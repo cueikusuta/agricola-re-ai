@@ -160,6 +160,17 @@ impl Session {
         *self = next;
         Ok(())
     }
+    pub fn harvest_preview(&self, input: &Value) -> Result<Value, String> {
+        let feeding: FeedingPlan = serde_json::from_value(
+            input.get("feeding").cloned().ok_or("feeding choices required")?,
+        )
+        .map_err(|e| e.to_string())?;
+        let action = self.pending_harvest.as_ref().ok_or("no harvest pending")?;
+        let public = self
+            .game
+            .preview_harvest_after_feeding(action, 0, &feeding)?;
+        Ok(json!({"public": public}))
+    }
     pub fn harvest(&mut self, input: &Value) -> Result<(), String> {
         let feeding: FeedingPlan = serde_json::from_value(
             input.get("feeding").cloned().ok_or("feeding choices required")?,
@@ -283,8 +294,12 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
         ("POST", "/api/new")
         | ("POST", "/api/play")
         | ("POST", "/api/free")
-        | ("POST", "/api/harvest") => {
+        | ("POST", "/api/harvest")
+        | ("POST", "/api/harvest-preview") => {
             let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            if path == "/api/harvest-preview" {
+                return session.harvest_preview(&value);
+            }
             match path {
                 "/api/new" => session.reset(&value)?,
                 "/api/play" => session.play(&value)?,
@@ -385,6 +400,19 @@ mod tests {
         } else {
             panic!("final worker must record harvest decisions")
         }
+    }
+
+    #[test]
+    fn manual_detail_and_free_actions_do_not_fallback_to_ai() {
+        let mut session = Session::new(Config::default()).unwrap();
+        let before = session.game.state_hash();
+        let space = session.game.legal_spaces()[0];
+        assert!(session.play(&json!({"space":space})).is_err());
+        assert_eq!(session.game.state_hash(), before);
+        assert!(session
+            .free(&json!({"action":{"ConvertCrop":{"good":"Grain","quantity":0}}}))
+            .is_err());
+        assert_eq!(session.game.state_hash(), before);
     }
 
     #[test]
