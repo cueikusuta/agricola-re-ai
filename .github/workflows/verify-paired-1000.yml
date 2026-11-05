@@ -1,0 +1,76 @@
+name: One-time 4P paired AI evaluation - 1000 games per arm
+
+# Verified push-only experiment in an isolated branch.
+# This workflow is intentionally not merged to main.
+on:
+  push:
+    branches: [verify/paired-eval-4p-1000-20261106]
+    paths: [.github/workflows/verify-paired-1000.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  shard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bin paired_eval
+      - name: Evaluate complete 4-seat and 2-arm blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          INDEX=${{ matrix.shard }}
+          START=$(( 250 * INDEX / 4 ))
+          END=$(( 250 * (INDEX + 1) / 4 ))
+          COUNT=$(( END - START ))
+          mkdir -p "results/shard-$INDEX"
+          ./target/release/paired_eval \
+            --players 4 --seed-start 600000 \
+            --block-start "$START" --blocks "$COUNT" \
+            --candidate eval --baseline greedy --opponent greedy \
+            --additional-action-space false \
+            --output "results/shard-$INDEX/matches.jsonl"
+      - name: Preserve JSONL even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          path: results/shard-${{ matrix.shard }}/
+          if-no-files-found: error
+          retention-days: 7
+
+  aggregate:
+    if: always()
+    needs: [shard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shard-*
+          path: results
+      - name: Verify 2000 games / 250 independent seed blocks and compute paired 95% interval
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/paired_eval_stats.py \
+            --root results --players 4 --seed-start 600000 \
+            --blocks 250 --candidate eval --baseline greedy \
+            --opponent greedy --output results/report.json
+          echo '2000 cardless games, 1000 per arm. Baseline greedy, NOT M7-MCTS. This does not enforce the 10s hard deadline.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Save reproducible evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paired-eval-4p-1000-report
+          path: results/report.json
+          if-no-files-found: error
+          retention-days: 7
