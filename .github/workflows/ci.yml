@@ -86,6 +86,10 @@ jobs:
           shared-key: release
           add-job-id-key: 'false'
           cache-on-failure: 'true'
+      # rust-cache retains dependencies by default, not workspace code.
+      # Test cross-run reuse of compiled workspace objects with sccache.
+      - name: Install compiler cache (sccache)
+        uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install nextest (prebuilt v0.9.151)
         uses: taiki-e/install-action@v2
         with:
@@ -94,6 +98,10 @@ jobs:
       # The previous cargo test --all-targets also excluded doctests.
       # Use the measured faster release profile; complete all target tests.
       - run: cargo nextest run --release --locked --all-targets
+        env:
+          RUSTC_WRAPPER: sccache
+          SCCACHE_GHA_ENABLED: "true"
+          CARGO_INCREMENTAL: "0"
       - name: Check inline browser JavaScript syntax
         run: |
           sed -n '/<script>/,/<\/script>/p' web/index.html | sed '1d;$d' > /tmp/agricola-web.js
