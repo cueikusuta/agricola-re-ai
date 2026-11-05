@@ -334,6 +334,32 @@ fn affordable(p: &Player, i: Improvement) -> bool {
 }
 
 impl Game {
+    /// Apply post-placement card rewards identically in committed moves and
+    /// harvest previews, before the space becomes occupied.
+    fn apply_post_work_card_effects(
+        &mut self,
+        player: usize,
+        action: &Action,
+        previous: &Player,
+    ) -> Result<()> {
+        let current = &mut self.public.players[player];
+        crate::cards::after_harvest_baking(
+            &self.card_set,
+            current,
+            self.public.round,
+            is_bake_bread_detail(&action.detail),
+        )?;
+        crate::cards::after_clay_construction(&self.card_set, previous, current)?;
+        crate::cards::after_worker(&self.card_set, current, action.space)?;
+        crate::cards::after_worker_if_used(
+            &self.card_set,
+            current,
+            action.space,
+            &self.public.used,
+        )?;
+        Ok(())
+    }
+
     pub fn legal_spaces(&self) -> Vec<Space> {
         if self.public.finished {
             return vec![];
@@ -438,28 +464,7 @@ impl Game {
         let mut next = self.clone();
         let before = self.state_hash();
         next.execute_work(player, &action)?;
-        crate::cards::after_harvest_baking(
-            &next.card_set,
-            &mut next.public.players[player],
-            next.public.round,
-            is_bake_bread_detail(&action.detail),
-        )?;
-        crate::cards::after_clay_construction(
-            &next.card_set,
-            &self.public.players[player],
-            &mut next.public.players[player],
-        )?;
-        crate::cards::after_worker(
-            &next.card_set,
-            &mut next.public.players[player],
-            action.space,
-        )?;
-        crate::cards::after_worker_if_used(
-            &next.card_set,
-            &mut next.public.players[player],
-            action.space,
-            &next.public.used,
-        )?;
+        next.apply_post_work_card_effects(player, &action, &self.public.players[player])?;
         next.public.used.insert(action.space);
         next.public.workers_placed[player] += 1;
         let will_harvest = next.public.workers_placed == next.public.work_quota
@@ -552,7 +557,7 @@ impl Game {
         let mut next = self.clone();
         let id = next.public.active_player;
         next.execute_work(id, action)?;
-        crate::cards::after_worker(&next.card_set, &mut next.public.players[id], action.space)?;
+        next.apply_post_work_card_effects(id, action, &self.public.players[id])?;
         next.public.used.insert(action.space);
         next.public.workers_placed[id] += 1;
         next.harvest_fields();
