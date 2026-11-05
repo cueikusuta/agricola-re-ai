@@ -12,3 +12,9 @@ rand_chacha = { version = "0.3", features = ["serde1"] }
 sha2 = "0.10"
 
 [dev-dependencies]
+
+# Keep runtime-heavy simulation tests optimized while building test artifacts
+# in parallel codegen units on GitHub Actions. This does not remove tests.
+[profile.ci-test]
+inherits = "release"
+codegen-units = 128
