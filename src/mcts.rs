@@ -74,12 +74,23 @@ fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Game {
     game
 }
 
-fn equivalent_better(a: (f64, f64), b: (f64, f64)) -> bool {
-    if (a.0 - b.0).abs() <= WIN_RATE_TOLERANCE {
-        a.1 > b.1
-    } else {
-        a.0 > b.0
-    }
+/// Compare every root action to the same best observed win rate.
+/// A pairwise tolerance comparator is non-transitive and makes the result
+/// dependent on the order of legal actions.
+fn best_root_action(candidates: &[(Space, (f64, f64))]) -> Option<Space> {
+    let highest_win = candidates
+        .iter()
+        .map(|(_, value)| value.0)
+        .max_by(f64::total_cmp)?;
+    candidates
+        .iter()
+        .filter(|(_, value)| highest_win - value.0 <= WIN_RATE_TOLERANCE)
+        .max_by(|(space_a, a), (space_b, b)| {
+            a.1.total_cmp(&b.1)
+                .then_with(|| a.0.total_cmp(&b.0))
+                .then_with(|| space_b.cmp(space_a))
+        })
+        .map(|(space, _)| *space)
 }
 
 fn rollout(game: &mut Game, rng: &mut ChaCha8Rng) -> Result<(), String> {
@@ -214,7 +225,7 @@ impl SpacePolicy for MctsPolicy {
                 }
             }
         }
-        let mut best: Option<(Space, (f64, f64))> = None;
+        let mut candidates = Vec::new();
         for &space in legal {
             let Some(&child) = nodes[0].children.get(&space) else {
                 continue;
@@ -227,15 +238,9 @@ impl SpacePolicy for MctsPolicy {
                 nodes[child].wins[obs.player_id] / f64::from(n),
                 nodes[child].margins[obs.player_id] / f64::from(n),
             );
-            if best
-                .as_ref()
-                .is_none_or(|(_, previous)| equivalent_better(value, *previous))
-            {
-                best = Some((space, value));
-            }
+            candidates.push((space, value));
         }
-        best.map(|(s, _)| s)
-            .or_else(|| EvaluationPolicy.select(obs, legal, rng))
+        best_root_action(&candidates).or_else(|| EvaluationPolicy.select(obs, legal, rng))
     }
 }
 
@@ -265,9 +270,29 @@ mod tests {
 
     #[test]
     fn score_margin_only_breaks_nearly_equal_win_rates() {
-        assert!(equivalent_better((0.6, -10.0), (0.5, 100.0)));
-        assert!(equivalent_better((0.50, 4.0), (0.51, 1.0)));
-        assert!(!equivalent_better((0.50, 1.0), (0.51, 4.0)));
+        let clear_winner = [
+            (Space::Forest, (0.6, -10.0)),
+            (Space::ClayPit, (0.5, 100.0)),
+        ];
+        assert_eq!(best_root_action(&clear_winner), Some(Space::Forest));
+        let close = [
+            (Space::Forest, (0.50, 4.0)),
+            (Space::ClayPit, (0.51, 1.0)),
+        ];
+        assert_eq!(best_root_action(&close), Some(Space::Forest));
+    }
+
+    #[test]
+    fn win_rate_tolerance_is_order_independent_and_anchored_to_best() {
+        let scores = [
+            (Space::Forest, (0.56, 1000.0)),
+            (Space::ClayPit, (0.58, 50.0)),
+            (Space::ReedBank, (0.60, -1.0)),
+        ];
+        assert_eq!(best_root_action(&scores), Some(Space::ClayPit));
+        let reversed = scores.iter().copied().rev().collect::<Vec<_>>();
+        assert_eq!(best_root_action(&reversed), Some(Space::ClayPit));
+        assert_eq!(best_root_action(&[]), None);
     }
 
     #[test]
