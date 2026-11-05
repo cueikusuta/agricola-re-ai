@@ -3,6 +3,7 @@ use agricola_re_ai::model::{Config, Crop, Game, RoundCard, Space, Tile};
 
 fn game() -> Game {
     Game::new(Config {
+        players: 2,
         seed: 42,
         additional_action_space_enabled: false,
     })

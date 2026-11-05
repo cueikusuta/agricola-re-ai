@@ -7,6 +7,7 @@ fn one_hundred_seeded_games_per_mode_are_replayable() {
     for enabled in [false, true] {
         for seed in 0..100 {
             let config = Config {
+                players: 2,
                 seed,
                 additional_action_space_enabled: enabled,
             };
@@ -26,6 +27,7 @@ fn one_hundred_seeded_games_per_mode_are_replayable() {
 fn greedy_complete_game_replays_in_both_modes() {
     for enabled in [false, true] {
         let config = Config {
+            players: 2,
             seed: 9183,
             additional_action_space_enabled: enabled,
         };

@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 
 fn revealed(target: RoundCard, additional: bool) -> Game {
     let mut game = Game::new(Config {
+        players: 2,
         seed: 8301,
         additional_action_space_enabled: additional,
     });

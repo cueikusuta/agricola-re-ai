@@ -56,6 +56,7 @@ fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Game {
     let mut game = Game::new(Config {
         seed,
         additional_action_space_enabled: obs.public.additional_action_space_enabled,
+        players: obs.public.players.len(),
     });
     game.public = obs.public.clone();
     let mut deck = Vec::new();
@@ -96,7 +97,7 @@ fn rollout(game: &mut Game, rng: &mut ChaCha8Rng) -> Result<(), String> {
     let details = SimpleDetails;
     let evaluation = EvaluationPolicy;
     let greedy = GreedyPolicy;
-    for _ in 0..250 {
+    for _ in 0..320 {
         if game.public.finished {
             return Ok(());
         }
@@ -295,6 +296,7 @@ mod tests {
     fn returns_legal_and_seed_reproducible_choice() {
         for enabled in [false, true] {
             let game = Game::new(Config {
+                players: 2,
                 seed: 37,
                 additional_action_space_enabled: enabled,
             });

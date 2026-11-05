@@ -4,6 +4,7 @@ use agricola_re_ai::policy::{DetailPolicy, SimpleDetails};
 
 fn game(enabled: bool) -> Game {
     Game::new(Config {
+        players: 2,
         seed: 123,
         additional_action_space_enabled: enabled,
     })

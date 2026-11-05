@@ -9,13 +9,27 @@ pub const FARM_CELLS: usize = 15;
 pub const HARVEST_ROUNDS: [u8; 6] = [4, 7, 9, 11, 13, 14];
 pub const RULES_VERSION: &str = "agricola-revised-2016-beginner";
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const LOG_VERSION: u32 = 3;
+pub const LOG_VERSION: u32 = 4;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Config {
     pub seed: u64,
     #[serde(default)]
     pub additional_action_space_enabled: bool,
+    #[serde(default = "default_player_count")]
+    pub players: usize,
+}
+fn default_player_count() -> usize {
+    2
+}
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            seed: 0,
+            additional_action_space_enabled: false,
+            players: 2,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -357,6 +371,9 @@ pub enum Space {
     ResourceMarket,
     AnimalMarket,
     ModestFamilyGrowth,
+    Grove,
+    Hollow,
+    TravelingPlayers,
 }
 impl From<RoundCard> for Space {
     fn from(x: RoundCard) -> Self {
@@ -396,6 +413,44 @@ impl Space {
             Self::Copse | Self::ResourceMarket | Self::AnimalMarket | Self::ModestFamilyGrowth
         )
     }
+    /// Spaces printed on the multiplayer boards (occupation-only Lessons
+    /// are not playable without cards).
+    pub fn regular_for(players: usize) -> Vec<Self> {
+        let mut result = Self::BASE.to_vec();
+        match players {
+            3 => result.extend([Self::Grove, Self::Hollow, Self::ResourceMarket]),
+            4 => result.extend([
+                Self::Copse,
+                Self::Grove,
+                Self::Hollow,
+                Self::ResourceMarket,
+                Self::TravelingPlayers,
+            ]),
+            _ => {}
+        }
+        result
+    }
+    pub fn extra_for(players: usize) -> Vec<Self> {
+        match players {
+            2 => vec![
+                Self::Copse,
+                Self::ResourceMarket,
+                Self::AnimalMarket,
+                Self::ModestFamilyGrowth,
+            ],
+            3 | 4 => vec![Self::AnimalMarket, Self::ModestFamilyGrowth],
+            _ => vec![],
+        }
+    }
+    pub fn additional_for(self, players: usize) -> bool {
+        Self::extra_for(players).contains(&self)
+    }
+    pub fn accumulation_for(self, players: usize) -> Option<(Good, u32)> {
+        match self {
+            Self::Hollow if players == 4 => Some((Good::Clay, 2)),
+            _ => self.accumulation(),
+        }
+    }
     pub fn accumulation(self) -> Option<(Good, u32)> {
         match self {
             Self::Forest => Some((Good::Wood, 3)),
@@ -405,6 +460,9 @@ impl Space {
             Self::SheepMarket | Self::PigMarket | Self::CattleMarket => None,
             Self::WesternQuarry | Self::EasternQuarry => Some((Good::Stone, 1)),
             Self::Copse => Some((Good::Wood, 1)),
+            Self::Grove => Some((Good::Wood, 2)),
+            Self::Hollow => Some((Good::Clay, 1)),
+            Self::TravelingPlayers => Some((Good::Food, 1)),
             _ => None,
         }
     }
@@ -476,7 +534,8 @@ impl Game {
             round: ChaCha8Rng::seed_from_u64(round_seed),
             ai: ChaCha8Rng::seed_from_u64(action_seed),
         };
-        let start_player = rng.round.gen_range(0..2);
+        assert!((2..=4).contains(&config.players), "players must be 2..=4");
+        let start_player = rng.round.gen_range(0..config.players);
         let mut deck = Vec::new();
         for stage in 1..=6 {
             let mut cards = RoundCard::ALL
@@ -488,7 +547,7 @@ impl Game {
             deck.extend(cards);
         }
         deck.reverse();
-        let players = (0..2)
+        let players = (0..config.players)
             .map(|id| Player::new(id, if id == start_player { 2 } else { 3 }))
             .collect();
         let public = PublicState {
@@ -501,8 +560,8 @@ impl Game {
             animal_accumulations: BTreeMap::new(),
             players,
             improvement_market: Improvement::ALL.to_vec(),
-            work_quota: vec![2, 2],
-            workers_placed: vec![0, 0],
+            work_quota: vec![2; config.players],
+            workers_placed: vec![0; config.players],
             additional_action_space_enabled: config.additional_action_space_enabled,
             finished: false,
         };
@@ -601,13 +660,14 @@ impl Game {
         for p in &mut self.public.players {
             p.newborns = 0;
         }
-        let mut spaces = Space::BASE.to_vec();
+        let players = self.config.players;
+        let mut spaces = Space::regular_for(players);
         spaces.extend(self.public.revealed.iter().copied().map(Space::from));
         if self.config.additional_action_space_enabled {
-            spaces.push(Space::Copse)
+            spaces.extend(Space::extra_for(players));
         }
         for space in spaces {
-            if let Some((_, n)) = space.accumulation() {
+            if let Some((_, n)) = space.accumulation_for(players) {
                 *self.public.accumulations.entry(space).or_default() += n
             }
         }
@@ -624,8 +684,8 @@ impl Game {
     }
     pub fn validate(&self) -> Result<(), String> {
         let p = &self.public;
-        if p.players.len() != 2 {
-            return Err("M1 is two players only".into());
+        if !(2..=4).contains(&self.config.players) || p.players.len() != self.config.players {
+            return Err("player count mismatch".into());
         }
         if self.config.additional_action_space_enabled != p.additional_action_space_enabled {
             return Err("setting mutated".into());
@@ -777,21 +837,25 @@ impl Game {
                 }
             }
         }
-        if !self.config.additional_action_space_enabled && p.used.iter().any(|s| s.additional()) {
+        if !self.config.additional_action_space_enabled
+            && p.used.iter().any(|s| s.additional_for(self.config.players))
+        {
             return Err("disabled additional space used".into());
         }
-        if p.used.iter().filter(|s| s.additional()).count() > 1 {
+        if p.used
+            .iter()
+            .filter(|s| s.additional_for(self.config.players))
+            .count()
+            > 1
+        {
             return Err("multiple mutually-exclusive additional spaces used".into());
         }
-        let mut available: BTreeSet<_> = Space::BASE.into_iter().collect();
+        let mut available: BTreeSet<_> = Space::regular_for(self.config.players)
+            .into_iter()
+            .collect();
         available.extend(p.revealed.iter().copied().map(Space::from));
         if self.config.additional_action_space_enabled {
-            available.extend([
-                Space::Copse,
-                Space::ResourceMarket,
-                Space::AnimalMarket,
-                Space::ModestFamilyGrowth,
-            ]);
+            available.extend(Space::extra_for(self.config.players));
         }
         if !p.used.is_subset(&available) {
             return Err("a non-revealed action space was used".into());

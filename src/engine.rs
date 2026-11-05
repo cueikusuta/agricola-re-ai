@@ -56,6 +56,7 @@ pub struct BakeAllocation {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Detail {
     None,
+    MarketChoice(Good),
     Plow {
         cell: usize,
     },
@@ -167,8 +168,8 @@ pub enum RecordedAction {
     },
 }
 
-fn group_occupied(used: &BTreeSet<Space>) -> bool {
-    used.iter().any(|s| s.additional())
+fn group_occupied(used: &BTreeSet<Space>, players: usize) -> bool {
+    used.iter().any(|s| s.additional_for(players))
 }
 fn room_material(p: &Player) -> Good {
     match p.house {
@@ -262,18 +263,15 @@ impl Game {
             return vec![];
         }
         let me = &self.public.players[self.public.active_player];
-        let mut list = Space::BASE.to_vec();
+        let players = self.config.players;
+        let mut list = Space::regular_for(players);
         list.extend(self.public.revealed.iter().copied().map(Space::from));
         if self.config.additional_action_space_enabled {
-            list.extend([
-                Space::Copse,
-                Space::ResourceMarket,
-                Space::AnimalMarket,
-                Space::ModestFamilyGrowth,
-            ]);
+            list.extend(Space::extra_for(players));
         }
         list.retain(|&s| {
-            if self.public.used.contains(&s) || s.additional() && group_occupied(&self.public.used)
+            if self.public.used.contains(&s)
+                || s.additional_for(players) && group_occupied(&self.public.used, players)
             {
                 return false;
             }
@@ -497,10 +495,15 @@ impl Game {
             | Space::Fishing
             | Space::WesternQuarry
             | Space::EasternQuarry
-            | Space::Copse => {
+            | Space::Copse
+            | Space::Grove
+            | Space::Hollow
+            | Space::TravelingPlayers => {
                 require_none(detail)?;
                 let n = self.public.accumulations.remove(&space).unwrap_or(0);
-                let (kind, _) = space.accumulation().ok_or("not an accumulation space")?;
+                let (kind, _) = space
+                    .accumulation_for(self.config.players)
+                    .ok_or("not an accumulation space")?;
                 p.supply.gain(kind, n);
             }
             Space::MeetingPlace => {
@@ -522,8 +525,16 @@ impl Game {
                 p.supply.vegetable += 1;
             }
             Space::ResourceMarket => {
-                require_none(detail)?;
-                p.supply.stone += 1;
+                match (self.config.players, detail) {
+                    (2, Detail::None) => p.supply.stone += 1,
+                    (3, Detail::MarketChoice(Good::Reed)) => p.supply.reed += 1,
+                    (3, Detail::MarketChoice(Good::Stone)) => p.supply.stone += 1,
+                    (4, Detail::None) => {
+                        p.supply.reed += 1;
+                        p.supply.stone += 1;
+                    }
+                    _ => return Err("incorrect resource market selection".into()),
+                }
                 p.supply.food += 1;
             }
             Space::Farmland => {

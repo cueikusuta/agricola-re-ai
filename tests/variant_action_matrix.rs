@@ -3,6 +3,7 @@ use agricola_re_ai::model::{Animal, Config, Game, Space};
 
 fn game(additional: bool) -> Game {
     Game::new(Config {
+        players: 2,
         seed: 7205,
         additional_action_space_enabled: additional,
     })

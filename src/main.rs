@@ -3,6 +3,7 @@ use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::mcts::MctsPolicy;
 use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
 use agricola_re_ai::score::standings;
+use agricola_re_ai::web::serve;
 use agricola_re_ai::{Config, Game};
 use std::collections::BTreeMap;
 use std::time::Instant;
@@ -11,6 +12,8 @@ fn main() {
     let mut batch = 1usize;
     let mut greedy = false;
     let mut evaluated = false;
+    let mut web = false;
+    let mut player_option_supplied = false;
     let mut mcts_budget: Option<usize> = None;
     let mut benchmark: Option<usize> = None;
     let mut log_file: Option<String> = None;
@@ -36,6 +39,15 @@ fn main() {
             "--additional-action-space" => config.additional_action_space_enabled = true,
             "--greedy" => greedy = true,
             "--eval" => evaluated = true,
+            "--web" => web = true,
+            "--players" => {
+                player_option_supplied = true;
+                config.players = it
+                    .next()
+                    .expect("--players requires 2, 3 or 4")
+                    .parse()
+                    .expect("invalid player count");
+            }
             "--mcts" => mcts_budget = Some(48),
             "--mcts-simulations" => {
                 mcts_budget = Some(
@@ -58,7 +70,7 @@ fn main() {
                 state_file = Some(it.next().expect("--state-file requires path").clone())
             }
             "--help" | "-h" => {
-                println!("Usage: agricola-re-ai [--seed N] [--batch N] [--additional-action-space] [--greedy | --eval | --mcts | --mcts-simulations N] [--benchmark N] [--log-file FILE] [--state-file FILE]");
+                println!("Usage: agricola-re-ai [--seed N] [--players 2|3|4] [--web] [--batch N] [--additional-action-space] [--greedy | --eval | --mcts | --mcts-simulations N] [--benchmark N] [--log-file FILE] [--state-file FILE]");
                 return;
             }
             x => {
@@ -66,6 +78,20 @@ fn main() {
                 std::process::exit(2)
             }
         }
+    }
+    if !(2..=4).contains(&config.players) {
+        eprintln!("--players requires 2, 3 or 4");
+        std::process::exit(2);
+    }
+    if web {
+        if !player_option_supplied {
+            config.players = 4;
+        }
+        if let Err(error) = serve(config) {
+            eprintln!("web UI error: {error}");
+            std::process::exit(1);
+        }
+        return;
     }
     if batch != 1 && (log_file.is_some() || state_file.is_some()) {
         eprintln!("--log-file and --state-file require --batch 1");
@@ -76,6 +102,10 @@ fn main() {
         std::process::exit(2)
     }
     if let Some(seeds) = benchmark {
+        if config.players != 2 {
+            eprintln!("--benchmark supports exactly 2 players");
+            std::process::exit(2);
+        }
         if seeds == 0 || batch != 1 || log_file.is_some() || state_file.is_some() {
             eprintln!("--benchmark requires N > 0 and cannot use --batch or state/log files");
             std::process::exit(2)
@@ -116,6 +146,7 @@ fn main() {
     let mut duration = 0f64;
     for n in 0..batch {
         let mut game = Game::new(Config {
+            players: config.players,
             seed: config.seed + n as u64,
             additional_action_space_enabled: config.additional_action_space_enabled,
         });

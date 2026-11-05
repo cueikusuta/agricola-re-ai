@@ -50,6 +50,7 @@ pub fn compare_policies(
     for n in 0..seeds {
         for swapped in [false, true] {
             let mut game = Game::new(Config {
+                players: 2,
                 seed: first_seed.wrapping_add(n as u64),
                 additional_action_space_enabled,
             });
