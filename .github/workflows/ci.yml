@@ -97,7 +97,17 @@ jobs:
       # All --all-targets tests are executed, across test binaries in parallel.
       # The previous cargo test --all-targets also excluded doctests.
       # Use the measured faster release profile; complete all target tests.
-      - run: cargo nextest run --release --locked --all-targets
+      - name: Run all Rust tests (offline when cached)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if cargo fetch --locked --offline --target x86_64-unknown-linux-gnu >/dev/null 2>&1; then
+            echo "Using cached Cargo dependencies (offline)"
+            cargo nextest run --release --locked --offline --all-targets
+          else
+            echo "Cargo dependency cache incomplete, allowing network fetch"
+            cargo nextest run --release --locked --all-targets
+          fi
         env:
           RUSTC_WRAPPER: sccache
           SCCACHE_GHA_ENABLED: "true"
@@ -124,7 +134,16 @@ jobs:
       # Compile the release binary once: M1, M2 and M7 previously built the
       # same binary independently on separate runners, wasting build time.
       - name: Build shared release benchmark binary
-        run: cargo build --release --locked
+        shell: bash
+        run: |
+          set -euo pipefail
+          if cargo fetch --locked --offline --target x86_64-unknown-linux-gnu >/dev/null 2>&1; then
+            echo "Using cached Cargo dependencies (offline)"
+            cargo build --release --locked --offline
+          else
+            echo "Cargo dependency cache incomplete, allowing network fetch"
+            cargo build --release --locked
+          fi
         env:
           RUSTC_WRAPPER: sccache
           SCCACHE_GHA_ENABLED: "true"
