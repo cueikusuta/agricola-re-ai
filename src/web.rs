@@ -4,7 +4,7 @@ use crate::evaluation::EvaluationPolicy;
 use crate::mcts::MctsPolicy;
 use crate::model::{Config, Game, Good, Space};
 use crate::policy::{DetailPolicy, SimpleDetails, SpacePolicy};
-use crate::score::standings;
+use crate::score::standings_with_cards;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use serde_json::{json, Value};
@@ -63,7 +63,7 @@ impl Session {
         json!({
             "public": &self.game.public,
             "legal": if human_turn { self.game.legal_spaces() } else { vec![] },
-            "standings": standings(&self.game.public.players),
+            "standings": standings_with_cards(&self.game.public.players, &self.game.card_set),
             "last_actions": self.game.log.events.iter().rev().take(5).map(|e| json!({
                 "player": e.player,
                 "kind": &e.kind,
