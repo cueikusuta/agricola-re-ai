@@ -2,7 +2,7 @@
 use crate::cards::CardSet;
 use crate::model::{Config, Game, Observation, Space};
 use crate::policy::{play_to_end, CardChoiceDetails, SimpleDetails, SpacePolicy};
-use crate::score::standings;
+use crate::score::standings_with_cards;
 use rand_chacha::ChaCha8Rng;
 use serde::Serialize;
 
@@ -115,7 +115,7 @@ fn compare_policies_in_mode(
             } else {
                 play_to_end(&mut game, &seats, &SimpleDetails)?;
             }
-            let result = standings(&game.public.players);
+            let result = standings_with_cards(&game.public.players, &game.card_set);
             let left_id = usize::from(swapped);
             let right_id = 1 - left_id;
             sum_left += i64::from(result.scores[left_id].total);
