@@ -1305,7 +1305,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 },
                 good: Good::Food,
                 amount: 1,
-            }],
+            },
             ],
         },
         CardDefinition {
