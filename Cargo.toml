@@ -12,10 +12,3 @@ rand_chacha = { version = "0.3", features = ["serde1"] }
 sha2 = "0.10"
 
 [dev-dependencies]
-
-# Optimized assertions with faster compile-time code generation for CI.
-# Kept separate from production release so benchmark performance is unchanged.
-[profile.ci-fast]
-inherits = "release"
-opt-level = 2
-codegen-units = 32
