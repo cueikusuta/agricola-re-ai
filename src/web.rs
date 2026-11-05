@@ -481,6 +481,61 @@ mod tests {
     }
 
     #[test]
+    fn manual_free_action_is_logged_and_replays() {
+        let mut session = Session::new(Config {
+            seed: 34,
+            ..Config::default()
+        })
+        .unwrap();
+        let before = session.game.public.players[0].supply.food;
+        session
+            .free(&json!({"action": {"DiscardGood": {"good": "food", "quantity": 1}}}))
+            .unwrap();
+        assert_eq!(session.game.public.players[0].supply.food, before - 1);
+        let replay = Game::replay(session.game.config.clone(), &session.game.log.events).unwrap();
+        assert_eq!(replay.state_hash(), session.game.state_hash());
+    }
+
+    #[test]
+    fn harvest_decisions_require_human_and_replay() {
+        let mut session = Session::new(Config {
+            seed: 123,
+            ..Config::default()
+        })
+        .unwrap();
+        for _ in 0..80 {
+            if let Some(PendingHarvest::Feeding(action)) = session.pending.clone() {
+                let before = session.game.state_hash();
+                let preview = session.game.preview_harvest(&action, None).unwrap();
+                assert_eq!(preview.round, 4);
+                let mut plan = FeedingPlan::default();
+                plan.priorities.reverse();
+                session.harvest(&json!({"feeding": plan})).unwrap();
+                assert_eq!(session.game.state_hash(), before);
+                let (action, plans) = match session.pending.clone().unwrap() {
+                    PendingHarvest::Breeding(action, plans) => (action, plans),
+                    _ => panic!("breeding choice must follow feeding choice"),
+                };
+                let after_feeding =
+                    session.game.preview_harvest(&action, Some(&plans)).unwrap();
+                let choice = BreedingPlan::simple(&after_feeding.players[0]);
+                session.harvest(&json!({"breeding": choice})).unwrap();
+                let replay =
+                    Game::replay(session.game.config.clone(), &session.game.log.events).unwrap();
+                assert_eq!(replay.state_hash(), session.game.state_hash());
+                return;
+            }
+            let space = session.game.legal_spaces()[0];
+            let detail = SimpleDetails
+                .produce(&session.game.observation(0).unwrap(), space)
+                .unwrap()
+                .detail;
+            session.play(&json!({"space": space, "detail": detail})).unwrap();
+        }
+        panic!("harvest was never reached");
+    }
+
+    #[test]
     fn human_and_cpu_can_take_turns() {
         let mut session = Session::new(Config {
             seed: 5,
