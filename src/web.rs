@@ -124,9 +124,34 @@ impl Session {
                 detail: Detail::MarketChoice(good),
             };
         }
-        self.game.apply(action)?;
-        self.advance_cpu()
+        // Do not commit the human move unless the subsequent CPU moves succeed.
+        let mut next = Self {
+            game: self.game.clone(),
+            mcts: self.mcts,
+            budget: self.budget,
+        };
+        next.game.apply(action)?;
+        next.advance_cpu()?;
+        *self = next;
+        Ok(())
     }
+}
+
+fn local_request_allowed(host: Option<&str>, origin: Option<&str>) -> bool {
+    let local_host = matches!(host, Some("127.0.0.1:8787" | "localhost:8787"));
+    let local_origin = origin.is_none_or(|value| {
+        matches!(
+            value,
+            "http://127.0.0.1:8787" | "http://localhost:8787"
+        )
+    });
+    local_host && local_origin
+}
+
+fn json_content_type(value: Option<&str>) -> bool {
+    value
+        .and_then(|content_type| content_type.split(';').next())
+        .is_some_and(|kind| kind.trim().eq_ignore_ascii_case("application/json"))
 }
 
 fn response(stream: &mut TcpStream, status: &str, mime: &str, content: &str) -> Result<(), String> {
@@ -154,6 +179,9 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
     let path = parts.next().unwrap_or("");
     let mut length = 0usize;
     let mut count = 0usize;
+    let mut host: Option<String> = None;
+    let mut origin: Option<String> = None;
+    let mut content_type: Option<String> = None;
     loop {
         let mut line = String::new();
         reader.read_line(&mut line).map_err(|e| e.to_string())?;
@@ -175,8 +203,30 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
                     .trim()
                     .parse()
                     .map_err(|e: std::num::ParseIntError| e.to_string())?;
+            } else if name.eq_ignore_ascii_case("host") {
+                host = Some(value.trim().to_ascii_lowercase());
+            } else if name.eq_ignore_ascii_case("origin") {
+                origin = Some(value.trim().to_ascii_lowercase());
+            } else if name.eq_ignore_ascii_case("content-type") {
+                content_type = Some(value.trim().to_owned());
             }
         }
+    }
+    if !local_request_allowed(host.as_deref(), origin.as_deref()) {
+        return response(
+            &mut stream,
+            "403 Forbidden",
+            "application/json",
+            "{\"error\":\"non-local request rejected\"}",
+        );
+    }
+    if method == "POST" && !json_content_type(content_type.as_deref()) {
+        return response(
+            &mut stream,
+            "415 Unsupported Media Type",
+            "application/json",
+            "{\"error\":\"application/json required\"}",
+        );
     }
     if length > MAX_BODY {
         return response(
@@ -238,6 +288,27 @@ pub fn serve(config: Config) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn local_api_rejects_cross_site_and_simple_form_posts() {
+        assert!(local_request_allowed(Some("127.0.0.1:8787"), None));
+        assert!(local_request_allowed(
+            Some("localhost:8787"),
+            Some("http://localhost:8787")
+        ));
+        assert!(!local_request_allowed(
+            Some("evil.example:8787"),
+            Some("http://evil.example:8787")
+        ));
+        assert!(!local_request_allowed(
+            Some("127.0.0.1:8787"),
+            Some("https://evil.example")
+        ));
+        assert!(!local_request_allowed(None, None));
+        assert!(json_content_type(Some("application/json; charset=utf-8")));
+        assert!(!json_content_type(Some("text/plain")));
+        assert!(!json_content_type(None));
+    }
+
     #[test]
     fn rejects_invalid_configuration_and_move() {
         let mut session = Session::new(Config::default()).unwrap();
