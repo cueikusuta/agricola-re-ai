@@ -94,6 +94,8 @@ jobs:
           tool: nextest@0.9.151
       # All --all-targets tests are executed, across test binaries in parallel.
       # The previous cargo test --all-targets also excluded doctests.
+      # Cargo ci-fast inherits release semantics, with quicker opt2 codegen.
+      # Compare warm/cold cache durations; restore --release if it regresses.
       - run: cargo nextest run --cargo-profile ci-fast --locked --all-targets
       - name: Check inline browser JavaScript syntax
         run: |
