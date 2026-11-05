@@ -348,6 +348,23 @@ fn fence(
     p.fences = edges;
 }
 
+/// Apply a card to the observer's own projected state. The hand and card
+/// definitions are included in Observation; no opponent hand is consulted.
+fn project_play_card(
+    obs: &Observation,
+    player: &mut Player,
+    id: &str,
+    kind: crate::cards::CardKind,
+    fee: u32,
+) -> Option<()> {
+    let set = crate::cards::CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
+    let mut hand = obs.hand.clone();
+    crate::cards::play(&set, &mut hand, player, id, kind, fee).ok()?;
+    Some(())
+}
+
 /// Approximate only the immediate *public* effects of an action.
 /// No hidden deck, RNG, or future round information is sampled.
 fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
@@ -367,6 +384,43 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
             | Space::TravelingPlayers,
             Detail::None,
         ) => add_accumulation(obs, &mut p, action.space),
+        (Space::Lessons | Space::ExtraLessons, Detail::PlayOccupation { card_id }) => {
+            let count = p
+                .played_cards
+                .iter()
+                .filter(|id| {
+                    obs.card_definitions.iter().any(|card| {
+                        card.id == **id && card.kind == crate::cards::CardKind::Occupation
+                    })
+                })
+                .count();
+            let fee = if action.space == Space::Lessons {
+                u32::from(count > 0)
+            } else if obs.public.players.len() == 3 || count >= 2 {
+                2
+            } else {
+                1
+            };
+            project_play_card(
+                obs,
+                &mut p,
+                card_id,
+                crate::cards::CardKind::Occupation,
+                fee,
+            )?;
+        }
+        (Space::MeetingPlace | Space::MajorImprovement, Detail::PlayMinor { card_id }) => {
+            project_play_card(
+                obs,
+                &mut p,
+                card_id,
+                crate::cards::CardKind::MinorImprovement,
+                0,
+            )?;
+            if action.space == Space::MeetingPlace {
+                add_accumulation(obs, &mut p, action.space);
+            }
+        }
         (Space::DayLaborer, Detail::None) => p.supply.food += 2,
         (Space::GrainSeeds, Detail::None) => p.supply.grain += 1,
         (Space::VegetableSeeds, Detail::None) => p.supply.vegetable += 1,
@@ -390,6 +444,20 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
         ) => {
             p.family += 1;
             p.newborns += 1;
+        }
+        (
+            Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth,
+            Detail::GrowWithMinor { card_id },
+        ) => {
+            p.family += 1;
+            p.newborns += 1;
+            project_play_card(
+                obs,
+                &mut p,
+                card_id,
+                crate::cards::CardKind::MinorImprovement,
+                0,
+            )?;
         }
         (Space::Farmland, Detail::Plow { cell }) => {
             p.farm[*cell].tile = Tile::Field {
@@ -499,6 +567,10 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
         }
         _ => return None,
     }
+    let set = crate::cards::CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
+    crate::cards::after_worker(&set, &mut p, action.space).ok()?;
     Some(p)
 }
 
@@ -538,6 +610,48 @@ mod projection_tests {
         let mut obs = game.observation(game.public.active_player).unwrap();
         update(&mut obs.public.players[obs.player_id]);
         obs
+    }
+
+    #[test]
+    fn projecting_a_known_occupation_uses_only_own_hand() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind};
+
+        let mut obs = observed(|_| {});
+        obs.card_definitions.push(CardDefinition {
+            id: "sample_occ".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 1,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Wood,
+                amount: 2,
+            }],
+        });
+        obs.hand.push("sample_occ".into());
+        let original = &obs.public.players[obs.player_id];
+        let next = project_action(
+            &obs,
+            &Action {
+                space: Space::Lessons,
+                detail: Detail::PlayOccupation {
+                    card_id: "sample_occ".into(),
+                },
+            },
+        )
+        .unwrap();
+        assert_eq!(next.supply.wood, original.supply.wood + 2);
+        assert_eq!(next.card_points, original.card_points + 1);
+        assert!(next.played_cards.contains(&"sample_occ".to_owned()));
+        assert!(project_action(
+            &obs,
+            &Action {
+                space: Space::Lessons,
+                detail: Detail::PlayOccupation {
+                    card_id: "unknown".into(),
+                },
+            },
+        )
+        .is_none());
     }
 
     #[test]
