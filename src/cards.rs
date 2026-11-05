@@ -300,7 +300,10 @@ pub fn verified_worker_bonus_cards(players: usize) -> Vec<CardDefinition> {
         ));
     }
     if players >= 3 {
-        cards.push(occupation("B142", vec![gain(Space::GrainSeeds, Good::Vegetable, 1)]));
+        cards.push(occupation(
+            "B142",
+            vec![gain(Space::GrainSeeds, Good::Vegetable, 1)],
+        ));
     }
     cards
 }
