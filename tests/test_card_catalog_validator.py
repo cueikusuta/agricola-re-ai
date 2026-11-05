@@ -29,7 +29,7 @@ class CardCatalogAuditTests(unittest.TestCase):
     def test_preliminary_never_counts_as_verified(self):
         result, errors = review_ledger([prelim()], [audit()], require_full=False)
         self.assertEqual(errors, [])
-        self.assertFalse(result["verified_4p_10_7_ready"])
+        self.assertFalse(result["verified_4p_card_count_gate"])
         self.assertEqual(result["verified_eligible_by_players"]["4"]["minor_improvement"], 0)
 
     def test_missing_official_source_is_rejected(self):
