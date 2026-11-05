@@ -1,5 +1,6 @@
 use agricola_re_ai::benchmark::compare_policies;
 use agricola_re_ai::evaluation::EvaluationPolicy;
+use agricola_re_ai::mcts::MctsPolicy;
 use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
 use agricola_re_ai::score::standings;
 use agricola_re_ai::{Config, Game};
@@ -10,6 +11,7 @@ fn main() {
     let mut batch = 1usize;
     let mut greedy = false;
     let mut evaluated = false;
+    let mut mcts_budget: Option<usize> = None;
     let mut benchmark: Option<usize> = None;
     let mut log_file: Option<String> = None;
     let mut state_file: Option<String> = None;
@@ -34,6 +36,15 @@ fn main() {
             "--additional-action-space" => config.additional_action_space_enabled = true,
             "--greedy" => greedy = true,
             "--eval" => evaluated = true,
+            "--mcts" => mcts_budget = Some(48),
+            "--mcts-simulations" => {
+                mcts_budget = Some(
+                    it.next()
+                        .expect("--mcts-simulations requires N")
+                        .parse()
+                        .expect("invalid MCTS simulation count"),
+                );
+            }
             "--benchmark" => {
                 benchmark = Some(
                     it.next()
@@ -47,7 +58,7 @@ fn main() {
                 state_file = Some(it.next().expect("--state-file requires path").clone())
             }
             "--help" | "-h" => {
-                println!("Usage: agricola-re-ai [--seed N] [--batch N] [--additional-action-space] [--greedy | --eval] [--benchmark N] [--log-file FILE] [--state-file FILE]");
+                println!("Usage: agricola-re-ai [--seed N] [--batch N] [--additional-action-space] [--greedy | --eval | --mcts | --mcts-simulations N] [--benchmark N] [--log-file FILE] [--state-file FILE]");
                 return;
             }
             x => {
@@ -60,8 +71,8 @@ fn main() {
         eprintln!("--log-file and --state-file require --batch 1");
         std::process::exit(2)
     }
-    if greedy && evaluated {
-        eprintln!("--greedy and --eval cannot be combined");
+    if (greedy as u8 + evaluated as u8 + mcts_budget.is_some() as u8) > 1 {
+        eprintln!("choose one of --greedy, --eval, --mcts");
         std::process::exit(2)
     }
     if let Some(seeds) = benchmark {
@@ -96,6 +107,10 @@ fn main() {
         }
         return;
     }
+    let mcts_policy = MctsPolicy {
+        simulations: mcts_budget.unwrap_or(48),
+        ..MctsPolicy::default()
+    };
     let mut scores = Vec::new();
     let mut histogram: BTreeMap<i32, usize> = BTreeMap::new();
     let mut duration = 0f64;
@@ -105,7 +120,9 @@ fn main() {
             additional_action_space_enabled: config.additional_action_space_enabled,
         });
         let t = Instant::now();
-        let strategy: &dyn SpacePolicy = if evaluated {
+        let strategy: &dyn SpacePolicy = if mcts_budget.is_some() {
+            &mcts_policy
+        } else if evaluated {
             &EvaluationPolicy
         } else if greedy {
             &GreedyPolicy
