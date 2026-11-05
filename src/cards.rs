@@ -117,7 +117,10 @@ impl CardSet {
                 if let CardEffect::Prerequisite { rule } = effect {
                     if let CardRequirement::MinimumPlayers(min) = rule {
                         if *min == 0 || *min as usize > players {
-                            return Err(format!("card {} is not eligible for this player count", card.id));
+                            return Err(format!(
+                                "card {} is not eligible for this player count",
+                                card.id
+                            ));
                         }
                     }
                 }
@@ -221,9 +224,14 @@ pub fn affordable(card: &CardDefinition, player: &Player, extra_food: u32) -> bo
 }
 
 fn occupation_count(set: &CardSet, player: &Player) -> usize {
-    player.played_cards.iter().filter(|id| {
-        set.definition(id).is_some_and(|card| card.kind == CardKind::Occupation)
-    }).count()
+    player
+        .played_cards
+        .iter()
+        .filter(|id| {
+            set.definition(id)
+                .is_some_and(|card| card.kind == CardKind::Occupation)
+        })
+        .count()
 }
 
 pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_food: u32) -> bool {
@@ -340,7 +348,6 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
             vec![],
             ScoreBonusRule::HouseMaterial,
         ),
-
         scoring(
             "A098",
             CardKind::Occupation,
@@ -362,7 +369,10 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
     ];
     if let Some(card) = cards.iter_mut().find(|card| card.id == "A038") {
         card.effects.push(CardEffect::Prerequisite {
-            rule: CardRequirement::MinimumAnimals { animal: Animal::Sheep, number: 5 },
+            rule: CardRequirement::MinimumAnimals {
+                animal: Animal::Sheep,
+                number: 5,
+            },
         });
     }
     if players >= 3 {
@@ -372,7 +382,9 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
             vec![],
             ScoreBonusRule::ImprovementCount,
         );
-        card.effects.push(CardEffect::Prerequisite { rule: CardRequirement::MinimumPlayers(3) });
+        card.effects.push(CardEffect::Prerequisite {
+            rule: CardRequirement::MinimumPlayers(3),
+        });
         cards.push(card);
     }
     cards
@@ -595,22 +607,33 @@ mod card_prerequisite_tests {
 
     fn prerequisite_card(rule: CardRequirement) -> (CardSet, CardDefinition) {
         let card = CardDefinition {
-            id: "check".into(), kind: CardKind::MinorImprovement,
-            cost: vec![(Good::Wood, 1)], points: 0,
+            id: "check".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
             effects: vec![CardEffect::Prerequisite { rule }],
         };
-        (CardSet { definitions: vec![card.clone()] }, card)
+        (
+            CardSet {
+                definitions: vec![card.clone()],
+            },
+            card,
+        )
     }
 
     #[test]
     fn occupations_minimum_and_maximum_are_exact() {
         let (mut set, card) = prerequisite_card(CardRequirement::MinimumOccupations(2));
-        set.definitions.extend(["one", "two"].into_iter().map(|id| CardDefinition {
-            id: id.into(), kind: CardKind::Occupation,
-            cost: vec![], points: 0, effects: vec![],
-        }));
-        let mut p = Player::new(0,0);
-        p.supply.wood=1;
+        set.definitions
+            .extend(["one", "two"].into_iter().map(|id| CardDefinition {
+                id: id.into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            }));
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
         p.played_cards.push("one".into());
         assert!(!can_play(&set, &card, &p, 0));
         p.played_cards.push("two".into());
@@ -621,40 +644,59 @@ mod card_prerequisite_tests {
 
     #[test]
     fn five_sheep_required_for_a038() {
-        let set = CardSet { definitions: verified_scoring_cards(2) };
+        let set = CardSet {
+            definitions: verified_scoring_cards(2),
+        };
         let card = set.definition("A038").unwrap();
-        let mut p = Player::new(0,0);
+        let mut p = Player::new(0, 0);
         p.pet = Some(Animal::Sheep);
         assert!(!can_play(&set, card, &p, 0));
         p.pastures.push(crate::model::Pasture {
-            id:0,cells:vec![2,3,4],animal:Some(Animal::Sheep),quantity:4
+            id: 0,
+            cells: vec![2, 3, 4],
+            animal: Some(Animal::Sheep),
+            quantity: 4,
         });
         assert!(can_play(&set, card, &p, 0));
     }
 
     #[test]
     fn crop_field_prerequisite_counts_only_planted_type() {
-        let (set, card) = prerequisite_card(
-            CardRequirement::MinimumCropFields { crop: Crop::Grain, number:2 },
-        );
-        let mut p = Player::new(0,0);
-        p.supply.wood=1;
-        p.farm[2].tile=Tile::Field {crop:Some(Crop::Grain),remaining:1};
-        p.farm[3].tile=Tile::Field {crop:Some(Crop::Vegetable),remaining:1};
-        assert!(!can_play(&set, &card, &p,0));
-        p.farm[3].tile=Tile::Field {crop:Some(Crop::Grain),remaining:1};
-        assert!(can_play(&set, &card, &p,0));
+        let (set, card) = prerequisite_card(CardRequirement::MinimumCropFields {
+            crop: Crop::Grain,
+            number: 2,
+        });
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        p.farm[3].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        assert!(!can_play(&set, &card, &p, 0));
+        p.farm[3].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        assert!(can_play(&set, &card, &p, 0));
     }
 
     #[test]
     fn player_count_requirement_rejected_by_card_set() {
         let mut cards = verified_scoring_cards(3);
-        cards.push(CardDefinition { id:"extra".into(), kind:CardKind::MinorImprovement,
-            cost:vec![], points:0, effects:vec![CardEffect::Prerequisite{
-                rule: CardRequirement::MinimumPlayers(3)
-            }]
+        cards.push(CardDefinition {
+            id: "extra".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumPlayers(3),
+            }],
         });
-        let set=CardSet{definitions:cards};
+        let set = CardSet { definitions: cards };
         assert!(set.validate(2).is_err());
     }
 }
