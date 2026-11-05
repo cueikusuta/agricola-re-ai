@@ -232,6 +232,7 @@ fn improvement_choice(obs: &Observation) -> Option<Improvement> {
 impl DetailPolicy for SimpleDetails {
     fn produce(&self, obs: &Observation, space: Space) -> Option<Action> {
         let p = &obs.public.players[obs.player_id];
+        let card_set = crate::cards::CardSet { definitions: obs.card_definitions.clone() };
         let detail = match space {
             Space::Lessons | Space::ExtraLessons => {
                 let count = p
@@ -257,7 +258,7 @@ impl DetailPolicy for SimpleDetails {
                         obs.card_definitions.iter().any(|card| {
                             card.id == **id
                                 && card.kind == crate::cards::CardKind::Occupation
-                                && crate::cards::affordable(card, p, fee)
+                                && crate::cards::can_play(&card_set, card, p, fee)
                         })
                     })?
                     .clone();
@@ -410,7 +411,7 @@ impl DetailPolicy for SimpleDetails {
                             obs.card_definitions.iter().any(|card| {
                                 card.id == **id
                                     && card.kind == crate::cards::CardKind::MinorImprovement
-                                    && crate::cards::affordable(card, p, 0)
+                                    && crate::cards::can_play(&card_set, card, p, 0)
                             })
                         })?
                         .clone();
