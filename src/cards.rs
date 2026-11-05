@@ -154,11 +154,8 @@ impl CardSet {
                         || matches!(
                             effect,
                             CardEffect::HarvestFieldGain {
-                                rule: HarvestFieldRule::Animals {
-                                    sheep_per: 0, ..
-                                } | HarvestFieldRule::Animals {
-                                    cattle_per: 0, ..
-                                },
+                                rule: HarvestFieldRule::Animals { sheep_per: 0, .. }
+                                    | HarvestFieldRule::Animals { cattle_per: 0, .. },
                                 ..
                             }
                         )
@@ -1176,14 +1173,19 @@ mod verified_worker_bonus_tests {
     }
 }
 
-
 /// Deterministic public start-of-round rewards. Evaluates the owner's state
 /// when the round begins, not when the card was originally played.
 pub fn start_round_rewards(set: &CardSet, player: &mut Player) -> Result<(), String> {
     for id in player.played_cards.clone() {
         let card = set.definition(&id).ok_or("unknown played card")?;
         for effect in &card.effects {
-            if let CardEffect::StartRoundGain { good, amount, house, rooms } = effect {
+            if let CardEffect::StartRoundGain {
+                good,
+                amount,
+                house,
+                rooms,
+            } = effect
+            {
                 if house.is_none_or(|h| player.house == h)
                     && rooms.is_none_or(|r| player.rooms() == usize::from(r))
                 {
@@ -1203,21 +1205,28 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
         for effect in &card.effects {
             if let CardEffect::HarvestFieldGain { rule, good, amount } = effect {
                 let multiplier = match rule {
-                    HarvestFieldRule::Animals { sheep_per, cattle_per } => {
-                        (player.animal_count(Animal::Sheep) / *sheep_per)
-                            .checked_add(player.animal_count(Animal::Cattle) / *cattle_per)
-                            .ok_or("harvest animal bonus overflow")?
-                    }
+                    HarvestFieldRule::Animals {
+                        sheep_per,
+                        cattle_per,
+                    } => (player.animal_count(Animal::Sheep) / *sheep_per)
+                        .checked_add(player.animal_count(Animal::Cattle) / *cattle_per)
+                        .ok_or("harvest animal bonus overflow")?,
                     HarvestFieldRule::MixedFields => {
-                        let has = |crop: Option<Crop>| player.farm.iter().any(|cell| {
+                        let has = |crop: Option<Crop>| {
+                            player.farm.iter().any(|cell| {
                             matches!(cell.tile, Tile::Field { crop: found, .. } if found == crop)
-                        });
-                        u32::from(has(Some(Crop::Grain))
-                            && has(Some(Crop::Vegetable))
-                            && has(None))
+                        })
+                        };
+                        u32::from(has(Some(Crop::Grain)) && has(Some(Crop::Vegetable)) && has(None))
                     }
                 };
-                safe_gain(player, *good, multiplier.checked_mul(*amount).ok_or("harvest bonus overflow")?)?;
+                safe_gain(
+                    player,
+                    *good,
+                    multiplier
+                        .checked_mul(*amount)
+                        .ok_or("harvest bonus overflow")?,
+                )?;
             }
         }
     }
@@ -1256,36 +1265,64 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
     let occupation = CardKind::Occupation;
     vec![
         CardDefinition {
-            id: "B050".into(), kind: minor, cost: vec![(Good::Wood, 1)], points: 0,
+            id: "B050".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
             effects: vec![CardEffect::HarvestFieldGain {
-                rule: HarvestFieldRule::Animals { sheep_per: 3, cattle_per: 2 },
-                good: Good::Food, amount: 1,
+                rule: HarvestFieldRule::Animals {
+                    sheep_per: 3,
+                    cattle_per: 2,
+                },
+                good: Good::Food,
+                amount: 1,
             }],
         },
         CardDefinition {
-            id: "B057".into(), kind: minor,
-            cost: vec![(Good::Clay, 1), (Good::Wood, 1)], points: 0,
+            id: "B057".into(),
+            kind: minor,
+            cost: vec![(Good::Clay, 1), (Good::Wood, 1)],
+            points: 0,
             effects: vec![CardEffect::StartRoundGain {
-                good: Good::Food, amount: 1, house: Some(House::Wood), rooms: None,
+                good: Good::Food,
+                amount: 1,
+                house: Some(House::Wood),
+                rooms: None,
             }],
         },
         CardDefinition {
-            id: "B061".into(), kind: minor, cost: vec![], points: 0,
+            id: "B061".into(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
             effects: vec![CardEffect::HarvestFieldGain {
-                rule: HarvestFieldRule::MixedFields, good: Good::Food, amount: 3,
+                rule: HarvestFieldRule::MixedFields,
+                good: Good::Food,
+                amount: 3,
             }],
         },
         CardDefinition {
-            id: "B062".into(), kind: minor, cost: vec![(Good::Wood, 1)], points: 0,
+            id: "B062".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
             effects: vec![CardEffect::AfterWorkerGainIfUsed {
-                space: Space::GrainSeeds, required_space: Space::Farmland,
-                good: Good::Food, amount: 3,
+                space: Space::GrainSeeds,
+                required_space: Space::Farmland,
+                good: Good::Food,
+                amount: 3,
             }],
         },
         CardDefinition {
-            id: "B118".into(), kind: occupation, cost: vec![], points: 0,
+            id: "B118".into(),
+            kind: occupation,
+            cost: vec![],
+            points: 0,
             effects: vec![CardEffect::StartRoundGain {
-                good: Good::Wood, amount: 1, house: None, rooms: Some(2),
+                good: Good::Wood,
+                amount: 1,
+                house: None,
+                rooms: Some(2),
             }],
         },
     ]
@@ -1295,17 +1332,25 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
 mod round_and_harvest_card_tests {
     use super::*;
     fn set() -> CardSet {
-        CardSet { definitions: verified_round_and_harvest_cards() }
+        CardSet {
+            definitions: verified_round_and_harvest_cards(),
+        }
     }
     #[test]
     fn b050_counts_sheep_in_threes_and_cattle_in_pairs() {
         let mut p = Player::new(0, 0);
         p.played_cards.push("B050".into());
         p.pastures.push(crate::model::Pasture {
-            id: 0, cells: vec![2,3,4], animal: Some(Animal::Sheep), quantity: 6,
+            id: 0,
+            cells: vec![2, 3, 4],
+            animal: Some(Animal::Sheep),
+            quantity: 6,
         });
         p.pastures.push(crate::model::Pasture {
-            id: 1, cells: vec![6,7], animal: Some(Animal::Cattle), quantity: 3,
+            id: 1,
+            cells: vec![6, 7],
+            animal: Some(Animal::Cattle),
+            quantity: 3,
         });
         harvest_field_rewards(&set(), &mut p).unwrap();
         assert_eq!(p.supply.food, 3);
@@ -1324,11 +1369,20 @@ mod round_and_harvest_card_tests {
     fn b061_requires_three_different_field_states() {
         let mut p = Player::new(0, 0);
         p.played_cards.push("B061".into());
-        p.farm[2].tile = Tile::Field { crop: Some(Crop::Grain), remaining: 2 };
-        p.farm[3].tile = Tile::Field { crop: Some(Crop::Vegetable), remaining: 1 };
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        p.farm[3].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
         harvest_field_rewards(&set(), &mut p).unwrap();
         assert_eq!(p.supply.food, 0);
-        p.farm[4].tile = Tile::Field { crop: None, remaining: 0 };
+        p.farm[4].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
         harvest_field_rewards(&set(), &mut p).unwrap();
         assert_eq!(p.supply.food, 3);
     }
@@ -1338,7 +1392,13 @@ mod round_and_harvest_card_tests {
         p.played_cards.push("B062".into());
         after_worker_if_used(&set(), &mut p, Space::GrainSeeds, &BTreeSet::new()).unwrap();
         assert_eq!(p.supply.food, 0);
-        after_worker_if_used(&set(), &mut p, Space::GrainSeeds, &BTreeSet::from([Space::Farmland])).unwrap();
+        after_worker_if_used(
+            &set(),
+            &mut p,
+            Space::GrainSeeds,
+            &BTreeSet::from([Space::Farmland]),
+        )
+        .unwrap();
         assert_eq!(p.supply.food, 3);
     }
     #[test]
