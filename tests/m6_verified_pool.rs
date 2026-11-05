@@ -56,3 +56,51 @@ fn fixed_seed_cards_complete_and_preserve_hashes_and_hidden_hands() {
         assert_eq!(restored.state_hash(), game.state_hash());
     }
 }
+
+#[test]
+fn harvest_preview_includes_conditional_card_rewards_without_committing() {
+    use agricola_re_ai::engine::{Action, Detail};
+    use agricola_re_ai::model::Space;
+    use std::collections::BTreeSet;
+
+    // B062 awards food when a worker chooses Grain Seeds after Farmland
+    // has already been occupied. A harvest preview must show that food.
+    let (mut game, owner) = (0..32)
+        .find_map(|seed| {
+            let config = Config {
+                players: 2,
+                seed,
+                additional_action_space_enabled: false,
+            };
+            let game = Game::with_cards(config, verified_basic_card_set(2).unwrap()).ok()?;
+            let owner = game
+                .cards
+                .hands
+                .iter()
+                .position(|hand| hand.iter().any(|id| id == "B062"))?;
+            Some((game, owner))
+        })
+        .expect("B062 should be dealt in at least one fixed seed");
+
+    game.cards.hands[owner].retain(|id| id != "B062");
+    game.public.players[owner].played_cards.push("B062".into());
+    game.public.round = 4;
+    game.public.active_player = owner;
+    game.public.used = BTreeSet::from([Space::Farmland]);
+    game.public.workers_placed = game.public.work_quota.clone();
+    game.public.workers_placed[owner] -= 1;
+
+    let before = game.state_hash();
+    let original_food = game.public.players[owner].supply.food;
+    let preview = game
+        .preview_harvest(
+            &Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            },
+            None,
+        )
+        .unwrap();
+    assert_eq!(preview.players[owner].supply.food, original_food + 3);
+    assert_eq!(game.state_hash(), before, "preview must not commit");
+}
