@@ -448,7 +448,12 @@ mod tests {
             assert_eq!(simulated.public, obs.public);
             assert_eq!(simulated.cards.hands[obs.player_id], obs.hand);
             assert_eq!(
-                simulated.cards.hands.iter().map(Vec::len).collect::<Vec<_>>(),
+                simulated
+                    .cards
+                    .hands
+                    .iter()
+                    .map(Vec::len)
+                    .collect::<Vec<_>>(),
                 obs.hand_counts
             );
         }
