@@ -1,13 +1,14 @@
 //! M3: information-safe, re-determinized Monte Carlo tree search.
 //! A fresh hidden round order is sampled from the public revealed cards for
 //! each simulation. No Game reference (or hidden RNG) enters SpacePolicy.
+use crate::cards::{CardKind, CardSet, CardState};
 use crate::evaluation::EvaluationPolicy;
 use crate::model::{Config, Game, Observation, RoundCard, Space};
 use crate::policy::{DetailPolicy, GreedyPolicy, SimpleDetails, SpacePolicy};
 use crate::score::standings;
 use rand::{seq::SliceRandom, Rng};
 use rand_chacha::ChaCha8Rng;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Win probability comes first; only empirically equivalent win rates
 /// (absolute difference <= 2.5 percentage points) use score margin.
@@ -51,14 +52,99 @@ impl Node {
 /// The remaining round cards are sampled independently within each stage.
 /// This is a rollout approximation: past Well purchase times are not part
 /// of Observation, so pending Well rewards cannot be reconstructed.
-fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Game {
+/// Rebuild the hidden card partition from the observing player's information.
+/// Unknown cards are shuffled separately by kind; opponent cards are never copied
+/// from the real Game, even when the caller has a reference to that Game.
+fn sample_private_cards(
+    obs: &Observation,
+    rng: &mut ChaCha8Rng,
+) -> Option<(CardSet, CardState)> {
+    let players = obs.public.players.len();
+    if obs.player_id >= players || obs.hand_counts.len() != players {
+        return None;
+    }
+    let set = CardSet {
+        definitions: obs.card_definitions.clone(),
+    };
+    set.validate(players).ok()?;
+    if !set.enabled() {
+        if obs.hand_counts.iter().any(|&n| n != 0) || !obs.hand.is_empty() {
+            return None;
+        }
+        return Some((
+            set,
+            CardState {
+                hands: vec![Vec::new(); players],
+                undealt: Vec::new(),
+            },
+        ));
+    }
+
+    // All public played cards and only the observer's own hand are known.
+    let mut known = BTreeSet::new();
+    for id in obs
+        .public
+        .players
+        .iter()
+        .flat_map(|p| p.played_cards.iter())
+        .chain(obs.hand.iter())
+    {
+        if set.definition(id).is_none() || !known.insert(id.clone()) {
+            return None;
+        }
+    }
+    let mut hands = vec![Vec::new(); players];
+    hands[obs.player_id] = obs.hand.clone();
+    let mut undealt = Vec::new();
+    for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
+        let mut pool = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == kind && !known.contains(&c.id))
+            .map(|c| c.id.clone())
+            .collect::<Vec<_>>();
+        pool.shuffle(rng);
+        for (id, player) in obs.public.players.iter().enumerate() {
+            if id == obs.player_id {
+                continue;
+            }
+            let played = player
+                .played_cards
+                .iter()
+                .filter(|id| set.definition(id).is_some_and(|c| c.kind == kind))
+                .count();
+            let required = 7usize.checked_sub(played)?;
+            if pool.len() < required {
+                return None;
+            }
+            for _ in 0..required {
+                hands[id].push(pool.pop()?);
+            }
+        }
+        undealt.extend(pool);
+    }
+    if hands.iter().map(Vec::len).collect::<Vec<_>>() != obs.hand_counts {
+        return None;
+    }
+    let cards = CardState { hands, undealt };
+    cards.validate(&set, &obs.public.players).ok()?;
+    Some((set, cards))
+}
+
+fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     let seed: u64 = rng.gen();
-    let mut game = Game::new(Config {
-        seed,
-        additional_action_space_enabled: obs.public.additional_action_space_enabled,
-        players: obs.public.players.len(),
-    });
+    let (set, cards) = sample_private_cards(obs, rng)?;
+    let mut game = Game::with_cards(
+        Config {
+            seed,
+            additional_action_space_enabled: obs.public.additional_action_space_enabled,
+            players: obs.public.players.len(),
+        },
+        set,
+    )
+    .ok()?;
     game.public = obs.public.clone();
+    game.cards = cards;
     let mut deck = Vec::new();
     for stage in 1..=6 {
         let mut remaining = RoundCard::ALL
@@ -71,7 +157,8 @@ fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Game {
     }
     deck.reverse(); // Game::start_round pops the next card from the end.
     game.hidden_round_deck = deck;
-    game
+    game.validate().ok()?;
+    Some(game)
 }
 
 /// Compare every root action to the same best observed win rate.
@@ -136,7 +223,9 @@ impl SpacePolicy for MctsPolicy {
         let mut nodes = vec![Node::new(player_count)];
         let detail_policy = SimpleDetails;
         for _ in 0..self.simulations {
-            let mut game = sample_game(obs, rng);
+            let Some(mut game) = sample_game(obs, rng) else {
+                continue;
+            };
             let mut path = vec![0usize];
             let mut node_id = 0usize;
             let mut valid = true;
@@ -255,7 +344,7 @@ mod tests {
         let obs = game.observation(game.public.active_player).unwrap();
         let mut rng = ChaCha8Rng::seed_from_u64(11);
         for _ in 0..20 {
-            let sampled = sample_game(&obs, &mut rng);
+            let sampled = sample_game(&obs, &mut rng).unwrap();
             assert_eq!(sampled.public, obs.public);
             sampled.validate().unwrap();
             assert_eq!(
@@ -264,7 +353,7 @@ mod tests {
             );
         }
         game.public.revealed.clear(); // changing public info changes what is sampled
-        let original = sample_game(&obs, &mut rng);
+        let original = sample_game(&obs, &mut rng).unwrap();
         assert_eq!(original.public.revealed.len(), 1);
     }
 
