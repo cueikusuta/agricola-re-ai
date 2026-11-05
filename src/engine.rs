@@ -353,6 +353,43 @@ impl Game {
         placed == self.public.work_quota
     }
 
+    /// Public preview after the field and feeding phases. The next breeding
+    /// choices can be made from this snapshot without exposing hidden cards.
+    pub fn preview_harvest_after_feeding(
+        &self,
+        action: &Action,
+        human: usize,
+        feeding: &FeedingPlan,
+    ) -> Result<PublicState> {
+        if !self.will_harvest_after_work() || human >= self.config.players {
+            return Err("harvest preview requires the final harvest action".into());
+        }
+        if !self.legal_spaces().contains(&action.space) {
+            return Err("illegal final harvest action".into());
+        }
+        feeding.validate()?;
+        let mut preview = self.clone();
+        let active = preview.public.active_player;
+        preview.execute_work(active, action)?;
+        crate::cards::after_worker(
+            &preview.card_set,
+            &mut preview.public.players[active],
+            action.space,
+        )?;
+        preview.harvest_fields();
+        let plans = (0..self.config.players)
+            .map(|id| {
+                if id == human {
+                    feeding.clone()
+                } else {
+                    FeedingPlan::default()
+                }
+            })
+            .collect::<Vec<_>>();
+        preview.feed_after_fields(&plans)?;
+        Ok(preview.public)
+    }
+
     /// An explicit human plan replaces only that player's harvest decisions.
     /// The other players' plans remain CPU-driven. All plans are validated
     /// and logged through the same transactional work/replay path.
@@ -369,16 +406,7 @@ impl Game {
         if !self.legal_spaces().contains(&action.space) {
             return Err("illegal final harvest action".into());
         }
-        feeding.validate()?;
-        let mut preview = self.clone();
-        let active = preview.public.active_player;
-        preview.execute_work(active, &action)?;
-        crate::cards::after_worker(
-            &preview.card_set,
-            &mut preview.public.players[active],
-            action.space,
-        )?;
-        preview.harvest_fields();
+        let post_feeding = self.preview_harvest_after_feeding(&action, human, &feeding)?;
         let feeding_plans = (0..self.config.players)
             .map(|id| {
                 if id == human {
@@ -388,9 +416,7 @@ impl Game {
                 }
             })
             .collect::<Vec<_>>();
-        preview.feed_after_fields(&feeding_plans)?;
-        let breeding_plans = preview
-            .public
+        let breeding_plans = post_feeding
             .players
             .iter()
             .enumerate()
