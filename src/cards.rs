@@ -435,11 +435,15 @@ mod verified_scoring_card_tests {
     fn b099_counts_own_later_occupations_only() {
         let mut set = CardSet { definitions: verified_scoring_cards(2) };
         set.definitions.push(CardDefinition {
+            id:"before_occ".into(),kind:CardKind::Occupation,cost:vec![],
+            points:0,effects:vec![]
+        });
+        set.definitions.push(CardDefinition {
             id:"after_occ".into(),kind:CardKind::Occupation,cost:vec![],
             points:0,effects:vec![]
         });
         let mut player = Player::new(0, 0);
-        player.played_cards = vec!["after_occ".into(),"B099".into(),"A032".into(),"after_occ".into()];
+        player.played_cards = vec!["before_occ".into(),"B099".into(),"A032".into(),"after_occ".into()];
         assert_eq!(end_game_bonus(&set, &player),1);
     }
 }
