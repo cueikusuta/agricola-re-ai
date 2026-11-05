@@ -47,7 +47,7 @@
 
 ## 5. 保存・再演・監査
 
-`DraftState` に `schema_version`, `ruleset_id`, `seed_commitment`（公開が許された場合のみ）, `deck_version`, `engine_sha`, `player_count`, `round`, `phase`, `packets`, `picked`, `discarded_private`, `commitments`, `event_index` を保持。既存セーブと区別したバージョン化。ゲーム実行ログには各選択イベントを決定的に記録し、ハッシュは**秘匿を保ったサーバ側の完全ログ**と、必要なら公開観測ログを別々に算出する。
+`DraftState` に `schema_version`, `ruleset_id`, `private_seed_or_rng_state`（権威サーバー状態にのみ保存しAI/他人への観測では絶対に出さない）, `seed_commitment`（公開が許された場合のみ）, `deck_version`, `engine_sha`, `player_count`, `round`, `phase`, `packets`, `picked`, `discarded_private`, `commitments`, `event_index` を保持。既存セーブと区別したバージョン化。ゲーム実行ログには各選択イベントを決定的に記録し、ハッシュは**秘匿を保ったサーバ側の完全ログ**と、必要なら公開観測ログを別々に算出する。
 
 復元直後・イベント再演後に不変条件、最終配布、各人の観測履歴、公開情報、再演ハッシュが一致。未入力のコミットも保存するが他人へ明かさない。再接続とサーバプロセス再起動からの復元は**別試験**。
 
