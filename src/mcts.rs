@@ -414,6 +414,49 @@ mod tests {
     }
 
     #[test]
+    fn sampler_survives_a_publicly_played_card() {
+        use crate::cards::verified_basic_card_set;
+        use crate::engine::{Action, Detail};
+        use rand::SeedableRng;
+
+        let mut game = Game::with_cards(
+            Config {
+                seed: 33,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+        let acting = game.public.active_player;
+        let card_id = game
+            .observation(acting)
+            .unwrap()
+            .hand
+            .into_iter()
+            .find(|id| {
+                game.card_set.definition(id).unwrap().kind == CardKind::Occupation
+            })
+            .unwrap();
+        game.apply(Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation { card_id },
+        })
+        .unwrap();
+        let obs = game.observation(game.public.active_player).unwrap();
+        let mut rng = ChaCha8Rng::seed_from_u64(115);
+        for _ in 0..3 {
+            let simulated = sample_game(&obs, &mut rng).unwrap();
+            simulated.validate().unwrap();
+            assert_eq!(simulated.public, obs.public);
+            assert_eq!(simulated.cards.hands[obs.player_id], obs.hand);
+            assert_eq!(
+                simulated.cards.hands.iter().map(Vec::len).collect::<Vec<_>>(),
+                obs.hand_counts
+            );
+        }
+    }
+
+    #[test]
     fn mcts_can_select_a_legal_move_with_private_cards() {
         use crate::cards::verified_basic_card_set;
         use rand::SeedableRng;
