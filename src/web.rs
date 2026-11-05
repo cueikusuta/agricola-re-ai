@@ -580,4 +580,47 @@ mod tests {
         let replay = Game::replay(session.game.config.clone(), &session.game.log.events).unwrap();
         assert_eq!(replay.state_hash(), session.game.state_hash());
     }
+
+    #[test]
+    fn complete_two_player_verified_cards_through_manual_requests() {
+        let mut session = Session::new(Config::default()).unwrap();
+        session
+            .reset(&json!({"players": 2, "seed": 22, "preset": "verified"}))
+            .unwrap();
+        assert_eq!(session.view()["card_enabled"], true);
+        for turn in 0..80 {
+            if session.game.public.finished {
+                break;
+            }
+            assert_eq!(session.game.public.active_player, 0, "turn {turn}");
+            let obs = session.game.observation(0).unwrap();
+            let legal = session.game.legal_spaces();
+            let mut rng = ChaCha8Rng::seed_from_u64(turn);
+            let space = if legal.contains(&Space::Lessons) {
+                Space::Lessons
+            } else {
+                EvaluationPolicy.select(&obs, &legal, &mut rng).unwrap()
+            };
+            play_simple(&mut session, space);
+            session.game.validate().unwrap();
+        }
+        assert!(session.game.public.finished, "manual card game must finish");
+        assert_eq!(session.game.public.round, 14);
+        assert!(
+            session
+                .game
+                .public
+                .players
+                .iter()
+                .any(|player| !player.played_cards.is_empty()),
+            "the card-enabled UI path must actually play a card"
+        );
+        let replay = Game::replay_with_cards(
+            session.game.config.clone(),
+            session.game.card_set.clone(),
+            &session.game.log.events,
+        )
+        .unwrap();
+        assert_eq!(replay.state_hash(), session.game.state_hash());
+    }
 }
