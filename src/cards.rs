@@ -67,6 +67,9 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    AfterHarvestBakeGain {
+        amount: u32,
+    },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -167,7 +170,8 @@ impl CardSet {
                         | CardEffect::StartRoundGain { amount, .. }
                         | CardEffect::HarvestFieldGain { amount, .. }
                         | CardEffect::AfterWorkerGainIfUsed { amount, .. }
-                        | CardEffect::AfterClayConstructionGain { amount, .. } => *amount,
+                        | CardEffect::AfterClayConstructionGain { amount, .. }
+                        | CardEffect::AfterHarvestBakeGain { amount } => *amount,
                     };
                     amount == 0 || amount > 30
                 })
@@ -1776,13 +1780,13 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 29);
+        assert_eq!(set.definitions.len(), 30);
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::MinorImprovement)
                 .count(),
-            15
+            16
         );
         assert_eq!(
             set.definitions
@@ -1797,11 +1801,24 @@ mod simple_occupation_tests {
 
 
 pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
-    vec![CardDefinition {
-        id: "B010".into(), kind: CardKind::MinorImprovement,
-        cost: vec![(Good::Wood,3),(Good::Food,3)], points:0,
-        effects: vec![CardEffect::Passive {rule:PassiveRule::HousingSpace(1)}],
-    }]
+    vec![
+        CardDefinition {
+            id: "B010".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 3), (Good::Food, 3)],
+            points: 0,
+            effects: vec![CardEffect::Passive {
+                rule: PassiveRule::HousingSpace(1),
+            }],
+        },
+        CardDefinition {
+            id: "A063".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 2), (Good::Stone, 2)],
+            points: 2,
+            effects: vec![CardEffect::AfterHarvestBakeGain { amount: 3 }],
+        },
+    ]
 }
 pub fn verified_multiplayer_passive_cards(players:usize) -> Vec<CardDefinition> {
     if players<3{return vec![];}
@@ -1828,5 +1845,59 @@ mod m6_extra_passive_tests {
         let mut p=Player::new(0,0);
         play(&set,&mut vec!["A143".into()],&mut p,"A143",CardKind::Occupation,0).unwrap();
         assert_eq!(p.stone_cost_discount,1);
+    }
+}
+
+
+/// Extra food when a player takes Bake Bread in a round directly following a
+/// harvest round. The work action is already validated and applied.
+pub fn after_harvest_baking(
+    set: &CardSet,
+    player: &mut Player,
+    round: u8,
+    baked: bool,
+) -> Result<(), String> {
+    if !baked || round < 2 || !crate::model::HARVEST_ROUNDS.contains(&(round - 1)) {
+        return Ok(());
+    }
+    for id in player.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            if let CardEffect::AfterHarvestBakeGain { amount } = effect {
+                safe_gain(player, Good::Food, *amount)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod a063_baking_tests {
+    use super::*;
+    #[test]
+    fn after_harvest_bread_action_only_and_exact_three_food() {
+        let set = CardSet { definitions: verified_extra_simple_cards() };
+        let mut player = Player::new(0, 0);
+        player.played_cards.push("A063".into());
+        after_harvest_baking(&set, &mut player, 4, true).unwrap();
+        after_harvest_baking(&set, &mut player, 5, false).unwrap();
+        after_harvest_baking(&set, &mut player, 6, true).unwrap();
+        assert_eq!(player.supply.food, 0);
+        for round in [5, 8, 10, 12, 14] {
+            after_harvest_baking(&set, &mut player, round, true).unwrap();
+        }
+        assert_eq!(player.supply.food, 15);
+    }
+    #[test]
+    fn correct_improvement_cost_and_card_points() {
+        let set = CardSet { definitions: verified_extra_simple_cards() };
+        let mut player = Player::new(0, 0);
+        player.supply.wood = 2;
+        player.supply.stone = 2;
+        let mut hand = vec!["A063".into()];
+        play(&set, &mut hand, &mut player, "A063", CardKind::MinorImprovement, 0).unwrap();
+        assert_eq!(player.card_points, 2);
+        assert_eq!(player.supply.wood, 0);
+        assert_eq!(player.supply.stone, 0);
     }
 }

@@ -177,6 +177,19 @@ pub enum RecordedAction {
     },
 }
 
+
+fn is_bake_bread_detail(detail: &Detail) -> bool {
+    match detail {
+        Detail::Sow { bake, .. } | Detail::Buy { instant_bake: bake, .. }
+        | Detail::Renovate { instant_bake: bake, .. } => *bake > 0,
+        Detail::SowDetailed { baking, .. }
+        | Detail::BuyDetailed { instant_baking: baking, .. }
+        | Detail::BuyWithMode { instant_baking: baking, .. }
+        | Detail::RenovateDetailed { instant_baking: baking, .. } => !baking.is_empty(),
+        _ => false,
+    }
+}
+
 fn group_occupied(used: &BTreeSet<Space>, players: usize) -> bool {
     used.iter().any(|s| s.additional_for(players))
 }
@@ -400,6 +413,12 @@ impl Game {
         let mut next = self.clone();
         let before = self.state_hash();
         next.execute_work(player, &action)?;
+        crate::cards::after_harvest_baking(
+            &next.card_set,
+            &mut next.public.players[player],
+            next.public.round,
+            is_bake_bread_detail(&action.detail),
+        )?;
         crate::cards::after_clay_construction(
             &next.card_set,
             &self.public.players[player],
@@ -2156,5 +2175,25 @@ mod m6_extra_passive_engine_tests {
         assert!(major_cost(&p,Improvement::Well).contains(&(Good::Stone,2)));
         p.house=House::Clay;p.supply.reed=1;p.supply.stone=1;
         assert!(can_renovate(&p));renovate(&mut p).unwrap();assert_eq!(p.house,House::Stone);
+    }
+}
+
+
+#[cfg(test)]
+mod m6_bake_detection_tests {
+    use super::*;
+    #[test]
+    fn detects_only_real_bake_bread_choices() {
+        assert!(!is_bake_bread_detail(&Detail::None));
+        assert!(!is_bake_bread_detail(&Detail::Sow { plantings: vec![], bake: 0 }));
+        assert!(is_bake_bread_detail(&Detail::Sow { plantings: vec![], bake: 1 }));
+        assert!(is_bake_bread_detail(&Detail::SowDetailed {
+            plantings: vec![],
+            baking: vec![BakeAllocation { improvement: Improvement::ClayOven, grain: 1 }],
+        }));
+        assert!(!is_bake_bread_detail(&Detail::BuyDetailed {
+            improvement: Improvement::ClayOven,
+            instant_baking: vec![],
+        }));
     }
 }
