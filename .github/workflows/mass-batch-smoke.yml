@@ -107,7 +107,7 @@ jobs:
             --seed-start "$SEED_START" --policy "$POLICY" \
             --sha "$GITHUB_SHA" --shard "${{ matrix.shard }}" \
             --binary ./target/release/agricola-re-ai \
-            --out "results/mass-smoke-shard-${{ matrix.shard }}" "${{ FLAGS[@] }}"
+            --out "results/mass-smoke-shard-${{ matrix.shard }}" "${FLAGS[@]}"
       - name: Preserve shard results, including failure logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -145,7 +145,7 @@ jobs:
           python3 scripts/mass_batch_smoke.py aggregate \
             --games "$GAME_COUNT" --players "$PLAYER_COUNT" \
             --seed-start "$SEED_START" --policy "$POLICY" \
-            --sha "$GITHUB_SHA" --out results "${{ FLAGS[@] }}"
+            --sha "$GITHUB_SHA" --out results "${FLAGS[@]}"
           echo "Cardless game completion and speed only; no winner-rate inference." >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve aggregate
         if: always()
