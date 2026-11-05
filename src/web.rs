@@ -516,8 +516,7 @@ mod tests {
                     PendingHarvest::Breeding(action, plans) => (action, plans),
                     _ => panic!("breeding choice must follow feeding choice"),
                 };
-                let after_feeding =
-                    session.game.preview_harvest(&action, Some(&plans)).unwrap();
+                let after_feeding = session.game.preview_harvest(&action, Some(&plans)).unwrap();
                 let choice = BreedingPlan::simple(&after_feeding.players[0]);
                 session.harvest(&json!({"breeding": choice})).unwrap();
                 let replay =
@@ -530,7 +529,9 @@ mod tests {
                 .produce(&session.game.observation(0).unwrap(), space)
                 .unwrap()
                 .detail;
-            session.play(&json!({"space": space, "detail": detail})).unwrap();
+            session
+                .play(&json!({"space": space, "detail": detail}))
+                .unwrap();
         }
         panic!("harvest was never reached");
     }
