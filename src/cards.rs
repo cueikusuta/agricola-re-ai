@@ -1,7 +1,7 @@
 //! Card-set metadata is supplied by callers; copyrighted card text is never bundled.
 //! This is a deliberately small deterministic effect vocabulary, not a claim that
 //! the full Agricola Revised deck has been implemented.
-use crate::model::{Good, Player, Space};
+use crate::model::{Good, House, Player, Space, Tile};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -25,6 +25,21 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    EndGameBonus {
+        rule: ScoreBonusRule,
+    },
+}
+
+/// Named formulas keep card descriptions outside source and replay data.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScoreBonusRule {
+    PastureArea,
+    HouseMaterial,
+    UnfencedStables,
+    ImprovementCount,
+    SparePastureCapacity,
+    LaterOccupations,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -76,6 +91,7 @@ impl CardSet {
                     let amount = match effect {
                         CardEffect::OnPlayGain { amount, .. }
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
+                        CardEffect::EndGameBonus { .. } => 1,
                     };
                     amount == 0 || amount > 30
                 })
@@ -245,4 +261,185 @@ pub fn after_worker(set: &CardSet, player: &mut Player, space: Space) -> Result<
         }
     }
     Ok(())
+}
+
+pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
+    fn scoring(id: &str, kind: CardKind, cost: Vec<(Good, u32)>, rule: ScoreBonusRule) -> CardDefinition {
+        CardDefinition {
+            id: id.to_owned(),
+            kind,
+            cost,
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus { rule }],
+        }
+    }
+    let mut cards = vec![
+        scoring(
+            "A032", CardKind::MinorImprovement, vec![(Good::Wood, 2)],
+            ScoreBonusRule::PastureArea,
+        ),
+        scoring(
+            "A038", CardKind::MinorImprovement, vec![],
+            ScoreBonusRule::HouseMaterial,
+        ),
+        scoring(
+            "A098", CardKind::Occupation, vec![],
+            ScoreBonusRule::UnfencedStables,
+        ),
+        scoring(
+            "B098", CardKind::Occupation, vec![],
+            ScoreBonusRule::SparePastureCapacity,
+        ),
+        scoring(
+            "B099", CardKind::Occupation, vec![],
+            ScoreBonusRule::LaterOccupations,
+        ),
+    ];
+    if players >= 3 {
+        cards.push(scoring(
+            "A133", CardKind::Occupation, vec![],
+            ScoreBonusRule::ImprovementCount,
+        ));
+    }
+    cards
+}
+
+/// Calculated at read time from public played cards; it is never added to the
+/// immutable printed-points counter and therefore cannot be counted twice.
+pub fn end_game_bonus(set: &CardSet, player: &Player) -> i32 {
+    player
+        .played_cards
+        .iter()
+        .filter_map(|id| set.definition(id))
+        .flat_map(|card| card.effects.iter())
+        .map(|effect| match effect {
+            CardEffect::EndGameBonus { rule } => match rule {
+                ScoreBonusRule::PastureArea => {
+                    let squares = player.pastures.iter().map(|p| p.cells.len()).sum::<usize>();
+                    [6, 7, 8, 10].iter().filter(|&&n| squares >= n).count() as i32
+                }
+                ScoreBonusRule::HouseMaterial => match player.house {
+                    House::Wood => 3,
+                    House::Clay => 2,
+                    House::Stone => 0,
+                },
+                ScoreBonusRule::UnfencedStables => player
+                    .farm.iter()
+                    .filter(|cell| cell.stable && !matches!(cell.tile, Tile::Pasture { .. }))
+                    .count() as i32,
+                ScoreBonusRule::ImprovementCount => {
+                    let minor = player.played_cards.iter().filter(|id| {
+                        set.definition(id).is_some_and(|card| card.kind == CardKind::MinorImprovement)
+                    }).count();
+                    let total = minor + player.improvements.len();
+                    match total {
+                        0..=4 => 0,
+                        5 => 2,
+                        6 => 3,
+                        7 => 4,
+                        8 => 5,
+                        9 => 7,
+                        _ => 9,
+                    }
+                }
+                ScoreBonusRule::SparePastureCapacity => player.pastures.iter().filter(|pasture| {
+                    pasture.quantity > 0
+                        && player.pasture_capacity(pasture).saturating_sub(pasture.quantity) >= 3
+                }).count() as i32,
+                ScoreBonusRule::LaterOccupations => {
+                    let tutor = player.played_cards.iter().position(|id| {
+                        set.definition(id).is_some_and(|card| {
+                            card.effects.iter().any(|effect| matches!(
+                                effect,
+                                CardEffect::EndGameBonus { rule: ScoreBonusRule::LaterOccupations }
+                            ))
+                        })
+                    });
+                    tutor.map_or(0, |index| player.played_cards[index + 1..].iter().filter(|id| {
+                        set.definition(id).is_some_and(|card| card.kind == CardKind::Occupation)
+                    }).count() as i32)
+                }
+            },
+            _ => 0,
+        })
+        .sum()
+}
+
+#[cfg(test)]
+mod verified_scoring_card_tests {
+    use super::*;
+    use crate::model::{Animal, Pasture, Improvement};
+
+    fn score_card(id: &str, edit: impl FnOnce(&mut Player)) -> i32 {
+        let set = CardSet { definitions: verified_scoring_cards(4) };
+        let mut player = Player::new(0, 0);
+        player.played_cards.push(id.into());
+        edit(&mut player);
+        end_game_bonus(&set, &player)
+    }
+
+    #[test]
+    fn a032_pasture_area_thresholds() {
+        assert_eq!(score_card("A032", |_| {}), 0);
+        assert_eq!(score_card("A032", |p| p.pastures.push(Pasture {
+            id: 0, cells: (0..7).collect(), animal: None, quantity: 0,
+        })), 2);
+    }
+
+    #[test]
+    fn a038_bonus_respects_house_material() {
+        assert_eq!(score_card("A038", |_| {}), 3);
+        assert_eq!(score_card("A038", |p| p.house = House::Clay), 2);
+        assert_eq!(score_card("A038", |p| p.house = House::Stone), 0);
+    }
+
+    #[test]
+    fn a098_only_unfenced_stables() {
+        assert_eq!(score_card("A098", |p| {
+            p.farm[2].stable = true;
+            p.farm[3].stable = true;
+            p.farm[3].tile = Tile::Pasture { id: 0 };
+        }), 1);
+    }
+
+    #[test]
+    fn a133_rewards_major_and_minor_improvements() {
+        let mut set = CardSet { definitions: verified_scoring_cards(3) };
+        set.definitions.push(CardDefinition {
+            id:"test_minor".into(),kind:CardKind::MinorImprovement,
+            cost:vec![],points:0,effects:vec![],
+        });
+        let mut player = Player::new(0,0);
+        player.played_cards.extend(["A133".into(),"test_minor".into()]);
+        player.improvements.extend([Improvement::Fireplace2, Improvement::Fireplace3,
+            Improvement::Hearth4, Improvement::Hearth5]);
+        assert_eq!(end_game_bonus(&set, &player),2);
+        player.improvements.push(Improvement::ClayOven);
+        assert_eq!(end_game_bonus(&set, &player),3);
+        assert!(!verified_scoring_cards(2).iter().any(|c| c.id == "A133"));
+    }
+
+    #[test]
+    fn b098_only_sufficiently_spare_and_occupied_pastures() {
+        assert_eq!(score_card("B098", |p| {
+            p.pastures.push(Pasture {
+                id:0,cells:vec![2,3],animal:Some(Animal::Sheep),quantity:1
+            });
+            p.pastures.push(Pasture {
+                id:1,cells:vec![4,6],animal:None,quantity:0
+            });
+        }), 1);
+    }
+
+    #[test]
+    fn b099_counts_own_later_occupations_only() {
+        let mut set = CardSet { definitions: verified_scoring_cards(2) };
+        set.definitions.push(CardDefinition {
+            id:"after_occ".into(),kind:CardKind::Occupation,cost:vec![],
+            points:0,effects:vec![]
+        });
+        let mut player = Player::new(0, 0);
+        player.played_cards = vec!["after_occ".into(),"B099".into(),"A032".into(),"after_occ".into()];
+        assert_eq!(end_game_bonus(&set, &player),1);
+    }
 }
