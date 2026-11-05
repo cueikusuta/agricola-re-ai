@@ -381,6 +381,11 @@ impl Game {
         let mut next = self.clone();
         let before = self.state_hash();
         next.execute_work(player, &action)?;
+        crate::cards::after_clay_construction(
+            &next.card_set,
+            &self.public.players[player],
+            &mut next.public.players[player],
+        )?;
         crate::cards::after_worker(
             &next.card_set,
             &mut next.public.players[player],

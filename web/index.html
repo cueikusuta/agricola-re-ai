@@ -33,7 +33,8 @@ footer{color:#b7c5c8;font-size:14px}
 <label>CPU <select id="ai"><option value="eval">評価関数</option><option value="mcts">MCTS</option></select></label>
 <label>シード <input id="seed" type="number" value="42" min="0" step="1"></label>
 <button id="new">新しい対戦</button>
-<details><summary>カードセットを読み込む（実装済み定義JSON）</summary><textarea id="cardJson" placeholder='{"definitions":[]}'></textarea><p class="minor">空欄ならカードなし。原文や画像は不要です。公式カードを自動収録する機能はありません。</p></details>
+<label>カード <select id="cards"><option value="none">カードなし</option><option value="verified">A/B実装済み（2人戦）</option><option value="json">外部定義JSON</option></select></label>
+<details><summary>外部カード定義JSONを読み込む</summary><textarea id="cardJson" placeholder='{"definitions":[]}'></textarea><p class="minor">空欄ならカードなし。原文や画像は不要です。公式カードを自動収録する機能はありません。</p></details>
 </section>
 <section class="panel status"><strong id="turn">読み込み中...</strong><span id="summary" class="minor"></span></section>
 <section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
@@ -207,7 +208,8 @@ $("detailForm").onsubmit=async e=>{e.preventDefault();try{const payload=mode==="
 const path=mode==="work"?"/api/play":mode==="free"?"/api/free":"/api/harvest";if(await request(path,payload))$("editor").close();}catch(err){$("editorHint").textContent=err.message;}};
 $("cancel").onclick=()=>$("editor").close();
 $("free").onclick=openFree;
-$("new").onclick=async()=>{viewPlayer=0;let card_set;try{if($("cardJson").value.trim())card_set=JSON.parse($("cardJson").value);}catch(e){$("notice").textContent="カード定義JSONが不正です: "+e.message;return;}
-await request("/api/new",{players:Number($("players").value),extra:$("extra").checked,ai:$("ai").value,seed:Number($("seed").value),budget:8,card_set});};
+$("new").onclick=async()=>{viewPlayer=0;let card_set;const cards=val("cards");
+try{if(cards==="json"){card_set=JSON.parse($("cardJson").value);}}catch(e){$("notice").textContent="カード定義JSONが不正です: "+e.message;return;}
+await request("/api/new",{players:Number($("players").value),extra:$("extra").checked,ai:$("ai").value,seed:Number($("seed").value),budget:8,...(cards==="verified"?{preset:"verified"}:cards==="json"?{card_set}: {})});};
 request("/api/state");
 </script></body></html>

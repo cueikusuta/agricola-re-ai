@@ -61,6 +61,7 @@ pub enum CardEffect {
         amount: u32,
     },
     Passive { rule: PassiveRule },
+    AfterClayConstructionGain { good: Good, amount: u32 },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -158,7 +159,8 @@ impl CardSet {
                         | CardEffect::OnPlayGainIfHouse { amount, .. }
                         | CardEffect::StartRoundGain { amount, .. }
                         | CardEffect::HarvestFieldGain { amount, .. }
-                        | CardEffect::AfterWorkerGainIfUsed { amount, .. } => *amount,
+                        | CardEffect::AfterWorkerGainIfUsed { amount, .. }
+                        | CardEffect::AfterClayConstructionGain { amount, .. } => *amount,
                     };
                     amount == 0 || amount > 30
                 })
@@ -1506,5 +1508,116 @@ mod passive_cards_tests {
         assert!(can_play(&set,set.definition("B050").unwrap(),&p,0));
         p.played_cards.extend((0..4).map(|i|format!("occ{i}")));
         assert!(!can_play(&set,set.definition("B050").unwrap(),&p,0));
+    }
+}
+
+
+/// One-time reward on the completion of qualifying clay construction.
+pub fn after_clay_construction(
+    set: &CardSet,
+    previous: &Player,
+    current: &mut Player,
+) -> Result<(), String> {
+    let qualifies = (previous.house == House::Clay
+        && current.rooms() > previous.rooms())
+        || (previous.house == House::Clay && current.house == House::Stone);
+    if !qualifies { return Ok(()); }
+    for id in current.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            if let CardEffect::AfterClayConstructionGain { good, amount } = effect {
+                safe_gain(current, *good, *amount)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Additional A/B occupations with unambiguous fixed, public-state effects.
+/// Consultant's immediate option here applies to the two-player starter pool.
+pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
+    let mut result = vec![
+        CardDefinition {
+            id: "A110".into(), kind: CardKind::Occupation,
+            cost: vec![], points: 0,
+            effects: vec![CardEffect::AfterClayConstructionGain {
+                good: Good::Food, amount: 3,
+            }],
+        },
+        CardDefinition {
+            id: "B107".into(), kind: CardKind::Occupation,
+            cost: vec![], points: 0,
+            effects: vec![CardEffect::StartRoundGain {
+                good: Good::Food, amount: 3, house: Some(House::Stone), rooms: None,
+            }],
+        },
+    ];
+    if players == 2 {
+        result.push(CardDefinition {
+            id: "B102".into(), kind: CardKind::Occupation,
+            cost: vec![], points: 0,
+            effects: vec![CardEffect::OnPlayGain { good: Good::Clay, amount: 3 }],
+        });
+    }
+    result
+}
+
+/// Includes ONLY cards whose effects are actually implemented. The official
+/// 7+7 hands require 14 cards of each kind at two players.
+pub fn verified_basic_card_set(players: usize) -> Result<CardSet, String> {
+    if players != 2 {
+        return Err("built-in A/B card pool currently supports two players only".into());
+    }
+    let mut definitions = Vec::new();
+    definitions.extend(verified_scoring_cards(players));
+    definitions.extend(verified_minor_worker_cards(players));
+    definitions.extend(verified_immediate_resource_cards());
+    definitions.extend(verified_worker_bonus_cards(players));
+    definitions.extend(verified_round_and_harvest_cards());
+    definitions.extend(verified_passive_cards());
+    definitions.extend(verified_simple_occupations(players));
+    let set = CardSet { definitions };
+    set.validate(players)?;
+    Ok(set)
+}
+
+#[cfg(test)]
+mod simple_occupation_tests {
+    use super::*;
+    #[test] fn a110_triggers_once_for_clay_room_or_stone_renovation() {
+        let set = CardSet { definitions: verified_simple_occupations(2) };
+        let mut old = Player::new(0,0);
+        old.house=House::Clay; old.played_cards.push("A110".into());
+        let mut built=old.clone(); built.farm[1].tile=Tile::Room;
+        after_clay_construction(&set,&old,&mut built).unwrap();
+        assert_eq!(built.supply.food,3);
+        let mut stone=old.clone(); stone.house=House::Stone;
+        after_clay_construction(&set,&old,&mut stone).unwrap();
+        assert_eq!(stone.supply.food,3);
+        let mut not_clay=old.clone(); not_clay.house=House::Wood;
+        let mut extra=not_clay.clone(); extra.farm[1].tile=Tile::Room;
+        after_clay_construction(&set,&not_clay,&mut extra).unwrap();
+        assert_eq!(extra.supply.food,0);
+    }
+    #[test] fn b107_starts_payments_only_once_in_stone_house() {
+        let set = CardSet { definitions: verified_simple_occupations(2) };
+        let mut p=Player::new(0,0);p.played_cards.push("B107".into());
+        start_round_rewards(&set,&mut p).unwrap();assert_eq!(p.supply.food,0);
+        p.house=House::Stone;
+        start_round_rewards(&set,&mut p).unwrap();assert_eq!(p.supply.food,3);
+    }
+    #[test] fn b102_gains_three_clay_only_in_two_player_subset() {
+        let set=CardSet { definitions: verified_simple_occupations(2) };
+        let mut p=Player::new(0,0);
+        play(&set,&mut vec!["B102".into()],&mut p,"B102",CardKind::Occupation,0).unwrap();
+        assert_eq!(p.supply.clay,3);
+        assert!(!verified_simple_occupations(3).iter().any(|c|c.id=="B102"));
+    }
+    #[test] fn only_implemented_cards_are_in_two_player_preset() {
+        let set=verified_basic_card_set(2).unwrap();
+        assert_eq!(set.definitions.len(),28);
+        assert_eq!(set.definitions.iter().filter(|x|x.kind==CardKind::MinorImprovement).count(),14);
+        assert_eq!(set.definitions.iter().filter(|x|x.kind==CardKind::Occupation).count(),14);
+        assert!(verified_basic_card_set(3).is_err());
     }
 }
