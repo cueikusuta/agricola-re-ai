@@ -767,16 +767,14 @@ mod verified_minor_worker_tests {
         let p = owner("A078", 2, &[Space::Fishing, Space::ReedBank]);
         assert_eq!(p.supply.food, 1);
         assert_eq!(p.supply.reed, 1);
-        let set = CardSet { definitions: verified_minor_worker_cards(2) };
+        let mut set = CardSet { definitions: verified_minor_worker_cards(2) };
+        set.definitions.push(CardDefinition { id:"test_occ".into(), kind:CardKind::Occupation,
+            cost:vec![], points:0, effects:vec![] });
         let card = set.definition("A078").unwrap();
         let mut p = Player::new(0, 0);
         p.supply.wood = 2;
         assert!(!can_play(&set, card, &p, 0));
-        let mut occupation = CardDefinition { id:"test_occ".into(), kind:CardKind::Occupation,
-            cost:vec![], points:0, effects:vec![] };
-        let mut set = set;
-        set.definitions.push(occupation.clone());
-        p.played_cards.push(std::mem::take(&mut occupation.id));
+        p.played_cards.push("test_occ".into());
         assert!(can_play(&set, card, &p, 0));
         assert_eq!(card.points, 1);
     }
