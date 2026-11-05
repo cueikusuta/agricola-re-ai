@@ -163,6 +163,10 @@ pub struct Player {
     pub played_cards: Vec<String>,
     #[serde(default)]
     pub card_points: i32,
+    #[serde(default)]
+    pub card_pasture_capacity_bonus: u32,
+    #[serde(default)]
+    pub card_family_space_bonus: u8,
     pub begging: u32,
 }
 impl Player {
@@ -186,6 +190,8 @@ impl Player {
             improvements: vec![],
             played_cards: vec![],
             card_points: 0,
+            card_pasture_capacity_bonus: 0,
+            card_family_space_bonus: 0,
             begging: 0,
         }
     }
@@ -221,7 +227,9 @@ impl Player {
     }
     pub fn pasture_capacity(&self, p: &Pasture) -> u32 {
         let stables = p.cells.iter().filter(|&&i| self.farm[i].stable).count();
-        (2 * p.cells.len() as u32).saturating_mul(1u32 << stables)
+        (2 * p.cells.len() as u32)
+            .saturating_mul(1u32 << stables)
+            .saturating_add(self.card_pasture_capacity_bonus)
     }
     pub fn total_crop(&self, kind: Crop) -> u32 {
         let in_supply = match kind {
