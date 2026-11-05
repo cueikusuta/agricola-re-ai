@@ -43,6 +43,12 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    AtRoundStart {
+        house: Option<House>,
+        rooms: Option<u8>,
+        good: Good,
+        amount: u32,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -118,7 +124,8 @@ impl CardSet {
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         CardEffect::EndGameBonus { .. } | CardEffect::Prerequisite { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
-                        | CardEffect::OnPlayGainIfHouse { amount, .. } => *amount,
+                        | CardEffect::OnPlayGainIfHouse { amount, .. }
+                        | CardEffect::AtRoundStart { amount, .. } => *amount,
                     };
                     amount == 0 || amount > 30
                 })
@@ -999,5 +1006,77 @@ mod verified_immediate_resource_tests {
             (wrong.supply.clay, wrong.supply.reed, wrong.supply.stone),
             (0, 0, 0)
         );
+    }
+}
+
+/** Called on every new round after the round is revealed, before worker placement. */
+pub fn at_round_start(set: &CardSet, player: &mut Player) -> Result<(), String> {
+    for id in player.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            if let CardEffect::AtRoundStart {
+                house, rooms, good, amount,
+            } = effect
+            {
+                let house_ok = house.is_none_or(|expected| expected == player.house);
+                let rooms_ok = rooms.is_none_or(|expected| usize::from(expected) == player.rooms());
+                if house_ok && rooms_ok {
+                    safe_gain(player, *good, *amount)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn verified_round_start_cards() -> Vec<CardDefinition> {
+    vec![
+        CardDefinition {
+            id: "B057".into(), kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1), (Good::Clay, 1)], points: 0,
+            effects: vec![CardEffect::AtRoundStart {
+                house: Some(House::Wood), rooms: None, good: Good::Food, amount: 1,
+            }],
+        },
+        CardDefinition {
+            id: "B118".into(), kind: CardKind::Occupation,
+            cost: vec![], points: 0,
+            effects: vec![CardEffect::AtRoundStart {
+                house: None, rooms: Some(2), good: Good::Wood, amount: 1,
+            }],
+        },
+    ]
+}
+
+#[cfg(test)]
+mod verified_round_start_tests {
+    use super::*;
+
+    #[test]
+    fn b057_one_food_each_round_in_wooden_home_only() {
+        let set = CardSet { definitions: verified_round_start_cards() };
+        let mut player = Player::new(0,0);
+        player.played_cards.push("B057".into());
+        at_round_start(&set,&mut player).unwrap();
+        at_round_start(&set,&mut player).unwrap();
+        assert_eq!(player.supply.food,2);
+        player.house = House::Clay;
+        at_round_start(&set,&mut player).unwrap();
+        assert_eq!(player.supply.food,2);
+    }
+
+    #[test]
+    fn b118_requires_two_real_rooms_even_if_house_material_changes() {
+        let set = CardSet { definitions: verified_round_start_cards() };
+        let mut player = Player::new(0,0);
+        player.played_cards.push("B118".into());
+        at_round_start(&set,&mut player).unwrap();
+        assert_eq!(player.supply.wood,1);
+        player.house=House::Stone;
+        at_round_start(&set,&mut player).unwrap();
+        assert_eq!(player.supply.wood,2);
+        player.farm[2].tile=Tile::Room;
+        at_round_start(&set,&mut player).unwrap();
+        assert_eq!(player.supply.wood,2);
     }
 }
