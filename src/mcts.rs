@@ -55,10 +55,7 @@ impl Node {
 /// Rebuild the hidden card partition from the observing player's information.
 /// Unknown cards are shuffled separately by kind; opponent cards are never copied
 /// from the real Game, even when the caller has a reference to that Game.
-fn sample_private_cards(
-    obs: &Observation,
-    rng: &mut ChaCha8Rng,
-) -> Option<(CardSet, CardState)> {
+fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(CardSet, CardState)> {
     let players = obs.public.players.len();
     if obs.player_id >= players || obs.hand_counts.len() != players {
         return None;
@@ -375,8 +372,7 @@ mod tests {
         let old_index = changed_hidden.cards.hands[1]
             .iter()
             .position(|id| {
-                changed_hidden.card_set.definition(id).unwrap().kind
-                    == CardKind::MinorImprovement
+                changed_hidden.card_set.definition(id).unwrap().kind == CardKind::MinorImprovement
             })
             .unwrap();
         let replacement = changed_hidden.cards.undealt[0].clone();
@@ -389,8 +385,8 @@ mod tests {
         let mut second_rng = ChaCha8Rng::seed_from_u64(99);
         for _ in 0..5 {
             let first = sample_game(&observed, &mut first_rng).unwrap();
-            let second = sample_game(&changed_hidden.observation(0).unwrap(), &mut second_rng)
-                .unwrap();
+            let second =
+                sample_game(&changed_hidden.observation(0).unwrap(), &mut second_rng).unwrap();
             first.validate().unwrap();
             second.validate().unwrap();
             assert_eq!(first.public, observed.public);
