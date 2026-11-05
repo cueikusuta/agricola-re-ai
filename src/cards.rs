@@ -114,14 +114,15 @@ impl CardSet {
         }
         for card in &self.definitions {
             for effect in &card.effects {
-                if let CardEffect::Prerequisite { rule } = effect {
-                    if let CardRequirement::MinimumPlayers(min) = rule {
-                        if *min == 0 || *min as usize > players {
-                            return Err(format!(
-                                "card {} is not eligible for this player count",
-                                card.id
-                            ));
-                        }
+                if let CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(min),
+                } = effect
+                {
+                    if *min == 0 || *min as usize > players {
+                        return Err(format!(
+                            "card {} is not eligible for this player count",
+                            card.id
+                        ));
                     }
                 }
             }
