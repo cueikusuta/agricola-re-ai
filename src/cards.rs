@@ -142,24 +142,68 @@ impl CardState {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod test_support {
-    use super::*;
-    pub fn fixture_set(players: usize) -> CardSet {
-        let mut definitions = Vec::new();
-        for index in 0..players * 7 {
-            definitions.push(CardDefinition {
-                id: format!("occ_{index}"), kind: CardKind::Occupation,
-                cost: vec![], points: 0, effects: vec![CardEffect::AfterWorkerGain {
-                    space: Space::GrainSeeds, good: Good::Food, amount: 1
-                }],
-            });
-            definitions.push(CardDefinition {
-                id: format!("minor_{index}"), kind: CardKind::MinorImprovement,
-                cost: vec![], points: 1,
-                effects: vec![CardEffect::OnPlayGain { good: Good::Wood, amount: 1 }],
-            });
-        }
-        CardSet { definitions }
+
+/// Verify card affordability using aggregate costs (including occupation fees).
+pub fn affordable(card: &CardDefinition, player: &Player, extra_food: u32) -> bool {
+    let mut amounts = std::collections::BTreeMap::<Good, u32>::new();
+    for &(good, amount) in &card.cost {
+        *amounts.entry(good).or_default() += amount;
     }
+    *amounts.entry(Good::Food).or_default() += extra_food;
+    amounts.iter().all(|(&good, &amount)| player.supply.get(good) >= amount)
+}
+
+fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String> {
+    let next = player.supply.get(good).checked_add(amount).ok_or("card resource overflow")?;
+    player.supply.set(good, next);
+    Ok(())
+}
+
+/// Execute one prevalidated card play; the containing Game transaction provides rollback.
+pub fn play(
+    set: &CardSet,
+    hand: &mut Vec<String>,
+    player: &mut Player,
+    id: &str,
+    kind: CardKind,
+    extra_food: u32,
+) -> Result<(), String> {
+    let card = set.definition(id).ok_or("unknown card")?;
+    if card.kind != kind || !hand.iter().any(|x| x == id) {
+        return Err("card is not in the player's hand or is the wrong kind".into());
+    }
+    if !affordable(card, player, extra_food) {
+        return Err("cannot pay card costs".into());
+    }
+    for &(good, amount) in &card.cost {
+        player.supply.pay(good, amount)?;
+    }
+    if extra_food > 0 {
+        player.supply.pay(Good::Food, extra_food)?;
+    }
+    let next_points = player.card_points.checked_add(card.points).ok_or("card points overflow")?;
+    for effect in &card.effects {
+        if let CardEffect::OnPlayGain { good, amount } = effect {
+            safe_gain(player, *good, *amount)?;
+        }
+    }
+    hand.retain(|x| x != id);
+    player.played_cards.push(id.to_string());
+    player.card_points = next_points;
+    Ok(())
+}
+
+/// Deterministic, already-public effects on a recorded worker action.
+pub fn after_worker(set: &CardSet, player: &mut Player, space: Space) -> Result<(), String> {
+    for id in player.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            if let CardEffect::AfterWorkerGain { space: trigger, good, amount } = effect {
+                if *trigger == space {
+                    safe_gain(player, *good, *amount)?;
+                }
+            }
+        }
+    }
+    Ok(())
 }

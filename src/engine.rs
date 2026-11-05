@@ -57,6 +57,9 @@ pub struct BakeAllocation {
 pub enum Detail {
     None,
     MarketChoice(Good),
+    PlayOccupation { card_id: String },
+    PlayMinor { card_id: String },
+    GrowWithMinor { card_id: String },
     Plow {
         cell: usize,
     },
@@ -265,10 +268,18 @@ impl Game {
         let me = &self.public.players[self.public.active_player];
         let players = self.config.players;
         let mut list = Space::regular_for(players);
+        if self.card_set.enabled() {
+            list.push(Space::Lessons);
+            if players >= 3 { list.push(Space::ExtraLessons); }
+        }
         list.extend(self.public.revealed.iter().copied().map(Space::from));
         if self.config.additional_action_space_enabled {
             list.extend(Space::extra_for(players));
         }
+        let hand = &self.cards.hands[self.public.active_player];
+        let own_cards = hand.iter().filter_map(|id| self.card_set.definition(id)).collect::<Vec<_>>();
+        let occupations = me.played_cards.iter().filter(|id| self.card_set.definition(id).is_some_and(|c| c.kind == crate::cards::CardKind::Occupation)).count();
+        let can_minor = own_cards.iter().any(|c| c.kind == crate::cards::CardKind::MinorImprovement && crate::cards::affordable(c, me, 0));
         list.retain(|&s| {
             if self.public.used.contains(&s)
                 || s.additional_for(players) && group_occupied(&self.public.used, players)
@@ -280,7 +291,12 @@ impl Game {
                 Space::FarmExpansion => can_build(me),
                 Space::Fencing => can_fence(me),
                 Space::GrainUtilization => can_sow(me) || can_bake(me),
-                Space::MajorImprovement => can_buy(me, &self.public.improvement_market),
+                Space::MajorImprovement => can_buy(me, &self.public.improvement_market) || can_minor,
+                Space::Lessons => own_cards.iter().any(|c| c.kind == crate::cards::CardKind::Occupation && crate::cards::affordable(c, me, u32::from(occupations > 0))),
+                Space::ExtraLessons => {
+                    let fee = if players == 3 || occupations >= 2 { 2 } else { 1 };
+                    own_cards.iter().any(|c| c.kind == crate::cards::CardKind::Occupation && crate::cards::affordable(c, me, fee))
+                },
                 Space::FamilyGrowthWithRoom => me.family < 5 && me.rooms() > me.family as usize,
                 Space::FamilyGrowthNoRoom => me.family < 5,
                 Space::ModestFamilyGrowth => {
@@ -317,6 +333,7 @@ impl Game {
         let mut next = self.clone();
         let before = self.state_hash();
         next.execute_work(player, &action)?;
+        crate::cards::after_worker(&next.card_set, &mut next.public.players[player], action.space)?;
         next.public.used.insert(action.space);
         next.public.workers_placed[player] += 1;
         let will_harvest = next.public.workers_placed == next.public.work_quota
@@ -510,10 +527,25 @@ impl Game {
                 p.supply.gain(kind, n);
             }
             Space::MeetingPlace => {
-                require_none(detail)?;
+                match detail {
+                    Detail::None => {},
+                    Detail::PlayMinor { card_id } if self.card_set.enabled() => {
+                        crate::cards::play(&self.card_set, &mut self.cards.hands[id], p, card_id, crate::cards::CardKind::MinorImprovement, 0)?;
+                    },
+                    _ => return Err("invalid starting-player details".into()),
+                }
                 let n = self.public.accumulations.remove(&space).unwrap_or(0);
                 p.supply.food += n;
                 self.public.start_player = id;
+            }
+            Space::Lessons | Space::ExtraLessons => {
+                if let Detail::PlayOccupation { card_id } = detail {
+                    let count = p.played_cards.iter().filter(|id| self.card_set.definition(id).is_some_and(|c| c.kind == crate::cards::CardKind::Occupation)).count();
+                    let fee = if space == Space::Lessons { u32::from(count > 0) } else if self.config.players == 3 || count >= 2 { 2 } else { 1 };
+                    crate::cards::play(&self.card_set, &mut self.cards.hands[id], p, card_id, crate::cards::CardKind::Occupation, fee)?;
+                } else {
+                    return Err("occupation selection required".into());
+                }
             }
             Space::DayLaborer => {
                 require_none(detail)?;
@@ -571,8 +603,14 @@ impl Game {
                 _ => return Err("pasture details required".into()),
             },
             Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth => {
-                require_none(detail)?;
-                grow(p, true)?;
+                match detail {
+                    Detail::None => grow(p, true)?,
+                    Detail::GrowWithMinor { card_id } if self.card_set.enabled() => {
+                        grow(p, true)?;
+                        crate::cards::play(&self.card_set, &mut self.cards.hands[id], p, card_id, crate::cards::CardKind::MinorImprovement, 0)?;
+                    },
+                    _ => return Err("invalid growth details".into()),
+                }
             }
             Space::FamilyGrowthNoRoom => {
                 require_none(detail)?;
@@ -613,6 +651,9 @@ impl Game {
                 }
             }
             Space::MajorImprovement => match detail {
+                Detail::PlayMinor { card_id } if self.card_set.enabled() => {
+                    crate::cards::play(&self.card_set, &mut self.cards.hands[id], p, card_id, crate::cards::CardKind::MinorImprovement, 0)?;
+                },
                 Detail::Buy {
                     improvement,
                     instant_bake,

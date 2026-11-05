@@ -360,6 +360,8 @@ pub enum Space {
     Farmland,
     FarmExpansion,
     MeetingPlace,
+    Lessons,
+    ExtraLessons,
     MajorImprovement,
     Fencing,
     GrainUtilization,
@@ -700,7 +702,16 @@ impl Game {
         if self.config.additional_action_space_enabled {
             spaces.extend(Space::extra_for(players));
         }
+        if self.card_set.enabled() {
+            spaces.push(Space::Lessons);
+            if players >= 3 {
+                spaces.push(Space::ExtraLessons);
+            }
+        }
         for space in spaces {
+            if space == Space::MeetingPlace && self.card_set.enabled() {
+                continue;
+            }
             if let Some((_, n)) = space.accumulation_for(players) {
                 *self.public.accumulations.entry(space).or_default() += n
             }
@@ -718,11 +729,11 @@ impl Game {
     }
     pub fn validate(&self) -> Result<(), String> {
         let p = &self.public;
-        self.card_set.validate(self.config.players)?;
-        self.cards.validate(&self.card_set, &p.players)?;
         if !(2..=4).contains(&self.config.players) || p.players.len() != self.config.players {
             return Err("player count mismatch".into());
         }
+        self.card_set.validate(self.config.players)?;
+        self.cards.validate(&self.card_set, &p.players)?;
         if self.config.additional_action_space_enabled != p.additional_action_space_enabled {
             return Err("setting mutated".into());
         }
@@ -889,6 +900,12 @@ impl Game {
         let mut available: BTreeSet<_> = Space::regular_for(self.config.players)
             .into_iter()
             .collect();
+        if self.card_set.enabled() {
+            available.insert(Space::Lessons);
+            if self.config.players >= 3 {
+                available.insert(Space::ExtraLessons);
+            }
+        }
         available.extend(p.revealed.iter().copied().map(Space::from));
         if self.config.additional_action_space_enabled {
             available.extend(Space::extra_for(self.config.players));
