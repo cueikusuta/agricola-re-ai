@@ -17,12 +17,12 @@ from scripts.episode_dataset import (
 def report(
     *, total, finished, players, seed_min, seed_max, sha="abc",
     card_mode="none", corrupt=None, duplicate_seeds=None,
-    engine_versions=None, formats=None,
+    engine_versions=None, formats=None, schema_versions=None,
 ):
     return {
         "total": total,
         "finished": finished,
-        "schema_versions": [1],
+        "schema_versions": schema_versions or [1],
         "player_counts": [players],
         "duplicate_seeds": duplicate_seeds or [],
         "corrupt": corrupt or [],
@@ -206,6 +206,18 @@ class AggregateTests(unittest.TestCase):
                 root, shard_folder_name(1), meta_for(1, 2, 102, 2, 4),
                 report(total=2, finished=2, players=2, seed_min=102, seed_max=103,
                        engine_versions=["9.9.9"]),
+            )
+            with self.assertRaises(ValueError):
+                aggregate(root, 4, 2, 100, 2, "eval", False, False, "abc")
+
+    def test_rejects_schema_provenance_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.create_fixture(root)
+            make_shard(
+                root, shard_folder_name(1), meta_for(1, 2, 102, 2, 4),
+                report(total=2, finished=2, players=2, seed_min=102, seed_max=103,
+                       schema_versions=[2]),
             )
             with self.assertRaises(ValueError):
                 aggregate(root, 4, 2, 100, 2, "eval", False, False, "abc")

@@ -185,6 +185,7 @@ def _read_json(path: Path) -> dict:
 
 def _provenance(report: dict) -> dict:
     return {
+        "schema_versions": report.get("schema_versions"),
         "formats": report.get("formats"),
         "engine_versions": report.get("engine_versions"),
         "rules_versions": report.get("rules_versions"),
