@@ -27,9 +27,8 @@ fn http_get_with_headers(port: u16, path: &str, host: &str, origin: Option<&str>
     let origin_header = origin
         .map(|value| format!("Origin: {value}\r\n"))
         .unwrap_or_default();
-    let request = format!(
-        "GET {path} HTTP/1.1\r\nHost: {host}\r\n{origin_header}Connection: close\r\n\r\n"
-    );
+    let request =
+        format!("GET {path} HTTP/1.1\r\nHost: {host}\r\n{origin_header}Connection: close\r\n\r\n");
     stream.write_all(request.as_bytes()).expect("write request");
     let mut response = String::new();
     stream.read_to_string(&mut response).expect("read response");
@@ -79,8 +78,12 @@ fn web_server_starts_serves_and_stops() {
     let same_origin =
         http_get_with_headers(port, "/api/state", &expected_host, Some(&expected_origin));
     assert!(same_origin.starts_with("HTTP/1.1 200 OK"));
-    let cross_origin =
-        http_get_with_headers(port, "/api/state", &expected_host, Some("https://evil.example"));
+    let cross_origin = http_get_with_headers(
+        port,
+        "/api/state",
+        &expected_host,
+        Some("https://evil.example"),
+    );
     assert!(cross_origin.starts_with("HTTP/1.1 403 Forbidden"));
     let wrong_host = http_get_with_headers(port, "/api/state", "evil.example:8787", None);
     assert!(wrong_host.starts_with("HTTP/1.1 403 Forbidden"));
