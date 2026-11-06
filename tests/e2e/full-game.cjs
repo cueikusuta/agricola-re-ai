@@ -171,25 +171,35 @@ async function inspectAvailableEditors(page, coverage) {
 }
 
 async function runGame(page, options) {
+  const players = options.players || 2;
+  const cards = options.cards || (players === 2 ? "verified" : "none");
   await page.goto(baseUrl);
-  await page.locator("#players").selectOption("2");
-  await page.locator("#cards").selectOption("verified");
+  await page.locator("#players").selectOption(String(players));
+  await page.locator("#cards").selectOption(cards);
   await page.locator("#ai").selectOption("eval");
   await page.locator("#seed").fill(String(options.seed));
   if (options.extra) await page.locator("#extra").check();
   else await page.locator("#extra").uncheck();
   await page.locator("#new").click();
-  await page.waitForFunction(extra => {
+  await page.waitForFunction(expected => {
     const summary = document.querySelector("#summary")?.textContent || "";
     const turn = document.querySelector("#turn")?.textContent || "";
-    return summary.includes("2人戦") && summary.includes("カードあり")
-      && summary.includes(extra ? "ON" : "OFF") && turn.includes("ラウンド 1/14");
-  }, options.extra);
-  assert.match(await page.locator("#hand").innerText(), /^手札: (?!なし)/);
+    return summary.includes(expected.players + "人戦")
+      && summary.includes(expected.cards === "verified" ? "カードあり" : "カードなし")
+      && summary.includes(expected.extra ? "ON" : "OFF") && turn.includes("ラウンド 1/14");
+  }, { players, cards, extra: options.extra });
+  assert.equal(await page.locator("#tabs button").count(), players);
+  if (cards === "verified") {
+    assert.match(await page.locator("#hand").innerText(), /^手札: (?!なし)/);
+  }
   await verifyPrivateHand(page);
+  // The turn bar must expose the active player's remaining workers and the
+  // number of reachable action spaces without opening a dialog.
+  assert.match(await page.locator("#turnWorkers").innerText(), /^残りワーカー \d+ \/ \d+（1P）$/);
+  assert.match(await page.locator("#turnActions").innerText(), /^使用可能アクション \d+件$/);
 
   const coverage = {
-    seed: options.seed, extra: options.extra, visitedRounds: [],
+    seed: options.seed, extra: options.extra, players, cards, visitedRounds: [],
     workerActions: 0, feeding: 0, breeding: 0,
     feedOrderChanged: false, freeAction: false, pageReloadResumed: false,
     dialogsObserved: [],
@@ -275,11 +285,19 @@ async function runGame(page, options) {
     + "Reached rounds: " + [...visitedRounds].join(","));
 }
 
-test("Issue #92: actual Chromium UI completes 14 rounds", async (t) => {
+test("Issue #92 / M9: actual Chromium UI completes 14 rounds", async (t) => {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   t.after(() => browser.close());
-  for (const options of [{ seed: 42, extra: false }, { seed: 43, extra: true }]) {
-    await t.test("2 players, verified cards, additional tile " + (options.extra ? "ON" : "OFF"), async () => {
+  const games = [
+    { seed: 42, extra: false, players: 2, cards: "verified" },
+    { seed: 43, extra: true, players: 2, cards: "verified" },
+    { seed: 44, extra: true, players: 4, cards: "none" }
+  ];
+  for (const options of games) {
+    const label = options.players + " players, "
+      + (options.cards === "verified" ? "verified cards" : "no cards")
+      + ", additional tile " + (options.extra ? "ON" : "OFF");
+    await t.test(label, async () => {
       const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: "ja-JP" });
       const browserErrors = [];
       page.on("pageerror", error => browserErrors.push(error.message));
