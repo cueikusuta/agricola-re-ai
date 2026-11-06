@@ -130,11 +130,16 @@ fn derived_growth_rounds_are_well_formed() {
 #[test]
 fn same_seed_is_byte_for_byte_reproducible() {
     let first = run_diagnostics("repro-a", 3, 5, 950_000);
+    let first_bytes = std::fs::read(workspace_dir().join("repro-a.jsonl")).unwrap();
     let second = run_diagnostics("repro-b", 3, 5, 950_000);
+    let second_bytes = std::fs::read(workspace_dir().join("repro-b.jsonl")).unwrap();
     assert_eq!(first, second);
+    assert_eq!(first_bytes, second_bytes, "same seed changed JSONL bytes");
     // A different seed range must not silently reuse cached rows.
     let other = run_diagnostics("repro-c", 3, 5, 951_000);
+    let other_bytes = std::fs::read(workspace_dir().join("repro-c.jsonl")).unwrap();
     assert_ne!(first, other);
+    assert_ne!(first_bytes, other_bytes);
 }
 
 #[test]
