@@ -233,6 +233,12 @@ class PairedStatsTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, expected_error):
                     run(rows)
 
+    def test_mixed_decision_budgets_are_rejected(self):
+        rows = fixture()
+        rows[1]["decision_budget_ms"] = 5000
+        with self.assertRaisesRegex(ValueError, "inconsistent decision budgets"):
+            run(rows)
+
     def test_equal_score_tiebreak_ranks_are_allowed(self):
         rows = fixture()
         # Two equal scores may have different ranks due to the resource

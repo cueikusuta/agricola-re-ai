@@ -180,6 +180,9 @@ def validate_and_report(
         received[key] = row
     if set(received) != expected:
         raise ValueError(f"missing {len(expected - set(received))} game records")
+    budgets = {row["decision_budget_ms"] for row in rows}
+    if len(budgets) != 1:
+        raise ValueError("inconsistent decision budgets across game records")
     values = defaultdict(list)
     deltas = []
     for block in range(first_block, first_block + blocks):
