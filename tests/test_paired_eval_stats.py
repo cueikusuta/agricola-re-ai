@@ -45,6 +45,11 @@ def fixture(blocks=3, players=4):
                     "timeout_count": 0,
                     "fallback_count": 0,
                     "mcts_simulations_completed": 0,
+                    "focus_decisions": 30,
+                    "focus_max_decision_ms": 0.8,
+                    "focus_p95_decision_ms": 0.6,
+                    "focus_p99_decision_ms": 0.7,
+                    "focus_timeout_count": 0,
                     "policy_select_only": True,
                     "total_wall_ms": 50.0,
                     "replay_hash": "a" * 64,
@@ -186,6 +191,28 @@ class PairedStatsTests(unittest.TestCase):
         self.assertEqual(report["decision_budget_ms"], 10000)
         self.assertEqual(report["candidate_mcts_simulations_completed"], 12 * 240)
         self.assertEqual(report["candidate_timeout_rate"], 0.0)
+        self.assertEqual(report["focus_decision_timing_includes_detail"], True)
+        self.assertEqual(report["mean_first_credit_delta_pp"], report["mean_first_credit_delta"] * 100)
+        self.assertEqual(report["candidate_first_credit_pct"], report["candidate_first_credit"] * 100)
+        self.assertTrue(report["full_decision_10s_enforced"])
+
+    def test_mcts_over_budget_disables_full_decision_flag(self):
+        rows = fixture()
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "mcts"
+                row["focus_max_decision_ms"] = 12000.0
+                row["focus_p99_decision_ms"] = 11999.0
+                row["focus_p95_decision_ms"] = 11000.0
+                row["focus_timeout_count"] = 5
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="mcts", baseline="random", opponent="greedy",
+            extra=False, iterations=500,
+        )
+        self.assertFalse(report["full_decision_10s_enforced"])
+        self.assertEqual(report["candidate_focus_timeout_count"], 12 * 5)
+        self.assertEqual(report["candidate_max_focus_decision_ms"], 12000.0)
 
     def test_invalid_selection_timing_and_counters_are_rejected(self):
         cases = (
@@ -195,6 +222,9 @@ class PairedStatsTests(unittest.TestCase):
             ("fallback_count", -1, "fallback_count"),
             ("mcts_simulations_completed", -1, "mcts simulations"),
             ("decision_budget_ms", 0, "budget"),
+            ("focus_decisions", 999, "focus decisions"),
+            ("focus_p99_decision_ms", 2.0, "out of order"),
+            ("focus_timeout_count", 999, "focus_timeout_count"),
         )
         for field, value, expected_error in cases:
             with self.subTest(field=field):

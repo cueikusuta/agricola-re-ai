@@ -4,9 +4,12 @@
 //! under a per-decision wall-clock budget and records whether it timed out or
 //! fell back to the guaranteed-legal evaluation policy.
 use agricola_re_ai::evaluation::EvaluationPolicy;
+use agricola_re_ai::harvest::SimpleHarvestDetails;
 use agricola_re_ai::mcts::{MctsOutcome, MctsPolicy};
 use agricola_re_ai::model::Space;
-use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
+use agricola_re_ai::policy::{
+    play_to_end_observed, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
+};
 use agricola_re_ai::score::standings;
 use agricola_re_ai::{Config, Game, Observation};
 use rand_chacha::ChaCha8Rng;
@@ -339,8 +342,19 @@ fn run(options: &Options) -> Result<(), String> {
                     focus_outcomes: RefCell::new(FocusOutcomes::default()),
                 };
                 let game_start = Instant::now();
-                play_to_end(&mut game, &selector, &SimpleDetails)
-                    .map_err(|error| format!("seed {seed} arm {arm_id} seat {seat}: {error}"))?;
+                let focus_whole_ns = RefCell::new(Vec::<u64>::new());
+                play_to_end_observed(
+                    &mut game,
+                    &selector,
+                    &SimpleDetails,
+                    &SimpleHarvestDetails,
+                    |player, ns| {
+                        if player == seat {
+                            focus_whole_ns.borrow_mut().push(ns);
+                        }
+                    },
+                )
+                .map_err(|error| format!("seed {seed} arm {arm_id} seat {seat}: {error}"))?;
                 if !game.public.finished {
                     return Err(format!("seed {seed}: game did not finish"));
                 }
@@ -364,6 +378,11 @@ fn run(options: &Options) -> Result<(), String> {
                     (scores.iter().sum::<i32>() - own_score) as f64 / (options.players - 1) as f64;
                 let decision_ns = selector.decision_ns.borrow();
                 let outcomes = selector.focus_outcomes.borrow();
+                let whole_ns = focus_whole_ns.borrow();
+                let budget_ns = options.decision_budget_ms * 1_000_000;
+                let focus_timeout_count = whole_ns.iter().filter(|&&ns| ns > budget_ns).count();
+                let focus_max_decision_ms =
+                    whole_ns.iter().copied().max().unwrap_or(0) as f64 / 1_000_000.0;
                 let record = json!({
                     "schema_version": 1,
                     "block_index": block_index,
@@ -383,11 +402,16 @@ fn run(options: &Options) -> Result<(), String> {
                     "expected_rank_observation": summary.rank[seat],
                     "score_margin": own_score as f64 - others_mean,
                     "decisions": decision_ns.len(),
+                    "focus_decisions": whole_ns.len(),
                     "decision_budget_ms": options.decision_budget_ms,
                     "max_policy_select_ms": decision_ns.iter().copied().max().unwrap_or(0) as f64 / 1_000_000.0,
                     "p50_policy_select_ms": percentile_ms(&decision_ns, 0.50),
                     "p95_policy_select_ms": percentile_ms(&decision_ns, 0.95),
                     "p99_policy_select_ms": percentile_ms(&decision_ns, 0.99),
+                    "focus_max_decision_ms": focus_max_decision_ms,
+                    "focus_p95_decision_ms": percentile_ms(&whole_ns, 0.95),
+                    "focus_p99_decision_ms": percentile_ms(&whole_ns, 0.99),
+                    "focus_timeout_count": focus_timeout_count,
                     "timeout_count": outcomes.timeouts,
                     "fallback_count": outcomes.fallbacks,
                     "mcts_simulations_completed": outcomes.simulations,
