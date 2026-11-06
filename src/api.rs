@@ -191,6 +191,18 @@ impl Episode {
         &self.game.config
     }
 
+    /// Trusted-coordinator view of the underlying engine.
+    ///
+    /// This exists so the coordinator can serialise a complete
+    /// [`crate::episode_data::EpisodeRecord`] (engine/rules versions, the
+    /// initial state hash, the card set and the full event log) from an
+    /// episode. Like [`Self::events`] and [`Self::config`], it exposes private
+    /// state and must never be handed to an untrusted policy; give policies
+    /// only [`Self::policy_input`].
+    pub fn game(&self) -> &Game {
+        &self.game
+    }
+
     /// Terminal reward summary, or `None` while the game is still running.
     pub fn result(&self) -> Option<EpisodeResult> {
         if !self.is_terminal() {

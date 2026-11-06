@@ -110,4 +110,5 @@ ExIt候補：教師として情報集合を守るE2/E3/E4の探索を用い、�
 - `verify()` はコミット済みイベント列を `Game::replay_with_cards` で再演し、最終ハッシュと順位表の一致を確認する。
 - `training_samples(viewer)` は行為者が `viewer` のターンだけを返し、`TrainingSample` には seed もイベント列も含めない。`assert_public()` で秘匿フィールドの混入を拒否する。ドラフト履歴は `DraftEpisode.views[seat]`（各席が正当に観測した `DraftObservation`）からのみ渡す。
 - ローカル小規模生成は `src/bin/episode_export.rs`。大量試合は既存のGitHub Actions専用ワークフロー（`docs/github-actions-mass-simulation-m8-3.md`）で実行し、通常CIには組み込まない。
-- 本モジュールは PR #148 のエピソードAPIに依存しない。統合（APIからの記録生成）は同PRのマージ後に別途行う。実測の強さ・学習結果は未評価。
+- **エピソードAPIとの統合**（2026-11-07）: `record_self_play` は `record_episode` / `record_from_episode` を通じて `src/api.rs` の `Episode` を駆動する。コーディネータが `Episode` を保持し、方策には `PolicyInput`（観測＋候補手）だけを渡し、各行動はエンジンの `validate_action`/`step` を通す。`Episode::game()` は信頼されたコーディネータ用の記録アクセサ（`events()`/`config()` と同じ境界）。API経由の記録が直接Gameドライバと完全一致することは `tests/m12_episode_api_bridge.rs` が固定する。実測の強さ・学習結果は未評価。
+- 本統合はマージ済みの PR #148 と PR #158 の再演検証強化を基盤とする。
