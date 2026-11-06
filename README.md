@@ -46,6 +46,52 @@ cargo run -- --seed 42 --log-file game-log.json --state-file final-state.json
 
 M1の実装・テストと受け入れ状況は `docs/m1-acceptance.md` および `docs/implementation-status.md` を参照。GitHub ActionsのRustfmt/Clippy/Cargo test/100試合計測を確認済み。公式ルール上のあらゆる組み合わせの形式的証明や、人間による最終レビューは別途必要です。
 
+## Windows での起動（ローカル専用・初回セットアップ）
+
+前提条件:
+
+- Windows 10/11。
+- Rust stable（`rustup` 経由）を導入し、`cargo --version` が通ること。
+- 追加のアカウント、外部サービス、有料ホスティングは不要。実行時に外部通信しません。
+
+初回のみ:
+
+```powershell
+rustup default stable
+cargo fetch --locked
+```
+
+起動（いちばん簡単）:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run-windows.ps1
+# 別ポートを使う場合
+powershell -ExecutionPolicy Bypass -File scripts\run-windows.ps1 -Port 8790
+```
+
+手動で起動する場合:
+
+```powershell
+cargo run --release --locked -- --web
+# ブラウザで http://127.0.0.1:8787/ を開く
+```
+
+- 既定の待受は `127.0.0.1:8787`（ループバック専用、外部公開なし）。
+- 終了は起動したターミナルで `Ctrl+C`。
+- ポートを変える場合は `--port 8790` または環境変数 `AGRICOLA_WEB_PORT=8790`。
+
+### 起動できないときの原因と対処
+
+| 症状 | 原因 | 対処 |
+|---|---|---|
+| `cargo` が見つからない | Rust未導入、またはPATH未反映 | https://rustup.rs から stable を導入し、ターミナルを開き直す |
+| `failed to bind 127.0.0.1:8787 ... (os error 10048)` | ポート使用中（別の起動中サーバ等） | 使用中のプロセスを終了するか、`--port 8790` 等の別ポートを指定 |
+| ビルドに失敗する | ツールチェーン更新やロックの不整合 | 表示された最初のエラーを確認。必要なら `rustup update stable` |
+| 画面が開かない | ブラウザ自動起動の失敗 | 手動で `http://127.0.0.1:8787/` を開く |
+| 操作が重い | MCTSなど探索の負荷 | 既定の評価関数AIを使う。`--mcts` は1手の探索が重い |
+
+`cargo test --locked --test web_startup` が、実プロセスの起動・HTTP応答・終了・ポート解放と、ポート衝突時の原因/対処表示を自動確認します。
+
 公式資料（ルールブック本文・画像・カード原文はリポジトリへ収録しない）:
 
 - https://lookout-spiele.de/upload/en_agricolare.html_Rules_Agricola-RE_EN.pdf
@@ -77,6 +123,7 @@ cargo run --release -- --mcts --mcts-simulations 48 --seed 42
 ```sh
 cargo run --release -- --web
 # ブラウザで http://127.0.0.1:8787/ を開く
+# ポートを変える場合: cargo run --release -- --web --port 8790
 ```
 
 ローカルホスト専用（外部公開なし）。画面で人数2〜4人、追加アクションタイルON/OFF、評価関数AI/MCTS、シードを選び「新しい対戦」。人間は1Pで、他のプレイヤーはCPU。アクションスペースはクリックで選択できる。M6で手動詳細入力APIを追加したが、実ブラウザ14ラウンド完走・操作性の受け入れ検証は [#92](https://github.com/cueikusuta/agricola-re-ai/issues/92) に残る。CPUデフォルトは応答性の高い評価関数AI。

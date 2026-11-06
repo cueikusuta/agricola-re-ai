@@ -327,10 +327,13 @@ impl Session {
     }
 }
 
-fn local_request_allowed(host: Option<&str>, origin: Option<&str>) -> bool {
-    let local_host = matches!(host, Some("127.0.0.1:8787" | "localhost:8787"));
-    let local_origin = origin
-        .is_none_or(|value| matches!(value, "http://127.0.0.1:8787" | "http://localhost:8787"));
+fn local_request_allowed(host: Option<&str>, origin: Option<&str>, port: u16) -> bool {
+    let local_host = host.is_some_and(|value| {
+        value == format!("127.0.0.1:{port}") || value == format!("localhost:{port}")
+    });
+    let local_origin = origin.is_none_or(|value| {
+        value == format!("http://127.0.0.1:{port}") || value == format!("http://localhost:{port}")
+    });
     local_host && local_origin
 }
 
@@ -351,7 +354,7 @@ fn response(stream: &mut TcpStream, status: &str, mime: &str, content: &str) -> 
         .map_err(|e| e.to_string())?;
     stream.write_all(bytes).map_err(|e| e.to_string())
 }
-fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
+fn handle(mut stream: TcpStream, session: &mut Session, port: u16) -> Result<(), String> {
     stream
         .set_read_timeout(Some(std::time::Duration::from_secs(5)))
         .map_err(|e| e.to_string())?;
@@ -398,7 +401,7 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
             }
         }
     }
-    if !local_request_allowed(host.as_deref(), origin.as_deref()) {
+    if !local_request_allowed(host.as_deref(), origin.as_deref(), port) {
         return response(
             &mut stream,
             "403 Forbidden",
@@ -462,14 +465,33 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
         ),
     }
 }
+/// Start the local UI on the port from `AGRICOLA_WEB_PORT`, or 8787.
 pub fn serve(config: Config) -> Result<(), String> {
-    let listener = TcpListener::bind(("127.0.0.1", 8787)).map_err(|e| e.to_string())?;
+    let port = std::env::var("AGRICOLA_WEB_PORT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(8787);
+    serve_on(config, port)
+}
+
+/// Bind the loopback-only UI on `port` and serve until the process stops.
+///
+/// Port `0` asks the OS for a free port and prints the bound URL. Only
+/// loopback `Host`/`Origin` values for the bound port are accepted, so the
+/// boundary stays single-user and local regardless of the chosen port.
+pub fn serve_on(config: Config, port: u16) -> Result<(), String> {
+    let listener = TcpListener::bind(("127.0.0.1", port))
+        .map_err(|error| format!("failed to bind 127.0.0.1:{port}: {error}"))?;
+    let bound = listener
+        .local_addr()
+        .map_err(|error| error.to_string())?
+        .port();
     let mut session = Session::new(config)?;
-    println!("Agricola local UI: http://127.0.0.1:8787/");
+    println!("Agricola local UI: http://127.0.0.1:{bound}/");
     for accepted in listener.incoming() {
         match accepted {
             Ok(stream) => {
-                if let Err(error) = handle(stream, &mut session) {
+                if let Err(error) = handle(stream, &mut session, bound) {
                     eprintln!("UI request error: {error}");
                 }
             }
@@ -485,20 +507,26 @@ mod tests {
 
     #[test]
     fn local_api_rejects_cross_site_and_simple_form_posts() {
-        assert!(local_request_allowed(Some("127.0.0.1:8787"), None));
+        assert!(local_request_allowed(Some("127.0.0.1:8787"), None, 8787));
         assert!(local_request_allowed(
             Some("localhost:8787"),
-            Some("http://localhost:8787")
+            Some("http://localhost:8787"),
+            8787
         ));
         assert!(!local_request_allowed(
             Some("evil.example:8787"),
-            Some("http://evil.example:8787")
+            Some("http://evil.example:8787"),
+            8787
         ));
         assert!(!local_request_allowed(
             Some("127.0.0.1:8787"),
-            Some("https://evil.example")
+            Some("https://evil.example"),
+            8787
         ));
-        assert!(!local_request_allowed(None, None));
+        assert!(!local_request_allowed(None, None, 8787));
+        // A different bound port must not accept the default port's host.
+        assert!(!local_request_allowed(Some("127.0.0.1:8787"), None, 8790));
+        assert!(local_request_allowed(Some("127.0.0.1:8790"), None, 8790));
         assert!(json_content_type(Some("application/json; charset=utf-8")));
         assert!(!json_content_type(Some("text/plain")));
         assert!(!json_content_type(None));
