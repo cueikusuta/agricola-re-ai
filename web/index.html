@@ -57,7 +57,7 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <label>カードプール <select id="draftPool"><option value="test_fixture">テスト用フィクスチャ</option><option value="verified_basic">実装済み公式カードプール（2人・通常/7-7）</option></select></label>
 <button id="draftNew">ドラフト開始</button><button id="draftReset">ドラフト解除</button>
 </div>
-<p class="minor">受渡方向・フェーズ順は公式未確定の対戦慣行です。未選択なら開始しません。ここで使うカードは<strong>テスト専用フィクスチャ</strong>であり公式カードではありません。人間は1Pとして選択し、他席は観測可能情報だけで選ぶCPUです。</p>
+<p class="minor">受渡方向・フェーズ順は公式未確定の対戦慣行です。未選択なら開始しません。カードプールで「テスト用フィクスチャ」を選んだ場合、カードは<strong>検証用の架空カード</strong>です。「実装済み公式カードプール」は収録数が限られ、公式照合も継続中です。人間は1Pとして選択し、他席は観測可能情報だけで選ぶCPUです。</p>
 <div id="draftStatus"></div><div id="draftOffered" class="chips"></div><div id="draftActions" class="buttons"></div><div id="draftLog" class="minor"></div>
 </section>
 <section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
