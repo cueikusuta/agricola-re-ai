@@ -8,9 +8,11 @@
 //! Guarantees:
 //! * The engine validates and applies every action; this module never
 //!   duplicates legality, scoring, harvest or card logic.
-//! * Callers receive [`Observation`] (public state plus only their own hand).
-//!   The hidden round deck, the internal RNG streams, opponent hands and the
-//!   engine's private card placements are never exposed.
+//! * **Trusted coordinator / untrusted policy boundary**: the coordinator owns
+//!   [`Episode`], which can expose private replay metadata through `config()`
+//!   and `events()`. Only pass [`PolicyInput`] (or its `observation` field) to
+//!   AI policies. `PolicyInput` contains public state, that viewer's hand, and
+//!   candidate/available action spaces, never the seed or event log.
 //! * A fixed [`Config::seed`] reproduces the whole episode, and
 //!   [`Episode::state_hash`]/[`Episode::replay`] stay compatible with the CLI
 //!   and browser save/replay paths.
@@ -25,13 +27,30 @@ use crate::model::{Config, Event, Game, Observation, Space};
 use crate::score::{standings_with_cards, Standings};
 use serde::Serialize;
 
-/// A reproducible single game driven only through public observations.
+/// A reproducible game owned by a **trusted** coordinator.
 ///
-/// The wrapped engine is private, so external drivers cannot read hidden
-/// decks, RNG state or opponent hands by accident.
+/// Do not pass an `Episode` to an untrusted AI: `observe(other_player)`,
+/// `config()` and `events()` are intentionally available to the coordinator
+/// and can reveal private information or permit reconstruction from the seed.
+/// Give policies only [`PolicyInput`] from [`Self::policy_input`].
 #[derive(Clone, Debug)]
 pub struct Episode {
     game: Game,
+}
+
+/// Whitelisted input safe to hand to an untrusted policy for one active turn.
+///
+/// Unlike `Episode`, this standalone value contains neither the initial seed
+/// nor the full replay log. Construct it via [`Episode::policy_input`]; keep
+/// `Episode`, `config()`, `events()` and `state_hash()` with the trusted host.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PolicyInput {
+    /// Public state and the viewing player's own private hand only.
+    pub observation: Observation,
+    /// AI-generated candidates; not the complete legal action set.
+    pub legal_actions: Vec<Space>,
+    /// All structurally available spaces, including those outside AI candidates.
+    pub available_actions: Vec<Space>,
 }
 
 /// Terminal summary for one episode.
@@ -63,6 +82,21 @@ impl Episode {
     /// included, matching the M5/M8 observation contract.
     pub fn observe(&self, player: usize) -> Result<Observation, String> {
         self.game.observation(player)
+    }
+
+    /// Produce the *only* input a trusted coordinator should give to an AI.
+    ///
+    /// `Episode` itself is not a policy interface: its `config()` and
+    /// `events()` can expose seed/replay data, and `observe()` can view any
+    /// player's private hand. Policies receive this detached, serialized-safe
+    /// snapshot for the current actor instead.
+    pub fn policy_input(&self, player: usize) -> Result<PolicyInput, String> {
+        self.require_turn(player)?;
+        Ok(PolicyInput {
+            observation: self.observe(player)?,
+            legal_actions: self.game.legal_spaces(),
+            available_actions: self.game.available_spaces(),
+        })
     }
 
     pub fn player_count(&self) -> usize {
@@ -138,17 +172,21 @@ impl Episode {
         self.game.apply_free(player, free)
     }
 
-    /// Full private-state hash, identical to the CLI and browser value. It is
-    /// exposed for reproducibility checks; it does not reveal hidden state.
+    /// Full private-state hash, identical to the CLI and browser value.
+    /// This is trusted-coordinator metadata, not a policy input.
     pub fn state_hash(&self) -> String {
         self.game.state_hash()
     }
 
-    /// The committed event log, suitable for [`Self::replay`].
+    /// Committed event log for trusted replay/verification only.
+    /// Never provide this to a policy (its history and hashes are not an
+    /// observation-scoped information boundary).
     pub fn events(&self) -> &[Event] {
         &self.game.log.events
     }
 
+    /// Trusted-coordinator configuration, including the **private seed**.
+    /// Never provide to a policy: the seed can reconstruct hidden card order.
     pub fn config(&self) -> &Config {
         &self.game.config
     }
