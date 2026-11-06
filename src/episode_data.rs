@@ -292,6 +292,13 @@ impl TrainingSample {
 }
 
 /// Aggregate health of a record set.
+///
+/// This is the machine-readable contract behind the episode-dataset Actions
+/// artifact. It records integrity (replay/duplicates) and the provenance a
+/// downstream aggregation can cross-check: the engine/rules/card/format
+/// versions, the producing code revision, the seed range, and how many turns
+/// and events were observed. Mixed provenance values mean the records were not
+/// generated under identical conditions and must not be pooled silently.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetReport {
     pub total: usize,
@@ -302,11 +309,47 @@ pub struct DatasetReport {
     pub duplicate_seeds: Vec<u64>,
     /// Verification failures as `"<index>: <error>"`.
     pub corrupt: Vec<String>,
+    #[serde(default)]
+    pub seed_min: Option<u64>,
+    #[serde(default)]
+    pub seed_max: Option<u64>,
+    #[serde(default)]
+    pub distinct_seeds: usize,
+    #[serde(default)]
+    pub total_turns: usize,
+    #[serde(default)]
+    pub total_events: usize,
+    #[serde(default)]
+    pub formats: BTreeSet<String>,
+    #[serde(default)]
+    pub engine_versions: BTreeSet<String>,
+    #[serde(default)]
+    pub rules_versions: BTreeSet<String>,
+    #[serde(default)]
+    pub card_modes: BTreeSet<String>,
+    #[serde(default)]
+    pub code_shas: BTreeSet<String>,
 }
 
 impl DatasetReport {
     pub fn is_clean(&self) -> bool {
         self.corrupt.is_empty() && self.duplicate_seeds.is_empty()
+    }
+
+    /// Every record is finished. A dataset with partially played games cannot
+    /// be used as a complete-game learning/evaluation set.
+    pub fn is_complete(&self) -> bool {
+        self.total > 0 && self.finished == self.total
+    }
+
+    /// All records share one format/engine/rules/card/code revision. When this
+    /// is `false`, do not compare or merge the records as one condition.
+    pub fn has_uniform_provenance(&self) -> bool {
+        self.formats.len() <= 1
+            && self.engine_versions.len() <= 1
+            && self.rules_versions.len() <= 1
+            && self.card_modes.len() <= 1
+            && self.code_shas.len() <= 1
     }
 }
 
@@ -321,11 +364,22 @@ pub fn inspect_dataset(records: &[EpisodeRecord]) -> DatasetReport {
         }
         report.schema_versions.insert(record.schema_version);
         report.player_counts.insert(record.config.players);
-        *seeds.entry(record.config.seed).or_default() += 1;
+        report.formats.insert(record.format.clone());
+        report.engine_versions.insert(record.engine_version.clone());
+        report.rules_versions.insert(record.rules_version.clone());
+        report.card_modes.insert(record.card_mode.clone());
+        report.code_shas.insert(record.code_sha.clone());
+        report.total_turns += record.turns.len();
+        report.total_events += record.events.len();
+        let seed = record.config.seed;
+        *seeds.entry(seed).or_default() += 1;
+        report.seed_min = Some(report.seed_min.map_or(seed, |min| min.min(seed)));
+        report.seed_max = Some(report.seed_max.map_or(seed, |max| max.max(seed)));
         if let Err(error) = record.verify() {
             report.corrupt.push(format!("{index}: {error}"));
         }
     }
+    report.distinct_seeds = seeds.len();
     report.duplicate_seeds = seeds
         .into_iter()
         .filter(|(_, count)| *count > 1)

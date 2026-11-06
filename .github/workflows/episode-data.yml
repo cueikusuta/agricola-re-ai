@@ -1,0 +1,193 @@
+name: Episode Dataset Generation (manual)
+
+# M12 learning-data pipeline (Issue #106). Generates complete self-play
+# episodes as versioned JSONL, replay-verifies every record, and aggregates the
+# shards into a provenance-checked report. It does NOT compute win rates or
+# 95% confidence intervals; use the paired-evaluation workflow for that.
+#
+# Manual only for the heavy jobs, so normal PR CI is unaffected. The `unit`
+# job still runs on PRs that touch the pipeline files.
+on:
+  pull_request:
+    paths:
+      - 'scripts/episode_dataset.py'
+      - 'tests/test_episode_dataset.py'
+      - 'src/episode_data.rs'
+      - 'src/bin/episode_export.rs'
+      - 'src/bin/episode_inspect.rs'
+      - '.github/workflows/episode-data.yml'
+  workflow_dispatch:
+    inputs:
+      episodes:
+        description: 'Total episodes, divisible by shards (1..20000)'
+        type: number
+        required: true
+        default: 128
+      players:
+        description: 'Number of players'
+        type: choice
+        options: ['2', '3', '4']
+        default: '2'
+        required: true
+      shards:
+        description: 'Seed shards (1..16)'
+        type: number
+        required: true
+        default: 4
+      policy:
+        description: 'Space policy for every seat'
+        type: choice
+        options: ['eval', 'greedy', 'random']
+        default: 'eval'
+        required: true
+      seed_start:
+        description: 'First episode seed (0..999999999999)'
+        type: string
+        default: '700000'
+        required: true
+      cards:
+        description: 'Use the verified two-player card pool'
+        type: boolean
+        default: false
+      extra:
+        description: 'Enable the additional action space'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: episode-dataset-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  unit:
+    name: Validate pipeline planning/aggregation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 -m unittest discover -s tests -p test_episode_dataset.py -v
+
+  plan:
+    name: Plan disjoint seed shards
+    if: github.event_name == 'workflow_dispatch'
+    needs: [unit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      shard_indices: ${{ steps.plan.outputs.shard_indices }}
+    env:
+      EPISODES: ${{ inputs.episodes }}
+      PLAYERS: ${{ inputs.players }}
+      SHARDS: ${{ inputs.shards }}
+      SEED_START: ${{ inputs.seed_start }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          from scripts.episode_dataset import plan
+          episodes = int(os.environ["EPISODES"])
+          players = int(os.environ["PLAYERS"])
+          shards = int(os.environ["SHARDS"])
+          seed_start = int(os.environ["SEED_START"])
+          rows = plan(episodes, players, seed_start, shards)
+          for row in rows:
+              print(f"shard {row['index']}: games={row['games']} seed_start={row['seed_start']}")
+          print("shard_indices=" + json.dumps([row["index"] for row in rows]))
+          PY
+
+  shard:
+    name: Generate shard ${{ matrix.shard }}
+    if: github.event_name == 'workflow_dispatch'
+    needs: [plan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shard_indices) }}
+    env:
+      EPISODES: ${{ inputs.episodes }}
+      PLAYERS: ${{ inputs.players }}
+      SHARDS: ${{ inputs.shards }}
+      POLICY: ${{ inputs.policy }}
+      SEED_START: ${{ inputs.seed_start }}
+      CARDS: ${{ inputs.cards }}
+      EXTRA: ${{ inputs.extra }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bins
+      - name: Generate and replay-verify the shard
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          if [[ "$CARDS" == "true" ]]; then FLAGS+=(--cards); fi
+          if [[ "$EXTRA" == "true" ]]; then FLAGS+=(--extra); fi
+          python3 scripts/episode_dataset.py shard \
+            --episodes "$EPISODES" --players "$PLAYERS" \
+            --seed-start "$SEED_START" --shards "$SHARDS" \
+            --shard "${{ matrix.shard }}" --policy "$POLICY" \
+            --sha "$GITHUB_SHA" \
+            --out "results/episode-data-shard-${{ matrix.shard }}" \
+            --binary ./target/release/episode_export \
+            --inspect-binary ./target/release/episode_inspect "${FLAGS[@]}"
+      - name: Preserve shard data and logs, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: episode-data-shard-${{ matrix.shard }}
+          path: results/episode-data-shard-${{ matrix.shard }}/
+          if-no-files-found: warn
+          retention-days: 7
+
+  aggregate:
+    name: Aggregate and cross-check shards
+    if: ${{ always() && github.event_name == 'workflow_dispatch' }}
+    needs: [unit, plan, shard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EPISODES: ${{ inputs.episodes }}
+      PLAYERS: ${{ inputs.players }}
+      SHARDS: ${{ inputs.shards }}
+      POLICY: ${{ inputs.policy }}
+      SEED_START: ${{ inputs.seed_start }}
+      CARDS: ${{ inputs.cards }}
+      EXTRA: ${{ inputs.extra }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: episode-data-shard-*
+          path: results
+          merge-multiple: false
+      - name: Verify every shard and aggregate
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          if [[ "$CARDS" == "true" ]]; then FLAGS+=(--cards); fi
+          if [[ "$EXTRA" == "true" ]]; then FLAGS+=(--extra); fi
+          python3 scripts/episode_dataset.py aggregate \
+            --episodes "$EPISODES" --players "$PLAYERS" \
+            --seed-start "$SEED_START" --shards "$SHARDS" \
+            --policy "$POLICY" --sha "$GITHUB_SHA" \
+            --out results "${FLAGS[@]}"
+          echo "Episode data integrity/completeness only; no win-rate inference." >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve aggregate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: episode-data-aggregate
+          path: results/summary.json
+          if-no-files-found: warn
+          retention-days: 7

@@ -141,6 +141,42 @@ fn dataset_report_detects_duplicate_seeds_and_corruption() {
 }
 
 #[test]
+fn dataset_report_summarizes_provenance_seed_range_and_completeness() {
+    let mut records = vec![self_play_record(2, 10), self_play_record(2, 11)];
+    let report = inspect_dataset(&records);
+    assert!(report.is_complete());
+    assert!(report.has_uniform_provenance());
+    assert_eq!(report.seed_min, Some(10));
+    assert_eq!(report.seed_max, Some(11));
+    assert_eq!(report.distinct_seeds, 2);
+    assert_eq!(report.total_turns, report.total_events);
+    assert_eq!(
+        report.formats,
+        ["agricola-episode".to_string()].into_iter().collect()
+    );
+    assert_eq!(
+        report.card_modes,
+        ["none".to_string()].into_iter().collect()
+    );
+    assert_eq!(
+        report.code_shas,
+        ["test-sha".to_string()].into_iter().collect()
+    );
+
+    // A different producing revision must not look like one uniform dataset.
+    records[1].code_sha = "other-sha".into();
+    let mixed = inspect_dataset(&records);
+    assert!(!mixed.has_uniform_provenance());
+    assert_eq!(mixed.code_shas.len(), 2);
+
+    // An empty record set is not a complete dataset.
+    let empty = inspect_dataset(&[]);
+    assert!(!empty.is_complete());
+    assert!(empty.seed_min.is_none());
+    assert_eq!(empty.distinct_seeds, 0);
+}
+
+#[test]
 fn training_samples_expose_only_the_viewers_own_turns() {
     let record = self_play_record(3, 303);
     for viewer in 0..3 {

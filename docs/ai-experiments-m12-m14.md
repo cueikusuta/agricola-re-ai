@@ -111,3 +111,4 @@ ExIt候補：教師として情報集合を守るE2/E3/E4の探索を用い、�
 - `training_samples(viewer)` は行為者が `viewer` のターンだけを返し、`TrainingSample` には seed もイベント列も含めない。`assert_public()` で秘匿フィールドの混入を拒否する。ドラフト履歴は `DraftEpisode.views[seat]`（各席が正当に観測した `DraftObservation`）からのみ渡す。
 - ローカル小規模生成は `src/bin/episode_export.rs`。大量試合は既存のGitHub Actions専用ワークフロー（`docs/github-actions-mass-simulation-m8-3.md`）で実行し、通常CIには組み込まない。
 - 本モジュールは PR #148 のエピソードAPIに依存しない。統合（APIからの記録生成）は同PRのマージ後に別途行う。実測の強さ・学習結果は未評価。
+- **大量生成・検証パイプライン**（2026-11-07）: `.github/workflows/episode-data.yml` と `scripts/episode_dataset.py`、`episode_export`（`--policy`/部分失敗記録）、`episode_inspect` を追加。重複しない seed シャードで JSONL を生成し、全件を再演検証、`summary.json` に件数・seed被覆・provenance を機械可読で保存する。勝率・首位率・95%区間は算出しない（`paired-eval` の担当）。詳細は `docs/episode-dataset-pipeline.md`。ドラフト込み・3〜4人カード戦は #104/#105/#139 待ちで対象外。

@@ -7,13 +7,22 @@
 //! Usage:
 //!   episode_export --episodes 20 --seed 1000 --players 2 --out episodes.jsonl
 //!   episode_export --cards --code-sha <git-sha>
+//!   episode_export --episodes 64 --players 4 --policy greedy --out shard.jsonl
+//!
+//! A failing seed does not discard the successful records: the JSONL of the
+//! seeds that finished is still written (so the artifact is inspectable) and
+//! the process exits non-zero. `--errors <path>` records the failed seeds as
+//! JSONL for the aggregation step.
 use agricola_re_ai::cards::{verified_basic_card_set, CardSet};
 use agricola_re_ai::episode_data::{
     inspect_dataset, record_self_play, to_jsonl, EpisodeMeta, EpisodeRecord,
 };
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::model::Config;
-use agricola_re_ai::policy::{CardChoiceDetails, SimpleDetails};
+use agricola_re_ai::policy::{
+    CardChoiceDetails, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
+};
+use serde_json::json;
 
 struct Options {
     episodes: usize,
@@ -23,6 +32,8 @@ struct Options {
     cards: bool,
     out: String,
     code_sha: String,
+    policy: String,
+    errors: Option<String>,
 }
 
 fn parse() -> Result<Options, String> {
@@ -34,6 +45,8 @@ fn parse() -> Result<Options, String> {
         cards: false,
         out: "episodes.jsonl".into(),
         code_sha: "unknown".into(),
+        policy: "eval".into(),
+        errors: None,
     };
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     let mut index = 0;
@@ -61,6 +74,16 @@ fn parse() -> Result<Options, String> {
             }
             "--out" => options.out = value(index)?,
             "--code-sha" => options.code_sha = value(index)?,
+            "--policy" => {
+                let policy = value(index)?;
+                if !matches!(policy.as_str(), "eval" | "greedy" | "random") {
+                    return Err(format!(
+                        "--policy must be eval, greedy or random, got {policy}"
+                    ));
+                }
+                options.policy = policy;
+            }
+            "--errors" => options.errors = Some(value(index)?),
             "--cards" => {
                 options.cards = true;
                 index += 1;
@@ -113,15 +136,23 @@ fn main() {
     } else {
         "none"
     };
+    let space_policy: &dyn SpacePolicy = match options.policy.as_str() {
+        "eval" => &EvaluationPolicy,
+        "greedy" => &GreedyPolicy,
+        "random" => &RandomPolicy,
+        _ => unreachable!("policy is validated in parse()"),
+    };
     let meta = EpisodeMeta::new(
         options.code_sha.clone(),
         card_mode,
-        vec!["evaluation".to_string(); options.players],
+        vec![options.policy.clone(); options.players],
     );
     let mut records: Vec<EpisodeRecord> = Vec::new();
+    let mut failures: Vec<(u64, String)> = Vec::new();
     for offset in 0..options.episodes {
+        let seed = options.seed.wrapping_add(offset as u64);
         let config = Config {
-            seed: options.seed.wrapping_add(offset as u64),
+            seed,
             players: options.players,
             additional_action_space_enabled: options.additional_action_space,
         };
@@ -129,18 +160,32 @@ fn main() {
             config,
             card_set.clone(),
             meta.clone(),
-            &EvaluationPolicy,
+            space_policy,
             detail_policy,
         ) {
             Ok(record) => records.push(record),
             Err(error) => {
-                eprintln!(
-                    "episode_export: seed {} failed: {error}",
-                    options.seed + offset as u64
-                );
-                std::process::exit(1);
+                eprintln!("episode_export: seed {seed} failed: {error}");
+                failures.push((seed, error));
             }
         }
+    }
+    if let Some(path) = &options.errors {
+        let body: String = failures
+            .iter()
+            .map(|(seed, error)| json!({"seed": seed, "error": error}).to_string() + "\n")
+            .collect();
+        if let Err(error) = std::fs::write(path, body) {
+            eprintln!("episode_export: cannot write {path}: {error}");
+            std::process::exit(1);
+        }
+    }
+    if records.is_empty() {
+        eprintln!(
+            "episode_export: all {} seeds failed, nothing written",
+            options.episodes
+        );
+        std::process::exit(1);
     }
     let jsonl = match to_jsonl(&records) {
         Ok(jsonl) => jsonl,
@@ -155,15 +200,18 @@ fn main() {
     }
     let report = inspect_dataset(&records);
     println!(
-        "wrote {} episodes to {} (finished {}, players {:?}, duplicate seeds {}, corrupt {})",
+        "wrote {} of {} episodes to {} (finished {}, players {:?}, policy {}, duplicate seeds {}, corrupt {}, failed {})",
         report.total,
+        options.episodes,
         options.out,
         report.finished,
         report.player_counts,
+        options.policy,
         report.duplicate_seeds.len(),
-        report.corrupt.len()
+        report.corrupt.len(),
+        failures.len()
     );
-    if !report.is_clean() {
+    if !failures.is_empty() || !report.is_clean() {
         std::process::exit(1);
     }
 }
