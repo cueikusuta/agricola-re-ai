@@ -135,4 +135,49 @@ test("ローカルWeb UIを実ブラウザで検証", async (t) => {
     }
     assert.ok(sawHarvest, "the human must reach a harvest with feeding hints");
   });
+
+  await scenario("fence_editor_renders_all_candidate_kinds", async () => {
+    await page.locator("#players").selectOption("2");
+    await page.locator("#cards").selectOption("none");
+    await page.locator("#new").click();
+    await page.waitForFunction(() => document.querySelector("#summary")?.textContent.includes("カードなし"));
+    // Deterministic display regression: the editor must render every proposal,
+    // including multi-cell and split shapes, not just the first ten 1-cell ones.
+    await page.evaluate(() => {
+      state.legal = (state.legal || []).concat(["fencing"]);
+      state.fence_hints = {
+        available_wood: 6,
+        free_fence_wood: 0,
+        remaining_segments: 15,
+        extendable_cells: [],
+        proposals: [
+          { pastures: [[1]], occupancy: null, cost_wood: 4, kind: "new" },
+          { pastures: [[1, 2]], occupancy: null, cost_wood: 6, kind: "new" },
+          { pastures: [[1], [2]], occupancy: null, cost_wood: 2, kind: "split" },
+        ],
+      };
+      openWork("fencing");
+    });
+    await page.locator("#editor").waitFor({ state: "visible" });
+    assert.equal(await page.locator("#fields button[data-kind]").count(), 3, "all proposals must be rendered");
+    const multi = page.locator('#fields button[data-multicell="true"]').first();
+    assert.ok(await multi.count(), "a multi-cell candidate must be reachable");
+    await multi.click();
+    assert.equal(await page.locator("#pastures").inputValue(), "1,2");
+    assert.ok(await page.locator('#fields button[data-kind="split"]').count(), "a split candidate must be reachable");
+  });
+
+  await scenario("free_action_does_not_offer_workshop_processing", async () => {
+    await page.locator("#players").selectOption("2");
+    await page.locator("#cards").selectOption("none");
+    await page.locator("#new").click();
+    await page.waitForFunction(() => document.querySelector("#summary")?.textContent.includes("カードなし"));
+    const carriesWorkshops = await page.evaluate(() => Object.prototype.hasOwnProperty.call(state.free_action_hints || {}, "workshops"));
+    assert.equal(carriesWorkshops, false, "free_action_hints must not carry workshop conversions");
+    await page.locator("#free").click();
+    await page.locator("#editor").waitFor({ state: "visible" });
+    const text = await page.locator("#fields").innerText();
+    assert.match(text, /工房加工は収穫時の給餌/, "workshop processing must be marked as harvest-only");
+    assert.doesNotMatch(text, /製材所\(|製陶所\(|かご製作所\(/, "workshops must not be listed as free conversions");
+  });
 });

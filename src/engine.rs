@@ -617,40 +617,6 @@ impl Game {
         let budget = p.supply.wood.saturating_add(free);
         let remaining = 15usize.saturating_sub(p.fences.len());
         let mut proposals: Vec<FenceProposal> = Vec::new();
-        let touches_existing = |region: &[usize]| {
-            region.iter().any(|&i| {
-                neighbors(i)
-                    .iter()
-                    .any(|&j| matches!(p.farm[j].tile, Tile::Pasture { .. }))
-            })
-        };
-        for i in 0..FARM_CELLS {
-            if !matches!(p.farm[i].tile, Tile::Empty) {
-                continue;
-            }
-            if !p.pastures.is_empty() && !touches_existing(&[i]) {
-                continue;
-            }
-            if let Some(proposal) = fence_proposal(p, budget, vec![vec![i]], None, "new") {
-                proposals.push(proposal);
-            }
-        }
-        for a in 0..FARM_CELLS {
-            if !matches!(p.farm[a].tile, Tile::Empty) {
-                continue;
-            }
-            for b in neighbors(a) {
-                if b < a || !matches!(p.farm[b].tile, Tile::Empty) {
-                    continue;
-                }
-                if !p.pastures.is_empty() && !touches_existing(&[a, b]) {
-                    continue;
-                }
-                if let Some(proposal) = fence_proposal(p, budget, vec![vec![a, b]], None, "new") {
-                    proposals.push(proposal);
-                }
-            }
-        }
         let mut extendable = BTreeSet::new();
         for pasture in &p.pastures {
             for &cell in &pasture.cells {
@@ -661,6 +627,14 @@ impl Game {
                 }
             }
         }
+        let touches_existing = |region: &[usize]| {
+            region.iter().any(|&i| {
+                neighbors(i)
+                    .iter()
+                    .any(|&j| matches!(p.farm[j].tile, Tile::Pasture { .. }))
+            })
+        };
+        // Splits first: they are rare but important, so never crowd them out.
         if let Some(regions) = split_candidate(p) {
             if let Some(proposal) = fence_proposal(p, budget, regions, None, "split") {
                 proposals.push(proposal);
@@ -675,7 +649,49 @@ impl Game {
                 proposals.push(proposal);
             }
         }
-        proposals.truncate(24);
+        // Two-cell new pastures: guarantee multi-cell shapes are visible even
+        // when there are many single-cell options.
+        let mut multi = 0usize;
+        for a in 0..FARM_CELLS {
+            if multi >= 8 {
+                break;
+            }
+            if !matches!(p.farm[a].tile, Tile::Empty) {
+                continue;
+            }
+            for b in neighbors(a) {
+                if multi >= 8 {
+                    break;
+                }
+                if b < a || !matches!(p.farm[b].tile, Tile::Empty) {
+                    continue;
+                }
+                if !p.pastures.is_empty() && !touches_existing(&[a, b]) {
+                    continue;
+                }
+                if let Some(proposal) = fence_proposal(p, budget, vec![vec![a, b]], None, "new") {
+                    proposals.push(proposal);
+                    multi += 1;
+                }
+            }
+        }
+        // Single-cell new pastures, bounded so the dialog stays readable.
+        let mut singles = 0usize;
+        for i in 0..FARM_CELLS {
+            if singles >= 8 {
+                break;
+            }
+            if !matches!(p.farm[i].tile, Tile::Empty) {
+                continue;
+            }
+            if !p.pastures.is_empty() && !touches_existing(&[i]) {
+                continue;
+            }
+            if let Some(proposal) = fence_proposal(p, budget, vec![vec![i]], None, "new") {
+                proposals.push(proposal);
+                singles += 1;
+            }
+        }
         FenceHints {
             available_wood: p.supply.wood,
             free_fence_wood: free,

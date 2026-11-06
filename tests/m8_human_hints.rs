@@ -166,6 +166,14 @@ fn feeding_hints_report_owed_food_and_conversion_rates() {
             .food_each,
         0
     );
+    // Workshop processing is a harvest feeding option, not a free action.
+    let mut workshopper = Player::new(0, 0);
+    workshopper.improvements.push(Improvement::Joinery);
+    workshopper.supply.wood = 1;
+    assert!(hints::feeding_hints(&workshopper)
+        .options
+        .iter()
+        .any(|option| option.source == FeedSource::Joinery));
 }
 
 #[test]
@@ -229,7 +237,6 @@ fn free_action_hints_report_only_available_conversions() {
 
     let plain = Player::new(1, 0);
     assert!(hints::free_action_hints(&plain).cookable_animals.is_empty());
-    assert!(hints::free_action_hints(&plain).workshops.is_empty());
 }
 
 #[test]

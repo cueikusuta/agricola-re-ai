@@ -210,9 +210,6 @@ pub struct FreeActionHints {
     /// Animals that a cooking improvement can convert: animal, held amount,
     /// food per unit.
     pub cookable_animals: Vec<(Animal, u32, u32)>,
-    /// Workshops usable as a free conversion this harvest: improvement, good
-    /// paid, held amount, food produced.
-    pub workshops: Vec<(Improvement, Good, u32, u32)>,
     /// Every held good and its amount, so a player can return surplus.
     pub held_goods: Vec<(Good, u32)>,
 }
@@ -233,16 +230,6 @@ pub fn free_action_hints(p: &Player) -> FreeActionHints {
             }
         }
     }
-    let mut workshops = Vec::new();
-    for (improvement, good, food) in [
-        (Improvement::Joinery, Good::Wood, 2),
-        (Improvement::Pottery, Good::Clay, 2),
-        (Improvement::Basketry, Good::Reed, 3),
-    ] {
-        if p.improvements.contains(&improvement) {
-            workshops.push((improvement, good, p.supply.get(good), food));
-        }
-    }
     let held_goods = [
         Good::Wood,
         Good::Clay,
@@ -258,7 +245,6 @@ pub fn free_action_hints(p: &Player) -> FreeActionHints {
     FreeActionHints {
         convertible_crops,
         cookable_animals,
-        workshops,
         held_goods,
     }
 }
