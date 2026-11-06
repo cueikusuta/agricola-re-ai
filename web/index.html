@@ -198,6 +198,7 @@ if(hints.plow_cells&&hints.plow_cells.length)parts.push("耕せるマス: "+hint
 if(hints.room_cells&&hints.room_cells.length)parts.push("部屋を建てられるマス: "+hints.room_cells.join(","));
 if(hints.stable_cells&&hints.stable_cells.length)parts.push("厩を建てられるマス: "+hints.stable_cells.join(","));
 if(hints.sow_fields&&hints.sow_fields.length)parts.push("種をまける畑: "+hints.sow_fields.join(","));
+if(["sheep_market","pig_market","cattle_market","animal_market"].includes(space)){const acc=(state.public.animal_accumulations||{})[space]||0;parts.push("市場の累積家畜: "+acc+"頭（配置・調理・返却の合計で指定）");}
 if(parts.length){const p=document.createElement("p");p.className="minor";p.id="detailHint";p.textContent=parts.join(" / ");$("fields").append(p);}}
 function openWork(space){const hints=(state.detail_hints&&state.detail_hints[space])||{};openEditor(names[space]||space,"各選択は任意ではなく、エンジンにそのまま渡されます。","work",space);appendHint(space,hints);workFields(space,hints);}
 function sourceField(){
