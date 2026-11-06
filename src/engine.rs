@@ -697,7 +697,12 @@ impl Game {
             return Err(format!("illegal space {:?}", action.space));
         }
         let mut next = self.clone();
-        let before = self.state_hash();
+        let record = self.record_events;
+        let before = if record {
+            self.state_hash()
+        } else {
+            String::new()
+        };
         next.execute_work(player, &action)?;
         next.apply_post_work_card_effects(player, &action, &self.public.players[player])?;
         next.public.used.insert(action.space);
@@ -750,20 +755,22 @@ impl Game {
         };
         next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
         next.validate()?;
-        let after = next.state_hash();
-        next.log.events.push(Event {
-            player: Some(player),
-            kind: "work".into(),
-            payload: serde_json::to_value(RecordedAction::Work {
-                player,
-                action,
-                harvest_plans,
-                breeding_plans,
-            })
-            .map_err(|e| e.to_string())?,
-            before,
-            after,
-        });
+        if record {
+            let after = next.state_hash();
+            next.log.events.push(Event {
+                player: Some(player),
+                kind: "work".into(),
+                payload: serde_json::to_value(RecordedAction::Work {
+                    player,
+                    action,
+                    harvest_plans,
+                    breeding_plans,
+                })
+                .map_err(|e| e.to_string())?,
+                before,
+                after,
+            });
+        }
         *self = next;
         Ok(())
     }
@@ -807,21 +814,28 @@ impl Game {
             return Err("not an active game/player".into());
         }
         let mut next = self.clone();
-        let before = self.state_hash();
+        let record = self.record_events;
+        let before = if record {
+            self.state_hash()
+        } else {
+            String::new()
+        };
         next.execute_free(player, &free)?;
         next.validate()?;
-        let after = next.state_hash();
-        next.log.events.push(Event {
-            player: Some(player),
-            kind: "free".into(),
-            payload: serde_json::to_value(RecordedAction::Free {
-                player,
-                action: free,
-            })
-            .map_err(|e| e.to_string())?,
-            before,
-            after,
-        });
+        if record {
+            let after = next.state_hash();
+            next.log.events.push(Event {
+                player: Some(player),
+                kind: "free".into(),
+                payload: serde_json::to_value(RecordedAction::Free {
+                    player,
+                    action: free,
+                })
+                .map_err(|e| e.to_string())?,
+                before,
+                after,
+            });
+        }
         *self = next;
         Ok(())
     }

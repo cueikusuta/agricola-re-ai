@@ -155,6 +155,8 @@ fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     }
     deck.reverse(); // Game::start_round pops the next card from the end.
     game.hidden_round_deck = deck;
+    // Search positions are hypothetical: skip state hashing and event logging.
+    game.record_events = false;
     game.validate().ok()?;
     Some(game)
 }

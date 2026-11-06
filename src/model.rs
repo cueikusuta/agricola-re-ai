@@ -537,6 +537,16 @@ pub struct Game {
     #[serde(default)]
     pub cards: CardState,
     pub log: GameLog,
+    /// Search-only fast path. When false, `apply`/`apply_free` skip state
+    /// hashing and event logging for hypothetical MCTS positions. It is never
+    /// serialized and defaults to true, so committed games, saves and replays
+    /// always keep a complete, hash-checked event log.
+    #[serde(skip, default = "record_events_by_default")]
+    pub record_events: bool,
+}
+
+fn record_events_by_default() -> bool {
+    true
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Event {
@@ -640,6 +650,7 @@ impl Game {
             card_set,
             cards,
             log,
+            record_events: true,
         };
         result.start_round();
         result.log.initial_state_hash = result.state_hash();
