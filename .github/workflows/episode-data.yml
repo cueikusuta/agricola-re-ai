@@ -98,8 +98,8 @@ jobs:
           shards = int(os.environ["SHARDS"])
           seed_start = int(os.environ["SEED_START"])
           rows = plan(episodes, players, seed_start, shards)
-          for row in rows:
-              print(f"shard {row['index']}: games={row['games']} seed_start={row['seed_start']}")
+          # GITHUB_OUTPUT accepts only name=value or multiline output syntax.
+          # Keep human-readable shard diagnostics off this redirected stream.
           print("shard_indices=" + json.dumps([row["index"] for row in rows]))
           PY
 
