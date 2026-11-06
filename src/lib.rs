@@ -5,6 +5,7 @@ pub mod draft;
 pub mod draft_ai;
 pub mod draft_game;
 pub mod engine;
+pub mod episode_data;
 pub mod evaluation;
 pub mod harvest;
 pub mod hints;
