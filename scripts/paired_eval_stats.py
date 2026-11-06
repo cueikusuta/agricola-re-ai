@@ -40,7 +40,7 @@ def validate_and_report(
     if players not in (2, 3, 4) or blocks < 1 or iterations < 100:
         raise ValueError("invalid experimental settings")
     if candidate == baseline or any(
-        name not in ("random", "greedy", "eval")
+        name not in ("random", "greedy", "eval", "mcts")
         for name in (candidate, baseline, opponent)
     ):
         raise ValueError("unsupported/identical policy")
@@ -139,9 +139,60 @@ def validate_and_report(
             raise ValueError(f"selection time exceeds game wall time: {key}")
         if type(row.get("decisions")) is not int or row["decisions"] <= 0:
             raise ValueError(f"invalid decisions: {key}")
+        if type(row.get("decision_budget_ms")) is not int or not 0 <= row["decision_budget_ms"] <= 60000:
+            raise ValueError(f"invalid decision budget: {key}")
+        for numeric in ("p50_policy_select_ms", "p95_policy_select_ms", "p99_policy_select_ms"):
+            value = row.get(numeric)
+            if (
+                not finite_number(value)
+                or value < 0
+                or value > row["max_policy_select_ms"] + 1e-9
+            ):
+                raise ValueError(f"invalid timing {numeric}: {key}")
+        if not (
+            row["p50_policy_select_ms"] <= row["p95_policy_select_ms"] + 1e-9
+            and row["p95_policy_select_ms"] <= row["p99_policy_select_ms"] + 1e-9
+        ):
+            raise ValueError(f"timing percentiles out of order: {key}")
+        for field in ("timeout_count", "fallback_count"):
+            value = row.get(field)
+            if type(value) is not int or not 0 <= value <= row["decisions"]:
+                raise ValueError(f"invalid {field}: {key}")
+        simulations = row.get("mcts_simulations_completed")
+        if type(simulations) is not int or simulations < 0:
+            raise ValueError(f"invalid mcts simulations: {key}")
+        if type(row.get("focus_decisions")) is not int or not 0 <= row["focus_decisions"] <= row["decisions"]:
+            raise ValueError(f"invalid focus decisions: {key}")
+        for numeric in ("focus_max_decision_ms", "focus_p95_decision_ms", "focus_p99_decision_ms"):
+            value = row.get(numeric)
+            if not finite_number(value) or value < 0:
+                raise ValueError(f"invalid timing {numeric}: {key}")
+        if not (
+            row["focus_p95_decision_ms"] <= row["focus_p99_decision_ms"] + 1e-9
+            and row["focus_p99_decision_ms"] <= row["focus_max_decision_ms"] + 1e-9
+        ):
+            raise ValueError(f"focus decision percentiles out of order: {key}")
+        if (
+            type(row.get("focus_timeout_count")) is not int
+            or not 0 <= row["focus_timeout_count"] <= row["focus_decisions"]
+        ):
+            raise ValueError(f"invalid focus_timeout_count: {key}")
+        if (
+            type(row.get("mcts_deadline_active")) is not bool
+            or type(row.get("deterministic_policy_selection")) is not bool
+            or row["deterministic_policy_selection"] != (not row["mcts_deadline_active"])
+        ):
+            raise ValueError(f"invalid policy mode flags: {key}")
+        if row["mcts_deadline_active"] != (
+            row.get("focus_policy") == "mcts" and row["decision_budget_ms"] > 0
+        ):
+            raise ValueError(f"deadline flag does not match policy/budget: {key}")
         received[key] = row
     if set(received) != expected:
         raise ValueError(f"missing {len(expected - set(received))} game records")
+    budgets = {row["decision_budget_ms"] for row in rows}
+    if len(budgets) != 1:
+        raise ValueError("inconsistent decision budgets across game records")
     values = defaultdict(list)
     deltas = []
     for block in range(first_block, first_block + blocks):
@@ -165,6 +216,29 @@ def validate_and_report(
         if sample_sd is not None and sample_sd > 0 else None
     )
     max_selection = max(g["max_policy_select_ms"] for g in rows)
+    candidate_decisions = sum(g["decisions"] for g in values["candidate"])
+    baseline_decisions = sum(g["decisions"] for g in values["baseline"])
+    candidate_focus_decisions = sum(g["focus_decisions"] for g in values["candidate"])
+    baseline_focus_decisions = sum(g["focus_decisions"] for g in values["baseline"])
+    if candidate_focus_decisions == 0 or baseline_focus_decisions == 0:
+        raise ValueError("focus decisions must be positive to form rates")
+    candidate_focus_timeouts = sum(g["focus_timeout_count"] for g in values["candidate"])
+    baseline_focus_timeouts = sum(g["focus_timeout_count"] for g in values["baseline"])
+    budget_ms = rows[0]["decision_budget_ms"]
+    budget_enabled = budget_ms > 0
+    budget_within_10s = 0 < budget_ms <= 10000
+    candidate_max_focus = max(g["focus_max_decision_ms"] for g in values["candidate"])
+    baseline_max_focus = max(g["focus_max_decision_ms"] for g in values["baseline"])
+    candidate_deadline_control = candidate == "mcts" and budget_enabled
+    baseline_deadline_control = baseline == "mcts" and budget_enabled
+    candidate_measured_within = budget_enabled and candidate_max_focus <= budget_ms
+    baseline_measured_within = budget_enabled and baseline_max_focus <= budget_ms
+    candidate_10s_observed_pass = (
+        candidate_deadline_control and budget_within_10s and candidate_measured_within
+    )
+    baseline_10s_observed_pass = (
+        baseline_deadline_control and budget_within_10s and baseline_measured_within
+    )
     return {
         "schema_version": 1,
         "mode": "cardless_seat_rotated_candidate_vs_fixed_opponents",
@@ -202,15 +276,59 @@ def validate_and_report(
             g["score_margin"] for g in values["baseline"]
         ),
         "maximum_policy_selection_ms": max_selection,
-        "full_decision_10s_enforced": False,
+        "first_credit_units": "probability fraction; 1.0 = 100 percentage points (pp)",
+        "candidate_first_credit_pct": statistics.mean(
+            g["first_place_credit"] for g in values["candidate"]
+        ) * 100,
+        "baseline_first_credit_pct": statistics.mean(
+            g["first_place_credit"] for g in values["baseline"]
+        ) * 100,
+        "mean_first_credit_delta_pp": point * 100,
+        "paired_block_bootstrap_95ci_pp": [lower * 100, upper * 100],
+        "decision_budget_ms": rows[0]["decision_budget_ms"],
+        "candidate_timeout_rate": sum(g["timeout_count"] for g in values["candidate"]) / candidate_focus_decisions,
+        "baseline_timeout_rate": sum(g["timeout_count"] for g in values["baseline"]) / baseline_focus_decisions,
+        "candidate_fallback_rate": sum(g["fallback_count"] for g in values["candidate"]) / candidate_focus_decisions,
+        "baseline_fallback_rate": sum(g["fallback_count"] for g in values["baseline"]) / baseline_focus_decisions,
+        "candidate_measured_timeout_rate": candidate_focus_timeouts / candidate_focus_decisions,
+        "baseline_measured_timeout_rate": baseline_focus_timeouts / baseline_focus_decisions,
+        "candidate_focus_decisions": candidate_focus_decisions,
+        "baseline_focus_decisions": baseline_focus_decisions,
+        "all_player_decisions": candidate_decisions + baseline_decisions,
+        "candidate_mcts_simulations_completed": sum(g["mcts_simulations_completed"] for g in values["candidate"]),
+        "baseline_mcts_simulations_completed": sum(g["mcts_simulations_completed"] for g in values["baseline"]),
+        "maximum_p95_policy_select_ms": max(g["p95_policy_select_ms"] for g in rows),
+        "maximum_p99_policy_select_ms": max(g["p99_policy_select_ms"] for g in rows),
+        "measurement_scope": "focus-seat whole decision: action-space selection plus detail generation; rates use focus-only decisions as denominator",
+        "focus_decision_timing_includes_detail": True,
+        "maximum_focus_p95_decision_ms": max(g["focus_p95_decision_ms"] for g in rows),
+        "maximum_focus_p99_decision_ms": max(g["focus_p99_decision_ms"] for g in rows),
+        "candidate_max_focus_decision_ms": candidate_max_focus,
+        "baseline_max_focus_decision_ms": baseline_max_focus,
+        "candidate_focus_timeout_count": candidate_focus_timeouts,
+        "baseline_focus_timeout_count": baseline_focus_timeouts,
+        "candidate_focus_deadline_control": candidate_deadline_control,
+        "baseline_focus_deadline_control": baseline_deadline_control,
+        "candidate_focus_measured_within_budget": candidate_measured_within,
+        "baseline_focus_measured_within_budget": baseline_measured_within,
+        "candidate_10s_observed_pass": candidate_10s_observed_pass,
+        "baseline_10s_observed_pass": baseline_10s_observed_pass,
+        "deadline_enforcement": "cooperative_in_policy_checks",
         "first_credit_goal_5pp_point_estimate_met": point >= .05,
         "improvement_ci_lower_above_zero": lower > 0,
         "provisional_goal_and_positive_ci": point >= .05 and lower > 0,
         "caveat": (
-            "Comparison uses named random/greedy/eval policies, not the M7 "
-            "card-aware search AI. Timing is selection only, not a hard 10s "
-            "whole-decision cap. Official rule fidelity and full M8-3 "
-            "acceptance require independent gates."
+            "First-place credit values are probability fractions (0.05 = 5 "
+            "percentage points); *_pp fields are percentage points. Focus "
+            "decision timing includes action-space selection plus detail "
+            "generation for the arm ordered as candidate/baseline. "
+            "*_10s_observed_pass is an observed check, not an OS-enforced hard "
+            "guarantee: MCTS stops at cooperative deadline checks, so it is true "
+            "only when the arm is MCTS, a positive budget <= 10000 ms was "
+            "applied, and the measured maximum focus decision stayed within it. "
+            "A 0 ms budget means no deadline (deterministic MCTS by simulation "
+            "count) and makes all 10s flags false. Official rule fidelity still "
+            "requires independent gates."
         ),
     }
 
@@ -235,9 +353,9 @@ def main() -> int:
     p.add_argument("--seed-start", type=int, required=True)
     p.add_argument("--first-block", type=int, default=0)
     p.add_argument("--blocks", type=int, required=True)
-    p.add_argument("--candidate", choices=("random", "greedy", "eval"), required=True)
-    p.add_argument("--baseline", choices=("random", "greedy", "eval"), required=True)
-    p.add_argument("--opponent", choices=("random", "greedy", "eval"), required=True)
+    p.add_argument("--candidate", choices=("random", "greedy", "eval", "mcts"), required=True)
+    p.add_argument("--baseline", choices=("random", "greedy", "eval", "mcts"), required=True)
+    p.add_argument("--opponent", choices=("random", "greedy", "eval", "mcts"), required=True)
     p.add_argument("--extra", action="store_true")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()

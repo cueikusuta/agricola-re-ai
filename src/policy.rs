@@ -606,16 +606,32 @@ pub fn play_to_end_with_harvest_policy(
     detail_policy: &dyn DetailPolicy,
     harvest_policy: &dyn HarvestDetailPolicy,
 ) -> Result<(), String> {
+    play_to_end_observed(game, space_policy, detail_policy, harvest_policy, |_, _| {})
+}
+
+/// Same loop as `play_to_end_with_harvest_policy`, but reports the wall-clock
+/// duration of each *complete* decision (action-space selection plus detail
+/// generation) to `on_decision` as `(acting_player, nanoseconds)`. The observer
+/// never changes game state, choices, or RNG streams, so action-only replay
+/// stays identical to the unobserved path.
+pub fn play_to_end_observed(
+    game: &mut Game,
+    space_policy: &dyn SpacePolicy,
+    detail_policy: &dyn DetailPolicy,
+    harvest_policy: &dyn HarvestDetailPolicy,
+    mut on_decision: impl FnMut(usize, u64),
+) -> Result<(), String> {
     for _ in 0..320 {
         if game.public.finished {
             return Ok(());
         }
-        let obs = game.observation(game.public.active_player)?;
+        let acting = game.public.active_player;
+        let obs = game.observation(acting)?;
         let legal = game.legal_spaces();
         if legal.is_empty() {
             return Err(format!(
                 "no legal move in round {} for player {}",
-                game.public.round, game.public.active_player
+                game.public.round, acting
             ));
         }
         // Deterministic per-decision RNG: the policy never advances the rule engine RNG.
@@ -624,12 +640,18 @@ pub fn play_to_end_with_harvest_policy(
         let mut choice_rng = ChaCha8Rng::seed_from_u64(
             game.log.action_seed ^ decision_index.wrapping_mul(0x9E37_79B9_7F4A_7C15),
         );
+        let decision_start = std::time::Instant::now();
         let chosen = space_policy
             .select(&obs, &legal, &mut choice_rng)
             .ok_or("policy refused selection")?;
         let action = detail_policy
             .produce(&obs, chosen)
             .ok_or("detail policy declined")?;
+        let elapsed_ns = decision_start
+            .elapsed()
+            .as_nanos()
+            .min(u128::from(u64::MAX)) as u64;
+        on_decision(acting, elapsed_ns);
         game.apply_with_harvest_policy(action, harvest_policy)
             .map_err(|e| format!("policy action {:?} failed: {}", chosen, e))?;
     }
@@ -740,5 +762,32 @@ mod card_choice_tests {
                 .detail,
             Detail::None
         );
+    }
+
+    #[test]
+    fn decision_observer_does_not_change_the_game() {
+        let mut plain = Game::new(Config {
+            players: 4,
+            seed: 71,
+            additional_action_space_enabled: false,
+        });
+        let mut observed = plain.clone();
+        play_to_end(&mut plain, &GreedyPolicy, &SimpleDetails).unwrap();
+        let mut max_ns = 0u64;
+        let mut decisions = 0usize;
+        play_to_end_observed(
+            &mut observed,
+            &GreedyPolicy,
+            &SimpleDetails,
+            &SimpleHarvestDetails,
+            |_, ns| {
+                max_ns = max_ns.max(ns);
+                decisions += 1;
+            },
+        )
+        .unwrap();
+        assert_eq!(plain.state_hash(), observed.state_hash());
+        assert!(decisions > 0);
+        assert!(max_ns > 0, "whole-decision timing must be recorded");
     }
 }

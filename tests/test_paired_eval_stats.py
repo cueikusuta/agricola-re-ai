@@ -38,6 +38,20 @@ def fixture(blocks=3, players=4):
                     "score_margin": scores[seat] - (sum(scores) - scores[seat]) / (players - 1),
                     "decisions": 70,
                     "max_policy_select_ms": 1.0,
+                    "decision_budget_ms": 10000,
+                    "p50_policy_select_ms": 0.5,
+                    "p95_policy_select_ms": 0.9,
+                    "p99_policy_select_ms": 0.99,
+                    "timeout_count": 0,
+                    "fallback_count": 0,
+                    "mcts_simulations_completed": 0,
+                    "focus_decisions": 30,
+                    "focus_max_decision_ms": 0.8,
+                    "focus_p95_decision_ms": 0.6,
+                    "focus_p99_decision_ms": 0.7,
+                    "focus_timeout_count": 0,
+                    "mcts_deadline_active": False,
+                    "deterministic_policy_selection": True,
                     "policy_select_only": True,
                     "total_wall_ms": 50.0,
                     "replay_hash": "a" * 64,
@@ -61,7 +75,8 @@ class PairedStatsTests(unittest.TestCase):
         self.assertEqual(report["total_games"], 24)
         self.assertEqual(report["mean_first_credit_delta"], 1.0)
         self.assertEqual(report["paired_block_bootstrap_95ci"], [1.0, 1.0])
-        self.assertFalse(report["full_decision_10s_enforced"])
+        self.assertFalse(report["candidate_10s_observed_pass"])
+        self.assertFalse(report["candidate_focus_deadline_control"])
 
     def test_missing_and_duplicate_records(self):
         rows = fixture()
@@ -163,6 +178,157 @@ class PairedStatsTests(unittest.TestCase):
         rows[0]["scores_by_seat"][0] = 10**1000
         with self.assertRaisesRegex(ValueError, "standings"):
             run(rows)
+
+    def test_mcts_focus_is_accepted_with_budget_metrics(self):
+        rows = fixture()
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "mcts"
+                row["mcts_simulations_completed"] = 240
+                row["mcts_deadline_active"] = True
+                row["deterministic_policy_selection"] = False
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="mcts", baseline="random", opponent="greedy",
+            extra=False, iterations=500,
+        )
+        self.assertEqual(report["total_games"], 24)
+        self.assertEqual(report["decision_budget_ms"], 10000)
+        self.assertEqual(report["candidate_mcts_simulations_completed"], 12 * 240)
+        self.assertEqual(report["candidate_timeout_rate"], 0.0)
+        self.assertEqual(report["focus_decision_timing_includes_detail"], True)
+        self.assertEqual(report["mean_first_credit_delta_pp"], report["mean_first_credit_delta"] * 100)
+        self.assertEqual(report["candidate_first_credit_pct"], report["candidate_first_credit"] * 100)
+        self.assertTrue(report["candidate_focus_deadline_control"])
+        self.assertTrue(report["candidate_focus_measured_within_budget"])
+        self.assertTrue(report["candidate_10s_observed_pass"])
+        self.assertEqual(report["deadline_enforcement"], "cooperative_in_policy_checks")
+
+    def test_mcts_over_budget_disables_full_decision_flag(self):
+        rows = fixture()
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "mcts"
+                row["mcts_deadline_active"] = True
+                row["deterministic_policy_selection"] = False
+                row["focus_max_decision_ms"] = 12000.0
+                row["focus_p99_decision_ms"] = 11999.0
+                row["focus_p95_decision_ms"] = 11000.0
+                row["focus_timeout_count"] = 5
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="mcts", baseline="random", opponent="greedy",
+            extra=False, iterations=500,
+        )
+        self.assertFalse(report["candidate_10s_observed_pass"])
+        self.assertTrue(report["candidate_focus_deadline_control"])
+        self.assertFalse(report["candidate_focus_measured_within_budget"])
+        self.assertEqual(report["candidate_focus_timeout_count"], 12 * 5)
+        self.assertEqual(report["candidate_max_focus_decision_ms"], 12000.0)
+
+    def test_invalid_selection_timing_and_counters_are_rejected(self):
+        cases = (
+            ("p95_policy_select_ms", 2.0, "timing"),
+            ("p50_policy_select_ms", 0.95, "out of order"),
+            ("timeout_count", 999, "timeout_count"),
+            ("fallback_count", -1, "fallback_count"),
+            ("mcts_simulations_completed", -1, "mcts simulations"),
+            ("decision_budget_ms", 70000, "budget"),
+            ("focus_decisions", 999, "focus decisions"),
+            ("focus_p99_decision_ms", 2.0, "out of order"),
+            ("focus_timeout_count", 999, "focus_timeout_count"),
+            ("mcts_deadline_active", True, "policy mode flags"),
+            ("deterministic_policy_selection", False, "policy mode flags"),
+        )
+        for field, value, expected_error in cases:
+            with self.subTest(field=field):
+                rows = fixture()
+                rows[0][field] = value
+                with self.assertRaisesRegex(ValueError, expected_error):
+                    run(rows)
+
+    def test_deadline_flag_must_match_policy_and_budget(self):
+        rows = fixture()
+        row = rows[0]
+        row["focus_policy"] = "eval"
+        row["decision_budget_ms"] = 10000
+        row["mcts_deadline_active"] = True
+        row["deterministic_policy_selection"] = False
+        with self.assertRaisesRegex(ValueError, "deadline flag"):
+            run(rows)
+
+    def test_mixed_decision_budgets_are_rejected(self):
+        rows = fixture()
+        rows[1]["decision_budget_ms"] = 5000
+        with self.assertRaisesRegex(ValueError, "inconsistent decision budgets"):
+            run(rows)
+
+    def test_rates_use_focus_decision_denominator(self):
+        for players in (2, 4):
+            with self.subTest(players=players):
+                rows = fixture(blocks=2, players=players)
+                for row in rows:
+                    row["decisions"] = 100
+                    row["focus_decisions"] = 25
+                    row["timeout_count"] = 5
+                    row["fallback_count"] = 2
+                    row["focus_timeout_count"] = 1
+                report = validate_and_report(
+                    rows, players=players, seed_start=1000, first_block=0, blocks=2,
+                    candidate="eval", baseline="random", opponent="greedy",
+                    extra=False, iterations=200,
+                )
+                games_per_arm = 2 * players
+                focus_total = games_per_arm * 25
+                self.assertEqual(report["candidate_focus_decisions"], focus_total)
+                self.assertEqual(report["all_player_decisions"], 2 * games_per_arm * 100)
+                self.assertEqual(
+                    report["candidate_timeout_rate"], (games_per_arm * 5) / focus_total
+                )
+                self.assertEqual(
+                    report["candidate_measured_timeout_rate"],
+                    (games_per_arm * 1) / focus_total,
+                )
+                self.assertNotEqual(
+                    report["candidate_timeout_rate"],
+                    (games_per_arm * 5) / (games_per_arm * 100),
+                )
+
+    def test_timeout_and_fallback_accounting_is_consistent(self):
+        rows = fixture()
+        for row in rows:
+            row["focus_decisions"] = 30
+            row["focus_timeout_count"] = 3
+            row["timeout_count"] = 4
+            row["fallback_count"] = 1
+        report = run(rows)
+        games_per_arm = 12
+        focus_total = games_per_arm * 30
+        self.assertEqual(report["candidate_focus_timeout_count"], games_per_arm * 3)
+        self.assertLessEqual(
+            report["candidate_focus_timeout_count"], report["candidate_focus_decisions"]
+        )
+        self.assertEqual(
+            report["candidate_measured_timeout_rate"], (games_per_arm * 3) / focus_total
+        )
+        self.assertEqual(report["candidate_timeout_rate"], (games_per_arm * 4) / focus_total)
+        self.assertEqual(report["candidate_fallback_rate"], (games_per_arm * 1) / focus_total)
+
+    def test_zero_budget_is_deterministic_and_disables_10s_flags(self):
+        rows = fixture()
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "mcts"
+            row["decision_budget_ms"] = 0
+            row["focus_timeout_count"] = 0
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="mcts", baseline="random", opponent="greedy",
+            extra=False, iterations=200,
+        )
+        self.assertFalse(report["candidate_focus_deadline_control"])
+        self.assertFalse(report["candidate_focus_measured_within_budget"])
+        self.assertFalse(report["candidate_10s_observed_pass"])
 
     def test_equal_score_tiebreak_ranks_are_allowed(self):
         rows = fixture()
