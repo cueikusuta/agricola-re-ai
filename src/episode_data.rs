@@ -17,10 +17,11 @@
 //! accident. Draft history is attached per viewer from
 //! [`DraftEpisode::views`], which are themselves per-seat observations.
 
+use crate::api::Episode;
 use crate::cards::CardSet;
 use crate::draft::{DraftHistoryEvent, DraftMode, DraftObservation, DraftState};
 use crate::model::{Config, Event, Game, Observation};
-use crate::policy::SpacePolicy;
+use crate::policy::{DetailPolicy, SpacePolicy};
 use crate::score::{standings_with_cards, Standings};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -29,6 +30,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// On-disk version of one episode record. Bump when the JSON shape changes.
 pub const EPISODE_SCHEMA_VERSION: u32 = 1;
+/// Upper bound on recorded decisions in one game (14 rounds, four players).
+const MAX_RECORDED_TURNS: usize = 320;
 /// Machine-readable format marker.
 pub const EPISODE_FORMAT: &str = "agricola-episode";
 
@@ -377,57 +380,89 @@ pub fn from_jsonl(text: &str) -> Result<Vec<EpisodeRecord>, String> {
 /// pre-action observation. `SimpleDetails` and `EvaluationPolicy` are typical
 /// card-less choices; callers pass them explicitly so this module never
 /// hard-codes a policy version.
+///
+/// This is now a thin alias of [`record_episode`], so the recorded data is
+/// produced through the unified episode API (#148) rather than a second driver.
 pub fn record_self_play(
     config: Config,
     card_set: CardSet,
     meta: EpisodeMeta,
     space_policy: &dyn SpacePolicy,
-    detail_policy: &dyn crate::policy::DetailPolicy,
+    detail_policy: &dyn DetailPolicy,
 ) -> Result<EpisodeRecord, String> {
-    let mut game = Game::with_cards(config, card_set)?;
+    record_episode(config, card_set, meta, space_policy, detail_policy)
+}
+
+/// Drive the M12 [`Episode`] API and record every decision into an
+/// [`EpisodeRecord`].
+///
+/// This is the integration point between the evaluation API and the
+/// learning-data layer: the coordinator owns the [`Episode`], policies see only
+/// the acting player's [`Observation`] plus candidate actions, and the engine
+/// validates and applies each action. The recorded turn observations therefore
+/// contain only the acting player's own hand, never another player's cards, the
+/// hidden round order or the internal RNG.
+pub fn record_episode(
+    config: Config,
+    card_set: CardSet,
+    meta: EpisodeMeta,
+    space_policy: &dyn SpacePolicy,
+    detail_policy: &dyn DetailPolicy,
+) -> Result<EpisodeRecord, String> {
+    let mut episode = Episode::reset_with_cards(config, card_set)?;
+    record_from_episode(&mut episode, &meta, space_policy, detail_policy)
+}
+
+/// Record a fresh (no committed events) [`Episode`] through to its terminal
+/// state. Mixed histories are rejected so the record always owns a complete
+/// event log that [`EpisodeRecord::verify`] can replay.
+pub fn record_from_episode(
+    episode: &mut Episode,
+    meta: &EpisodeMeta,
+    space_policy: &dyn SpacePolicy,
+    detail_policy: &dyn DetailPolicy,
+) -> Result<EpisodeRecord, String> {
+    if !episode.events().is_empty() {
+        return Err("recording requires a fresh episode with no committed events".into());
+    }
     let mut turns = Vec::new();
-    for index in 0..320 {
-        if game.public.finished {
+    for index in 0..MAX_RECORDED_TURNS {
+        if episode.is_terminal() {
             break;
         }
-        let player = game.public.active_player;
-        let observation = game.observation(player)?;
-        let legal = game.legal_spaces();
-        if legal.is_empty() {
-            return Err("no legal move while recording an episode".into());
-        }
-        let decision_index = game.log.events.len() as u64;
+        let player = episode.active_player();
+        let input = episode.policy_input(player)?;
+        let decision_index = episode.events().len() as u64;
         let mut choice_rng = ChaCha8Rng::seed_from_u64(
-            game.log.action_seed ^ decision_index.wrapping_mul(0x9E37_79B9_7F4A_7C15),
+            episode.game().log.action_seed ^ decision_index.wrapping_mul(0x9E37_79B9_7F4A_7C15),
         );
         let space = space_policy
-            .select(&observation, &legal, &mut choice_rng)
+            .select(&input.observation, &input.legal_actions, &mut choice_rng)
             .ok_or("policy refused selection")?;
         let action = detail_policy
-            .produce(&observation, space)
+            .produce(&input.observation, space)
             .ok_or("policy refused details")?;
-        game.apply(action)?;
-        let event = game
-            .log
-            .events
+        episode.step(player, action)?;
+        let event = episode
+            .events()
             .last()
             .ok_or("applying an action produced no event")?
             .clone();
         turns.push(TurnRecord {
             index,
             player,
-            round: observation.public.round,
-            observation,
+            round: input.observation.public.round,
+            observation: input.observation,
             action: event.payload.clone(),
             before: event.before.clone(),
             after: event.after.clone(),
             reward: 0.0,
         });
     }
-    if !game.public.finished {
+    if !episode.is_terminal() {
         return Err("recording did not reach the end of the game".into());
     }
-    EpisodeRecord::from_game(&game, &meta, turns, None)
+    EpisodeRecord::from_game(episode.game(), meta, turns, None)
 }
 
 /// `1/k` first-place credit for each of the `k` tied leaders, else `0`.
