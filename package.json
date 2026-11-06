@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "test:e2e": "node --test tests/e2e/*.test.cjs"
+    "test:e2e": "node --test --test-concurrency=1 tests/e2e/*.test.cjs"
   },
   "devDependencies": {
     "playwright-core": "1.58.2"

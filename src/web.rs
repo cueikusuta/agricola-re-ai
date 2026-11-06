@@ -1,6 +1,10 @@
 //! Loopback-only, single-user web UI. No external services or accounts.
 use crate::breeding::BreedingPlan;
 use crate::cards::CardSet;
+use crate::draft::{
+    cpu_choice, cpu_pick, CardKind, Direction, DraftMode, DraftObservation, DraftPhase, DraftPool,
+    DraftRuleset, DraftSetup, DraftState,
+};
 use crate::engine::{Action, Detail, FreeAction};
 use crate::harvest::{FeedingPlan, HarvestDetailPolicy};
 
@@ -24,6 +28,15 @@ pub struct Session {
     mcts: bool,
     budget: usize,
     pending: Option<PendingHarvest>,
+    draft: Option<DraftWeb>,
+}
+
+/// A server-owned draft session. The authoritative state stays on the server;
+/// the browser only ever receives `DraftObservation` for the human seat.
+#[derive(Clone)]
+struct DraftWeb {
+    setup: DraftSetup,
+    state: DraftState,
 }
 
 #[derive(Clone)]
@@ -51,6 +64,7 @@ impl Session {
             mcts: false,
             budget: 8,
             pending: None,
+            draft: None,
         };
         session.advance_cpu()?;
         Ok(session)
@@ -194,7 +208,148 @@ impl Session {
             })).collect::<Vec<_>>(),
             "mcts": self.mcts,
             "seed": self.game.config.seed,
+            "draft": self
+                .draft
+                .as_ref()
+                .and_then(|d| d.state.observe(0, d.state.current_token()).ok())
+                .map(|obs| draft_json(&obs, &self.draft.as_ref().unwrap().state, &self.draft.as_ref().unwrap().setup))
+                .unwrap_or(Value::Null),
         })
+    }
+
+    // ---- M11 draft foundation (Issue #104) --------------------------------
+
+    fn draft(&self) -> Result<&DraftWeb, String> {
+        self.draft.as_ref().ok_or("no draft session".into())
+    }
+
+    fn draft_mut(&mut self) -> Result<&mut DraftWeb, String> {
+        self.draft.as_mut().ok_or("no draft session".into())
+    }
+
+    pub fn draft_view(&self) -> Result<Value, String> {
+        let d = self.draft()?;
+        let obs = d.state.observe(0, d.state.current_token())?;
+        Ok(draft_json(&obs, &d.state, &d.setup))
+    }
+
+    /// Start a draft with an explicit ruleset. Missing direction or phase-order
+    /// parameters are rejected rather than defaulted, because those are
+    /// unconfirmed tournament conventions (see `docs/draft-protocol-m11.md`).
+    pub fn start_draft(&mut self, input: &Value) -> Result<(), String> {
+        let mode = match input.get("mode").and_then(Value::as_str) {
+            Some("deal_7") => DraftMode::Deal7,
+            Some("draft_7_7") => DraftMode::Draft77,
+            Some("draft_10_7_simultaneous") => DraftMode::Draft10_7Simultaneous,
+            Some("choose_10_7") => DraftMode::Choose10_7,
+            _ => return Err("unknown draft mode".into()),
+        };
+        let players = input.get("players").and_then(Value::as_u64).unwrap_or(2) as usize;
+        if !(2..=4).contains(&players) {
+            return Err("draft players must be 2, 3 or 4".into());
+        }
+        let direction_occupation = parse_direction(
+            input.get("direction_occupation").and_then(Value::as_str),
+            "direction_occupation",
+        )?;
+        let direction_minor = parse_direction(
+            input.get("direction_minor").and_then(Value::as_str),
+            "direction_minor",
+        )?;
+        let occupation_phase_first = match input.get("occupation_phase_first") {
+            Some(value) => value
+                .as_bool()
+                .ok_or("occupation_phase_first must be a boolean")?,
+            None if mode == DraftMode::Draft77 => {
+                return Err("draft_7_7 requires an explicit occupation_phase_first".into())
+            }
+            None => true,
+        };
+        let seed = input.get("seed").and_then(Value::as_u64).unwrap_or(42);
+        let pool = fixture_pool(mode, players);
+        let setup = DraftSetup {
+            mode,
+            ruleset: DraftRuleset::explicit(
+                format!("fixture-explicit-{}", mode.id()),
+                direction_occupation,
+                direction_minor,
+                occupation_phase_first,
+            ),
+            pool,
+            player_count: players,
+            seed,
+            deck_version: "test-fixture-v1".into(),
+        };
+        let state = setup.start()?;
+        self.draft = Some(DraftWeb { setup, state });
+        Ok(())
+    }
+
+    /// Human seat 0 commits one round pick; the CPU seats then follow.
+    pub fn draft_pick(&mut self, input: &Value) -> Result<(), String> {
+        let token = input
+            .get("token")
+            .and_then(Value::as_u64)
+            .ok_or("draft token is required")?;
+        let occupation = optional_string(input.get("occupation"))?;
+        let minor = optional_string(input.get("minor"))?;
+        {
+            let d = self.draft_mut()?;
+            d.state.commit_pick(0, token, occupation, minor)?;
+        }
+        self.auto_commit_cpus()
+    }
+
+    /// Human seat 0 finalises a 10-7 non-draft hand; the CPU seats follow.
+    pub fn draft_choice(&mut self, input: &Value) -> Result<(), String> {
+        let token = input
+            .get("token")
+            .and_then(Value::as_u64)
+            .ok_or("draft token is required")?;
+        let occupations = string_list(input.get("occupations"), "occupations")?;
+        let minors = string_list(input.get("minors"), "minors")?;
+        {
+            let d = self.draft_mut()?;
+            d.state.commit_choice(0, token, occupations, minors)?;
+        }
+        self.auto_commit_cpus()
+    }
+
+    /// Advance every CPU seat that has not yet committed, using only each
+    /// seat's own observation. Never reads another seat's private packet.
+    fn auto_commit_cpus(&mut self) -> Result<(), String> {
+        let players = self.draft()?.state.player_count;
+        let mode = self.draft()?.state.mode;
+        for seat in 1..players {
+            let (pending, token) = {
+                let d = self.draft()?;
+                (
+                    d.state.commitments[seat].is_none() && !d.state.is_complete(),
+                    d.state.current_token(),
+                )
+            };
+            if !pending {
+                continue;
+            }
+            let d = self.draft_mut()?;
+            let obs = d.state.observe(seat, token)?;
+            match mode {
+                DraftMode::Choose10_7 => {
+                    let (occ, minor) = cpu_choice(&obs)?;
+                    d.state.commit_choice(seat, token, occ, minor)?;
+                }
+                _ => {
+                    let commit = cpu_pick(&obs)?;
+                    d.state
+                        .commit_pick(seat, token, commit.occupation, commit.minor)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn reset_draft(&mut self) {
+        self.draft = None;
     }
     pub fn reset(&mut self, input: &Value) -> Result<(), String> {
         let players = input.get("players").and_then(Value::as_u64).unwrap_or(2);
@@ -226,6 +381,9 @@ impl Session {
             mcts: input.get("ai").and_then(Value::as_str) == Some("mcts"),
             budget: budget as usize,
             pending: None,
+            // A fresh game resets the draft setup; the draft is a distinct
+            // pre-game phase and must not leak into a new match.
+            draft: None,
         };
         next.advance_cpu()?;
         *self = next;
@@ -327,10 +485,97 @@ impl Session {
     }
 }
 
-fn local_request_allowed(host: Option<&str>, origin: Option<&str>) -> bool {
-    let local_host = matches!(host, Some("127.0.0.1:8787" | "localhost:8787"));
-    let local_origin = origin
-        .is_none_or(|value| matches!(value, "http://127.0.0.1:8787" | "http://localhost:8787"));
+/// Build the observable draft payload for the browser. It contains only the
+/// human seat's own packets and history plus public counts; the seed, other
+/// seats' packets, and the private discard pile are never serialized here.
+fn draft_json(obs: &DraftObservation, state: &DraftState, setup: &DraftSetup) -> Value {
+    let complete = state.is_complete();
+    // Only the viewer's own final hand may be revealed. Other seats' hands are
+    // private even after the draft ends.
+    let own_final_hands = if complete {
+        state
+            .final_hands()
+            .get(obs.viewer)
+            .map(|(occupations, minors)| json!({"occupations": occupations, "minors": minors}))
+    } else {
+        None
+    };
+    json!({
+        "mode": obs.mode.id(),
+        "ruleset_id": obs.ruleset_id,
+        "pool_kind": "test_fixture",
+        "deck_version": setup.deck_version,
+        "phase": match obs.phase {
+            DraftPhase::Drafting => "drafting",
+            DraftPhase::Choosing => "choosing",
+            DraftPhase::Complete => "complete",
+        },
+        "round": obs.round,
+        "active_kind": obs.active_kind.map(CardKind::as_str),
+        "hand_counts": obs.hand_counts,
+        "own_picked": obs.own_picked,
+        "offered_occupation": obs.offered_occupation,
+        "offered_minor": obs.offered_minor,
+        "remaining_to_pick": obs.remaining_to_pick,
+        "request_token": obs.request_token,
+        "history": obs.own_observation_history,
+        "complete": complete,
+        "own_final_hands": own_final_hands,
+    })
+}
+
+fn parse_direction(value: Option<&str>, field: &str) -> Result<Direction, String> {
+    match value {
+        Some("left") => Ok(Direction::Left),
+        Some("right") => Ok(Direction::Right),
+        _ => Err(format!("{field} must be explicitly left or right")),
+    }
+}
+
+/// Deterministic fixture pool. These IDs are NOT official cards; they exist so
+/// the draft foundation can be exercised before the verified card pool (#115)
+/// and the card subsystem (#139) are ready.
+fn fixture_pool(mode: DraftMode, players: usize) -> DraftPool {
+    let n = mode.dealt_per_kind() * players;
+    DraftPool::new(
+        (0..n).map(|i| format!("FIX-OCC-{i:02}")).collect(),
+        (0..n).map(|i| format!("FIX-MIN-{i:02}")).collect(),
+    )
+}
+
+fn optional_string(value: Option<&Value>) -> Result<Option<String>, String> {
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(text)) if text.is_empty() => Ok(None),
+        Some(Value::String(text)) => Ok(Some(text.clone())),
+        Some(_) => Err("expected a string card id".into()),
+    }
+}
+
+fn string_list(value: Option<&Value>, field: &str) -> Result<Vec<String>, String> {
+    let array = value
+        .and_then(Value::as_array)
+        .ok_or_else(|| format!("{field} must be an array of card ids"))?;
+    array
+        .iter()
+        .map(|item| {
+            item.as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("{field} must contain only strings"))
+        })
+        .collect()
+}
+
+fn local_request_allowed(host: Option<&str>, origin: Option<&str>, port: u16) -> bool {
+    let local_host = host.is_some_and(|value| match value.rsplit_once(':') {
+        Some((name, value_port)) => {
+            (name == "127.0.0.1" || name == "localhost") && value_port.parse::<u16>() == Ok(port)
+        }
+        None => false,
+    });
+    let local_origin = origin.is_none_or(|value| {
+        value == format!("http://127.0.0.1:{port}") || value == format!("http://localhost:{port}")
+    });
     local_host && local_origin
 }
 
@@ -351,7 +596,7 @@ fn response(stream: &mut TcpStream, status: &str, mime: &str, content: &str) -> 
         .map_err(|e| e.to_string())?;
     stream.write_all(bytes).map_err(|e| e.to_string())
 }
-fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
+fn handle(mut stream: TcpStream, session: &mut Session, port: u16) -> Result<(), String> {
     stream
         .set_read_timeout(Some(std::time::Duration::from_secs(5)))
         .map_err(|e| e.to_string())?;
@@ -398,7 +643,7 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
             }
         }
     }
-    if !local_request_allowed(host.as_deref(), origin.as_deref()) {
+    if !local_request_allowed(host.as_deref(), origin.as_deref(), port) {
         return response(
             &mut stream,
             "403 Forbidden",
@@ -429,6 +674,20 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
     }
     let result: Result<Value, String> = (|| match (method, path) {
         ("GET", "/api/state") => Ok(session.view()),
+        ("GET", "/api/draft/state") => session.draft_view(),
+        ("POST", "/api/draft/new")
+        | ("POST", "/api/draft/pick")
+        | ("POST", "/api/draft/choice")
+        | ("POST", "/api/draft/reset") => {
+            let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            match path {
+                "/api/draft/new" => session.start_draft(&value)?,
+                "/api/draft/pick" => session.draft_pick(&value)?,
+                "/api/draft/choice" => session.draft_choice(&value)?,
+                _ => session.reset_draft(),
+            }
+            Ok(session.view())
+        }
         ("POST", "/api/new")
         | ("POST", "/api/play")
         | ("POST", "/api/free")
@@ -463,13 +722,17 @@ fn handle(mut stream: TcpStream, session: &mut Session) -> Result<(), String> {
     }
 }
 pub fn serve(config: Config) -> Result<(), String> {
-    let listener = TcpListener::bind(("127.0.0.1", 8787)).map_err(|e| e.to_string())?;
+    let port: u16 = std::env::var("AGRICOLA_WEB_PORT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(8787);
+    let listener = TcpListener::bind(("127.0.0.1", port)).map_err(|e| e.to_string())?;
     let mut session = Session::new(config)?;
-    println!("Agricola local UI: http://127.0.0.1:8787/");
+    println!("Agricola local UI: http://127.0.0.1:{port}/");
     for accepted in listener.incoming() {
         match accepted {
             Ok(stream) => {
-                if let Err(error) = handle(stream, &mut session) {
+                if let Err(error) = handle(stream, &mut session, port) {
                     eprintln!("UI request error: {error}");
                 }
             }
@@ -485,20 +748,24 @@ mod tests {
 
     #[test]
     fn local_api_rejects_cross_site_and_simple_form_posts() {
-        assert!(local_request_allowed(Some("127.0.0.1:8787"), None));
+        assert!(local_request_allowed(Some("127.0.0.1:8787"), None, 8787));
         assert!(local_request_allowed(
             Some("localhost:8787"),
-            Some("http://localhost:8787")
+            Some("http://localhost:8787"),
+            8787
         ));
         assert!(!local_request_allowed(
             Some("evil.example:8787"),
-            Some("http://evil.example:8787")
+            Some("http://evil.example:8787"),
+            8787
         ));
         assert!(!local_request_allowed(
             Some("127.0.0.1:8787"),
-            Some("https://evil.example")
+            Some("https://evil.example"),
+            8787
         ));
-        assert!(!local_request_allowed(None, None));
+        assert!(!local_request_allowed(None, None, 8787));
+        assert!(!local_request_allowed(Some("127.0.0.1:9999"), None, 8787));
         assert!(json_content_type(Some("application/json; charset=utf-8")));
         assert!(!json_content_type(Some("text/plain")));
         assert!(!json_content_type(None));
@@ -729,5 +996,108 @@ mod tests {
         )
         .unwrap();
         assert_eq!(replay.state_hash(), session.game.state_hash());
+    }
+
+    #[test]
+    fn draft_endpoints_require_explicit_directions_and_phase_order() {
+        let mut session = Session::new(Config::default()).unwrap();
+        assert!(
+            session
+                .start_draft(&json!({"mode":"draft_7_7","players":2}))
+                .is_err(),
+            "missing directions must be rejected, not defaulted"
+        );
+        assert!(
+            session
+                .start_draft(&json!({
+                    "mode":"draft_7_7","players":2,
+                    "direction_occupation":"left","direction_minor":"right"
+                }))
+                .is_err(),
+            "7-7 needs an explicit phase order"
+        );
+        session
+            .start_draft(&json!({
+                "mode":"draft_7_7","players":2,"seed":3,
+                "direction_occupation":"left","direction_minor":"right",
+                "occupation_phase_first":true
+            }))
+            .unwrap();
+        assert!(session.draft_view().is_ok());
+    }
+
+    #[test]
+    fn draft_web_plays_full_simultaneous_and_redacts_private_data() {
+        let mut session = Session::new(Config::default()).unwrap();
+        session
+            .start_draft(&json!({
+                "mode":"draft_10_7_simultaneous","players":2,"seed":9,
+                "direction_occupation":"left","direction_minor":"right"
+            }))
+            .unwrap();
+        for _ in 0..40 {
+            let view = session.draft_view().unwrap();
+            if view["complete"].as_bool().unwrap() {
+                break;
+            }
+            let token = view["request_token"].as_u64().unwrap();
+            let occupation = view["offered_occupation"][0].as_str().unwrap().to_owned();
+            let minor = view["offered_minor"][0].as_str().unwrap().to_owned();
+            session
+                .draft_pick(&json!({"token":token,"occupation":occupation,"minor":minor}))
+                .unwrap();
+        }
+        let view = session.draft_view().unwrap();
+        assert!(view["complete"].as_bool().unwrap());
+        assert_eq!(view["phase"], "complete");
+        assert_eq!(
+            view["own_final_hands"]["occupations"]
+                .as_array()
+                .unwrap()
+                .len(),
+            7
+        );
+        // The browser view never carries the private seed or a deck field.
+        assert!(view.get("seed").is_none());
+        assert!(view.get("packets").is_none());
+        // Other seats' final hands are not exposed in the viewer payload.
+        assert!(view.get("final_hands").is_none());
+        session
+            .draft()
+            .unwrap()
+            .state
+            .validate_invariants()
+            .unwrap();
+    }
+
+    #[test]
+    fn draft_web_auto_plays_cpu_choice_mode() {
+        let mut session = Session::new(Config::default()).unwrap();
+        session
+            .start_draft(&json!({
+                "mode":"choose_10_7","players":3,"seed":17,
+                "direction_occupation":"right","direction_minor":"right"
+            }))
+            .unwrap();
+        let view = session.draft_view().unwrap();
+        let token = view["request_token"].as_u64().unwrap();
+        let occ = view["offered_occupation"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .take(7)
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        let minor = view["offered_minor"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .take(7)
+            .map(|v| v.as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        session
+            .draft_choice(&json!({"token":token,"occupations":occ,"minors":minor}))
+            .unwrap();
+        assert!(session.draft_view().unwrap()["complete"].as_bool().unwrap());
     }
 }

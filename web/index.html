@@ -37,6 +37,19 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <details><summary>外部カード定義JSONを読み込む</summary><textarea id="cardJson" placeholder='{"definitions":[]}'></textarea><p class="minor">空欄ならカードなし。原文や画像は不要です。公式カードを自動収録する機能はありません。</p></details>
 </section>
 <section class="panel status"><strong id="turn">読み込み中...</strong><span id="summary" class="minor"></span></section>
+<section class="panel" id="draftPanel"><h2>ドラフト（M11・テスト用フィクスチャ）</h2>
+<div class="buttons">
+<label>方式 <select id="draftMode"><option value="deal_7">通常7枚配布</option><option value="draft_7_7">7-7ドラフト</option><option value="draft_10_7_simultaneous">10-7同時ドラフト</option><option value="choose_10_7">10-7選択</option></select></label>
+<label>人数 <select id="draftPlayers"><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option></select></label>
+<label>乱数シード <input id="draftSeed" type="number" value="42" min="0" step="1"></label>
+<label>職業の受渡方向 <select id="draftDirOcc"><option value="">選択してください</option><option value="left">左へ</option><option value="right">右へ</option></select></label>
+<label>小進歩の受渡方向 <select id="draftDirMinor"><option value="">選択してください</option><option value="left">左へ</option><option value="right">右へ</option></select></label>
+<label><input id="draftOccFirst" type="checkbox" checked>7-7は職業を先に選ぶ</label>
+<button id="draftNew">ドラフト開始</button><button id="draftReset">ドラフト解除</button>
+</div>
+<p class="minor">受渡方向・フェーズ順は公式未確定の対戦慣行です。未選択なら開始しません。ここで使うカードは<strong>テスト専用フィクスチャ</strong>であり公式カードではありません。人間は1Pとして選択し、他席は観測可能情報だけで選ぶCPUです。</p>
+<div id="draftStatus"></div><div id="draftOffered" class="chips"></div><div id="draftActions" class="buttons"></div><div id="draftLog" class="minor"></div>
+</section>
 <section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
 <div class="stats"><h2>資源・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p><p id="hand" class="minor"></p><details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details><p id="history"></p></div></div></section>
 <section class="panel"><h2 id="actionTitle">アクションの詳細を手動指定</h2><div id="notice"></div><div class="actions" id="actions"></div><div class="buttons" id="actionNav"></div></section>
@@ -100,6 +113,7 @@ return [cell.stable?"厩":"空き",""];}
 function putStats(label,value){const d=document.createElement("div");d.className="stat";d.textContent=label+" "+value;$("stats").append(d);}
 function render(){
 if(!state)return;
+renderDraft();
 const p=state.public,scores=state.standings,harvest=state.harvest,shown=harvest?harvest.preview:p;
 $("turn").textContent=p.finished?"対戦終了":harvest?"収穫の詳細を決めてください":"ラウンド "+p.round+"/14・"+(p.active_player+1)+"Pの手番";
 $("summary").textContent=p.players.length+"人戦 / 追加タイル "+(p.additional_action_space_enabled?"ON":"OFF")+" / "+(state.card_enabled?"カードあり":"カードなし");
@@ -256,4 +270,67 @@ $("new").onclick=async()=>{viewPlayer=0;let card_set;const cards=val("cards");
 try{if(cards==="json"){card_set=JSON.parse($("cardJson").value);}}catch(e){$("notice").textContent="カード定義JSONが不正です: "+e.message;return;}
 await request("/api/new",{players:Number($("players").value),extra:$("extra").checked,ai:$("ai").value,seed:Number($("seed").value),budget:8,...(cards==="verified"?{preset:"verified"}:cards==="json"?{card_set}: {})});};
 request("/api/state");
+let draftSel={occupation:new Set(),minor:new Set()},draftSelToken=null;
+function draftCardLabel(id){return cardNames[id]?cardLabel(id):id;}
+function resetDraftSel(){draftSel={occupation:new Set(),minor:new Set()};draftSelToken=null;}
+function renderDraft(){
+const d=state&&state.draft,status=$("draftStatus"),offered=$("draftOffered"),actions=$("draftActions"),log=$("draftLog");
+if(!d){status.textContent="ドラフトは開始されていません。";offered.replaceChildren();actions.replaceChildren();log.textContent="";return;}
+if(!d.complete&&draftSelToken!==d.request_token){resetDraftSel();draftSelToken=d.request_token;}
+const label={occupation:"職業",minor_improvement:"小進歩"};
+let phase;
+if(d.complete)phase="完了";
+else if(d.phase==="choosing")phase="自分の10枚から7枚を選ぶ";
+else if(d.active_kind)phase=label[d.active_kind]+"を1枚選ぶ";
+else phase="職業と小進歩を同時に1枚ずつ選ぶ";
+status.textContent="方式 "+d.mode+" / "+phase+" / 選んだ枚数 "+d.hand_counts.map((n,i)=>(i+1)+"P:"+n).join(" ")+" / 残り "+d.remaining_to_pick+"（テスト用フィクスチャ）";
+offered.replaceChildren();
+if(d.complete){
+  const own=d.own_final_hands||{occupations:[],minors:[]};
+  const p=document.createElement("p");p.className="minor";p.textContent="あなたの最終手札 — 職業: "+(own.occupations.map(draftCardLabel).join(" / ")||"なし")+" ｜ 小進歩: "+(own.minors.map(draftCardLabel).join(" / ")||"なし");
+  offered.append(p);
+  actions.replaceChildren();log.textContent="観測履歴 "+((d.history||[]).length)+"件（見た束・自分のピック・渡した束）";
+  return;
+}
+const chooseMode=d.phase==="choosing";
+const allowOcc=chooseMode||d.active_kind==="occupation"||d.active_kind===null;
+const allowMin=chooseMode||d.active_kind==="minor_improvement"||d.active_kind===null;
+function group(title,ids,kind,allow){
+  const h=document.createElement("h3");h.textContent=title+"（候補 "+ids.length+"枚"+(chooseMode?"・7枚まで選択":"")+"）";offered.append(h);
+  const box=document.createElement("div");box.className="chips";
+  for(const id of ids){
+    const b=document.createElement("button");b.type="button";b.textContent=draftCardLabel(id);b.disabled=!allow;
+    b.dataset.kind=kind;b.dataset.id=id;
+    if(draftSel[kind].has(id))b.className="active";
+    b.onclick=()=>{const s=draftSel[kind];if(chooseMode){if(s.has(id))s.delete(id);else if(s.size<7)s.add(id);}else{s.clear();s.add(id);}renderDraft();};
+    box.append(b);
+  }
+  offered.append(box);
+}
+group("職業",d.offered_occupation,"occupation",allowOcc);
+group("小進歩",d.offered_minor,"minor",allowMin);
+actions.replaceChildren();
+const confirm=document.createElement("button");confirm.id="draftConfirm";confirm.textContent="選択を確定";confirm.className="primary";
+confirm.onclick=async()=>{
+  if(chooseMode){
+    if(draftSel.occupation.size!==7||draftSel.minor.size!==7){log.textContent="10-7選択では職業・小進歩をそれぞれ7枚選んでください。";return;}
+    await request("/api/draft/choice",{token:d.request_token,occupations:[...draftSel.occupation],minors:[...draftSel.minor]});
+  }else{
+    const occ=draftSel.occupation.size?[...draftSel.occupation][0]:null,minor=draftSel.minor.size?[...draftSel.minor][0]:null;
+    if(d.active_kind==="occupation"&&!occ){log.textContent="職業を1枚選んでください。";return;}
+    if(d.active_kind==="minor_improvement"&&!minor){log.textContent="小進歩を1枚選んでください。";return;}
+    if(d.active_kind===null&&(!occ||!minor)){log.textContent="職業と小進歩を1枚ずつ選んでください。";return;}
+    await request("/api/draft/pick",{token:d.request_token,occupation:occ,minor});
+  }
+};
+actions.append(confirm);
+log.textContent="自分のピック: "+(d.own_picked.length?d.own_picked.map(draftCardLabel).join(" / "):"なし")+" / 観測履歴 "+((d.history||[]).length)+"件";
+}
+$("draftNew").onclick=async()=>{
+const mode=val("draftMode"),do_=val("draftDirOcc"),dm=val("draftDirMinor");
+if(mode!=="deal_7"&&mode!=="choose_10_7"&&(!do_||!dm)){$("draftStatus").textContent="受渡方向を明示してください（公式未確定の対戦慣行）。";return;}
+resetDraftSel();
+await request("/api/draft/new",{mode,players:Number(val("draftPlayers")),seed:Number(val("draftSeed")),direction_occupation:do_||"left",direction_minor:dm||"left",occupation_phase_first:checked("draftOccFirst")});
+};
+$("draftReset").onclick=async()=>{resetDraftSel();await request("/api/draft/reset",{});};
 </script></body></html>
