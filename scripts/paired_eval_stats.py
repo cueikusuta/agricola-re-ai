@@ -16,6 +16,11 @@ import random
 import statistics
 import sys
 
+# Every policy name accepted by the aggregator and the CLI. Keep in sync with
+# the `Ai` enum in src/bin/paired_eval.rs.
+POLICY_CHOICES = ("random", "greedy", "eval", "mcts", "puct")
+SEARCH_POLICIES = ("mcts", "puct")
+
 
 def finite_number(value: object) -> bool:
     """Reject NaN, infinities, booleans, and non-numeric JSON values."""
@@ -39,10 +44,9 @@ def validate_and_report(
 ) -> dict:
     if players not in (2, 3, 4) or blocks < 1 or iterations < 100:
         raise ValueError("invalid experimental settings")
-    search_policies = ("mcts", "puct")
+    search_policies = SEARCH_POLICIES
     if candidate == baseline or any(
-        name not in ("random", "greedy", "eval", "mcts", "puct")
-        for name in (candidate, baseline, opponent)
+        name not in POLICY_CHOICES for name in (candidate, baseline, opponent)
     ):
         raise ValueError("unsupported/identical policy")
     expected = {
@@ -354,9 +358,9 @@ def main() -> int:
     p.add_argument("--seed-start", type=int, required=True)
     p.add_argument("--first-block", type=int, default=0)
     p.add_argument("--blocks", type=int, required=True)
-    p.add_argument("--candidate", choices=("random", "greedy", "eval", "mcts"), required=True)
-    p.add_argument("--baseline", choices=("random", "greedy", "eval", "mcts"), required=True)
-    p.add_argument("--opponent", choices=("random", "greedy", "eval", "mcts"), required=True)
+    p.add_argument("--candidate", choices=POLICY_CHOICES, required=True)
+    p.add_argument("--baseline", choices=POLICY_CHOICES, required=True)
+    p.add_argument("--opponent", choices=POLICY_CHOICES, required=True)
     p.add_argument("--extra", action="store_true")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()

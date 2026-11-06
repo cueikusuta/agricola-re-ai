@@ -2,7 +2,7 @@
 import copy
 import unittest
 
-from scripts.paired_eval_stats import validate_and_report
+from scripts.paired_eval_stats import POLICY_CHOICES, validate_and_report
 
 
 def fixture(blocks=3, players=4):
@@ -69,6 +69,14 @@ def run(rows, blocks=3, players=4):
 
 
 class PairedStatsTests(unittest.TestCase):
+    def test_cli_and_validator_accept_every_search_policy(self):
+        # Guards against the CLI choices drifting from the validator (a
+        # workflow_dispatch with candidate=puct previously failed here).
+        for name in ("mcts", "puct"):
+            self.assertIn(name, POLICY_CHOICES)
+        for name in ("random", "greedy", "eval"):
+            self.assertIn(name, POLICY_CHOICES)
+
     def test_complete_seat_blocks_and_effect_size(self):
         report = run(fixture())
         self.assertEqual(report["games_per_arm"], 12)
