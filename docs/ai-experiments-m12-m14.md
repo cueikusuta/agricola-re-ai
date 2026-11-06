@@ -102,3 +102,12 @@ ExIt候補：教師として情報集合を守るE2/E3/E4の探索を用い、�
 - 毎コミット：fmt/clippy/test、seed固定回帰、差分レビュー、ブラウザ動作との境界、CIと専用Actions run URL。未測定の結果は書かない。
 
 **この文書に記載のG0〜G3・+5pp・1000試合・10秒を、現時点で合格済みとは扱わない。**
+
+## 9. 実装状況：M12データ層（2026-11-07、Task C / #106）
+
+- `src/episode_data.rs` が独立した変換・検証機構。`EpisodeRecord` は1試合分の観測・行動・報酬・終局結果・seed・ルールモード・AI版・`code_sha`・エンジン版・カード版を保持し、`schema_version = 1` で版管理する。
+- JSONL の書き出し・読み込み（`to_jsonl` / `from_jsonl`）と、件数・スキーマ版・人数・重複seed・再演破損を検出する `inspect_dataset` / `DatasetReport`。
+- `verify()` はコミット済みイベント列を `Game::replay_with_cards` で再演し、最終ハッシュと順位表の一致を確認する。
+- `training_samples(viewer)` は行為者が `viewer` のターンだけを返し、`TrainingSample` には seed もイベント列も含めない。`assert_public()` で秘匿フィールドの混入を拒否する。ドラフト履歴は `DraftEpisode.views[seat]`（各席が正当に観測した `DraftObservation`）からのみ渡す。
+- ローカル小規模生成は `src/bin/episode_export.rs`。大量試合は既存のGitHub Actions専用ワークフロー（`docs/github-actions-mass-simulation-m8-3.md`）で実行し、通常CIには組み込まない。
+- 本モジュールは PR #148 のエピソードAPIに依存しない。統合（APIからの記録生成）は同PRのマージ後に別途行う。実測の強さ・学習結果は未評価。

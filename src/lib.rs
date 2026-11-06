@@ -3,6 +3,7 @@ pub mod breeding;
 pub mod cards;
 pub mod draft;
 pub mod engine;
+pub mod episode_data;
 pub mod evaluation;
 pub mod harvest;
 pub mod hints;
