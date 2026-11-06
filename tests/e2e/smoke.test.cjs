@@ -115,6 +115,8 @@ test("ローカルWeb UIを実ブラウザで検証", async (t) => {
         await harvestButton.first().click();
         await page.locator("#editor").waitFor({ state: "visible" });
         assert.match(await page.locator("#fields").innerText(), /必要食料/, "feeding hints must show owed food");
+        await page.locator("#cancel").click();
+        await page.locator("#editor").waitFor({ state: "hidden" });
         sawHarvest = true;
         break;
       }
@@ -165,6 +167,8 @@ test("ローカルWeb UIを実ブラウザで検証", async (t) => {
     await multi.click();
     assert.equal(await page.locator("#pastures").inputValue(), "1,2");
     assert.ok(await page.locator('#fields button[data-kind="split"]').count(), "a split candidate must be reachable");
+    await page.locator("#cancel").click();
+    await page.locator("#editor").waitFor({ state: "hidden" });
   });
 
   await scenario("free_action_does_not_offer_workshop_processing", async () => {
@@ -179,5 +183,7 @@ test("ローカルWeb UIを実ブラウザで検証", async (t) => {
     const text = await page.locator("#fields").innerText();
     assert.match(text, /工房加工は収穫時の給餌/, "workshop processing must be marked as harvest-only");
     assert.doesNotMatch(text, /製材所\(|製陶所\(|かご製作所\(/, "workshops must not be listed as free conversions");
+    await page.locator("#cancel").click();
+    await page.locator("#editor").waitFor({ state: "hidden" });
   });
 });
