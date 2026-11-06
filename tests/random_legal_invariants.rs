@@ -57,6 +57,8 @@ fn detail_kind(detail: &Detail) -> &'static str {
 struct Coverage {
     spaces: BTreeSet<Space>,
     details: BTreeSet<&'static str>,
+    /// One post-action state hash per action; compares the whole trajectory.
+    trace: Vec<String>,
 }
 
 impl Coverage {
@@ -105,6 +107,8 @@ fn modes() -> Vec<Mode> {
     modes
 }
 
+const DEFAULT_SEEDS: [u64; 5] = [101, 4242, 999_983, 13, 271_828];
+
 fn seeds() -> Vec<u64> {
     if let Ok(raw) = std::env::var("AGRICOLA_FUZZ_SEEDS") {
         let parsed: Vec<u64> = raw
@@ -115,7 +119,7 @@ fn seeds() -> Vec<u64> {
             return parsed;
         }
     }
-    vec![101, 4242, 999_983, 13, 271_828]
+    DEFAULT_SEEDS.to_vec()
 }
 
 fn play_one(mode: Mode, seed: u64) -> Result<Coverage, String> {
@@ -160,11 +164,13 @@ fn play_one(mode: Mode, seed: u64) -> Result<Coverage, String> {
         let before = game.state_hash();
         game.apply(action)
             .map_err(|error| format!("apply failed at step {step}: {error}"))?;
+        let after = game.state_hash();
         assert_ne!(
-            game.state_hash(),
+            after,
             before,
             "an applied action must change the state hash at step {step}"
         );
+        coverage.trace.push(after);
         game.validate()
             .map_err(|error| format!("invariant violation after step {step}: {error}"))?;
     }
@@ -229,8 +235,10 @@ fn random_legal_play_is_deterministic_for_a_fixed_seed() {
 #[test]
 fn random_legal_play_covers_major_action_types() {
     let mut total = Coverage::default();
+    // A one-off AGRICOLA_FUZZ_SEEDS override should not break the baseline
+    // coverage gate when isolating one failing random game.
     for mode in modes() {
-        for seed in seeds() {
+        for seed in DEFAULT_SEEDS {
             total.merge(&play_one(mode, seed).expect("random legal play"));
         }
     }
@@ -371,17 +379,17 @@ fn illegal_actions_are_rejected_without_mutating_state() {
             }
 
             // (c) A still-hidden round space is rejected.
-            if !game.available_spaces().contains(&Space::MajorImprovement) {
-                let hidden = Action {
-                    space: Space::MajorImprovement,
-                    detail: Detail::None,
-                };
-                assert_rejected(
-                    &game,
-                    hidden,
-                    &format!("hidden space in {context} seed={seed}"),
-                );
-            }
+            // FarmRedevelopment is a final-stage action, never revealed
+            // at the start of round 1; this must run in every mode/seed.
+            let hidden = Action {
+                space: Space::FarmRedevelopment,
+                detail: Detail::None,
+            };
+            assert_rejected(
+                &game,
+                hidden,
+                &format!("hidden space in {context} seed={seed}"),
+            );
         }
     }
 }
