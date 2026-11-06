@@ -54,9 +54,10 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <label>職業の受渡方向 <select id="draftDirOcc"><option value="">選択してください</option><option value="left">左へ</option><option value="right">右へ</option></select></label>
 <label>小進歩の受渡方向 <select id="draftDirMinor"><option value="">選択してください</option><option value="left">左へ</option><option value="right">右へ</option></select></label>
 <label><input id="draftOccFirst" type="checkbox" checked>7-7は職業を先に選ぶ</label>
+<label>カードプール <select id="draftPool"><option value="test_fixture">テスト用フィクスチャ</option><option value="verified_basic">実装済み公式カードプール（2人・通常/7-7）</option></select></label>
 <button id="draftNew">ドラフト開始</button><button id="draftReset">ドラフト解除</button>
 </div>
-<p class="minor">受渡方向・フェーズ順は公式未確定の対戦慣行です。未選択なら開始しません。ここで使うカードは<strong>テスト専用フィクスチャ</strong>であり公式カードではありません。人間は1Pとして選択し、他席は観測可能情報だけで選ぶCPUです。</p>
+<p class="minor">受渡方向・フェーズ順は公式未確定の対戦慣行です。未選択なら開始しません。カードプールで「テスト用フィクスチャ」を選んだ場合、カードは<strong>検証用の架空カード</strong>です。「実装済み公式カードプール」は収録数が限られ、公式照合も継続中です。人間は1Pとして選択し、他席は観測可能情報だけで選ぶCPUです。</p>
 <div id="draftStatus"></div><div id="draftOffered" class="chips"></div><div id="draftActions" class="buttons"></div><div id="draftLog" class="minor"></div>
 </section>
 <section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
@@ -326,13 +327,22 @@ if(d.complete)phase="完了";
 else if(d.phase==="choosing")phase="自分の10枚から7枚を選ぶ";
 else if(d.active_kind)phase=label[d.active_kind]+"を1枚選ぶ";
 else phase="職業と小進歩を同時に1枚ずつ選ぶ";
-status.textContent="方式 "+d.mode+" / "+phase+" / 選んだ枚数 "+d.hand_counts.map((n,i)=>(i+1)+"P:"+n).join(" ")+" / 残り "+d.remaining_to_pick+"（テスト用フィクスチャ）";
+const poolLabel=d.pool_kind==="verified_basic"?"実装済み公式カードプール":"テスト用フィクスチャ";
+status.textContent="方式 "+d.mode+" / "+phase+" / 選んだ枚数 "+d.hand_counts.map((n,i)=>(i+1)+"P:"+n).join(" ")+" / 残り "+d.remaining_to_pick+"（"+poolLabel+"）"+(d.game_started?" / ゲーム開始済み":"");
 offered.replaceChildren();
 if(d.complete){
   const own=d.own_final_hands||{occupations:[],minors:[]};
   const p=document.createElement("p");p.className="minor";p.textContent="あなたの最終手札 — 職業: "+(own.occupations.map(draftCardLabel).join(" / ")||"なし")+" ｜ 小進歩: "+(own.minors.map(draftCardLabel).join(" / ")||"なし");
   offered.append(p);
-  actions.replaceChildren();renderDraftHistory(log,d.history||[],"ドラフト完了");
+  actions.replaceChildren();
+  if(d.game_started){
+    const done=document.createElement("p");done.className="minor";done.textContent="このドラフトの手札でゲームを開始済みです。盤面で操作してください。";offered.append(done);
+  }else{
+    const start=document.createElement("button");start.id="draftStartGame";start.className="primary";start.textContent="この手札でゲーム開始";
+    start.onclick=async()=>{await request("/api/draft/start-game",{seed:Number(val("seed")),extra:checked("extra"),ai:val("ai"),budget:8});};
+    actions.append(start);
+  }
+  renderDraftHistory(log,d.history||[],"ドラフト完了");
   return;
 }
 const chooseMode=d.phase==="choosing";
@@ -373,7 +383,7 @@ $("draftNew").onclick=async()=>{
 const mode=val("draftMode"),do_=val("draftDirOcc"),dm=val("draftDirMinor");
 if(mode!=="deal_7"&&mode!=="choose_10_7"&&(!do_||!dm)){$("draftStatus").textContent="受渡方向を明示してください（公式未確定の対戦慣行）。";return;}
 resetDraftSel();
-await request("/api/draft/new",{mode,players:Number(val("draftPlayers")),seed:Number(val("draftSeed")),direction_occupation:do_||"left",direction_minor:dm||"left",occupation_phase_first:checked("draftOccFirst")});
+await request("/api/draft/new",{mode,players:Number(val("draftPlayers")),seed:Number(val("draftSeed")),direction_occupation:do_||"left",direction_minor:dm||"left",occupation_phase_first:checked("draftOccFirst"),pool:val("draftPool")});
 };
 $("draftReset").onclick=async()=>{resetDraftSel();await request("/api/draft/reset",{});};
 </script></body></html>

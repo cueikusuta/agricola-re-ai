@@ -1,10 +1,11 @@
 //! Loopback-only, single-user web UI. No external services or accounts.
 use crate::breeding::BreedingPlan;
-use crate::cards::CardSet;
+use crate::cards::{CardDefinition, CardSet};
 use crate::draft::{
-    cpu_choice, cpu_pick, CardKind, Direction, DraftMode, DraftObservation, DraftPhase, DraftPool,
+    cpu_choice, cpu_pick, CardKind, Direction, DraftCardInfo, DraftMode, DraftPhase, DraftPool,
     DraftRuleset, DraftSetup, DraftState,
 };
+use crate::draft_game::{card_catalog, pool_from_card_set, start_game_from_draft};
 use crate::engine::{Action, Detail, FreeAction};
 use crate::harvest::{FeedingPlan, HarvestDetailPolicy};
 
@@ -37,6 +38,16 @@ pub struct Session {
 struct DraftWeb {
     setup: DraftSetup,
     state: DraftState,
+    /// Card set the draft's vocabulary belongs to. Test fixtures and the
+    /// implemented ("verified basic") pool are never mixed here.
+    card_set: CardSet,
+    /// Machine-readable pool provenance shown to players and saved with the
+    /// session: `test_fixture` or `verified_basic`.
+    pool_kind: String,
+    /// Public card vocabulary attached to every viewer's observation.
+    catalog: Vec<DraftCardInfo>,
+    /// Set once the completed draft has seeded a real game.
+    game_started: bool,
 }
 
 #[derive(Clone)]
@@ -211,8 +222,7 @@ impl Session {
             "draft": self
                 .draft
                 .as_ref()
-                .and_then(|d| d.state.observe(0, d.state.current_token()).ok())
-                .map(|obs| draft_json(&obs, &self.draft.as_ref().unwrap().state, &self.draft.as_ref().unwrap().setup))
+                .and_then(|draft| draft_json(draft, 0).ok())
                 .unwrap_or(Value::Null),
         })
     }
@@ -224,9 +234,7 @@ impl Session {
     }
 
     pub fn draft_view(&self) -> Result<Value, String> {
-        let d = self.draft()?;
-        let obs = d.state.observe(0, d.state.current_token())?;
-        Ok(draft_json(&obs, &d.state, &d.setup))
+        draft_json(self.draft()?, 0)
     }
 
     /// Start a draft with an explicit ruleset. Missing direction or phase-order
@@ -262,11 +270,43 @@ impl Session {
             None => true,
         };
         let seed = input.get("seed").and_then(Value::as_u64).unwrap_or(42);
-        let pool = fixture_pool(mode, players);
+        let pool_kind = input
+            .get("pool")
+            .and_then(Value::as_str)
+            .unwrap_or("test_fixture");
+        let (card_set, pool, deck_version, ruleset_id) = match pool_kind {
+            "test_fixture" => {
+                let pool = fixture_pool(mode, players);
+                let set = fixture_card_set(&pool);
+                (
+                    set,
+                    pool,
+                    "test-fixture-v1".to_string(),
+                    format!("fixture-explicit-{}", mode.id()),
+                )
+            }
+            "verified_basic" => {
+                // The implemented card pool the project already labels
+                // "verified basic". Official card-by-card review is tracked by
+                // #115/#139 and is not asserted here. The draft supply check
+                // still gates the mode, so a mode needing more cards than exist
+                // is rejected rather than padded with unverified cards.
+                let set = crate::cards::verified_basic_card_set(players)?;
+                let pool = pool_from_card_set(&set);
+                (
+                    set,
+                    pool,
+                    format!("verified-basic-{players}p-v1"),
+                    format!("verified-basic-explicit-{}", mode.id()),
+                )
+            }
+            other => return Err(format!("unknown draft pool kind: {other}")),
+        };
+        let catalog = card_catalog(&card_set);
         let setup = DraftSetup {
             mode,
             ruleset: DraftRuleset::explicit(
-                format!("fixture-explicit-{}", mode.id()),
+                ruleset_id,
                 direction_occupation,
                 direction_minor,
                 occupation_phase_first,
@@ -274,10 +314,56 @@ impl Session {
             pool,
             player_count: players,
             seed,
-            deck_version: "test-fixture-v1".into(),
+            deck_version,
         };
         let state = setup.start()?;
-        self.draft = Some(DraftWeb { setup, state });
+        self.draft = Some(DraftWeb {
+            setup,
+            state,
+            card_set,
+            pool_kind: pool_kind.to_string(),
+            catalog,
+            game_started: false,
+        });
+        Ok(())
+    }
+
+    /// Seed a real game from the completed draft. The whole operation runs on a
+    /// clone, so a rejected request (incomplete draft, wrong player count, or a
+    /// fixture card missing from the card set) leaves the session untouched.
+    pub fn start_draft_game(&mut self, input: &Value) -> Result<(), String> {
+        let budget = input.get("budget").and_then(Value::as_u64).unwrap_or(8);
+        if !(1..=256).contains(&budget) {
+            return Err("MCTS simulations must be 1..=256".into());
+        }
+        let mut next = self.clone();
+        let config = {
+            let draft = next.draft.as_ref().ok_or("no draft session")?;
+            if draft.game_started {
+                return Err("a game was already started from this draft".into());
+            }
+            Config {
+                players: draft.state.player_count,
+                seed: input.get("seed").and_then(Value::as_u64).unwrap_or(42),
+                additional_action_space_enabled: input
+                    .get("extra")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+            }
+        };
+        let game = {
+            let draft = next.draft.as_ref().ok_or("no draft session")?;
+            start_game_from_draft(&draft.state, draft.card_set.clone(), config)?
+        };
+        next.game = game;
+        next.pending = None;
+        next.mcts = input.get("ai").and_then(Value::as_str) == Some("mcts");
+        next.budget = budget as usize;
+        if let Some(draft) = next.draft.as_mut() {
+            draft.game_started = true;
+        }
+        next.advance_cpu()?;
+        *self = next;
         Ok(())
     }
 
@@ -482,23 +568,28 @@ fn auto_commit_cpus(draft: &mut DraftWeb) -> Result<(), String> {
 /// Build the observable draft payload for the browser. It contains only the
 /// human seat's own packets and history plus public counts; the seed, other
 /// seats' packets, and the private discard pile are never serialized here.
-fn draft_json(obs: &DraftObservation, state: &DraftState, setup: &DraftSetup) -> Value {
-    let complete = state.is_complete();
+fn draft_json(draft: &DraftWeb, viewer: usize) -> Result<Value, String> {
+    let obs =
+        draft
+            .state
+            .observe_with_catalog(viewer, draft.state.current_token(), &draft.catalog)?;
+    let complete = draft.state.is_complete();
     // Only the viewer's own final hand may be revealed. Other seats' hands are
     // private even after the draft ends.
     let own_final_hands = if complete {
-        state
+        draft
+            .state
             .final_hands()
-            .get(obs.viewer)
+            .get(viewer)
             .map(|(occupations, minors)| json!({"occupations": occupations, "minors": minors}))
     } else {
         None
     };
-    json!({
+    Ok(json!({
         "mode": obs.mode.id(),
         "ruleset_id": obs.ruleset_id,
-        "pool_kind": "test_fixture",
-        "deck_version": setup.deck_version,
+        "pool_kind": &draft.pool_kind,
+        "deck_version": &draft.setup.deck_version,
         "phase": match obs.phase {
             DraftPhase::Drafting => "drafting",
             DraftPhase::Choosing => "choosing",
@@ -514,8 +605,9 @@ fn draft_json(obs: &DraftObservation, state: &DraftState, setup: &DraftSetup) ->
         "request_token": obs.request_token,
         "history": obs.own_observation_history,
         "complete": complete,
+        "game_started": draft.game_started,
         "own_final_hands": own_final_hands,
-    })
+    }))
 }
 
 fn parse_direction(value: Option<&str>, field: &str) -> Result<Direction, String> {
@@ -535,6 +627,28 @@ fn fixture_pool(mode: DraftMode, players: usize) -> DraftPool {
         (0..n).map(|i| format!("FIX-OCC-{i:02}")).collect(),
         (0..n).map(|i| format!("FIX-MIN-{i:02}")).collect(),
     )
+}
+
+/// Test-only card set for the fixture draft. These definitions let the
+/// draft-to-game bridge (#104) run in the browser before the official pool
+/// (#115/#139) is large enough. They are never returned by any `verified_*`
+/// function and must not be treated as reviewed cards.
+fn fixture_card_set(pool: &DraftPool) -> CardSet {
+    let definition = |id: &String, kind: crate::cards::CardKind| CardDefinition {
+        id: id.clone(),
+        kind,
+        cost: vec![],
+        points: 0,
+        effects: vec![],
+    };
+    let mut definitions = Vec::new();
+    for id in &pool.occupations {
+        definitions.push(definition(id, crate::cards::CardKind::Occupation));
+    }
+    for id in &pool.minors {
+        definitions.push(definition(id, crate::cards::CardKind::MinorImprovement));
+    }
+    CardSet { definitions }
 }
 
 fn optional_string(value: Option<&Value>) -> Result<Option<String>, String> {
@@ -672,12 +786,14 @@ fn handle(mut stream: TcpStream, session: &mut Session, port: u16) -> Result<(),
         ("POST", "/api/draft/new")
         | ("POST", "/api/draft/pick")
         | ("POST", "/api/draft/choice")
+        | ("POST", "/api/draft/start-game")
         | ("POST", "/api/draft/reset") => {
             let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
             match path {
                 "/api/draft/new" => session.start_draft(&value)?,
                 "/api/draft/pick" => session.draft_pick(&value)?,
                 "/api/draft/choice" => session.draft_choice(&value)?,
+                "/api/draft/start-game" => session.start_draft_game(&value)?,
                 _ => session.reset_draft(),
             }
             Ok(session.view())
@@ -1125,5 +1241,158 @@ mod tests {
             .draft_choice(&json!({"token":token,"occupations":occ,"minors":minor}))
             .unwrap();
         assert!(session.draft_view().unwrap()["complete"].as_bool().unwrap());
+    }
+
+    fn drive_draft_to_completion(session: &mut Session) {
+        for _ in 0..40 {
+            let view = session.draft_view().unwrap();
+            if view["complete"].as_bool().unwrap() {
+                return;
+            }
+            let token = view["request_token"].as_u64().unwrap();
+            if view["phase"] == "choosing" {
+                let take7 = |key: &str| {
+                    view[key]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .take(7)
+                        .map(|value| value.as_str().unwrap().to_owned())
+                        .collect::<Vec<_>>()
+                };
+                session
+                    .draft_choice(&json!({
+                        "token": token,
+                        "occupations": take7("offered_occupation"),
+                        "minors": take7("offered_minor"),
+                    }))
+                    .unwrap();
+                continue;
+            }
+            let active = view["active_kind"].as_str();
+            let occupation = (active != Some("minor_improvement")
+                && !view["offered_occupation"].as_array().unwrap().is_empty())
+            .then(|| view["offered_occupation"][0].as_str().unwrap().to_owned());
+            let minor = (active != Some("occupation")
+                && !view["offered_minor"].as_array().unwrap().is_empty())
+            .then(|| view["offered_minor"][0].as_str().unwrap().to_owned());
+            session
+                .draft_pick(&json!({"token":token,"occupation":occupation,"minor":minor}))
+                .unwrap();
+        }
+        panic!("draft did not complete");
+    }
+
+    #[test]
+    fn draft_web_starts_a_game_from_the_drafted_hand_and_keeps_history() {
+        let mut session = Session::new(Config::default()).unwrap();
+        session
+            .start_draft(&json!({
+                "mode":"draft_7_7","players":2,"seed":606,
+                "direction_occupation":"left","direction_minor":"right",
+                "occupation_phase_first":true
+            }))
+            .unwrap();
+        drive_draft_to_completion(&mut session);
+        let view = session.draft_view().unwrap();
+        assert_eq!(view["complete"], true);
+        let expected = view["own_final_hands"]["occupations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .chain(view["own_final_hands"]["minors"].as_array().unwrap().iter())
+            .map(|value| value.as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        let history_len = view["history"].as_array().unwrap().len();
+        assert!(history_len > 0);
+
+        session.start_draft_game(&json!({})).unwrap();
+        let started = session.draft_view().unwrap();
+        assert_eq!(started["game_started"], true);
+        // The observation history survives into the playing phase.
+        assert_eq!(started["history"].as_array().unwrap().len(), history_len);
+        assert_eq!(session.view()["draft"]["game_started"], true);
+
+        let mut hand = session.game.cards.hands[0].clone();
+        let mut expected = expected;
+        hand.sort();
+        expected.sort();
+        assert_eq!(
+            hand, expected,
+            "the in-game hand is exactly the drafted 7 + 7"
+        );
+        assert_eq!(session.view()["hand"].as_array().unwrap().len(), 14);
+        // A second start request is rejected.
+        assert!(session.start_draft_game(&json!({})).is_err());
+    }
+
+    #[test]
+    fn draft_web_rejects_incomplete_start_without_touching_the_game() {
+        let mut session = Session::new(Config::default()).unwrap();
+        session
+            .start_draft(&json!({
+                "mode":"draft_7_7","players":2,"seed":1,
+                "direction_occupation":"left","direction_minor":"right",
+                "occupation_phase_first":true
+            }))
+            .unwrap();
+        let hash = session.game.state_hash();
+        assert!(session.start_draft_game(&json!({})).is_err());
+        assert_eq!(session.game.state_hash(), hash);
+        assert_eq!(session.draft_view().unwrap()["game_started"], false);
+    }
+
+    #[test]
+    fn draft_web_separates_fixture_and_verified_pools() {
+        let mut session = Session::new(Config::default()).unwrap();
+        // 10-7 is blocked for the implemented pool instead of being padded.
+        assert!(session
+            .start_draft(&json!({
+                "mode":"draft_10_7_simultaneous","players":2,"seed":1,
+                "direction_occupation":"left","direction_minor":"right",
+                "pool":"verified_basic"
+            }))
+            .is_err());
+        session
+            .start_draft(&json!({
+                "mode":"draft_7_7","players":2,"seed":1,
+                "direction_occupation":"left","direction_minor":"right",
+                "occupation_phase_first":true,"pool":"verified_basic"
+            }))
+            .unwrap();
+        assert_eq!(session.draft_view().unwrap()["pool_kind"], "verified_basic");
+        session
+            .start_draft(&json!({
+                "mode":"draft_7_7","players":2,"seed":1,
+                "direction_occupation":"left","direction_minor":"right",
+                "occupation_phase_first":true
+            }))
+            .unwrap();
+        assert_eq!(session.draft_view().unwrap()["pool_kind"], "test_fixture");
+    }
+
+    #[test]
+    fn draft_web_verified_pool_seeds_a_playable_card_game() {
+        let mut session = Session::new(Config::default()).unwrap();
+        session
+            .start_draft(&json!({
+                "mode":"draft_7_7","players":2,"seed":707,
+                "direction_occupation":"left","direction_minor":"right",
+                "occupation_phase_first":true,"pool":"verified_basic"
+            }))
+            .unwrap();
+        drive_draft_to_completion(&mut session);
+        session.start_draft_game(&json!({"seed":808})).unwrap();
+        assert_eq!(session.view()["card_enabled"], true);
+        assert_eq!(
+            session.view()["public"]["players"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(session.view()["hand"].as_array().unwrap().len(), 14);
+        // Opponent hands stay hidden in the serialized session view.
+        assert!(session.view().get("hidden_round_deck").is_none());
     }
 }

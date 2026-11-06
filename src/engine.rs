@@ -863,54 +863,69 @@ impl Game {
         cards: crate::cards::CardSet,
         events: &[Event],
     ) -> Result<Self> {
-        let mut g = Game::with_cards(config, cards)?;
+        Self::replay_with_setup(config, cards, None, events)
+    }
+    /// Replay with an explicit initial card state. `hands = Some(..)` rebuilds a
+    /// draft-seeded game (#104); `None` re-deals randomly from the seed.
+    pub fn replay_with_setup(
+        config: Config,
+        cards: crate::cards::CardSet,
+        hands: Option<Vec<Vec<String>>>,
+        events: &[Event],
+    ) -> Result<Self> {
+        let mut g = match hands {
+            Some(hands) => Game::with_cards_and_hands(config, cards, hands)?,
+            None => Game::with_cards(config, cards)?,
+        };
         for event in events {
-            if g.state_hash() != event.before {
-                return Err("replay prestate hash mismatch".into());
-            }
-            let action: RecordedAction =
-                serde_json::from_value(event.payload.clone()).map_err(|e| e.to_string())?;
-            match action {
-                RecordedAction::Work {
-                    player,
-                    action,
-                    harvest_plans,
-                    breeding_plans,
-                } => {
-                    if event.kind != "work"
-                        || event.player != Some(player)
-                        || player != g.public.active_player
-                    {
-                        return Err("replay work metadata/player mismatch".into());
-                    }
-                    let mut placements = g.public.workers_placed.clone();
-                    placements[player] += 1;
-                    let will_harvest = placements == g.public.work_quota
-                        && HARVEST_ROUNDS.contains(&g.public.round);
-                    if harvest_plans.is_some() != will_harvest
-                        || breeding_plans.is_some() != will_harvest
-                    {
-                        return Err("replay harvest decisions missing or unexpected".into());
-                    }
-                    g.apply_with_plans(
-                        action,
-                        harvest_plans,
-                        breeding_plans,
-                        &SimpleHarvestDetails,
-                    )?
-                }
-                RecordedAction::Free { player, action } => {
-                    if event.kind != "free" || event.player != Some(player) {
-                        return Err("replay free action metadata/player mismatch".into());
-                    }
-                    g.apply_free(player, action)?;
-                }
-            }
-            if g.state_hash() != event.after {
-                return Err("replay poststate hash mismatch".into());
-            }
+            g.apply_recorded(event)?;
         }
         Ok(g)
+    }
+    /// Apply one committed event, checking the before/after state hashes.
+    /// [`Self::replay_with_setup`] and the M12 episode-data conversion share
+    /// this single validation path so they cannot drift apart.
+    pub fn apply_recorded(&mut self, event: &Event) -> Result<()> {
+        if self.state_hash() != event.before {
+            return Err("replay prestate hash mismatch".into());
+        }
+        let action: RecordedAction =
+            serde_json::from_value(event.payload.clone()).map_err(|e| e.to_string())?;
+        match action {
+            RecordedAction::Work {
+                player,
+                action,
+                harvest_plans,
+                breeding_plans,
+            } => {
+                if event.kind != "work"
+                    || event.player != Some(player)
+                    || player != self.public.active_player
+                {
+                    return Err("replay work metadata/player mismatch".into());
+                }
+                let mut placements = self.public.workers_placed.clone();
+                placements[player] += 1;
+                let will_harvest = placements == self.public.work_quota
+                    && HARVEST_ROUNDS.contains(&self.public.round);
+                if harvest_plans.is_some() != will_harvest
+                    || breeding_plans.is_some() != will_harvest
+                {
+                    return Err("replay harvest decisions missing or unexpected".into());
+                }
+                self.apply_with_plans(action, harvest_plans, breeding_plans, &SimpleHarvestDetails)?
+            }
+            RecordedAction::Free { player, action } => {
+                if event.kind != "free" || event.player != Some(player) {
+                    return Err("replay free action metadata/player mismatch".into());
+                }
+                self.apply_free(player, action)?;
+            }
+        }
+        if self.state_hash() != event.after {
+            return Err("replay poststate hash mismatch".into());
+        }
+        Ok(())
     }
     fn next_worker_or_round(
         &mut self,

@@ -55,6 +55,33 @@ async function takeOneRound(page) {
     (document.querySelector("#draftStatus")?.textContent || "") !== previous, before);
 }
 
+// Click one ordinary resource space and submit whatever detail dialog it
+// opens. Returns the Japanese label that succeeded, or null. This is a real
+// board operation, not a direct /api call.
+async function takeSimpleAction(page) {
+  const simple = ["森林", "粘土坑", "葦", "漁", "日雇い", "穀物", "野菜", "採石場", "林", "林地", "粘土の採取"];
+  // The action list is rebuilt by the server response; wait for it to render.
+  await page.locator("#actions button").first().waitFor({ state: "visible", timeout: 20000 });
+  for (const name of simple) {
+    const button = page.locator("#actions button", { hasText: name }).first();
+    if (await button.count() === 0) continue;
+    await button.click();
+    await page.locator("#editor").waitFor({ state: "visible" });
+    const response = page.waitForResponse(response =>
+      new URL(response.url()).pathname === "/api/play"
+        && response.request().method() === "POST", { timeout: 15000 });
+    await page.locator("#confirm").click();
+    if ((await response).ok()) {
+      await page.locator("#editor").waitFor({ state: "hidden", timeout: 15000 });
+      return name;
+    }
+    const cancel = page.locator("#cancel");
+    if (await cancel.count() > 0) await cancel.click();
+    await page.locator("#editor").waitFor({ state: "hidden" }).catch(() => {});
+  }
+  return null;
+}
+
 async function playToCompletion(page, guard = 40) {
   for (let step = 0; step < guard; step += 1) {
     const complete = await page.evaluate(() => Boolean(state.draft && state.draft.complete));
@@ -176,6 +203,49 @@ test("Issue #104: Japanese draft UI completes every pick", async (t) => {
     const view = await page.evaluate(() => state.draft);
     assert.equal(view.own_final_hands.occupations.length, 7);
     assert.equal(view.own_final_hands.minors.length, 7);
+  });
+
+  await scenario("draft_hand_seeds_real_game_and_manual_operation", async () => {
+    await page.goto(baseUrl);
+    // The official pool is not yet large enough for a four-player draft; the
+    // test fixture pool proves the draft-to-game path without promoting any
+    // unverified card.
+    await page.locator("#draftPool").selectOption("test_fixture");
+    await startDraft(page, { mode: "draft_7_7", seed: 505 });
+    await playToCompletion(page);
+    const drafted = await page.evaluate(() => state.draft);
+    assert.equal(drafted.complete, true);
+    assert.equal(drafted.game_started, false);
+
+    await page.locator("#draftStartGame").click();
+    // Wait for the start request itself, not the always-present round banner.
+    await page.waitForFunction(() => Boolean(state.draft && state.draft.game_started),
+      null, { timeout: 20000 });
+    assert.equal(await page.evaluate(() => state.draft.game_started), true);
+    assert.match(await page.locator("#turn").innerText(), /ラウンド 1\/14・1Pの手番/);
+    assert.match(await page.locator("#draftStatus").innerText(), /ゲーム開始済み/);
+
+    // The in-game hand must be exactly the drafted 7 + 7, nothing else.
+    const inGame = await page.evaluate(() => ({
+      hand: [...state.hand].sort(),
+      occ: [...state.draft.own_final_hands.occupations].sort(),
+      min: [...state.draft.own_final_hands.minors].sort()
+    }));
+    assert.equal(inGame.hand.length, 14, "game hand must be 7 + 7");
+    assert.deepEqual(inGame.hand, [...inGame.occ, ...inGame.min].sort(),
+      "game hand must equal the drafted cards");
+
+    // The opponent's drafted cards stay private after the game starts.
+    await page.locator("#tabs button").nth(1).click();
+    assert.equal((await page.locator("#hand").innerText()).trim(), "手札: 非公開");
+    await page.locator("#tabs button").first().click();
+
+    // Perform a real worker placement through the board UI.
+    const before = await page.evaluate(() => state.public.workers_placed[0]);
+    const acted = await takeSimpleAction(page);
+    assert.ok(acted, "a simple board action must be accepted after the draft");
+    const after = await page.evaluate(() => state.public.workers_placed[0]);
+    assert.ok(after > before, "the human worker must have been placed through the UI");
   });
 
   assert.deepEqual(browserErrors, [], "no uncaught JavaScript exceptions");
