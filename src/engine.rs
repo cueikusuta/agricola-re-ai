@@ -360,11 +360,9 @@ impl Game {
         Ok(())
     }
 
-    pub fn legal_spaces(&self) -> Vec<Space> {
-        if self.public.finished {
-            return vec![];
-        }
-        let me = &self.public.players[self.public.active_player];
+    /// Spaces that exist on the board for the current mode/round, before the
+    /// unused/extra-exclusivity and per-space rule filters are applied.
+    fn space_pool(&self) -> Vec<Space> {
         let players = self.config.players;
         let mut list = Space::regular_for(players);
         if self.card_set.enabled() {
@@ -377,6 +375,37 @@ impl Game {
         if self.config.additional_action_space_enabled {
             list.extend(Space::extra_for(players));
         }
+        list
+    }
+
+    /// Structurally available spaces: revealed, unused, and not blocked by the
+    /// mutually exclusive extra-space rule. This deliberately ignores whether a
+    /// candidate generator can produce a detail, so the rule engine accepts
+    /// every legal detail, including ones the default policies would never
+    /// propose. Detail-level legality is enforced by `execute_work` and the
+    /// final `validate` invariant check in the transactional apply path.
+    pub fn available_spaces(&self) -> Vec<Space> {
+        if self.public.finished {
+            return vec![];
+        }
+        let players = self.config.players;
+        let mut list = self.space_pool();
+        list.retain(|&s| {
+            !self.public.used.contains(&s)
+                && !(s.additional_for(players) && group_occupied(&self.public.used, players))
+        });
+        list
+    }
+
+    /// Candidate-narrowed listing used by AI policies. It is a subset of
+    /// `available_spaces` and must not be used to define legal action sets.
+    pub fn legal_spaces(&self) -> Vec<Space> {
+        if self.public.finished {
+            return vec![];
+        }
+        let me = &self.public.players[self.public.active_player];
+        let players = self.config.players;
+        let mut list = self.available_spaces();
         let hand = &self.cards.hands[self.public.active_player];
         let own_cards = hand
             .iter()
@@ -450,6 +479,15 @@ impl Game {
     ) -> Result<()> {
         self.apply_with_plans(action, None, None, policy)
     }
+
+    /// Read-only, transactional validation using the exact same engine path as
+    /// `apply`. Human input and AI selections share this validator; it never
+    /// modifies `self` and rejects illegal details before any state change.
+    pub fn validate_action(&self, action: &Action) -> Result<()> {
+        let mut probe = self.clone();
+        probe.apply_with_plans(action.clone(), None, None, &SimpleHarvestDetails)
+    }
+
     fn apply_with_plans(
         &mut self,
         action: Action,
@@ -458,7 +496,7 @@ impl Game {
         policy: &dyn HarvestDetailPolicy,
     ) -> Result<()> {
         let player = self.public.active_player;
-        if !self.legal_spaces().contains(&action.space) {
+        if !self.available_spaces().contains(&action.space) {
             return Err(format!("illegal space {:?}", action.space));
         }
         let mut next = self.clone();
@@ -551,7 +589,7 @@ impl Game {
         action: &Action,
         feeding: Option<&[FeedingPlan]>,
     ) -> Result<PublicState> {
-        if !self.will_harvest_after_work() || !self.legal_spaces().contains(&action.space) {
+        if !self.will_harvest_after_work() || !self.available_spaces().contains(&action.space) {
             return Err("not a legal last placement before harvest".into());
         }
         let mut next = self.clone();

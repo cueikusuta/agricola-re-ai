@@ -130,6 +130,7 @@ impl Session {
             "card_enabled": self.game.card_set.enabled(),
             "public": &self.game.public,
             "legal": if human_turn { self.game.legal_spaces() } else { vec![] },
+            "available": if human_turn { self.game.available_spaces() } else { vec![] },
             "standings": standings_with_cards(&self.game.public.players, &self.game.card_set),
             "last_actions": self.game.log.events.iter().rev().take(5).map(|e| json!({
                 "player": e.player,
@@ -186,9 +187,6 @@ impl Session {
         let space: Space =
             serde_json::from_value(input.get("space").cloned().ok_or("space is required")?)
                 .map_err(|e| e.to_string())?;
-        if !self.game.legal_spaces().contains(&space) {
-            return Err("selected space is not legal".into());
-        }
         // Human input is always explicit. SimpleDetails remains CPU-only.
         let detail: Detail = serde_json::from_value(
             input
@@ -197,8 +195,12 @@ impl Session {
                 .ok_or("manual detail is required")?,
         )
         .map_err(|e| format!("invalid detail: {e}"))?;
+        // Human and CPU share the engine's transactional validator. The
+        // candidate-narrowed `legal_spaces` listing never defines legality.
+        let action = Action { space, detail };
+        self.game.validate_action(&action)?;
         let mut next = self.clone();
-        next.queue_or_apply(Action { space, detail })?;
+        next.queue_or_apply(action)?;
         next.advance_cpu()?;
         *self = next;
         Ok(())
@@ -495,6 +497,44 @@ mod tests {
         let hash = session.game.state_hash();
         assert!(session.play(&json!({"space": first})).is_err());
         assert_eq!(session.game.state_hash(), hash);
+    }
+
+    #[test]
+    fn human_path_accepts_a_legal_non_default_detail_and_rejects_illegal() {
+        let seed = (0..2_000u64)
+            .find(|&seed| {
+                let probe = Game::new(Config {
+                    players: 2,
+                    seed,
+                    additional_action_space_enabled: false,
+                });
+                probe.public.start_player == 0
+                    && probe.public.revealed.first() == Some(&crate::model::RoundCard::Fencing)
+            })
+            .expect("seed with human start and Fencing revealed");
+        let mut session = Session::new(Config {
+            players: 2,
+            seed,
+            additional_action_space_enabled: false,
+        })
+        .unwrap();
+        assert_eq!(session.game.public.active_player, 0);
+        session.game.public.players[0].supply.wood = 10;
+
+        let hash = session.game.state_hash();
+        // An illegal detail is rejected by the shared validator without
+        // changing state; the web endpoint no longer filters by candidate set.
+        assert!(session
+            .play(&json!({"space":"fencing","detail":{"Fence":{"pastures":[[0,1]]}}}))
+            .is_err());
+        assert_eq!(session.game.state_hash(), hash);
+        session
+            .play(&json!({"space":"fencing","detail":{"Fence":{"pastures":[[1,2]]}}}))
+            .expect("legal non-default detail accepted through the human endpoint");
+        assert!(session.game.public.players[0]
+            .pastures
+            .iter()
+            .any(|pasture| pasture.cells == vec![1, 2]));
     }
 
     #[test]
