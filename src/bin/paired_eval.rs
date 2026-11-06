@@ -64,6 +64,7 @@ struct Options {
     additional_action_space: bool,
     decision_budget_ms: u64,
     mcts_simulations: usize,
+    mcts_tree_depth: usize,
     output: String,
 }
 
@@ -96,6 +97,7 @@ fn parse_options() -> Result<Options, String> {
             "additional-action-space",
             "decision-budget-ms",
             "mcts-simulations",
+            "mcts-tree-depth",
             "output",
         ]
         .contains(&key)
@@ -145,6 +147,14 @@ fn parse_options() -> Result<Options, String> {
         })
         .transpose()?
         .unwrap_or(64);
+    let mcts_tree_depth = optional_option(&values, "mcts-tree-depth")
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .map_err(|_| "invalid mcts-tree-depth".to_string())
+        })
+        .transpose()?
+        .unwrap_or(2);
     let output = option(&values, "output")?.to_string();
     if !(2..=4).contains(&players) {
         return Err("players must be 2, 3, or 4".into());
@@ -165,6 +175,9 @@ fn parse_options() -> Result<Options, String> {
     if mcts_simulations == 0 || mcts_simulations > 100_000 {
         return Err("mcts-simulations must be 1..=100000".into());
     }
+    if !(1..=6).contains(&mcts_tree_depth) {
+        return Err("mcts-tree-depth must be 1..=6".into());
+    }
     if candidate == baseline {
         return Err("candidate and baseline must be different".into());
     }
@@ -179,6 +192,7 @@ fn parse_options() -> Result<Options, String> {
         additional_action_space,
         decision_budget_ms,
         mcts_simulations,
+        mcts_tree_depth,
         output,
     })
 }
@@ -311,7 +325,7 @@ fn run(options: &Options) -> Result<(), String> {
     let eval = EvaluationPolicy;
     let mcts = MctsPolicy {
         simulations: options.mcts_simulations,
-        tree_depth: 2,
+        tree_depth: options.mcts_tree_depth,
     };
     let budget = Duration::from_millis(options.decision_budget_ms);
     let deadline_enabled = options.decision_budget_ms > 0;
@@ -422,6 +436,7 @@ fn run(options: &Options) -> Result<(), String> {
                     "timeout_count": outcomes.timeouts,
                     "fallback_count": outcomes.fallbacks,
                     "mcts_simulations_completed": outcomes.simulations,
+                    "mcts_tree_depth": options.mcts_tree_depth,
                     "policy_select_only": true,
                     "total_wall_ms": game_start.elapsed().as_secs_f64() * 1000.0,
                     "replay_hash": hash,
