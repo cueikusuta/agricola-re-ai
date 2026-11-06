@@ -186,4 +186,52 @@ test("ローカルWeb UIを実ブラウザで検証", async (t) => {
     await page.locator("#cancel").click();
     await page.locator("#editor").waitFor({ state: "hidden" });
   });
+
+  await scenario("four_player_turn_workers_and_error_alert", async () => {
+    await page.locator("#players").selectOption("4");
+    await page.locator("#cards").selectOption("none");
+    await page.locator("#extra").uncheck();
+    await page.locator("#new").click();
+    await page.waitForFunction(() => document.querySelector("#summary")?.textContent.includes("4人戦")
+      && document.querySelector("#summary")?.textContent.includes("カードなし"));
+    assert.equal(await page.locator("#tabs button").count(), 4);
+    assert.match(await page.locator("#turnWorkers").innerText(), /残りワーカー 2 \/ 2（1P）/);
+    assert.match(await page.locator("#turnActions").innerText(), /使用可能アクション \d+件/);
+    assert.equal(await page.locator("#turnView").innerText(), "表示中: 1P（あなた）");
+    assert.equal(await page.locator("#alert").isHidden(), true);
+    assert.match(await page.locator("#tabs button").first().innerText(), /残2/);
+
+    // Viewing another player exposes only public information.
+    await page.locator("#tabs button").nth(1).click();
+    assert.equal(await page.locator("#hand").innerText(), "手札: 非公開");
+    assert.equal(await page.locator("#turnView").innerText(), "表示中: 2P（公開情報のみ）");
+    await page.locator("#tabs button").first().click();
+
+    // A simple worker placement reduces the human's remaining workers.
+    const actions = page.locator("#actions button");
+    let chosen = -1;
+    for (let i = 0; i < await actions.count(); i++) {
+      if (simpleActions.has((await actions.nth(i).innerText()).trim())) { chosen = i; break; }
+    }
+    assert.notEqual(chosen, -1, "a simple action must be reachable in a 4-player game");
+    await actions.nth(chosen).click();
+    await page.locator("#editor").waitFor({ state: "visible" });
+    await page.locator("#confirm").click();
+    await page.locator("#editor").waitFor({ state: "hidden" });
+    assert.match(await page.locator("#turnWorkers").innerText(), /残りワーカー 1 \/ 2（1P）/);
+
+    // An invalid free action shows a visible role=alert error and keeps the turn.
+    const before = await page.locator("#turn").innerText();
+    await page.locator("#free").click();
+    await page.locator("#editor").waitFor({ state: "visible" });
+    await page.locator("#freeKind").selectOption("DiscardGood");
+    await page.locator("#good").selectOption("food");
+    await page.locator("#quantity").fill("0");
+    await page.locator("#confirm").click();
+    await page.locator("#alert").waitFor({ state: "visible" });
+    assert.match(await page.locator("#alert").innerText(), /discard zero/);
+    assert.equal(await page.locator("#turn").innerText(), before);
+    await page.locator("#cancel").click();
+    await page.locator("#editor").waitFor({ state: "hidden" });
+  });
 });
