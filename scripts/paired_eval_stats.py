@@ -99,6 +99,17 @@ def validate_and_report(
             for i in range(players) for j in range(players)
         ):
             raise ValueError(f"score/rank ordering mismatch: {key}")
+        # src/score.rs assigns competition ranks: one plus the number of
+        # players with a higher score, or an equal score and more resources.
+        # Equal resources share a rank; the next distinct rank must skip
+        # exactly the number of players who held the preceding rank.
+        for score in set(scores):
+            group_ranks = [ranks[i] for i in range(players) if scores[i] == score]
+            next_rank = 1 + sum(other > score for other in scores)
+            for rank in sorted(set(group_ranks)):
+                if rank != next_rank:
+                    raise ValueError(f"impossible tiebreak rank sequence: {key}")
+                next_rank += group_ranks.count(rank)
         # Recompute first-place credit from the engine's recorded ranks.
         firsts = ranks.count(1)
         if firsts < 1:

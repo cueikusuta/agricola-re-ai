@@ -178,5 +178,45 @@ class PairedStatsTests(unittest.TestCase):
 
 
 
+    def test_impossible_competition_rank_gaps_are_rejected(self):
+        # No combination of resource tiebreaks can produce these gaps.
+        cases = (
+            ([30, 20, 20, 20], [1, 4, 4, 4]),
+            ([30, 20, 20, 20], [1, 2, 4, 4]),
+            ([30, 30, 20, 20], [1, 1, 4, 4]),
+            ([30, 30, 30, 30], [1, 1, 4, 4]),
+        )
+        for scores, ranks in cases:
+            with self.subTest(scores=scores, ranks=ranks):
+                rows = fixture()
+                row = rows[0]
+                row["scores_by_seat"] = scores
+                row["ranks_by_seat"] = ranks
+                row["expected_rank_observation"] = ranks[0]
+                row["first_place_credit"] = 1 / ranks.count(1)
+                row["score_margin"] = scores[0] - (sum(scores) - scores[0]) / 3
+                with self.assertRaisesRegex(ValueError, "impossible tiebreak rank"):
+                    run(rows)
+
+    def test_valid_resource_tiebreak_competition_ranks_remain_allowed(self):
+        # Skipping positions after *actual* ties is correct competition ranking.
+        cases = (
+            ([30, 20, 20, 20], [1, 2, 3, 3]),
+            ([30, 20, 20, 20], [1, 2, 2, 4]),
+            ([30, 30, 20, 20], [1, 1, 3, 3]),
+            ([30, 30, 30, 30], [1, 1, 3, 3]),
+        )
+        for scores, ranks in cases:
+            with self.subTest(scores=scores, ranks=ranks):
+                rows = fixture()
+                row = rows[0]
+                row["scores_by_seat"] = scores
+                row["ranks_by_seat"] = ranks
+                row["expected_rank_observation"] = ranks[0]
+                row["first_place_credit"] = 1 / ranks.count(1)
+                row["score_margin"] = scores[0] - (sum(scores) - scores[0]) / 3
+                self.assertEqual(run(rows)["total_games"], 24)
+
+
 if __name__ == "__main__":
     unittest.main()
