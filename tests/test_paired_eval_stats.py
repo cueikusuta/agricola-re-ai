@@ -139,5 +139,43 @@ class PairedStatsTests(unittest.TestCase):
                     run(rows)
 
 
+    def test_oversized_integer_metrics_are_rejected_without_overflow(self):
+        for field, error in (("first_place_credit", "credit"), ("score_margin", "margin"),
+                             ("total_wall_ms", "timing")):
+            with self.subTest(field=field):
+                rows = fixture()
+                rows[0][field] = 10**1000
+                with self.assertRaisesRegex(ValueError, error):
+                    run(rows)
+
+    def test_strict_integer_rank_schema_and_score_range(self):
+        cases = (
+            ("expected_rank_observation", True, "rank"),
+            ("schema_version", True, "metadata"),
+        )
+        for field, value, expected_error in cases:
+            with self.subTest(field=field):
+                rows = fixture()
+                rows[0][field] = value
+                with self.assertRaisesRegex(ValueError, expected_error):
+                    run(rows)
+        rows = fixture()
+        rows[0]["scores_by_seat"][0] = 10**1000
+        with self.assertRaisesRegex(ValueError, "standings"):
+            run(rows)
+
+    def test_equal_score_tiebreak_ranks_are_allowed(self):
+        rows = fixture()
+        # Two equal scores may have different ranks due to the resource
+        # tiebreaker, which is intentionally not exposed in this JSONL.
+        rows[0]["scores_by_seat"][1] = rows[0]["scores_by_seat"][0]
+        rows[0]["score_margin"] = rows[0]["scores_by_seat"][0] - (
+            sum(rows[0]["scores_by_seat"]) - rows[0]["scores_by_seat"][0]
+        ) / 3
+        report = run(rows)
+        self.assertEqual(report["total_games"], 24)
+
+
+
 if __name__ == "__main__":
     unittest.main()
