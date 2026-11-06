@@ -166,8 +166,7 @@ fn play_one(mode: Mode, seed: u64) -> Result<Coverage, String> {
             .map_err(|error| format!("apply failed at step {step}: {error}"))?;
         let after = game.state_hash();
         assert_ne!(
-            after,
-            before,
+            after, before,
             "an applied action must change the state hash at step {step}"
         );
         coverage.trace.push(after);
