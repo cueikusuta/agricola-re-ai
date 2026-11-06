@@ -4,6 +4,7 @@ pub mod cards;
 pub mod engine;
 pub mod evaluation;
 pub mod harvest;
+pub mod hints;
 pub mod hooks;
 pub mod mcts;
 pub mod model;

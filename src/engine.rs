@@ -605,6 +605,102 @@ impl Game {
         hints
     }
 
+    /// Bounded, read-only fencing suggestions for the active player. It does
+    /// not enumerate every connected subset: it offers single- and two-cell
+    /// new pastures, one-cell extensions of existing pastures, and the
+    /// deterministic splits the default policy already finds. The engine still
+    /// validates any submitted construction.
+    pub fn fence_hints(&self) -> crate::hints::FenceHints {
+        use crate::hints::{FenceHints, FenceProposal};
+        let p = &self.public.players[self.public.active_player];
+        let free = p.free_fence_wood;
+        let budget = p.supply.wood.saturating_add(free);
+        let remaining = 15usize.saturating_sub(p.fences.len());
+        let mut proposals: Vec<FenceProposal> = Vec::new();
+        let mut extendable = BTreeSet::new();
+        for pasture in &p.pastures {
+            for &cell in &pasture.cells {
+                for adj in neighbors(cell) {
+                    if matches!(p.farm[adj].tile, Tile::Empty) {
+                        extendable.insert(adj);
+                    }
+                }
+            }
+        }
+        let touches_existing = |region: &[usize]| {
+            region.iter().any(|&i| {
+                neighbors(i)
+                    .iter()
+                    .any(|&j| matches!(p.farm[j].tile, Tile::Pasture { .. }))
+            })
+        };
+        // Splits first: they are rare but important, so never crowd them out.
+        if let Some(regions) = split_candidate(p) {
+            if let Some(proposal) = fence_proposal(p, budget, regions, None, "split") {
+                proposals.push(proposal);
+            }
+        }
+        if let Some((regions, occupancy)) = split_occupied_candidate(p) {
+            if let Some(proposal) = fence_proposal(p, budget, regions, Some(occupancy), "split") {
+                proposals.push(proposal);
+            }
+        } else if let Some((regions, occupancy)) = general_split_candidate(p) {
+            if let Some(proposal) = fence_proposal(p, budget, regions, Some(occupancy), "split") {
+                proposals.push(proposal);
+            }
+        }
+        // Two-cell new pastures: guarantee multi-cell shapes are visible even
+        // when there are many single-cell options.
+        let mut multi = 0usize;
+        for a in 0..FARM_CELLS {
+            if multi >= 8 {
+                break;
+            }
+            if !matches!(p.farm[a].tile, Tile::Empty) {
+                continue;
+            }
+            for b in neighbors(a) {
+                if multi >= 8 {
+                    break;
+                }
+                if b < a || !matches!(p.farm[b].tile, Tile::Empty) {
+                    continue;
+                }
+                if !p.pastures.is_empty() && !touches_existing(&[a, b]) {
+                    continue;
+                }
+                if let Some(proposal) = fence_proposal(p, budget, vec![vec![a, b]], None, "new") {
+                    proposals.push(proposal);
+                    multi += 1;
+                }
+            }
+        }
+        // Single-cell new pastures, bounded so the dialog stays readable.
+        let mut singles = 0usize;
+        for i in 0..FARM_CELLS {
+            if singles >= 8 {
+                break;
+            }
+            if !matches!(p.farm[i].tile, Tile::Empty) {
+                continue;
+            }
+            if !p.pastures.is_empty() && !touches_existing(&[i]) {
+                continue;
+            }
+            if let Some(proposal) = fence_proposal(p, budget, vec![vec![i]], None, "new") {
+                proposals.push(proposal);
+                singles += 1;
+            }
+        }
+        FenceHints {
+            available_wood: p.supply.wood,
+            free_fence_wood: free,
+            remaining_segments: remaining,
+            extendable_cells: extendable.into_iter().collect(),
+            proposals,
+        }
+    }
+
     fn apply_with_plans(
         &mut self,
         action: Action,
@@ -1552,6 +1648,63 @@ fn boundary(cells: &[usize]) -> BTreeSet<(u8, u8)> {
     }
     edges
 }
+/// Fence segments implied by the changed regions plus every unchanged pasture,
+/// matching `build_pastures`. Rejects disconnected/out-of-bounds/overlapping
+/// regions and any construction that would demolish fencing.
+fn fence_edges(p: &Player, regions: &[Vec<usize>]) -> Option<BTreeSet<(u8, u8)>> {
+    let mut edges = BTreeSet::new();
+    let mut affected = BTreeSet::new();
+    let mut covered = BTreeSet::new();
+    for region in regions {
+        if region.is_empty() || region.iter().any(|&i| i >= FARM_CELLS) || !connected(region) {
+            return None;
+        }
+        for &i in region {
+            if !covered.insert(i) {
+                return None;
+            }
+            if let Tile::Pasture { id } = p.farm[i].tile {
+                affected.insert(id);
+            }
+        }
+        edges.extend(boundary(region));
+    }
+    for old in &p.pastures {
+        if affected.contains(&old.id) && old.cells.iter().any(|cell| !covered.contains(cell)) {
+            return None;
+        }
+    }
+    for pasture in p.pastures.iter().filter(|q| !affected.contains(&q.id)) {
+        edges.extend(boundary(&pasture.cells));
+    }
+    if edges.len() > 15 || !p.fences.is_subset(&edges) {
+        return None;
+    }
+    Some(edges)
+}
+
+/// A priced fencing proposal, or `None` if it is unaffordable or over the
+/// 15-segment limit.
+fn fence_proposal(
+    p: &Player,
+    budget: u32,
+    regions: Vec<Vec<usize>>,
+    occupancy: Option<Vec<PastureOccupancy>>,
+    kind: &str,
+) -> Option<crate::hints::FenceProposal> {
+    let edges = fence_edges(p, &regions)?;
+    let cost = edges.difference(&p.fences).count() as u32;
+    if cost == 0 || cost > budget || p.fences.len() + cost as usize > 15 {
+        return None;
+    }
+    Some(crate::hints::FenceProposal {
+        pastures: regions,
+        occupancy,
+        cost_wood: cost,
+        kind: kind.into(),
+    })
+}
+
 /// Legal one-cell pasture option used by the default detail policy.
 /// Check fresh fence cost, the 15 fence limit, and adjacency.
 pub fn single_cell_pasture(p: &Player) -> Option<usize> {

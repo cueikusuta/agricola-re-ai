@@ -136,7 +136,7 @@ return (optional?[["","使用しない"]]:[]).concat(ids.map(id=>[id,cardLabel(i
 }
 function plantFields(){add("種まき（例：3:小麦,4:野菜）","plants","text","","1つの畑に1種。空欄なら種まきなし");}
 function bakeFields(){add("パン焼き（例：レンガ暖炉:1,調理場4:2）","baking","text","","改善名:麦の個数（日本語名または内部ID）。空欄なら焼かない");}
-function fenceFields(){add("牧場のマス（例：2,3;7,8）","pastures","text","","牧場ごとに ; で区切る。既存牧場を含む場合も新しい全区画を指定");add("移動後の家畜（例：羊:2;なし:0）","fenceAnimals","text","","指定した牧場順。空欄なら従来の配置を維持");}
+function fenceFields(){add("牧場のマス（例：2,3;7,8）","pastures","text","","牧場ごとに ; で区切る。既存牧場を含む場合も新しい全区画を指定");add("移動後の家畜（例：羊:2;なし:0）","fenceAnimals","text","","指定した牧場順。空欄なら従来の配置を維持");const fh=state.fence_hints;if(fh&&fh.proposals&&fh.proposals.length){const head=document.createElement("p");head.className="minor";head.textContent="合法候補（全"+fh.proposals.length+"件・クリックで入力。手入力も可）: 残り柵 "+fh.remaining_segments+"本 / 木材 "+fh.available_wood+(fh.free_fence_wood?" + 無料"+fh.free_fence_wood:"");$("fields").append(head);const box=document.createElement("div");box.className="chips";fh.proposals.forEach(p=>{const b=document.createElement("button");b.type="button";b.dataset.kind=p.kind;b.dataset.multicell=p.pastures.some(r=>r.length>=2)?"true":"false";b.textContent=(p.kind==="split"?"分割":p.kind==="new"?"新規":"変更")+" "+p.cost_wood+"本 ("+p.pastures.map(r=>r.join(",")).join(" / ")+")";b.title="牧場: "+p.pastures.map(r=>r.join(",")).join(" / ");b.onclick=()=>{document.getElementById("pastures").value=p.pastures.map(r=>r.join(",")).join(";");const a=document.getElementById("fenceAnimals");a.value=p.occupancy&&p.occupancy.length?p.occupancy.map(o=>o.animal?(animals[o.animal]||o.animal)+":"+o.quantity:"なし:0").join(";"):"";};box.append(b);});$("fields").append(box);}}
 function buyFields(prefix){select("買う主要改善",prefix+"buy",[["","買わない"]].concat(Object.entries(improvements)));select("支払い方法",prefix+"mode",[["Auto","通常（自動交換）"],["Pay","材料で支払う"]].concat(["fireplace2","fireplace3"].map(x=>["exchange_"+x,"手持ちの"+improvements[x]+"を交換"])));add("購入直後のパン焼き",prefix+"baking","text","","改善名:麦の個数（日本語名または内部ID）");}
 function choiceFrom(ids,optional){return (optional?[["","使用しない"]]:[]).concat(ids.map(id=>[id,cardLabel(id)]));}
 function workFields(space,hints){
@@ -199,6 +199,7 @@ const pasture=val("arrPastures").split(";").map(x=>x.trim()).filter(Boolean).map
 const stables=pairs("arrStables").map(([cell,animal])=>[Number(cell),animalId(animal)]);return {pasture,stables,pet:val("arrPet")==="none"?null:val("arrPet")};}
 function openFree(){
 openEditor("任意の操作","ワーカーを使わない操作です。","free",null);
+const fh=state.free_action_hints;if(fh){const p=document.createElement("p");p.className="minor";const crops=fh.convertible_crops.filter(x=>x[1]>0).map(x=>goods[x[0]]+"×"+x[1]+"→食料"+(x[1]*x[2]));const cook=fh.cookable_animals.map(x=>animals[x[0]]+"×"+x[1]+"→食料"+(x[1]*x[2]));p.textContent="通常のフリーアクションで変換可能: "+(crops.concat(cook).join("、")||"なし")+"（工房加工は収穫時の給餌で指定します）";$("fields").append(p);}
 select("操作","freeKind",[["ConvertCrop","作物を食料へ"],["CookAnimal","家畜を調理"],["DiscardGood","資源を返す"],["DiscardAnimal","家畜を返す"],["RearrangeAnimals","家畜を配置換え"]]);
 select("資源","good",Object.entries(goods));select("家畜","animal",Object.entries(animals));
 add("個数","quantity","number",1);sourceField();arrangeFields();
@@ -210,6 +211,7 @@ const location=val("sourceType"),source=location==="Pet"?"Pet":{[location]:num("
 return {[kind]:{animal:val("animal"),source,quantity:num("quantity")}};
 }
 function feedingFields(){
+const fh=state.feeding_hints;if(fh){const p=document.createElement("p");p.className="minor";p.textContent="必要食料: "+fh.owed_food+" / 所持食料: "+fh.stored_food+" / 変換: "+(fh.options.filter(o=>o.available>0&&o.food_each>0).map(o=>feeds[o.source]+"×"+o.available+"→食料"+o.food_each).join("、")||"なし");$("fields").append(p);}
 feedOrder=Object.keys(feeds);const list=document.createElement("div");list.id="feedOrder";list.className="details";$("fields").append(list);
 function showOrder(){list.replaceChildren();for(let i=0;i<feedOrder.length;i++){const row=document.createElement("div");row.className="buttons";row.textContent=(i+1)+". "+feeds[feedOrder[i]]+" ";for(const [text,step] of [["↑",-1],["↓",1]]){const b=document.createElement("button");b.type="button";b.textContent=text;b.disabled=i+step<0||i+step>=feedOrder.length;b.onclick=()=>{const j=i+step;[feedOrder[i],feedOrder[j]]=[feedOrder[j],feedOrder[i]];showOrder();};row.append(b);}list.append(row);}}
 showOrder();add("繁殖用の2匹を優先して残す","preserve","checkbox",true);
@@ -218,6 +220,7 @@ for(const id of ["joinery","pottery","basketry"]){const label=document.createEle
 }
 function breedingFields(){
 const p=state.harvest.preview.players[0];const eligible=Object.keys(animals).filter(x=>countAnimal(p,x)>=2);
+const bh=state.breeding_hints;if(bh){const note=document.createElement("p");note.className="minor";const name=d=>{if(typeof d==="string")return d==="Discard"?"返す":d==="Pet"?"家":d;const k=Object.keys(d)[0];return k==="Pasture"?"牧場"+d.Pasture:k==="Stable"?"厩"+d.Stable:k;};note.textContent="収容先: "+(bh.eligible.map(e=>animals[e.species]+" → "+e.destinations.map(d=>name(d.destination)+"(空き"+(d.free_space===4294967295?"∞":d.free_space)+")").join(", ")).join(" / ")||"なし");$("fields").append(note);}
 for(const species of eligible){const destinations=[["Discard","返す"],["Pet","家"]];for(const pasture of p.pastures)destinations.push(["Pasture:"+pasture.id,"牧場"+pasture.id]);for(let i=0;i<p.farm.length;i++)if(p.farm[i].stable)destinations.push(["Stable:"+i,"厩"+i]);select(animals[species]+"の子の置き場","birth_"+species,destinations);}
 $("fields").dataset.eligible=eligible.join(",");add("繁殖前の家畜配置換えも指定する","arrange","checkbox",false);arrangeFields();
 }
