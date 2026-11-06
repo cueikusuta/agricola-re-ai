@@ -1,11 +1,12 @@
-//! Tests for the AI loss-cause diagnostics binary (Issue #106).
+//! Tests for the AI outcome diagnostics binary (Issue #106).
 //!
-//! These tests pin the two properties the analysis depends on:
-//! 1. The diagnostics decision loop reproduces the canonical `play_to_end`
-//!    result for the same seed and policy, so the recorded metrics describe the
-//!    exact games the rest of the project plays.
-//! 2. The same seed/config produces byte-identical output, so a reported
-//!    number can always be re-run.
+//! These tests pin the properties the analysis depends on:
+//! 1. The reported games are exactly the canonical `play_to_end` games, so the
+//!    recorded metrics describe what the rest of the project plays.
+//! 2. The log-derived family-growth rounds are well formed and consistent with
+//!    the final family sizes (i.e. the prefix replay actually observed growth).
+//! 3. The same seed/config produces byte-identical output, so a reported number
+//!    can always be re-run.
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::policy::{play_to_end, SimpleDetails};
 use agricola_re_ai::{Config, Game};
@@ -74,6 +75,56 @@ fn matches_canonical_play_to_end_state_hash() {
         assert_eq!(row["ranks"].as_array().unwrap().len(), 4);
         assert_eq!(row["metrics"].as_array().unwrap().len(), 4);
     }
+}
+
+/// The growth rounds come from canonical prefix replay, not from a parallel
+/// decision loop, so this guards the derivation and its consistency with the
+/// final family size for every player count.
+#[test]
+fn derived_growth_rounds_are_well_formed() {
+    let mut saw_a_growth = false;
+    for players in [2usize, 3, 4] {
+        let rows = run_diagnostics(&format!("growth-{players}p"), players, 4, 960_000);
+        for row in &rows {
+            let metrics = row["metrics"].as_array().unwrap();
+            assert_eq!(metrics.len(), players);
+            assert_eq!(row["ranks"].as_array().unwrap().len(), players);
+            for metric in metrics {
+                let round = |key: &str| metric[key].as_u64();
+                let family = metric["family_final"].as_u64().unwrap();
+                for (threshold, key) in [
+                    (3u64, "grow_third_round"),
+                    (4, "grow_fourth_round"),
+                    (5, "grow_fifth_round"),
+                ] {
+                    match round(key) {
+                        Some(value) => {
+                            assert!((1..=14).contains(&value), "{key}={value} out of range");
+                            assert!(
+                                family >= threshold,
+                                "{key} recorded but final family {family} < {threshold}"
+                            );
+                            saw_a_growth = true;
+                        }
+                        None => assert!(
+                            family < threshold,
+                            "final family {family} >= {threshold} but {key} missing"
+                        ),
+                    }
+                }
+                let third = round("grow_third_round");
+                let fourth = round("grow_fourth_round");
+                let fifth = round("grow_fifth_round");
+                if let (Some(third), Some(fourth)) = (third, fourth) {
+                    assert!(third <= fourth, "third worker grew after fourth");
+                }
+                if let (Some(fourth), Some(fifth)) = (fourth, fifth) {
+                    assert!(fourth <= fifth, "fourth worker grew after fifth");
+                }
+            }
+        }
+    }
+    assert!(saw_a_growth, "no family growth was observed in the sample");
 }
 
 #[test]

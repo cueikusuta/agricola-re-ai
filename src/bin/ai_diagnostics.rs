@@ -1,19 +1,21 @@
-//! AI loss-cause diagnostics (roadmap M12/M13 preparation, Issue #106).
+//! AI outcome diagnostics (roadmap M12/M13 preparation, Issue #106).
 //!
 //! This tool does NOT add or modify a search algorithm. It plays cardless
-//! self-play games under a single evaluation policy, records the observable
-//! per-player outcome metrics, and aggregates which failure modes are
-//! associated with finishing last instead of first. The output is meant to
-//! turn "the AI feels weak" into countable hypotheses (food failures, stalled
-//! family growth, empty rooms, unused farm cells, ...) that can each become a
-//! small, measurable experiment.
+//! self-play games under a single policy, records the observable per-player
+//! outcome metrics, and aggregates which failure modes are *associated* with
+//! finishing last instead of first. It measures correlation, not causation;
+//! the output is meant to turn "the AI feels weak" into countable hypotheses
+//! (food failures, stalled family growth, empty rooms, unused farm cells, ...)
+//! that can each become a small, measurable experiment.
 //!
 //! Design constraints:
 //! * Every policy reads only `Observation`; private deck order and the rule
 //!   engine RNG are never sampled by the analysis.
-//! * The decision loop mirrors `policy::play_to_end_observed` exactly so that
-//!   the same seed reproduces the same game. `tests/ai_diagnostics.rs` asserts
-//!   the final state hash matches the canonical loop.
+//! * The tool **calls the canonical `policy::play_to_end`** for the actual
+//!   games; it never re-implements the decision loop, so it cannot drift from
+//!   the engine's policy execution. Family-growth timing is derived afterwards
+//!   from the recorded log by replaying canonically (`Game::replay`) up to each
+//!   growth event, which also re-validates every `before`/`after` state hash.
 //! * Output is deterministic: sorted maps, no timestamps, no wall-clock data.
 //!
 //! Usage:
@@ -22,20 +24,14 @@
 //!     --policy eval --output diagnostics.jsonl [--summary-output summary.json]
 
 use agricola_re_ai::evaluation::EvaluationPolicy;
-use agricola_re_ai::harvest::SimpleHarvestDetails;
-use agricola_re_ai::model::{Animal, Crop};
-use agricola_re_ai::policy::{GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
+use agricola_re_ai::model::{Animal, Crop, Event, Space};
+use agricola_re_ai::policy::{play_to_end, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
 use agricola_re_ai::score::standings;
 use agricola_re_ai::{Config, Game};
-use rand::SeedableRng;
-use rand_chacha::ChaCha8Rng;
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
-
-/// Same iteration limit as `policy::play_to_end_observed`.
-const MOVE_LIMIT: usize = 320;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PolicyKind {
@@ -234,62 +230,55 @@ fn collect_player_metrics(
         .collect()
 }
 
-/// Record, for every player, the current round if their family count has just
-/// reached a new threshold. Called after each applied action; because rounds
-/// only advance after all workers are placed, this attributes growth to the
-/// round in which the growth action was taken.
-fn record_growth(game: &Game, growth: &mut [BTreeMap<u8, u8>]) {
-    let round = game.public.round;
-    for (id, player) in game.public.players.iter().enumerate() {
-        for threshold in 3u8..=5 {
-            if player.family >= threshold {
-                growth[id].entry(threshold).or_insert(round);
+/// Spaces whose action increases the family count. In cardless play these are
+/// the only ways a family can grow, so a growth event in the log is exactly a
+/// work action on one of them. (`ModestFamilyGrowth` is the 2-player extra
+/// tile; a card that grows the family still uses one of these spaces.)
+fn is_family_growth_space(space: Space) -> bool {
+    matches!(
+        space,
+        Space::FamilyGrowthWithRoom | Space::FamilyGrowthNoRoom | Space::ModestFamilyGrowth
+    )
+}
+
+/// Derive each player's family-growth rounds from the canonical log without
+/// re-running any policy decision.
+///
+/// For every work action that can grow a family, replay the log canonically up
+/// to (before) and including (after) that event. `Game::replay` re-checks every
+/// `before`/`after` state hash, so this cannot silently use a wrong state. The
+/// growth is attributed to the round the action was taken in, read from the
+/// pre-action state; this avoids the off-by-one that occurs when the action
+/// also ends the round.
+fn record_growth_from_log(
+    config: &Config,
+    events: &[Event],
+    growth: &mut [BTreeMap<u8, u8>],
+) -> Result<(), String> {
+    for index in 0..events.len() {
+        let action = match serde_json::from_value::<agricola_re_ai::engine::RecordedAction>(
+            events[index].payload.clone(),
+        ) {
+            Ok(agricola_re_ai::engine::RecordedAction::Work { action, .. }) => action,
+            _ => continue,
+        };
+        if !is_family_growth_space(action.space) {
+            continue;
+        }
+        let before = Game::replay(config.clone(), &events[..index])?;
+        let after = Game::replay(config.clone(), &events[..=index])?;
+        let round = before.public.round;
+        for (id, slots) in growth.iter_mut().enumerate() {
+            let was = before.public.players[id].family;
+            let now = after.public.players[id].family;
+            for threshold in (was + 1)..=now {
+                if (3..=5).contains(&threshold) {
+                    slots.entry(threshold).or_insert(round);
+                }
             }
         }
     }
-}
-
-/// Deterministic decision loop that mirrors `policy::play_to_end_observed`
-/// while capturing family-growth timing. Returns the same error strings.
-fn play_with_growth(
-    game: &mut Game,
-    space_policy: &dyn SpacePolicy,
-    detail_policy: &dyn agricola_re_ai::policy::DetailPolicy,
-    growth: &mut [BTreeMap<u8, u8>],
-) -> Result<(), String> {
-    record_growth(game, growth);
-    for _ in 0..MOVE_LIMIT {
-        if game.public.finished {
-            return Ok(());
-        }
-        let acting = game.public.active_player;
-        let obs = game.observation(acting)?;
-        let legal = game.legal_spaces();
-        if legal.is_empty() {
-            return Err(format!(
-                "no legal move in round {} for player {}",
-                game.public.round, acting
-            ));
-        }
-        let decision_index = game.log.events.len() as u64;
-        let mut choice_rng = ChaCha8Rng::seed_from_u64(
-            game.log.action_seed ^ decision_index.wrapping_mul(0x9E37_79B9_7F4A_7C15),
-        );
-        let chosen = space_policy
-            .select(&obs, &legal, &mut choice_rng)
-            .ok_or("policy refused selection")?;
-        let action = detail_policy
-            .produce(&obs, chosen)
-            .ok_or("detail policy declined")?;
-        game.apply_with_harvest_policy(action, &SimpleHarvestDetails)
-            .map_err(|e| format!("policy action {:?} failed: {}", chosen, e))?;
-        record_growth(game, growth);
-    }
-    if game.public.finished {
-        Ok(())
-    } else {
-        Err("move limit exceeded".into())
-    }
+    Ok(())
 }
 
 #[derive(Default, Clone)]
@@ -334,10 +323,12 @@ fn run(options: &Options) -> Result<String, String> {
             seed,
             additional_action_space_enabled: options.additional_action_space,
         };
-        let mut game = Game::new(config);
-        let mut growth = vec![BTreeMap::<u8, u8>::new(); options.players];
-        play_with_growth(&mut game, selected, &SimpleDetails, &mut growth)
+        let mut game = Game::new(config.clone());
+        play_to_end(&mut game, selected, &SimpleDetails)
             .map_err(|e| format!("seed {seed}: {e}"))?;
+        let mut growth = vec![BTreeMap::<u8, u8>::new(); options.players];
+        record_growth_from_log(&config, &game.log.events, &mut growth)
+            .map_err(|e| format!("seed {seed}: growth log replay failed: {e}"))?;
         if !game.public.finished {
             return Err(format!("seed {seed}: game did not finish"));
         }
