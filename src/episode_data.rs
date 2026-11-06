@@ -178,9 +178,19 @@ impl EpisodeRecord {
     /// the recorded [`TurnRecord`] fields. It recomputes the initial state,
     /// checks the recorded `initial_state_hash`, and, for every event,
     /// recomputes the acting player's [`Observation`] and requires the recorded
-    /// observation, round and action payload to match. Swapping in another
-    /// seat's observation, editing an action payload, or editing the initial
-    /// hash is detected even when the replay hashes alone would still agree.
+    /// observation, round, action payload and zero-based index to match. After
+    /// the replay it checks the terminal metadata (`finished`, `rounds`,
+    /// `final_state_hash`, `standings`), rejects non-finite rewards, and
+    /// requires every `turn.reward` to equal the first-place credit recomputed
+    /// from the replayed standings. Swapping in another seat's observation,
+    /// editing an action payload, an index, the initial hash or a learning
+    /// reward is therefore detected even when the replay hashes alone agree.
+    ///
+    /// Draft-seeded records are not yet produced: `EpisodeRecord` has no
+    /// initial-hand field, so verification always rebuilds the dealt state from
+    /// `config`/`card_set`. When draft-to-game records are integrated, this must
+    /// store and replay the explicit initial hands (as
+    /// `Game::replay_with_setup` does) instead of deriving them from the seed.
     pub fn verify(&self) -> Result<(), String> {
         if self.schema_version != EPISODE_SCHEMA_VERSION {
             return Err(format!(
@@ -208,7 +218,13 @@ impl EpisodeRecord {
         if game.state_hash() != self.initial_state_hash {
             return Err("recomputed initial state does not match the recorded state".into());
         }
-        for (turn, event) in self.turns.iter().zip(&self.events) {
+        for (expected_index, (turn, event)) in self.turns.iter().zip(&self.events).enumerate() {
+            if turn.index != expected_index {
+                return Err(format!(
+                    "turn at position {expected_index} has index {}",
+                    turn.index
+                ));
+            }
             if event.player != Some(turn.player) {
                 return Err(format!(
                     "turn {} player does not match its event",
@@ -242,16 +258,46 @@ impl EpisodeRecord {
         if game.state_hash() != self.final_state_hash {
             return Err("replay does not reproduce the recorded final state".into());
         }
+        if game.public.finished != self.finished {
+            return Err("recorded finished flag does not match the replay".into());
+        }
+        if game.public.round != self.rounds {
+            return Err("recorded rounds does not match the replay".into());
+        }
         let standings = standings_with_cards(&game.public.players, &self.card_set);
         if standings != self.standings {
             return Err("replay standings differ from the recorded standings".into());
+        }
+        // The learning label must equal the first-place credit of the replayed
+        // result; `NaN`/infinite/any other value is a corrupted reward.
+        let credit = first_credit(&standings.rank);
+        for turn in &self.turns {
+            let expected = credit.get(turn.player).copied().unwrap_or(0.0);
+            if !turn.reward.is_finite() {
+                return Err(format!("turn {} has a non-finite reward", turn.index));
+            }
+            if turn.reward != expected {
+                return Err(format!(
+                    "turn {} reward {} does not match the replay credit {expected}",
+                    turn.index, turn.reward
+                ));
+            }
         }
         Ok(())
     }
 
     /// Per-viewer learning samples. Only turns where `viewer` acted are used,
     /// so only that viewer's own observation is exposed.
+    ///
+    /// The record is re-verified before conversion, so a tampered observation,
+    /// action, index, terminal flag or reward can never become a training
+    /// sample. `verify()` is the single gate and there is intentionally no
+    /// unchecked path. For large datasets this replays once per call; the future
+    /// optimisation is to cache a proof of verification (for example a
+    /// `VerifiedEpisodeRecord` value or a batch-level check), never to skip the
+    /// check.
     pub fn training_samples(&self, viewer: usize) -> Result<Vec<TrainingSample>, String> {
+        self.verify()?;
         if viewer >= self.config.players {
             return Err("invalid training viewer".into());
         }

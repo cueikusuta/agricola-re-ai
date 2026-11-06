@@ -141,18 +141,44 @@ fn dataset_report_detects_duplicate_seeds_and_corruption() {
 }
 
 #[test]
-fn verify_detects_tampered_observations_actions_and_initial_hash() {
+fn verify_detects_all_recorded_tampering() {
     let record = self_play_record(2, 2024);
     record.verify().expect("the untouched record is valid");
 
-    // Editing the recorded action payload is corruption even though the event
-    // log and its before/after hashes are untouched.
+    // 1. A corrupted learning reward (including NaN) is rejected.
+    let mut reward_tampered = record.clone();
+    reward_tampered.turns[0].reward += 1.0;
+    assert!(reward_tampered.verify().is_err());
+    let mut nan_reward = record.clone();
+    nan_reward.turns[0].reward = f64::NAN;
+    assert!(nan_reward.verify().is_err());
+    let mut infinite_reward = record.clone();
+    infinite_reward.turns[0].reward = f64::INFINITY;
+    assert!(infinite_reward.verify().is_err());
+
+    // 2. A non-sequential turn index is rejected.
+    let mut index_tampered = record.clone();
+    index_tampered.turns[1].index = 99;
+    assert!(index_tampered.verify().is_err());
+
+    // 3. Editing the terminal finished flag is rejected.
+    let mut finished_tampered = record.clone();
+    finished_tampered.finished = !finished_tampered.finished;
+    assert!(finished_tampered.verify().is_err());
+
+    // 4. Editing the terminal round count is rejected.
+    let mut rounds_tampered = record.clone();
+    rounds_tampered.rounds = rounds_tampered.rounds.wrapping_sub(1);
+    assert!(rounds_tampered.verify().is_err());
+
+    // 5. Editing the recorded action payload is corruption even though the
+    //    event log and its before/after hashes are untouched.
     let mut action_tampered = record.clone();
     action_tampered.turns[0].action = serde_json::json!({"tampered": true});
     assert!(action_tampered.verify().is_err());
     assert_eq!(inspect_dataset(&[action_tampered]).corrupt.len(), 1);
 
-    // Substituting another seat's observation must be rejected.
+    // 6. Substituting another seat's observation must be rejected.
     let mut observation_tampered = record.clone();
     let player = observation_tampered.turns[0].observation.player_id;
     observation_tampered.turns[0].observation.player_id = (player + 1) % 2;
@@ -169,15 +195,38 @@ fn verify_detects_tampered_observations_actions_and_initial_hash() {
     swapped.turns[last].observation = first_view;
     assert!(swapped.verify().is_err());
 
-    // A mismatched initial state hash is rejected.
+    // 7. A mismatched initial state hash is rejected.
     let mut initial_tampered = record.clone();
     initial_tampered.initial_state_hash = "0".repeat(64);
     assert!(initial_tampered.verify().is_err());
 
-    // A wrong round label is rejected.
+    // A wrong round label on a turn is rejected.
     let mut round_tampered = record.clone();
     round_tampered.turns[0].round = round_tampered.turns[0].round.wrapping_add(1);
     assert!(round_tampered.verify().is_err());
+}
+
+#[test]
+fn training_samples_reject_a_corrupted_record() {
+    let record = self_play_record(2, 3030);
+    assert!(!record.training_samples(0).unwrap().is_empty());
+
+    // 8. A tampered record must never be converted into learning data.
+    let mut reward_tampered = record.clone();
+    reward_tampered.turns[0].reward = f64::NAN;
+    assert!(reward_tampered.training_samples(0).is_err());
+
+    let mut index_tampered = record.clone();
+    index_tampered.turns[1].index = 99;
+    assert!(index_tampered.training_samples(0).is_err());
+
+    let mut observation_tampered = record.clone();
+    let player = observation_tampered.turns[0].observation.player_id;
+    observation_tampered.turns[0].observation.player_id = (player + 1) % 2;
+    assert!(observation_tampered.training_samples(0).is_err());
+
+    // An out-of-range viewer is still rejected on a valid record.
+    assert!(record.training_samples(2).is_err());
 }
 
 #[test]
