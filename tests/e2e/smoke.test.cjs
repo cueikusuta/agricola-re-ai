@@ -78,4 +78,24 @@ test("ローカルWeb UIを実ブラウザで検証", async (t) => {
       && document.querySelector("#summary")?.textContent.includes("ON"));
     assert.ok((await page.locator("#actions button").count()) > 0);
   });
+
+  await scenario("non_default_legal_detail_plows_specific_cell", async () => {
+    await page.locator("#players").selectOption("2");
+    await page.locator("#cards").selectOption("none");
+    await page.locator("#extra").uncheck();
+    await page.locator("#new").click();
+    await page.waitForFunction(() => document.querySelector("#summary")?.textContent.includes("2人戦")
+      && document.querySelector("#summary")?.textContent.includes("カードなし"));
+    // Human turn. The default detail policy would plow cell 1; supply cell 2
+    // explicitly through the manual editor and verify the engine accepts it.
+    const farmland = page.locator("#actions button", { hasText: "畑" }).first();
+    await farmland.waitFor({ state: "visible" });
+    await farmland.click();
+    await page.locator("#editor").waitFor({ state: "visible" });
+    assert.match(await page.locator("#detailHint").innerText(), /耕せるマス/);
+    await page.locator("#cell").fill("2");
+    await page.locator("#confirm").click();
+    await page.locator("#editor").waitFor({ state: "hidden" });
+    assert.match(await page.locator("#farm .cell").nth(2).innerText(), /畑/);
+  });
 });

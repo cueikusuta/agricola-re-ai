@@ -116,8 +116,9 @@ $("actions").replaceChildren();$("actionNav").replaceChildren();$("free").disabl
 if(p.finished){$("notice").textContent="最終順位: "+scores.rank.map((r,i)=>(i+1)+"P "+r+"位").join("、");return;}
 if(harvest){$("notice").textContent=harvest.phase==="feeding"?"収穫：給餌順と工房加工を選択":"収穫：繁殖する子の置き場所を選択";const b=document.createElement("button");b.textContent="収穫の詳細を指定";b.onclick=()=>openHarvest();$("actions").append(b);return;}
 $("notice").textContent="1Pの手番です。自動の詳細選択は使用しません。";
-const pages=Math.max(1,Math.ceil(state.legal.length/8));actionPage=Math.min(actionPage,pages-1);
-for(const key of state.legal.slice(actionPage*8,(actionPage+1)*8)){const b=document.createElement("button");b.textContent=names[key]||key;b.disabled=busy;b.onclick=()=>openWork(key);$("actions").append(b);}
+const available=state.available||state.legal||[];const candidate=new Set(state.legal||[]);
+const pages=Math.max(1,Math.ceil(available.length/8));actionPage=Math.min(actionPage,pages-1);
+for(const key of available.slice(actionPage*8,(actionPage+1)*8)){const b=document.createElement("button");b.textContent=(names[key]||key)+(candidate.has(key)?"":"（詳細指定）");b.title=candidate.has(key)?"AI候補にも含まれるスペース":"AI候補外。詳細を明示すれば実行できます";b.disabled=busy;b.onclick=()=>openWork(key);$("actions").append(b);}
 if(pages>1){for(const [label,next,disabled] of [["前へ",actionPage-1,actionPage===0],["次へ",actionPage+1,actionPage===pages-1]]){const b=document.createElement("button");b.textContent=label;b.disabled=busy||disabled;b.onclick=()=>{actionPage=next;render();};$("actionNav").append(b);}}
 }
 function add(label,id,type="text",value="",hint=""){
@@ -137,24 +138,26 @@ function plantFields(){add("種まき（例：3:小麦,4:野菜）","plants","te
 function bakeFields(){add("パン焼き（例：レンガ暖炉:1,調理場4:2）","baking","text","","改善名:麦の個数（日本語名または内部ID）。空欄なら焼かない");}
 function fenceFields(){add("牧場のマス（例：2,3;7,8）","pastures","text","","牧場ごとに ; で区切る。既存牧場を含む場合も新しい全区画を指定");add("移動後の家畜（例：羊:2;なし:0）","fenceAnimals","text","","指定した牧場順。空欄なら従来の配置を維持");}
 function buyFields(prefix){select("買う主要改善",prefix+"buy",[["","買わない"]].concat(Object.entries(improvements)));select("支払い方法",prefix+"mode",[["Auto","通常（自動交換）"],["Pay","材料で支払う"]].concat(["fireplace2","fireplace3"].map(x=>["exchange_"+x,"手持ちの"+improvements[x]+"を交換"])));add("購入直後のパン焼き",prefix+"baking","text","","改善名:麦の個数（日本語名または内部ID）");}
-function workFields(space){
+function choiceFrom(ids,optional){return (optional?[["","使用しない"]]:[]).concat(ids.map(id=>[id,cardLabel(id)]));}
+function workFields(space,hints){
+hints=hints||{};
 const none=["forest","clay_pit","reed_bank","fishing","day_laborer","grain_seeds","vegetable_seeds","western_quarry","eastern_quarry","copse","grove","hollow","traveling_players","family_growth_no_room"];
 if(none.includes(space)){add("追加の指定はありません","nothing","text","None").disabled=true;return;}
 switch(space){
 case "resource_market":if(state.public.players.length===3)select("選ぶ資源","market",[["stone","石"],["reed","葦"]]);break;
-case "farmland":add("耕すマス（0〜14）","cell","number",2);break;
-case "farm_expansion":add("建てる部屋のマス","rooms","text","","例：1,2。空欄なら部屋なし");add("建てる厩のマス","stables","text","","例：3,8。空欄なら厩なし");break;
+case "farmland":add("耕すマス（0〜14）","cell","number",hints.plow_cells&&hints.plow_cells.length?hints.plow_cells[0]:2);break;
+case "farm_expansion":add("建てる部屋のマス","rooms","text","",hints.room_cells&&hints.room_cells.length?"例："+hints.room_cells.join(","):"建てられる部屋マスなし");add("建てる厩のマス","stables","text","",hints.stable_cells&&hints.stable_cells.length?"例："+hints.stable_cells.join(","):"建てられる厩マスなし");break;
 case "fencing":fenceFields();break;
 case "grain_utilization":plantFields();bakeFields();break;
-case "cultivation":add("耕すマス（空欄なら耕さない）","plow","text","");plantFields();break;
-case "major_improvement":select("種類","buyKind",[["major","主要改善"],["minor","小改善"]]);buyFields("");select("使う小改善","minor",choiceCards("minor_improvement",true));break;
+case "cultivation":add("耕すマス（空欄なら耕さない）","plow","text",hints.plow_cells&&hints.plow_cells.length?String(hints.plow_cells[0]):"");plantFields();break;
+case "major_improvement":select("種類","buyKind",[["major","主要改善"],["minor","小改善"]]);buyFields("");select("使う小改善","minor",choiceFrom(hints.minors&&hints.minors.length?hints.minors:state.hand.filter(id=>state.card_definitions.some(c=>c.id===id&&c.kind==="minor_improvement")),true));break;
 case "house_redevelopment":buyFields("");break;
 case "farm_redevelopment":fenceFields();break;
 case "sheep_market":case "pig_market":case "cattle_market":case "animal_market":
 if(space==="animal_market")select("家畜の種類","species",Object.entries(animals));else add("家畜の種類（固定）","species","text",space==="sheep_market"?"sheep":space==="pig_market"?"boar":"cattle").disabled=true;
 add("牧場への割り当て（例：0:2,1:3）","animalPastures");add("厩のマス（例：4,5）","animalStables");add("家に1匹置く","pet","checkbox",false);add("調理して食料にする数","cook","number",0);add("返す数","discard","number",0);break;
-case "lessons":case "extra_lessons":select("使う職業","occupation",choiceCards("occupation",false));break;
-case "meeting_place":case "family_growth_with_room":case "modest_family_growth":select("使う小改善","minor",choiceCards("minor_improvement",true));break;
+case "lessons":case "extra_lessons":select("使う職業","occupation",choiceFrom(hints.occupations&&hints.occupations.length?hints.occupations:state.hand.filter(id=>state.card_definitions.some(c=>c.id===id&&c.kind==="occupation")),false));break;
+case "meeting_place":case "family_growth_with_room":case "modest_family_growth":select("使う小改善","minor",choiceFrom(hints.minors&&hints.minors.length?hints.minors:state.hand.filter(id=>state.card_definitions.some(c=>c.id===id&&c.kind==="minor_improvement")),true));break;
 default:throw Error("未対応アクション: "+space);
 }}
 function parsePlant(){return pairs("plants").map(([cell,crop])=>({cell:Number(cell),crop:crop==="小麦"?"grain":crop==="野菜"?"vegetable":crop}));}
@@ -179,7 +182,14 @@ case "meeting_place":case "family_growth_with_room":case "modest_family_growth":
 default:return "None";
 }}
 function openEditor(title,hint,what,space){mode=what;selectedSpace=space;$("fields").replaceChildren();$("editorTitle").textContent=title;$("editorHint").textContent=hint;$("editor").showModal();}
-function openWork(space){openEditor(names[space]||space,"各選択は任意ではなく、エンジンにそのまま渡されます。","work",space);workFields(space);}
+function appendHint(space,hints){
+const parts=[];if(!(state.legal||[]).includes(space))parts.push("このスペースは現在のAI候補に含まれません。合法な詳細を入力すれば実行できます。");
+if(hints.plow_cells&&hints.plow_cells.length)parts.push("耕せるマス: "+hints.plow_cells.join(","));
+if(hints.room_cells&&hints.room_cells.length)parts.push("部屋を建てられるマス: "+hints.room_cells.join(","));
+if(hints.stable_cells&&hints.stable_cells.length)parts.push("厩を建てられるマス: "+hints.stable_cells.join(","));
+if(hints.sow_fields&&hints.sow_fields.length)parts.push("種をまける畑: "+hints.sow_fields.join(","));
+if(parts.length){const p=document.createElement("p");p.className="minor";p.id="detailHint";p.textContent=parts.join(" / ");$("fields").append(p);}}
+function openWork(space){const hints=(state.detail_hints&&state.detail_hints[space])||{};openEditor(names[space]||space,"各選択は任意ではなく、エンジンにそのまま渡されます。","work",space);appendHint(space,hints);workFields(space,hints);}
 function sourceField(){
 select("動物の場所","sourceType",[["Pet","家"],["Pasture","牧場"],["Stable","厩"]]);add("牧場ID / 厩マス（家なら不要）","sourceIndex","number",0);
 }
