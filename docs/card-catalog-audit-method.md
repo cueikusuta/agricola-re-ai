@@ -13,13 +13,24 @@
 - `card_id`：A001〜E168の不変の主キー。
 - `card_type_normalized`：`occupation` / `minor_improvement` / `multi_type`。一次台帳の型を構造化しただけで、兼用種別の最終確定を意味しない。
 - `eligible_at_2` / `eligible_at_3` / `eligible_at_4`：`yes`, `no`, `unverified`。公式確認までは必ず `unverified`。
-- `review_status`：`unverified` / `reviewed-needs-official` / `verified` / `rejected`。最終確定ではない記録を`verified`にしない。
+- `review_status`：`unverified` / `reviewed-needs-official` / `verified` / `rejected`。最終確定ではない記録を`verified`にしない。`reviewed-needs-official` は内部確認済みだが公式未確認であり、**`eligible_at_* = yes` を付けられない**（検証スクリプトが失敗させる）。
 - `reference_type`：`secondary_catalog` / `official_pdf` / `official_print` / `official_other`。非公式サイトだけなら `secondary_catalog` に留める。
 - `primary_reference_id`：公式の印刷カードID/版・文書・該当箇所を追跡できる安定識別子（例：`printed-card:A005:edition-2016`）。正式照合した事実を持たずに埋めない。
 - `primary_reference_url`：公式デジタル資料の検証可能なURL。印刷カード照合の場合は空欄でもよいが、出典IDは必須。
 - `source_language`、`ruleset_version`（常に `2016-revised`）、`reviewed_by`、`reviewed_on`（ISO日付）、`review_note`：照合の来歴。
 
 `verified` の必須条件：全人数適格が yes/no に決定し、公式の出典種別、個別参照ID、言語、監査者、照合日があり、デジタル出典ならURLがあること。一次台帳の英語名が空欄の場合も英名を公式照合してから確認すること。CIはこれらの**記入漏れ**を検出するが、**URL内容やカードルールの真偽を自動証明するものではない**。
+
+公式資料の区分と1枚あたりの照合項目は [公式資料の入手可能性と照合手順](card-catalog-official-sources.md) を正本とする。
+
+## 構造検証と公式照合進捗を分ける
+
+`scripts/validate_card_catalog.py` は次の2つを別項目で報告する。
+
+- `structure_validation`：840行の形式・ID・列挙値・種別整合が正しいか。
+- `official_verification_progress`：公式照合が何枚済みか（`verified` として記録された件数）。
+
+構造検証が成功しても、公式照合済みとは扱わない。`high_risk_audit_queue` と `stratified_audit_sample` はレビュー**作業キュー**であり、選ばれた事実は照合の証拠ではない。
 
 ## 最初に確定している監査上の注意
 
@@ -39,7 +50,7 @@ python3 -m unittest discover -s tests -p test_card_catalog_validator.py -v
 
 ## 残作業・受け入れ
 
-1. 公式カード・Lookoutの一次資料で、カードごとに**人数適格、費用、効果、発動時点、型、名称**を照合し記録する。特にD159・A005・複合4件を優先する。
+1. 公式カード・Lookoutの一次資料で、カードごとに**人数適格、費用、効果、発動時点、型、名称**を照合し記録する。特にD159・A005・複合4件を優先する。手順と一次資料の区分は [card-catalog-official-sources.md](card-catalog-official-sources.md) に従う。
 2. 照合済み件数、2/3/4人ごとの候補数をレポートに出す。未照合を配布可能としない。
 3. #105側で公式照合済み候補を実装し、個別効果/相互作用テスト、4人10-7用40+40の実効配布可能枚数を確認する。
 4. 40+40の最低ゲートと80+80の実戦目標を別々に監査。公式カード原文・画像は公開リポジトリに収録しない。
