@@ -1,6 +1,6 @@
 //! M12 episode/learning-data foundation (Issue #106, M12 data layer).
 //!
-//! This module is deliberately independent of any single evaluation API. It
+//! This module uses the unified evaluation API to drive new episodes. It
 //! records one game as a versioned, machine-readable [`EpisodeRecord`], writes
 //! and reads JSONL, verifies each record by replaying its committed event log,
 //! detects corrupt/duplicate data, and converts records into per-viewer
@@ -176,6 +176,24 @@ impl EpisodeRecord {
 
     /// Replay the committed event log and compare the terminal state, the
     /// standings, and every turn/event boundary. Any mismatch is corruption.
+    ///
+    /// This is the tamper-detection gate for a record, so it does **not** trust
+    /// the recorded [`TurnRecord`] fields. It recomputes the initial state,
+    /// checks the recorded `initial_state_hash`, and, for every event,
+    /// recomputes the acting player's [`Observation`] and requires the recorded
+    /// observation, round, action payload and zero-based index to match. After
+    /// the replay it checks the terminal metadata (`finished`, `rounds`,
+    /// `final_state_hash`, `standings`), rejects non-finite rewards, and
+    /// requires every `turn.reward` to equal the first-place credit recomputed
+    /// from the replayed standings. Swapping in another seat's observation,
+    /// editing an action payload, an index, the initial hash or a learning
+    /// reward is therefore detected even when the replay hashes alone agree.
+    ///
+    /// Draft-seeded records are not yet produced: `EpisodeRecord` has no
+    /// initial-hand field, so verification always rebuilds the dealt state from
+    /// `config`/`card_set`. When draft-to-game records are integrated, this must
+    /// store and replay the explicit initial hands (as
+    /// `Game::replay_with_setup` does) instead of deriving them from the seed.
     pub fn verify(&self) -> Result<(), String> {
         if self.schema_version != EPISODE_SCHEMA_VERSION {
             return Err(format!(
@@ -192,7 +210,24 @@ impl EpisodeRecord {
         if self.turns.len() != self.events.len() {
             return Err("turn/event count mismatch".into());
         }
-        for (turn, event) in self.turns.iter().zip(&self.events) {
+        if self.turns.is_empty() {
+            return Err("episode record has no turns".into());
+        }
+        // The first committed event's pre-state is the initial state.
+        if self.events[0].before != self.initial_state_hash {
+            return Err("recorded initial state hash does not match the first event".into());
+        }
+        let mut game = Game::with_cards(self.config.clone(), self.card_set.clone())?;
+        if game.state_hash() != self.initial_state_hash {
+            return Err("recomputed initial state does not match the recorded state".into());
+        }
+        for (expected_index, (turn, event)) in self.turns.iter().zip(&self.events).enumerate() {
+            if turn.index != expected_index {
+                return Err(format!(
+                    "turn at position {expected_index} has index {}",
+                    turn.index
+                ));
+            }
             if event.player != Some(turn.player) {
                 return Err(format!(
                     "turn {} player does not match its event",
@@ -202,22 +237,70 @@ impl EpisodeRecord {
             if event.before != turn.before || event.after != turn.after {
                 return Err(format!("turn {} hash does not match its event", turn.index));
             }
+            if turn.action != event.payload {
+                return Err(format!(
+                    "turn {} action does not match its committed event payload",
+                    turn.index
+                ));
+            }
+            let observation = game.observation(turn.player)?;
+            if observation != turn.observation {
+                return Err(format!(
+                    "turn {} observation does not match the replayed state",
+                    turn.index
+                ));
+            }
+            if turn.round != observation.public.round {
+                return Err(format!(
+                    "turn {} round does not match the replayed state",
+                    turn.index
+                ));
+            }
+            game.apply_recorded(event)?;
         }
-        let replayed =
-            Game::replay_with_cards(self.config.clone(), self.card_set.clone(), &self.events)?;
-        if replayed.state_hash() != self.final_state_hash {
+        if game.state_hash() != self.final_state_hash {
             return Err("replay does not reproduce the recorded final state".into());
         }
-        let standings = standings_with_cards(&replayed.public.players, &self.card_set);
+        if game.public.finished != self.finished {
+            return Err("recorded finished flag does not match the replay".into());
+        }
+        if game.public.round != self.rounds {
+            return Err("recorded rounds does not match the replay".into());
+        }
+        let standings = standings_with_cards(&game.public.players, &self.card_set);
         if standings != self.standings {
             return Err("replay standings differ from the recorded standings".into());
+        }
+        // The learning label must equal the first-place credit of the replayed
+        // result; `NaN`/infinite/any other value is a corrupted reward.
+        let credit = first_credit(&standings.rank);
+        for turn in &self.turns {
+            let expected = credit.get(turn.player).copied().unwrap_or(0.0);
+            if !turn.reward.is_finite() {
+                return Err(format!("turn {} has a non-finite reward", turn.index));
+            }
+            if turn.reward != expected {
+                return Err(format!(
+                    "turn {} reward {} does not match the replay credit {expected}",
+                    turn.index, turn.reward
+                ));
+            }
         }
         Ok(())
     }
 
     /// Per-viewer learning samples. Only turns where `viewer` acted are used,
     /// so only that viewer's own observation is exposed.
+    ///
+    /// The record is re-verified before conversion, so a tampered observation,
+    /// action, index, terminal flag or reward can never become a training
+    /// sample. `verify()` is the single gate and there is intentionally no
+    /// unchecked path. For large datasets this replays once per call; the future
+    /// optimisation is to cache a proof of verification (for example a
+    /// `VerifiedEpisodeRecord` value or a batch-level check), never to skip the
+    /// check.
     pub fn training_samples(&self, viewer: usize) -> Result<Vec<TrainingSample>, String> {
+        self.verify()?;
         if viewer >= self.config.players {
             return Err("invalid training viewer".into());
         }
@@ -295,6 +378,13 @@ impl TrainingSample {
 }
 
 /// Aggregate health of a record set.
+///
+/// This is the machine-readable contract behind the episode-dataset Actions
+/// artifact. It records integrity (replay/duplicates) and the provenance a
+/// downstream aggregation can cross-check: the engine/rules/card/format
+/// versions, the producing code revision, the seed range, and how many turns
+/// and events were observed. Mixed provenance values mean the records were not
+/// generated under identical conditions and must not be pooled silently.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetReport {
     pub total: usize,
@@ -305,11 +395,47 @@ pub struct DatasetReport {
     pub duplicate_seeds: Vec<u64>,
     /// Verification failures as `"<index>: <error>"`.
     pub corrupt: Vec<String>,
+    #[serde(default)]
+    pub seed_min: Option<u64>,
+    #[serde(default)]
+    pub seed_max: Option<u64>,
+    #[serde(default)]
+    pub distinct_seeds: usize,
+    #[serde(default)]
+    pub total_turns: usize,
+    #[serde(default)]
+    pub total_events: usize,
+    #[serde(default)]
+    pub formats: BTreeSet<String>,
+    #[serde(default)]
+    pub engine_versions: BTreeSet<String>,
+    #[serde(default)]
+    pub rules_versions: BTreeSet<String>,
+    #[serde(default)]
+    pub card_modes: BTreeSet<String>,
+    #[serde(default)]
+    pub code_shas: BTreeSet<String>,
 }
 
 impl DatasetReport {
     pub fn is_clean(&self) -> bool {
         self.corrupt.is_empty() && self.duplicate_seeds.is_empty()
+    }
+
+    /// Every record is finished. A dataset with partially played games cannot
+    /// be used as a complete-game learning/evaluation set.
+    pub fn is_complete(&self) -> bool {
+        self.total > 0 && self.finished == self.total
+    }
+
+    /// All records share one format/engine/rules/card/code revision. When this
+    /// is `false`, do not compare or merge the records as one condition.
+    pub fn has_uniform_provenance(&self) -> bool {
+        self.formats.len() <= 1
+            && self.engine_versions.len() <= 1
+            && self.rules_versions.len() <= 1
+            && self.card_modes.len() <= 1
+            && self.code_shas.len() <= 1
     }
 }
 
@@ -324,11 +450,22 @@ pub fn inspect_dataset(records: &[EpisodeRecord]) -> DatasetReport {
         }
         report.schema_versions.insert(record.schema_version);
         report.player_counts.insert(record.config.players);
-        *seeds.entry(record.config.seed).or_default() += 1;
+        report.formats.insert(record.format.clone());
+        report.engine_versions.insert(record.engine_version.clone());
+        report.rules_versions.insert(record.rules_version.clone());
+        report.card_modes.insert(record.card_mode.clone());
+        report.code_shas.insert(record.code_sha.clone());
+        report.total_turns += record.turns.len();
+        report.total_events += record.events.len();
+        let seed = record.config.seed;
+        *seeds.entry(seed).or_default() += 1;
+        report.seed_min = Some(report.seed_min.map_or(seed, |min| min.min(seed)));
+        report.seed_max = Some(report.seed_max.map_or(seed, |max| max.max(seed)));
         if let Err(error) = record.verify() {
             report.corrupt.push(format!("{index}: {error}"));
         }
     }
+    report.distinct_seeds = seeds.len();
     report.duplicate_seeds = seeds
         .into_iter()
         .filter(|(_, count)| *count > 1)
@@ -380,9 +517,6 @@ pub fn from_jsonl(text: &str) -> Result<Vec<EpisodeRecord>, String> {
 /// pre-action observation. `SimpleDetails` and `EvaluationPolicy` are typical
 /// card-less choices; callers pass them explicitly so this module never
 /// hard-codes a policy version.
-///
-/// This is now a thin alias of [`record_episode`], so the recorded data is
-/// produced through the unified episode API (#148) rather than a second driver.
 pub fn record_self_play(
     config: Config,
     card_set: CardSet,
