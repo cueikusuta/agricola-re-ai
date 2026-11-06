@@ -135,6 +135,14 @@ test("Issue #104: Japanese draft UI completes every pick", async (t) => {
     assert.match(await page.locator("#draftOffered").innerText(), /あなたの最終手札/);
     // The UI shows the viewer's own observation history.
     assert.match(await page.locator("#draftLog").innerText(), /観測履歴 \d+件/);
+    await page.locator("#draftLog details summary").click();
+    const history = await page.locator("#draftHistoryEntries li").allTextContents();
+    assert.ok(history.some(line => line.includes("見た束") && line.includes("FIX-OCC-")),
+      "own observed packet cards must be visible in the history");
+    assert.ok(history.some(line => line.includes("自分の選択")),
+      "own picks must be visible in the history");
+    assert.ok(history.some(line => line.includes("渡した束")),
+      "passed packets must be visible in the history");
   });
 
   await scenario("ten_seven_simultaneous_all_picks", async () => {

@@ -273,6 +273,27 @@ request("/api/state");
 let draftSel={occupation:new Set(),minor:new Set()},draftSelToken=null;
 function draftCardLabel(id){return cardNames[id]?cardLabel(id):id;}
 function resetDraftSel(){draftSel={occupation:new Set(),minor:new Set()};draftSelToken=null;}
+function renderDraftHistory(container,history,heading){
+  const wasOpen=container.querySelector("details")?.open||false;
+  container.replaceChildren();
+  const intro=document.createElement("p");intro.textContent=heading;container.append(intro);
+  const details=document.createElement("details");details.open=wasOpen;
+  const summary=document.createElement("summary");summary.textContent="観測履歴 "+history.length+"件（自分が見た・選んだ・渡した札）";
+  details.append(summary);
+  const list=document.createElement("ol");list.id="draftHistoryEntries";
+  for(const event of history){
+    const kind=event.kind==="occupation"?"職業":event.kind==="minor_improvement"?"小進歩":"カード";
+    let description="";
+    if(event.event==="seen_packet")description="見た束 "+(event.ids||[]).map(draftCardLabel).join(" / ");
+    else if(event.event==="own_pick")description="自分の選択 "+draftCardLabel(event.id);
+    else if(event.event==="passed_packet")description="渡した束（"+(event.to_seat+1)+"Pへ） "+(event.ids||[]).map(draftCardLabel).join(" / ");
+    else if(event.event==="public_reveal")description="公開札 "+draftCardLabel(event.id);
+    const item=document.createElement("li");
+    item.textContent="ラウンド "+event.round+"・"+kind+"："+description;
+    list.append(item);
+  }
+  details.append(list);container.append(details);
+}
 function renderDraft(){
 const d=state&&state.draft,status=$("draftStatus"),offered=$("draftOffered"),actions=$("draftActions"),log=$("draftLog");
 if(!d){status.textContent="ドラフトは開始されていません。";offered.replaceChildren();actions.replaceChildren();log.textContent="";return;}
@@ -289,7 +310,7 @@ if(d.complete){
   const own=d.own_final_hands||{occupations:[],minors:[]};
   const p=document.createElement("p");p.className="minor";p.textContent="あなたの最終手札 — 職業: "+(own.occupations.map(draftCardLabel).join(" / ")||"なし")+" ｜ 小進歩: "+(own.minors.map(draftCardLabel).join(" / ")||"なし");
   offered.append(p);
-  actions.replaceChildren();log.textContent="観測履歴 "+((d.history||[]).length)+"件（見た束・自分のピック・渡した束）";
+  actions.replaceChildren();renderDraftHistory(log,d.history||[],"ドラフト完了");
   return;
 }
 const chooseMode=d.phase==="choosing";
@@ -324,7 +345,7 @@ confirm.onclick=async()=>{
   }
 };
 actions.append(confirm);
-log.textContent="自分のピック: "+(d.own_picked.length?d.own_picked.map(draftCardLabel).join(" / "):"なし")+" / 観測履歴 "+((d.history||[]).length)+"件";
+renderDraftHistory(log,d.history||[],"自分のピック: "+(d.own_picked.length?d.own_picked.map(draftCardLabel).join(" / "):"なし"));
 }
 $("draftNew").onclick=async()=>{
 const mode=val("draftMode"),do_=val("draftDirOcc"),dm=val("draftDirMinor");

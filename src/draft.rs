@@ -499,10 +499,14 @@ impl DraftState {
                 Vec::new()
             }
         };
-        let remaining_to_pick = match self.mode {
-            DraftMode::Deal7 => 0,
-            DraftMode::Choose10_7 => 7,
-            _ => (self.mode.picks_per_kind() as u8).saturating_sub(self.round - 1),
+        let remaining_to_pick = if self.is_complete() {
+            0
+        } else {
+            match self.mode {
+                DraftMode::Deal7 => 0,
+                DraftMode::Choose10_7 => 7,
+                _ => (self.mode.picks_per_kind() as u8).saturating_sub(self.round - 1),
+            }
         };
         Ok(DraftObservation {
             viewer,
@@ -865,7 +869,37 @@ impl DraftState {
         {
             return Err("draft per-seat vectors have the wrong length".into());
         }
+        // Each kind has exactly one packet per seat, including after completion
+        // (when packets are empty). Detect duplicated owners and forged packet IDs.
+        let expected_packets = 2 * self.player_count;
+        if self.packets.len() != expected_packets {
+            return Err("draft packet count does not match player_count".into());
+        }
+        let mut packet_ids = BTreeSet::new();
+        let mut packet_owners = BTreeSet::new();
+        for packet in &self.packets {
+            if packet.packet_id as usize >= expected_packets || !packet_ids.insert(packet.packet_id) {
+                return Err("draft packet IDs are missing, duplicated or out of range".into());
+            }
+            if packet.owner_seat >= self.player_count
+                || !packet_owners.insert((packet.owner_seat, packet.kind))
+            {
+                return Err("draft has invalid or duplicated packet owner/kind".into());
+            }
+        }
+
+        // Cards in each draft are conserved from their initial deal: exactly
+        // dealt_per_kind * players of each kind must exist in packets, picked,
+        // or private discards. Unused pool cards are intentionally not counted.
         let mut seen = BTreeSet::new();
+        let mut counts = BTreeMap::<CardKind, usize>::new();
+        for packet in &self.packets {
+            for id in &packet.cards {
+                if self.card_kind(id) != Some(packet.kind) {
+                    return Err(format!("card {id} has the wrong packet kind"));
+                }
+            }
+        }
         for id in self
             .packets
             .iter()
@@ -873,8 +907,16 @@ impl DraftState {
             .chain(self.picked.iter().flatten())
             .chain(self.discarded.iter())
         {
+            let kind = self.card_kind(id).ok_or_else(|| format!("unknown draft card: {id}"))?;
             if !seen.insert(id.clone()) {
                 return Err(format!("draft card appears twice: {id}"));
+            }
+            *counts.entry(kind).or_default() += 1;
+        }
+        let expected_kind_cards = self.mode.dealt_per_kind() * self.player_count;
+        for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
+            if counts.get(&kind).copied().unwrap_or_default() != expected_kind_cards {
+                return Err(format!("{} draft cards were lost or added", kind.as_str()));
             }
         }
         for ids in self.picked.iter() {

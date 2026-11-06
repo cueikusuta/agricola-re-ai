@@ -276,3 +276,49 @@ fn start_rejects_unconfirmed_or_insufficient_setups() {
     // No silent default direction exists.
     let _ = DraftRuleset::explicit("x", Direction::Left, Direction::Left, true);
 }
+
+#[test]
+fn completed_observation_reports_no_remaining_picks_in_all_modes() {
+    for mode in [
+        DraftMode::Deal7,
+        DraftMode::Draft77,
+        DraftMode::Draft10_7Simultaneous,
+        DraftMode::Choose10_7,
+    ] {
+        let mut state = setup(mode, 3, 505).start().unwrap();
+        play_to_end(&mut state);
+        assert!(state.is_complete());
+        assert_eq!(
+            state.observe(0, state.current_token()).unwrap().remaining_to_pick,
+            0,
+            "{mode:?} must show no remaining picks after completion"
+        );
+    }
+}
+
+#[test]
+fn corrupt_restored_draft_rejects_missing_cards_and_bad_packets() {
+    let original = setup(DraftMode::Draft10_7Simultaneous, 3, 77)
+        .start()
+        .unwrap();
+    let corruptions: Vec<Box<dyn Fn(&mut DraftState)>> = vec![
+        Box::new(|state| { state.packets[0].cards.pop(); }),
+        Box::new(|state| { state.packets[0].packet_id = state.packets[1].packet_id; }),
+        Box::new(|state| { state.packets[0].owner_seat = state.packets[1].owner_seat; }),
+        Box::new(|state| { state.packets[0].owner_seat = state.player_count; }),
+        Box::new(|state| { state.packets[0].cards[0] = "UNREGISTERED-CARD".into(); }),
+        Box::new(|state| {
+            let id = state.packets[0].cards[0].clone();
+            state.kind_of.insert(id, CardKind::MinorImprovement);
+        }),
+    ];
+    for (index, corrupt) in corruptions.into_iter().enumerate() {
+        let mut state = original.clone();
+        corrupt(&mut state);
+        // The serialized form is untrusted; callers must validate it after
+        // deserialization and before using it as authoritative draft state.
+        let saved = serde_json::to_string(&state).unwrap();
+        let restored: DraftState = serde_json::from_str(&saved).unwrap();
+        assert!(restored.validate_invariants().is_err(), "corruption #{index}");
+    }
+}
