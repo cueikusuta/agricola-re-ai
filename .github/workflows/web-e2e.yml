@@ -1,0 +1,55 @@
+name: Browser UI E2E
+
+# This is deliberately separate from the mandatory Rust CI until the runtime
+# is measured and the 60-second target can be preserved.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tests/e2e/**'
+      - 'package.json'
+      - '.github/workflows/web-e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: web-e2e
+      - name: Install pinned browser driver (use runner's Chrome)
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Build local web server
+        run: cargo build --locked
+      - name: Launch server and wait for readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./target/debug/agricola-re-ai --web > /tmp/agricola-web-e2e.log 2>&1 &
+          for i in $(seq 1 80); do
+            if curl -fsS http://127.0.0.1:8787/ > /dev/null; then
+              exit 0
+            fi
+            sleep 0.25
+          done
+          cat /tmp/agricola-web-e2e.log
+          exit 1
+      - name: Playwright browser scenarios
+        run: npm run test:e2e
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-failure
+          path: |
+            artifacts/
+            /tmp/agricola-web-e2e.log
+          if-no-files-found: ignore
