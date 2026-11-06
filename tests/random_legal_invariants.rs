@@ -12,6 +12,8 @@
 //! same sequence because both the game and the sampling RNG are seeded from it.
 //! Set `AGRICOLA_FUZZ_SEEDS=1,2,3` to re-run an explicit failing seed list.
 use agricola_re_ai::cards::verified_basic_card_set;
+use agricola_re_ai::engine::{Action, Detail};
+use agricola_re_ai::model::Space;
 use agricola_re_ai::policy::{
     CardChoiceDetails, DetailPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
 };
@@ -172,4 +174,107 @@ fn random_legal_play_is_deterministic_for_a_fixed_seed() {
         cards: false,
     };
     assert_eq!(play_one(mode, 777), play_one(mode, 777));
+}
+
+/// Assert the shared validator and the apply path both reject an illegal
+/// action, and that neither changes the state (a rejected action is a no-op).
+fn assert_rejected(game: &Game, action: Action, why: &str) {
+    let before = game.state_hash();
+    assert!(
+        game.validate_action(&action).is_err(),
+        "validator accepted an illegal action ({why})"
+    );
+    let mut probe = game.clone();
+    assert!(
+        probe.apply(action).is_err(),
+        "apply accepted an illegal action ({why})"
+    );
+    assert_eq!(
+        probe.state_hash(),
+        before,
+        "illegal action mutated state ({why})"
+    );
+}
+
+/// Random legal play must not weaken the rejection path. Three illegal shapes
+/// are constructed per mode/seed: reusing a taken space, pairing a space with
+/// an impossible detail, and naming a still-hidden round space.
+#[test]
+fn illegal_actions_are_rejected_without_mutating_state() {
+    for mode in modes() {
+        for seed in seeds() {
+            let config = Config {
+                players: mode.players,
+                seed,
+                additional_action_space_enabled: mode.additional,
+            };
+            let card_set = if mode.cards {
+                Some(verified_basic_card_set(mode.players).unwrap())
+            } else {
+                None
+            };
+            let mut game = match &card_set {
+                Some(set) => Game::with_cards(config, set.clone()).unwrap(),
+                None => Game::new(config),
+            };
+            let mut rng = ChaCha8Rng::seed_from_u64(seed ^ 0x00A5_5A5A_00A5_5A5A);
+            let context = mode.label();
+
+            // Play one legal action so a used space exists.
+            let observation = game.observation(game.public.active_player).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy.select(&observation, &legal, &mut rng).unwrap();
+            let action = if mode.cards {
+                CardChoiceDetails.produce(&observation, space)
+            } else {
+                SimpleDetails.produce(&observation, space)
+            }
+            .unwrap();
+            game.apply(action).unwrap();
+
+            // (a) A used action space can never be taken again.
+            let used = *game.public.used.iter().next().expect("one used space");
+            let reuse = Action {
+                space: used,
+                detail: Detail::None,
+            };
+            assert_rejected(
+                &game,
+                reuse,
+                &format!("reused space in {context} seed={seed}"),
+            );
+
+            // (b) A space paired with an impossible card detail is rejected.
+            let available = game.available_spaces();
+            if let Some(plain) = available.iter().copied().find(|candidate| {
+                !matches!(candidate, Space::Lessons | Space::ExtraLessons)
+                    && !game.public.used.contains(candidate)
+            }) {
+                let mismatched = Action {
+                    space: plain,
+                    detail: Detail::PlayOccupation {
+                        card_id: "no-such-card".into(),
+                    },
+                };
+                assert_rejected(
+                    &game,
+                    mismatched,
+                    &format!("mismatched detail in {context} seed={seed}"),
+                );
+            }
+
+            // (c) A still-hidden round space is rejected.
+            if !game.available_spaces().contains(&Space::MajorImprovement) {
+                let hidden = Action {
+                    space: Space::MajorImprovement,
+                    detail: Detail::None,
+                };
+                assert_rejected(
+                    &game,
+                    hidden,
+                    &format!("hidden space in {context} seed={seed}"),
+                );
+            }
+        }
+    }
 }
