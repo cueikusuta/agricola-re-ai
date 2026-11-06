@@ -6,6 +6,9 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      # Exercise the actual browser when either UI markup or its Web API changes.
+      - 'web/**'
+      - 'src/web.rs'
       - 'tests/e2e/**'
       - 'package.json'
       - '.github/workflows/web-e2e.yml'
