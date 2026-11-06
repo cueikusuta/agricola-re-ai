@@ -89,3 +89,4 @@
 - `GameLog.initial_hands` に初期手札を保存し、`Game::replay_with_setup` と `load_json` が同じ初期状態を再構築する。`Game::with_cards` の通常配布は従来どおり（`initial_hands = None`）。
 - 本番プールは `verified_basic`（現状は2人・通常7枚/7-7のみ。10-7は枚数不足で拒否）。統合検証は `test_fixture`。フィクスチャID `FIX-*` は `verified_*` に登録しない。
 - ブラウザは `POST /api/draft/start-game` でドラフト完了後にゲームを開始し、観測履歴はセッションに保持する。相手の最終手札は開始後も `DraftObservation` に出さない。
+- ドラフトAIは `src/draft_ai.rs` の Random / CardValue / Synergy の3種。すべて `DraftObservation` のみを入力とし、公開カタログ（宣言点数・宣言費用・実装済み効果タグ）だけを評価に使う。カタログ欠落時は合法手へフォールバックする。固定seed・座席交代の比較は `compare_draft_ais`。公式照合済みプールが不足するため、**実戦の強さは未評価**（機能検証のみ）。
