@@ -169,6 +169,7 @@ class PairedStatsTests(unittest.TestCase):
         # Two equal scores may have different ranks due to the resource
         # tiebreaker, which is intentionally not exposed in this JSONL.
         rows[0]["scores_by_seat"][1] = rows[0]["scores_by_seat"][0]
+        rows[0]["ranks_by_seat"][2:] = [3, 3]
         rows[0]["score_margin"] = rows[0]["scores_by_seat"][0] - (
             sum(rows[0]["scores_by_seat"]) - rows[0]["scores_by_seat"][0]
         ) / 3
