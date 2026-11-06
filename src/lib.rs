@@ -7,6 +7,7 @@ pub mod harvest;
 pub mod hints;
 pub mod hooks;
 pub mod mcts;
+pub mod mcts_puct;
 pub mod model;
 pub mod policy;
 pub mod score;

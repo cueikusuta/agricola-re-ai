@@ -3,9 +3,11 @@
 //! candidate seat for both comparison arms. The optional M7 MCTS arm runs
 //! under a per-decision wall-clock budget and records whether it timed out or
 //! fell back to the guaranteed-legal evaluation policy.
+#![recursion_limit = "256"]
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::harvest::SimpleHarvestDetails;
 use agricola_re_ai::mcts::{MctsOutcome, MctsPolicy};
+use agricola_re_ai::mcts_puct::{LeafMode, PuctConfig, PuctPolicy};
 use agricola_re_ai::model::Space;
 use agricola_re_ai::policy::{
     play_to_end_observed, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
@@ -28,6 +30,7 @@ enum Ai {
     Greedy,
     Eval,
     Mcts,
+    Puct,
 }
 
 impl Ai {
@@ -37,6 +40,7 @@ impl Ai {
             "greedy" => Ok(Ai::Greedy),
             "eval" => Ok(Ai::Eval),
             "mcts" => Ok(Ai::Mcts),
+            "puct" => Ok(Ai::Puct),
             _ => Err(format!("unsupported AI: {name}")),
         }
     }
@@ -46,10 +50,12 @@ impl Ai {
             Ai::Greedy => "greedy",
             Ai::Eval => "eval",
             Ai::Mcts => "mcts",
+            Ai::Puct => "puct",
         }
     }
-    fn is_mcts(self) -> bool {
-        self == Ai::Mcts
+    /// Search policies use a per-decision wall-clock budget and a fallback.
+    fn is_search(self) -> bool {
+        matches!(self, Ai::Mcts | Ai::Puct)
     }
 }
 
@@ -65,6 +71,14 @@ struct Options {
     decision_budget_ms: u64,
     mcts_simulations: usize,
     mcts_tree_depth: usize,
+    puct_simulations: usize,
+    puct_tree_depth: usize,
+    puct_c: f64,
+    puct_prior_temperature: f64,
+    puct_value_temperature: f64,
+    puct_leaf: LeafMode,
+    puct_root_limit: usize,
+    puct_final_prior: f64,
     output: String,
 }
 
@@ -77,6 +91,21 @@ fn option<'a>(values: &'a BTreeMap<String, String>, key: &str) -> Result<&'a str
 
 fn optional_option<'a>(values: &'a BTreeMap<String, String>, key: &str) -> Option<&'a str> {
     values.get(key).map(String::as_str)
+}
+
+fn parse_option_or<T>(
+    values: &BTreeMap<String, String>,
+    key: &str,
+    default: T,
+    error: &str,
+) -> Result<T, String>
+where
+    T: std::str::FromStr,
+{
+    match optional_option(values, key) {
+        Some(value) => value.parse::<T>().map_err(|_| error.to_string()),
+        None => Ok(default),
+    }
 }
 
 fn parse_options() -> Result<Options, String> {
@@ -98,6 +127,14 @@ fn parse_options() -> Result<Options, String> {
             "decision-budget-ms",
             "mcts-simulations",
             "mcts-tree-depth",
+            "puct-simulations",
+            "puct-tree-depth",
+            "puct-c",
+            "puct-prior-temp",
+            "puct-value-temp",
+            "puct-leaf",
+            "puct-root-limit",
+            "puct-final-prior",
             "output",
         ]
         .contains(&key)
@@ -155,6 +192,49 @@ fn parse_options() -> Result<Options, String> {
         })
         .transpose()?
         .unwrap_or(2);
+    let default_puct = PuctConfig::default();
+    let puct_simulations = parse_option_or(
+        &values,
+        "puct-simulations",
+        default_puct.simulations,
+        "invalid puct-simulations",
+    )?;
+    let puct_tree_depth = parse_option_or(
+        &values,
+        "puct-tree-depth",
+        default_puct.tree_depth,
+        "invalid puct-tree-depth",
+    )?;
+    let puct_c = parse_option_or(&values, "puct-c", default_puct.c_puct, "invalid puct-c")?;
+    let puct_prior_temperature = parse_option_or(
+        &values,
+        "puct-prior-temp",
+        default_puct.prior_temperature,
+        "invalid puct-prior-temp",
+    )?;
+    let puct_value_temperature = parse_option_or(
+        &values,
+        "puct-value-temp",
+        default_puct.value_temperature,
+        "invalid puct-value-temp",
+    )?;
+    let puct_leaf = match optional_option(&values, "puct-leaf").unwrap_or("heuristic") {
+        "heuristic" => LeafMode::Heuristic,
+        "terminal" => LeafMode::Terminal,
+        _ => return Err("puct-leaf must be heuristic or terminal".into()),
+    };
+    let puct_root_limit = parse_option_or(
+        &values,
+        "puct-root-limit",
+        default_puct.root_candidate_limit,
+        "invalid puct-root-limit",
+    )?;
+    let puct_final_prior = parse_option_or(
+        &values,
+        "puct-final-prior",
+        default_puct.final_prior_weight,
+        "invalid puct-final-prior",
+    )?;
     let output = option(&values, "output")?.to_string();
     if !(2..=4).contains(&players) {
         return Err("players must be 2, 3, or 4".into());
@@ -178,6 +258,27 @@ fn parse_options() -> Result<Options, String> {
     if !(1..=6).contains(&mcts_tree_depth) {
         return Err("mcts-tree-depth must be 1..=6".into());
     }
+    if puct_simulations == 0 || puct_simulations > 100_000 {
+        return Err("puct-simulations must be 1..=100000".into());
+    }
+    if !(1..=6).contains(&puct_tree_depth) {
+        return Err("puct-tree-depth must be 1..=6".into());
+    }
+    if !puct_c.is_finite() || puct_c < 0.0 || puct_c > 100.0 {
+        return Err("puct-c must be finite and 0..=100".into());
+    }
+    if !puct_prior_temperature.is_finite() || puct_prior_temperature <= 0.0 {
+        return Err("puct-prior-temp must be finite and > 0".into());
+    }
+    if !puct_value_temperature.is_finite() || puct_value_temperature <= 0.0 {
+        return Err("puct-value-temp must be finite and > 0".into());
+    }
+    if puct_root_limit > 100 {
+        return Err("puct-root-limit must be 0..=100".into());
+    }
+    if !puct_final_prior.is_finite() || !(0.0..=10.0).contains(&puct_final_prior) {
+        return Err("puct-final-prior must be finite and 0..=10".into());
+    }
     if candidate == baseline {
         return Err("candidate and baseline must be different".into());
     }
@@ -193,6 +294,14 @@ fn parse_options() -> Result<Options, String> {
         decision_budget_ms,
         mcts_simulations,
         mcts_tree_depth,
+        puct_simulations,
+        puct_tree_depth,
+        puct_c,
+        puct_prior_temperature,
+        puct_value_temperature,
+        puct_leaf,
+        puct_root_limit,
+        puct_final_prior,
         output,
     })
 }
@@ -212,6 +321,7 @@ struct SeatSelector<'a> {
     greedy: &'a GreedyPolicy,
     eval: &'a EvaluationPolicy,
     mcts: &'a MctsPolicy,
+    puct: &'a PuctPolicy,
     budget: Option<Duration>,
     decision_ns: RefCell<Vec<u64>>,
     focus_outcomes: RefCell<FocusOutcomes>,
@@ -224,6 +334,7 @@ fn select_ai(
     greedy: &GreedyPolicy,
     eval: &EvaluationPolicy,
     mcts: &MctsPolicy,
+    puct: &PuctPolicy,
     obs: &Observation,
     legal: &[Space],
     rng: &mut ChaCha8Rng,
@@ -234,6 +345,10 @@ fn select_ai(
         Ai::Greedy => (greedy.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Eval => (eval.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Mcts => match mcts.select_with_budget(obs, legal, rng, deadline) {
+            Some((space, outcome)) => (Some(space), outcome),
+            None => (None, MctsOutcome::default()),
+        },
+        Ai::Puct => match puct.select_with_budget(obs, legal, rng, deadline) {
             Some((space, outcome)) => (Some(space), outcome),
             None => (None, MctsOutcome::default()),
         },
@@ -256,6 +371,7 @@ impl SpacePolicy for SeatSelector<'_> {
                 self.greedy,
                 self.eval,
                 self.mcts,
+                self.puct,
                 obs,
                 legal,
                 rng,
@@ -268,6 +384,7 @@ impl SpacePolicy for SeatSelector<'_> {
                 self.greedy,
                 self.eval,
                 self.mcts,
+                self.puct,
                 obs,
                 legal,
                 rng,
@@ -278,7 +395,7 @@ impl SpacePolicy for SeatSelector<'_> {
         self.decision_ns.borrow_mut().push(ns);
         if is_focus {
             let mut outcomes = self.focus_outcomes.borrow_mut();
-            if self.focus_ai.is_mcts() {
+            if self.focus_ai.is_search() {
                 let over_budget = self
                     .budget
                     .is_some_and(|budget| ns > budget.as_nanos() as u64);
@@ -327,6 +444,22 @@ fn run(options: &Options) -> Result<(), String> {
         simulations: options.mcts_simulations,
         tree_depth: options.mcts_tree_depth,
     };
+    let puct = PuctPolicy {
+        config: PuctConfig {
+            simulations: options.puct_simulations,
+            tree_depth: options.puct_tree_depth,
+            c_puct: options.puct_c,
+            prior_temperature: options.puct_prior_temperature,
+            value_temperature: options.puct_value_temperature,
+            leaf_mode: options.puct_leaf,
+            root_candidate_limit: options.puct_root_limit,
+            final_prior_weight: options.puct_final_prior,
+        },
+    };
+    let puct_leaf_name = match options.puct_leaf {
+        LeafMode::Heuristic => "heuristic",
+        LeafMode::Terminal => "terminal",
+    };
     let budget = Duration::from_millis(options.decision_budget_ms);
     let deadline_enabled = options.decision_budget_ms > 0;
     let start = Instant::now();
@@ -352,7 +485,8 @@ fn run(options: &Options) -> Result<(), String> {
                     greedy: &greedy,
                     eval: &eval,
                     mcts: &mcts,
-                    budget: (focus_ai.is_mcts() && deadline_enabled).then_some(budget),
+                    puct: &puct,
+                    budget: (focus_ai.is_search() && deadline_enabled).then_some(budget),
                     decision_ns: RefCell::new(Vec::new()),
                     focus_outcomes: RefCell::new(FocusOutcomes::default()),
                 };
@@ -423,8 +557,9 @@ fn run(options: &Options) -> Result<(), String> {
                     "decisions": decision_ns.len(),
                     "focus_decisions": whole_ns.len(),
                     "decision_budget_ms": options.decision_budget_ms,
-                    "mcts_deadline_active": focus_ai.is_mcts() && deadline_enabled,
-                    "deterministic_policy_selection": !(focus_ai.is_mcts() && deadline_enabled),
+                    "mcts_deadline_active": focus_ai.is_search() && deadline_enabled,
+                    "search_deadline_active": focus_ai.is_search() && deadline_enabled,
+                    "deterministic_policy_selection": !(focus_ai.is_search() && deadline_enabled),
                     "max_policy_select_ms": decision_ns.iter().copied().max().unwrap_or(0) as f64 / 1_000_000.0,
                     "p50_policy_select_ms": percentile_ms(&decision_ns, 0.50),
                     "p95_policy_select_ms": percentile_ms(&decision_ns, 0.95),
@@ -436,7 +571,16 @@ fn run(options: &Options) -> Result<(), String> {
                     "timeout_count": outcomes.timeouts,
                     "fallback_count": outcomes.fallbacks,
                     "mcts_simulations_completed": outcomes.simulations,
+                    "search_simulations_completed": outcomes.simulations,
                     "mcts_tree_depth": options.mcts_tree_depth,
+                    "puct_leaf": puct_leaf_name,
+                    "puct_simulations_config": options.puct_simulations,
+                    "puct_tree_depth": options.puct_tree_depth,
+                    "puct_c": options.puct_c,
+                    "puct_prior_temperature": options.puct_prior_temperature,
+                    "puct_value_temperature": options.puct_value_temperature,
+                    "puct_root_limit": options.puct_root_limit,
+                    "puct_final_prior_weight": options.puct_final_prior,
                     "policy_select_only": true,
                     "total_wall_ms": game_start.elapsed().as_secs_f64() * 1000.0,
                     "replay_hash": hash,
@@ -493,6 +637,9 @@ mod tests {
     #[test]
     fn mcts_is_a_recognized_ai_name() {
         assert_eq!(Ai::parse("mcts").unwrap(), Ai::Mcts);
+        assert_eq!(Ai::parse("puct").unwrap(), Ai::Puct);
+        assert!(Ai::Mcts.is_search() && Ai::Puct.is_search());
+        assert!(!Ai::Eval.is_search() && !Ai::Random.is_search());
         assert!(Ai::parse("stockfish").is_err());
     }
 }

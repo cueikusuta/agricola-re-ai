@@ -39,8 +39,9 @@ def validate_and_report(
 ) -> dict:
     if players not in (2, 3, 4) or blocks < 1 or iterations < 100:
         raise ValueError("invalid experimental settings")
+    search_policies = ("mcts", "puct")
     if candidate == baseline or any(
-        name not in ("random", "greedy", "eval", "mcts")
+        name not in ("random", "greedy", "eval", "mcts", "puct")
         for name in (candidate, baseline, opponent)
     ):
         raise ValueError("unsupported/identical policy")
@@ -184,7 +185,7 @@ def validate_and_report(
         ):
             raise ValueError(f"invalid policy mode flags: {key}")
         if row["mcts_deadline_active"] != (
-            row.get("focus_policy") == "mcts" and row["decision_budget_ms"] > 0
+            row.get("focus_policy") in search_policies and row["decision_budget_ms"] > 0
         ):
             raise ValueError(f"deadline flag does not match policy/budget: {key}")
         received[key] = row
@@ -229,8 +230,8 @@ def validate_and_report(
     budget_within_10s = 0 < budget_ms <= 10000
     candidate_max_focus = max(g["focus_max_decision_ms"] for g in values["candidate"])
     baseline_max_focus = max(g["focus_max_decision_ms"] for g in values["baseline"])
-    candidate_deadline_control = candidate == "mcts" and budget_enabled
-    baseline_deadline_control = baseline == "mcts" and budget_enabled
+    candidate_deadline_control = candidate in search_policies and budget_enabled
+    baseline_deadline_control = baseline in search_policies and budget_enabled
     candidate_measured_within = budget_enabled and candidate_max_focus <= budget_ms
     baseline_measured_within = budget_enabled and baseline_max_focus <= budget_ms
     candidate_10s_observed_pass = (

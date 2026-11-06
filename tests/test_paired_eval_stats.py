@@ -204,6 +204,25 @@ class PairedStatsTests(unittest.TestCase):
         self.assertTrue(report["candidate_10s_observed_pass"])
         self.assertEqual(report["deadline_enforcement"], "cooperative_in_policy_checks")
 
+    def test_puct_focus_is_accepted_with_budget_metrics(self):
+        rows = fixture()
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "puct"
+                row["mcts_simulations_completed"] = 256
+                row["search_simulations_completed"] = 256
+                row["mcts_deadline_active"] = True
+                row["deterministic_policy_selection"] = False
+                row["puct_leaf"] = "heuristic"
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="puct", baseline="random", opponent="greedy",
+            extra=False, iterations=500,
+        )
+        self.assertEqual(report["total_games"], 24)
+        self.assertTrue(report["candidate_focus_deadline_control"])
+        self.assertEqual(report["candidate_mcts_simulations_completed"], 12 * 256)
+
     def test_mcts_over_budget_disables_full_decision_flag(self):
         rows = fixture()
         for row in rows:
