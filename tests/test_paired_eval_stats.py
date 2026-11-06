@@ -38,6 +38,13 @@ def fixture(blocks=3, players=4):
                     "score_margin": scores[seat] - (sum(scores) - scores[seat]) / (players - 1),
                     "decisions": 70,
                     "max_policy_select_ms": 1.0,
+                    "decision_budget_ms": 10000,
+                    "p50_policy_select_ms": 0.5,
+                    "p95_policy_select_ms": 0.9,
+                    "p99_policy_select_ms": 0.99,
+                    "timeout_count": 0,
+                    "fallback_count": 0,
+                    "mcts_simulations_completed": 0,
                     "policy_select_only": True,
                     "total_wall_ms": 50.0,
                     "replay_hash": "a" * 64,
@@ -163,6 +170,38 @@ class PairedStatsTests(unittest.TestCase):
         rows[0]["scores_by_seat"][0] = 10**1000
         with self.assertRaisesRegex(ValueError, "standings"):
             run(rows)
+
+    def test_mcts_focus_is_accepted_with_budget_metrics(self):
+        rows = fixture()
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "mcts"
+                row["mcts_simulations_completed"] = 240
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="mcts", baseline="random", opponent="greedy",
+            extra=False, iterations=500,
+        )
+        self.assertEqual(report["total_games"], 24)
+        self.assertEqual(report["decision_budget_ms"], 10000)
+        self.assertEqual(report["candidate_mcts_simulations_completed"], 12 * 240)
+        self.assertEqual(report["candidate_timeout_rate"], 0.0)
+
+    def test_invalid_selection_timing_and_counters_are_rejected(self):
+        cases = (
+            ("p95_policy_select_ms", 2.0, "timing"),
+            ("p50_policy_select_ms", 0.95, "out of order"),
+            ("timeout_count", 999, "timeout_count"),
+            ("fallback_count", -1, "fallback_count"),
+            ("mcts_simulations_completed", -1, "mcts simulations"),
+            ("decision_budget_ms", 0, "budget"),
+        )
+        for field, value, expected_error in cases:
+            with self.subTest(field=field):
+                rows = fixture()
+                rows[0][field] = value
+                with self.assertRaisesRegex(ValueError, expected_error):
+                    run(rows)
 
     def test_equal_score_tiebreak_ranks_are_allowed(self):
         rows = fixture()

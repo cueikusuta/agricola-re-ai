@@ -26,23 +26,34 @@ on:
         default: '500000'
         required: true
       candidate:
+        description: 'Candidate AI (mcts = M7 card-aware search)'
         type: choice
-        options: ['eval', 'greedy', 'random']
+        options: ['eval', 'greedy', 'random', 'mcts']
         default: 'eval'
         required: true
       baseline:
         type: choice
-        options: ['random', 'greedy', 'eval']
+        options: ['random', 'greedy', 'eval', 'mcts']
         default: 'greedy'
         required: true
       opponent:
         type: choice
-        options: ['random', 'greedy', 'eval']
+        options: ['random', 'greedy', 'eval', 'mcts']
         default: 'greedy'
         required: true
       extra:
         type: boolean
         default: false
+      decision_budget_ms:
+        description: 'Per-decision MCTS search budget in ms (1-60000)'
+        type: number
+        default: 10000
+        required: true
+      mcts_simulations:
+        description: 'MCTS simulations per decision (used for mcts arms)'
+        type: number
+        default: 64
+        required: true
 
 permissions:
   contents: read
@@ -98,6 +109,8 @@ jobs:
       BASELINE: ${{ inputs.baseline }}
       OPPONENT: ${{ inputs.opponent }}
       EXTRA: ${{ inputs.extra }}
+      DECISION_BUDGET_MS: ${{ inputs.decision_budget_ms }}
+      MCTS_SIMULATIONS: ${{ inputs.mcts_simulations }}
     steps:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
@@ -120,6 +133,8 @@ jobs:
             --block-start "$BLOCK_START" --blocks "$COUNT" \
             --candidate "$CANDIDATE" --baseline "$BASELINE" \
             --opponent "$OPPONENT" --additional-action-space "$EXTRA" \
+            --decision-budget-ms "$DECISION_BUDGET_MS" \
+            --mcts-simulations "$MCTS_SIMULATIONS" \
             --output "results/shard-$INDEX/matches.jsonl"
       - name: Save results and failure artifacts
         if: always()
@@ -160,7 +175,7 @@ jobs:
             --blocks "$BLOCKS" --candidate "$CANDIDATE" \
             --baseline "$BASELINE" --opponent "$OPPONENT" \
             --output results/report.json "${FLAGS[@]}"
-          echo 'Paired seeded seat-block comparison; NOT M7-MCTS or 10s full-decision enforcement.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Paired seeded seat-block comparison; MCTS arms use a per-decision search budget. NOT full-decision 10s enforcement or official-rule proof.' >> "$GITHUB_STEP_SUMMARY"
       - name: Save confidence interval report
         if: always()
         uses: actions/upload-artifact@v4

@@ -40,7 +40,7 @@ def validate_and_report(
     if players not in (2, 3, 4) or blocks < 1 or iterations < 100:
         raise ValueError("invalid experimental settings")
     if candidate == baseline or any(
-        name not in ("random", "greedy", "eval")
+        name not in ("random", "greedy", "eval", "mcts")
         for name in (candidate, baseline, opponent)
     ):
         raise ValueError("unsupported/identical policy")
@@ -139,6 +139,28 @@ def validate_and_report(
             raise ValueError(f"selection time exceeds game wall time: {key}")
         if type(row.get("decisions")) is not int or row["decisions"] <= 0:
             raise ValueError(f"invalid decisions: {key}")
+        if type(row.get("decision_budget_ms")) is not int or not 1 <= row["decision_budget_ms"] <= 60000:
+            raise ValueError(f"invalid decision budget: {key}")
+        for numeric in ("p50_policy_select_ms", "p95_policy_select_ms", "p99_policy_select_ms"):
+            value = row.get(numeric)
+            if (
+                not finite_number(value)
+                or value < 0
+                or value > row["max_policy_select_ms"] + 1e-9
+            ):
+                raise ValueError(f"invalid timing {numeric}: {key}")
+        if not (
+            row["p50_policy_select_ms"] <= row["p95_policy_select_ms"] + 1e-9
+            and row["p95_policy_select_ms"] <= row["p99_policy_select_ms"] + 1e-9
+        ):
+            raise ValueError(f"timing percentiles out of order: {key}")
+        for field in ("timeout_count", "fallback_count"):
+            value = row.get(field)
+            if type(value) is not int or not 0 <= value <= row["decisions"]:
+                raise ValueError(f"invalid {field}: {key}")
+        simulations = row.get("mcts_simulations_completed")
+        if type(simulations) is not int or simulations < 0:
+            raise ValueError(f"invalid mcts simulations: {key}")
         received[key] = row
     if set(received) != expected:
         raise ValueError(f"missing {len(expected - set(received))} game records")
@@ -165,6 +187,8 @@ def validate_and_report(
         if sample_sd is not None and sample_sd > 0 else None
     )
     max_selection = max(g["max_policy_select_ms"] for g in rows)
+    candidate_decisions = sum(g["decisions"] for g in values["candidate"])
+    baseline_decisions = sum(g["decisions"] for g in values["baseline"])
     return {
         "schema_version": 1,
         "mode": "cardless_seat_rotated_candidate_vs_fixed_opponents",
@@ -202,15 +226,25 @@ def validate_and_report(
             g["score_margin"] for g in values["baseline"]
         ),
         "maximum_policy_selection_ms": max_selection,
+        "decision_budget_ms": rows[0]["decision_budget_ms"],
+        "candidate_timeout_rate": sum(g["timeout_count"] for g in values["candidate"]) / candidate_decisions,
+        "baseline_timeout_rate": sum(g["timeout_count"] for g in values["baseline"]) / baseline_decisions,
+        "candidate_fallback_rate": sum(g["fallback_count"] for g in values["candidate"]) / candidate_decisions,
+        "baseline_fallback_rate": sum(g["fallback_count"] for g in values["baseline"]) / baseline_decisions,
+        "candidate_mcts_simulations_completed": sum(g["mcts_simulations_completed"] for g in values["candidate"]),
+        "baseline_mcts_simulations_completed": sum(g["mcts_simulations_completed"] for g in values["baseline"]),
+        "maximum_p95_policy_select_ms": max(g["p95_policy_select_ms"] for g in rows),
+        "maximum_p99_policy_select_ms": max(g["p99_policy_select_ms"] for g in rows),
         "full_decision_10s_enforced": False,
         "first_credit_goal_5pp_point_estimate_met": point >= .05,
         "improvement_ci_lower_above_zero": lower > 0,
         "provisional_goal_and_positive_ci": point >= .05 and lower > 0,
         "caveat": (
-            "Comparison uses named random/greedy/eval policies, not the M7 "
-            "card-aware search AI. Timing is selection only, not a hard 10s "
-            "whole-decision cap. Official rule fidelity and full M8-3 "
-            "acceptance require independent gates."
+            "Comparison uses named random/greedy/eval policies plus the M7 "
+            "card-aware MCTS with its own per-decision search budget, not a "
+            "whole-decision 10s cap: timing covers space selection only and "
+            "detail generation is deterministic. Official rule fidelity and "
+            "full M8-3 acceptance require independent gates."
         ),
     }
 
@@ -235,9 +269,9 @@ def main() -> int:
     p.add_argument("--seed-start", type=int, required=True)
     p.add_argument("--first-block", type=int, default=0)
     p.add_argument("--blocks", type=int, required=True)
-    p.add_argument("--candidate", choices=("random", "greedy", "eval"), required=True)
-    p.add_argument("--baseline", choices=("random", "greedy", "eval"), required=True)
-    p.add_argument("--opponent", choices=("random", "greedy", "eval"), required=True)
+    p.add_argument("--candidate", choices=("random", "greedy", "eval", "mcts"), required=True)
+    p.add_argument("--baseline", choices=("random", "greedy", "eval", "mcts"), required=True)
+    p.add_argument("--opponent", choices=("random", "greedy", "eval", "mcts"), required=True)
     p.add_argument("--extra", action="store_true")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()

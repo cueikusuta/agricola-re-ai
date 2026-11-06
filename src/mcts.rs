@@ -9,6 +9,7 @@ use crate::score::standings_with_cards;
 use rand::{seq::SliceRandom, Rng};
 use rand_chacha::ChaCha8Rng;
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::Instant;
 
 /// Win probability comes first; only empirically equivalent win rates
 /// (absolute difference <= 2.5 percentage points) use score margin.
@@ -214,18 +215,48 @@ fn rollout(game: &mut Game, rng: &mut ChaCha8Rng) -> Result<(), String> {
     Err("rollout move limit reached".into())
 }
 
-impl SpacePolicy for MctsPolicy {
-    fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MctsOutcome {
+    pub simulations_completed: usize,
+    pub used_fallback: bool,
+    pub timed_out: bool,
+}
+
+impl MctsPolicy {
+    /// MCTS with an optional wall-clock deadline. When the deadline elapses it
+    /// returns the best completed candidate, or a guaranteed legal fallback
+    /// from the evaluation policy, never an illegal or panicking move. With
+    /// `deadline = None` the result is deterministic for a fixed RNG seed.
+    pub fn select_with_budget(
+        &self,
+        obs: &Observation,
+        legal: &[Space],
+        rng: &mut ChaCha8Rng,
+        deadline: Option<Instant>,
+    ) -> Option<(Space, MctsOutcome)> {
+        let immediate = MctsOutcome {
+            simulations_completed: 0,
+            used_fallback: false,
+            timed_out: false,
+        };
         if legal.is_empty() {
             return None;
         }
         if legal.len() == 1 || self.simulations == 0 {
-            return Some(legal[0]);
+            return Some((legal[0], immediate));
         }
         let player_count = obs.public.players.len();
         let mut nodes = vec![Node::new(player_count)];
         let detail_policy = CardChoiceDetails;
+        let mut simulations_completed = 0usize;
+        let mut timed_out = false;
         for _ in 0..self.simulations {
+            if let Some(limit) = deadline {
+                if Instant::now() >= limit {
+                    timed_out = true;
+                    break;
+                }
+            }
             let Some(mut game) = sample_game(obs, rng) else {
                 continue;
             };
@@ -296,6 +327,7 @@ impl SpacePolicy for MctsPolicy {
             if !valid || rollout(&mut game, rng).is_err() {
                 continue;
             }
+            simulations_completed += 1;
             let ranks = standings_with_cards(&game.public.players, &game.card_set);
             let top_count = ranks.rank.iter().filter(|&&rank| rank == 1).count() as f64;
             for &index in &path {
@@ -332,7 +364,9 @@ impl SpacePolicy for MctsPolicy {
             );
             candidates.push((space, value));
         }
-        best_root_action(&candidates).or_else(|| {
+        let chosen = best_root_action(&candidates);
+        let used_fallback = chosen.is_none();
+        let space = chosen.or_else(|| {
             let details = CardChoiceDetails;
             DetailAwareEvaluationPolicy {
                 weights: WeightedEvaluationPolicy {
@@ -342,7 +376,22 @@ impl SpacePolicy for MctsPolicy {
                 details: &details,
             }
             .select(obs, legal, rng)
-        })
+        })?;
+        Some((
+            space,
+            MctsOutcome {
+                simulations_completed,
+                used_fallback,
+                timed_out,
+            },
+        ))
+    }
+}
+
+impl SpacePolicy for MctsPolicy {
+    fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
+        self.select_with_budget(obs, legal, rng, None)
+            .map(|(space, _outcome)| space)
     }
 }
 
@@ -552,5 +601,29 @@ mod tests {
             assert_eq!(one, two);
             assert!(legal.contains(&one.unwrap()));
         }
+    }
+
+    #[test]
+    fn elapsed_budget_falls_back_to_a_legal_move() {
+        let game = Game::new(Config {
+            players: 4,
+            seed: 9,
+            additional_action_space_enabled: false,
+        });
+        let obs = game.observation(game.public.active_player).unwrap();
+        let legal = game.legal_spaces();
+        assert!(legal.len() > 1);
+        let policy = MctsPolicy {
+            simulations: 10_000,
+            tree_depth: 2,
+        };
+        let mut rng = ChaCha8Rng::seed_from_u64(3);
+        let (space, outcome) = policy
+            .select_with_budget(&obs, &legal, &mut rng, Some(Instant::now()))
+            .unwrap();
+        assert!(legal.contains(&space), "fallback must stay legal");
+        assert!(outcome.timed_out, "an elapsed deadline must be reported");
+        assert_eq!(outcome.simulations_completed, 0);
+        assert!(outcome.used_fallback);
     }
 }
