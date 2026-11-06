@@ -120,3 +120,42 @@ fn clone_is_independent() {
         Episode::reset(config(64, 2)).unwrap().state_hash()
     );
 }
+
+#[test]
+fn policy_input_whitelists_observation_and_actions_without_seed_or_log() {
+    let cards = verified_basic_card_set(2).unwrap();
+    let episode = Episode::reset_with_cards(config(12, 2), cards).unwrap();
+    let player = episode.active_player();
+    let input = episode.policy_input(player).unwrap();
+
+    assert_eq!(input.observation, episode.observe(player).unwrap());
+    assert!(input
+        .legal_actions
+        .iter()
+        .all(|space| input.available_actions.contains(space)));
+    assert!(episode.policy_input((player + 1) % 2).is_err());
+
+    // Unlike the privileged Episode, the serialized policy DTO must contain
+    // exactly the allowlisted fields. Never hand an Episode to the AI.
+    let value = serde_json::to_value(&input).unwrap();
+    let object = value.as_object().unwrap();
+    let fields: Vec<&str> = object.keys().map(String::as_str).collect();
+    assert_eq!(
+        fields,
+        vec!["available_actions", "legal_actions", "observation"]
+    );
+    let serialized = value.to_string();
+    for secret in [
+        "\"seed\"",
+        "\"events\"",
+        "\"round_seed\"",
+        "\"action_seed\"",
+        "\"hidden_round_deck\"",
+        "\"rng\"",
+    ] {
+        assert!(!serialized.contains(secret), "policy input leaked {secret}");
+    }
+    let observation = object.get("observation").unwrap();
+    assert!(observation.get("hand").is_some());
+    assert!(observation.get("hand_counts").is_some());
+}
