@@ -71,6 +71,29 @@ pub enum CardEffect {
         amount: u32,
     },
 }
+
+impl CardEffect {
+    /// Stable public name for this implemented effect category. Used to build
+    /// the neutral draft-AI catalog (#104). It describes only effects the
+    /// engine actually implements, never a guessed printed effect.
+    pub fn public_tag(&self) -> &'static str {
+        match self {
+            CardEffect::OnPlayGain { .. } => "on_play_gain",
+            CardEffect::AfterWorkerGain { .. } => "after_worker_gain",
+            CardEffect::EndGameBonus { .. } => "end_game_bonus",
+            CardEffect::Prerequisite { .. } => "prerequisite",
+            CardEffect::OnPlayGainPerStored { .. } => "on_play_gain_per_stored",
+            CardEffect::OnPlayGainIfHouse { .. } => "on_play_gain_if_house",
+            CardEffect::StartRoundGain { .. } => "start_round_gain",
+            CardEffect::HarvestFieldGain { .. } => "harvest_field_gain",
+            CardEffect::AfterWorkerGainIfUsed { .. } => "after_worker_gain_if_used",
+            CardEffect::Passive { .. } => "passive",
+            CardEffect::AfterClayConstructionGain { .. } => "after_clay_construction_gain",
+            CardEffect::AfterHarvestBakeGain { .. } => "after_harvest_bake_gain",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PassiveRule {
@@ -245,6 +268,60 @@ impl CardState {
             undealt.extend(pool);
         }
         Self { hands, undealt }
+    }
+
+    /// Build a card state from explicit, fully specified starting hands.
+    ///
+    /// This is the M11 draft-to-game bridge (#104): it never re-shuffles or
+    /// deals randomly. Every card id must already exist in `set`, appear at
+    /// most once across all seats, and each seat must hold exactly seven
+    /// occupations and seven minor improvements. Cards that no seat was given
+    /// become `undealt`, so the usual "every implemented card has exactly one
+    /// location" invariant still holds.
+    pub fn from_hands(set: &CardSet, hands: &[Vec<String>]) -> Result<Self, String> {
+        if !set.enabled() {
+            return Err("cannot seed hands from an empty card set".into());
+        }
+        if hands.is_empty() {
+            return Err("at least one seat is required".into());
+        }
+        let mut seen = BTreeSet::new();
+        for (seat, hand) in hands.iter().enumerate() {
+            for id in hand {
+                let definition = set
+                    .definition(id)
+                    .ok_or_else(|| format!("seat {seat} was given unknown card {id}"))?;
+                if !seen.insert(id.clone()) {
+                    return Err(format!("starting card {id} appears more than once"));
+                }
+                let _ = definition;
+            }
+            for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
+                let count = hand
+                    .iter()
+                    .filter(|id| set.definition(id).is_some_and(|card| card.kind == kind))
+                    .count();
+                if count != 7 {
+                    return Err(format!(
+                        "seat {seat} must start with seven {}, got {count}",
+                        match kind {
+                            CardKind::Occupation => "occupations",
+                            CardKind::MinorImprovement => "minor improvements",
+                        }
+                    ));
+                }
+            }
+        }
+        let undealt = set
+            .definitions
+            .iter()
+            .filter(|card| !seen.contains(&card.id))
+            .map(|card| card.id.clone())
+            .collect();
+        Ok(Self {
+            hands: hands.to_vec(),
+            undealt,
+        })
     }
 
     pub fn validate(&self, set: &CardSet, players: &[Player]) -> Result<(), String> {

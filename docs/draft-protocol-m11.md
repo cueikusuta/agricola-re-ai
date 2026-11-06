@@ -81,3 +81,11 @@
 - [ ] 4人戦での多人数プレイヤー認証は現在の単一人間Webモデルに存在しない。AI観測の秘匿と、人間間の通信上の秘匿を混同しない。
 
 **変更スコープ**: 本文書のみ。ルールエンジン・他AIのM8/M9 PRには変更しない。
+
+## 9. 実装状況（2026-11-07、Task A / #104）
+
+- `src/draft.rs` に `DraftCardInfo`、`DraftObservation::catalog`、`observe_with_catalog` を追加。カタログは `Observation::card_definitions` と同じ公開語彙のみで、未実装の効果を推測してはならない。
+- `src/draft_game.rs` が確定ドラフトとゲームを接続する唯一の入口。`hands_from_completed_draft` と `start_game_from_draft` は未完了ドラフト・不明カード・人数不一致を拒否し、`Game::with_cards_and_hands` が通常のランダム再配布を回避する。
+- `GameLog.initial_hands` に初期手札を保存し、`Game::replay_with_setup` と `load_json` が同じ初期状態を再構築する。`Game::with_cards` の通常配布は従来どおり（`initial_hands = None`）。
+- 本番プールは `verified_basic`（現状は2人・通常7枚/7-7のみ。10-7は枚数不足で拒否）。統合検証は `test_fixture`。フィクスチャID `FIX-*` は `verified_*` に登録しない。
+- ブラウザは `POST /api/draft/start-game` でドラフト完了後にゲームを開始し、観測履歴はセッションに保持する。相手の最終手札は開始後も `DraftObservation` に出さない。

@@ -388,6 +388,29 @@ pub enum DraftHistoryEvent {
     },
 }
 
+/// Public, non-secret card metadata that a [`DraftObservation`] may carry.
+///
+/// This mirrors the vocabulary the engine already exposes through
+/// `Observation::card_definitions`: identity, kind, declared end-game points,
+/// declared cost, and the *implemented* effect categories. It contains no
+/// hidden location, hand, deck order, or seed information, and it never
+/// invents an effect the card subsystem has not implemented (an unknown card
+/// simply has no tags).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DraftCardInfo {
+    pub id: String,
+    pub kind: CardKind,
+    pub points: i32,
+    /// Declared cost as `(good, quantity)` with stable good names.
+    #[serde(default)]
+    pub cost: Vec<(String, u32)>,
+    /// Implemented value-producing effect categories, e.g. `on_play_gain`.
+    /// Empty means no implemented effect is known; the draft AI must not value
+    /// such a card by guesswork.
+    #[serde(default)]
+    pub effect_tags: Vec<String>,
+}
+
 /// The only representation an AI or remote viewer may consume.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DraftObservation {
@@ -405,6 +428,18 @@ pub struct DraftObservation {
     pub hand_counts: Vec<usize>,
     pub remaining_to_pick: u8,
     pub request_token: u64,
+    /// Public card vocabulary for the offered and already-picked cards.
+    /// Populated by [`DraftState::observe_with_catalog`]; empty otherwise, so
+    /// policies fall back to legality rather than guessing card value.
+    #[serde(default)]
+    pub catalog: Vec<DraftCardInfo>,
+}
+
+impl DraftObservation {
+    /// Public metadata for one card, if the coordinator supplied a catalog.
+    pub fn card_info(&self, id: &str) -> Option<&DraftCardInfo> {
+        self.catalog.iter().find(|info| info.id == id)
+    }
 }
 
 /// Full private state. Serializing this is equivalent to a server-side save.
@@ -522,7 +557,23 @@ impl DraftState {
             hand_counts: self.picked.iter().map(Vec::len).collect(),
             remaining_to_pick,
             request_token,
+            catalog: Vec::new(),
         })
+    }
+
+    /// The authoritative observation plus the coordinator-supplied public card
+    /// catalog. The catalog is public vocabulary (the same information as
+    /// `Observation::card_definitions`), never hidden state, so attaching it
+    /// keeps the "policies only see a `DraftObservation`" boundary intact.
+    pub fn observe_with_catalog(
+        &self,
+        viewer: usize,
+        request_token: u64,
+        catalog: &[DraftCardInfo],
+    ) -> Result<DraftObservation, String> {
+        let mut observation = self.observe(viewer, request_token)?;
+        observation.catalog = catalog.to_vec();
+        Ok(observation)
     }
 
     /// Commit one pick for `viewer`. All seats must commit before the packets

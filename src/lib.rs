@@ -2,6 +2,7 @@ pub mod benchmark;
 pub mod breeding;
 pub mod cards;
 pub mod draft;
+pub mod draft_game;
 pub mod engine;
 pub mod evaluation;
 pub mod harvest;
