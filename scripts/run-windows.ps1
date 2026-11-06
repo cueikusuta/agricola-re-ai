@@ -8,6 +8,7 @@
 # service is required beyond a Rust toolchain.
 [CmdletBinding()]
 param(
+    [ValidateRange(0, 65535)]
     [int]$Port = 0
 )
 
@@ -49,5 +50,54 @@ Write-Host "終了するにはこの画面で Ctrl+C を押してください。
 Write-Host "ポート $Port が使用中の場合は -Port 8790 のような別ポートを指定してください。"
 Write-Host ""
 
-Start-Process $url | Out-Null
-cargo run --release --locked -- --web --port $Port
+# Start the compiled server first, then wait for an actual HTTP 200 before
+# opening the browser. Opening it before the listener binds is a race.
+$binary = Join-Path $repoRoot "target\release\agricola-re-ai.exe"
+if (-not (Test-Path -LiteralPath $binary)) {
+    Fail "ビルド済みの実行ファイルが見つかりません: $binary"
+}
+
+$server = $null
+try {
+    $server = Start-Process -FilePath $binary -ArgumentList @("--web", "--port", "$Port") -NoNewWindow -PassThru
+
+    $ready = $false
+    for ($attempt = 0; $attempt -lt 100; $attempt++) {
+        if ($server.HasExited) {
+            Fail "サーバが起動直後に終了しました（終了コード: $($server.ExitCode)）。上のエラーを確認してください。"
+        }
+        try {
+            $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 1 -ErrorAction Stop
+            if ($response.StatusCode -eq 200) {
+                $ready = $true
+                break
+            }
+        } catch {
+            Start-Sleep -Milliseconds 100
+        }
+    }
+    if (-not $ready) {
+        Fail "サーバがHTTP応答を返しませんでした: $url"
+    }
+
+    try {
+        Start-Process $url | Out-Null
+    } catch {
+        Write-Warning "ブラウザを自動で開けませんでした。手動で $url を開いてください。"
+    }
+
+    # Keep the server attached to this terminal. Ctrl+C interrupts the wait;
+    # finally stops the child so the port can be reused.
+    $server.WaitForExit()
+    if ($server.ExitCode -ne 0) {
+        exit $server.ExitCode
+    }
+} finally {
+    if ($null -ne $server) {
+        if (-not $server.HasExited) {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+        }
+        $server.WaitForExit()
+        $server.Dispose()
+    }
+}
