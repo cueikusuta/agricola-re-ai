@@ -19,7 +19,9 @@ import sys
 
 def finite_number(value: object) -> bool:
     """Reject NaN, infinities, booleans, and non-numeric JSON values."""
-    return type(value) in (int, float) and math.isfinite(value)
+    if type(value) is int:
+        return abs(value) <= 9007199254740992
+    return type(value) is float and math.isfinite(value)
 
 
 def validate_and_report(
