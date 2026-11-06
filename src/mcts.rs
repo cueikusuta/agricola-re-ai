@@ -178,7 +178,11 @@ fn best_root_action(candidates: &[(Space, (f64, f64))]) -> Option<Space> {
         .map(|(space, _)| *space)
 }
 
-fn rollout(game: &mut Game, rng: &mut ChaCha8Rng) -> Result<(), String> {
+fn rollout(
+    game: &mut Game,
+    rng: &mut ChaCha8Rng,
+    deadline: Option<Instant>,
+) -> Result<bool, String> {
     let details = CardChoiceDetails;
     let evaluation = DetailAwareEvaluationPolicy {
         weights: WeightedEvaluationPolicy {
@@ -189,8 +193,15 @@ fn rollout(game: &mut Game, rng: &mut ChaCha8Rng) -> Result<(), String> {
     };
     let greedy = GreedyPolicy;
     for _ in 0..320 {
+        // A single playout can be long; stop mid-playout too so the whole
+        // decision budget is not overshot by one full rollout.
+        if let Some(limit) = deadline {
+            if Instant::now() >= limit {
+                return Ok(false);
+            }
+        }
         if game.public.finished {
-            return Ok(());
+            return Ok(true);
         }
         let id = game.public.active_player;
         let obs = game.observation(id)?;
@@ -264,6 +275,13 @@ impl MctsPolicy {
             let mut node_id = 0usize;
             let mut valid = true;
             for _ in 0..self.tree_depth {
+                if let Some(limit) = deadline {
+                    if Instant::now() >= limit {
+                        timed_out = true;
+                        valid = false;
+                        break;
+                    }
+                }
                 if game.public.finished {
                     break;
                 }
@@ -324,8 +342,19 @@ impl MctsPolicy {
                     break;
                 }
             }
-            if !valid || rollout(&mut game, rng).is_err() {
+            if timed_out {
+                break;
+            }
+            if !valid {
                 continue;
+            }
+            match rollout(&mut game, rng, deadline) {
+                Ok(true) => {}
+                Ok(false) => {
+                    timed_out = true;
+                    break;
+                }
+                Err(_) => continue,
             }
             simulations_completed += 1;
             let ranks = standings_with_cards(&game.public.players, &game.card_set);
@@ -524,7 +553,7 @@ mod tests {
         let obs = game.observation(game.public.active_player).unwrap();
         let mut rng = ChaCha8Rng::seed_from_u64(5);
         let mut sampled = sample_game(&obs, &mut rng).unwrap();
-        rollout(&mut sampled, &mut rng).unwrap();
+        rollout(&mut sampled, &mut rng, None).unwrap();
         assert!(sampled.public.finished);
         assert_eq!(sampled.public.round, 14);
         sampled.validate().unwrap();
@@ -625,5 +654,21 @@ mod tests {
         assert!(outcome.timed_out, "an elapsed deadline must be reported");
         assert_eq!(outcome.simulations_completed, 0);
         assert!(outcome.used_fallback);
+    }
+
+    #[test]
+    fn rollout_stops_when_the_deadline_has_passed() {
+        let game = Game::new(Config {
+            players: 2,
+            seed: 5,
+            additional_action_space_enabled: false,
+        });
+        let mut rng = ChaCha8Rng::seed_from_u64(1);
+        let obs = game.observation(game.public.active_player).unwrap();
+        let mut sampled = sample_game(&obs, &mut rng).unwrap();
+        assert!(
+            !rollout(&mut sampled, &mut rng, Some(Instant::now())).unwrap(),
+            "an elapsed deadline must abort the playout, not finish it"
+        );
     }
 }

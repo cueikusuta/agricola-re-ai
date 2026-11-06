@@ -45,7 +45,7 @@ on:
         type: boolean
         default: false
       decision_budget_ms:
-        description: 'Per-decision MCTS search budget in ms (1-60000)'
+        description: 'Per-decision MCTS budget in ms; 0 = no deadline (deterministic by simulation count)'
         type: number
         default: 10000
         required: true

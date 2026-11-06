@@ -139,7 +139,7 @@ def validate_and_report(
             raise ValueError(f"selection time exceeds game wall time: {key}")
         if type(row.get("decisions")) is not int or row["decisions"] <= 0:
             raise ValueError(f"invalid decisions: {key}")
-        if type(row.get("decision_budget_ms")) is not int or not 1 <= row["decision_budget_ms"] <= 60000:
+        if type(row.get("decision_budget_ms")) is not int or not 0 <= row["decision_budget_ms"] <= 60000:
             raise ValueError(f"invalid decision budget: {key}")
         for numeric in ("p50_policy_select_ms", "p95_policy_select_ms", "p99_policy_select_ms"):
             value = row.get(numeric)
@@ -177,6 +177,16 @@ def validate_and_report(
             or not 0 <= row["focus_timeout_count"] <= row["focus_decisions"]
         ):
             raise ValueError(f"invalid focus_timeout_count: {key}")
+        if (
+            type(row.get("mcts_deadline_active")) is not bool
+            or type(row.get("deterministic_policy_selection")) is not bool
+            or row["deterministic_policy_selection"] != (not row["mcts_deadline_active"])
+        ):
+            raise ValueError(f"invalid policy mode flags: {key}")
+        if row["mcts_deadline_active"] != (
+            row.get("focus_policy") == "mcts" and row["decision_budget_ms"] > 0
+        ):
+            raise ValueError(f"deadline flag does not match policy/budget: {key}")
         received[key] = row
     if set(received) != expected:
         raise ValueError(f"missing {len(expected - set(received))} game records")
@@ -208,14 +218,26 @@ def validate_and_report(
     max_selection = max(g["max_policy_select_ms"] for g in rows)
     candidate_decisions = sum(g["decisions"] for g in values["candidate"])
     baseline_decisions = sum(g["decisions"] for g in values["baseline"])
+    candidate_focus_decisions = sum(g["focus_decisions"] for g in values["candidate"])
+    baseline_focus_decisions = sum(g["focus_decisions"] for g in values["baseline"])
+    if candidate_focus_decisions == 0 or baseline_focus_decisions == 0:
+        raise ValueError("focus decisions must be positive to form rates")
     candidate_focus_timeouts = sum(g["focus_timeout_count"] for g in values["candidate"])
     baseline_focus_timeouts = sum(g["focus_timeout_count"] for g in values["baseline"])
-    budget_within_10s = rows[0]["decision_budget_ms"] <= 10000
-    candidate_full_decision_within_budget = (
-        candidate == "mcts" and candidate_focus_timeouts == 0 and budget_within_10s
+    budget_ms = rows[0]["decision_budget_ms"]
+    budget_enabled = budget_ms > 0
+    budget_within_10s = 0 < budget_ms <= 10000
+    candidate_max_focus = max(g["focus_max_decision_ms"] for g in values["candidate"])
+    baseline_max_focus = max(g["focus_max_decision_ms"] for g in values["baseline"])
+    candidate_deadline_control = candidate == "mcts" and budget_enabled
+    baseline_deadline_control = baseline == "mcts" and budget_enabled
+    candidate_measured_within = budget_enabled and candidate_max_focus <= budget_ms
+    baseline_measured_within = budget_enabled and baseline_max_focus <= budget_ms
+    candidate_10s_guaranteed = (
+        candidate_deadline_control and budget_within_10s and candidate_measured_within
     )
-    baseline_full_decision_within_budget = (
-        baseline == "mcts" and baseline_focus_timeouts == 0 and budget_within_10s
+    baseline_10s_guaranteed = (
+        baseline_deadline_control and budget_within_10s and baseline_measured_within
     )
     return {
         "schema_version": 1,
@@ -264,27 +286,33 @@ def validate_and_report(
         "mean_first_credit_delta_pp": point * 100,
         "paired_block_bootstrap_95ci_pp": [lower * 100, upper * 100],
         "decision_budget_ms": rows[0]["decision_budget_ms"],
-        "candidate_timeout_rate": sum(g["timeout_count"] for g in values["candidate"]) / candidate_decisions,
-        "baseline_timeout_rate": sum(g["timeout_count"] for g in values["baseline"]) / baseline_decisions,
-        "candidate_fallback_rate": sum(g["fallback_count"] for g in values["candidate"]) / candidate_decisions,
-        "baseline_fallback_rate": sum(g["fallback_count"] for g in values["baseline"]) / baseline_decisions,
+        "candidate_timeout_rate": sum(g["timeout_count"] for g in values["candidate"]) / candidate_focus_decisions,
+        "baseline_timeout_rate": sum(g["timeout_count"] for g in values["baseline"]) / baseline_focus_decisions,
+        "candidate_fallback_rate": sum(g["fallback_count"] for g in values["candidate"]) / candidate_focus_decisions,
+        "baseline_fallback_rate": sum(g["fallback_count"] for g in values["baseline"]) / baseline_focus_decisions,
+        "candidate_measured_timeout_rate": candidate_focus_timeouts / candidate_focus_decisions,
+        "baseline_measured_timeout_rate": baseline_focus_timeouts / baseline_focus_decisions,
+        "candidate_focus_decisions": candidate_focus_decisions,
+        "baseline_focus_decisions": baseline_focus_decisions,
+        "all_player_decisions": candidate_decisions + baseline_decisions,
         "candidate_mcts_simulations_completed": sum(g["mcts_simulations_completed"] for g in values["candidate"]),
         "baseline_mcts_simulations_completed": sum(g["mcts_simulations_completed"] for g in values["baseline"]),
         "maximum_p95_policy_select_ms": max(g["p95_policy_select_ms"] for g in rows),
         "maximum_p99_policy_select_ms": max(g["p99_policy_select_ms"] for g in rows),
+        "measurement_scope": "focus-seat whole decision: action-space selection plus detail generation; rates use focus-only decisions as denominator",
         "focus_decision_timing_includes_detail": True,
         "maximum_focus_p95_decision_ms": max(g["focus_p95_decision_ms"] for g in rows),
         "maximum_focus_p99_decision_ms": max(g["focus_p99_decision_ms"] for g in rows),
-        "candidate_max_focus_decision_ms": max(
-            g["focus_max_decision_ms"] for g in values["candidate"]
-        ),
-        "baseline_max_focus_decision_ms": max(
-            g["focus_max_decision_ms"] for g in values["baseline"]
-        ),
+        "candidate_max_focus_decision_ms": candidate_max_focus,
+        "baseline_max_focus_decision_ms": baseline_max_focus,
         "candidate_focus_timeout_count": candidate_focus_timeouts,
         "baseline_focus_timeout_count": baseline_focus_timeouts,
-        "full_decision_10s_enforced": candidate_full_decision_within_budget,
-        "baseline_full_decision_within_budget": baseline_full_decision_within_budget,
+        "candidate_focus_deadline_control": candidate_deadline_control,
+        "baseline_focus_deadline_control": baseline_deadline_control,
+        "candidate_focus_measured_within_budget": candidate_measured_within,
+        "baseline_focus_measured_within_budget": baseline_measured_within,
+        "candidate_10s_guaranteed": candidate_10s_guaranteed,
+        "baseline_10s_guaranteed": baseline_10s_guaranteed,
         "first_credit_goal_5pp_point_estimate_met": point >= .05,
         "improvement_ci_lower_above_zero": lower > 0,
         "provisional_goal_and_positive_ci": point >= .05 and lower > 0,
@@ -292,11 +320,13 @@ def validate_and_report(
             "First-place credit values are probability fractions (0.05 = 5 "
             "percentage points); *_pp fields are percentage points. Focus "
             "decision timing includes action-space selection plus detail "
-            "generation for the arm ordered as candidate/baseline. The 10s "
-            "flag is true only when that arm is MCTS, the configured budget is "
-            "<= 10000 ms and no measured focus decision exceeded it; non-MCTS "
-            "arms have no deadline and stay false. Official rule fidelity "
-            "still requires independent gates."
+            "generation for the arm ordered as candidate/baseline. "
+            "*_10s_guaranteed is true only when the arm is MCTS, a positive "
+            "budget <= 10000 ms was applied, and the measured maximum focus "
+            "decision stayed within it; it is not a proof of a whole-decision "
+            "hard cap. A 0 ms budget means no deadline (deterministic MCTS by "
+            "simulation count) and makes all 10s flags false. Official rule "
+            "fidelity still requires independent gates."
         ),
     }
 

@@ -159,8 +159,8 @@ fn parse_options() -> Result<Options, String> {
     {
         return Err("seed range overflows u64".into());
     }
-    if !(1..=60_000).contains(&decision_budget_ms) {
-        return Err("decision-budget-ms must be 1..=60000".into());
+    if decision_budget_ms > 60_000 {
+        return Err("decision-budget-ms must be 0 (no deadline) or 1..=60000".into());
     }
     if mcts_simulations == 0 || mcts_simulations > 100_000 {
         return Err("mcts-simulations must be 1..=100000".into());
@@ -314,6 +314,7 @@ fn run(options: &Options) -> Result<(), String> {
         tree_depth: 2,
     };
     let budget = Duration::from_millis(options.decision_budget_ms);
+    let deadline_enabled = options.decision_budget_ms > 0;
     let start = Instant::now();
     for relative_block in 0..options.blocks {
         let block_index = options.block_start + relative_block;
@@ -337,7 +338,7 @@ fn run(options: &Options) -> Result<(), String> {
                     greedy: &greedy,
                     eval: &eval,
                     mcts: &mcts,
-                    budget: focus_ai.is_mcts().then_some(budget),
+                    budget: (focus_ai.is_mcts() && deadline_enabled).then_some(budget),
                     decision_ns: RefCell::new(Vec::new()),
                     focus_outcomes: RefCell::new(FocusOutcomes::default()),
                 };
@@ -380,7 +381,11 @@ fn run(options: &Options) -> Result<(), String> {
                 let outcomes = selector.focus_outcomes.borrow();
                 let whole_ns = focus_whole_ns.borrow();
                 let budget_ns = options.decision_budget_ms * 1_000_000;
-                let focus_timeout_count = whole_ns.iter().filter(|&&ns| ns > budget_ns).count();
+                let focus_timeout_count = if deadline_enabled {
+                    whole_ns.iter().filter(|&&ns| ns > budget_ns).count()
+                } else {
+                    0
+                };
                 let focus_max_decision_ms =
                     whole_ns.iter().copied().max().unwrap_or(0) as f64 / 1_000_000.0;
                 let record = json!({
@@ -404,6 +409,8 @@ fn run(options: &Options) -> Result<(), String> {
                     "decisions": decision_ns.len(),
                     "focus_decisions": whole_ns.len(),
                     "decision_budget_ms": options.decision_budget_ms,
+                    "mcts_deadline_active": focus_ai.is_mcts() && deadline_enabled,
+                    "deterministic_policy_selection": !(focus_ai.is_mcts() && deadline_enabled),
                     "max_policy_select_ms": decision_ns.iter().copied().max().unwrap_or(0) as f64 / 1_000_000.0,
                     "p50_policy_select_ms": percentile_ms(&decision_ns, 0.50),
                     "p95_policy_select_ms": percentile_ms(&decision_ns, 0.95),
