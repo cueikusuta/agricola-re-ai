@@ -218,10 +218,11 @@ test("Issue #104: Japanese draft UI completes every pick", async (t) => {
     assert.equal(drafted.ai, "card_value", "the selected draft baseline is used");
 
     await page.locator("#draftStartGame").click();
-    await page.waitForFunction(() =>
-      (document.querySelector("#turn")?.textContent || "").includes("ラウンド 1/14"),
-    null, { timeout: 20000 });
+    // Wait for the start request itself, not the always-present round banner.
+    await page.waitForFunction(() => Boolean(state.draft && state.draft.game_started),
+      null, { timeout: 20000 });
     assert.equal(await page.evaluate(() => state.draft.game_started), true);
+    assert.match(await page.locator("#turn").innerText(), /ラウンド 1\/14・1Pの手番/);
     assert.match(await page.locator("#draftStatus").innerText(), /ゲーム開始済み/);
 
     // The in-game hand must be exactly the drafted 7 + 7, nothing else.
