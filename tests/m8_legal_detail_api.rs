@@ -127,3 +127,134 @@ fn human_and_ai_paths_agree_on_the_shared_validator() {
     };
     assert!(game.validate_action(&illegal).is_err());
 }
+
+#[test]
+fn used_space_is_no_longer_available_and_cannot_be_reused() {
+    let mut game = Game::new(Config {
+        players: 2,
+        seed: 3,
+        additional_action_space_enabled: false,
+    });
+    game.apply(Action {
+        space: Space::DayLaborer,
+        detail: Detail::None,
+    })
+    .unwrap();
+    assert!(!game.available_spaces().contains(&Space::DayLaborer));
+    let before = game.state_hash();
+    assert!(game
+        .apply(Action {
+            space: Space::DayLaborer,
+            detail: Detail::None,
+        })
+        .is_err());
+    assert_eq!(game.state_hash(), before);
+}
+
+#[test]
+fn additional_spaces_stay_mutually_exclusive_through_available_spaces() {
+    let mut game = Game::new(Config {
+        players: 2,
+        seed: 0,
+        additional_action_space_enabled: true,
+    });
+    assert!(game.available_spaces().contains(&Space::ResourceMarket));
+    assert!(game.available_spaces().contains(&Space::ModestFamilyGrowth));
+    game.apply(Action {
+        space: Space::ResourceMarket,
+        detail: Detail::None,
+    })
+    .unwrap();
+    assert!(!game.available_spaces().contains(&Space::ModestFamilyGrowth));
+    let before = game.state_hash();
+    assert!(game
+        .apply(Action {
+            space: Space::ModestFamilyGrowth,
+            detail: Detail::None,
+        })
+        .is_err());
+    assert_eq!(game.state_hash(), before);
+}
+
+#[test]
+fn modest_family_growth_is_rejected_before_round_five() {
+    let mut game = Game::new(Config {
+        players: 2,
+        seed: 0,
+        additional_action_space_enabled: true,
+    });
+    assert_eq!(game.public.round, 1);
+    // Structurally available, and a free housing slot exists, so only the
+    // round-5 rule can reject the move.
+    assert!(game.available_spaces().contains(&Space::ModestFamilyGrowth));
+    let active = game.public.active_player;
+    game.public.players[active].extra_housing = 1;
+    let action = Action {
+        space: Space::ModestFamilyGrowth,
+        detail: Detail::None,
+    };
+    let error = game.validate_action(&action).unwrap_err();
+    assert!(error.contains("round 5"), "unexpected error: {error}");
+    let before = game.state_hash();
+    assert!(game.apply(action).is_err());
+    assert_eq!(game.state_hash(), before);
+}
+
+#[test]
+fn detail_hints_list_legal_elementary_parameters() {
+    let game = Game::new(Config {
+        players: 2,
+        seed: 0,
+        additional_action_space_enabled: false,
+    });
+    let plow = game.detail_hints(Space::Farmland);
+    assert!(plow.plow_cells.contains(&1));
+    assert!(!plow.plow_cells.contains(&0), "a room cannot be plowed");
+    assert_eq!(plow.plow_cells.len(), 13);
+    let build = game.detail_hints(Space::FarmExpansion);
+    assert!(build.room_cells.contains(&1));
+    assert!(build.room_cells.contains(&6));
+    assert!(!build.room_cells.contains(&0));
+    assert_eq!(build.stable_cells.len(), 13);
+}
+
+#[test]
+fn detail_hints_never_include_the_opponent_hand() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    let game = Game::with_cards(
+        Config {
+            players: 2,
+            seed: 7,
+            additional_action_space_enabled: false,
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+    let active = game.public.active_player;
+    let own = game.observation(active).unwrap().hand;
+    let hints = game.detail_hints(Space::Lessons);
+    assert!(
+        hints.occupations.iter().all(|id| own.contains(id)),
+        "occupation hints must come only from the active player's hand"
+    );
+    let major = game.detail_hints(Space::MajorImprovement);
+    assert!(major.minors.iter().all(|id| own.contains(id)));
+}
+
+#[test]
+fn web_view_exposes_staged_detail_hints_and_available_spaces() {
+    use agricola_re_ai::web::Session;
+    let mut session = Session::new(Config {
+        players: 2,
+        seed: 0,
+        additional_action_space_enabled: false,
+    })
+    .unwrap();
+    if session.view()["public"]["active_player"] != 0 {
+        session.advance_cpu().unwrap();
+    }
+    let view = session.view();
+    assert!(view["available"].as_array().is_some_and(|v| !v.is_empty()));
+    assert!(view["detail_hints"].is_object());
+    assert!(view["detail_hints"]["farmland"]["plow_cells"].is_array());
+}

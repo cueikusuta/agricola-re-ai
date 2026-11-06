@@ -123,6 +123,19 @@ impl Session {
                 "preview": self.game.preview_harvest(action, Some(feeding)).expect("validated plans"),
             }),
         };
+        let detail_hints = if human_turn {
+            let mut map = serde_json::Map::new();
+            for space in self.game.available_spaces() {
+                if let Ok(Value::String(key)) = serde_json::to_value(space) {
+                    if let Ok(value) = serde_json::to_value(self.game.detail_hints(space)) {
+                        map.insert(key, value);
+                    }
+                }
+            }
+            Value::Object(map)
+        } else {
+            Value::Object(serde_json::Map::new())
+        };
         json!({
             "harvest": harvest,
             "hand": &self.game.cards.hands[0],
@@ -131,6 +144,7 @@ impl Session {
             "public": &self.game.public,
             "legal": if human_turn { self.game.legal_spaces() } else { vec![] },
             "available": if human_turn { self.game.available_spaces() } else { vec![] },
+            "detail_hints": detail_hints,
             "standings": standings_with_cards(&self.game.public.players, &self.game.card_set),
             "last_actions": self.game.log.events.iter().rev().take(5).map(|e| json!({
                 "player": e.player,

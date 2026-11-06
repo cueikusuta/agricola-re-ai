@@ -129,6 +129,20 @@ pub struct Action {
     pub space: Space,
     pub detail: Detail,
 }
+/// Staged detail query for the active player: elementary parameters that are
+/// individually legal right now. It is a *hint*, not a legality definition;
+/// the engine still validates the complete action. Card lists come only from
+/// the active player's own hand and the public improvement market.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DetailHints {
+    pub plow_cells: Vec<usize>,
+    pub room_cells: Vec<usize>,
+    pub stable_cells: Vec<usize>,
+    pub sow_fields: Vec<usize>,
+    pub occupations: Vec<String>,
+    pub minors: Vec<String>,
+    pub improvements: Vec<Improvement>,
+}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AnimalLocation {
     Pet,
@@ -488,6 +502,109 @@ impl Game {
         probe.apply_with_plans(action.clone(), None, None, &SimpleHarvestDetails)
     }
 
+    /// Staged detail query for the active player. See [`DetailHints`].
+    pub fn detail_hints(&self, space: Space) -> DetailHints {
+        use crate::cards::CardKind;
+        let active = self.public.active_player;
+        let me = &self.public.players[active];
+        let mut hints = DetailHints::default();
+        let plow_legal = |i: usize| {
+            matches!(me.farm[i].tile, Tile::Empty)
+                && !me.farm[i].stable
+                && (me.fields() == 0
+                    || neighbors(i)
+                        .iter()
+                        .any(|&j| matches!(me.farm[j].tile, Tile::Field { .. })))
+        };
+        let room_legal = |i: usize| {
+            matches!(me.farm[i].tile, Tile::Empty)
+                && !me.farm[i].stable
+                && neighbors(i)
+                    .iter()
+                    .any(|&j| matches!(me.farm[j].tile, Tile::Room))
+        };
+        let stable_legal = |i: usize| {
+            me.occupied_stables() < 4
+                && !me.farm[i].stable
+                && matches!(me.farm[i].tile, Tile::Empty)
+        };
+        if matches!(space, Space::Farmland | Space::Cultivation) {
+            hints.plow_cells = (0..FARM_CELLS).filter(|&i| plow_legal(i)).collect();
+        }
+        if matches!(space, Space::FarmExpansion) {
+            hints.room_cells = (0..FARM_CELLS).filter(|&i| room_legal(i)).collect();
+            hints.stable_cells = (0..FARM_CELLS).filter(|&i| stable_legal(i)).collect();
+        }
+        if matches!(space, Space::GrainUtilization | Space::Cultivation) {
+            hints.sow_fields = (0..FARM_CELLS)
+                .filter(|&i| {
+                    matches!(
+                        me.farm[i].tile,
+                        Tile::Field {
+                            crop: None,
+                            remaining: 0
+                        }
+                    )
+                })
+                .collect();
+        }
+        let occupations = me
+            .played_cards
+            .iter()
+            .filter(|id| {
+                self.card_set
+                    .definition(id)
+                    .is_some_and(|c| c.kind == CardKind::Occupation)
+            })
+            .count();
+        let hand = &self.cards.hands[active];
+        let playable = |kind: CardKind, fee: u32| -> Vec<String> {
+            hand.iter()
+                .filter(|id| {
+                    self.card_set.definition(id).is_some_and(|card| {
+                        card.kind == kind && crate::cards::can_play(&self.card_set, card, me, fee)
+                    })
+                })
+                .cloned()
+                .collect()
+        };
+        match space {
+            Space::Lessons => {
+                hints.occupations = playable(CardKind::Occupation, u32::from(occupations > 0));
+            }
+            Space::ExtraLessons => {
+                let fee = if self.config.players == 3 || occupations >= 2 {
+                    2
+                } else {
+                    1
+                };
+                hints.occupations = playable(CardKind::Occupation, fee);
+            }
+            Space::MajorImprovement => {
+                hints.minors = playable(CardKind::MinorImprovement, 0);
+                hints.improvements = self
+                    .public
+                    .improvement_market
+                    .iter()
+                    .copied()
+                    .filter(|&i| {
+                        affordable(me, i)
+                            || i.is_cooking()
+                                && matches!(i, Improvement::Hearth4 | Improvement::Hearth5)
+                                && me.improvements.iter().any(|c| {
+                                    matches!(c, Improvement::Fireplace2 | Improvement::Fireplace3)
+                                })
+                    })
+                    .collect();
+            }
+            Space::MeetingPlace | Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth => {
+                hints.minors = playable(CardKind::MinorImprovement, 0);
+            }
+            _ => {}
+        }
+        hints
+    }
+
     fn apply_with_plans(
         &mut self,
         action: Action,
@@ -838,21 +955,26 @@ impl Game {
                 } => build_pastures(p, pastures, Some(occupancy))?,
                 _ => return Err("pasture details required".into()),
             },
-            Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth => match detail {
-                Detail::None => grow(p, true)?,
-                Detail::GrowWithMinor { card_id } if self.card_set.enabled() => {
-                    grow(p, true)?;
-                    crate::cards::play(
-                        &self.card_set,
-                        &mut self.cards.hands[id],
-                        p,
-                        card_id,
-                        crate::cards::CardKind::MinorImprovement,
-                        0,
-                    )?;
+            Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth => {
+                if space == Space::ModestFamilyGrowth && self.public.round < 5 {
+                    return Err("modest family growth is only available from round 5".into());
                 }
-                _ => return Err("invalid growth details".into()),
-            },
+                match detail {
+                    Detail::None => grow(p, true)?,
+                    Detail::GrowWithMinor { card_id } if self.card_set.enabled() => {
+                        grow(p, true)?;
+                        crate::cards::play(
+                            &self.card_set,
+                            &mut self.cards.hands[id],
+                            p,
+                            card_id,
+                            crate::cards::CardKind::MinorImprovement,
+                            0,
+                        )?;
+                    }
+                    _ => return Err("invalid growth details".into()),
+                }
+            }
             Space::FamilyGrowthNoRoom => {
                 require_none(detail)?;
                 grow(p, false)?;
