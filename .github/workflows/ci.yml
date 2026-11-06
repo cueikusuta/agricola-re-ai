@@ -207,6 +207,17 @@ jobs:
         run: ./target/release/agricola-re-ai --benchmark-cards 10 --seed 901
       - name: M7 card-mode paired comparison ON
         run: ./target/release/agricola-re-ai --benchmark-cards 10 --seed 901 --additional-action-space
+      # M10-CORE (#139): publish the verified-pool / G1-G2 counts as machine-readable
+      # evidence. Zero counts mean official verification is still incomplete.
+      - name: M10 verified-pool and G1/G2 report
+        run: ./target/release/card_pool_report > "$RUNNER_TEMP/card-pool-report.json"
+      - name: Upload M10 card pool report
+        uses: actions/upload-artifact@v4
+        with:
+          name: m10-card-pool-report
+          path: ${{ runner.temp }}/card-pool-report.json
+          if-no-files-found: error
+          retention-days: 7
 
   gate:
     name: CI required
