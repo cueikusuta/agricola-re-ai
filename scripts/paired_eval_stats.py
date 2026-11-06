@@ -17,6 +17,11 @@ import statistics
 import sys
 
 
+def finite_number(value: object) -> bool:
+    """Reject NaN, infinities, booleans, and non-numeric JSON values."""
+    return type(value) in (int, float) and math.isfinite(value)
+
+
 def validate_and_report(
     rows: list[dict],
     *,
@@ -45,6 +50,10 @@ def validate_and_report(
     }
     received = {}
     for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("game record must be an object")
+        if any(type(row.get(field)) is not int for field in ("block_index", "candidate_seat", "seed")):
+            raise ValueError("block, seat and seed must be integers")
         key = (row.get("block_index"), row.get("arm_id"), row.get("candidate_seat"))
         if key not in expected:
             raise ValueError(f"unexpected block/arm/seat: {key}")
@@ -63,7 +72,9 @@ def validate_and_report(
             or row.get("rounds_completed") != 14
             or row.get("replay_verified") is not True
             or not isinstance(row.get("replay_hash"), str)
-            or len(row["replay_hash"]) < 16
+            or len(row["replay_hash"]) != 64
+            or any(char not in "0123456789abcdef" for char in row["replay_hash"])
+            or row.get("policy_select_only") is not True
         ):
             raise ValueError(f"invalid metadata/verification: {key}")
         scores = row.get("scores_by_seat")
@@ -77,22 +88,37 @@ def validate_and_report(
             or any(not 1 <= rank <= players for rank in ranks)
         ):
             raise ValueError(f"invalid standings: {key}")
-        # Recompute official engine's standings rules from recorded ranks.
+        # Scores must outrank lower scores; equal scores may use the
+        # engine's resource tiebreaker, which is not present in this JSONL.
+        if any(
+            scores[i] > scores[j] and ranks[i] >= ranks[j]
+            for i in range(players) for j in range(players)
+        ):
+            raise ValueError(f"score/rank ordering mismatch: {key}")
+        # Recompute first-place credit from the engine's recorded ranks.
         firsts = ranks.count(1)
         if firsts < 1:
             raise ValueError(f"missing first place: {key}")
         credit = 1.0 / firsts if ranks[seat] == 1 else 0.0
-        if abs(row.get("first_place_credit", -1) - credit) > 1e-9:
+        first_place_credit = row.get("first_place_credit")
+        if (
+            not finite_number(first_place_credit)
+            or not 0 <= first_place_credit <= 1
+            or abs(first_place_credit - credit) > 1e-9
+        ):
             raise ValueError(f"first-place credit mismatch: {key}")
         mean_other = (sum(scores) - scores[seat]) / (players - 1)
-        if abs(row.get("score_margin", float("inf")) - (scores[seat] - mean_other)) > 1e-8:
+        score_margin = row.get("score_margin")
+        if not finite_number(score_margin) or abs(score_margin - (scores[seat] - mean_other)) > 1e-8:
             raise ValueError(f"margin mismatch: {key}")
         if row.get("expected_rank_observation") != ranks[seat]:
             raise ValueError(f"rank mismatch: {key}")
         for numeric in ("total_wall_ms", "max_policy_select_ms"):
             value = row.get(numeric)
-            if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+            if not finite_number(value) or value < 0:
                 raise ValueError(f"invalid timing {numeric}: {key}")
+        if row["max_policy_select_ms"] > row["total_wall_ms"]:
+            raise ValueError(f"selection time exceeds game wall time: {key}")
         if type(row.get("decisions")) is not int or row["decisions"] <= 0:
             raise ValueError(f"invalid decisions: {key}")
         received[key] = row
