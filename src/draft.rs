@@ -522,8 +522,23 @@ impl DraftState {
     }
 
     /// Commit one pick for `viewer`. All seats must commit before the packets
-    /// move, matching the design's atomic transfer rule.
+    /// move, matching the design's atomic transfer rule. The whole operation is
+    /// transactional: any error leaves `self` untouched.
     pub fn commit_pick(
+        &mut self,
+        viewer: usize,
+        token: u64,
+        occupation: Option<String>,
+        minor: Option<String>,
+    ) -> Result<(), String> {
+        let mut next = self.clone();
+        next.commit_pick_inner(viewer, token, occupation, minor)?;
+        next.validate_invariants()?;
+        *self = next;
+        Ok(())
+    }
+
+    fn commit_pick_inner(
         &mut self,
         viewer: usize,
         token: u64,
@@ -599,12 +614,25 @@ impl DraftState {
         if self.commitments.iter().all(Option::is_some) {
             self.resolve_round()?;
         }
-        self.validate_invariants()?;
         Ok(())
     }
 
-    /// Choose 7 of 10 for both kinds (10-7 non-draft mode).
+    /// Choose 7 of 10 for both kinds (10-7 non-draft mode). Transactional.
     pub fn commit_choice(
+        &mut self,
+        viewer: usize,
+        token: u64,
+        occupations: Vec<String>,
+        minors: Vec<String>,
+    ) -> Result<(), String> {
+        let mut next = self.clone();
+        next.commit_choice_inner(viewer, token, occupations, minors)?;
+        next.validate_invariants()?;
+        *self = next;
+        Ok(())
+    }
+
+    fn commit_choice_inner(
         &mut self,
         viewer: usize,
         token: u64,
@@ -676,7 +704,6 @@ impl DraftState {
         if self.commitments.iter().all(Option::is_some) {
             self.phase = DraftPhase::Complete;
         }
-        self.validate_invariants()?;
         Ok(())
     }
 

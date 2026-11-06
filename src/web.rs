@@ -223,10 +223,6 @@ impl Session {
         self.draft.as_ref().ok_or("no draft session".into())
     }
 
-    fn draft_mut(&mut self) -> Result<&mut DraftWeb, String> {
-        self.draft.as_mut().ok_or("no draft session".into())
-    }
-
     pub fn draft_view(&self) -> Result<Value, String> {
         let d = self.draft()?;
         let obs = d.state.observe(0, d.state.current_token())?;
@@ -293,11 +289,13 @@ impl Session {
             .ok_or("draft token is required")?;
         let occupation = optional_string(input.get("occupation"))?;
         let minor = optional_string(input.get("minor"))?;
-        {
-            let d = self.draft_mut()?;
-            d.state.commit_pick(0, token, occupation, minor)?;
-        }
-        self.auto_commit_cpus()
+        // Whole request is transactional: the human commit and every CPU
+        // follow-up either all apply or none do.
+        let mut next = self.draft.clone().ok_or("no draft session")?;
+        next.state.commit_pick(0, token, occupation, minor)?;
+        auto_commit_cpus(&mut next)?;
+        self.draft = Some(next);
+        Ok(())
     }
 
     /// Human seat 0 finalises a 10-7 non-draft hand; the CPU seats follow.
@@ -308,43 +306,10 @@ impl Session {
             .ok_or("draft token is required")?;
         let occupations = string_list(input.get("occupations"), "occupations")?;
         let minors = string_list(input.get("minors"), "minors")?;
-        {
-            let d = self.draft_mut()?;
-            d.state.commit_choice(0, token, occupations, minors)?;
-        }
-        self.auto_commit_cpus()
-    }
-
-    /// Advance every CPU seat that has not yet committed, using only each
-    /// seat's own observation. Never reads another seat's private packet.
-    fn auto_commit_cpus(&mut self) -> Result<(), String> {
-        let players = self.draft()?.state.player_count;
-        let mode = self.draft()?.state.mode;
-        for seat in 1..players {
-            let (pending, token) = {
-                let d = self.draft()?;
-                (
-                    d.state.commitments[seat].is_none() && !d.state.is_complete(),
-                    d.state.current_token(),
-                )
-            };
-            if !pending {
-                continue;
-            }
-            let d = self.draft_mut()?;
-            let obs = d.state.observe(seat, token)?;
-            match mode {
-                DraftMode::Choose10_7 => {
-                    let (occ, minor) = cpu_choice(&obs)?;
-                    d.state.commit_choice(seat, token, occ, minor)?;
-                }
-                _ => {
-                    let commit = cpu_pick(&obs)?;
-                    d.state
-                        .commit_pick(seat, token, commit.occupation, commit.minor)?;
-                }
-            }
-        }
+        let mut next = self.draft.clone().ok_or("no draft session")?;
+        next.state.commit_choice(0, token, occupations, minors)?;
+        auto_commit_cpus(&mut next)?;
+        self.draft = Some(next);
         Ok(())
     }
 
@@ -483,6 +448,35 @@ impl Session {
         *self = next;
         Ok(())
     }
+}
+
+/// Advance every CPU seat that has not yet committed, using only each seat's
+/// own observation. Never reads another seat's private packet. The caller runs
+/// this on a clone so a failure cannot partially mutate the session.
+fn auto_commit_cpus(draft: &mut DraftWeb) -> Result<(), String> {
+    let players = draft.state.player_count;
+    let mode = draft.state.mode;
+    for seat in 1..players {
+        let pending = draft.state.commitments[seat].is_none() && !draft.state.is_complete();
+        if !pending {
+            continue;
+        }
+        let token = draft.state.current_token();
+        let obs = draft.state.observe(seat, token)?;
+        match mode {
+            DraftMode::Choose10_7 => {
+                let (occ, minor) = cpu_choice(&obs)?;
+                draft.state.commit_choice(seat, token, occ, minor)?;
+            }
+            _ => {
+                let commit = cpu_pick(&obs)?;
+                draft
+                    .state
+                    .commit_pick(seat, token, commit.occupation, commit.minor)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Build the observable draft payload for the browser. It contains only the
@@ -1068,6 +1062,38 @@ mod tests {
             .state
             .validate_invariants()
             .unwrap();
+    }
+
+    #[test]
+    fn draft_web_rejected_pick_does_not_advance_cpu_or_state() {
+        let mut session = Session::new(Config::default()).unwrap();
+        session
+            .start_draft(&json!({
+                "mode":"draft_7_7","players":2,"seed":3,
+                "direction_occupation":"left","direction_minor":"right",
+                "occupation_phase_first":true
+            }))
+            .unwrap();
+        let before = session.draft().unwrap().state.state_hash();
+        let token = session.draft().unwrap().state.current_token();
+        // Off-packet card: the human commit and the CPU follow-ups must not
+        // happen at all.
+        assert!(session
+            .draft_pick(&json!({"token":token,"occupation":"NOT-OFFERED"}))
+            .is_err());
+        assert_eq!(session.draft().unwrap().state.state_hash(), before);
+        assert!(session
+            .draft()
+            .unwrap()
+            .state
+            .commitments
+            .iter()
+            .all(Option::is_none));
+        // A stale token is likewise atomic.
+        assert!(session
+            .draft_pick(&json!({"token":token + 5,"occupation":"NOT-OFFERED"}))
+            .is_err());
+        assert_eq!(session.draft().unwrap().state.state_hash(), before);
     }
 
     #[test]
