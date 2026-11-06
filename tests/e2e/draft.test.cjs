@@ -60,6 +60,8 @@ async function takeOneRound(page) {
 // board operation, not a direct /api call.
 async function takeSimpleAction(page) {
   const simple = ["森林", "粘土坑", "葦", "漁", "日雇い", "穀物", "野菜", "採石場", "林", "林地", "粘土の採取"];
+  // The action list is rebuilt by the server response; wait for it to render.
+  await page.locator("#actions button").first().waitFor({ state: "visible", timeout: 20000 });
   for (const name of simple) {
     const button = page.locator("#actions button", { hasText: name }).first();
     if (await button.count() === 0) continue;
