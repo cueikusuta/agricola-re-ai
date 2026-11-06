@@ -61,12 +61,19 @@ fn unrevealed_round_order_and_internal_rng_are_not_observable() {
 
     let mut future = original.clone();
     assert!(future.hidden_round_deck.len() >= 2);
-    // Both earliest vector slots are unrevealed cards from the final stage.
-    assert_eq!(
-        future.hidden_round_deck[0].stage(),
-        future.hidden_round_deck[1].stage()
-    );
-    future.hidden_round_deck.swap(0, 1);
+    // Only swap cards within the same future stage to preserve stage order.
+    let first = future
+        .hidden_round_deck
+        .iter()
+        .position(|card| card.stage() == 5)
+        .expect("stage five must still be unrevealed");
+    let second = future
+        .hidden_round_deck
+        .iter()
+        .rposition(|card| card.stage() == 5)
+        .expect("stage five must still be unrevealed");
+    assert_ne!(first, second, "stage five has two future cards");
+    future.hidden_round_deck.swap(first, second);
     future.validate().unwrap();
     assert_ne!(future.state_hash(), original.state_hash());
     assert_eq!(future.observation(0).unwrap(), view);
