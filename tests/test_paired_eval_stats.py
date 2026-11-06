@@ -75,7 +75,7 @@ class PairedStatsTests(unittest.TestCase):
         self.assertEqual(report["total_games"], 24)
         self.assertEqual(report["mean_first_credit_delta"], 1.0)
         self.assertEqual(report["paired_block_bootstrap_95ci"], [1.0, 1.0])
-        self.assertFalse(report["candidate_10s_guaranteed"])
+        self.assertFalse(report["candidate_10s_observed_pass"])
         self.assertFalse(report["candidate_focus_deadline_control"])
 
     def test_missing_and_duplicate_records(self):
@@ -201,7 +201,8 @@ class PairedStatsTests(unittest.TestCase):
         self.assertEqual(report["candidate_first_credit_pct"], report["candidate_first_credit"] * 100)
         self.assertTrue(report["candidate_focus_deadline_control"])
         self.assertTrue(report["candidate_focus_measured_within_budget"])
-        self.assertTrue(report["candidate_10s_guaranteed"])
+        self.assertTrue(report["candidate_10s_observed_pass"])
+        self.assertEqual(report["deadline_enforcement"], "cooperative_in_policy_checks")
 
     def test_mcts_over_budget_disables_full_decision_flag(self):
         rows = fixture()
@@ -219,7 +220,7 @@ class PairedStatsTests(unittest.TestCase):
             candidate="mcts", baseline="random", opponent="greedy",
             extra=False, iterations=500,
         )
-        self.assertFalse(report["candidate_10s_guaranteed"])
+        self.assertFalse(report["candidate_10s_observed_pass"])
         self.assertTrue(report["candidate_focus_deadline_control"])
         self.assertFalse(report["candidate_focus_measured_within_budget"])
         self.assertEqual(report["candidate_focus_timeout_count"], 12 * 5)
@@ -327,7 +328,7 @@ class PairedStatsTests(unittest.TestCase):
         )
         self.assertFalse(report["candidate_focus_deadline_control"])
         self.assertFalse(report["candidate_focus_measured_within_budget"])
-        self.assertFalse(report["candidate_10s_guaranteed"])
+        self.assertFalse(report["candidate_10s_observed_pass"])
 
     def test_equal_score_tiebreak_ranks_are_allowed(self):
         rows = fixture()

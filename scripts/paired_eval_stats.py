@@ -233,10 +233,10 @@ def validate_and_report(
     baseline_deadline_control = baseline == "mcts" and budget_enabled
     candidate_measured_within = budget_enabled and candidate_max_focus <= budget_ms
     baseline_measured_within = budget_enabled and baseline_max_focus <= budget_ms
-    candidate_10s_guaranteed = (
+    candidate_10s_observed_pass = (
         candidate_deadline_control and budget_within_10s and candidate_measured_within
     )
-    baseline_10s_guaranteed = (
+    baseline_10s_observed_pass = (
         baseline_deadline_control and budget_within_10s and baseline_measured_within
     )
     return {
@@ -311,8 +311,9 @@ def validate_and_report(
         "baseline_focus_deadline_control": baseline_deadline_control,
         "candidate_focus_measured_within_budget": candidate_measured_within,
         "baseline_focus_measured_within_budget": baseline_measured_within,
-        "candidate_10s_guaranteed": candidate_10s_guaranteed,
-        "baseline_10s_guaranteed": baseline_10s_guaranteed,
+        "candidate_10s_observed_pass": candidate_10s_observed_pass,
+        "baseline_10s_observed_pass": baseline_10s_observed_pass,
+        "deadline_enforcement": "cooperative_in_policy_checks",
         "first_credit_goal_5pp_point_estimate_met": point >= .05,
         "improvement_ci_lower_above_zero": lower > 0,
         "provisional_goal_and_positive_ci": point >= .05 and lower > 0,
@@ -321,12 +322,13 @@ def validate_and_report(
             "percentage points); *_pp fields are percentage points. Focus "
             "decision timing includes action-space selection plus detail "
             "generation for the arm ordered as candidate/baseline. "
-            "*_10s_guaranteed is true only when the arm is MCTS, a positive "
-            "budget <= 10000 ms was applied, and the measured maximum focus "
-            "decision stayed within it; it is not a proof of a whole-decision "
-            "hard cap. A 0 ms budget means no deadline (deterministic MCTS by "
-            "simulation count) and makes all 10s flags false. Official rule "
-            "fidelity still requires independent gates."
+            "*_10s_observed_pass is an observed check, not an OS-enforced hard "
+            "guarantee: MCTS stops at cooperative deadline checks, so it is true "
+            "only when the arm is MCTS, a positive budget <= 10000 ms was "
+            "applied, and the measured maximum focus decision stayed within it. "
+            "A 0 ms budget means no deadline (deterministic MCTS by simulation "
+            "count) and makes all 10s flags false. Official rule fidelity still "
+            "requires independent gates."
         ),
     }
 
