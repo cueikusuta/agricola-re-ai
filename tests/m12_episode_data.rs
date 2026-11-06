@@ -141,6 +141,46 @@ fn dataset_report_detects_duplicate_seeds_and_corruption() {
 }
 
 #[test]
+fn verify_detects_tampered_observations_actions_and_initial_hash() {
+    let record = self_play_record(2, 2024);
+    record.verify().expect("the untouched record is valid");
+
+    // Editing the recorded action payload is corruption even though the event
+    // log and its before/after hashes are untouched.
+    let mut action_tampered = record.clone();
+    action_tampered.turns[0].action = serde_json::json!({"tampered": true});
+    assert!(action_tampered.verify().is_err());
+    assert_eq!(inspect_dataset(&[action_tampered]).corrupt.len(), 1);
+
+    // Substituting another seat's observation must be rejected.
+    let mut observation_tampered = record.clone();
+    let player = observation_tampered.turns[0].observation.player_id;
+    observation_tampered.turns[0].observation.player_id = (player + 1) % 2;
+    assert!(observation_tampered.verify().is_err());
+
+    // Two individually well-formed observations exchanged between turns are
+    // detected because each is checked against the live replayed state.
+    let last = record.turns.len() - 1;
+    let first_view = record.turns[0].observation.clone();
+    let last_view = record.turns[last].observation.clone();
+    assert_ne!(first_view, last_view, "turns must observe different states");
+    let mut swapped = record.clone();
+    swapped.turns[0].observation = last_view;
+    swapped.turns[last].observation = first_view;
+    assert!(swapped.verify().is_err());
+
+    // A mismatched initial state hash is rejected.
+    let mut initial_tampered = record.clone();
+    initial_tampered.initial_state_hash = "0".repeat(64);
+    assert!(initial_tampered.verify().is_err());
+
+    // A wrong round label is rejected.
+    let mut round_tampered = record.clone();
+    round_tampered.turns[0].round = round_tampered.turns[0].round.wrapping_add(1);
+    assert!(round_tampered.verify().is_err());
+}
+
+#[test]
 fn dataset_report_summarizes_provenance_seed_range_and_completeness() {
     let mut records = vec![self_play_record(2, 10), self_play_record(2, 11)];
     let report = inspect_dataset(&records);

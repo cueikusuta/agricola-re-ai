@@ -173,6 +173,14 @@ impl EpisodeRecord {
 
     /// Replay the committed event log and compare the terminal state, the
     /// standings, and every turn/event boundary. Any mismatch is corruption.
+    ///
+    /// This is the tamper-detection gate for a record, so it does **not** trust
+    /// the recorded [`TurnRecord`] fields. It recomputes the initial state,
+    /// checks the recorded `initial_state_hash`, and, for every event,
+    /// recomputes the acting player's [`Observation`] and requires the recorded
+    /// observation, round and action payload to match. Swapping in another
+    /// seat's observation, editing an action payload, or editing the initial
+    /// hash is detected even when the replay hashes alone would still agree.
     pub fn verify(&self) -> Result<(), String> {
         if self.schema_version != EPISODE_SCHEMA_VERSION {
             return Err(format!(
@@ -189,6 +197,17 @@ impl EpisodeRecord {
         if self.turns.len() != self.events.len() {
             return Err("turn/event count mismatch".into());
         }
+        if self.turns.is_empty() {
+            return Err("episode record has no turns".into());
+        }
+        // The first committed event's pre-state is the initial state.
+        if self.events[0].before != self.initial_state_hash {
+            return Err("recorded initial state hash does not match the first event".into());
+        }
+        let mut game = Game::with_cards(self.config.clone(), self.card_set.clone())?;
+        if game.state_hash() != self.initial_state_hash {
+            return Err("recomputed initial state does not match the recorded state".into());
+        }
         for (turn, event) in self.turns.iter().zip(&self.events) {
             if event.player != Some(turn.player) {
                 return Err(format!(
@@ -199,13 +218,31 @@ impl EpisodeRecord {
             if event.before != turn.before || event.after != turn.after {
                 return Err(format!("turn {} hash does not match its event", turn.index));
             }
+            if turn.action != event.payload {
+                return Err(format!(
+                    "turn {} action does not match its committed event payload",
+                    turn.index
+                ));
+            }
+            let observation = game.observation(turn.player)?;
+            if observation != turn.observation {
+                return Err(format!(
+                    "turn {} observation does not match the replayed state",
+                    turn.index
+                ));
+            }
+            if turn.round != observation.public.round {
+                return Err(format!(
+                    "turn {} round does not match the replayed state",
+                    turn.index
+                ));
+            }
+            game.apply_recorded(event)?;
         }
-        let replayed =
-            Game::replay_with_cards(self.config.clone(), self.card_set.clone(), &self.events)?;
-        if replayed.state_hash() != self.final_state_hash {
+        if game.state_hash() != self.final_state_hash {
             return Err("replay does not reproduce the recorded final state".into());
         }
-        let standings = standings_with_cards(&replayed.public.players, &self.card_set);
+        let standings = standings_with_cards(&game.public.players, &self.card_set);
         if standings != self.standings {
             return Err("replay standings differ from the recorded standings".into());
         }
