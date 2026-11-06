@@ -294,7 +294,8 @@ def review_ledger(
             "reviewed-needs-official": verified_count.get("reviewed-needs-official", 0),
             "unverified": verified_count.get("unverified", 0),
             "rejected": verified_count.get("rejected", 0),
-            "official_verification_complete": False,
+            "official_verification_complete": bool(audit)
+            and verified_count.get("verified", 0) == len(audit),
         },
         "eligibility_progress": {
             n: dict(sorted(eligibility_counts[n].items())) for n in ("2", "3", "4")
