@@ -209,11 +209,13 @@ test("Issue #104: Japanese draft UI completes every pick", async (t) => {
     // test fixture pool proves the draft-to-game path without promoting any
     // unverified card.
     await page.locator("#draftPool").selectOption("test_fixture");
+    await page.locator("#draftAi").selectOption("card_value");
     await startDraft(page, { mode: "draft_7_7", seed: 505 });
     await playToCompletion(page);
     const drafted = await page.evaluate(() => state.draft);
     assert.equal(drafted.complete, true);
     assert.equal(drafted.game_started, false);
+    assert.equal(drafted.ai, "card_value", "the selected draft baseline is used");
 
     await page.locator("#draftStartGame").click();
     await page.waitForFunction(() =>

@@ -2,9 +2,10 @@
 use crate::breeding::BreedingPlan;
 use crate::cards::{CardDefinition, CardSet};
 use crate::draft::{
-    cpu_choice, cpu_pick, CardKind, Direction, DraftCardInfo, DraftMode, DraftPhase, DraftPool,
-    DraftRuleset, DraftSetup, DraftState,
+    CardKind, Direction, DraftCardInfo, DraftMode, DraftPhase, DraftPool, DraftRuleset, DraftSetup,
+    DraftState,
 };
+use crate::draft_ai::{decision_rng, DraftAiKind};
 use crate::draft_game::{card_catalog, pool_from_card_set, start_game_from_draft};
 use crate::engine::{Action, Detail, FreeAction};
 use crate::harvest::{FeedingPlan, HarvestDetailPolicy};
@@ -48,6 +49,8 @@ struct DraftWeb {
     catalog: Vec<DraftCardInfo>,
     /// Set once the completed draft has seeded a real game.
     game_started: bool,
+    /// Observation-only AI used for the non-human seats.
+    draft_ai: DraftAiKind,
 }
 
 #[derive(Clone)]
@@ -302,6 +305,12 @@ impl Session {
             }
             other => return Err(format!("unknown draft pool kind: {other}")),
         };
+        let draft_ai = match input.get("draft_ai").and_then(Value::as_str) {
+            None | Some("random") => DraftAiKind::Random,
+            Some("card_value") => DraftAiKind::CardValue,
+            Some("synergy") => DraftAiKind::Synergy,
+            Some(other) => return Err(format!("unknown draft AI: {other}")),
+        };
         let catalog = card_catalog(&card_set);
         let setup = DraftSetup {
             mode,
@@ -324,6 +333,7 @@ impl Session {
             pool_kind: pool_kind.to_string(),
             catalog,
             game_started: false,
+            draft_ai,
         });
         Ok(())
     }
@@ -548,17 +558,23 @@ fn auto_commit_cpus(draft: &mut DraftWeb) -> Result<(), String> {
             continue;
         }
         let token = draft.state.current_token();
-        let obs = draft.state.observe(seat, token)?;
+        let obs = draft
+            .state
+            .observe_with_catalog(seat, token, &draft.catalog)?;
+        let ai = draft.draft_ai;
+        let mut rng = decision_rng(draft.setup.seed, seat, token, ai);
         match mode {
             DraftMode::Choose10_7 => {
-                let (occ, minor) = cpu_choice(&obs)?;
-                draft.state.commit_choice(seat, token, occ, minor)?;
-            }
-            _ => {
-                let commit = cpu_pick(&obs)?;
+                let decision = ai.decide_choice(&obs, &mut rng)?;
                 draft
                     .state
-                    .commit_pick(seat, token, commit.occupation, commit.minor)?;
+                    .commit_choice(seat, token, decision.occupations, decision.minors)?;
+            }
+            _ => {
+                let decision = ai.decide_pick(&obs, &mut rng)?;
+                draft
+                    .state
+                    .commit_pick(seat, token, decision.occupation, decision.minor)?;
             }
         }
     }
@@ -590,6 +606,7 @@ fn draft_json(draft: &DraftWeb, viewer: usize) -> Result<Value, String> {
         "ruleset_id": obs.ruleset_id,
         "pool_kind": &draft.pool_kind,
         "deck_version": &draft.setup.deck_version,
+        "ai": draft.draft_ai.id(),
         "phase": match obs.phase {
             DraftPhase::Drafting => "drafting",
             DraftPhase::Choosing => "choosing",
@@ -1369,6 +1386,30 @@ mod tests {
             }))
             .unwrap();
         assert_eq!(session.draft_view().unwrap()["pool_kind"], "test_fixture");
+    }
+
+    #[test]
+    fn draft_web_exposes_selectable_baselines_and_rejects_unknown_ai() {
+        let mut session = Session::new(Config::default()).unwrap();
+        assert!(session
+            .start_draft(&json!({
+                "mode":"draft_7_7","players":2,"seed":1,
+                "direction_occupation":"left","direction_minor":"right",
+                "occupation_phase_first":true,"draft_ai":"not_a_baseline"
+            }))
+            .is_err());
+        for ai in ["random", "card_value", "synergy"] {
+            session
+                .start_draft(&json!({
+                    "mode":"draft_7_7","players":2,"seed":11,
+                    "direction_occupation":"left","direction_minor":"right",
+                    "occupation_phase_first":true,"draft_ai":ai
+                }))
+                .unwrap();
+            assert_eq!(session.draft_view().unwrap()["ai"], ai);
+            drive_draft_to_completion(&mut session);
+            assert!(session.draft_view().unwrap()["complete"].as_bool().unwrap());
+        }
     }
 
     #[test]
