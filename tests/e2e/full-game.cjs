@@ -22,7 +22,11 @@ async function chooseAction(page, priorities) {
   let currentPage = 0;
   for (let p = 0; p < 10; p++) {
     const names = await page.locator("#actions button").allTextContents();
-    for (const name of names) available.push({ name: name.trim(), page: p });
+    for (const name of names) {
+      // Spaces outside the AI candidate set render with this suffix. The
+      // button is still a legal manual entry point, so normalise the label.
+      available.push({ name: name.trim().replace(/（詳細指定）$/, ""), page: p });
+    }
     const next = page.locator("#actionNav").getByRole("button", { name: "次へ", exact: true });
     if (await next.count() === 0 || !await next.isEnabled()) break;
     await next.click();
@@ -40,9 +44,16 @@ async function chooseAction(page, priorities) {
     await page.locator("#actionNav").getByRole("button", { name: "前へ", exact: true }).click();
     currentPage--;
   }
-  await page.locator("#actions").getByRole("button", { name: picked.name, exact: true }).click();
-  await page.locator("#editor").waitFor({ state: "visible" });
-  return picked.name;
+  const buttons = page.locator("#actions button");
+  for (let i = 0; i < await buttons.count(); i++) {
+    const label = (await buttons.nth(i).innerText()).trim().replace(/（詳細指定）$/, "");
+    if (label === picked.name) {
+      await buttons.nth(i).click();
+      await page.locator("#editor").waitFor({ state: "visible" });
+      return picked.name;
+    }
+  }
+  return null;
 }
 
 async function playAndObserveResponse(page) {
@@ -170,30 +181,206 @@ async function inspectAvailableEditors(page, coverage) {
   }
 }
 
+async function cancelEditor(page) {
+  if (await page.locator("#editor").isVisible()) {
+    await page.locator("#cancel").click();
+    await page.locator("#editor").waitFor({ state: "hidden" });
+  }
+}
+
+async function submitOrCancel(page, purpose) {
+  if (await playAndObserveResponse(page)) return true;
+  await cancelEditor(page);
+  return false;
+}
+
+async function readSupply(page) {
+  const text = await page.locator("#stats").innerText();
+  const count = label => Number((text.match(new RegExp(label + " (\\d+)")) || [])[1] || 0);
+  return { wood: count("木"), clay: count("粘土"), reed: count("葦"), grain: count("麦") };
+}
+
+// Issue #92: actually *submit* the detail operations that the dialog-only
+// coverage used to skip. Every attempt is a real UI submission; an illegal
+// attempt is cancelled and the turn falls back to a simple action.
+async function attemptManualOperations(page, coverage) {
+  const once = key => (coverage[key] || 0) === 0;
+  const note = message => {
+    coverage.notes = coverage.notes || [];
+    if (coverage.notes.length < 60) coverage.notes.push(message);
+  };
+  const supply = await readSupply(page);
+
+  // Goal-directed resource gathering: the naive "first simple action" policy
+  // would always take 森林 and never accumulate reed or grain.
+  const gather = async (spaceName, purpose) => {
+    if (!await chooseAction(page, [spaceName])) return false;
+    if (await submitOrCancel(page, purpose)) {
+      coverage.manualResource = (coverage.manualResource || 0) + 1;
+      return true;
+    }
+    return false;
+  };
+  if (once("manualFence") && supply.wood < 4 && await gather("森林", "gather wood")) return true;
+  if (once("manualRenovation") && supply.reed < 2 && await gather("葦", "gather reed")) return true;
+  if (once("manualRenovation") && supply.clay < 2 && await gather("粘土坑", "gather clay")) return true;
+  if (once("manualRoom") && supply.wood < 5 && await gather("森林", "gather room wood")) return true;
+  if (once("manualRoom") && supply.reed < 2 && await gather("葦", "gather room reed")) return true;
+  if (once("manualSow") && supply.grain === 0 && await gather("穀物", "gather grain")) return true;
+
+  if (once("manualFence") && await chooseAction(page, ["柵"])) {
+    const header = await page.locator("#fields").innerText();
+    const wood = Number((header.match(/木材 (\d+)/) || [])[1] || 0);
+    const proposals = page.locator("#fields button[data-kind]");
+    let chosen = false;
+    for (let i = 0; i < await proposals.count(); i++) {
+      const cost = Number(((await proposals.nth(i).innerText()).match(/(\d+)本/) || [])[1] || 0);
+      if (cost > 0 && cost <= wood) {
+        await proposals.nth(i).click();
+        chosen = true;
+        break;
+      }
+    }
+    if (chosen && await submitOrCancel(page, "manual fence")) {
+      coverage.manualFence++;
+      return true;
+    }
+    await cancelEditor(page);
+  }
+
+  if (once("manualRoom")) {
+    if (!await chooseAction(page, ["部屋・厩"])) {
+      note("room:unavailable");
+    } else {
+      const hint = await page.locator("#detailHint").innerText().catch(() => "");
+      const room = (hint.match(/部屋を建てられるマス: ([0-9,]+)/) || [])[1];
+      if (room) {
+        await page.locator("#rooms").fill(room.split(",")[0]);
+        if (await submitOrCancel(page, "manual room")) {
+          coverage.manualRoom++;
+          return true;
+        }
+        note("room:rejected");
+      } else {
+        note("room:nohint");
+      }
+      await cancelEditor(page);
+    }
+  }
+
+  if (once("manualRenovation")) {
+    if (!await chooseAction(page, ["改築"])) {
+      note("renovation:unavailable");
+    } else {
+      if (await submitOrCancel(page, "manual renovation")) {
+        coverage.manualRenovation++;
+        return true;
+      }
+      note("renovation:rejected");
+      await cancelEditor(page);
+    }
+  }
+
+  if (once("manualSow")) {
+    if (!await chooseAction(page, ["種まき・パン"])) {
+      note("sow:unavailable");
+    } else {
+      const hint = await page.locator("#detailHint").innerText().catch(() => "");
+      const fields = (hint.match(/種をまける畑: ([0-9,]+)/) || [])[1];
+      const stats = await page.locator("#stats").innerText();
+      const grain = Number((stats.match(/麦 (\d+)/) || [])[1] || 0);
+      const vegetable = Number((stats.match(/野菜 (\d+)/) || [])[1] || 0);
+      let planted = false;
+      if (fields && grain > 0) {
+        await page.locator("#plants").fill(fields.split(",")[0] + ":小麦");
+        planted = true;
+      } else if (fields && vegetable > 0) {
+        await page.locator("#plants").fill(fields.split(",")[0] + ":野菜");
+        planted = true;
+      }
+      if (planted && await submitOrCancel(page, "manual sow")) {
+        coverage.manualSow++;
+        return true;
+      }
+      note("sow:skip");
+      await cancelEditor(page);
+    }
+  }
+
+  if (once("manualAnimal")) {
+    const name = await chooseAction(page, ["羊", "猪", "牛"]);
+    if (!name) {
+      note("animal:unavailable");
+    } else {
+      const key = { "羊": "sheep_market", "猪": "pig_market", "牛": "cattle_market" }[name];
+      const accumulated = Number(
+        ((await page.locator("#detailHint").innerText().catch(() => ""))
+          .match(/市場の累積家畜: (\d+)頭/) || [])[1] || 0);
+      if (accumulated < 1) {
+        note("animal:empty " + key);
+        await cancelEditor(page);
+      } else {
+        await page.locator("#animalPastures").fill("0:1");
+        if (accumulated > 1) await page.locator("#discard").fill(String(accumulated - 1));
+        if (await playAndObserveResponse(page)) {
+          coverage.manualAnimal++;
+          return true;
+        }
+        note("animal:rejected " + await page.locator("#editorHint").innerText());
+        await cancelEditor(page);
+      }
+    }
+  }
+
+  if (once("manualImprovement") && await chooseAction(page, ["改善"])) {
+    await page.locator("#buyKind").selectOption("major");
+    await page.locator("#buy").selectOption("fireplace2");
+    if (await submitOrCancel(page, "manual improvement")) {
+      coverage.manualImprovement++;
+      return true;
+    }
+    await cancelEditor(page);
+  }
+
+  return false;
+}
+
 async function runGame(page, options) {
+  const players = options.players || 2;
+  const cards = options.cards || (players === 2 ? "verified" : "none");
   await page.goto(baseUrl);
-  await page.locator("#players").selectOption("2");
-  await page.locator("#cards").selectOption("verified");
+  await page.locator("#players").selectOption(String(players));
+  await page.locator("#cards").selectOption(cards);
   await page.locator("#ai").selectOption("eval");
   await page.locator("#seed").fill(String(options.seed));
   if (options.extra) await page.locator("#extra").check();
   else await page.locator("#extra").uncheck();
   await page.locator("#new").click();
-  await page.waitForFunction(extra => {
+  await page.waitForFunction(expected => {
     const summary = document.querySelector("#summary")?.textContent || "";
     const turn = document.querySelector("#turn")?.textContent || "";
-    return summary.includes("2人戦") && summary.includes("カードあり")
-      && summary.includes(extra ? "ON" : "OFF") && turn.includes("ラウンド 1/14");
-  }, options.extra);
-  assert.match(await page.locator("#hand").innerText(), /^手札: (?!なし)/);
+    return summary.includes(expected.players + "人戦")
+      && summary.includes(expected.cards === "verified" ? "カードあり" : "カードなし")
+      && summary.includes(expected.extra ? "ON" : "OFF") && turn.includes("ラウンド 1/14");
+  }, { players, cards, extra: options.extra });
+  assert.equal(await page.locator("#tabs button").count(), players);
+  if (cards === "verified") {
+    assert.match(await page.locator("#hand").innerText(), /^手札: (?!なし)/);
+  }
   await verifyPrivateHand(page);
+  // The turn bar must expose the active player's remaining workers and the
+  // number of reachable action spaces without opening a dialog.
+  assert.match(await page.locator("#turnWorkers").innerText(), /^残りワーカー \d+ \/ \d+（1P）$/);
+  assert.match(await page.locator("#turnActions").innerText(), /^使用可能アクション \d+件$/);
 
   const coverage = {
-    seed: options.seed, extra: options.extra, visitedRounds: [],
+    seed: options.seed, extra: options.extra, players, cards, visitedRounds: [],
     workerActions: 0, feeding: 0, breeding: 0,
     feedOrderChanged: false, freeAction: false, pageReloadResumed: false,
     dialogsObserved: [],
-    invalidInputRejected: false, manualPlow: false, cardPlayed: false
+    invalidInputRejected: false, manualPlow: false, cardPlayed: false,
+    manualFence: 0, manualRoom: 0, manualRenovation: 0, manualSow: 0,
+    manualAnimal: 0, manualImprovement: 0
   };
 
   await inspectAvailableEditors(page, coverage);
@@ -226,6 +413,13 @@ async function runGame(page, options) {
         "Every round was observed in the live browser");
       assert.match(await page.locator("#notice").innerText(), /最終順位/);
       await verifyPrivateHand(page);
+      if (players === 2 && cards === "verified") {
+        assert.equal(coverage.cardPlayed, true, "verified-card match must play an occupation");
+        for (const key of ["manualFence", "manualRoom", "manualRenovation",
+          "manualSow", "manualAnimal", "manualImprovement"]) {
+          assert.ok(coverage[key] >= 1, "manual UI operation was never executed: " + key);
+        }
+      }
       coverage.visitedRounds = [...visitedRounds].sort((a, b) => a - b);
       console.log("browser_full_game_coverage=" + JSON.stringify(coverage));
       return coverage;
@@ -256,6 +450,10 @@ async function runGame(page, options) {
       continue;
     }
     assert.match(turn, /^ラウンド \d+\/14・1Pの手番$/, "UI remains on human turn");
+    if (players === 2 && await attemptManualOperations(page, coverage)) {
+      coverage.workerActions++;
+      continue;
+    }
     const action = await chooseAction(page, [
       ...simpleActions,
       "スタート", "家族増員", "家族を増やす", "追加家族増員"
@@ -275,11 +473,19 @@ async function runGame(page, options) {
     + "Reached rounds: " + [...visitedRounds].join(","));
 }
 
-test("Issue #92: actual Chromium UI completes 14 rounds", async (t) => {
+test("Issue #92 / M9: actual Chromium UI completes 14 rounds", async (t) => {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   t.after(() => browser.close());
-  for (const options of [{ seed: 42, extra: false }, { seed: 43, extra: true }]) {
-    await t.test("2 players, verified cards, additional tile " + (options.extra ? "ON" : "OFF"), async () => {
+  const games = [
+    { seed: 42, extra: false, players: 2, cards: "verified" },
+    { seed: 43, extra: true, players: 2, cards: "verified" },
+    { seed: 44, extra: true, players: 4, cards: "none" }
+  ];
+  for (const options of games) {
+    const label = options.players + " players, "
+      + (options.cards === "verified" ? "verified cards" : "no cards")
+      + ", additional tile " + (options.extra ? "ON" : "OFF");
+    await t.test(label, async () => {
       const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: "ja-JP" });
       const browserErrors = [];
       page.on("pageerror", error => browserErrors.push(error.message));
