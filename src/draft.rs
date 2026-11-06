@@ -878,7 +878,8 @@ impl DraftState {
         let mut packet_ids = BTreeSet::new();
         let mut packet_owners = BTreeSet::new();
         for packet in &self.packets {
-            if packet.packet_id as usize >= expected_packets || !packet_ids.insert(packet.packet_id) {
+            if packet.packet_id as usize >= expected_packets || !packet_ids.insert(packet.packet_id)
+            {
                 return Err("draft packet IDs are missing, duplicated or out of range".into());
             }
             if packet.owner_seat >= self.player_count
@@ -907,7 +908,9 @@ impl DraftState {
             .chain(self.picked.iter().flatten())
             .chain(self.discarded.iter())
         {
-            let kind = self.card_kind(id).ok_or_else(|| format!("unknown draft card: {id}"))?;
+            let kind = self
+                .card_kind(id)
+                .ok_or_else(|| format!("unknown draft card: {id}"))?;
             if !seen.insert(id.clone()) {
                 return Err(format!("draft card appears twice: {id}"));
             }
