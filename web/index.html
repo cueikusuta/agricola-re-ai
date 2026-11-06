@@ -54,7 +54,7 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <label>職業の受渡方向 <select id="draftDirOcc"><option value="">選択してください</option><option value="left">左へ</option><option value="right">右へ</option></select></label>
 <label>小進歩の受渡方向 <select id="draftDirMinor"><option value="">選択してください</option><option value="left">左へ</option><option value="right">右へ</option></select></label>
 <label><input id="draftOccFirst" type="checkbox" checked>7-7は職業を先に選ぶ</label>
-<label>カードプール <select id="draftPool"><option value="test_fixture">テスト用フィクスチャ</option><option value="verified_basic">実装済み公式カードプール（2人・通常/7-7）</option></select></label>
+<label>カードプール <select id="draftPool"><option value="test_fixture">テスト用フィクスチャ</option><option value="verified_basic">実装済みカードプール（2人・通常/7-7、公式照合中）</option></select></label>
 <label>CPUのドラフトAI <select id="draftAi"><option value="random">ランダム</option><option value="card_value">カード価値</option><option value="synergy">シナジー</option></select></label>
 <button id="draftNew">ドラフト開始</button><button id="draftReset">ドラフト解除</button>
 </div>
@@ -328,7 +328,7 @@ if(d.complete)phase="完了";
 else if(d.phase==="choosing")phase="自分の10枚から7枚を選ぶ";
 else if(d.active_kind)phase=label[d.active_kind]+"を1枚選ぶ";
 else phase="職業と小進歩を同時に1枚ずつ選ぶ";
-const poolLabel=d.pool_kind==="verified_basic"?"実装済み公式カードプール":"テスト用フィクスチャ";
+const poolLabel=d.pool_kind==="verified_basic"?"実装済みカードプール（公式照合中）":"テスト用フィクスチャ";
 status.textContent="方式 "+d.mode+" / "+phase+" / 選んだ枚数 "+d.hand_counts.map((n,i)=>(i+1)+"P:"+n).join(" ")+" / 残り "+d.remaining_to_pick+"（"+poolLabel+"・CPU:"+d.ai+"）"+(d.game_started?" / ゲーム開始済み":"");
 offered.replaceChildren();
 if(d.complete){
