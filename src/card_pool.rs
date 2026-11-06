@@ -133,15 +133,19 @@ impl CardReview {
 /// decks, so it cannot silently drift from the options the engine can run.
 pub fn builtin_implemented_cards() -> Vec<CardDefinition> {
     let mut cards = Vec::new();
-    cards.extend(verified_scoring_cards(4));
-    cards.extend(verified_minor_worker_cards(4));
+    // Union over every supported player count so player-count-specific cards
+    // are included as well (for example a two-player-only occupation).
+    for players in 2..=4 {
+        cards.extend(verified_scoring_cards(players));
+        cards.extend(verified_minor_worker_cards(players));
+        cards.extend(verified_worker_bonus_cards(players));
+        cards.extend(verified_simple_occupations(players));
+        cards.extend(verified_multiplayer_passive_cards(players));
+    }
     cards.extend(verified_immediate_resource_cards());
-    cards.extend(verified_worker_bonus_cards(4));
     cards.extend(verified_round_and_harvest_cards());
     cards.extend(verified_passive_cards());
-    cards.extend(verified_simple_occupations(4));
     cards.extend(verified_extra_simple_cards());
-    cards.extend(verified_multiplayer_passive_cards(4));
     let mut seen = BTreeSet::new();
     cards.retain(|card| seen.insert(card.id.clone()));
     cards
@@ -214,7 +218,7 @@ pub struct PoolGateReport {
     pub g2_met: bool,
     pub registry_entries: usize,
     pub registry_verified: usize,
-    pub registry_unreviewed: usize,
+    pub registry_not_verified: usize,
 }
 
 /// Machine-readable G1/G2 summary for one player count.
@@ -233,7 +237,7 @@ pub fn pool_gate_report(set: &CardSet, registry: &[CardReview], players: usize) 
         g2_met: occupations >= G2_TARGET_PER_KIND && minors >= G2_TARGET_PER_KIND,
         registry_entries: registry.len(),
         registry_verified,
-        registry_unreviewed: registry.len() - registry_verified,
+        registry_not_verified: registry.len() - registry_verified,
     }
 }
 
