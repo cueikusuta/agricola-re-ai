@@ -136,6 +136,42 @@ impl Session {
         } else {
             Value::Object(serde_json::Map::new())
         };
+        let human_player = &self.game.public.players[0];
+        let free_action_hints = if human_turn {
+            serde_json::to_value(crate::hints::free_action_hints(human_player))
+                .unwrap_or(Value::Null)
+        } else {
+            Value::Null
+        };
+        let fence_hints = if human_turn {
+            serde_json::to_value(self.game.fence_hints()).unwrap_or(Value::Null)
+        } else {
+            Value::Null
+        };
+        let feeding_hints = match &self.pending {
+            Some(PendingHarvest::Feeding(action)) => self
+                .game
+                .preview_harvest(action, None)
+                .ok()
+                .map(|preview| {
+                    serde_json::to_value(crate::hints::feeding_hints(&preview.players[0]))
+                        .unwrap_or(Value::Null)
+                })
+                .unwrap_or(Value::Null),
+            _ => Value::Null,
+        };
+        let breeding_hints = match &self.pending {
+            Some(PendingHarvest::Breeding(action, feeding)) => self
+                .game
+                .preview_harvest(action, Some(feeding))
+                .ok()
+                .map(|preview| {
+                    serde_json::to_value(crate::hints::breeding_hints(&preview.players[0]))
+                        .unwrap_or(Value::Null)
+                })
+                .unwrap_or(Value::Null),
+            _ => Value::Null,
+        };
         json!({
             "harvest": harvest,
             "hand": &self.game.cards.hands[0],
@@ -145,6 +181,10 @@ impl Session {
             "legal": if human_turn { self.game.legal_spaces() } else { vec![] },
             "available": if human_turn { self.game.available_spaces() } else { vec![] },
             "detail_hints": detail_hints,
+            "free_action_hints": free_action_hints,
+            "fence_hints": fence_hints,
+            "feeding_hints": feeding_hints,
+            "breeding_hints": breeding_hints,
             "standings": standings_with_cards(&self.game.public.players, &self.game.card_set),
             "last_actions": self.game.log.events.iter().rev().take(5).map(|e| json!({
                 "player": e.player,

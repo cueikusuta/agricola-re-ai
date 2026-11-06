@@ -6,7 +6,7 @@ const { chromium } = require("playwright-core");
 
 const baseUrl = process.env.AGRICOLA_WEB_URL || "http://127.0.0.1:8787/";
 const simpleActions = new Set([
-  "森林", "粘土坑", "葦", "漁", "日雇い", "穀物", "野菜",
+  "森林", "粘土坑", "葦", "漁", "日雇い", "穀物", "野菜", "スタート",
   "採石場", "採石場2", "林", "林地", "粘土の採取", "旅芸人"
 ]);
 
@@ -97,5 +97,42 @@ test("ローカルWeb UIを実ブラウザで検証", async (t) => {
     await page.locator("#confirm").click();
     await page.locator("#editor").waitFor({ state: "hidden" });
     assert.match(await page.locator("#farm .cell").nth(2).innerText(), /畑/);
+  });
+
+  await scenario("human_detail_hints_are_exposed_and_reachable", async () => {
+    await page.locator("#players").selectOption("2");
+    await page.locator("#cards").selectOption("none");
+    await page.locator("#extra").uncheck();
+    await page.locator("#new").click();
+    await page.waitForFunction(() => document.querySelector("#summary")?.textContent.includes("カードなし"));
+    const exposed = await page.evaluate(() => ({ fence: state.fence_hints, free: state.free_action_hints }));
+    assert.ok(exposed.fence && Array.isArray(exposed.fence.proposals), "fence hints must be exposed");
+    assert.ok(exposed.free && Array.isArray(exposed.free.held_goods), "free-action hints must be exposed");
+    let sawHarvest = false;
+    for (let turn = 0; turn < 48 && !sawHarvest; turn += 1) {
+      const harvestButton = page.locator("#actions button", { hasText: "収穫の詳細を指定" });
+      if (await harvestButton.count()) {
+        await harvestButton.first().click();
+        await page.locator("#editor").waitFor({ state: "visible" });
+        assert.match(await page.locator("#fields").innerText(), /必要食料/, "feeding hints must show owed food");
+        sawHarvest = true;
+        break;
+      }
+      const actions = page.locator("#actions button");
+      let chosen = -1;
+      for (let i = 0; i < await actions.count(); i += 1) {
+        if (simpleActions.has((await actions.nth(i).innerText()).trim())) { chosen = i; break; }
+      }
+      if (chosen === -1) {
+        const next = page.locator("#actionNav button", { hasText: "次へ" });
+        if (await next.count()) { await next.first().click(); await page.waitForTimeout(200); continue; }
+        break;
+      }
+      await actions.nth(chosen).click();
+      await page.locator("#editor").waitFor({ state: "visible" });
+      await page.locator("#confirm").click();
+      await page.locator("#editor").waitFor({ state: "hidden" });
+    }
+    assert.ok(sawHarvest, "the human must reach a harvest with feeding hints");
   });
 });
