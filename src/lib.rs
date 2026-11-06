@@ -1,3 +1,4 @@
+pub mod api;
 pub mod benchmark;
 pub mod breeding;
 pub mod cards;
