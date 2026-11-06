@@ -16,12 +16,20 @@ fn free_port() -> u16 {
 }
 
 fn http_get(port: u16, path: &str) -> String {
+    http_get_with_headers(port, path, &format!("127.0.0.1:{port}"), None)
+}
+
+fn http_get_with_headers(port: u16, path: &str, host: &str, origin: Option<&str>) -> String {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect to local UI");
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
         .expect("read timeout");
-    let request =
-        format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n");
+    let origin_header = origin
+        .map(|value| format!("Origin: {value}\r\n"))
+        .unwrap_or_default();
+    let request = format!(
+        "GET {path} HTTP/1.1\r\nHost: {host}\r\n{origin_header}Connection: close\r\n\r\n"
+    );
     stream.write_all(request.as_bytes()).expect("write request");
     let mut response = String::new();
     stream.read_to_string(&mut response).expect("read response");
@@ -64,6 +72,19 @@ fn web_server_starts_serves_and_stops() {
         "state must expose public data"
     );
 
+    // A custom port accepts its own origin but refuses cross-site requests
+    // and an unrelated Host even if the TCP socket is on loopback.
+    let expected_host = format!("127.0.0.1:{port}");
+    let expected_origin = format!("http://127.0.0.1:{port}");
+    let same_origin =
+        http_get_with_headers(port, "/api/state", &expected_host, Some(&expected_origin));
+    assert!(same_origin.starts_with("HTTP/1.1 200 OK"));
+    let cross_origin =
+        http_get_with_headers(port, "/api/state", &expected_host, Some("https://evil.example"));
+    assert!(cross_origin.starts_with("HTTP/1.1 403 Forbidden"));
+    let wrong_host = http_get_with_headers(port, "/api/state", "evil.example:8787", None);
+    assert!(wrong_host.starts_with("HTTP/1.1 403 Forbidden"));
+
     child.kill().expect("stop local web server");
     let status = child.wait().expect("wait for local web server");
     assert!(!status.success(), "a killed server must not report success");
@@ -101,4 +122,21 @@ fn busy_port_reports_cause_and_remedy() {
         "the remedy must be printed: {stderr}"
     );
     drop(occupied);
+}
+
+#[test]
+fn windows_launcher_waits_for_http_before_opening_browser() {
+    // Static regression guard for the Windows-only launcher; the HTTP
+    // integration test above exercises the actual server on this platform.
+    let script = include_str!("../scripts/run-windows.ps1");
+    let server = script
+        .find("Start-Process -FilePath $binary")
+        .expect("launcher starts compiled server");
+    let ready = script
+        .find("Invoke-WebRequest -Uri $url")
+        .expect("launcher checks HTTP readiness");
+    let browser = script
+        .find("Start-Process $url")
+        .expect("launcher opens browser");
+    assert!(server < ready && ready < browser);
 }
