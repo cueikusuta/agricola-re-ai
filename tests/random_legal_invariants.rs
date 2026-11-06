@@ -20,9 +20,51 @@ use agricola_re_ai::policy::{
 use agricola_re_ai::{Config, Game};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
+use std::collections::BTreeSet;
 
 /// Same move limit the canonical `policy::play_to_end_observed` applies.
 const MOVE_LIMIT: usize = 320;
+
+/// Names for the `Detail` variants, used to report which detail paths random
+/// play actually exercised.
+fn detail_kind(detail: &Detail) -> &'static str {
+    match detail {
+        Detail::None => "None",
+        Detail::MarketChoice(_) => "MarketChoice",
+        Detail::PlayOccupation { .. } => "PlayOccupation",
+        Detail::PlayMinor { .. } => "PlayMinor",
+        Detail::GrowWithMinor { .. } => "GrowWithMinor",
+        Detail::Plow { .. } => "Plow",
+        Detail::Build { .. } => "Build",
+        Detail::Fence { .. } => "Fence",
+        Detail::FenceDetailed { .. } => "FenceDetailed",
+        Detail::Sow { .. } => "Sow",
+        Detail::SowDetailed { .. } => "SowDetailed",
+        Detail::Cultivate { .. } => "Cultivate",
+        Detail::Buy { .. } => "Buy",
+        Detail::BuyDetailed { .. } => "BuyDetailed",
+        Detail::BuyWithMode { .. } => "BuyWithMode",
+        Detail::Renovate { .. } => "Renovate",
+        Detail::RenovateDetailed { .. } => "RenovateDetailed",
+        Detail::Animals(_) => "Animals",
+    }
+}
+
+/// Which action spaces and detail paths a run actually reached. Coverage is
+/// asserted below so a future driver change cannot silently stop exercising a
+/// major action type while still passing the invariant checks.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Coverage {
+    spaces: BTreeSet<Space>,
+    details: BTreeSet<&'static str>,
+}
+
+impl Coverage {
+    fn merge(&mut self, other: &Coverage) {
+        self.spaces.extend(other.spaces.iter().copied());
+        self.details.extend(other.details.iter().copied());
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Mode {
@@ -76,7 +118,8 @@ fn seeds() -> Vec<u64> {
     vec![101, 4242, 999_983, 13, 271_828]
 }
 
-fn play_one(mode: Mode, seed: u64) -> Result<(), String> {
+fn play_one(mode: Mode, seed: u64) -> Result<Coverage, String> {
+    let mut coverage = Coverage::default();
     let config = Config {
         players: mode.players,
         seed,
@@ -112,6 +155,8 @@ fn play_one(mode: Mode, seed: u64) -> Result<(), String> {
             SimpleDetails.produce(&observation, space)
         }
         .ok_or_else(|| format!("detail policy declined {space:?} at step {step}"))?;
+        coverage.spaces.insert(space);
+        coverage.details.insert(detail_kind(&action.detail));
         let before = game.state_hash();
         game.apply(action)
             .map_err(|error| format!("apply failed at step {step}: {error}"))?;
@@ -147,7 +192,7 @@ fn play_one(mode: Mode, seed: u64) -> Result<(), String> {
     if restored.state_hash() != game.state_hash() {
         return Err("save/restore state hash mismatch".into());
     }
-    Ok(())
+    Ok(coverage)
 }
 
 #[test]
@@ -174,6 +219,68 @@ fn random_legal_play_is_deterministic_for_a_fixed_seed() {
         cards: false,
     };
     assert_eq!(play_one(mode, 777), play_one(mode, 777));
+}
+
+/// Coverage guard: a green invariant run is only meaningful if it actually
+/// reaches the major action types. These spaces and detail paths are all
+/// reachable inside the fixed seed set (verified when the test was added); a
+/// failure here means the driver or seed set stopped covering them, not that
+/// the rule engine broke.
+#[test]
+fn random_legal_play_covers_major_action_types() {
+    let mut total = Coverage::default();
+    for mode in modes() {
+        for seed in seeds() {
+            total.merge(&play_one(mode, seed).expect("random legal play"));
+        }
+    }
+    eprintln!("covered spaces: {:?}", total.spaces);
+    eprintln!("covered details: {:?}", total.details);
+
+    for space in [
+        Space::Forest,
+        Space::ClayPit,
+        Space::ReedBank,
+        Space::Fishing,
+        Space::DayLaborer,
+        Space::GrainSeeds,
+        Space::Farmland,
+        Space::FarmExpansion,
+        Space::MeetingPlace,
+        Space::MajorImprovement,
+        Space::Fencing,
+        Space::GrainUtilization,
+        Space::SheepMarket,
+        Space::FamilyGrowthWithRoom,
+        Space::VegetableSeeds,
+        Space::PigMarket,
+        Space::CattleMarket,
+        Space::Cultivation,
+    ] {
+        assert!(
+            total.spaces.contains(&space),
+            "random play never reached {space:?}; covered={:?}",
+            total.spaces
+        );
+    }
+    for detail in [
+        "None",
+        "MarketChoice",
+        "PlayOccupation",
+        "Plow",
+        "Build",
+        "Fence",
+        "SowDetailed",
+        "Cultivate",
+        "Buy",
+        "Renovate",
+        "Animals",
+    ] {
+        assert!(
+            total.details.contains(detail),
+            "random play never reached Detail::{detail}"
+        );
+    }
 }
 
 /// Assert the shared validator and the apply path both reject an illegal
