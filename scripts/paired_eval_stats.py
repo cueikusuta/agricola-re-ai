@@ -63,7 +63,8 @@ def validate_and_report(
             raise ValueError(f"duplicate record: {key}")
         block, arm, seat = key
         if (
-            row.get("schema_version") != 1
+            type(row.get("schema_version")) is not int
+            or row["schema_version"] != 1
             or row.get("seed") != seed_start + block
             or row.get("players") != players
             or row.get("cards") != "none"
@@ -88,6 +89,7 @@ def validate_and_report(
             or len(ranks) != players
             or not all(type(x) is int for x in scores + ranks)
             or any(not 1 <= rank <= players for rank in ranks)
+            or any(not -(2**31) <= score < 2**31 for score in scores)
         ):
             raise ValueError(f"invalid standings: {key}")
         # Scores must outrank lower scores; equal scores may use the
@@ -113,7 +115,10 @@ def validate_and_report(
         score_margin = row.get("score_margin")
         if not finite_number(score_margin) or abs(score_margin - (scores[seat] - mean_other)) > 1e-8:
             raise ValueError(f"margin mismatch: {key}")
-        if row.get("expected_rank_observation") != ranks[seat]:
+        if (
+            type(row.get("expected_rank_observation")) is not int
+            or row["expected_rank_observation"] != ranks[seat]
+        ):
             raise ValueError(f"rank mismatch: {key}")
         for numeric in ("total_wall_ms", "max_policy_select_ms"):
             value = row.get(numeric)
