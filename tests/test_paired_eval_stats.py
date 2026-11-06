@@ -40,7 +40,7 @@ def fixture(blocks=3, players=4):
                     "max_policy_select_ms": 1.0,
                     "policy_select_only": True,
                     "total_wall_ms": 50.0,
-                    "replay_hash": "abcdef0123456789abcdef",
+                    "replay_hash": "a" * 64,
                     "replay_verified": True,
                 })
     return records
@@ -89,6 +89,93 @@ class PairedStatsTests(unittest.TestCase):
         rows[0]["score_margin"] += 1
         with self.assertRaisesRegex(ValueError, "margin"):
             run(rows)
+
+    def test_nonfinite_and_nonnumeric_effect_sizes_are_rejected(self):
+        for key, error in (("first_place_credit", "credit"), ("score_margin", "margin")):
+            for bad in (float("nan"), float("inf"), -float("inf"), "0", True, None):
+                with self.subTest(key=key, bad=repr(bad)):
+                    rows = fixture()
+                    rows[0][key] = bad
+                    with self.assertRaisesRegex(ValueError, error):
+                        run(rows)
+
+    def test_non_sha256_hash_and_untrusted_policy_timing_are_rejected(self):
+        for bad_hash in ("abc", "g" * 64, "A" * 64, ""):
+            with self.subTest(hash=bad_hash):
+                rows = fixture()
+                rows[0]["replay_hash"] = bad_hash
+                with self.assertRaisesRegex(ValueError, "metadata"):
+                    run(rows)
+        rows = fixture()
+        rows[0]["policy_select_only"] = False
+        with self.assertRaisesRegex(ValueError, "metadata"):
+            run(rows)
+        rows = fixture()
+        rows[0]["max_policy_select_ms"] = 100.0
+        with self.assertRaisesRegex(ValueError, "selection time"):
+            run(rows)
+
+    def test_score_order_must_be_consistent_with_rank(self):
+        rows = fixture()
+        rows[0]["ranks_by_seat"][0] = 2
+        rows[0]["ranks_by_seat"][1] = 1
+        with self.assertRaisesRegex(ValueError, "score/rank ordering"):
+            run(rows)
+
+    def test_boolean_or_nonnumeric_identifiers_are_not_valid(self):
+        for key, value in (("block_index", True), ("candidate_seat", False), ("seed", "1000")):
+            with self.subTest(key=key):
+                rows = fixture()
+                rows[0][key] = value
+                with self.assertRaisesRegex(ValueError, "integers"):
+                    run(rows)
+
+    def test_nonnumeric_or_nonfinite_timing_is_rejected(self):
+        for value in (float("nan"), float("inf"), "5.0", None, False):
+            with self.subTest(value=repr(value)):
+                rows = fixture()
+                rows[0]["max_policy_select_ms"] = value
+                with self.assertRaisesRegex(ValueError, "timing"):
+                    run(rows)
+
+
+    def test_oversized_integer_metrics_are_rejected_without_overflow(self):
+        for field, error in (("first_place_credit", "credit"), ("score_margin", "margin"),
+                             ("total_wall_ms", "timing")):
+            with self.subTest(field=field):
+                rows = fixture()
+                rows[0][field] = 10**1000
+                with self.assertRaisesRegex(ValueError, error):
+                    run(rows)
+
+    def test_strict_integer_rank_schema_and_score_range(self):
+        cases = (
+            ("expected_rank_observation", True, "rank"),
+            ("schema_version", True, "metadata"),
+        )
+        for field, value, expected_error in cases:
+            with self.subTest(field=field):
+                rows = fixture()
+                rows[0][field] = value
+                with self.assertRaisesRegex(ValueError, expected_error):
+                    run(rows)
+        rows = fixture()
+        rows[0]["scores_by_seat"][0] = 10**1000
+        with self.assertRaisesRegex(ValueError, "standings"):
+            run(rows)
+
+    def test_equal_score_tiebreak_ranks_are_allowed(self):
+        rows = fixture()
+        # Two equal scores may have different ranks due to the resource
+        # tiebreaker, which is intentionally not exposed in this JSONL.
+        rows[0]["scores_by_seat"][1] = rows[0]["scores_by_seat"][0]
+        rows[0]["ranks_by_seat"][2:] = [3, 3]
+        rows[0]["score_margin"] = rows[0]["scores_by_seat"][0] - (
+            sum(rows[0]["scores_by_seat"]) - rows[0]["scores_by_seat"][0]
+        ) / 3
+        report = run(rows)
+        self.assertEqual(report["total_games"], 24)
+
 
 
 if __name__ == "__main__":
