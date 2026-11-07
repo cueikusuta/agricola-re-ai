@@ -19,7 +19,7 @@
 //! simulation samples hidden information from [`Observation`] only, through the
 //! same `sample_game` helper the baseline uses.
 use crate::evaluation::{action_value_with_details, evaluate_player, WeightedEvaluationPolicy};
-use crate::mcts::{rollout, sample_game, MctsOutcome};
+use crate::mcts::{rollout, sample_game, MctsOutcome, SearchLimit, SearchMode};
 use crate::model::{Game, Observation, Space};
 use crate::policy::{weight, DetailPolicy, SimpleDetails, SpacePolicy};
 use crate::score::standings_with_cards;
@@ -251,17 +251,78 @@ impl PuctPolicy {
         rng: &mut ChaCha8Rng,
         deadline: Option<Instant>,
     ) -> Option<(Space, MctsOutcome)> {
-        let immediate = MctsOutcome {
-            simulations_completed: 0,
-            used_fallback: false,
-            timed_out: false,
+        let limit = match deadline {
+            None => SearchLimit::Simulations(self.config.simulations),
+            Some(deadline) => SearchLimit::TimeBudget {
+                deadline,
+                max_simulations: self.config.simulations,
+            },
         };
+        self.select_with_limit(obs, legal, rng, limit)
+    }
+
+    /// PUCT selection under an explicit stopping rule (#164), matching
+    /// [`crate::mcts::MctsPolicy::select_with_limit`].
+    ///
+    /// In `TimeBudgeted` mode the loop keeps going after every completed
+    /// simulation while wall-clock time remains, so the budget is actually
+    /// consumed. An interrupted simulation is discarded and never applied to
+    /// the tree. The returned `Space` is always a member of `legal`.
+    pub fn select_with_limit(
+        &self,
+        obs: &Observation,
+        legal: &[Space],
+        rng: &mut ChaCha8Rng,
+        limit: SearchLimit,
+    ) -> Option<(Space, MctsOutcome)> {
+        let mode = limit.mode();
+        let started = Instant::now();
+        let (budget, deadline, max_simulations) = match limit {
+            SearchLimit::Simulations(n) => (None, None, n),
+            SearchLimit::TimeBudget {
+                deadline,
+                max_simulations,
+            } => (
+                Some(deadline.saturating_duration_since(started)),
+                Some(deadline),
+                max_simulations,
+            ),
+        };
+        let outcome = |simulations_completed: usize,
+                       used_fallback: bool,
+                       timed_out: bool,
+                       elapsed: std::time::Duration| MctsOutcome {
+            simulations_completed,
+            used_fallback,
+            timed_out,
+            elapsed_ms: elapsed.as_millis().min(u128::from(u64::MAX)) as u64,
+            overshoot_ms: budget
+                .map(|budget| elapsed.saturating_sub(budget).as_millis() as u64)
+                .unwrap_or(0),
+            mode,
+        };
+        let immediate = outcome(0, false, false, started.elapsed());
         if legal.is_empty() {
             return None;
         }
-        if legal.len() == 1 || self.config.simulations == 0 {
+        if legal.len() == 1 || max_simulations == 0 {
             return Some((legal[0], immediate));
         }
+        // A budget that is already spent must not pay for root priors or a
+        // single expansion: return the guaranteed legal fallback immediately,
+        // exactly as `MctsPolicy::select_with_limit` does.
+        if let Some(deadline) = deadline {
+            if Instant::now() >= deadline {
+                let space = fallback(obs, legal, rng)
+                    .filter(|space| legal.contains(space))
+                    .or_else(|| legal.first().copied())?;
+                return Some((space, outcome(0, true, true, started.elapsed())));
+            }
+        }
+        debug_assert!(matches!(
+            mode,
+            SearchMode::SimulationCapped | SearchMode::TimeBudgeted
+        ));
         let players = obs.public.players.len();
         let details = SimpleDetails;
 
@@ -288,7 +349,7 @@ impl PuctPolicy {
         let mut nodes = vec![Node::new(players, 1.0)];
         let mut simulations_completed = 0usize;
         let mut timed_out = false;
-        for _ in 0..self.config.simulations {
+        for _ in 0..max_simulations {
             if let Some(limit) = deadline {
                 if Instant::now() >= limit {
                     timed_out = true;
@@ -418,11 +479,12 @@ impl PuctPolicy {
         let space = chosen.or_else(|| fallback(obs, legal, rng))?;
         Some((
             space,
-            MctsOutcome {
+            outcome(
                 simulations_completed,
                 used_fallback,
                 timed_out,
-            },
+                started.elapsed(),
+            ),
         ))
     }
 }
@@ -555,5 +617,74 @@ mod tests {
         assert!(outcome.timed_out);
         assert_eq!(outcome.simulations_completed, 0);
         assert!(outcome.used_fallback);
+    }
+
+    /// Regression for the review finding on PR #166: an expired budget must be
+    /// detected *before* root priors and expansions, so the decision reports a
+    /// measured elapsed time near zero instead of paying for a full prior pass.
+    #[test]
+    fn an_already_spent_budget_returns_before_any_prior_work() {
+        let game = four_player_game();
+        let obs = game.observation(game.public.active_player).unwrap();
+        let legal = game.legal_spaces();
+        assert!(legal.len() > 1);
+        let policy = PuctPolicy {
+            config: PuctConfig {
+                simulations: 100_000,
+                ..PuctConfig::default()
+            },
+        };
+        let mut rng = ChaCha8Rng::seed_from_u64(4);
+        let (space, outcome) = policy
+            .select_with_limit(
+                &obs,
+                &legal,
+                &mut rng,
+                SearchLimit::TimeBudget {
+                    deadline: Instant::now(),
+                    max_simulations: 100_000,
+                },
+            )
+            .unwrap();
+        assert!(legal.contains(&space), "fallback must stay legal");
+        assert_eq!(outcome.mode, SearchMode::TimeBudgeted);
+        assert!(outcome.timed_out);
+        assert!(outcome.used_fallback);
+        assert_eq!(outcome.simulations_completed, 0);
+        assert!(
+            outcome.elapsed_ms < 100,
+            "an expired budget must not pay for root priors, took {}ms",
+            outcome.elapsed_ms
+        );
+        assert_eq!(outcome.overshoot_ms, 0);
+    }
+
+    /// Fixed-seed reproducibility of the capped mode must stay intact after the
+    /// search-limit refactor.
+    #[test]
+    fn simulation_capped_puct_is_seed_reproducible() {
+        let game = four_player_game();
+        let obs = game.observation(game.public.active_player).unwrap();
+        let legal = game.legal_spaces();
+        let policy = PuctPolicy {
+            config: PuctConfig {
+                simulations: 4,
+                ..PuctConfig::default()
+            },
+        };
+        let run = || {
+            let mut rng = ChaCha8Rng::seed_from_u64(17);
+            policy
+                .select_with_limit(&obs, &legal, &mut rng, SearchLimit::Simulations(4))
+                .unwrap()
+        };
+        let (first_space, first) = run();
+        let (second_space, second) = run();
+        assert_eq!(first_space, second_space, "fixed seed must be reproducible");
+        assert_eq!(first.simulations_completed, second.simulations_completed);
+        assert!(first.simulations_completed <= 4);
+        assert_eq!(first.mode, SearchMode::SimulationCapped);
+        assert!(!first.timed_out);
+        assert_eq!(first.overshoot_ms, 0);
     }
 }

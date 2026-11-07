@@ -161,6 +161,22 @@ pub(crate) fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Gam
     Some(game)
 }
 
+/// The guaranteed-legal action used when the search produced nothing usable.
+/// It never reads hidden state: only the observation and the legal list.
+fn fallback_space(obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
+    let details = CardChoiceDetails;
+    DetailAwareEvaluationPolicy {
+        weights: WeightedEvaluationPolicy {
+            prior_weight: 0.5,
+            state_weight: 2.0,
+        },
+        details: &details,
+    }
+    .select(obs, legal, rng)
+    .filter(|space| legal.contains(space))
+    .or_else(|| legal.first().copied())
+}
+
 /// Compare every root action to the same best observed win rate.
 /// A pairwise tolerance comparator is non-transitive and makes the result
 /// dependent on the order of legal actions.
@@ -228,11 +244,77 @@ pub(crate) fn rollout(
     Err("rollout move limit reached".into())
 }
 
+/// How a search is allowed to stop (#164).
+///
+/// These two modes answer different questions and their results must never be
+/// pooled: `SimulationCapped` caps the number of simulation attempts
+/// (reproducible), while `TimeBudgeted` fixes the wall-clock cost (not
+/// reproducible).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SearchMode {
+    /// Cap the search at N simulation *attempts*. No wall-clock limit is
+    /// applied, so a fixed RNG seed reproduces the same choice. The number of
+    /// **completed** simulations can be lower than N: a sampled simulation that
+    /// turns out invalid is discarded and does not update the tree.
+    #[default]
+    SimulationCapped,
+    /// Keep searching while the wall-clock deadline has not passed, up to a
+    /// safety cap. The simulation count therefore depends on the machine.
+    TimeBudgeted,
+}
+
+impl SearchMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SearchMode::SimulationCapped => "simulation-capped",
+            SearchMode::TimeBudgeted => "time-budgeted",
+        }
+    }
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "simulation-capped" | "simulations" => Some(SearchMode::SimulationCapped),
+            "time-budgeted" | "time" => Some(SearchMode::TimeBudgeted),
+            _ => None,
+        }
+    }
+}
+
+/// The stopping rule handed to [`MctsPolicy::select_with_limit`].
+#[derive(Clone, Copy, Debug)]
+pub enum SearchLimit {
+    /// Stop after at most this many simulation attempts (`max_simulations`).
+    /// Completed simulations can be fewer; see [`SearchMode::SimulationCapped`].
+    Simulations(usize),
+    /// Stop at `deadline`, and never run more than `max_simulations`.
+    TimeBudget {
+        deadline: Instant,
+        max_simulations: usize,
+    },
+}
+
+impl SearchLimit {
+    pub fn mode(&self) -> SearchMode {
+        match self {
+            SearchLimit::Simulations(_) => SearchMode::SimulationCapped,
+            SearchLimit::TimeBudget { .. } => SearchMode::TimeBudgeted,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MctsOutcome {
     pub simulations_completed: usize,
     pub used_fallback: bool,
     pub timed_out: bool,
+    /// Wall-clock time this decision consumed inside the search.
+    pub elapsed_ms: u64,
+    /// How far past its deadline the decision ran. Always `0` when no deadline
+    /// was in force. A non-zero value is a measurement, not a failure: the
+    /// deadline can only be observed between simulations, so one simulation of
+    /// overshoot is possible.
+    pub overshoot_ms: u64,
+    pub mode: SearchMode,
 }
 
 impl MctsPolicy {
@@ -240,6 +322,10 @@ impl MctsPolicy {
     /// returns the best completed candidate, or a guaranteed legal fallback
     /// from the evaluation policy, never an illegal or panicking move. With
     /// `deadline = None` the result is deterministic for a fixed RNG seed.
+    ///
+    /// `Some(deadline)` keeps the historical meaning: the simulation count in
+    /// `self.simulations` is a cap and the deadline may cut the search short.
+    /// Prefer [`Self::select_with_limit`] when the mode must be explicit.
     pub fn select_with_budget(
         &self,
         obs: &Observation,
@@ -247,23 +333,77 @@ impl MctsPolicy {
         rng: &mut ChaCha8Rng,
         deadline: Option<Instant>,
     ) -> Option<(Space, MctsOutcome)> {
-        let immediate = MctsOutcome {
-            simulations_completed: 0,
-            used_fallback: false,
-            timed_out: false,
+        let limit = match deadline {
+            None => SearchLimit::Simulations(self.simulations),
+            Some(deadline) => SearchLimit::TimeBudget {
+                deadline,
+                max_simulations: self.simulations,
+            },
         };
+        self.select_with_limit(obs, legal, rng, limit)
+    }
+
+    /// Search under an explicit stopping rule (#164).
+    ///
+    /// In `TimeBudgeted` mode the loop keeps going after every completed
+    /// simulation while time remains, so the budget is actually consumed. A
+    /// simulation that is interrupted by the deadline is discarded: it is never
+    /// counted and never updates the tree. The returned `Space` is always a
+    /// member of `legal`.
+    pub fn select_with_limit(
+        &self,
+        obs: &Observation,
+        legal: &[Space],
+        rng: &mut ChaCha8Rng,
+        limit: SearchLimit,
+    ) -> Option<(Space, MctsOutcome)> {
+        let mode = limit.mode();
+        let started = Instant::now();
+        let (budget, deadline, max_simulations) = match limit {
+            SearchLimit::Simulations(n) => (None, None, n),
+            SearchLimit::TimeBudget {
+                deadline,
+                max_simulations,
+            } => (
+                Some(deadline.saturating_duration_since(started)),
+                Some(deadline),
+                max_simulations,
+            ),
+        };
+        let outcome = |simulations_completed: usize,
+                       used_fallback: bool,
+                       timed_out: bool,
+                       elapsed: std::time::Duration| MctsOutcome {
+            simulations_completed,
+            used_fallback,
+            timed_out,
+            elapsed_ms: elapsed.as_millis().min(u128::from(u64::MAX)) as u64,
+            overshoot_ms: budget
+                .map(|budget| elapsed.saturating_sub(budget).as_millis() as u64)
+                .unwrap_or(0),
+            mode,
+        };
+        let immediate = outcome(0, false, false, started.elapsed());
         if legal.is_empty() {
             return None;
         }
-        if legal.len() == 1 || self.simulations == 0 {
+        if legal.len() == 1 || max_simulations == 0 {
             return Some((legal[0], immediate));
+        }
+        // A time budget that is already spent returns a legal fallback without
+        // touching the tree.
+        if let Some(deadline) = deadline {
+            if Instant::now() >= deadline {
+                let fallback = fallback_space(obs, legal, rng)?;
+                return Some((fallback, outcome(0, true, true, started.elapsed())));
+            }
         }
         let player_count = obs.public.players.len();
         let mut nodes = vec![Node::new(player_count)];
         let detail_policy = CardChoiceDetails;
         let mut simulations_completed = 0usize;
         let mut timed_out = false;
-        for _ in 0..self.simulations {
+        for _ in 0..max_simulations {
             if let Some(limit) = deadline {
                 if Instant::now() >= limit {
                     timed_out = true;
@@ -397,24 +537,15 @@ impl MctsPolicy {
         }
         let chosen = best_root_action(&candidates);
         let used_fallback = chosen.is_none();
-        let space = chosen.or_else(|| {
-            let details = CardChoiceDetails;
-            DetailAwareEvaluationPolicy {
-                weights: WeightedEvaluationPolicy {
-                    prior_weight: 0.5,
-                    state_weight: 2.0,
-                },
-                details: &details,
-            }
-            .select(obs, legal, rng)
-        })?;
+        let space = chosen.or_else(|| fallback_space(obs, legal, rng))?;
         Some((
             space,
-            MctsOutcome {
+            outcome(
                 simulations_completed,
                 used_fallback,
                 timed_out,
-            },
+                started.elapsed(),
+            ),
         ))
     }
 }
@@ -430,6 +561,172 @@ impl SpacePolicy for MctsPolicy {
 mod tests {
     use super::*;
     use rand::SeedableRng;
+
+    #[test]
+    fn search_mode_round_trips_and_rejects_unknown_names() {
+        for mode in [SearchMode::SimulationCapped, SearchMode::TimeBudgeted] {
+            assert_eq!(SearchMode::parse(mode.as_str()), Some(mode));
+        }
+        assert_eq!(
+            SearchMode::parse("simulations"),
+            Some(SearchMode::SimulationCapped)
+        );
+        assert_eq!(SearchMode::parse("time"), Some(SearchMode::TimeBudgeted));
+        assert_eq!(SearchMode::parse("adaptive"), None);
+        assert_eq!(SearchMode::default(), SearchMode::SimulationCapped);
+    }
+
+    #[test]
+    fn simulation_capped_searches_a_fixed_amount_and_is_reproducible() {
+        let policy = MctsPolicy {
+            simulations: 6,
+            tree_depth: 2,
+        };
+        let run = |rng_seed: u64| {
+            let game = Game::new(Config {
+                players: 2,
+                seed: 5,
+                additional_action_space_enabled: false,
+            });
+            let obs = game.observation(game.public.active_player).unwrap();
+            let legal = game.legal_spaces();
+            let mut rng = ChaCha8Rng::seed_from_u64(rng_seed);
+            let (space, outcome) = policy
+                .select_with_limit(&obs, &legal, &mut rng, SearchLimit::Simulations(6))
+                .unwrap();
+            assert!(legal.contains(&space), "the choice must stay legal");
+            (space, outcome)
+        };
+        let (first_space, first) = run(9);
+        let (second_space, second) = run(9);
+        assert_eq!(first_space, second_space, "fixed seed must be reproducible");
+        assert_eq!(first.simulations_completed, second.simulations_completed);
+        assert!(first.simulations_completed <= 6);
+        assert_eq!(first.mode, SearchMode::SimulationCapped);
+        assert!(!first.timed_out);
+        assert_eq!(first.overshoot_ms, 0, "no deadline is applied in this mode");
+    }
+
+    #[test]
+    fn time_budgeted_search_consumes_the_budget_instead_of_stopping_at_the_cap() {
+        let game = Game::new(Config {
+            players: 4,
+            seed: 21,
+            additional_action_space_enabled: false,
+        });
+        let obs = game.observation(game.public.active_player).unwrap();
+        let legal = game.legal_spaces();
+        assert!(legal.len() > 1);
+        // `simulations` is only a safety cap in time-budgeted mode. Setting it
+        // to 1 proves the budget, not the cap, decides when to stop.
+        let policy = MctsPolicy {
+            simulations: 1,
+            tree_depth: 2,
+        };
+        let budget = std::time::Duration::from_millis(250);
+        let mut rng = ChaCha8Rng::seed_from_u64(7);
+        let (space, outcome) = policy
+            .select_with_limit(
+                &obs,
+                &legal,
+                &mut rng,
+                SearchLimit::TimeBudget {
+                    deadline: Instant::now() + budget,
+                    max_simulations: 100_000,
+                },
+            )
+            .unwrap();
+        assert!(legal.contains(&space), "the choice must stay legal");
+        assert_eq!(outcome.mode, SearchMode::TimeBudgeted);
+        assert!(
+            outcome.simulations_completed > 0,
+            "the budget was not used for any simulation"
+        );
+        assert!(
+            outcome.timed_out,
+            "a budgeted search must report that the deadline ended it"
+        );
+        assert!(
+            outcome.elapsed_ms >= 200,
+            "the deadline should end the search near the budget, got {}ms",
+            outcome.elapsed_ms
+        );
+        assert!(
+            outcome.overshoot_ms <= 1_000,
+            "overshoot must stay within roughly one simulation, got {}ms",
+            outcome.overshoot_ms
+        );
+    }
+
+    #[test]
+    fn a_longer_budget_completes_at_least_as_many_simulations() {
+        let game = Game::new(Config {
+            players: 2,
+            seed: 33,
+            additional_action_space_enabled: false,
+        });
+        let obs = game.observation(game.public.active_player).unwrap();
+        let legal = game.legal_spaces();
+        let policy = MctsPolicy {
+            simulations: 1,
+            tree_depth: 2,
+        };
+        let measure = |millis: u64| {
+            let mut rng = ChaCha8Rng::seed_from_u64(11);
+            policy
+                .select_with_limit(
+                    &obs,
+                    &legal,
+                    &mut rng,
+                    SearchLimit::TimeBudget {
+                        deadline: Instant::now() + std::time::Duration::from_millis(millis),
+                        max_simulations: 100_000,
+                    },
+                )
+                .unwrap()
+                .1
+                .simulations_completed
+        };
+        let short = measure(120);
+        let long = measure(600);
+        assert!(short > 0 && long > 0);
+        assert!(
+            long >= short,
+            "a longer budget must not complete fewer simulations ({short} then {long})"
+        );
+    }
+
+    #[test]
+    fn an_already_spent_budget_returns_a_legal_fallback() {
+        let game = Game::new(Config {
+            players: 2,
+            seed: 5,
+            additional_action_space_enabled: false,
+        });
+        let obs = game.observation(game.public.active_player).unwrap();
+        let legal = game.legal_spaces();
+        let policy = MctsPolicy {
+            simulations: 50,
+            tree_depth: 2,
+        };
+        let mut rng = ChaCha8Rng::seed_from_u64(3);
+        let (space, outcome) = policy
+            .select_with_limit(
+                &obs,
+                &legal,
+                &mut rng,
+                SearchLimit::TimeBudget {
+                    deadline: Instant::now(),
+                    max_simulations: 100_000,
+                },
+            )
+            .unwrap();
+        assert!(legal.contains(&space), "fallback must stay legal");
+        assert!(outcome.timed_out);
+        assert!(outcome.used_fallback);
+        assert_eq!(outcome.simulations_completed, 0);
+        assert_eq!(outcome.mode, SearchMode::TimeBudgeted);
+    }
 
     #[test]
     fn sampler_obeys_public_state_and_stage_boundaries() {

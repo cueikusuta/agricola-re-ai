@@ -52,9 +52,20 @@ on:
         default: 'none'
         required: true
       decision_budget_ms:
-        description: 'Per-decision MCTS budget in ms; 0 = no deadline (deterministic by simulation count)'
+        description: 'Per-decision search budget in ms; required by time-budgeted, unused by simulation-capped'
         type: number
         default: 10000
+        required: true
+      search_mode:
+        description: 'simulation-capped (fixed count, reproducible) or time-budgeted (fixed wall clock, not reproducible)'
+        type: choice
+        options: ['simulation-capped', 'time-budgeted']
+        default: 'simulation-capped'
+        required: true
+      time_budget_max_simulations:
+        description: 'Safety cap on simulations inside one time-budgeted decision'
+        type: number
+        default: 100000
         required: true
       mcts_simulations:
         description: 'MCTS simulations per decision (used for mcts arms)'
@@ -167,6 +178,23 @@ jobs:
             --root demo-puct-cards --players 2 --seed-start 62000 --blocks 1 \
             --candidate puct --baseline eval --opponent greedy \
             --cards verified_basic_2p --output demo-puct-cards/report.json
+      - name: Real smoke in the time-budgeted search mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p demo-time/shard-0
+          ./target/release/paired_eval \
+            --players 2 --seed-start 63000 --block-start 0 --blocks 1 \
+            --candidate mcts --baseline eval --opponent greedy \
+            --additional-action-space false \
+            --search-mode time-budgeted --decision-budget-ms 60 \
+            --mcts-tree-depth 2 \
+            --output demo-time/shard-0/matches.jsonl
+          python3 scripts/paired_eval_stats.py \
+            --root demo-time --players 2 --seed-start 63000 --blocks 1 \
+            --candidate mcts --baseline eval --opponent greedy \
+            --search-mode time-budgeted \
+            --output demo-time/report.json
       - name: Save smoke output
         if: always()
         uses: actions/upload-artifact@v4
@@ -176,6 +204,7 @@ jobs:
             demo/
             demo-cards/
             demo-puct-cards/
+            demo-time/
           if-no-files-found: warn
           retention-days: 7
 
@@ -197,6 +226,8 @@ jobs:
       OPPONENT: ${{ inputs.opponent }}
       EXTRA: ${{ inputs.extra }}
       CARDS: ${{ inputs.cards }}
+      SEARCH_MODE: ${{ inputs.search_mode }}
+      TIME_BUDGET_MAX_SIMULATIONS: ${{ inputs.time_budget_max_simulations }}
       DECISION_BUDGET_MS: ${{ inputs.decision_budget_ms }}
       MCTS_SIMULATIONS: ${{ inputs.mcts_simulations }}
       MCTS_TREE_DEPTH: ${{ inputs.mcts_tree_depth }}
@@ -222,6 +253,7 @@ jobs:
           test "$SEED_START" -ge 0
           test "$CANDIDATE" != "$BASELINE"
           if [[ "$CARDS" != "none" ]]; then test "$PLAYERS" -eq 2; fi
+          if [[ "$SEARCH_MODE" == "time-budgeted" ]]; then test "$DECISION_BUDGET_MS" -gt 0; fi
           BLOCK_START=$(( BLOCKS * INDEX / 4 ))
           BLOCK_END=$(( BLOCKS * (INDEX + 1) / 4 ))
           COUNT=$(( BLOCK_END - BLOCK_START ))
@@ -232,6 +264,8 @@ jobs:
             --candidate "$CANDIDATE" --baseline "$BASELINE" \
             --opponent "$OPPONENT" --additional-action-space "$EXTRA" \
             --cards "$CARDS" \
+            --search-mode "$SEARCH_MODE" \
+            --time-budget-max-simulations "$TIME_BUDGET_MAX_SIMULATIONS" \
             --decision-budget-ms "$DECISION_BUDGET_MS" \
             --mcts-simulations "$MCTS_SIMULATIONS" \
             --mcts-tree-depth "$MCTS_TREE_DEPTH" \
@@ -267,6 +301,8 @@ jobs:
       OPPONENT: ${{ inputs.opponent }}
       EXTRA: ${{ inputs.extra }}
       CARDS: ${{ inputs.cards }}
+      SEARCH_MODE: ${{ inputs.search_mode }}
+      DECISION_BUDGET_MS: ${{ inputs.decision_budget_ms }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4
@@ -284,8 +320,10 @@ jobs:
             --blocks "$BLOCKS" --candidate "$CANDIDATE" \
             --baseline "$BASELINE" --opponent "$OPPONENT" \
             --cards "$CARDS" \
+            --search-mode "$SEARCH_MODE" \
             --output results/report.json "${FLAGS[@]}"
-          echo 'Paired seeded seat-block comparison; MCTS arms use a per-decision search budget. NOT full-decision 10s enforcement or official-rule proof.' >> "$GITHUB_STEP_SUMMARY"
+          echo "Search mode: $SEARCH_MODE (decision budget ${DECISION_BUDGET_MS} ms). Fixed simulation counts and fixed wall-clock budgets are different experiments and are never pooled." >> "$GITHUB_STEP_SUMMARY"
+          echo 'Paired seeded seat-block comparison; search arms use a per-decision search budget. NOT full-decision 10s enforcement or official-rule proof.' >> "$GITHUB_STEP_SUMMARY"
       - name: Save confidence interval report
         if: always()
         uses: actions/upload-artifact@v4
