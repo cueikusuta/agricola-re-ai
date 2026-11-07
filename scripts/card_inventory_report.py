@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -93,6 +94,11 @@ def inventory(rows: list[dict], source: str = "docs/card-catalog-ae-preliminary.
         if not card_id or card_id in seen_ids:
             raise ValueError(f"duplicate or empty card_id: {card_id!r}")
         seen_ids.add(card_id)
+        deck = row["deck"]
+        if deck not in "ABCDE" or re.fullmatch(r"[A-E][0-9]{3}", card_id) is None or card_id[0] != deck:
+            raise ValueError(f"{card_id}: invalid deck/card_id pairing: {deck!r}")
+        if row["in_base_2016"] not in ("YES", "NO"):
+            raise ValueError(f"{card_id}: invalid in_base_2016")
         kind = normalize_type(row["card_type"])
         level = row["difficulty_1_to_5_preliminary"]
         if level not in {"1", "2", "3", "4", "5"}:
