@@ -4,6 +4,7 @@ pub mod breeding;
 pub mod card_pool;
 pub mod cards;
 pub mod dataset_split;
+pub mod decision_budget;
 pub mod draft;
 pub mod draft_ai;
 pub mod draft_game;
