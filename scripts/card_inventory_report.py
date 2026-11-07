@@ -34,7 +34,10 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-IMPLEMENTED_REFERENCES = {\n    "コード内に定義あり（配布対象要照合）",\n    "コード内に定義あり・2人戦プリセット外",\n}
+IMPLEMENTED_REFERENCES = {
+    "コード内に定義あり（配布対象要照合）",
+    "コード内に定義あり・2人戦プリセット外",
+}
 UNIMPLEMENTED = "未実装または未照合"
 CATEGORY_SEPARATOR = "／"
 OCCUPATION = "職業"
