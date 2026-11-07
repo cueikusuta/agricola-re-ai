@@ -1,16 +1,24 @@
-//! Reproducible seat-rotated, cardless AI comparisons for M8-3.
+//! Reproducible seat-rotated AI comparisons for M8-3/M13.
 //! A JSONL row is one completed game. Each seed block contains every
 //! candidate seat for both comparison arms. The optional M7 MCTS arm runs
 //! under a per-decision wall-clock budget and records whether it timed out or
 //! fell back to the guaranteed-legal evaluation policy.
+//!
+//! `--cards` selects the card condition. M13 compares cardless and
+//! implemented-card conditions as separate experiments, so the condition, the
+//! deck size and the deck content hash are recorded on every row and the
+//! aggregator refuses to pool them. Only the built-in, two-player A/B pool is
+//! available; no unverified card can enter a deck here.
+use agricola_re_ai::cards::{verified_basic_card_set, CardSet};
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::harvest::SimpleHarvestDetails;
 use agricola_re_ai::mcts::{MctsOutcome, MctsPolicy};
 use agricola_re_ai::model::Space;
 use agricola_re_ai::policy::{
-    play_to_end_observed, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
+    play_to_end_observed, CardChoiceDetails, DetailPolicy, GreedyPolicy, RandomPolicy,
+    SimpleDetails, SpacePolicy,
 };
-use agricola_re_ai::score::standings;
+use agricola_re_ai::score::{standings, standings_with_cards};
 use agricola_re_ai::{Config, Game, Observation};
 use rand_chacha::ChaCha8Rng;
 use serde_json::json;
@@ -21,6 +29,39 @@ use std::io::{BufWriter, Write};
 use std::time::{Duration, Instant};
 
 const DEFAULT_DECISION_BUDGET_MS: u64 = 10_000;
+
+/// Card condition of an experiment arm.
+///
+/// M13 must report cardless and implemented-card conditions separately, never
+/// pooled. `verified` means the built-in A/B pool that
+/// `verified_basic_card_set` already gates to two players; nothing here
+/// promotes an unverified card into a deck.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Cards {
+    None,
+    Verified,
+}
+
+impl Cards {
+    fn parse(name: &str) -> Result<Self, String> {
+        match name {
+            "none" => Ok(Cards::None),
+            // Both spellings are accepted so the GitHub Actions input can be
+            // forwarded verbatim to this CLI and to the aggregation script.
+            "verified" | "verified_basic_2p" => Ok(Cards::Verified),
+            _ => Err(format!("unsupported card condition: {name}")),
+        }
+    }
+    fn name(self) -> &'static str {
+        match self {
+            Cards::None => "none",
+            Cards::Verified => "verified_basic_2p",
+        }
+    }
+    fn is_enabled(self) -> bool {
+        self != Cards::None
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Ai {
@@ -62,6 +103,7 @@ struct Options {
     baseline: Ai,
     opponent: Ai,
     additional_action_space: bool,
+    cards: Cards,
     decision_budget_ms: u64,
     mcts_simulations: usize,
     mcts_tree_depth: usize,
@@ -73,6 +115,18 @@ fn option<'a>(values: &'a BTreeMap<String, String>, key: &str) -> Result<&'a str
         .get(key)
         .map(String::as_str)
         .ok_or_else(|| format!("missing --{key}"))
+}
+
+/// The built-in verified pool is two-player only, so enabling it in a
+/// three- or four-player experiment must fail before any game runs.
+fn check_card_condition(cards: Cards, players: usize) -> Result<(), String> {
+    if cards.is_enabled() && players != 2 {
+        return Err(
+            "the verified card pool currently supports two players only (see verified_basic_card_set)"
+                .into(),
+        );
+    }
+    Ok(())
 }
 
 fn optional_option<'a>(values: &'a BTreeMap<String, String>, key: &str) -> Option<&'a str> {
@@ -95,6 +149,7 @@ fn parse_options() -> Result<Options, String> {
             "baseline",
             "opponent",
             "additional-action-space",
+            "cards",
             "decision-budget-ms",
             "mcts-simulations",
             "mcts-tree-depth",
@@ -131,6 +186,7 @@ fn parse_options() -> Result<Options, String> {
         "false" => false,
         _ => return Err("additional-action-space must be true or false".into()),
     };
+    let cards = Cards::parse(optional_option(&values, "cards").unwrap_or("none"))?;
     let decision_budget_ms = optional_option(&values, "decision-budget-ms")
         .map(|value| {
             value
@@ -181,6 +237,7 @@ fn parse_options() -> Result<Options, String> {
     if candidate == baseline {
         return Err("candidate and baseline must be different".into());
     }
+    check_card_condition(cards, players)?;
     Ok(Options {
         players,
         seed_start,
@@ -190,6 +247,7 @@ fn parse_options() -> Result<Options, String> {
         baseline,
         opponent,
         additional_action_space,
+        cards,
         decision_budget_ms,
         mcts_simulations,
         mcts_tree_depth,
@@ -329,6 +387,20 @@ fn run(options: &Options) -> Result<(), String> {
     };
     let budget = Duration::from_millis(options.decision_budget_ms);
     let deadline_enabled = options.decision_budget_ms > 0;
+    // The deck is built once and validated by the same gate the game uses, so
+    // every arm and seat of an experiment provably shares one pool.
+    let card_set = match options.cards {
+        Cards::None => CardSet::default(),
+        Cards::Verified => verified_basic_card_set(options.players)?,
+    };
+    let card_set_hash = card_set.content_hash();
+    let card_set_count = card_set.definitions.len();
+    let card_details = CardChoiceDetails;
+    let details: &dyn DetailPolicy = if card_set.enabled() {
+        &card_details
+    } else {
+        &SimpleDetails
+    };
     let start = Instant::now();
     for relative_block in 0..options.blocks {
         let block_index = options.block_start + relative_block;
@@ -343,7 +415,8 @@ fn run(options: &Options) -> Result<(), String> {
                     seed,
                     additional_action_space_enabled: options.additional_action_space,
                 };
-                let mut game = Game::new(config.clone());
+                let mut game = Game::with_cards(config.clone(), card_set.clone())
+                    .map_err(|error| format!("seed {seed}: {error}"))?;
                 let selector = SeatSelector {
                     focus: seat,
                     focus_ai,
@@ -361,7 +434,7 @@ fn run(options: &Options) -> Result<(), String> {
                 play_to_end_observed(
                     &mut game,
                     &selector,
-                    &SimpleDetails,
+                    details,
                     &SimpleHarvestDetails,
                     |player, ns| {
                         if player == seat {
@@ -373,11 +446,16 @@ fn run(options: &Options) -> Result<(), String> {
                 if !game.public.finished {
                     return Err(format!("seed {seed}: game did not finish"));
                 }
-                let summary = standings(&game.public.players);
+                let summary = if card_set.enabled() {
+                    standings_with_cards(&game.public.players, &game.card_set)
+                } else {
+                    standings(&game.public.players)
+                };
                 let hash = game.state_hash();
-                let replay = Game::replay(config, &game.log.events).map_err(|error| {
-                    format!("seed {seed} arm {arm_id} seat {seat} replay: {error}")
-                })?;
+                let replay = Game::replay_with_cards(config, card_set.clone(), &game.log.events)
+                    .map_err(|error| {
+                        format!("seed {seed} arm {arm_id} seat {seat} replay: {error}")
+                    })?;
                 if replay.state_hash() != hash {
                     return Err(format!(
                         "seed {seed} arm {arm_id} seat {seat}: replay mismatch"
@@ -412,7 +490,9 @@ fn run(options: &Options) -> Result<(), String> {
                     "candidate_seat": seat,
                     "players": options.players,
                     "additional_action_space": options.additional_action_space,
-                    "cards": "none",
+                    "cards": options.cards.name(),
+                    "card_set_count": card_set_count,
+                    "card_set_hash": card_set_hash,
                     "finished": true,
                     "rounds_completed": 14,
                     "scores_by_seat": scores,
@@ -494,5 +574,35 @@ mod tests {
     fn mcts_is_a_recognized_ai_name() {
         assert_eq!(Ai::parse("mcts").unwrap(), Ai::Mcts);
         assert!(Ai::parse("stockfish").is_err());
+    }
+
+    #[test]
+    fn card_condition_parses_and_names_itself() {
+        assert_eq!(Cards::parse("none").unwrap(), Cards::None);
+        assert_eq!(Cards::parse("verified").unwrap(), Cards::Verified);
+        assert_eq!(
+            Cards::parse("verified_basic_2p").unwrap(),
+            Cards::Verified,
+            "the workflow forwards its own input value verbatim"
+        );
+        assert!(Cards::parse("all_840").is_err());
+        assert_eq!(Cards::None.name(), "none");
+        assert_eq!(Cards::Verified.name(), "verified_basic_2p");
+        assert!(!Cards::None.is_enabled());
+        assert!(Cards::Verified.is_enabled());
+    }
+
+    #[test]
+    fn verified_cards_are_rejected_outside_two_players() {
+        for players in [2, 3, 4] {
+            assert!(check_card_condition(Cards::None, players).is_ok());
+        }
+        assert!(check_card_condition(Cards::Verified, 2).is_ok());
+        for players in [3, 4] {
+            assert!(
+                check_card_condition(Cards::Verified, players).is_err(),
+                "an unverifiable pool must fail closed at {players} players"
+            );
+        }
     }
 }

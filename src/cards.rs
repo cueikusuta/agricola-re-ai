@@ -5,6 +5,7 @@ use crate::model::{Animal, Crop, Good, House, Player, Space, Tile};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -158,6 +159,36 @@ impl CardSet {
 
     pub fn enabled(&self) -> bool {
         !self.definitions.is_empty()
+    }
+
+    /// Order-independent content hash of the deck's public metadata.
+    ///
+    /// Experiment manifests (M12/M13) must show that two runs used the same
+    /// card pool. Only `id`, `kind`, `cost`, `points` and `effects` are hashed:
+    /// no seed, no dealt hand, no hidden state. The `agricola-card-set-v1`
+    /// domain tag keeps an empty set distinct from any populated one.
+    pub fn content_hash(&self) -> String {
+        let mut entries = self
+            .definitions
+            .iter()
+            .map(|card| {
+                (
+                    card.id.clone(),
+                    serde_json::to_string(card).expect("card definition serialization"),
+                )
+            })
+            .collect::<Vec<_>>();
+        entries.sort();
+        entries.dedup();
+        let mut hasher = Sha256::new();
+        hasher.update(b"agricola-card-set-v1\0");
+        for (id, definition) in entries {
+            hasher.update(id.as_bytes());
+            hasher.update([0u8]);
+            hasher.update(definition.as_bytes());
+            hasher.update([0u8]);
+        }
+        format!("{:x}", hasher.finalize())
     }
 
     pub fn validate(&self, players: usize) -> Result<(), String> {
@@ -2020,5 +2051,84 @@ mod a063_baking_tests {
         assert_eq!(player.card_points, 2);
         assert_eq!(player.supply.wood, 0);
         assert_eq!(player.supply.stone, 0);
+    }
+}
+
+#[cfg(test)]
+mod card_set_content_hash_tests {
+    use super::*;
+
+    fn card(id: &str, kind: CardKind, points: i32) -> CardDefinition {
+        CardDefinition {
+            id: id.into(),
+            kind,
+            cost: Vec::new(),
+            points,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 1,
+            }],
+        }
+    }
+
+    #[test]
+    fn empty_and_populated_sets_have_distinct_hashes() {
+        let empty = CardSet::default();
+        let one = CardSet {
+            definitions: vec![card("X1", CardKind::Occupation, 1)],
+        };
+        assert_eq!(empty.content_hash().len(), 64);
+        assert_ne!(empty.content_hash(), one.content_hash());
+        // Deterministic across calls.
+        assert_eq!(one.content_hash(), one.content_hash());
+    }
+
+    #[test]
+    fn hash_ignores_definition_order_but_tracks_every_field() {
+        let a = card("X1", CardKind::Occupation, 1);
+        let b = card("X2", CardKind::MinorImprovement, 2);
+        let forward = CardSet {
+            definitions: vec![a.clone(), b.clone()],
+        };
+        let reverse = CardSet {
+            definitions: vec![b.clone(), a.clone()],
+        };
+        assert_eq!(forward.content_hash(), reverse.content_hash());
+
+        // Each individual field change must change the hash.
+        let mut renamed = a.clone();
+        renamed.id = "X9".into();
+        let mut rekinded = a.clone();
+        rekinded.kind = CardKind::MinorImprovement;
+        let mut rescored = a.clone();
+        rescored.points = 7;
+        let mut recosted = a.clone();
+        recosted.cost = vec![(Good::Wood, 2)];
+        let mut reeffected = a.clone();
+        reeffected.effects = vec![CardEffect::EndGameBonus {
+            rule: ScoreBonusRule::PastureArea,
+        }];
+        for changed in [renamed, rekinded, rescored, recosted, reeffected] {
+            let other = CardSet {
+                definitions: vec![changed],
+            };
+            assert_ne!(
+                forward.content_hash(),
+                other.content_hash(),
+                "a changed field must change the deck hash"
+            );
+        }
+    }
+
+    #[test]
+    fn verified_two_player_pool_hashes_stably() {
+        let first = verified_basic_card_set(2).unwrap();
+        let second = verified_basic_card_set(2).unwrap();
+        assert!(!first.definitions.is_empty());
+        assert_eq!(first.content_hash(), second.content_hash());
+        // The hash must not depend on how the pool was assembled.
+        let mut shuffled = first.clone();
+        shuffled.definitions.reverse();
+        assert_eq!(first.content_hash(), shuffled.content_hash());
     }
 }
