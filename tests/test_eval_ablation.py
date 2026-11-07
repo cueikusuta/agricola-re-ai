@@ -36,6 +36,9 @@ def arm_rows(blocks=4, players=2, *, credit, seed_base=1000, replay="a"):
                     "players": players,
                     "additional_action_space": False,
                     "cards": "none",
+                    "card_set_count": 0,
+                    "card_set_hash": "0" * 64,
+                    "mcts_tree_depth": 2,
                     "finished": True,
                     "rounds_completed": 14,
                     "scores_by_seat": scores,
@@ -212,6 +215,18 @@ class AblationTests(unittest.TestCase):
                 {"control": rows, "variant": copy.deepcopy(rows)}, control="control",
                 per_arm_options={"control": options(), "variant": options()},
                 iterations=10,
+            )
+
+    def test_multi_factor_change_is_rejected(self):
+        rows = arm_rows(credit=always_wins)
+        variant_options = options(candidate="mcts")
+        variant_options["mcts_simulations"] = 2
+        with self.assertRaisesRegex(ValueError, "multiple candidate factors"):
+            compare_arms(
+                {"control": rows, "variant": copy.deepcopy(rows)},
+                control="control",
+                per_arm_options={"control": options(), "variant": variant_options},
+                iterations=500,
             )
 
     def test_empty_arm_is_rejected(self):
