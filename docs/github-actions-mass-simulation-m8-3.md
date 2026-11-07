@@ -111,6 +111,8 @@ M12の**エピソードデータ（1試合1行JSONL）の大量生成・再演�
 | `--cards`（`paired_eval`） | `none`（既定）/ `verified` | `verified` は `verified_basic_card_set` が返す**2人戦専用**の実装済みA/Bプール。3〜4人では起動前に拒否する |
 | `--cards`（`paired_eval_stats`） | `none`（既定）/ `verified_basic_2p` | 行の `cards` と一致しない入力は集約を拒否する |
 
+**用語上の注意**：ここでの `verified_basic_2p` は既存の関数名に由来する「Rustに効果が実装されている2人用A/Bテストプール」を指す。M10の`review_status=verified`（公式典拠照合済み）を意味しない。公式照合は未完了であり、このモードの結果を公式カード条件の評価として扱わない。
+
 ### 記録される証跡
 
 - `cards`: `none` または `verified_basic_2p`。
