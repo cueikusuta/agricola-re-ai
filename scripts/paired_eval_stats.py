@@ -272,9 +272,9 @@ def validate_and_report(
         ]
         for arm in ("candidate", "baseline")
     }
-    # Games were run back to back, so the summed per-game wall time is the CPU
-    # time the experiment actually consumed. It is a throughput measurement of
-    # one shard set, not a promise about wall-clock latency.
+    # The denominator is summed per-game elapsed wall time (not measured OS
+    # CPU time), appropriate for the serial-run throughput approximation.
+    # Keep the historical `total_cpu_seconds` key for report compatibility.
     total_cpu_seconds = sum(g["total_wall_ms"] for g in rows) / 1000.0
     return {
         "schema_version": 1,
