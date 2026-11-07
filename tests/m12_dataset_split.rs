@@ -670,3 +670,220 @@ fn card_mode_spellings_are_normalised_consistently() {
     assert_eq!(normalise_card_mode("verified_basic_2p"), "verified_basic");
     assert_eq!(normalise_card_mode("verified"), "verified_basic");
 }
+
+// --- Seat rotation and seed-block integrity (#170 re-review) -----------------
+
+/// A seat-rotated run where the caller controls the seed of every block.
+fn matches_with_seeds(blocks: usize, players: usize, seed_of: impl Fn(usize) -> u64) -> String {
+    let mut out = String::new();
+    for block in 0..blocks {
+        let seed = seed_of(block);
+        for arm in ["candidate", "baseline"] {
+            for seat in 0..players {
+                out.push_str(&row_json(block, seed, arm, seat, players));
+                out.push('\n');
+            }
+        }
+    }
+    out
+}
+
+/// The gate ties a mode to the dataset's own condition, so a 4-player
+/// evaluation needs a 4-player dataset to be judged against.
+fn dataset_for(players: usize) -> Vec<EpisodeRecord> {
+    if players == 2 {
+        return dataset();
+    }
+    [100, 101, 110, 120]
+        .into_iter()
+        .map(|seed| record(players, seed))
+        .collect()
+}
+
+fn manifest_for(players: usize) -> DatasetSplitManifest {
+    build_manifest(&dataset_for(players), plan()).expect("a clean split")
+}
+
+fn g0_with(matches: &str, players: usize) -> (GateStatus, Vec<String>) {
+    let (evidence, bundles) = evidence_for("cardless_2p", players, "none", matches, true);
+    let records = dataset_for(players);
+    let report = evaluate_g0(
+        &manifest_for(players),
+        &inspect_dataset(&records),
+        Some(&evidence),
+        &bundles,
+    );
+    let failed = report
+        .checks
+        .iter()
+        .filter(|check| check.status != GateStatus::Pass)
+        .map(|check| check.id.clone())
+        .collect();
+    (report.verdict, failed)
+}
+
+#[test]
+fn a_two_player_run_using_only_seat_zero_is_not_a_full_rotation() {
+    // The reviewer's counter-example: 1,000 blocks x 2 rows with only seat 0
+    // reaches "1000 games/arm" arithmetic but never rotated seats at all.
+    let mut text = String::new();
+    for block in 0..1000u64 {
+        let seed = 120 + block;
+        for arm in ["candidate", "baseline"] {
+            text.push_str(&row_json(block as usize, seed, arm, 0, 2));
+            text.push('\n');
+        }
+    }
+    let facts = recompute_mode(&load_matches(text.as_bytes()).expect("rows"));
+    // 1,000 blocks x 1 seat per arm reaches "1000 games/arm" exactly, so the
+    // scale check alone would pass; only the seat-rotation check catches it.
+    assert_eq!(facts.games_per_arm(), 1000);
+    assert!(!facts.is_complete());
+    assert!(!facts.incomplete_seat_coverage.is_empty());
+    let (verdict, failed) = g0_with(&text, 2);
+    assert_eq!(verdict, GateStatus::Fail, "failed checks: {failed:?}");
+    assert!(failed.contains(&"evaluation_block_completeness".to_string()));
+    assert!(
+        !failed.contains(&"evaluation_scale".to_string()),
+        "the scale check must not be what rejects this run: {failed:?}"
+    );
+}
+
+#[test]
+fn a_four_player_run_needs_all_eight_rows_per_block() {
+    // 250 blocks x 4 seats x 2 arms = 1,000 games/arm and 8 rows per block.
+    let complete = matches_with_seeds(250, 4, |block| 200 + block as u64);
+    assert_eq!(g0_with(&complete, 4).0, GateStatus::Pass);
+
+    // Drop one seat from one block: the run is no longer a full rotation.
+    let mut missing = String::new();
+    for block in 0..250usize {
+        let seed = 200 + block as u64;
+        for arm in ["candidate", "baseline"] {
+            for seat in 0..4usize {
+                if block == 7 && arm == "candidate" && seat == 3 {
+                    continue;
+                }
+                missing.push_str(&row_json(block, seed, arm, seat, 4));
+                missing.push('\n');
+            }
+        }
+    }
+    let facts = recompute_mode(&load_matches(missing.as_bytes()).expect("rows"));
+    assert!(!facts.is_complete());
+    assert_eq!(facts.incomplete_blocks, vec![7]);
+    assert_eq!(g0_with(&missing, 4).0, GateStatus::Fail);
+}
+
+#[test]
+fn a_seat_outside_the_player_range_is_rejected() {
+    let mut text = matches_with_seeds(250, 4, |block| 200 + block as u64);
+    text.push_str(&row_json(0, 200, "candidate", 4, 4));
+    text.push('\n');
+    let facts = recompute_mode(&load_matches(text.as_bytes()).expect("rows"));
+    assert_eq!(facts.out_of_range_seats, [4usize].into_iter().collect());
+    assert!(!facts.is_complete());
+    assert_eq!(g0_with(&text, 4).0, GateStatus::Fail);
+}
+
+#[test]
+fn a_reused_seed_is_not_a_thousand_independent_games() {
+    // Every block claims the same seed: the arithmetic still says 1,000/arm, but
+    // it is one seed seen 500 times.
+    let reused = matches_with_seeds(500, 2, |_| 120);
+    let facts = recompute_mode(&load_matches(reused.as_bytes()).expect("rows"));
+    assert_eq!(facts.games_per_arm(), 1000);
+    assert_eq!(facts.seeds.len(), 1);
+    assert_eq!(facts.seeds_in_multiple_blocks, vec![120]);
+    assert!(!facts.is_complete());
+    let (verdict, failed) = g0_with(&reused, 2);
+    assert_eq!(verdict, GateStatus::Fail, "failed checks: {failed:?}");
+    assert!(failed.contains(&"evaluation_seed_blocks".to_string()));
+}
+
+#[test]
+fn one_block_with_two_different_seeds_is_rejected() {
+    let mut text = String::new();
+    for arm in ["candidate", "baseline"] {
+        for seat in 0..2usize {
+            // Same block, different seed per arm.
+            let seed = if arm == "candidate" { 120 } else { 999 };
+            text.push_str(&row_json(0, seed, arm, seat, 2));
+            text.push('\n');
+        }
+    }
+    let facts = recompute_mode(&load_matches(text.as_bytes()).expect("rows"));
+    assert_eq!(facts.blocks_with_mixed_seeds, vec![0]);
+    assert!(!facts.is_complete());
+    assert_eq!(g0_with(&text, 2).0, GateStatus::Fail);
+}
+
+#[test]
+fn the_seed_block_offset_must_be_constant() {
+    // seed = seed_start + block is the harness contract; a run whose offsets
+    // disagree cannot be reproduced from seed_start alone.
+    let mut text = matches_with_seeds(500, 2, |block| 120 + block as u64);
+    text.push_str(&row_json(0, 777, "candidate", 0, 2));
+    text.push('\n');
+    let facts = recompute_mode(&load_matches(text.as_bytes()).expect("rows"));
+    assert!(facts.seed_offset_conflicts >= 1);
+    assert!(!facts.is_complete());
+    assert_eq!(g0_with(&text, 2).0, GateStatus::Fail);
+}
+
+#[test]
+fn a_correctly_rotated_run_passes_the_seat_and_seed_checks() {
+    // 500 blocks x 2 seats x 2 arms with unique seeds inside the test range.
+    let matches = matches_with_seeds(500, 2, |block| 120 + block as u64);
+    let facts = recompute_mode(&load_matches(matches.as_bytes()).expect("rows"));
+    assert!(facts.is_complete(), "{facts:?}");
+    assert_eq!(facts.expected_rows(), 2000);
+    assert_eq!(facts.games_per_arm(), 1000);
+    assert_eq!(facts.seed_offsets, [120i64].into_iter().collect());
+    let (verdict, failed) = g0_with(&matches, 2);
+    assert_eq!(verdict, GateStatus::Pass, "failed checks: {failed:?}");
+}
+
+#[test]
+fn a_checks_file_with_an_unsupported_schema_is_rejected() {
+    let matches = matches_with_seeds(500, 2, |block| 120 + block as u64);
+    let (mut evidence, mut bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
+    let digest = sha256_hex(matches.as_bytes());
+    let stale_checks = serde_json::to_string(&ChecksEvidence {
+        schema_version: 1,
+        code_sha: "test-sha".into(),
+        matches_sha256: digest,
+        m8_rule_evidence: true,
+        m8_legal_api_evidence: true,
+        observation_noninterference_passed: true,
+        ci_reproducible: true,
+    })
+    .expect("checks json");
+    bundles.get_mut("cardless_2p").unwrap().checks = Some(stale_checks.clone().into_bytes());
+    evidence.modes[0].checks_sha256 = Some(sha256_hex(stale_checks.as_bytes()));
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+    let attested = report
+        .checks
+        .iter()
+        .find(|check| check.id == "checks_attested")
+        .expect("checks_attested check");
+    assert_eq!(attested.status, GateStatus::Fail);
+    assert!(
+        attested.detail.contains("checks schema 1 is not 2"),
+        "{}",
+        attested.detail
+    );
+}
+
+#[test]
+fn a_checks_file_with_the_supported_schema_passes() {
+    let matches = matches_with_seeds(500, 2, |block| 120 + block as u64);
+    let (verdict, failed) = g0_with(&matches, 2);
+    assert_eq!(verdict, GateStatus::Pass, "failed checks: {failed:?}");
+}

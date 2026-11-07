@@ -424,6 +424,8 @@ impl GateCheck {
 /// Version of the evidence file. v2 replaced free-form declarations with
 /// references to the actual evaluation output (#167 C review P1).
 pub const G0_EVIDENCE_SCHEMA_VERSION: u32 = 2;
+/// Version of the attested checks file. Bumped when the checks layout changes.
+pub const CHECKS_SCHEMA_VERSION: u32 = 2;
 
 /// One row of a `paired_eval` matches file, reduced to the fields the gate
 /// recomputes. Unknown fields are ignored, so the gate reads the artifact itself
@@ -457,6 +459,7 @@ pub struct ModeRecompute {
     pub baseline_rows: usize,
     pub blocks: BTreeSet<usize>,
     pub seeds: BTreeSet<u64>,
+    /// Seat indexes that appeared anywhere.
     pub seats: BTreeSet<usize>,
     pub players: BTreeSet<usize>,
     pub cards: BTreeSet<String>,
@@ -465,8 +468,22 @@ pub struct ModeRecompute {
     pub unfinished: usize,
     pub unverified: usize,
     pub wrong_rounds: usize,
-    /// Blocks that do not contain both arms for every seat exactly once.
+    /// Blocks that do not contain both arms for **every** seat exactly once.
     pub incomplete_blocks: Vec<usize>,
+    /// `(block, arm)` pairs whose seat set is not exactly `0..players-1`.
+    pub incomplete_seat_coverage: Vec<(usize, String, Vec<usize>)>,
+    /// Seat indexes outside `0..players-1` (or contradicting the player count).
+    pub out_of_range_seats: BTreeSet<usize>,
+    /// Blocks whose rows do not all carry the same seed.
+    pub blocks_with_mixed_seeds: Vec<usize>,
+    /// Seeds that appear in more than one block.
+    pub seeds_in_multiple_blocks: Vec<u64>,
+    /// Rows whose `seed - block_index` differs from the first offset seen. The
+    /// harness writes `seed = seed_start + block_index`, so one experiment has
+    /// exactly one offset; anything else is a hand-edited or reused seed.
+    pub seed_offset_conflicts: usize,
+    /// The offsets that were observed (for the report detail).
+    pub seed_offsets: BTreeSet<i64>,
 }
 
 impl ModeRecompute {
@@ -474,27 +491,48 @@ impl ModeRecompute {
         self.candidate_rows.min(self.baseline_rows)
     }
 
-    /// A seed block holds one game per seat per arm, so a complete block of a
-    /// 2-player comparison is `2 arms * 2 seats = 4` rows. This is the
-    /// seat-rotation contract the manifest documents.
-    pub fn expected_rows(&self) -> usize {
-        let seats = self.seats.len().max(1);
-        self.blocks.len() * seats * 2
+    /// The single player count of the run, if the rows agree on one.
+    pub fn player_count(&self) -> Option<usize> {
+        if self.players.len() == 1 {
+            self.players.iter().copied().next()
+        } else {
+            None
+        }
     }
 
-    /// Every block holds one game per seat per arm, with no duplicates and no
-    /// unfinished or unreplayed row.
+    /// A seed block holds one game per seat per arm, so a complete block of a
+    /// 2-player comparison is `2 arms * 2 seats = 4` rows and a 4-player one is
+    /// `2 arms * 4 seats = 8` rows. This is the seat-rotation contract the
+    /// manifest documents.
+    pub fn expected_rows(&self) -> usize {
+        let players = self.player_count().unwrap_or(0);
+        self.blocks.len() * players * 2
+    }
+
+    /// Every block holds one game per seat per arm, seeds map one-to-one onto
+    /// blocks, and no row is unfinished, unreplayed or contradicted.
     pub fn is_complete(&self) -> bool {
         self.duplicate_keys.is_empty()
             && self.unfinished == 0
             && self.unverified == 0
             && self.wrong_rounds == 0
             && self.incomplete_blocks.is_empty()
+            && self.incomplete_seat_coverage.is_empty()
+            && self.out_of_range_seats.is_empty()
+            && self.blocks_with_mixed_seeds.is_empty()
+            && self.seeds_in_multiple_blocks.is_empty()
+            && self.seed_offset_conflicts == 0
+            && self.player_count().is_some()
             && self.rows == self.expected_rows()
     }
 }
 
 /// Recompute the facts of one mode from its rows.
+///
+/// Seat rotation (review P1-a) and the seed/block mapping (review P1-b) are
+/// derived here rather than trusted, because "1000 games per arm" is only
+/// meaningful if every block really contains every seat of every arm and no seed
+/// block is counted twice.
 pub fn recompute_mode(rows: &[PairedRow]) -> ModeRecompute {
     let mut report = ModeRecompute {
         rows: rows.len(),
@@ -502,6 +540,9 @@ pub fn recompute_mode(rows: &[PairedRow]) -> ModeRecompute {
     };
     let mut seen: BTreeMap<(usize, String, usize), usize> = BTreeMap::new();
     let mut per_block: BTreeMap<usize, BTreeMap<(String, usize), usize>> = BTreeMap::new();
+    let mut block_seed: BTreeMap<usize, u64> = BTreeMap::new();
+    let mut seed_block: BTreeMap<u64, usize> = BTreeMap::new();
+    let mut expected_offset: Option<i64> = None;
     for row in rows {
         match row.arm_id.as_str() {
             "candidate" => report.candidate_rows += 1,
@@ -533,14 +574,75 @@ pub fn recompute_mode(rows: &[PairedRow]) -> ModeRecompute {
             .or_default()
             .entry((row.arm_id.clone(), row.candidate_seat))
             .or_default() += 1;
-    }
-    let seats = report.seats.len();
-    for (block, entries) in per_block {
-        let complete = entries.len() == seats * 2 && entries.values().all(|count| *count == 1);
-        if !complete {
-            report.incomplete_blocks.push(block);
+
+        // One block, one seed; one seed, one block.
+        match block_seed.get(&row.block_index) {
+            Some(seed) if *seed != row.seed => {
+                if !report.blocks_with_mixed_seeds.contains(&row.block_index) {
+                    report.blocks_with_mixed_seeds.push(row.block_index);
+                }
+            }
+            Some(_) => {}
+            None => {
+                block_seed.insert(row.block_index, row.seed);
+            }
+        }
+        match seed_block.get(&row.seed) {
+            Some(block) if *block != row.block_index => {
+                if !report.seeds_in_multiple_blocks.contains(&row.seed) {
+                    report.seeds_in_multiple_blocks.push(row.seed);
+                }
+            }
+            Some(_) => {}
+            None => {
+                seed_block.insert(row.seed, row.block_index);
+            }
+        }
+        // The harness writes `seed = seed_start + block_index`, so all rows of
+        // one experiment share a single offset.
+        let offset = row.seed as i64 - row.block_index as i64;
+        report.seed_offsets.insert(offset);
+        match expected_offset {
+            Some(expected) if offset != expected => report.seed_offset_conflicts += 1,
+            Some(_) => {}
+            None => expected_offset = Some(offset),
         }
     }
+
+    // Seat rotation: every block must cover `0..players-1` for both arms.
+    if let Some(players) = report.player_count() {
+        let expected_seats: BTreeSet<usize> = (0..players).collect();
+        let mut covered: BTreeMap<(usize, String), BTreeSet<usize>> = BTreeMap::new();
+        for row in rows {
+            if row.candidate_seat >= players {
+                report.out_of_range_seats.insert(row.candidate_seat);
+            }
+            covered
+                .entry((row.block_index, row.arm_id.clone()))
+                .or_default()
+                .insert(row.candidate_seat);
+        }
+        for ((block, arm), seats) in covered {
+            if seats != expected_seats {
+                report
+                    .incomplete_seat_coverage
+                    .push((block, arm, seats.into_iter().collect()));
+            }
+        }
+        for (block, entries) in &per_block {
+            let complete =
+                entries.len() == players * 2 && entries.values().all(|count| *count == 1);
+            if !complete {
+                report.incomplete_blocks.push(*block);
+            }
+        }
+    } else {
+        // Without a single player count nothing about seats can be verified.
+        report.incomplete_blocks = report.blocks.iter().copied().collect();
+    }
+    report.blocks_with_mixed_seeds.sort_unstable();
+    report.seeds_in_multiple_blocks.sort_unstable();
+    report.incomplete_blocks.sort_unstable();
     report
 }
 
@@ -817,6 +919,7 @@ pub fn evaluate_g0(
             "evaluation_completion",
             "evaluation_replay",
             "evaluation_block_completeness",
+            "evaluation_seed_blocks",
             "evaluation_split_discipline",
             "checks_attested",
             "artifact_traceable",
@@ -1084,9 +1187,13 @@ pub fn evaluate_g0(
             ),
         ));
 
-        // Seat rotation: a seed block legitimately holds one game per seat per
-        // arm, so the contract is "every (block, arm, seat) once", not "one game
-        // per seed".
+        // Seat rotation (review P1-a): every block must contain **every** seat
+        // of every arm, so a run that only ever used seat 0 cannot be counted as
+        // a full rotation. The expected row count comes from the declared player
+        // count, not from the seats that happened to appear.
+        let players_label = facts
+            .player_count()
+            .map_or("?".to_string(), |count| count.to_string());
         checks.push(GateCheck::new(
             "evaluation_block_completeness",
             if facts.is_complete() {
@@ -1096,15 +1203,48 @@ pub fn evaluate_g0(
             },
             "evidence",
             format!(
-                "{}: {} rows, expected {} for {} blocks x {} seats x 2 arms; duplicate \
-                 keys {:?}; incomplete blocks {:?}",
+                "{}: {} rows, expected {} for {} blocks x {} players x 2 arms; duplicate \
+                 keys {:?}; incomplete blocks {:?}; incomplete seat coverage {:?}; \
+                 out-of-range seats {:?}",
                 mode.mode,
                 facts.rows,
                 facts.expected_rows(),
                 facts.blocks.len(),
-                facts.seats.len(),
+                players_label,
                 facts.duplicate_keys,
-                facts.incomplete_blocks
+                facts.incomplete_blocks,
+                facts.incomplete_seat_coverage,
+                facts.out_of_range_seats
+            ),
+        ));
+
+        // Seed/block integrity (review P1-b): one block one seed, one seed one
+        // block, and one `seed - block_index` offset for the whole run. Without
+        // this, rows that reuse a single seed would look like many independent
+        // games.
+        checks.push(GateCheck::new(
+            "evaluation_seed_blocks",
+            if facts.blocks_with_mixed_seeds.is_empty()
+                && facts.seeds_in_multiple_blocks.is_empty()
+                && facts.seed_offset_conflicts == 0
+                && facts.seeds.len() == facts.blocks.len()
+            {
+                GateStatus::Pass
+            } else {
+                GateStatus::Fail
+            },
+            "evidence",
+            format!(
+                "{}: {} blocks, {} distinct seeds, offsets {:?}; blocks with mixed seeds \
+                 {:?}; seeds in several blocks {:?}; rows with a different seed-block \
+                 offset {}",
+                mode.mode,
+                facts.blocks.len(),
+                facts.seeds.len(),
+                facts.seed_offsets,
+                facts.blocks_with_mixed_seeds,
+                facts.seeds_in_multiple_blocks,
+                facts.seed_offset_conflicts
             ),
         ));
 
@@ -1152,7 +1292,21 @@ pub fn evaluate_g0(
         };
         match attestation {
             Some(Ok(checks_file)) => {
-                if checks_file.code_sha != evidence.code_sha || checks_file.matches_sha256 != digest
+                // The checks file has its own schema (review P2). A file written
+                // for an older layout carries fields we would not interpret, so
+                // its booleans must not be trusted.
+                if checks_file.schema_version != CHECKS_SCHEMA_VERSION {
+                    checks.push(GateCheck::new(
+                        "checks_attested",
+                        GateStatus::Fail,
+                        "evidence",
+                        format!(
+                            "{}: checks schema {} is not {}",
+                            mode.mode, checks_file.schema_version, CHECKS_SCHEMA_VERSION
+                        ),
+                    ));
+                } else if checks_file.code_sha != evidence.code_sha
+                    || checks_file.matches_sha256 != digest
                 {
                     checks.push(GateCheck::new(
                         "checks_attested",
