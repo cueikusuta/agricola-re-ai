@@ -51,6 +51,36 @@ class CardCatalogAuditTests(unittest.TestCase):
         self.assertEqual(result["verified_eligible_by_players"]["2"]["minor_improvement"], 0)
         self.assertEqual(result["verified_eligible_by_players"]["4"]["minor_improvement"], 1)
 
+    def test_invalid_verified_metadata_never_counts_as_eligible(self):
+        row = audit(
+            review_status="verified",
+            reference_type="official_print",
+            primary_reference_id="printed:A001",
+            source_language="en",
+            reviewed_on="2026-11-06",
+            reviewed_by="",  # Missing reviewer provenance.
+            eligible_at_2="yes", eligible_at_3="yes", eligible_at_4="yes",
+        )
+        report, errors = review_ledger([prelim()], [row], require_full=False)
+        self.assertTrue(errors)
+        self.assertEqual(report["review_status_counts"]["verified"], 1)
+        self.assertEqual(report["official_verification_progress"]["verified_with_valid_metadata"], 0)
+        self.assertEqual(report["verified_eligible_by_players"]["4"]["minor_improvement"], 0)
+        self.assertFalse(report["verified_4p_card_count_gate"])
+        self.assertFalse(report["official_verification_progress"]["official_verification_complete"])
+
+    def test_partial_ledger_is_not_complete_even_when_every_row_valid(self):
+        row = audit(
+            review_status="verified", reference_type="official_print",
+            primary_reference_id="printed:A001", source_language="en",
+            reviewed_by="reviewer", reviewed_on="2026-11-06",
+            eligible_at_2="yes", eligible_at_3="yes", eligible_at_4="yes",
+        )
+        report, errors = review_ledger([prelim()], [row], require_full=False)
+        self.assertEqual(errors, [])
+        self.assertEqual(report["official_verification_progress"]["verified_with_valid_metadata"], 1)
+        self.assertFalse(report["official_verification_progress"]["official_verification_complete"])
+
     def test_duplicate_ids_are_rejected(self):
         _, errors = review_ledger([prelim(), prelim()], [audit()], require_full=False)
         self.assertTrue(any("duplicate ID" in message for message in errors))
