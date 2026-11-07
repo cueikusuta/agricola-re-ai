@@ -135,6 +135,10 @@ def validate_and_report(
             value = row.get(numeric)
             if not finite_number(value) or value < 0:
                 raise ValueError(f"invalid timing {numeric}: {key}")
+        # A finished 14-round game always took measurable time; a zero here is a
+        # placeholder, not a measurement, and would make throughput divide by zero.
+        if not row["total_wall_ms"] > 0:
+            raise ValueError(f"non-positive game wall time: {key}")
         if row["max_policy_select_ms"] > row["total_wall_ms"]:
             raise ValueError(f"selection time exceeds game wall time: {key}")
         if type(row.get("decisions")) is not int or row["decisions"] <= 0:
@@ -239,6 +243,39 @@ def validate_and_report(
     baseline_10s_observed_pass = (
         baseline_deadline_control and budget_within_10s and baseline_measured_within
     )
+
+    # Roadmap 3.1 asks for shared/tied first place as separate reference
+    # values, and 6.6 asks for games/sec and decisions/sec. All of these are
+    # derived from already-validated fields; nothing is re-sampled.
+    def first_place_breakdown(games: list[dict]) -> dict:
+        solo = [
+            1.0 if g["expected_rank_observation"] == 1 and g["ranks_by_seat"].count(1) == 1 else 0.0
+            for g in games
+        ]
+        reach = [1.0 if g["expected_rank_observation"] == 1 else 0.0 for g in games]
+        tied = [1.0 if g["ranks_by_seat"].count(1) > 1 else 0.0 for g in games]
+        return {
+            "solo_first_rate": statistics.mean(solo),
+            "first_reach_rate": statistics.mean(reach),
+            "tied_first_game_rate": statistics.mean(tied),
+        }
+
+    candidate_breakdown = first_place_breakdown(values["candidate"])
+    baseline_breakdown = first_place_breakdown(values["baseline"])
+    by_seat = {
+        arm: [
+            statistics.mean(
+                received[(block, arm, seat)]["first_place_credit"]
+                for block in range(first_block, first_block + blocks)
+            )
+            for seat in range(players)
+        ]
+        for arm in ("candidate", "baseline")
+    }
+    # Games were run back to back, so the summed per-game wall time is the CPU
+    # time the experiment actually consumed. It is a throughput measurement of
+    # one shard set, not a promise about wall-clock latency.
+    total_cpu_seconds = sum(g["total_wall_ms"] for g in rows) / 1000.0
     return {
         "schema_version": 1,
         "mode": "cardless_seat_rotated_candidate_vs_fixed_opponents",
@@ -265,6 +302,24 @@ def validate_and_report(
         "required_seed_blocks_estimate_5pp_80pct_power": needed,
         "candidate_expected_rank": statistics.mean(
             g["expected_rank_observation"] for g in values["candidate"]
+        ),
+        "candidate_solo_first_rate": candidate_breakdown["solo_first_rate"],
+        "baseline_solo_first_rate": baseline_breakdown["solo_first_rate"],
+        "candidate_first_reach_rate": candidate_breakdown["first_reach_rate"],
+        "baseline_first_reach_rate": baseline_breakdown["first_reach_rate"],
+        "candidate_tied_first_game_rate": candidate_breakdown["tied_first_game_rate"],
+        "baseline_tied_first_game_rate": baseline_breakdown["tied_first_game_rate"],
+        "candidate_first_credit_by_seat": by_seat["candidate"],
+        "baseline_first_credit_by_seat": by_seat["baseline"],
+        "candidate_seat_credit_spread": max(by_seat["candidate"]) - min(by_seat["candidate"]),
+        "baseline_seat_credit_spread": max(by_seat["baseline"]) - min(by_seat["baseline"]),
+        "total_cpu_seconds": total_cpu_seconds,
+        "games_per_second": len(rows) / total_cpu_seconds,
+        "decisions_per_second": (candidate_decisions + baseline_decisions) / total_cpu_seconds,
+        "throughput_note": (
+            "games_per_second and decisions_per_second use the summed per-game "
+            "wall time of this shard set as the CPU denominator. They are single-"
+            "process throughput measurements, not parallel speedup or latency."
         ),
         "baseline_expected_rank": statistics.mean(
             g["expected_rank_observation"] for g in values["baseline"]
