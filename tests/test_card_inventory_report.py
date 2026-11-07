@@ -82,6 +82,9 @@ class ClassificationTests(unittest.TestCase):
         self.assertTrue(is_implemented("コード内に定義あり・2人戦プリセット外"))
         with self.assertRaisesRegex(ValueError, "unknown implementation_reference"):
             is_implemented("実装済み")
+        # A familiar prefix with an unknown suffix must not be counted as Rust implementation.
+        with self.assertRaisesRegex(ValueError, "unknown implementation_reference"):
+            is_implemented("コード内に定義あり（未確認の新しい状態）")
 
     def test_unknown_card_type_is_rejected(self):
         self.assertEqual(normalize_type("職業"), "職業")
