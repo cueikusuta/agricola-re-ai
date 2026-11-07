@@ -45,9 +45,24 @@ arm定義はJSONで与える。
   "opponent": "greedy",
   "decision_budget_ms": 0,
   "arms": [
-    {"label": "control_eval", "candidate": "eval"},
-    {"label": "greedy", "candidate": "greedy"},
+    {"label": "control_puct", "candidate": "puct"},
+    {"label": "leaf_heuristic", "candidate": "puct", "puct_leaf": "heuristic"},
+    {"label": "explore_c3", "candidate": "puct", "puct_c": 3.0},
     {"label": "mcts_sim2", "candidate": "mcts", "mcts_simulations": 2, "mcts_tree_depth": 2}
+  ]
+}
+```
+
+検索パラメータは **仕様レベル**（`arms` の外）に既定値として書き、**arm単位**で上書きできる。どちらも同じ名前を使う。
+
+```json
+{
+  "players": 2, "seed_start": 900, "blocks": 2,
+  "baseline": "eval", "opponent": "greedy",
+  "puct_leaf": "terminal",
+  "arms": [
+    {"label": "control", "candidate": "puct"},
+    {"label": "leaf_heuristic", "candidate": "puct", "puct_leaf": "heuristic"}
   ]
 }
 ```
@@ -65,15 +80,43 @@ python3 scripts/eval_ablation.py \
 
 | 要因 | 状態 |
 |---|---|
-| 候補ポリシー（`random`/`greedy`/`eval`/`mcts`） | 実行可能 |
-| MCTS `mcts_simulations` | 実行可能（シミュレーション回数固定＝決定論的） |
-| MCTS `mcts_tree_depth` | 実行可能 |
+| 候補ポリシー（`random`/`greedy`/`eval`/`mcts`/`puct`） | 実行可能 |
+| MCTS `mcts_simulations` / `mcts_tree_depth` | 実行可能（シミュレーション回数固定＝決定論的） |
+| **PUCT の全パラメータ**（`puct_simulations` / `puct_tree_depth` / `puct_c` / `puct_prior_temp` / `puct_value_temp` / `puct_leaf` / `puct_root_limit` / `puct_final_prior`） | **実行可能（#167 B）**。arm単位で指定し、`paired_eval` のフラグへそのまま渡す。既定値は `PuctConfig::default()` と一致 |
 | per-decision思考時間予算 `decision_budget_ms` | 実行可能（時間予算ありの比較は非決定論的。`deterministic_policy_selection` がfalseになる） |
-| PUCTの事前分布・目的関数・リーフ評価の分離 | **未提供**。`src/mcts_puct.rs` はPR #146で未マージであり、本基盤は既存 `src/mcts.rs` のパラメータだけを扱う。マージ後にarmとして追加する |
-| カードあり条件 | **未提供**。`--cards` の受け渡しは別PRで扱う。M10 G1（4人40+40）未達のため4人戦カードありは不可 |
+| カードあり条件 | `scripts/paired_eval_stats.py --cards` と `paired_eval --cards` で実行可能（2人戦のみ）。M10 G1（4人40+40）未達のため4人戦カードありは不可 |
 | ドラフト条件 | **未提供**（#155の慣行決定と M10 のプール整備が前提） |
 
+### 6.1 パラメータ検証（fail closed）
+
+- **未知のキーは拒否する。** 仕様レベル・arm単位のどちらでも、既知でないキーは実行前にエラーにする。typo したパラメータが既定値のまま「効果なし」として通るのを防ぐ。
+- **値域は `paired_eval` と同じ。** `*_simulations` 1..=100000、`*_tree_depth` 1..=6、`puct_c` 0..=100、温度は有限かつ > 0、`puct_leaf` は `heuristic`/`terminal`、`puct_root_limit` 0..=100、`puct_final_prior` 0..=10。整数指定の項目に小数を書くと拒否する。
+- **既定値も明示的に渡す。** arm が指定しなかったパラメータも既定値で `paired_eval` に渡し、レポートの `search_parameters` に実際の値を載せる。
+- **PUCT専用パラメータを PUCT を使わない arm で変えると拒否する。** `candidate` も `baseline` も `puct` でない arm で `puct_*` を動かしても誰も読まないため、「効果ゼロ」の証拠に見えてしまう。
+- **1要因原則は全検索パラメータに適用する。** 制御armと比べて2つ以上変わる arm は拒否する（`changed_search_parameters` に差分を記録）。
+- **モード混在は従来どおり拒否する。** `simulation-capped` と `time-budgeted` を同じ表に混ぜられない。
+
 ## 7. ローカル小規模スモーク（強さの主張ではない）
+
+### 7.1 PUCT パラメータの1要因比較（#167 B、2026-11-07）
+
+条件：カードなし2人戦、baseline `eval`、他席 `greedy`、seed 900〜901の2ブロック（各arm 4試合）、releaseビルド、ローカルWindows、`--iterations 500`。
+
+| arm | 変更した要因 | 首位クレジット | control比 | 95%区間 | 最大決断時間 |
+|---|---|---:|---:|---|---:|
+| `control_puct` | （制御） | 100.0 pp | 0.0 pp | [0.0, 0.0] | 91.9 ms |
+| `leaf_heuristic` | `puct_leaf` | 75.0 pp | −25.0 pp | [−50.0, 0.0] | **1.9 ms** |
+| `explore_c3` | `puct_c` | 100.0 pp | 0.0 pp | [0.0, 0.0] | 153.5 ms |
+| `prior_temp1` | `puct_prior_temp` | 100.0 pp | 0.0 pp | [0.0, 0.0] | 112.8 ms |
+| `mcts_baseline` | `candidate` | 100.0 pp | 0.0 pp | [0.0, 0.0] | 155.5 ms |
+
+読み方と限界：
+
+- **強さの主張はしない。** 2ブロック（各arm 4試合）では区間幅が最大50 ppで退化しており、首位率の差は判定できない。上の表で言えるのは「配管が通り、各armが1要因だけ変えている」ことまでである。
+- **`leaf_heuristic` の差は強さの証拠ではない。** 同じ表の最大決断時間が 91.9 ms → 1.9 ms と約48倍速いことは**コスト**の観測であり、首位率の改善とは別指標。最終的な採否は `docs/roadmap-m7-onward.md` 3.2節の手順（1,000試合/arm、事前登録した一次比較）で決める。
+- `changed_factors_vs_control` が各armで1要素、`search_parameters` が実行時の実値、`baseline_games_are_shared: true` が付いていることをレポートで確認済み。
+
+### 7.2 初期スモーク（2026-11-07 以前、PUCT 非対応時）
 
 - 条件：カードなし2人戦、baseline `random`、他席 `greedy`、seed 900〜901の2ブロック、各arm 8試合、releaseビルド、`--decision-budget-ms 0`、ローカルWindows。
 - 結果：`control_eval` 100.0pp、`greedy` 50.0pp（control比 −50.0pp）、`mcts_sim2` 0.0pp（control比 −100.0pp）。全armでbaselineゲーム同一（`baseline_games_are_shared: true`）。
