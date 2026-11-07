@@ -593,6 +593,18 @@ mod tests {
     }
 
     #[test]
+    fn cardless_constructor_retains_legacy_game_hash() {
+        let config = Config {
+            players: 2,
+            seed: 42,
+            additional_action_space_enabled: false,
+        };
+        let legacy = Game::new(config.clone());
+        let explicit = Game::with_cards(config, CardSet::default()).unwrap();
+        assert_eq!(legacy.state_hash(), explicit.state_hash());
+    }
+
+    #[test]
     fn verified_cards_are_rejected_outside_two_players() {
         for players in [2, 3, 4] {
             assert!(check_card_condition(Cards::None, players).is_ok());
