@@ -2,7 +2,12 @@
 //! Reports the cost of a state clone and a full state hash (the two costs the
 //! search-only fast path removes) plus MCTS decision time across simulation
 //! counts. Output is one JSON object.
-use agricola_re_ai::mcts::MctsPolicy;
+//!
+//! It also sweeps the wall-clock search modes from #164, because that is the
+//! only place where "how much search does a budget actually buy" can be
+//! measured without paying for a whole game at 10 s per decision.
+//! `--search-budget-sweep` is opt-in: the sweep costs the sum of its budgets.
+use agricola_re_ai::mcts::{MctsPolicy, SearchLimit, SearchMode};
 use agricola_re_ai::model::{Config, Game};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -54,6 +59,42 @@ fn main() {
         }));
     }
 
+    let budget_sweep = std::env::args().any(|arg| arg == "--search-budget-sweep");
+    let mut time_budgets = Vec::new();
+    if budget_sweep {
+        for millis in [1_000u64, 3_000, 5_000, 10_000] {
+            let policy = MctsPolicy {
+                simulations: 1,
+                tree_depth: 2,
+            };
+            let mut rng = ChaCha8Rng::seed_from_u64(7);
+            let started = Instant::now();
+            let (space, outcome) = policy
+                .select_with_limit(
+                    &obs,
+                    &legal,
+                    &mut rng,
+                    SearchLimit::TimeBudget {
+                        deadline: Instant::now() + std::time::Duration::from_millis(millis),
+                        max_simulations: 100_000,
+                    },
+                )
+                .expect("budgeted decision");
+            let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+            time_budgets.push(json!({
+                "budget_ms": millis,
+                "mode": SearchMode::TimeBudgeted.as_str(),
+                "simulations_completed": outcome.simulations_completed,
+                "elapsed_ms": elapsed_ms,
+                "overshoot_ms": outcome.overshoot_ms,
+                "timed_out": outcome.timed_out,
+                "used_fallback": outcome.used_fallback,
+                "budget_used_fraction": (elapsed_ms / millis as f64).min(1.5),
+                "choice_is_legal": legal.contains(&space),
+            }));
+        }
+    }
+
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
@@ -63,6 +104,7 @@ fn main() {
             "state_hash_us": state_hash_us,
             "hash_vs_clone_ratio": if clone_us > 0.0 { state_hash_us / clone_us } else { 0.0 },
             "sweeps": sweeps,
+            "time_budget_sweep": time_budgets,
         }))
         .expect("profile JSON")
     );

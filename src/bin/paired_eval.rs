@@ -9,10 +9,16 @@
 //! deck size and the deck content hash are recorded on every row and the
 //! aggregator refuses to pool them. Only the built-in, two-player A/B pool is
 //! available; no unverified card can enter a deck here.
+//!
+//! `--search-mode` selects the stopping rule (#164). `simulation-capped` runs a
+//! fixed number of simulations and is reproducible; `time-budgeted` searches
+//! until a wall-clock deadline and is not. The two are different experiments
+//! and the aggregator refuses to mix them.
+#![recursion_limit = "256"]
 use agricola_re_ai::cards::{verified_basic_card_set, CardSet};
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::harvest::SimpleHarvestDetails;
-use agricola_re_ai::mcts::{MctsOutcome, MctsPolicy};
+use agricola_re_ai::mcts::{MctsOutcome, MctsPolicy, SearchLimit, SearchMode};
 use agricola_re_ai::model::Space;
 use agricola_re_ai::policy::{
     play_to_end_observed, CardChoiceDetails, DetailPolicy, GreedyPolicy, RandomPolicy,
@@ -29,6 +35,10 @@ use std::io::{BufWriter, Write};
 use std::time::{Duration, Instant};
 
 const DEFAULT_DECISION_BUDGET_MS: u64 = 10_000;
+const DEFAULT_SIMULATIONS: usize = 64;
+/// Safety cap for time-budgeted search. It is high enough not to bind on small
+/// games, and low enough that a pathological position cannot loop forever.
+const DEFAULT_TIME_BUDGET_MAX_SIMULATIONS: usize = 100_000;
 
 /// Card condition of an experiment arm.
 ///
@@ -105,7 +115,9 @@ struct Options {
     additional_action_space: bool,
     cards: Cards,
     decision_budget_ms: u64,
+    search_mode: SearchMode,
     mcts_simulations: usize,
+    time_budget_max_simulations: usize,
     mcts_tree_depth: usize,
     output: String,
 }
@@ -151,6 +163,8 @@ fn parse_options() -> Result<Options, String> {
             "additional-action-space",
             "cards",
             "decision-budget-ms",
+            "search-mode",
+            "time-budget-max-simulations",
             "mcts-simulations",
             "mcts-tree-depth",
             "output",
@@ -202,7 +216,20 @@ fn parse_options() -> Result<Options, String> {
                 .map_err(|_| "invalid mcts-simulations".to_string())
         })
         .transpose()?
-        .unwrap_or(64);
+        .unwrap_or(DEFAULT_SIMULATIONS);
+    let time_budget_max_simulations = optional_option(&values, "time-budget-max-simulations")
+        .map(|value| {
+            value
+                .parse::<usize>()
+                .map_err(|_| "invalid time-budget-max-simulations".to_string())
+        })
+        .transpose()?
+        .unwrap_or(DEFAULT_TIME_BUDGET_MAX_SIMULATIONS);
+    // The mode is explicit (#164). Defaulting to `simulation-capped` keeps every
+    // existing invocation reproducible and comparable with past results.
+    let search_mode_value = optional_option(&values, "search-mode").unwrap_or("simulation-capped");
+    let search_mode = SearchMode::parse(search_mode_value)
+        .ok_or_else(|| format!("unsupported search mode: {search_mode_value}"))?;
     let mcts_tree_depth = optional_option(&values, "mcts-tree-depth")
         .map(|value| {
             value
@@ -231,11 +258,19 @@ fn parse_options() -> Result<Options, String> {
     if mcts_simulations == 0 || mcts_simulations > 100_000 {
         return Err("mcts-simulations must be 1..=100000".into());
     }
+    if time_budget_max_simulations == 0 || time_budget_max_simulations > 1_000_000 {
+        return Err("time-budget-max-simulations must be 1..=1000000".into());
+    }
     if !(1..=6).contains(&mcts_tree_depth) {
         return Err("mcts-tree-depth must be 1..=6".into());
     }
     if candidate == baseline {
         return Err("candidate and baseline must be different".into());
+    }
+    // A time budget of 0 means "no deadline"; that combination has no meaning
+    // for a mode whose whole contract is the deadline.
+    if search_mode == SearchMode::TimeBudgeted && decision_budget_ms == 0 {
+        return Err("search-mode time-budgeted requires --decision-budget-ms > 0".into());
     }
     check_card_condition(cards, players)?;
     Ok(Options {
@@ -249,10 +284,27 @@ fn parse_options() -> Result<Options, String> {
         additional_action_space,
         cards,
         decision_budget_ms,
+        search_mode,
         mcts_simulations,
+        time_budget_max_simulations,
         mcts_tree_depth,
         output,
     })
+}
+
+/// The per-decision stopping rule for the focus seat.
+///
+/// Opponent seats always use `MctsPolicy.simulations` without a deadline, so a
+/// time-budgeted experiment does not quietly turn three opponents into
+/// unbounded searches.
+fn focus_search_rule(options: &Options) -> SearchRule {
+    match options.search_mode {
+        SearchMode::SimulationCapped => SearchRule::Simulations(options.mcts_simulations),
+        SearchMode::TimeBudgeted => SearchRule::TimeBudget {
+            budget: Duration::from_millis(options.decision_budget_ms),
+            max_simulations: options.time_budget_max_simulations,
+        },
+    }
 }
 
 #[derive(Default)]
@@ -260,6 +312,10 @@ struct FocusOutcomes {
     timeouts: u32,
     fallbacks: u32,
     simulations: u64,
+    /// Largest deadline overshoot reported by the search itself.
+    overshoot_ms: u64,
+    /// Largest search-internal decision time reported by the search itself.
+    elapsed_ms: u64,
 }
 
 struct SeatSelector<'a> {
@@ -270,9 +326,37 @@ struct SeatSelector<'a> {
     greedy: &'a GreedyPolicy,
     eval: &'a EvaluationPolicy,
     mcts: &'a MctsPolicy,
-    budget: Option<Duration>,
+    /// Stopping rule for a search policy. `None` for heuristic policies and for
+    /// the opponent seats, which always run the deterministic default.
+    search: Option<SearchRule>,
     decision_ns: RefCell<Vec<u64>>,
     focus_outcomes: RefCell<FocusOutcomes>,
+}
+
+/// Per-decision stopping rule template. The absolute deadline is resolved at
+/// the moment the decision starts.
+#[derive(Clone, Copy, Debug)]
+enum SearchRule {
+    Simulations(usize),
+    TimeBudget {
+        budget: Duration,
+        max_simulations: usize,
+    },
+}
+
+impl SearchRule {
+    fn resolve(self) -> SearchLimit {
+        match self {
+            SearchRule::Simulations(n) => SearchLimit::Simulations(n),
+            SearchRule::TimeBudget {
+                budget,
+                max_simulations,
+            } => SearchLimit::TimeBudget {
+                deadline: Instant::now() + budget,
+                max_simulations,
+            },
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -285,27 +369,28 @@ fn select_ai(
     obs: &Observation,
     legal: &[Space],
     rng: &mut ChaCha8Rng,
-    deadline: Option<Instant>,
+    search: Option<SearchRule>,
 ) -> (Option<Space>, MctsOutcome) {
     match ai {
         Ai::Random => (random.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Greedy => (greedy.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Eval => (eval.select(obs, legal, rng), MctsOutcome::default()),
-        Ai::Mcts => match mcts.select_with_budget(obs, legal, rng, deadline) {
-            Some((space, outcome)) => (Some(space), outcome),
-            None => (None, MctsOutcome::default()),
-        },
+        Ai::Mcts => {
+            let limit = search
+                .map(SearchRule::resolve)
+                .unwrap_or(SearchLimit::Simulations(mcts.simulations));
+            match mcts.select_with_limit(obs, legal, rng, limit) {
+                Some((space, outcome)) => (Some(space), outcome),
+                None => (None, MctsOutcome::default()),
+            }
+        }
     }
 }
 
 impl SpacePolicy for SeatSelector<'_> {
     fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
         let is_focus = obs.player_id == self.focus;
-        let deadline = if is_focus {
-            self.budget.map(|budget| Instant::now() + budget)
-        } else {
-            None
-        };
+        let search = if is_focus { self.search } else { None };
         let before = Instant::now();
         let (selected, outcome) = if is_focus {
             select_ai(
@@ -317,7 +402,7 @@ impl SpacePolicy for SeatSelector<'_> {
                 obs,
                 legal,
                 rng,
-                deadline,
+                search,
             )
         } else {
             select_ai(
@@ -337,16 +422,15 @@ impl SpacePolicy for SeatSelector<'_> {
         if is_focus {
             let mut outcomes = self.focus_outcomes.borrow_mut();
             if self.focus_ai.is_mcts() {
-                let over_budget = self
-                    .budget
-                    .is_some_and(|budget| ns > budget.as_nanos() as u64);
-                if outcome.timed_out || over_budget {
+                if outcome.timed_out {
                     outcomes.timeouts += 1;
                 }
                 if outcome.used_fallback {
                     outcomes.fallbacks += 1;
                 }
                 outcomes.simulations += outcome.simulations_completed as u64;
+                outcomes.overshoot_ms = outcomes.overshoot_ms.max(outcome.overshoot_ms);
+                outcomes.elapsed_ms = outcomes.elapsed_ms.max(outcome.elapsed_ms);
             }
         }
         selected
@@ -385,8 +469,11 @@ fn run(options: &Options) -> Result<(), String> {
         simulations: options.mcts_simulations,
         tree_depth: options.mcts_tree_depth,
     };
-    let budget = Duration::from_millis(options.decision_budget_ms);
-    let deadline_enabled = options.decision_budget_ms > 0;
+    // A wall-clock deadline is only enforced in time-budgeted mode. In
+    // simulation-capped mode the whole point is that the search length, not the
+    // clock, decides, so the run stays reproducible on any machine.
+    let deadline_enforced = options.search_mode == SearchMode::TimeBudgeted;
+    let search_rule = focus_search_rule(options);
     // The deck is built once and validated by the same gate the game uses, so
     // every arm and seat of an experiment provably shares one pool.
     let card_set = match options.cards {
@@ -425,7 +512,7 @@ fn run(options: &Options) -> Result<(), String> {
                     greedy: &greedy,
                     eval: &eval,
                     mcts: &mcts,
-                    budget: (focus_ai.is_mcts() && deadline_enabled).then_some(budget),
+                    search: Some(search_rule),
                     decision_ns: RefCell::new(Vec::new()),
                     focus_outcomes: RefCell::new(FocusOutcomes::default()),
                 };
@@ -473,7 +560,7 @@ fn run(options: &Options) -> Result<(), String> {
                 let outcomes = selector.focus_outcomes.borrow();
                 let whole_ns = focus_whole_ns.borrow();
                 let budget_ns = options.decision_budget_ms * 1_000_000;
-                let focus_timeout_count = if deadline_enabled {
+                let focus_timeout_count = if deadline_enforced && focus_ai.is_mcts() {
                     whole_ns.iter().filter(|&&ns| ns > budget_ns).count()
                 } else {
                     0
@@ -503,8 +590,12 @@ fn run(options: &Options) -> Result<(), String> {
                     "decisions": decision_ns.len(),
                     "focus_decisions": whole_ns.len(),
                     "decision_budget_ms": options.decision_budget_ms,
-                    "mcts_deadline_active": focus_ai.is_mcts() && deadline_enabled,
-                    "deterministic_policy_selection": !(focus_ai.is_mcts() && deadline_enabled),
+                    "search_mode": options.search_mode.as_str(),
+                    "mcts_simulations_cap": options.mcts_simulations,
+                    "time_budget_max_simulations": options.time_budget_max_simulations,
+                    "search_budget_enforced": deadline_enforced,
+                    "mcts_deadline_active": focus_ai.is_mcts() && deadline_enforced,
+                    "deterministic_policy_selection": !(focus_ai.is_mcts() && deadline_enforced),
                     "max_policy_select_ms": decision_ns.iter().copied().max().unwrap_or(0) as f64 / 1_000_000.0,
                     "p50_policy_select_ms": percentile_ms(&decision_ns, 0.50),
                     "p95_policy_select_ms": percentile_ms(&decision_ns, 0.95),
@@ -516,6 +607,13 @@ fn run(options: &Options) -> Result<(), String> {
                     "timeout_count": outcomes.timeouts,
                     "fallback_count": outcomes.fallbacks,
                     "mcts_simulations_completed": outcomes.simulations,
+                    "mcts_simulations_per_decision": if whole_ns.is_empty() {
+                        0.0
+                    } else {
+                        outcomes.simulations as f64 / whole_ns.len() as f64
+                    },
+                    "max_deadline_overshoot_ms": outcomes.overshoot_ms,
+                    "max_search_elapsed_ms": outcomes.elapsed_ms,
                     "mcts_tree_depth": options.mcts_tree_depth,
                     "policy_select_only": true,
                     "total_wall_ms": game_start.elapsed().as_secs_f64() * 1000.0,

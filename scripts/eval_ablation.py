@@ -128,6 +128,9 @@ def compare_arms(
             "additional_action_space",
             "baseline",
             "decision_budget_ms",
+            # #164: a fixed-simulation arm and a fixed-wall-clock arm answer
+            # different questions, so they may not share an ablation table.
+            "search_mode",
         ):
             if report[field] != controls[field]:
                 raise ValueError(
@@ -229,6 +232,7 @@ def compare_arms(
         "seed_blocks": controls["seed_blocks"],
         "cards": controls.get("cards", "none"),
         "decision_budget_ms": controls["decision_budget_ms"],
+        "search_mode": controls.get("search_mode", "simulation-capped"),
         "bootstrap_iterations": iterations,
         "bootstrap_seed": BOOTSTRAP_SEED,
         "baseline_games_are_shared": True,

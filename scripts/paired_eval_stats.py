@@ -16,6 +16,10 @@ import random
 import statistics
 import sys
 
+# #164: fixed-simulation and fixed-wall-clock searches are different
+# experiments. Only these names may appear, and never mixed in one report.
+SEARCH_MODES = ("simulation-capped", "time-budgeted")
+
 
 def finite_number(value: object) -> bool:
     """Reject NaN, infinities, booleans, and non-numeric JSON values."""
@@ -36,6 +40,7 @@ def validate_and_report(
     opponent: str,
     extra: bool,
     cards: str = "none",
+    search_mode: str = "simulation-capped",
     iterations: int = 10000,
 ) -> dict:
     if players not in (2, 3, 4) or blocks < 1 or iterations < 100:
@@ -52,6 +57,8 @@ def validate_and_report(
         raise ValueError("unsupported card condition")
     if cards != "none" and players != 2:
         raise ValueError("the verified card pool supports two players only")
+    if search_mode not in SEARCH_MODES:
+        raise ValueError("unsupported search mode")
     expected = {
         (block, arm, seat)
         for block in range(first_block, first_block + blocks)
@@ -204,19 +211,47 @@ def validate_and_report(
             or not 0 <= row["focus_timeout_count"] <= row["focus_decisions"]
         ):
             raise ValueError(f"invalid focus_timeout_count: {key}")
+        # #164: the search mode is explicit, and the deadline flag must match it
+        # rather than merely "a budget was configured".
+        if row.get("search_mode") not in SEARCH_MODES:
+            raise ValueError(f"invalid search mode: {key}")
+        time_budgeted = row["search_mode"] == "time-budgeted"
         if (
             type(row.get("mcts_deadline_active")) is not bool
             or type(row.get("deterministic_policy_selection")) is not bool
+            or type(row.get("search_budget_enforced")) is not bool
             or row["deterministic_policy_selection"] != (not row["mcts_deadline_active"])
+            or row["search_budget_enforced"] != time_budgeted
         ):
             raise ValueError(f"invalid policy mode flags: {key}")
         if row["mcts_deadline_active"] != (
-            row.get("focus_policy") == "mcts" and row["decision_budget_ms"] > 0
+            row.get("focus_policy") == "mcts" and time_budgeted
         ):
-            raise ValueError(f"deadline flag does not match policy/budget: {key}")
+            raise ValueError(f"deadline flag does not match policy/search mode: {key}")
+        # A simulation-capped run applies no deadline, so its "10 s" claim is
+        # meaningless; a time-budgeted run must have a positive budget.
+        if time_budgeted and row["decision_budget_ms"] <= 0:
+            raise ValueError(f"time-budgeted run without a budget: {key}")
+        for numeric in ("max_deadline_overshoot_ms", "max_search_elapsed_ms"):
+            value = row.get(numeric)
+            if not finite_number(value) or value < 0:
+                raise ValueError(f"invalid {numeric}: {key}")
+        for numeric in ("mcts_simulations_cap", "time_budget_max_simulations",
+                        "mcts_simulations_per_decision"):
+            value = row.get(numeric)
+            if not finite_number(value) or value < 0:
+                raise ValueError(f"invalid {numeric}: {key}")
         received[key] = row
     if set(received) != expected:
         raise ValueError(f"missing {len(expected - set(received))} game records")
+    search_modes = {row["search_mode"] for row in rows}
+    if len(search_modes) != 1:
+        raise ValueError("inconsistent search modes across game records")
+    if next(iter(search_modes)) != search_mode:
+        raise ValueError(
+            f"game records are {next(iter(search_modes))!r} but the report was "
+            f"asked for {search_mode!r}"
+        )
     budgets = {row["decision_budget_ms"] for row in rows}
     if len(budgets) != 1:
         raise ValueError("inconsistent decision budgets across game records")
@@ -260,8 +295,9 @@ def validate_and_report(
     budget_within_10s = 0 < budget_ms <= 10000
     candidate_max_focus = max(g["focus_max_decision_ms"] for g in values["candidate"])
     baseline_max_focus = max(g["focus_max_decision_ms"] for g in values["baseline"])
-    candidate_deadline_control = candidate == "mcts" and budget_enabled
-    baseline_deadline_control = baseline == "mcts" and budget_enabled
+    # A deadline is only enforced in time-budgeted mode (#164).
+    candidate_deadline_control = candidate == "mcts" and search_mode == "time-budgeted"
+    baseline_deadline_control = baseline == "mcts" and search_mode == "time-budgeted"
     candidate_measured_within = budget_enabled and candidate_max_focus <= budget_ms
     baseline_measured_within = budget_enabled and baseline_max_focus <= budget_ms
     candidate_10s_observed_pass = (
@@ -400,6 +436,33 @@ def validate_and_report(
         "baseline_focus_measured_within_budget": baseline_measured_within,
         "candidate_10s_observed_pass": candidate_10s_observed_pass,
         "baseline_10s_observed_pass": baseline_10s_observed_pass,
+        "search_mode": search_mode,
+        "search_budget_enforced": search_mode == "time-budgeted",
+        "candidate_max_deadline_overshoot_ms": max(
+            g["max_deadline_overshoot_ms"] for g in values["candidate"]
+        ),
+        "baseline_max_deadline_overshoot_ms": max(
+            g["max_deadline_overshoot_ms"] for g in values["baseline"]
+        ),
+        "candidate_simulations_per_decision": statistics.mean(
+            g["mcts_simulations_per_decision"] for g in values["candidate"]
+        ),
+        "baseline_simulations_per_decision": statistics.mean(
+            g["mcts_simulations_per_decision"] for g in values["baseline"]
+        ),
+        "timeout_rate_semantics": (
+            "timed_out means the wall-clock deadline ended that decision. In "
+            "time-budgeted mode that is the normal case and therefore close to "
+            "1.0; in simulation-capped mode no deadline is applied, so the rate "
+            "must be 0.0."
+        ),
+        "search_mode_note": (
+            "simulation-capped and time-budgeted are different experiments and "
+            "must not be pooled: the first fixes the amount of search and is "
+            "reproducible, the second fixes wall-clock cost and is not. "
+            "deterministic_policy_selection is true only when no deadline was "
+            "enforced for the focus seat."
+        ),
         "deadline_enforcement": "cooperative_in_policy_checks",
         "first_credit_goal_5pp_point_estimate_met": point >= .05,
         "improvement_ci_lower_above_zero": lower > 0,
@@ -445,6 +508,7 @@ def main() -> int:
     p.add_argument("--opponent", choices=("random", "greedy", "eval", "mcts"), required=True)
     p.add_argument("--extra", action="store_true")
     p.add_argument("--cards", choices=("none", "verified_basic_2p"), default="none")
+    p.add_argument("--search-mode", choices=SEARCH_MODES, default="simulation-capped")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     try:
@@ -453,7 +517,7 @@ def main() -> int:
             seed_start=args.seed_start, first_block=args.first_block,
             blocks=args.blocks, candidate=args.candidate,
             baseline=args.baseline, opponent=args.opponent,
-            extra=args.extra, cards=args.cards,
+            extra=args.extra, cards=args.cards, search_mode=args.search_mode,
         )
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
         print(json.dumps(report, ensure_ascii=False, indent=2))

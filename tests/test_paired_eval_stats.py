@@ -54,6 +54,13 @@ def fixture(blocks=3, players=4):
                     "focus_timeout_count": 0,
                     "mcts_deadline_active": False,
                     "deterministic_policy_selection": True,
+                    "search_mode": "simulation-capped",
+                    "search_budget_enforced": False,
+                    "mcts_simulations_cap": 64,
+                    "time_budget_max_simulations": 100000,
+                    "mcts_simulations_per_decision": 0.0,
+                    "max_deadline_overshoot_ms": 0,
+                    "max_search_elapsed_ms": 0,
                     "policy_select_only": True,
                     "total_wall_ms": 50.0,
                     "replay_hash": "a" * 64,
@@ -62,11 +69,19 @@ def fixture(blocks=3, players=4):
     return records
 
 
-def run(rows, blocks=3, players=4, cards="none"):
+def as_time_budgeted(rows):
+    """Mark every row as a fixed-wall-clock experiment (#164)."""
+    for row in rows:
+        row["search_mode"] = "time-budgeted"
+        row["search_budget_enforced"] = True
+    return rows
+
+
+def run(rows, blocks=3, players=4, cards="none", search_mode="simulation-capped"):
     return validate_and_report(
         rows, players=players, seed_start=1000, first_block=0, blocks=blocks,
         candidate="eval", baseline="random", opponent="greedy",
-        extra=False, cards=cards, iterations=500,
+        extra=False, cards=cards, search_mode=search_mode, iterations=500,
     )
 
 
@@ -252,7 +267,7 @@ class PairedStatsTests(unittest.TestCase):
             run(rows)
 
     def test_mcts_focus_is_accepted_with_budget_metrics(self):
-        rows = fixture()
+        rows = as_time_budgeted(fixture())
         for row in rows:
             if row["arm_id"] == "candidate":
                 row["focus_policy"] = "mcts"
@@ -262,7 +277,7 @@ class PairedStatsTests(unittest.TestCase):
         report = validate_and_report(
             rows, players=4, seed_start=1000, first_block=0, blocks=3,
             candidate="mcts", baseline="random", opponent="greedy",
-            extra=False, iterations=500,
+            extra=False, search_mode="time-budgeted", iterations=500,
         )
         self.assertEqual(report["total_games"], 24)
         self.assertEqual(report["decision_budget_ms"], 10000)
@@ -277,7 +292,7 @@ class PairedStatsTests(unittest.TestCase):
         self.assertEqual(report["deadline_enforcement"], "cooperative_in_policy_checks")
 
     def test_mcts_over_budget_disables_full_decision_flag(self):
-        rows = fixture()
+        rows = as_time_budgeted(fixture())
         for row in rows:
             if row["arm_id"] == "candidate":
                 row["focus_policy"] = "mcts"
@@ -290,7 +305,7 @@ class PairedStatsTests(unittest.TestCase):
         report = validate_and_report(
             rows, players=4, seed_start=1000, first_block=0, blocks=3,
             candidate="mcts", baseline="random", opponent="greedy",
-            extra=False, iterations=500,
+            extra=False, search_mode="time-budgeted", iterations=500,
         )
         self.assertFalse(report["candidate_10s_observed_pass"])
         self.assertTrue(report["candidate_focus_deadline_control"])
@@ -541,6 +556,97 @@ class PairedStatsCardConditionTests(unittest.TestCase):
                         candidate="eval", baseline="random", opponent="greedy",
                         extra=False, cards="verified_basic_2p", iterations=500,
                     )
+
+
+
+class PairedStatsSearchModeTests(unittest.TestCase):
+    """#164: fixed simulation counts and fixed wall-clock budgets never mix."""
+
+    def test_simulation_capped_report_is_labelled_and_cannot_claim_10s(self):
+        report = run(fixture())
+        self.assertEqual(report["search_mode"], "simulation-capped")
+        self.assertFalse(report["search_budget_enforced"])
+        # No deadline is enforced in this mode, so a 10 s claim is meaningless
+        # even though decision_budget_ms is 10000.
+        self.assertFalse(report["candidate_focus_deadline_control"])
+        self.assertFalse(report["candidate_10s_observed_pass"])
+        self.assertIn("simulation-capped", report["search_mode_note"])
+
+    def test_time_budgeted_report_carries_search_cost_measurements(self):
+        rows = as_time_budgeted(fixture())
+        for row in rows:
+            row["mcts_simulations_per_decision"] = 500.0
+            row["max_deadline_overshoot_ms"] = 7
+            row["max_search_elapsed_ms"] = 9993
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="eval", baseline="random", opponent="greedy",
+            extra=False, search_mode="time-budgeted", iterations=500,
+        )
+        self.assertEqual(report["search_mode"], "time-budgeted")
+        self.assertTrue(report["search_budget_enforced"])
+        self.assertEqual(report["candidate_simulations_per_decision"], 500.0)
+        self.assertEqual(report["candidate_max_deadline_overshoot_ms"], 7)
+        self.assertEqual(report["baseline_max_deadline_overshoot_ms"], 7)
+
+    def test_mixed_search_modes_are_rejected(self):
+        rows = as_time_budgeted(fixture())
+        rows[0]["search_mode"] = "simulation-capped"
+        rows[0]["search_budget_enforced"] = False
+        rows[0]["mcts_deadline_active"] = False
+        rows[0]["deterministic_policy_selection"] = True
+        with self.assertRaisesRegex(ValueError, "inconsistent search modes"):
+            run(rows, search_mode="time-budgeted")
+
+    def test_unknown_search_mode_is_rejected(self):
+        rows = fixture()
+        rows[0]["search_mode"] = "budgeted-ish"
+        with self.assertRaisesRegex(ValueError, "invalid search mode"):
+            run(rows)
+
+    def test_time_budgeted_requires_a_positive_budget(self):
+        rows = as_time_budgeted(fixture())
+        for row in rows:
+            row["decision_budget_ms"] = 0
+        with self.assertRaisesRegex(ValueError, "time-budgeted run without a budget"):
+            run(rows, search_mode="time-budgeted")
+
+    def test_deadline_flag_must_follow_the_search_mode(self):
+        def mcts_candidate(rows):
+            for row in rows:
+                if row["arm_id"] == "candidate":
+                    row["focus_policy"] = "mcts"
+                    row["mcts_deadline_active"] = True
+                    row["deterministic_policy_selection"] = False
+            return rows
+
+        def report(rows):
+            return validate_and_report(
+                rows, players=4, seed_start=1000, first_block=0, blocks=3,
+                candidate="mcts", baseline="random", opponent="greedy",
+                extra=False, search_mode="time-budgeted", iterations=500,
+            )
+
+        # Valid: MCTS focus in time-budgeted mode.
+        valid = report(mcts_candidate(as_time_budgeted(fixture())))
+        self.assertEqual(valid["candidate_focus_deadline_control"], True)
+
+        # Now claim an enforced deadline in simulation-capped mode: not allowed.
+        capped = as_time_budgeted(fixture())
+        for row in capped:
+            row["search_mode"] = "simulation-capped"
+            row["search_budget_enforced"] = False
+        with self.assertRaisesRegex(ValueError, "deadline flag"):
+            report(mcts_candidate(capped))
+
+    def test_negative_search_measurements_are_rejected(self):
+        for field in ("max_deadline_overshoot_ms", "max_search_elapsed_ms",
+                      "mcts_simulations_per_decision"):
+            with self.subTest(field=field):
+                rows = fixture()
+                rows[0][field] = -1
+                with self.assertRaisesRegex(ValueError, "invalid"):
+                    run(rows)
 
 
 if __name__ == "__main__":
