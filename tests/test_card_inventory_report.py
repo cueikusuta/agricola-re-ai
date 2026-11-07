@@ -96,6 +96,14 @@ class ClassificationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate or empty card_id"):
             inventory([row(), row()])
 
+    def test_malformed_deck_and_base_flag_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "invalid deck/card_id pairing"):
+            inventory([row(card_id="A001", deck="B")])
+        with self.assertRaisesRegex(ValueError, "invalid in_base_2016"):
+            changed = row()
+            changed["in_base_2016"] = "UNKNOWN"
+            inventory([changed])
+
     def test_invalid_difficulty_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "invalid preliminary difficulty"):
             inventory([row(difficulty="0")])
