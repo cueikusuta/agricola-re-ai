@@ -1,18 +1,25 @@
 //! #167 C: train/validation/test split manifest and the M14 G0 gate.
 //!
-//! These tests fix the two things the roadmap's data-split section asks for:
-//! the split cannot leak a seed or an initial state across splits, and G0 never
-//! reports `pass` while evidence is missing. They do not train anything and do
-//! not claim strength.
+//! These tests fix three things the roadmap asks for: the split cannot leak a
+//! seed or an initial state across splits, G0 never reports `pass` while the
+//! grounds are unproven, and — after the review P1 — **G0 never passes on a
+//! declaration**. Every scale, replay and completeness number the gate uses is
+//! recomputed from the matches files, so a hand-written `games_per_arm: 1000` or
+//! a pair of `true` booleans cannot open the gate.
+//!
+//! Nothing here trains a model and nothing claims strength. The few-game cases
+//! are explicitly plumbing tests.
 use agricola_re_ai::cards::CardSet;
 use agricola_re_ai::dataset_split::{
-    build_manifest, evaluate_g0, DatasetSplitManifest, G0Evidence, GateStatus, ModeEvidence, Split,
+    build_manifest, evaluate_g0, load_matches, normalise_card_mode, recompute_mode, sha256_hex,
+    ChecksEvidence, DatasetSplitManifest, G0Evidence, GateStatus, ModeBundle, ModeEvidence, Split,
     SplitPlan,
 };
 use agricola_re_ai::episode_data::{inspect_dataset, record_self_play, EpisodeMeta, EpisodeRecord};
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::model::Config;
 use agricola_re_ai::policy::SimpleDetails;
+use std::collections::BTreeMap;
 
 fn meta(players: usize) -> EpisodeMeta {
     EpisodeMeta::new("test-sha", "none", vec!["eval".to_string(); players])
@@ -33,13 +40,13 @@ fn record(players: usize, seed: u64) -> EpisodeRecord {
     .expect("self-play recording")
 }
 
-/// Seeds 100..=101 train, 110 validation, 120 test. Kept small: these tests are
-/// about the split rules, and every record is a full self-play game.
+/// Seeds 100..=101 train, 110 validation, and a wide locked test *range* so an
+/// evaluation can use many unseen seeds without shipping that many episodes.
 fn plan() -> SplitPlan {
     SplitPlan {
         train: (100, 101),
         validation: (110, 110),
-        test: (120, 120),
+        test: (120, 1600),
     }
 }
 
@@ -54,26 +61,89 @@ fn manifest() -> DatasetSplitManifest {
     build_manifest(&dataset(), plan()).expect("a clean split")
 }
 
-fn evidence(code_sha: &str) -> G0Evidence {
-    G0Evidence {
-        schema_version: 1,
-        code_sha: code_sha.into(),
-        m8_1_rule_evidence: true,
-        m8_2_legal_api_evidence: true,
-        modes: vec![ModeEvidence {
-            mode: "cardless_2p".into(),
-            players: 2,
-            card_mode: "none".into(),
-            games_per_arm: 1000,
-            anomalies: 0,
-            replay_mismatches: 0,
-            legal_action_violations: 0,
-            observation_noninterference_passed: true,
-            ci_reproducible: true,
-            artifact_url: "https://example.invalid/run/1".into(),
-        }],
-    }
+// --- Synthetic evaluation artifacts ----------------------------------------
+//
+// These are *rows*, not games: the gate only reads what a real `paired_eval`
+// run writes, so constructing the rows is exactly what an artifact check needs.
+
+fn row_json(block: usize, seed: u64, arm: &str, seat: usize, players: usize) -> String {
+    format!(
+        "{{\"block_index\":{block},\"seed\":{seed},\"arm_id\":\"{arm}\",\
+         \"candidate_seat\":{seat},\"players\":{players},\"cards\":\"none\",\
+         \"finished\":true,\"rounds_completed\":14,\"replay_verified\":true}}"
+    )
 }
+
+/// A complete seat-rotated evaluation over `blocks` seed blocks.
+fn matches_jsonl(blocks: usize, players: usize, first_seed: u64) -> String {
+    let mut out = String::new();
+    for block in 0..blocks {
+        let seed = first_seed + block as u64;
+        for arm in ["candidate", "baseline"] {
+            for seat in 0..players {
+                out.push_str(&row_json(block, seed, arm, seat, players));
+                out.push('\n');
+            }
+        }
+    }
+    out
+}
+
+fn checks_json(code_sha: &str, matches_sha256: &str) -> String {
+    serde_json::to_string(&ChecksEvidence {
+        schema_version: 2,
+        code_sha: code_sha.into(),
+        matches_sha256: matches_sha256.into(),
+        m8_rule_evidence: true,
+        m8_legal_api_evidence: true,
+        observation_noninterference_passed: true,
+        ci_reproducible: true,
+    })
+    .expect("checks json")
+}
+
+/// Build evidence plus the bytes it points at for one mode.
+fn evidence_for(
+    mode: &str,
+    players: usize,
+    card_mode: &str,
+    matches: &str,
+    with_checks: bool,
+) -> (G0Evidence, BTreeMap<String, ModeBundle>) {
+    let digest = sha256_hex(matches.as_bytes());
+    let mut bundle = ModeBundle {
+        matches: vec![matches.as_bytes().to_vec()],
+        checks: None,
+        load_error: None,
+    };
+    let checks_sha = if with_checks {
+        let checks = checks_json("test-sha", &digest);
+        let sha = sha256_hex(checks.as_bytes());
+        bundle.checks = Some(checks.into_bytes());
+        Some(sha)
+    } else {
+        None
+    };
+    let evidence = G0Evidence {
+        schema_version: 2,
+        code_sha: "test-sha".into(),
+        modes: vec![ModeEvidence {
+            mode: mode.into(),
+            players,
+            card_mode: card_mode.into(),
+            artifact_url: "https://example.invalid/run/1".into(),
+            matches_sha256: digest,
+            matches_paths: vec!["matches.jsonl".into()],
+            checks_path: checks_sha.as_ref().map(|_| "checks.json".to_string()),
+            checks_sha256: checks_sha,
+        }],
+    };
+    let mut bundles = BTreeMap::new();
+    bundles.insert(mode.to_string(), bundle);
+    (evidence, bundles)
+}
+
+// --- Split manifest ---------------------------------------------------------
 
 #[test]
 fn a_disjoint_plan_produces_three_non_empty_splits() {
@@ -90,9 +160,9 @@ fn a_disjoint_plan_produces_three_non_empty_splits() {
     }
     assert_eq!(manifest.split(Split::Train).unwrap().seeds, vec![100, 101]);
     assert_eq!(manifest.split(Split::Test).unwrap().seeds, vec![120]);
+    assert_eq!(manifest.player_counts(), [2].into_iter().collect());
     assert!(manifest.seed_isolation_problems().is_empty());
     assert!(manifest.is_usable());
-    // The manifest round-trips through JSON, because the gate reads it from disk.
     let encoded = serde_json::to_string(&manifest).expect("serialise");
     let decoded: DatasetSplitManifest = serde_json::from_str(&encoded).expect("deserialise");
     assert_eq!(decoded, manifest);
@@ -111,8 +181,6 @@ fn overlapping_ranges_are_rejected() {
 
 #[test]
 fn a_seed_outside_every_range_is_rejected_instead_of_defaulting() {
-    // Seed 120 is in the dataset but in no split: it must be an error, not a
-    // default assignment to (say) test.
     let plan = SplitPlan {
         train: (100, 101),
         validation: (110, 110),
@@ -139,8 +207,6 @@ fn a_duplicate_seed_in_one_dataset_is_rejected() {
 #[test]
 fn provenance_must_be_uniform_across_the_dataset() {
     let mut records = dataset();
-    // A different code revision is enough to make the set non-uniform: a learning
-    // set that mixes engines cannot be compared with itself.
     records[0].code_sha = "other-sha".into();
     let error = build_manifest(&records, plan()).unwrap_err();
     assert!(
@@ -175,7 +241,6 @@ fn training_samples_never_carry_private_state() {
     let manifest = manifest();
     assert!(manifest.private_sample_leaks.is_empty());
     assert!(manifest.total_training_samples > 0);
-    // Independent of the manifest counters, re-derive samples and check them.
     for record in dataset() {
         for viewer in 0..record.config.players {
             for sample in record.training_samples(viewer).unwrap() {
@@ -192,7 +257,6 @@ fn training_samples_never_carry_private_state() {
 #[test]
 fn the_same_initial_state_in_two_splits_is_leakage() {
     let mut dataset = manifest();
-    // Simulate an edited manifest: the same opening appears in train and test.
     let shared = dataset
         .split(Split::Train)
         .unwrap()
@@ -235,35 +299,155 @@ fn an_edited_manifest_with_a_seed_in_two_splits_is_detected() {
     );
 }
 
+// --- Recompute (the review P1 core) ----------------------------------------
+
 #[test]
-fn g0_is_hold_not_pass_when_evidence_is_missing() {
-    let manifest = manifest();
-    let report = evaluate_g0(&manifest, &inspect_dataset(&dataset()), None);
-    assert_eq!(report.verdict, GateStatus::Hold);
-    assert!(report.not_a_strength_claim);
-    let (_, fails, holds) = report.counts();
-    assert_eq!(fails, 0, "no data problem should be reported as a failure");
-    assert!(holds > 0, "missing evidence must be held");
-    let data_checks = report
-        .checks
-        .iter()
-        .filter(|check| check.source != "evidence")
-        .collect::<Vec<_>>();
-    assert!(
-        data_checks
-            .iter()
-            .all(|check| check.status == GateStatus::Pass),
-        "the data side should be clean: {data_checks:?}"
-    );
+fn the_gate_recomputes_scale_from_rows_not_from_a_declaration() {
+    // A two-block, two-player comparison is 8 rows: 2 blocks x 2 seats x 2 arms.
+    let rows = load_matches(matches_jsonl(2, 2, 120).as_bytes()).expect("rows");
+    let facts = recompute_mode(&rows);
+    assert_eq!(facts.rows, 8);
+    assert_eq!(facts.candidate_rows, 4);
+    assert_eq!(facts.baseline_rows, 4);
+    assert_eq!(facts.games_per_arm(), 4);
+    assert_eq!(facts.expected_rows(), 8);
+    assert!(facts.is_complete());
+    // Every seed block legitimately holds one game per seat per arm.
+    assert_eq!(facts.blocks.len(), 2);
+    assert_eq!(facts.seats, [0usize, 1].into_iter().collect());
 }
 
 #[test]
-fn g0_passes_only_with_complete_matching_evidence() {
+fn a_block_missing_one_seat_is_incomplete() {
+    let mut text = String::new();
+    text.push_str(&row_json(0, 120, "candidate", 0, 2));
+    text.push('\n');
+    text.push_str(&row_json(0, 120, "candidate", 1, 2));
+    text.push('\n');
+    text.push_str(&row_json(0, 120, "baseline", 0, 2));
+    text.push('\n');
+    let rows = load_matches(text.as_bytes()).expect("rows");
+    let facts = recompute_mode(&rows);
+    assert!(!facts.is_complete());
+    assert_eq!(facts.incomplete_blocks, vec![0]);
+}
+
+#[test]
+fn duplicate_blocks_arms_and_seats_are_detected() {
+    let mut text = matches_jsonl(1, 2, 120);
+    text.push_str(&row_json(0, 120, "candidate", 0, 2));
+    text.push('\n');
+    let rows = load_matches(text.as_bytes()).expect("rows");
+    let facts = recompute_mode(&rows);
+    assert_eq!(facts.duplicate_keys, vec![(0, "candidate".to_string(), 0)]);
+    assert!(!facts.is_complete());
+}
+
+#[test]
+fn unverified_or_truncated_rows_are_detected() {
+    let text = "{\"block_index\":0,\"seed\":120,\"arm_id\":\"candidate\",\
+                \"candidate_seat\":0,\"players\":2,\"finished\":false,\
+                \"rounds_completed\":13,\"replay_verified\":false}\n";
+    let rows = load_matches(text.as_bytes()).expect("rows");
+    let facts = recompute_mode(&rows);
+    assert_eq!(facts.unfinished, 1);
+    assert_eq!(facts.wrong_rounds, 1);
+    assert_eq!(facts.unverified, 1);
+    assert!(!facts.is_complete());
+}
+
+#[test]
+fn a_truncated_artifact_line_is_an_error_not_a_smaller_run() {
+    assert!(load_matches(b"{\"block_index\":0,").is_err());
+    assert!(load_matches(b"  \n\n").is_err());
+}
+
+// --- G0 ---------------------------------------------------------------------
+
+#[test]
+fn g0_is_hold_not_pass_without_evidence() {
     let manifest = manifest();
     let report = evaluate_g0(
         &manifest,
         &inspect_dataset(&dataset()),
-        Some(&evidence("test-sha")),
+        None,
+        &BTreeMap::new(),
+    );
+    assert_eq!(report.verdict, GateStatus::Hold);
+    assert!(report.not_a_strength_claim);
+    let (_, fails, holds) = report.counts();
+    assert_eq!(fails, 0, "a missing evidence file is not a failure");
+    assert!(holds > 0);
+}
+
+#[test]
+fn the_old_declaration_only_evidence_schema_cannot_pass() {
+    // The pre-review format had `games_per_arm`/booleans and no artifacts. It
+    // must be rejected outright, not silently accepted as "v1 compatible".
+    let legacy = serde_json::json!({
+        "schema_version": 1,
+        "code_sha": "test-sha",
+        "m8_1_rule_evidence": true,
+        "m8_2_legal_api_evidence": true,
+        "modes": [{
+            "mode": "cardless_2p", "players": 2, "card_mode": "none",
+            "games_per_arm": 1000, "anomalies": 0, "replay_mismatches": 0,
+            "legal_action_violations": 0,
+            "observation_noninterference_passed": true,
+            "ci_reproducible": true,
+            "artifact_url": "https://example.invalid/run/1"
+        }]
+    });
+    let evidence: G0Evidence = serde_json::from_value(legacy).expect("legacy shape parses");
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &BTreeMap::new(),
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+    assert!(
+        report
+            .checks
+            .iter()
+            .any(|check| check.id == "evidence_schema" && check.status == GateStatus::Fail),
+        "checks: {:?}",
+        report.checks
+    );
+}
+
+#[test]
+fn a_small_run_is_a_plumbing_test_and_cannot_pass() {
+    let (evidence, bundles) =
+        evidence_for("cardless_2p", 2, "none", &matches_jsonl(2, 2, 120), true);
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+    let scale = report
+        .checks
+        .iter()
+        .find(|check| check.id == "evaluation_scale")
+        .expect("scale check");
+    assert_eq!(scale.status, GateStatus::Fail);
+    assert!(scale.detail.contains("recomputed"), "{}", scale.detail);
+}
+
+#[test]
+fn a_thousand_games_per_arm_with_full_attestation_passes() {
+    // 500 blocks x 2 seats x 2 arms = 1,000 games per arm. This is synthetic
+    // *rows*, so it proves the gate's arithmetic and integrity chain, not that a
+    // real evaluation happened.
+    let matches = matches_jsonl(500, 2, 120);
+    let (evidence, bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
     );
     assert_eq!(
         report.verdict,
@@ -272,61 +456,192 @@ fn g0_passes_only_with_complete_matching_evidence() {
         report.checks
     );
     assert_eq!(report.evaluated_modes, vec!["cardless_2p".to_string()]);
-    assert!(report.next_action.contains("G1"));
+    let scale = report
+        .checks
+        .iter()
+        .find(|check| check.id == "evaluation_scale")
+        .expect("scale check");
+    assert_eq!(scale.status, GateStatus::Pass);
+    assert!(scale.detail.contains("1000 games/arm"), "{}", scale.detail);
 }
 
 #[test]
-fn g0_fails_on_a_short_or_mismatched_evaluation() {
-    let manifest = manifest();
-    let dataset_report = inspect_dataset(&dataset());
+fn attestations_without_a_bound_checks_file_are_only_hold() {
+    let matches = matches_jsonl(500, 2, 120);
+    let (evidence, bundles) = evidence_for("cardless_2p", 2, "none", &matches, false);
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(
+        report.verdict,
+        GateStatus::Hold,
+        "checks: {:?}",
+        report.checks
+    );
+    for id in [
+        "m8_rule_evidence",
+        "m8_legal_api_evidence",
+        "evaluation_observation_noninterference",
+        "evaluation_ci_reproducible",
+    ] {
+        let check = report
+            .checks
+            .iter()
+            .find(|check| check.id == id)
+            .unwrap_or_else(|| panic!("{id} missing"));
+        assert_eq!(check.status, GateStatus::Hold, "{id}: {}", check.detail);
+    }
+}
 
-    let mut short = evidence("test-sha");
-    short.modes[0].games_per_arm = 999;
-    let report = evaluate_g0(&manifest, &dataset_report, Some(&short));
+#[test]
+fn a_checks_file_that_does_not_match_the_matches_digest_fails() {
+    let matches = matches_jsonl(500, 2, 120);
+    let (mut evidence, mut bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
+    // Re-bind the checks file to different bytes: the binding must break.
+    let other = matches_jsonl(500, 2, 900);
+    let stale = checks_json("test-sha", &sha256_hex(other.as_bytes()));
+    bundles.get_mut("cardless_2p").unwrap().checks = Some(stale.clone().into_bytes());
+    evidence.modes[0].checks_sha256 = Some(sha256_hex(stale.as_bytes()));
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+}
+
+#[test]
+fn a_fabricated_matches_digest_fails() {
+    let matches = matches_jsonl(500, 2, 120);
+    let (mut evidence, bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
+    evidence.modes[0].matches_sha256 = sha256_hex(b"not the artifact");
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
     assert_eq!(report.verdict, GateStatus::Fail);
     assert!(report
         .checks
         .iter()
-        .any(|check| check.id == "evaluation_scale" && check.status == GateStatus::Fail));
-
-    let mut mismatched = evidence("another-sha");
-    mismatched.modes[0].artifact_url.clear();
-    let report = evaluate_g0(&manifest, &dataset_report, Some(&mismatched));
-    assert_eq!(report.verdict, GateStatus::Fail);
-    assert!(report
-        .checks
-        .iter()
-        .any(|check| check.id == "artifact_traceable" && check.status == GateStatus::Fail));
+        .any(|check| check.id == "evaluation_matches_digest" && check.status == GateStatus::Fail));
 }
 
 #[test]
-fn g0_fails_when_rules_or_legality_evidence_is_absent() {
-    let manifest = manifest();
-    let dataset_report = inspect_dataset(&dataset());
-    let mut missing_rule_evidence = evidence("test-sha");
-    missing_rule_evidence.m8_1_rule_evidence = false;
-    let report = evaluate_g0(&manifest, &dataset_report, Some(&missing_rule_evidence));
-    assert_eq!(report.verdict, GateStatus::Fail);
-
-    let mut illegal = evidence("test-sha");
-    illegal.modes[0].legal_action_violations = 1;
-    let report = evaluate_g0(&manifest, &dataset_report, Some(&illegal));
-    assert_eq!(report.verdict, GateStatus::Fail);
-    assert!(report
-        .checks
-        .iter()
-        .any(|check| check.id == "evaluation_legality" && check.status == GateStatus::Fail));
-}
-
-#[test]
-fn g0_holds_when_no_supported_card_mode_was_evaluated() {
-    let manifest = manifest();
-    let dataset_report = inspect_dataset(&dataset());
-    let mut only_unsupported = evidence("test-sha");
-    only_unsupported.modes[0].card_mode = "experimental_pool".into();
-    let report = evaluate_g0(&manifest, &dataset_report, Some(&only_unsupported));
+fn missing_matches_files_hold_instead_of_passing() {
+    let matches = matches_jsonl(500, 2, 120);
+    let (evidence, _) = evidence_for("cardless_2p", 2, "none", &matches, true);
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &BTreeMap::new(),
+    );
     assert_eq!(report.verdict, GateStatus::Hold);
-    assert!(report.evaluated_modes.is_empty());
+}
+
+#[test]
+fn duplicate_modes_are_rejected() {
+    let matches = matches_jsonl(500, 2, 120);
+    let (mut evidence, bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
+    evidence.modes.push(evidence.modes[0].clone());
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+    assert!(report
+        .checks
+        .iter()
+        .any(|check| check.detail.contains("duplicate modes")));
+}
+
+#[test]
+fn a_mode_condition_that_does_not_match_the_dataset_is_rejected() {
+    // The dataset is cardless 2p; a verified-card 4p evaluation is not the same
+    // experiment and must not be counted as evidence for it.
+    let matches = matches_jsonl(500, 4, 120);
+    let (evidence, bundles) = evidence_for("verified_4p", 4, "verified_basic", &matches, true);
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+}
+
+#[test]
+fn an_unverified_card_mode_in_the_evidence_is_rejected() {
+    let matches = matches_jsonl(500, 2, 120);
+    let (evidence, bundles) = evidence_for("experimental", 2, "experimental_pool", &matches, true);
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+}
+
+#[test]
+fn evaluating_on_training_seeds_is_leakage_and_fails() {
+    // Seeds 100/101 are the train split; an evaluation must use the locked test
+    // range only.
+    let matches = matches_jsonl(500, 2, 100);
+    let (evidence, bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+    let split_check = report
+        .checks
+        .iter()
+        .find(|check| check.id == "evaluation_split_discipline")
+        .expect("split check");
+    assert_eq!(split_check.status, GateStatus::Fail);
+}
+
+#[test]
+fn an_unfinished_or_unreplayed_evaluation_fails() {
+    let mut text = matches_jsonl(500, 2, 120);
+    text = text.replace("\"replay_verified\":true", "\"replay_verified\":false");
+    // Only the first occurrence is enough to prove the check.
+    let mut changed = String::new();
+    let mut replaced = false;
+    for line in text.lines() {
+        if !replaced && line.contains("\"replay_verified\":false") {
+            changed.push_str(line);
+            changed.push('\n');
+            replaced = true;
+        } else {
+            changed
+                .push_str(&line.replace("\"replay_verified\":false", "\"replay_verified\":true"));
+            changed.push('\n');
+        }
+    }
+    let (evidence, bundles) = evidence_for("cardless_2p", 2, "none", &changed, true);
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+    assert!(report
+        .checks
+        .iter()
+        .any(|check| check.id == "evaluation_replay" && check.status == GateStatus::Fail));
 }
 
 #[test]
@@ -334,10 +649,13 @@ fn g0_fails_a_dataset_with_a_corrupt_record() {
     let manifest = manifest();
     let mut records = dataset();
     records[0].final_state_hash = "0".repeat(64);
+    let matches = matches_jsonl(500, 2, 120);
+    let (evidence, bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
     let report = evaluate_g0(
         &manifest,
         &inspect_dataset(&records),
-        Some(&evidence("test-sha")),
+        Some(&evidence),
+        &bundles,
     );
     assert_eq!(report.verdict, GateStatus::Fail);
     assert!(report
@@ -347,22 +665,8 @@ fn g0_fails_a_dataset_with_a_corrupt_record() {
 }
 
 #[test]
-fn a_four_player_dataset_is_supported() {
-    let records = [200, 201, 210, 211, 220, 221]
-        .into_iter()
-        .map(|seed| record(4, seed))
-        .collect::<Vec<_>>();
-    let plan = SplitPlan {
-        train: (200, 201),
-        validation: (210, 211),
-        test: (220, 221),
-    };
-    let manifest = build_manifest(&records, plan).expect("4p split");
-    assert_eq!(
-        manifest.split(Split::Train).unwrap().episodes,
-        2,
-        "each seed is one game regardless of player count"
-    );
-    let report = evaluate_g0(&manifest, &inspect_dataset(&records), None);
-    assert_eq!(report.verdict, GateStatus::Hold);
+fn card_mode_spellings_are_normalised_consistently() {
+    assert_eq!(normalise_card_mode("none"), "none");
+    assert_eq!(normalise_card_mode("verified_basic_2p"), "verified_basic");
+    assert_eq!(normalise_card_mode("verified"), "verified_basic");
 }

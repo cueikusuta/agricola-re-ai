@@ -15,12 +15,14 @@
 //! verdict and exits 0 only for `pass`; `hold` and `fail` are non-zero so a
 //! workflow cannot treat a missing-evidence gate as success.
 use agricola_re_ai::dataset_split::{
-    build_manifest, evaluate_g0, DatasetSplitManifest, G0Evidence, GateStatus, SplitPlan,
+    build_manifest, evaluate_g0, DatasetSplitManifest, G0Evidence, GateStatus, ModeBundle,
+    SplitPlan,
 };
 use agricola_re_ai::episode_data::{from_jsonl, DatasetReport};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -136,15 +138,47 @@ fn evaluate(values: &BTreeMap<String, String>) -> Result<ExitCode, String> {
     )
     .map_err(|error| format!("{report_path}: {error}"))?;
     let evidence = match values.get("evidence") {
-        Some(path) => Some(
-            serde_json::from_str::<G0Evidence>(
-                &fs::read_to_string(path).map_err(|error| format!("{path}: {error}"))?,
-            )
-            .map_err(|error| format!("{path}: {error}"))?,
-        ),
+        Some(path) => {
+            let text = fs::read_to_string(path).map_err(|error| format!("{path}: {error}"))?;
+            let evidence: G0Evidence =
+                serde_json::from_str(&text).map_err(|error| format!("{path}: {error}"))?;
+            Some((evidence, PathBuf::from(path)))
+        }
         None => None,
     };
-    let report = evaluate_g0(&manifest, &dataset, evidence.as_ref());
+    // The gate reads the artifacts the evidence points at, so nothing it checks
+    // is a hand-typed number. Paths are resolved relative to the evidence file.
+    let mut bundles: BTreeMap<String, ModeBundle> = BTreeMap::new();
+    if let Some((evidence, evidence_path)) = &evidence {
+        let base = evidence_path.parent().unwrap_or(Path::new("."));
+        for mode in &evidence.modes {
+            let mut bundle = ModeBundle::default();
+            for declared in &mode.matches_paths {
+                match fs::read(base.join(declared)) {
+                    Ok(bytes) => bundle.matches.push(bytes),
+                    Err(error) => {
+                        bundle.load_error = Some(format!("{declared}: {error}"));
+                        break;
+                    }
+                }
+            }
+            if let Some(checks) = &mode.checks_path {
+                match fs::read(base.join(checks)) {
+                    Ok(bytes) => bundle.checks = Some(bytes),
+                    Err(error) => {
+                        bundle.load_error = Some(format!("{checks}: {error}"));
+                    }
+                }
+            }
+            bundles.insert(mode.mode.clone(), bundle);
+        }
+    }
+    let report = evaluate_g0(
+        &manifest,
+        &dataset,
+        evidence.as_ref().map(|(evidence, _)| evidence),
+        &bundles,
+    );
     fs::write(
         output,
         serde_json::to_string_pretty(&report).map_err(|error| error.to_string())? + "\n",

@@ -160,6 +160,10 @@ pub struct DatasetSplitManifest {
     pub splits: Vec<SplitContents>,
     pub total_episodes: usize,
     pub total_training_samples: usize,
+    /// Player counts present in the dataset. The G0 gate needs them to reject a
+    /// mode whose condition does not match the data.
+    #[serde(default)]
+    pub player_counts: BTreeSet<usize>,
     /// Sampled `TrainingSample` values that failed the public-only check.
     pub private_sample_leaks: Vec<String>,
     /// Blocking inconsistencies. A manifest with any entry is not usable and the
@@ -171,6 +175,11 @@ pub struct DatasetSplitManifest {
 impl DatasetSplitManifest {
     pub fn split(&self, split: Split) -> Option<&SplitContents> {
         self.splits.iter().find(|entry| entry.split == split)
+    }
+
+    /// Player counts the dataset actually contains.
+    pub fn player_counts(&self) -> BTreeSet<usize> {
+        self.player_counts.clone()
     }
 
     pub fn is_usable(&self) -> bool {
@@ -346,12 +355,16 @@ pub fn build_manifest(
         provenance,
         total_episodes: records.len(),
         total_training_samples: splits.iter().map(|entry| entry.training_samples).sum(),
+        player_counts: records.iter().map(|record| record.config.players).collect(),
         private_sample_leaks: leaks,
         issues,
         splits,
-        seat_rotation_note: "Rows are per seat-rotated game; a seed block contains one \
-            game per candidate seat, so split by seed never separates seats of the same \
-            block."
+        // A paired evaluation row is one (seed block, arm, seat) game, so a block
+        // legitimately holds `players * 2` games for one comparison. G0 checks
+        // that shape instead of assuming one game per seed.
+        seat_rotation_note: "One seed block holds one game per candidate seat for \
+            each arm (players * 2 rows). Evaluations are validated per (block, arm, \
+            seat), and splitting by seed never separates the seats of one block."
             .into(),
     };
 
@@ -408,39 +421,215 @@ impl GateCheck {
     }
 }
 
-/// Evidence a mode must supply before G0 can pass. Every field is an explicit
-/// measurement; nothing is inferred from the presence of the data alone.
+/// Version of the evidence file. v2 replaced free-form declarations with
+/// references to the actual evaluation output (#167 C review P1).
+pub const G0_EVIDENCE_SCHEMA_VERSION: u32 = 2;
+
+/// One row of a `paired_eval` matches file, reduced to the fields the gate
+/// recomputes. Unknown fields are ignored, so the gate reads the artifact itself
+/// rather than a transcription of it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PairedRow {
+    pub block_index: usize,
+    pub seed: u64,
+    #[serde(default)]
+    pub arm_id: String,
+    pub candidate_seat: usize,
+    pub players: usize,
+    #[serde(default)]
+    pub cards: String,
+    #[serde(default)]
+    pub finished: bool,
+    #[serde(default)]
+    pub rounds_completed: u8,
+    #[serde(default)]
+    pub replay_verified: bool,
+}
+
+/// What was actually observed in one mode's matches files.
+///
+/// Every value here is recomputed from the rows, so it cannot be typed in by
+/// hand. This is what replaces the old `games_per_arm: 1000` declaration.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ModeRecompute {
+    pub rows: usize,
+    pub candidate_rows: usize,
+    pub baseline_rows: usize,
+    pub blocks: BTreeSet<usize>,
+    pub seeds: BTreeSet<u64>,
+    pub seats: BTreeSet<usize>,
+    pub players: BTreeSet<usize>,
+    pub cards: BTreeSet<String>,
+    /// `(block, arm, seat)` seen more than once.
+    pub duplicate_keys: Vec<(usize, String, usize)>,
+    pub unfinished: usize,
+    pub unverified: usize,
+    pub wrong_rounds: usize,
+    /// Blocks that do not contain both arms for every seat exactly once.
+    pub incomplete_blocks: Vec<usize>,
+}
+
+impl ModeRecompute {
+    pub fn games_per_arm(&self) -> usize {
+        self.candidate_rows.min(self.baseline_rows)
+    }
+
+    /// A seed block holds one game per seat per arm, so a complete block of a
+    /// 2-player comparison is `2 arms * 2 seats = 4` rows. This is the
+    /// seat-rotation contract the manifest documents.
+    pub fn expected_rows(&self) -> usize {
+        let seats = self.seats.len().max(1);
+        self.blocks.len() * seats * 2
+    }
+
+    /// Every block holds one game per seat per arm, with no duplicates and no
+    /// unfinished or unreplayed row.
+    pub fn is_complete(&self) -> bool {
+        self.duplicate_keys.is_empty()
+            && self.unfinished == 0
+            && self.unverified == 0
+            && self.wrong_rounds == 0
+            && self.incomplete_blocks.is_empty()
+            && self.rows == self.expected_rows()
+    }
+}
+
+/// Recompute the facts of one mode from its rows.
+pub fn recompute_mode(rows: &[PairedRow]) -> ModeRecompute {
+    let mut report = ModeRecompute {
+        rows: rows.len(),
+        ..ModeRecompute::default()
+    };
+    let mut seen: BTreeMap<(usize, String, usize), usize> = BTreeMap::new();
+    let mut per_block: BTreeMap<usize, BTreeMap<(String, usize), usize>> = BTreeMap::new();
+    for row in rows {
+        match row.arm_id.as_str() {
+            "candidate" => report.candidate_rows += 1,
+            "baseline" => report.baseline_rows += 1,
+            _ => {}
+        }
+        report.blocks.insert(row.block_index);
+        report.seeds.insert(row.seed);
+        report.seats.insert(row.candidate_seat);
+        report.players.insert(row.players);
+        report.cards.insert(row.cards.clone());
+        if !row.finished {
+            report.unfinished += 1;
+        }
+        if !row.replay_verified {
+            report.unverified += 1;
+        }
+        if row.rounds_completed != 14 {
+            report.wrong_rounds += 1;
+        }
+        let key = (row.block_index, row.arm_id.clone(), row.candidate_seat);
+        if seen.insert(key, 1).is_some() {
+            report
+                .duplicate_keys
+                .push((row.block_index, row.arm_id.clone(), row.candidate_seat));
+        }
+        *per_block
+            .entry(row.block_index)
+            .or_default()
+            .entry((row.arm_id.clone(), row.candidate_seat))
+            .or_default() += 1;
+    }
+    let seats = report.seats.len();
+    for (block, entries) in per_block {
+        let complete = entries.len() == seats * 2 && entries.values().all(|count| *count == 1);
+        if !complete {
+            report.incomplete_blocks.push(block);
+        }
+    }
+    report
+}
+
+/// Checks that cannot be derived from the matches rows. They are only accepted
+/// when an independently produced checks file binds them to the same code
+/// revision and the same matches bytes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChecksEvidence {
+    pub schema_version: u32,
+    pub code_sha: String,
+    pub matches_sha256: String,
+    pub m8_rule_evidence: bool,
+    pub m8_legal_api_evidence: bool,
+    pub observation_noninterference_passed: bool,
+    pub ci_reproducible: bool,
+}
+
+/// One evaluated condition. It points at real files; the gate reads them and
+/// recomputes everything it can.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModeEvidence {
     pub mode: String,
     pub players: usize,
     pub card_mode: String,
-    pub games_per_arm: usize,
-    pub anomalies: usize,
-    pub replay_mismatches: usize,
-    pub legal_action_violations: usize,
-    pub observation_noninterference_passed: bool,
-    pub ci_reproducible: bool,
     pub artifact_url: String,
+    /// SHA-256 over the concatenated contents of `matches_paths`, computed by
+    /// the producer. The gate recomputes it and refuses a mismatch.
+    #[serde(default)]
+    pub matches_sha256: String,
+    /// Matches files, resolved relative to the evidence file's directory.
+    #[serde(default)]
+    pub matches_paths: Vec<String>,
+    /// Optional attested checks file, bound by its hash and by the
+    /// `code_sha`/`matches_sha256` it carries.
+    #[serde(default)]
+    pub checks_path: Option<String>,
+    #[serde(default)]
+    pub checks_sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct G0Evidence {
     pub schema_version: u32,
     pub code_sha: String,
-    pub m8_1_rule_evidence: bool,
-    pub m8_2_legal_api_evidence: bool,
     pub modes: Vec<ModeEvidence>,
 }
 
-impl G0Evidence {
-    /// A mode only counts when its card condition is a verified one.
-    pub fn supported_modes(&self) -> Vec<&ModeEvidence> {
-        self.modes
-            .iter()
-            .filter(|mode| SUPPORTED_CARD_MODES.contains(&mode.card_mode.as_str()))
-            .collect()
+/// Evidence plus the bytes it points at, loaded by the caller.
+#[derive(Clone, Debug, Default)]
+pub struct ModeBundle {
+    pub matches: Vec<Vec<u8>>,
+    pub checks: Option<Vec<u8>>,
+    /// Set when a declared file could not be read.
+    pub load_error: Option<String>,
+}
+
+/// Normalise the `cards` spelling used by `paired_eval` rows to the dataset's
+/// `card_mode` vocabulary.
+pub fn normalise_card_mode(value: &str) -> &str {
+    match value {
+        "verified_basic_2p" | "verified" => "verified_basic",
+        other => other,
     }
+}
+
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
+/// Parse a matches file. An empty line is ignored; a malformed line is an error
+/// so a truncated artifact cannot be mistaken for a smaller run.
+pub fn load_matches(bytes: &[u8]) -> Result<Vec<PairedRow>, String> {
+    let text = std::str::from_utf8(bytes).map_err(|error| error.to_string())?;
+    let mut rows = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let row: PairedRow = serde_json::from_str(line)
+            .map_err(|error| format!("matches line {}: {error}", index + 1))?;
+        rows.push(row);
+    }
+    if rows.is_empty() {
+        return Err("matches file contains no rows".into());
+    }
+    Ok(rows)
 }
 
 /// The G0 report artifact.
@@ -481,6 +670,7 @@ pub fn evaluate_g0(
     manifest: &DatasetSplitManifest,
     dataset: &DatasetReport,
     evidence: Option<&G0Evidence>,
+    bundles: &BTreeMap<String, ModeBundle>,
 ) -> G0Report {
     let mut checks = Vec::new();
 
@@ -615,16 +805,20 @@ pub fn evaluate_g0(
         format!("card_modes={:?}", manifest.provenance.card_modes),
     ));
 
-    // --- Evaluation side, only provable from an explicit evidence file. ---
+    // --- Evaluation side. Every number below is recomputed from the matches
+    // files the evidence points at; nothing is taken from a declaration. ---
     let Some(evidence) = evidence else {
         for id in [
-            "m8_rule_evidence",
-            "m8_legal_api_evidence",
+            "evidence_schema",
+            "evaluation_mode_conditions",
+            "evaluation_matches_loaded",
+            "evaluation_matches_digest",
             "evaluation_scale",
+            "evaluation_completion",
             "evaluation_replay",
-            "evaluation_legality",
-            "evaluation_observation_noninterference",
-            "evaluation_ci_reproducible",
+            "evaluation_block_completeness",
+            "evaluation_split_discipline",
+            "checks_attested",
             "artifact_traceable",
         ] {
             checks.push(GateCheck::new(
@@ -634,210 +828,434 @@ pub fn evaluate_g0(
                 "no evidence file was supplied; G0 cannot pass on data alone",
             ));
         }
-        return finish(manifest, evidence_modes(&[]), checks, GateStatus::Hold);
+        return finish(manifest, Vec::new(), checks, GateStatus::Hold);
     };
 
-    checks.push(GateCheck::new(
-        "m8_rule_evidence",
-        if evidence.m8_1_rule_evidence {
-            GateStatus::Pass
-        } else {
-            GateStatus::Fail
-        },
-        "evidence",
-        format!("m8_1_rule_evidence={}", evidence.m8_1_rule_evidence),
-    ));
-    checks.push(GateCheck::new(
-        "m8_legal_api_evidence",
-        if evidence.m8_2_legal_api_evidence {
-            GateStatus::Pass
-        } else {
-            GateStatus::Fail
-        },
-        "evidence",
-        format!(
-            "m8_2_legal_api_evidence={}",
-            evidence.m8_2_legal_api_evidence
-        ),
-    ));
-
-    let modes = evidence.supported_modes();
-    if modes.is_empty() {
+    if evidence.schema_version != G0_EVIDENCE_SCHEMA_VERSION {
         checks.push(GateCheck::new(
-            "evaluation_scale",
-            GateStatus::Hold,
-            "evidence",
-            "no supported (verified-card) mode was evaluated",
-        ));
-        checks.push(GateCheck::new(
-            "evaluation_replay",
-            GateStatus::Hold,
-            "evidence",
-            "no supported mode was evaluated",
-        ));
-        checks.push(GateCheck::new(
-            "evaluation_legality",
-            GateStatus::Hold,
-            "evidence",
-            "no supported mode was evaluated",
-        ));
-        checks.push(GateCheck::new(
-            "evaluation_observation_noninterference",
-            GateStatus::Hold,
-            "evidence",
-            "no supported mode was evaluated",
-        ));
-        checks.push(GateCheck::new(
-            "evaluation_ci_reproducible",
-            GateStatus::Hold,
-            "evidence",
-            "no supported mode was evaluated",
-        ));
-        checks.push(GateCheck::new(
-            "artifact_traceable",
-            GateStatus::Hold,
-            "evidence",
-            "no supported mode was evaluated",
-        ));
-        return finish(manifest, evidence_modes(&modes), checks, GateStatus::Hold);
-    }
-
-    let worst = |values: Vec<(String, bool)>| -> GateStatus {
-        if values.iter().all(|(_, ok)| *ok) {
-            GateStatus::Pass
-        } else {
-            GateStatus::Fail
-        }
-    };
-
-    checks.push(GateCheck::new(
-        "evaluation_scale",
-        worst(
-            modes
-                .iter()
-                .map(|mode| {
-                    (
-                        mode.mode.clone(),
-                        mode.games_per_arm >= G0_MIN_GAMES_PER_ARM,
-                    )
-                })
-                .collect(),
-        ),
-        "evidence",
-        modes
-            .iter()
-            .map(|mode| format!("{}={} games/arm", mode.mode, mode.games_per_arm))
-            .collect::<Vec<_>>()
-            .join(", "),
-    ));
-    checks.push(GateCheck::new(
-        "evaluation_replay",
-        worst(
-            modes
-                .iter()
-                .map(|mode| (mode.mode.clone(), mode.replay_mismatches == 0))
-                .collect(),
-        ),
-        "evidence",
-        modes
-            .iter()
-            .map(|mode| format!("{}={} mismatches", mode.mode, mode.replay_mismatches))
-            .collect::<Vec<_>>()
-            .join(", "),
-    ));
-    checks.push(GateCheck::new(
-        "evaluation_legality",
-        worst(
-            modes
-                .iter()
-                .map(|mode| (mode.mode.clone(), mode.legal_action_violations == 0))
-                .collect(),
-        ),
-        "evidence",
-        modes
-            .iter()
-            .map(|mode| format!("{}={} violations", mode.mode, mode.legal_action_violations))
-            .collect::<Vec<_>>()
-            .join(", "),
-    ));
-    checks.push(GateCheck::new(
-        "evaluation_observation_noninterference",
-        worst(
-            modes
-                .iter()
-                .map(|mode| (mode.mode.clone(), mode.observation_noninterference_passed))
-                .collect(),
-        ),
-        "evidence",
-        modes
-            .iter()
-            .map(|mode| format!("{}={}", mode.mode, mode.observation_noninterference_passed))
-            .collect::<Vec<_>>()
-            .join(", "),
-    ));
-    checks.push(GateCheck::new(
-        "evaluation_ci_reproducible",
-        worst(
-            modes
-                .iter()
-                .map(|mode| (mode.mode.clone(), mode.ci_reproducible))
-                .collect(),
-        ),
-        "evidence",
-        modes
-            .iter()
-            .map(|mode| format!("{}={}", mode.mode, mode.ci_reproducible))
-            .collect::<Vec<_>>()
-            .join(", "),
-    ));
-
-    let anomalies_ok = modes.iter().all(|mode| mode.anomalies == 0);
-    if !anomalies_ok {
-        checks.push(GateCheck::new(
-            "evaluation_anomalies",
+            "evidence_schema",
             GateStatus::Fail,
             "evidence",
-            modes
-                .iter()
-                .map(|mode| format!("{}={} anomalies", mode.mode, mode.anomalies))
-                .collect::<Vec<_>>()
-                .join(", "),
+            format!(
+                "evidence schema {} is not {}; the declaration-only format cannot pass G0",
+                evidence.schema_version, G0_EVIDENCE_SCHEMA_VERSION
+            ),
         ));
+        return finish(manifest, Vec::new(), checks, GateStatus::Fail);
+    }
+    checks.push(GateCheck::new(
+        "evidence_schema",
+        GateStatus::Pass,
+        "evidence",
+        format!("schema_version={G0_EVIDENCE_SCHEMA_VERSION}"),
+    ));
+
+    // Duplicate modes and mode/condition mismatches are errors, never a silent
+    // "last one wins" or a quiet exclusion of a condition we cannot check.
+    let mut seen_modes: BTreeSet<&str> = BTreeSet::new();
+    let mut duplicates: Vec<&str> = Vec::new();
+    for mode in &evidence.modes {
+        if !seen_modes.insert(mode.mode.as_str()) {
+            duplicates.push(mode.mode.as_str());
+        }
+    }
+    if !duplicates.is_empty() {
+        checks.push(GateCheck::new(
+            "evaluation_mode_conditions",
+            GateStatus::Fail,
+            "evidence",
+            format!("duplicate modes: {duplicates:?}"),
+        ));
+        return finish(manifest, Vec::new(), checks, GateStatus::Fail);
     }
 
-    let traceable = !evidence.code_sha.is_empty()
-        && manifest.provenance.code_shas.len() == 1
-        && manifest.provenance.code_shas.contains(&evidence.code_sha)
-        && modes.iter().all(|mode| !mode.artifact_url.is_empty());
+    let manifest_conditions = manifest
+        .provenance
+        .card_modes
+        .iter()
+        .map(|mode| normalise_card_mode(mode).to_string())
+        .collect::<BTreeSet<_>>();
+    let dataset_players = manifest.player_counts();
+    let mut mismatches = Vec::new();
+    for mode in &evidence.modes {
+        let normalised = normalise_card_mode(&mode.card_mode).to_string();
+        if !SUPPORTED_CARD_MODES.contains(&normalised.as_str()) {
+            mismatches.push(format!(
+                "{}: unsupported card_mode {normalised:?}; unverified cards cannot \
+                 enter an evaluation that gates learning",
+                mode.mode
+            ));
+        } else if !manifest_conditions.contains(&normalised) {
+            mismatches.push(format!(
+                "{}: card_mode {normalised:?} does not match the dataset {:?}",
+                mode.mode, manifest_conditions
+            ));
+        } else if !dataset_players.contains(&mode.players) {
+            mismatches.push(format!(
+                "{}: players {} does not match the dataset {:?}",
+                mode.mode, mode.players, dataset_players
+            ));
+        }
+    }
+    if !mismatches.is_empty() {
+        checks.push(GateCheck::new(
+            "evaluation_mode_conditions",
+            GateStatus::Fail,
+            "evidence",
+            mismatches.join("; "),
+        ));
+        return finish(manifest, Vec::new(), checks, GateStatus::Fail);
+    }
+
+    // "Implicit exclusion": if no supplied mode describes the dataset's own
+    // condition, the gate stays on hold instead of passing on unrelated runs.
+    let covers_dataset = evidence.modes.iter().any(|mode| {
+        manifest_conditions.contains(normalise_card_mode(&mode.card_mode))
+            && dataset_players.contains(&mode.players)
+    });
+    if !covers_dataset {
+        checks.push(GateCheck::new(
+            "evaluation_mode_conditions",
+            GateStatus::Hold,
+            "evidence",
+            format!(
+                "no evaluated mode covers the dataset condition (cards {:?}, players {:?})",
+                manifest_conditions, dataset_players
+            ),
+        ));
+        return finish(manifest, Vec::new(), checks, GateStatus::Hold);
+    }
     checks.push(GateCheck::new(
-        "artifact_traceable",
-        if traceable {
-            GateStatus::Pass
-        } else {
-            GateStatus::Fail
-        },
+        "evaluation_mode_conditions",
+        GateStatus::Pass,
         "evidence",
         format!(
-            "evidence_sha={:?} manifest_sha={:?} artifact_urls_present={}",
-            evidence.code_sha,
-            manifest.provenance.code_shas,
-            modes.iter().all(|mode| !mode.artifact_url.is_empty())
+            "{} mode(s) match the dataset condition",
+            evidence.modes.len()
         ),
     ));
 
+    // The locked unit is the declared **test range**, not the handful of
+    // episodes the learning dataset happens to contain: an evaluation draws many
+    // unseen seeds from that range. Because the plan's ranges are validated as
+    // disjoint, "inside test" also means "outside train and validation".
+    let plan = manifest.plan.clone();
+    let mut evaluated_modes = Vec::new();
+    let mut recomputed: Vec<(String, ModeRecompute)> = Vec::new();
+
+    for mode in &evidence.modes {
+        let Some(bundle) = bundles.get(&mode.mode) else {
+            checks.push(GateCheck::new(
+                "evaluation_matches_loaded",
+                GateStatus::Hold,
+                "evidence",
+                format!(
+                    "{}: matches files were not supplied, so nothing can be recomputed",
+                    mode.mode
+                ),
+            ));
+            continue;
+        };
+        if let Some(error) = &bundle.load_error {
+            checks.push(GateCheck::new(
+                "evaluation_matches_loaded",
+                GateStatus::Fail,
+                "evidence",
+                format!("{}: {error}", mode.mode),
+            ));
+            continue;
+        }
+        if mode.matches_paths.is_empty() || bundle.matches.is_empty() {
+            checks.push(GateCheck::new(
+                "evaluation_matches_loaded",
+                GateStatus::Hold,
+                "evidence",
+                format!("{}: no matches file is declared", mode.mode),
+            ));
+            continue;
+        }
+
+        let digest = sha256_hex(&bundle.matches.concat());
+        if mode.matches_sha256 != digest {
+            checks.push(GateCheck::new(
+                "evaluation_matches_digest",
+                GateStatus::Fail,
+                "evidence",
+                format!(
+                    "{}: declared sha256 {} does not match the supplied files ({})",
+                    mode.mode, mode.matches_sha256, digest
+                ),
+            ));
+            continue;
+        }
+        checks.push(GateCheck::new(
+            "evaluation_matches_digest",
+            GateStatus::Pass,
+            "evidence",
+            format!("{}: sha256 verified", mode.mode),
+        ));
+
+        let mut rows = Vec::new();
+        let mut parse_error = None;
+        for bytes in &bundle.matches {
+            match load_matches(bytes) {
+                Ok(mut parsed) => rows.append(&mut parsed),
+                Err(error) => {
+                    parse_error = Some(error);
+                    break;
+                }
+            }
+        }
+        if let Some(error) = parse_error {
+            checks.push(GateCheck::new(
+                "evaluation_matches_loaded",
+                GateStatus::Fail,
+                "evidence",
+                format!("{}: {error}", mode.mode),
+            ));
+            continue;
+        }
+        let facts = recompute_mode(&rows);
+        evaluated_modes.push(mode.mode.clone());
+
+        // Condition agreement between the declaration and the rows themselves.
+        let row_players = facts.players.iter().copied().collect::<Vec<_>>();
+        if row_players != vec![mode.players]
+            || facts
+                .cards
+                .iter()
+                .any(|cards| normalise_card_mode(cards) != normalise_card_mode(&mode.card_mode))
+        {
+            checks.push(GateCheck::new(
+                "evaluation_mode_conditions",
+                GateStatus::Fail,
+                "evidence",
+                format!(
+                    "{}: declared players/cards {}/{} but the rows say {:?}/{:?}",
+                    mode.mode, mode.players, mode.card_mode, row_players, facts.cards
+                ),
+            ));
+            continue;
+        }
+
+        checks.push(GateCheck::new(
+            "evaluation_scale",
+            if facts.games_per_arm() >= G0_MIN_GAMES_PER_ARM {
+                GateStatus::Pass
+            } else {
+                GateStatus::Fail
+            },
+            "evidence",
+            format!(
+                "{}: {} games/arm recomputed from {} rows ({} required); a smaller run \
+                 is a plumbing test, not a G0 pass",
+                mode.mode,
+                facts.games_per_arm(),
+                facts.rows,
+                G0_MIN_GAMES_PER_ARM
+            ),
+        ));
+
+        checks.push(GateCheck::new(
+            "evaluation_completion",
+            if facts.unfinished == 0 && facts.wrong_rounds == 0 {
+                GateStatus::Pass
+            } else {
+                GateStatus::Fail
+            },
+            "evidence",
+            format!(
+                "{}: {} unfinished rows, {} rows without 14 rounds",
+                mode.mode, facts.unfinished, facts.wrong_rounds
+            ),
+        ));
+
+        checks.push(GateCheck::new(
+            "evaluation_replay",
+            if facts.unverified == 0 {
+                GateStatus::Pass
+            } else {
+                GateStatus::Fail
+            },
+            "evidence",
+            format!(
+                "{}: {} rows without replay_verified",
+                mode.mode, facts.unverified
+            ),
+        ));
+
+        // Seat rotation: a seed block legitimately holds one game per seat per
+        // arm, so the contract is "every (block, arm, seat) once", not "one game
+        // per seed".
+        checks.push(GateCheck::new(
+            "evaluation_block_completeness",
+            if facts.is_complete() {
+                GateStatus::Pass
+            } else {
+                GateStatus::Fail
+            },
+            "evidence",
+            format!(
+                "{}: {} rows, expected {} for {} blocks x {} seats x 2 arms; duplicate \
+                 keys {:?}; incomplete blocks {:?}",
+                mode.mode,
+                facts.rows,
+                facts.expected_rows(),
+                facts.blocks.len(),
+                facts.seats.len(),
+                facts.duplicate_keys,
+                facts.incomplete_blocks
+            ),
+        ));
+
+        let leaked = facts
+            .seeds
+            .iter()
+            .copied()
+            .filter(|seed| plan.split_of(*seed) != Some(Split::Test))
+            .collect::<Vec<_>>();
+        checks.push(GateCheck::new(
+            "evaluation_split_discipline",
+            if leaked.is_empty() {
+                GateStatus::Pass
+            } else {
+                GateStatus::Fail
+            },
+            "evidence",
+            format!(
+                "{}: {} of {} evaluated seeds are outside the locked test range                  [{}, {}]: {:?}",
+                mode.mode,
+                leaked.len(),
+                facts.seeds.len(),
+                plan.test.0,
+                plan.test.1,
+                &leaked[..leaked.len().min(8)]
+            ),
+        ));
+
+        // Attested checks: only trusted when a checks file is bound to the same
+        // code revision and the same matches bytes.
+        let attestation = match (&bundle.checks, mode.checks_sha256.as_deref()) {
+            (Some(bytes), Some(expected)) => {
+                if sha256_hex(bytes) != expected {
+                    Some(Err(
+                        "declared checks sha256 does not match the file".to_string()
+                    ))
+                } else {
+                    match serde_json::from_slice::<ChecksEvidence>(bytes) {
+                        Ok(checks_file) => Some(Ok(checks_file)),
+                        Err(_) => Some(Err("checks file is not valid evidence JSON".to_string())),
+                    }
+                }
+            }
+            _ => None,
+        };
+        match attestation {
+            Some(Ok(checks_file)) => {
+                if checks_file.code_sha != evidence.code_sha || checks_file.matches_sha256 != digest
+                {
+                    checks.push(GateCheck::new(
+                        "checks_attested",
+                        GateStatus::Fail,
+                        "evidence",
+                        format!(
+                            "{}: checks file is bound to code {:?}/matches {:?}, not {:?}/{:?}",
+                            mode.mode,
+                            checks_file.code_sha,
+                            checks_file.matches_sha256,
+                            evidence.code_sha,
+                            digest
+                        ),
+                    ));
+                } else {
+                    for (id, passed) in [
+                        ("m8_rule_evidence", checks_file.m8_rule_evidence),
+                        ("m8_legal_api_evidence", checks_file.m8_legal_api_evidence),
+                        (
+                            "evaluation_observation_noninterference",
+                            checks_file.observation_noninterference_passed,
+                        ),
+                        ("evaluation_ci_reproducible", checks_file.ci_reproducible),
+                    ] {
+                        checks.push(GateCheck::new(
+                            id,
+                            if passed {
+                                GateStatus::Pass
+                            } else {
+                                GateStatus::Fail
+                            },
+                            "evidence",
+                            format!(
+                                "{}: {} attested in a checks file bound to code {:?} and the \
+                                 matches digest",
+                                mode.mode, passed, evidence.code_sha
+                            ),
+                        ));
+                    }
+                }
+            }
+            Some(Err(error)) => checks.push(GateCheck::new(
+                "checks_attested",
+                GateStatus::Fail,
+                "evidence",
+                format!("{}: {error}", mode.mode),
+            )),
+            None => {
+                for id in [
+                    "m8_rule_evidence",
+                    "m8_legal_api_evidence",
+                    "evaluation_observation_noninterference",
+                    "evaluation_ci_reproducible",
+                ] {
+                    checks.push(GateCheck::new(
+                        id,
+                        GateStatus::Hold,
+                        "evidence",
+                        format!(
+                            "{}: attested only (no checks file bound by hash); unverified \
+                             claims cannot pass G0",
+                            mode.mode
+                        ),
+                    ));
+                }
+            }
+        }
+
+        let traceable = !mode.artifact_url.is_empty()
+            && !evidence.code_sha.is_empty()
+            && manifest.provenance.code_shas.len() == 1
+            && manifest.provenance.code_shas.contains(&evidence.code_sha);
+        checks.push(GateCheck::new(
+            "artifact_traceable",
+            if traceable {
+                GateStatus::Pass
+            } else {
+                GateStatus::Fail
+            },
+            "evidence",
+            format!(
+                "{}: artifact_url_present={} evidence_sha={:?} manifest_sha={:?}",
+                mode.mode,
+                !mode.artifact_url.is_empty(),
+                evidence.code_sha,
+                manifest.provenance.code_shas
+            ),
+        ));
+
+        recomputed.push((mode.mode.clone(), facts));
+    }
+
+    // Every evaluated mode must have produced a complete recomputation before
+    // the gate may pass; a missing bundle leaves a hold and caps the verdict.
     let (_, fails, holds) = summarize(&checks);
     let verdict = if fails > 0 {
         GateStatus::Fail
-    } else if holds > 0 {
+    } else if holds > 0 || evaluated_modes.is_empty() || recomputed.is_empty() {
         GateStatus::Hold
     } else {
         GateStatus::Pass
     };
-    finish(manifest, evidence_modes(&modes), checks, verdict)
-}
-
-fn evidence_modes(modes: &[&ModeEvidence]) -> Vec<String> {
-    modes.iter().map(|mode| mode.mode.clone()).collect()
+    finish(manifest, evaluated_modes, checks, verdict)
 }
 
 fn summarize(checks: &[GateCheck]) -> (usize, usize, usize) {
