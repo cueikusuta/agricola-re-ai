@@ -25,8 +25,8 @@ use agricola_re_ai::mcts::{MctsOutcome, MctsPolicy, SearchLimit, SearchMode};
 use agricola_re_ai::mcts_puct::{LeafMode, PuctConfig, PuctPolicy};
 use agricola_re_ai::model::Space;
 use agricola_re_ai::policy::{
-    play_to_end_with_budget, CardChoiceDetails, DetailPolicy, GreedyPolicy, RandomPolicy,
-    SimpleDetails, SpacePolicy,
+    play_to_end_with_budget, BudgetedDecisions, CardChoiceDetails, DetailPolicy, GreedyPolicy,
+    RandomPolicy, SimpleDetails, SpacePolicy,
 };
 use agricola_re_ai::score::{standings, standings_with_cards};
 use agricola_re_ai::{Config, Game, Observation};
@@ -691,6 +691,8 @@ fn run(options: &Options) -> Result<(), String> {
     // it must not see a clock at all: it gets `None` and its decisions are
     // identical to the pre-#167 path. `time-budgeted` bounds selection **and**
     // details with one window, holding back the detail reserve from the search.
+    // The budget is applied to the **focus seat only** (review P1): the opponent
+    // seats must not become wall-clock dependent just because a budget exists.
     let budget_spec = if deadline_enforced {
         let limit = Duration::from_millis(options.decision_budget_ms);
         Some(match options.detail_reserve_ms {
@@ -752,12 +754,13 @@ fn run(options: &Options) -> Result<(), String> {
                 };
                 let game_start = Instant::now();
                 let timings = RefCell::new(DecisionTimings::new(options.decision_budget_ms));
+                let seat_budget = budget_spec.map(|spec| BudgetedDecisions::focus_only(spec, seat));
                 play_to_end_with_budget(
                     &mut game,
                     &selector,
                     details,
                     &SimpleHarvestDetails,
-                    budget_spec,
+                    seat_budget,
                     |outcome| {
                         if outcome.player == seat {
                             timings.borrow_mut().record(outcome);

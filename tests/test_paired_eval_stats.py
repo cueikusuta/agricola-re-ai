@@ -697,6 +697,57 @@ class PairedStatsSearchModeTests(unittest.TestCase):
                     run(rows)
 
 
+class PairedStatsTenSecondFlagTests(unittest.TestCase):
+    """#167 A review P1: the 10 s flag and its explanation must agree.
+
+    The whole-decision budget bounds the focus seat whatever its policy, while
+    the search deadline only exists for a search policy. The old flag required a
+    search policy and its explanation mentioned only MCTS, so a budgeted
+    heuristic seat could never pass and the text did not describe the check.
+    """
+
+    def test_a_budgeted_heuristic_focus_is_observable(self):
+        rows = as_time_budgeted(fixture())
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "eval"
+                row["mcts_deadline_active"] = False
+                row["deterministic_policy_selection"] = True
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="eval", baseline="random", opponent="greedy",
+            extra=False, search_mode="time-budgeted", iterations=500,
+        )
+        self.assertTrue(report["candidate_whole_decision_budget_enforced"])
+        self.assertFalse(report["candidate_focus_search_deadline_control"])
+        self.assertFalse(report["candidate_focus_deadline_control"])
+        self.assertTrue(report["candidate_10s_observed_pass"])
+        self.assertIn("whole-decision budget", report["candidate_10s_observed_pass_basis"])
+
+    def test_a_search_focus_reports_both_questions(self):
+        rows = as_time_budgeted(fixture())
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "puct"
+                row["mcts_deadline_active"] = True
+                row["deterministic_policy_selection"] = False
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="puct", baseline="random", opponent="greedy",
+            extra=False, search_mode="time-budgeted", iterations=500,
+        )
+        self.assertTrue(report["candidate_focus_search_deadline_control"])
+        self.assertTrue(report["candidate_whole_decision_budget_enforced"])
+        self.assertTrue(report["candidate_10s_observed_pass"])
+
+    def test_simulation_capped_never_claims_a_ten_second_observation(self):
+        report = run(fixture())
+        self.assertFalse(report["candidate_whole_decision_budget_enforced"])
+        self.assertFalse(report["candidate_10s_observed_pass"])
+        self.assertIn("not an OS-enforced hard guarantee", report["caveat"])
+        self.assertNotIn("only when the arm is MCTS", report["caveat"])
+
+
 class PairedStatsWholeDecisionBudgetTests(unittest.TestCase):
     """#167 A: the budget must be reported as covering the whole decision."""
 

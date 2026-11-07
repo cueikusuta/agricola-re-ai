@@ -672,6 +672,56 @@ pub fn fallback_detail(obs: &Observation, space: Space) -> Option<Action> {
     SimpleDetails.produce(obs, space)
 }
 
+/// Which seats a whole-decision budget applies to (#167 A review P1).
+///
+/// A wall-clock budget makes a decision machine-dependent, so applying it to a
+/// seat that is not being measured silently changes the opponent's behaviour and
+/// can even change a replay. Only the seat under evaluation may be budgeted;
+/// every other seat keeps the clock-free, reproducible path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BudgetScope {
+    /// No seat is budgeted (equivalent to no budget at all).
+    NoSeats,
+    /// Every seat is budgeted. Only for a game where the whole game, not one
+    /// seat, is the thing being timed; never for a paired comparison.
+    AllSeats,
+    /// Only this seat is budgeted; all other seats keep their historical
+    /// behaviour and determinism.
+    FocusSeat(usize),
+}
+
+/// A resolved budget plus the seats it may apply to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BudgetedDecisions {
+    pub spec: DecisionBudgetSpec,
+    pub scope: BudgetScope,
+}
+
+impl BudgetedDecisions {
+    /// The evaluation shape: only the focus seat is time-budgeted.
+    pub fn focus_only(spec: DecisionBudgetSpec, seat: usize) -> Self {
+        Self {
+            spec,
+            scope: BudgetScope::FocusSeat(seat),
+        }
+    }
+
+    pub fn all_seats(spec: DecisionBudgetSpec) -> Self {
+        Self {
+            spec,
+            scope: BudgetScope::AllSeats,
+        }
+    }
+
+    pub fn applies_to(&self, seat: usize) -> bool {
+        match self.scope {
+            BudgetScope::NoSeats => false,
+            BudgetScope::AllSeats => true,
+            BudgetScope::FocusSeat(focus) => focus == seat,
+        }
+    }
+}
+
 /// Play a game to the end under a **whole-decision** wall-clock budget (#167 A).
 ///
 /// Unlike [`play_to_end_observed`], this bounds selection *and* detail
@@ -682,21 +732,24 @@ pub fn fallback_detail(obs: &Observation, space: Space) -> Option<Action> {
 /// already spent by the time details would start, or the detail policy declines,
 /// the decision falls back to [`fallback_detail`] instead of failing the game.
 ///
-/// `decision_budget = None` keeps the historical behaviour exactly: no
-/// deadline, no fallback substitution, and the same reproducible choices for a
-/// fixed RNG seed. `simulation-capped` evaluation must use `None` so replays
-/// stay identical. `Some(budget)` instead guarantees a legal action even when
-/// the search or the detail policy gives up, and reports the fallback.
+/// The budget applies **only to the seats in `budget.scope`** (#167 A review
+/// P1). Every other seat takes the pre-#167 path exactly: no clock, no fallback
+/// substitution, and the same reproducible choices for a fixed RNG seed. A
+/// paired comparison must therefore use [`BudgetedDecisions::focus_only`], never
+/// [`BudgetedDecisions::all_seats`].
+///
+/// `decision_budget = None` keeps the historical behaviour for every seat.
+/// `simulation-capped` evaluation must use `None` so replays stay identical.
 ///
 /// Every decision is reported to `on_decision`, including the fallback flags and
-/// the measured overshoot. The overshoot is a measurement: a running function
-/// cannot be preempted, so no real-time guarantee is made.
+/// the measured overshoot (budgeted seats only). The overshoot is a measurement:
+/// a running function cannot be preempted, so no real-time guarantee is made.
 pub fn play_to_end_with_budget(
     game: &mut Game,
     space_policy: &dyn SpacePolicy,
     detail_policy: &dyn DetailPolicy,
     harvest_policy: &dyn HarvestDetailPolicy,
-    decision_budget: Option<DecisionBudgetSpec>,
+    decision_budget: Option<BudgetedDecisions>,
     mut on_decision: impl FnMut(DecisionOutcome),
 ) -> Result<(), String> {
     for _ in 0..320 {
@@ -718,13 +771,17 @@ pub fn play_to_end_with_budget(
         let mut choice_rng = ChaCha8Rng::seed_from_u64(
             game.log.action_seed ^ decision_index.wrapping_mul(0x9E37_79B9_7F4A_7C15),
         );
+        // Only the seats in scope get a clock (#167 A review P1). Everyone else
+        // takes the pre-#167 path, so an opponent's choices cannot drift with the
+        // wall clock and a replay cannot change because a budget was configured.
+        let seat_budget = decision_budget.filter(|budget| budget.applies_to(acting));
         let (action, outcome) = resolve_decision(
             &obs,
             &legal,
             space_policy,
             detail_policy,
             &mut choice_rng,
-            decision_budget,
+            seat_budget.map(|budget| budget.spec),
         )?;
         on_decision(outcome);
         let chosen = action.space;

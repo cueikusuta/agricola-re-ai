@@ -29,10 +29,14 @@
 ```rust
 pub struct DecisionBudgetSpec { limit: Duration, reserve: Option<Duration> }
 pub struct DecisionBudget     { limit, reserve, started: Instant }
+pub struct BudgetedDecisions  { spec: DecisionBudgetSpec, scope: BudgetScope }
+pub enum   BudgetScope        { NoSeats, AllSeats, FocusSeat(usize) }
 
 pub fn resolve_decision(obs, legal, space_policy, detail_policy, rng, budget)
     -> Result<(Action, DecisionOutcome), String>
 ```
+
+- **予算が適用される席（レビューP1で修正）**：`play_to_end_with_budget` は `BudgetedDecisions::applies_to(seat)` が真の席にだけ予算を渡す。評価は必ず `focus_only(spec, focus_seat)` を使い、**相手席は時計を見ない従来経路**（フォールバック置換なし・固定seedで再現）を維持する。`all_seats` は「試合全体を計時する」用途に限り、ペア比較では使わない。
 
 - **予備（reserve）**：既定は予算の 1/8、上限 100 ms、下限 1 ms、かつ予算の半分を超えない。`--detail-reserve-ms` で明示できる。実測した詳細生成は最大 0.2 ms（4節・5節）なので、1/8 は十分な余裕であり、同時に探索へ予算の 87.5 % を残す。
 - **探索の締切**：`DecisionBudget::search_deadline()` = 決断の締切 − 予備。`SpacePolicy::select_with_deadline` が MCTS/PUCT へ `SearchLimit::TimeBudget` として渡す。`simulation-capped` は締切を受け取らない。
@@ -45,7 +49,7 @@ pub fn resolve_decision(obs, legal, space_policy, detail_policy, rng, budget)
   | 探索が予算を使い切った | 詳細方針を呼ばず `SimpleDetails` | `budget_exhausted_before_details` + `detail_fallback` |
   | 詳細方針が `None` を返す | `SimpleDetails` | `detail_fallback` + `detail_declined` |
 
-  予算なし（`None`）では従来の契約を維持し、方針が拒否したら**エラー**にする。評価の意味を黙って変えないため。
+  予算なし（`None`）、および**予算対象外の席**では従来の契約を維持し、方針が拒否したら**エラー**にする。評価の意味を黙って変えないため。
 - **非公開情報**：入力は `Observation` と合法手リストのみ。新しい経路は内部状態・seed・相手手札を参照しない。
 
 ### 2.1 保証しないもの
@@ -55,6 +59,8 @@ pub fn resolve_decision(obs, legal, space_policy, detail_policy, rng, budget)
 - 報告する `observed_all_decisions_within_*` は**観測された決断の測定結果**であり、ハードウェア・負荷・OS を問う保証ではない。
 
 ## 3. 自己レビューで見つけて修正した問題
+
+0. **（独立レビューP1）時間予算が相手席にも適用されていた。** 旧 `play_to_end_with_budget` は全席に同じ予算を渡していたため、相手席の詳細生成が壁時計で置換され得た。カードあり条件では相手の `CardChoiceDetails` が予算切れで `SimpleDetails` に落ち、**相手の手がマシン負荷で変わる**余地があった。`BudgetScope` を導入し、評価では focus 席のみに適用するよう修正（`BudgetedDecisions::focus_only`）。回帰テストは `only_the_focus_seat_is_budgeted`、`a_scope_with_no_seats_reproduces_the_unbudgeted_game_exactly`、`a_puct_opponent_is_never_affected_by_the_focus_budget`。修正後、カードあり2人戦 200 ms でも focus 最大 175.3 ms・遅延0・方針拒否0、`simulation-capped` の二重実行は意味フィールド完全一致を再確認。
 
 1. **`SeatSelector` が探索の締切を無視していた（重要）。** `paired_eval` の focus 席は `SpacePolicy::select` を実装しており、`SearchSettings` のテンプレート（決断予算そのもの）から締切を作っていた。そのため予備が機能せず、**修正前は全 66 決断が予算超過・全 66 回で詳細方針がスキップ**されていた（2人戦 50 ms、seed 911）。`select_with_deadline` を実装して `search_deadline` を優先させた結果、同条件で超過 3/66・詳細スキップ 3/66 になった（4節）。回帰は `paired_eval` の `time_budgeted_honours_the_search_window_reserve` が固定する。
 2. **「遅い」の定義が厳密すぎて常に偽になっていた。** 協調的締切はシミュレーション間でしか見られないため、0.1〜0.6 ms の超過が毎回出る。厳密カウントの隣に許容幅（予算の1 %、下限1 ms）付きカウントを追加し、両方を記録する。
@@ -147,6 +153,19 @@ pub fn resolve_decision(obs, legal, space_policy, detail_policy, rng, budget)
 | `--detail-reserve-ms` | 未指定（予算の1/8、上限100 ms） | 探索から詳細生成へ渡す予備。`0..=decision_budget_ms/2` |
 
 `--search-mode simulation-capped` は時計を一切見ないため、`--detail-reserve-ms` を指定すると**エラー**にする（適用されない値をログに残さない）。
+
+`paired_eval` は `--search-mode time-budgeted` のとき、**focus 席にだけ**予算を適用する。相手席は同じ実行の中で従来どおり回数上限で動く。
+
+### 7.1 集約器のフラグ（P1で矛盾を解消）
+
+| フィールド | 意味 |
+|---|---|
+| `candidate_focus_search_deadline_control` | **探索**が締切下で走ったか（探索ポリシー かつ time-budgeted）。旧 `candidate_focus_deadline_control` と同じ意味で、互換のため残す |
+| `candidate_whole_decision_budget_enforced` | **決断全体**（選択＋詳細）が1つの時計で拘束されたか。focus 席ならポリシーを問わない |
+| `candidate_10s_observed_pass` | 上記の whole-decision 予算が有効・予算が 0 < ms ≤ 10000・実測最大が予算＋許容幅以内、の3条件。**MCTS/PUCT に限定しない** |
+| `candidate_10s_observed_pass_basis` | 上記の判定根拠を文章で明示 |
+
+旧版はこのフラグを「探索ポリシーのときだけ」真にし、説明文は「MCTS のときだけ」と書いていたため、**予算化された eval/greedy 席は永久に false** で、文面とも食い違っていた。`caveat` の記述も same 修正した。回帰テストは `PairedStatsTenSecondFlagTests`（3件）。
 
 ## 8. 未解決・範囲外
 

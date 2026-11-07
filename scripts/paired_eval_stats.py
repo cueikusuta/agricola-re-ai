@@ -390,25 +390,41 @@ def validate_and_report(
     budget_within_10s = 0 < budget_ms <= 10000
     candidate_max_focus = max(g["focus_max_decision_ms"] for g in values["candidate"])
     baseline_max_focus = max(g["focus_max_decision_ms"] for g in values["baseline"])
-    # A deadline is only enforced in time-budgeted mode (#164).
-    candidate_deadline_control = (
+    # Two different questions, deliberately kept apart (#164, #167 A review P1).
+    #
+    # 1. `*_focus_search_deadline_control`: did the *search* run under a
+    #    deadline? Only a search policy in time-budgeted mode can answer yes.
+    # 2. `*_whole_decision_budget_enforced`: did the *decision* (selection plus
+    #    details) run under one clock? Since #167 A the budget applies to the
+    #    focus seat whatever its policy, so this is not restricted to MCTS/PUCT.
+    #
+    # The 10 s observation follows (2), not (1). The previous version keyed it to
+    # (1), which both under-reported budgeted heuristic seats and contradicted
+    # its own explanation that named only MCTS.
+    candidate_search_deadline = (
         candidate in SEARCH_POLICIES and search_mode == "time-budgeted")
-    baseline_deadline_control = (
+    baseline_search_deadline = (
         baseline in SEARCH_POLICIES and search_mode == "time-budgeted")
-    # #167 A: a cooperative deadline can only be observed between simulations,
-    # so "within budget" is judged with the same tolerance the rows record
-    # (1 % of the budget, 1 ms floor). The strict overshoot stays in the report.
+    budget_enforced = rows[0]["whole_decision_budget_enforced"]
+    candidate_budget_enforced = budget_enforced and candidate_focus_decisions > 0
+    baseline_budget_enforced = budget_enforced and baseline_focus_decisions > 0
+    # A cooperative deadline can only be observed between simulations, so
+    # "within budget" uses the same tolerance the rows record (1 % of the
+    # budget, 1 ms floor). The strict overshoot stays in the report.
     tolerance_ms = max(g["focus_budget_tolerance_ms"] for g in rows)
     candidate_measured_within = (
         budget_enabled and candidate_max_focus <= budget_ms + tolerance_ms)
     baseline_measured_within = (
         budget_enabled and baseline_max_focus <= budget_ms + tolerance_ms)
     candidate_10s_observed_pass = (
-        candidate_deadline_control and budget_within_10s and candidate_measured_within
+        candidate_budget_enforced and budget_within_10s and candidate_measured_within
     )
     baseline_10s_observed_pass = (
-        baseline_deadline_control and budget_within_10s and baseline_measured_within
+        baseline_budget_enforced and budget_within_10s and baseline_measured_within
     )
+    # Backwards-compatible aliases: the old names described the search deadline.
+    candidate_deadline_control = candidate_search_deadline
+    baseline_deadline_control = baseline_search_deadline
 
     # Roadmap 3.1 asks for shared/tied first place as separate reference
     # values, and 6.6 asks for games/sec and decisions/sec. All of these are
@@ -614,6 +630,17 @@ def validate_and_report(
         "baseline_focus_timeout_count": baseline_focus_timeouts,
         "candidate_focus_deadline_control": candidate_deadline_control,
         "baseline_focus_deadline_control": baseline_deadline_control,
+        # #167 A review P1: the search deadline and the whole-decision budget are
+        # different questions and are reported separately.
+        "candidate_focus_search_deadline_control": candidate_search_deadline,
+        "baseline_focus_search_deadline_control": baseline_search_deadline,
+        "candidate_whole_decision_budget_enforced": candidate_budget_enforced,
+        "baseline_whole_decision_budget_enforced": baseline_budget_enforced,
+        "candidate_10s_observed_pass_basis": (
+            "whole-decision budget (selection + details) enforced for the focus "
+            "seat, a positive budget <= 10000 ms, and the measured maximum focus "
+            "decision within budget + tolerance"
+        ),
         "candidate_focus_measured_within_budget": candidate_measured_within,
         "baseline_focus_measured_within_budget": baseline_measured_within,
         "candidate_10s_observed_pass": candidate_10s_observed_pass,
@@ -655,12 +682,17 @@ def validate_and_report(
             "decision timing includes action-space selection plus detail "
             "generation for the arm ordered as candidate/baseline. "
             "*_10s_observed_pass is an observed check, not an OS-enforced hard "
-            "guarantee: MCTS stops at cooperative deadline checks, so it is true "
-            "only when the arm is MCTS, a positive budget <= 10000 ms was "
-            "applied, and the measured maximum focus decision stayed within it. "
-            "A 0 ms budget means no deadline (deterministic MCTS by simulation "
-            "count) and makes all 10s flags false. Official rule fidelity still "
-            "requires independent gates."
+            "guarantee. It is true only when the whole-decision budget was "
+            "enforced for the focus seat (time-budgeted mode; selection *and* "
+            "detail generation under one clock, whatever the focus policy), a "
+            "positive budget <= 10000 ms was applied, and the measured maximum "
+            "focus decision stayed within budget + tolerance. It is not "
+            "restricted to MCTS/PUCT: since #167 A a budgeted heuristic seat is "
+            "also bounded and therefore also observable. *"
+            "focus_search_deadline_control is the narrower question 'did the "
+            "search itself run under a deadline'. A 0 ms budget means no deadline "
+            "(deterministic by simulation count) and makes every 10 s flag false. "
+            "Official rule fidelity still requires independent gates."
         ),
     }
 
