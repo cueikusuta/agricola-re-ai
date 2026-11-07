@@ -152,6 +152,21 @@ def compare_arms(
             raise ValueError(f"arm {label!r} changes multiple candidate factors: {changes}")
         changed_factors[label] = changes
 
+    # Deck identity must also match between arms. The paired report checks
+    # within-arm consistency (after #160); this cross-arm guard prevents a
+    # different card-set revision from being mistaken for a policy effect.
+    control_decks = {
+        (row.get("cards"), row.get("card_set_count"), row.get("card_set_hash"))
+        for row in arms[control]
+    }
+    for label, rows in arms.items():
+        decks = {
+            (row.get("cards"), row.get("card_set_count"), row.get("card_set_hash"))
+            for row in rows
+        }
+        if decks != control_decks:
+            raise ValueError(f"arm {label!r} uses a different card-set identity")
+
     control_baseline = baseline_signature(arms[control])
     for label, rows in arms.items():
         if baseline_signature(rows) != control_baseline:
