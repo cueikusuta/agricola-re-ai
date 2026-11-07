@@ -2,7 +2,7 @@
 import copy
 import unittest
 
-from scripts.eval_ablation import compare_arms, plan_arms
+from scripts.eval_ablation import check_plan, compare_arms, plan_arms
 
 
 def arm_rows(blocks=4, players=2, *, credit, seed_base=1000, replay="a",
@@ -665,6 +665,167 @@ class AblationParameterEffectivenessTests(unittest.TestCase):
                     },
                     iterations=500,
                 )
+
+
+class AblationSharedConditionTests(unittest.TestCase):
+    """#169 review: an arm may not change a condition the comparison depends on.
+
+    The search cap is the case the reviewer found: in time-budgeted mode
+    `time_budget_max_simulations` decides how much search is allowed, so 1 vs
+    100000 is not a one-factor ablation of anything.
+    """
+
+    def opts(self, **overrides):
+        result = options()
+        result.update(overrides)
+        return result
+
+    def tiny_cap_opts(self):
+        return self.opts(candidate="puct", search_mode="time-budgeted") | {
+            "time_budget_max_simulations": 1,
+            "puct_simulations": 32,
+        }
+
+    def wide_cap_opts(self):
+        return self.opts(candidate="puct", search_mode="time-budgeted") | {
+            "time_budget_max_simulations": 100000,
+            "puct_simulations": 32,
+        }
+
+    def rows_for(self, candidate, baseline="random",
+                 search_mode="simulation-capped", cards="none", card_set=None):
+        rows = arm_rows(credit=always_wins, search_mode=search_mode)
+        for row in rows:
+            policy = candidate if row["arm_id"] == "candidate" else baseline
+            row["focus_policy"] = policy
+            search_policy = policy in ("mcts", "puct")
+            deadline = search_policy and search_mode == "time-budgeted"
+            row["mcts_deadline_active"] = deadline
+            row["deterministic_policy_selection"] = not deadline
+            row["cards"] = cards
+            if card_set is not None:
+                card_hash, card_count = card_set
+                row["card_set_hash"] = card_hash
+                row["card_set_count"] = card_count
+        return rows
+
+    def test_a_search_cap_mismatch_is_rejected_before_running(self):
+        with self.assertRaisesRegex(ValueError, "time_budget_max_simulations"):
+            check_plan(
+                {"control": self.tiny_cap_opts(), "wide": self.wide_cap_opts()},
+                "control",
+                arms={"control", "wide"},
+            )
+
+    def test_aggregation_also_rejects_a_search_cap_mismatch(self):
+        rows = self.rows_for("puct", search_mode="time-budgeted")
+        with self.assertRaisesRegex(ValueError, "time_budget_max_simulations"):
+            compare_arms(
+                {"control": rows, "wide": copy.deepcopy(rows)},
+                control="control",
+                per_arm_options={
+                    "control": self.tiny_cap_opts(),
+                    "wide": self.wide_cap_opts(),
+                },
+                iterations=500,
+            )
+
+    def test_one_factor_comparison_with_a_shared_cap_is_accepted(self):
+        per_arm = {
+            "control": self.wide_cap_opts(),
+            "explore": self.wide_cap_opts() | {"puct_c": 3.0},
+        }
+        changed, effective = check_plan(
+            per_arm, "control", arms={"control", "explore"})
+        self.assertEqual(changed["explore"], ["puct_c"])
+        self.assertEqual(effective["explore"], ["puct_c"])
+
+    def test_cards_reach_the_command_line(self):
+        from pathlib import Path
+
+        from scripts.eval_ablation import arm_command
+
+        command = arm_command(
+            Path("paired_eval"),
+            self.opts(candidate="eval", cards="verified"),
+            Path("out.jsonl"),
+        )
+        self.assertEqual(command[command.index("--cards") + 1], "verified_basic_2p")
+        plain = arm_command(
+            Path("paired_eval"), self.opts(candidate="eval"), Path("out.jsonl"))
+        self.assertEqual(plain[plain.index("--cards") + 1], "none")
+
+    def test_an_arm_cannot_change_the_card_condition(self):
+        with self.assertRaisesRegex(ValueError, "cards"):
+            check_plan(
+                {
+                    "control": self.opts(candidate="eval"),
+                    "carded": self.opts(candidate="eval", cards="verified"),
+                },
+                "control",
+                arms={"control", "carded"},
+            )
+
+    def test_a_carded_ablation_is_accepted_and_reports_its_condition(self):
+        rows = self.rows_for(
+            "eval", cards="verified_basic_2p", card_set=("a" * 64, 14))
+        report = compare_arms(
+            {"control": rows, "variant": copy.deepcopy(rows)},
+            control="control",
+            per_arm_options={
+                "control": self.opts(candidate="eval", cards="verified"),
+                "variant": self.opts(candidate="eval", cards="verified_basic_2p"),
+            },
+            iterations=500,
+        )
+        self.assertEqual(report["cards"], "verified_basic_2p")
+
+    def test_cards_at_three_players_are_rejected(self):
+        from scripts.eval_ablation import plan_arms
+
+        spec = {
+            "players": 3,
+            "seed_start": 900,
+            "blocks": 2,
+            "baseline": "random",
+            "opponent": "greedy",
+            "cards": "verified",
+            "arms": [{"label": "control", "candidate": "puct"}],
+        }
+        with self.assertRaisesRegex(ValueError, "two players only"):
+            plan_arms(spec)
+
+    def test_an_unknown_card_condition_is_rejected(self):
+        from scripts.eval_ablation import plan_arms
+
+        spec = {
+            "players": 2,
+            "seed_start": 900,
+            "blocks": 2,
+            "baseline": "random",
+            "opponent": "greedy",
+            "cards": "all_840",
+            "arms": [{"label": "control", "candidate": "puct"}],
+        }
+        with self.assertRaisesRegex(ValueError, "unsupported card condition"):
+            plan_arms(spec)
+
+    def test_a_search_cap_must_be_a_positive_integer(self):
+        from scripts.eval_ablation import plan_arms
+
+        spec = {
+            "players": 2,
+            "seed_start": 900,
+            "blocks": 2,
+            "baseline": "random",
+            "opponent": "greedy",
+            "search_mode": "time-budgeted",
+            "decision_budget_ms": 200,
+            "time_budget_max_simulations": 0,
+            "arms": [{"label": "control", "candidate": "puct"}],
+        }
+        with self.assertRaisesRegex(ValueError, "positive integer"):
+            plan_arms(spec)
 
 
 class AblationSpecificationTests(unittest.TestCase):

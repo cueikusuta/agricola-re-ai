@@ -84,7 +84,8 @@ python3 scripts/eval_ablation.py \
 | MCTS `mcts_simulations` / `mcts_tree_depth` | 実行可能（シミュレーション回数固定＝決定論的） |
 | **PUCT の全パラメータ**（`puct_simulations` / `puct_tree_depth` / `puct_c` / `puct_prior_temp` / `puct_value_temp` / `puct_leaf` / `puct_root_limit` / `puct_final_prior`） | **実行可能（#167 B）**。arm単位で指定し、`paired_eval` のフラグへそのまま渡す。既定値は `PuctConfig::default()` と一致 |
 | per-decision思考時間予算 `decision_budget_ms` | 実行可能（時間予算ありの比較は非決定論的。`deterministic_policy_selection` がfalseになる） |
-| カードあり条件 | `scripts/paired_eval_stats.py --cards` と `paired_eval --cards` で実行可能（2人戦のみ）。M10 G1（4人40+40）未達のため4人戦カードありは不可 |
+| カードあり条件 | **実行可能（#169 レビューP2でarm化）**。`cards` を仕様/armに書き、`paired_eval --cards` と集約器へ伝播する。2人戦のみ（`verified_basic_2p`）。M10 G1（4人40+40）未達のため4人戦カードありは不可で、指定すると実行前にエラー |
+| 探索上限 `time_budget_max_simulations` | **比較条件（因子ではない）**。arm別に変えると実行前に拒否。time-budgeted の探索量を揃えるための前提 |
 | ドラフト条件 | **未提供**（#155の慣行決定と M10 のプール整備が前提） |
 
 ### 6.1 パラメータ検証（fail closed）
@@ -97,6 +98,8 @@ python3 scripts/eval_ablation.py \
 - **MCTS専用パラメータも同様に拒否する（レビューP1）。** `mcts_simulations` / `mcts_tree_depth` を、`candidate` も `baseline` も `mcts` でない arm で変えても読まれない。PUCT 同士の比較で MCTS の木の深さを動かす、といった指定は無効なのでエラーにする。
 - **time-budgeted では回数パラメータの変更を拒否する（レビューP1）。** このモードの停止条件は壁時計であり、`mcts_simulations` / `puct_simulations` は**暴走防止の安全上限**にすぎない。ここで回数を変えても「効果ゼロ」しか測れないため、比較は `simulation-capped` で行うようエラーで促す。木の深さ（`*_tree_depth`）は探索構造を変えるので time-budgeted でも有効な要因として扱う。
 - **計画段階で検証する。** 上記の検査は試合を1つも走らせる前に実行する（`check_plan`）。集約時の検証も残すが、無駄な計算をしてから落ちることはない。
+- **実験条件は全arm共通（レビューP1）。** `search_mode` / `decision_budget_ms` / **`time_budget_max_simulations`** / `cards` は因子ではなく比較の前提であり、armごとに変えられない（`check_shared_conditions`）。特に time-budgeted の探索上限は「どれだけ探索してよいか」の上限そのものなので、1 と 100,000 を比べた結果は探索量の違いであり1要因比較ではない。**実行前**（`check_plan`）と**集約時**（`compare_arms`）の両方で拒否する。
+- **`cards` は実際に伝播する（レビューP2）。** 仕様キー `cards` は `paired_eval --cards` と集約器の `cards=` に渡され、レポートに条件が記録される。`none` / `verified_basic_2p`（`verified` も同義として正規化）のみ許可し、2人戦以外でのカードありと未知の条件は実行前に拒否する。**指定したのに無視して実行することはない。**
 - **1要因原則は全検索パラメータに適用する。** 制御armと比べて2つ以上変わる arm は拒否する（`changed_search_parameters` に差分を記録）。
 - **モード混在は従来どおり拒否する。** `simulation-capped` と `time-budgeted` を同じ表に混ぜられない。
 
@@ -129,6 +132,16 @@ python3 scripts/eval_ablation.py \
 | MCTS 同士の arm で `puct_prior_temp` を変更 | **拒否**: `PUCT-only parameters` |
 | simulation-capped で `puct_prior_temp` を変更 | 実行（1ブロック4試合、`changed_search_parameters.puct_prior_temp = {control: 3.0, arm: 1.0}`、`effective_changed_search_parameters = ["puct_prior_temp"]`） |
 | time-budgeted で `mcts_tree_depth` を変更 | 有効な要因として受理（`effective_changed_search_parameters = ["mcts_tree_depth"]`） |
+
+### 7.1.2 共通条件と cards の実測（#169 再レビュー対応、2026-11-07）
+
+| 指定 | 結果 |
+|---|---|
+| time-budgeted・200 ms で `time_budget_max_simulations` を control=1 / arm=100000 | **実行前に拒否**（`... disagrees with control ... on time_budget_max_simulations ...`）。試合は1件も走らない |
+| 同条件で上限を揃え、`puct_c` のみ変更 | 実行され、各arm 2試合/腕。`changed_search_parameters` は `puct_c` のみ |
+| `cards: "verified"` を指定 | `paired_eval --cards verified_basic_2p` へ伝播し、出力 JSONL は `cards=verified_basic_2p`・`card_set_count=30`、レポートの `cards` も `verified_basic_2p` |
+| `cards` を 3人戦で指定 | **実行前に拒否**（`the verified pool supports two players only`） |
+| 未知の `cards` 値（`all_840`） | **実行前に拒否** |
 
 ### 7.2 初期スモーク（2026-11-07 以前、PUCT 非対応時）
 

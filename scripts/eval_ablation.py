@@ -73,6 +73,24 @@ SPEC_PARAMETERS = (
     "extra", "cards", "decision_budget_ms", "search_mode",
     "time_budget_max_simulations",
 )
+# Accepted card conditions. `verified` is normalised to the value `paired_eval`
+# and the aggregator both use, so one spelling cannot silently become the other.
+CARD_CONDITIONS = ("none", "verified_basic_2p")
+# Experiment keys an arm may override. Every one of them changes the meaning of
+# the comparison, so all arms must agree on them (#169 review P1/P2).
+SHARED_CONDITION_KEYS = (
+    "search_mode",
+    "decision_budget_ms",
+    "time_budget_max_simulations",
+    "cards",
+)
+
+
+def normalise_cards(value: str) -> str:
+    """Map the accepted card spellings onto the one the tools use."""
+    if value in ("verified", "verified_basic"):
+        return "verified_basic_2p"
+    return value
 
 
 def effective_parameters(options: dict) -> dict:
@@ -205,6 +223,44 @@ def _is_effective(name: str, options: dict) -> bool:
     return True
 
 
+def check_shared_conditions(
+    per_arm_options: dict[str, dict], control: str, *, arms: set[str] | frozenset[str]
+) -> None:
+    """Reject an arm that changes a condition the comparison depends on.
+
+    `time_budget_max_simulations` (#169 review P1) is the case this exists for:
+    in time-budgeted mode it decides how much searching is allowed, so comparing
+    a cap of 1 against a cap of 100000 is not a one-factor ablation of anything —
+    the two arms ran different amounts of search. The same applies to the
+    decision budget, the search mode and the card condition.
+    """
+    if control not in per_arm_options:
+        raise ValueError(f"control arm {control!r} is missing")
+    control_options = per_arm_options[control]
+
+    def shared(key: str, options: dict):
+        # `cards` has two accepted spellings for the same condition, so compare
+        # the normalised value; otherwise `verified` vs `verified_basic_2p`
+        # would be reported as a condition change.
+        value = options.get(key)
+        if key == "cards":
+            return normalise_cards(value or "none")
+        return value
+
+    for label, options in per_arm_options.items():
+        if label not in arms or label == control:
+            continue
+        for key in SHARED_CONDITION_KEYS:
+            mine = shared(key, options)
+            theirs = shared(key, control_options)
+            if mine != theirs:
+                raise ValueError(
+                    f"arm {label!r} disagrees with control {control!r} on {key} "
+                    f"({mine!r} vs {theirs!r}); a comparison needs one shared "
+                    f"{key}"
+                )
+
+
 def check_plan(
     per_arm_options: dict[str, dict], control: str, *, arms: set[str] | frozenset[str]
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
@@ -217,11 +273,16 @@ def check_plan(
     Returns `(changed_factors, effective_changes)` per arm. A declared change
     that the mode or the policies cannot act on is an error, never a silent
     zero-effect arm.
+
+    The experiment-definition keys in `SHARED_CONDITION_KEYS` are not factors at
+    all: if one arm changes the search cap, the budget or the card condition, the
+    arms are no longer the same experiment (#169 review P1/P2).
     """
     if control not in per_arm_options:
         raise ValueError(f"control arm {control!r} is missing")
     control_options = per_arm_options[control]
     control_values = effective_parameters(control_options)
+    check_shared_conditions(per_arm_options, control, arms=arms)
     changed_factors: dict[str, list[str]] = {}
     effective_changes: dict[str, list[str]] = {}
     for label, options in per_arm_options.items():
@@ -296,6 +357,10 @@ def compare_arms(
     """Validate every arm, verify comparability, then bootstrap arm vs control."""
     if control not in arms:
         raise ValueError(f"control arm {control!r} is missing")
+    # Aggregation re-checks the shared conditions (#169 review P1): a report
+    # assembled from artifacts written by an older or hand-edited plan must not
+    # pool arms that ran different search caps, budgets or card conditions.
+    check_shared_conditions(per_arm_options, control, arms=set(arms))
     if len(arms) < 2:
         raise ValueError("an ablation needs at least a control and one variant")
     if iterations < 100:
@@ -325,6 +390,7 @@ def compare_arms(
             baseline=options["baseline"],
             opponent=options["opponent"],
             extra=options["extra"],
+            cards=normalise_cards(options.get("cards", "none")),
             search_mode=options["search_mode"],
             iterations=iterations,
         )
@@ -495,6 +561,7 @@ def arm_command(binary: Path, arm: dict, output: Path) -> list[str]:
         "--search-mode", arm["search_mode"],
         "--time-budget-max-simulations", str(arm["time_budget_max_simulations"]),
         "--decision-budget-ms", str(arm["decision_budget_ms"]),
+        "--cards", normalise_cards(arm.get("cards", "none")),
     ]
     # Every search knob reaches the binary explicitly, defaults included, so what
     # ran is exactly what the arm declared.
@@ -560,6 +627,10 @@ def plan_arms(spec: dict) -> dict[str, dict]:
                 "time_budget_max_simulations",
                 spec.get("time_budget_max_simulations", 100000),
             ),
+            # #169 review P2: `cards` must reach `paired_eval` and the
+            # aggregator, or a declared card condition would silently run as a
+            # cardless experiment.
+            "cards": normalise_cards(arm.get("cards", spec.get("cards", "none"))),
         }
         # Per-arm search knobs override the specification-level default, which
         # itself falls back to the Rust default. Recording the effective value
@@ -571,6 +642,23 @@ def plan_arms(spec: dict) -> dict[str, dict]:
             raise ValueError(
                 f"arm {label!r} has an unsupported search mode: "
                 f"{per_arm[label]['search_mode']!r}"
+            )
+        if per_arm[label]["cards"] not in CARD_CONDITIONS:
+            raise ValueError(
+                f"arm {label!r} has an unsupported card condition: "
+                f"{per_arm[label]['cards']!r} (expected one of {CARD_CONDITIONS})"
+            )
+        if per_arm[label]["cards"] != "none" and per_arm[label]["players"] != 2:
+            raise ValueError(
+                f"arm {label!r} requests cards at {per_arm[label]['players']} "
+                "players; the verified pool supports two players only"
+            )
+        if (
+            type(per_arm[label]["time_budget_max_simulations"]) is not int
+            or per_arm[label]["time_budget_max_simulations"] < 1
+        ):
+            raise ValueError(
+                f"arm {label!r}: time_budget_max_simulations must be a positive integer"
             )
     return per_arm
 
