@@ -51,6 +51,8 @@ python scripts/episode_dataset.py aggregate \
   --policy eval --sha local --out target
 ```
 
+分割と M14 G0 判定は `docs/m12-dataset-split-and-g0.md`（`dataset_split`）で行う。本パイプラインの JSONL をそのまま入力にできる。
+
 `episode_export` の直接利用:
 
 ```bash
