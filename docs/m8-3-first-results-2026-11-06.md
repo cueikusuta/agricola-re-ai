@@ -48,3 +48,27 @@
 5. カードあり4人・7-7/10-7ドラフト・2人/3人/追加タイルONのモード別実測。
 
 継続する正式工程：[M8-3 #110](https://github.com/cueikusuta/agricola-re-ai/issues/110)、[M8-3A #123（今回の小タスク完了）](https://github.com/cueikusuta/agricola-re-ai/issues/123)。追加実験はデータの再利用範囲・ルール/デッキ版を先に固定し、未実施の結果を記載しない。
+
+## 4. M13評価レポートの診断項目追加（2026-11-07、#106）
+
+前節までの集約器は首位クレジット平均・95%区間・期待順位・得点差・思考時間を出していたが、`docs/roadmap-m7-onward.md` 3.1 が求める**参考値**（同率首位を含む首位到達率、純粋な単独1位率）と 6.6 が求める**試合/秒・意思決定/秒**を出力していなかった。これを追加した。
+
+| 追加フィールド | 定義 |
+|---|---|
+| `candidate_solo_first_rate` / `baseline_solo_first_rate` | 対象席が**単独1位**を取った試合の割合（同率首位は数えない） |
+| `candidate_first_reach_rate` / `baseline_first_reach_rate` | `rank == 1` の試合の割合。同率首位を含む到達率 |
+| `candidate_tied_first_game_rate` / `baseline_tied_first_game_rate` | 1位が複数いた試合の割合 |
+| `candidate_first_credit_by_seat` / `baseline_first_credit_by_seat` | 席ごとの首位クレジット平均。座席ローテーションの偏りを検出する |
+| `candidate_seat_credit_spread` / `baseline_seat_credit_spread` | 上記の最大値−最小値。集約値が隠す席依存を可視化する |
+| `total_cpu_seconds` | 全試合の `total_wall_ms` 合計。1プロセスの連続実行時間 |
+| `games_per_second` / `decisions_per_second` | `total_cpu_seconds` を分母にしたスループット |
+
+- すべて**検証済みフィールドからの導出**であり、対戦を追加実行しない。首位クレジットの `1/k` 定義・順位の整合検査は既存のまま。
+- `total_wall_ms <= 0` は測定値ではなくプレースホルダなので**拒否**する（スループットの0除算も防ぐ）。
+- スループットは1プロセスの逐次実行を前提とした**ベンチマークの目安**で、並列実行の速度向上や人間対戦時のレイテンシを意味しない。`throughput_note` に同じ注意を機械可読で残す。
+
+### ローカル小規模スモーク（強さの主張ではない）
+
+- 条件：カードなし2人戦、candidate `eval` / baseline `greedy`、相手席は `greedy`。seed 901〜902の2ブロック、座席ローテーション込み8試合、release ビルド、ローカルWindows。
+- 観測値：`total_cpu_seconds ≈ 0.076`、`games_per_second ≈ 105.7`、`decisions_per_second ≈ 7362`、`candidate_solo_first_rate = 1.0`、`candidate_first_credit_by_seat = [1.0, 1.0]`（席偏りなし）。
+- 8試合は**統計的判断に使えない**。首位率の差・+5pp判定はこの結果から主張しない。正式評価は `Paired AI Evaluation` ワークフローの手動実行で行う。

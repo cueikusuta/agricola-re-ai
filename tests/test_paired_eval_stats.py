@@ -68,6 +68,76 @@ def run(rows, blocks=3, players=4):
     )
 
 
+class PairedStatsReportDiagnosticsTests(unittest.TestCase):
+    """Roadmap 3.1 (reference first-place values) and 6.6 (throughput)."""
+
+    def test_single_winner_reports_solo_first_and_no_ties(self):
+        report = run(fixture())
+        self.assertEqual(report["candidate_solo_first_rate"], 1.0)
+        self.assertEqual(report["candidate_first_reach_rate"], 1.0)
+        self.assertEqual(report["candidate_tied_first_game_rate"], 0.0)
+        self.assertEqual(report["baseline_solo_first_rate"], 0.0)
+        self.assertEqual(report["baseline_first_reach_rate"], 0.0)
+
+    def test_shared_first_is_reported_without_becoming_a_solo_win(self):
+        rows = fixture()
+        for row in rows:
+            row["scores_by_seat"] = [30] * 4
+            row["ranks_by_seat"] = [1, 1, 1, 1]
+            row["first_place_credit"] = 0.25
+            row["expected_rank_observation"] = 1
+            row["score_margin"] = 0.0
+        report = run(rows)
+        self.assertEqual(report["mean_first_credit_delta"], 0.0)
+        self.assertEqual(report["candidate_solo_first_rate"], 0.0)
+        self.assertEqual(report["candidate_first_reach_rate"], 1.0)
+        self.assertEqual(report["candidate_tied_first_game_rate"], 1.0)
+        self.assertEqual(report["candidate_first_credit_pct"], 25.0)
+
+    def test_per_seat_credit_exposes_a_seat_bias(self):
+        rows = fixture()
+        # Only seat 0 may win, so the seat spread must show the imbalance that
+        # the aggregated 25% would hide.
+        for row in rows:
+            scores = [20] * 4
+            ranks = [2] * 4
+            scores[0], ranks[0] = 30, 1
+            row["scores_by_seat"] = scores
+            row["ranks_by_seat"] = ranks
+            row["expected_rank_observation"] = ranks[row["candidate_seat"]]
+            row["first_place_credit"] = 1.0 if ranks[row["candidate_seat"]] == 1 else 0.0
+            row["score_margin"] = scores[row["candidate_seat"]] - (
+                sum(scores) - scores[row["candidate_seat"]]
+            ) / 3
+        report = run(rows)
+        self.assertEqual(
+            report["candidate_first_credit_by_seat"], [1.0, 0.0, 0.0, 0.0])
+        self.assertEqual(report["candidate_seat_credit_spread"], 1.0)
+        # The bias is in the game, not in one arm: whichever arm sits in seat 0
+        # wins, so both arms report the same seat profile.
+        self.assertEqual(report["baseline_first_credit_by_seat"], [1.0, 0.0, 0.0, 0.0])
+        self.assertEqual(report["baseline_seat_credit_spread"], 1.0)
+
+    def test_seat_balanced_blocks_have_no_spread(self):
+        report = run(fixture())
+        self.assertEqual(report["candidate_first_credit_by_seat"], [1.0] * 4)
+        self.assertEqual(report["candidate_seat_credit_spread"], 0.0)
+
+    def test_throughput_uses_the_summed_game_wall_time(self):
+        # 24 games x 50 ms = 1.2 s of game time, 70 decisions per game.
+        report = run(fixture())
+        self.assertAlmostEqual(report["total_cpu_seconds"], 1.2)
+        self.assertAlmostEqual(report["games_per_second"], 20.0)
+        self.assertAlmostEqual(report["decisions_per_second"], 1400.0)
+        self.assertIn("throughput", report["throughput_note"])
+
+    def test_zero_game_wall_time_is_rejected(self):
+        rows = fixture()
+        rows[0]["total_wall_ms"] = 0.0
+        with self.assertRaisesRegex(ValueError, "non-positive game wall time"):
+            run(rows)
+
+
 class PairedStatsTests(unittest.TestCase):
     def test_complete_seat_blocks_and_effect_size(self):
         report = run(fixture())
