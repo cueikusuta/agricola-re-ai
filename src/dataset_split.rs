@@ -461,6 +461,8 @@ pub struct ModeRecompute {
     pub seeds: BTreeSet<u64>,
     /// Seat indexes that appeared anywhere.
     pub seats: BTreeSet<usize>,
+    /// `arm_id` values that are neither `candidate` nor `baseline`.
+    pub unknown_arms: BTreeSet<String>,
     pub players: BTreeSet<usize>,
     pub cards: BTreeSet<String>,
     /// `(block, arm, seat)` seen more than once.
@@ -472,6 +474,11 @@ pub struct ModeRecompute {
     pub incomplete_blocks: Vec<usize>,
     /// `(block, arm)` pairs whose seat set is not exactly `0..players-1`.
     pub incomplete_seat_coverage: Vec<(usize, String, Vec<usize>)>,
+    /// Blocks that have no row at all for a required arm (first few, for the
+    /// report detail).
+    pub blocks_missing_arm: Vec<(usize, String)>,
+    /// How many `(block, arm)` pairs were entirely absent.
+    pub blocks_missing_arm_count: usize,
     /// Seat indexes outside `0..players-1` (or contradicting the player count).
     pub out_of_range_seats: BTreeSet<usize>,
     /// Blocks whose rows do not all carry the same seed.
@@ -518,6 +525,8 @@ impl ModeRecompute {
             && self.wrong_rounds == 0
             && self.incomplete_blocks.is_empty()
             && self.incomplete_seat_coverage.is_empty()
+            && self.blocks_missing_arm_count == 0
+            && self.unknown_arms.is_empty()
             && self.out_of_range_seats.is_empty()
             && self.blocks_with_mixed_seeds.is_empty()
             && self.seeds_in_multiple_blocks.is_empty()
@@ -547,7 +556,11 @@ pub fn recompute_mode(rows: &[PairedRow]) -> ModeRecompute {
         match row.arm_id.as_str() {
             "candidate" => report.candidate_rows += 1,
             "baseline" => report.baseline_rows += 1,
-            _ => {}
+            // Anything else is not a comparison row. It is recorded and fails
+            // the run instead of being silently ignored (#170 re-review P1).
+            other => {
+                report.unknown_arms.insert(other.to_string());
+            }
         }
         report.blocks.insert(row.block_index);
         report.seeds.insert(row.seed);
@@ -609,10 +622,15 @@ pub fn recompute_mode(rows: &[PairedRow]) -> ModeRecompute {
         }
     }
 
-    // Seat rotation: every block must cover `0..players-1` for both arms.
+    // Seat rotation: every block must hold exactly
+    // `{("candidate", seat), ("baseline", seat) | seat in 0..players}`.
+    // Comparing the whole key set, not just row counts or the seats of whichever
+    // arms appeared, is what makes a run where candidate and baseline live in
+    // different blocks fail (#170 re-review P1).
     if let Some(players) = report.player_count() {
         let expected_seats: BTreeSet<usize> = (0..players).collect();
         let mut covered: BTreeMap<(usize, String), BTreeSet<usize>> = BTreeMap::new();
+        let mut observed_keys: BTreeMap<usize, BTreeSet<(String, usize)>> = BTreeMap::new();
         for row in rows {
             if row.candidate_seat >= players {
                 report.out_of_range_seats.insert(row.candidate_seat);
@@ -621,21 +639,50 @@ pub fn recompute_mode(rows: &[PairedRow]) -> ModeRecompute {
                 .entry((row.block_index, row.arm_id.clone()))
                 .or_default()
                 .insert(row.candidate_seat);
+            observed_keys
+                .entry(row.block_index)
+                .or_default()
+                .insert((row.arm_id.clone(), row.candidate_seat));
         }
-        for ((block, arm), seats) in covered {
-            if seats != expected_seats {
-                report
-                    .incomplete_seat_coverage
-                    .push((block, arm, seats.into_iter().collect()));
+        for ((block, arm), seats) in &covered {
+            if seats != &expected_seats {
+                report.incomplete_seat_coverage.push((
+                    *block,
+                    arm.clone(),
+                    seats.iter().copied().collect(),
+                ));
             }
         }
-        for (block, entries) in &per_block {
-            let complete =
-                entries.len() == players * 2 && entries.values().all(|count| *count == 1);
-            if !complete {
+        let expected_keys: BTreeSet<(String, usize)> = ["candidate", "baseline"]
+            .iter()
+            .flat_map(|arm| {
+                expected_seats
+                    .iter()
+                    .map(move |seat| ((*arm).to_string(), *seat))
+            })
+            .collect();
+        for (block, keys) in &observed_keys {
+            if keys != &expected_keys {
+                report.incomplete_blocks.push(*block);
+            }
+            for arm in ["candidate", "baseline"] {
+                if !keys.iter().any(|(observed, _)| observed == arm) {
+                    report.blocks_missing_arm_count += 1;
+                    if report.blocks_missing_arm.len() < 10 {
+                        report.blocks_missing_arm.push((*block, arm.to_string()));
+                    }
+                }
+            }
+        }
+        for block in report.blocks.iter() {
+            // A block with no rows at all cannot be inspected above, but the
+            // block set comes from the rows, so this only guards future edits.
+            if !observed_keys.contains_key(block) {
                 report.incomplete_blocks.push(*block);
             }
         }
+        report.incomplete_blocks.sort_unstable();
+        report.incomplete_blocks.dedup();
     } else {
         // Without a single player count nothing about seats can be verified.
         report.incomplete_blocks = report.blocks.iter().copied().collect();
@@ -1204,17 +1251,25 @@ pub fn evaluate_g0(
             "evidence",
             format!(
                 "{}: {} rows, expected {} for {} blocks x {} players x 2 arms; duplicate \
-                 keys {:?}; incomplete blocks {:?}; incomplete seat coverage {:?}; \
-                 out-of-range seats {:?}",
+                 keys {:?}; incomplete blocks ({} total) {:?}; incomplete seat \
+                 coverage {:?}; \
+                 out-of-range seats {:?}; unknown arms {:?}; blocks missing an arm \
+                 ({} total) {:?}",
                 mode.mode,
                 facts.rows,
                 facts.expected_rows(),
                 facts.blocks.len(),
                 players_label,
                 facts.duplicate_keys,
-                facts.incomplete_blocks,
+                // Only the head of a long list goes into the report detail; the
+                // full list stays on the struct for tests and callers.
+                facts.incomplete_blocks.len(),
+                &facts.incomplete_blocks[..facts.incomplete_blocks.len().min(10)],
                 facts.incomplete_seat_coverage,
-                facts.out_of_range_seats
+                facts.out_of_range_seats,
+                facts.unknown_arms,
+                facts.blocks_missing_arm_count,
+                facts.blocks_missing_arm
             ),
         ));
 

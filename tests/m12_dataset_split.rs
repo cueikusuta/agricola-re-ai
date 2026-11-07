@@ -887,3 +887,110 @@ fn a_checks_file_with_the_supported_schema_passes() {
     let (verdict, failed) = g0_with(&matches, 2);
     assert_eq!(verdict, GateStatus::Pass, "failed checks: {failed:?}");
 }
+
+// --- Arm pairing inside a block (#170 re-review P1) -------------------------
+
+#[test]
+fn candidate_and_baseline_must_share_every_block() {
+    // The reviewer's counter-example: 500 blocks carry candidate + "bogus", the
+    // other 500 baseline + "bogus". Totals look like 1,000 games/arm with unique
+    // seeds, but no block ever compares candidate against baseline.
+    let mut text = String::new();
+    for block in 0..1000usize {
+        let seed = 120 + block as u64;
+        let arm = if block < 500 { "candidate" } else { "baseline" };
+        for seat in 0..2usize {
+            text.push_str(&row_json(block, seed, arm, seat, 2));
+            text.push('\n');
+            text.push_str(&row_json(block, seed, "bogus", seat, 2));
+            text.push('\n');
+        }
+    }
+    let facts = recompute_mode(&load_matches(text.as_bytes()).expect("rows"));
+    assert_eq!(facts.candidate_rows, 1000);
+    assert_eq!(facts.baseline_rows, 1000);
+    assert_eq!(
+        facts.unknown_arms,
+        ["bogus".to_string()].into_iter().collect()
+    );
+    assert_eq!(facts.blocks_missing_arm_count, 1000);
+    assert!(!facts.is_complete());
+    let (verdict, failed) = g0_with(&text, 2);
+    assert_eq!(verdict, GateStatus::Fail, "failed checks: {failed:?}");
+    assert!(failed.contains(&"evaluation_block_completeness".to_string()));
+}
+
+#[test]
+fn a_block_without_baseline_rows_is_rejected() {
+    let mut text = String::new();
+    for block in 0..2usize {
+        let seed = 120 + block as u64;
+        for seat in 0..2usize {
+            text.push_str(&row_json(block, seed, "candidate", seat, 2));
+            text.push('\n');
+        }
+    }
+    let facts = recompute_mode(&load_matches(text.as_bytes()).expect("rows"));
+    assert_eq!(facts.blocks_missing_arm_count, 2);
+    assert_eq!(
+        facts.blocks_missing_arm,
+        vec![(0, "baseline".to_string()), (1, "baseline".to_string())]
+    );
+    assert!(!facts.is_complete());
+    assert_eq!(g0_with(&text, 2).0, GateStatus::Fail);
+}
+
+#[test]
+fn a_block_without_candidate_rows_is_rejected() {
+    let mut text = String::new();
+    for block in 0..2usize {
+        let seed = 120 + block as u64;
+        for seat in 0..2usize {
+            text.push_str(&row_json(block, seed, "baseline", seat, 2));
+            text.push('\n');
+        }
+    }
+    let facts = recompute_mode(&load_matches(text.as_bytes()).expect("rows"));
+    assert_eq!(facts.blocks_missing_arm_count, 2);
+    assert!(facts
+        .blocks_missing_arm
+        .iter()
+        .all(|(_, arm)| arm == "candidate"));
+    assert_eq!(g0_with(&text, 2).0, GateStatus::Fail);
+}
+
+#[test]
+fn an_unknown_arm_id_fails_even_when_the_expected_rows_exist() {
+    // Complete rotation plus one extra row with an unknown arm: the extra row is
+    // not ignored, it invalidates the run.
+    let mut text = matches_with_seeds(500, 2, |block| 120 + block as u64);
+    text.push_str(&row_json(0, 120, "shadow", 0, 2));
+    text.push('\n');
+    let facts = recompute_mode(&load_matches(text.as_bytes()).expect("rows"));
+    assert_eq!(
+        facts.unknown_arms,
+        ["shadow".to_string()].into_iter().collect()
+    );
+    assert!(!facts.is_complete());
+    assert_eq!(g0_with(&text, 2).0, GateStatus::Fail);
+}
+
+#[test]
+fn a_correct_two_player_rotation_keeps_both_arms_per_block() {
+    let matches = matches_with_seeds(500, 2, |block| 120 + block as u64);
+    let facts = recompute_mode(&load_matches(matches.as_bytes()).expect("rows"));
+    assert!(facts.unknown_arms.is_empty());
+    assert_eq!(facts.blocks_missing_arm_count, 0);
+    assert!(facts.is_complete());
+    assert_eq!(g0_with(&matches, 2).0, GateStatus::Pass);
+}
+
+#[test]
+fn a_correct_four_player_rotation_keeps_both_arms_per_block() {
+    let matches = matches_with_seeds(250, 4, |block| 200 + block as u64);
+    let facts = recompute_mode(&load_matches(matches.as_bytes()).expect("rows"));
+    assert_eq!(facts.expected_rows(), 2000);
+    assert_eq!(facts.games_per_arm(), 1000);
+    assert!(facts.is_complete());
+    assert_eq!(g0_with(&matches, 4).0, GateStatus::Pass);
+}

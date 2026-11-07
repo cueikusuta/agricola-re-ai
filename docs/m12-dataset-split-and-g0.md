@@ -83,7 +83,7 @@ Manifest には分割ごとの `seeds` / `episodes` / `training_samples` / `init
 | `evaluation_scale` | **行から再計算**した games/arm が 1,000 未満なら **fail**（「plumbing test であり G0 pass ではない」と detail に明記） |
 | `evaluation_completion` | `finished` でない行・14 ラウンドでない行があれば **fail** |
 | `evaluation_replay` | `replay_verified` でない行があれば **fail** |
-| `evaluation_block_completeness` | 各ブロックが **全座席 `0..players-1` × 両arm を各1行** 持つことを要求。座席欠落・範囲外座席・重複・`rows != blocks × players × 2` で **fail** |
+| `evaluation_block_completeness` | 各ブロックの**キー集合が `{(candidate, seat), (baseline, seat) | seat in 0..players-1}` と完全一致**することを要求。`candidate`/`baseline` 以外の `arm_id`、片方のarmしか無いブロック、座席欠落・範囲外座席・重複・`rows != blocks × players × 2` で **fail** |
 | `evaluation_seed_blocks` | 1ブロック1seed・別ブロックでseed重複なし・`seed - block_index` のオフセットが全行で同一、を要求（再レビューP1-b） |
 | `evaluation_split_discipline` | 評価 seed が **ロックされた test 範囲の外**（train/validation を含む）なら **fail** |
 | `checks_attested` / `m8_*` / `evaluation_observation_noninterference` / `evaluation_ci_reproducible` | checks ファイルが **hash で束縛**され、その中の `code_sha` と `matches_sha256` が evidence と一致するときだけ判定。無ければ **hold**（未検証の主張は合格に使わない）。束縛が壊れていれば **fail** |
@@ -93,8 +93,10 @@ Manifest には分割ごとの `seeds` / `episodes` / `training_samples` / `init
 
 `paired_eval` の1行は **(seed block, arm, seat) の1試合**である。したがって1つの seed ブロックには `players × 2 arms` 件のゲームが属するのが正常であり、「1 seed = 1 試合」と仮定しない。
 
-- `evaluation_block_completeness` は `(block, arm, seat)` が各1回ずつ存在し、**座席集合が `0..players-1` と完全一致**し、総行数が `blocks × players × 2` と一致することを要求する（2人戦=4行/ブロック、4人戦=8行）。1席欠け・範囲外座席・重複行は fail。
-  - 以前は「実際に現れた座席数」を基準にしていたため、**seat 0 だけを1,000ブロック並べると「1,000 games/arm・完全」と判定できた**（再レビューP1-a）。現在は宣言された人数を基準にする。
+- `evaluation_block_completeness` は各ブロックの**キー集合**を期待集合 `{(candidate, seat) | seat in 0..players-1} ∪ {(baseline, seat) | seat in 0..players-1}` と**完全一致**比較する（2人戦=4行/ブロック、4人戦=8行）。行数や「現れたarmの座席数」で代用しない。
+  - 以前は「実際に現れた座席数」を基準にしていたため、**seat 0 だけを1,000ブロック並べると「1,000 games/arm・完全」と判定できた**（再レビューP1-a）。
+  - さらに `candidate` / `baseline` 以外の `arm_id` は**黙って無視せず** `unknown_arms` として記録し fail（再レビューP1）。
+  - 片方のarmだけのブロック、および**「前半のブロックは candidate+unknown、後半は baseline+unknown」のように両armが別ブロックに分かれた反例**は fail（`blocks_missing_arm_count`）。
 - `evaluation_seed_blocks`（再レビューP1-b）は次を要求する。
   - 同じブロックの全行が同一 seed。
   - 異なるブロックは異なる seed（同じ seed の使い回しは fail）。
@@ -183,6 +185,8 @@ dataset_split g0 --manifest manifest.json --dataset-report report.json     --evi
 | **1,000ブロック×seat 0 のみ**（再レビューP1-a の反例） | **`fail`（exit 1）** | `evaluation_block_completeness`（`evaluation_scale` は 1000/arm で pass してしまう） |
 | **全ブロックが同一 seed**（再レビューP1-b の反例） | **`fail`（exit 1）** | `evaluation_seed_blocks` + `evaluation_block_completeness` |
 | 1ブロック内で arm ごとに別 seed | **`fail`（exit 1）** | `evaluation_seed_blocks`（mixed seeds） |
+| **前半500ブロックが candidate+`bogus`、後半500ブロックが baseline+`bogus`**（再レビューP1の反例、各arm 1,000行） | **`fail`（exit 1）** | `evaluation_block_completeness`（`unknown arms {"bogus"}`、`blocks missing an arm (1000 total)`）。`evaluation_scale` と `evaluation_seed_blocks` は通ってしまう |
+| 1ブロックで baseline 全欠落 / candidate 全欠落 | **`fail`（exit 1）** | `evaluation_block_completeness`（`blocks_missing_arm`） |
 | `seed = 2 × block + 120`（オフセット不整合） | **`fail`（exit 1）** | `evaluation_seed_blocks`（offset conflicts） |
 | checks ファイルの `schema_version: 1` | **`fail`（exit 1）** | `checks_attested`（`checks schema 1 is not 2`） |
 
@@ -190,7 +194,7 @@ dataset_split g0 --manifest manifest.json --dataset-report report.json     --evi
 
 ## 7. テスト
 
-- `tests/m12_dataset_split.rs`：**39件**。分割の正常系（JSON round-trip、2人・4人、`player_counts`）、範囲重複、範囲外 seed、重複 seed、provenance 混在、未検証カードモード、破損記録、非公開情報の非混入、初期状態の共有検出、編集済み Manifest の再検査、**再計算（scale・ブロック完全性・重複・未再演・切り詰め行）**、**座席ローテーション（seat 0 のみ／4人戦の1席欠け／範囲外seat）**、**seed ブロック（seed 使い回し／同一ブロック異seed／オフセット不整合）**、**checks スキーマ（v1 拒否・v2 受理）**、G0 の hold/fail/pass（旧 v1 スキーマ拒否・少数試合の fail・digest 捏造・checks 束縛切れ・モード重複・条件不一致・未検証カード・train seed での評価・未再演行・破損データ）。
+- `tests/m12_dataset_split.rs`：**45件**。分割の正常系（JSON round-trip、2人・4人、`player_counts`）、範囲重複、範囲外 seed、重複 seed、provenance 混在、未検証カードモード、破損記録、非公開情報の非混入、初期状態の共有検出、編集済み Manifest の再検査、**再計算（scale・ブロック完全性・重複・未再演・切り詰め行）**、**座席ローテーション（seat 0 のみ／4人戦の1席欠け／範囲外seat）**、**seed ブロック（seed 使い回し／同一ブロック異seed／オフセット不整合）**、**checks スキーマ（v1 拒否・v2 受理）**、**armペア完全性（candidate/baseline同一ブロック・未知arm・arm分離反例）**、G0 の hold/fail/pass（旧 v1 スキーマ拒否・少数試合の fail・digest 捏造・checks 束縛切れ・モード重複・条件不一致・未検証カード・train seed での評価・未再演行・破損データ）。
 - `tests/test_g0_evidence.py`：**8件**。digest が実ファイルから計算されること、シャード連結、`(block, arm, seat)` 重複の拒否、未検証カードモード拒否、checks の digest 記録、**evidence に試合数を書く欄が無いこと**。
 - 既存 `tests/m12_episode_data.rs` / `tests/m12_api.rs` / `tests/m12_episode_api_bridge.rs` は変更なしで成功（`src/episode_data.rs` と Episode API を変更していない）。
 - `cargo fmt --check` / `cargo clippy --all-targets` / `cargo test` を最新HEADで確認。
