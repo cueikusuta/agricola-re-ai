@@ -221,9 +221,13 @@ class AblationTests(unittest.TestCase):
         rows = arm_rows(credit=always_wins)
         variant_options = options(candidate="mcts")
         variant_options["mcts_simulations"] = 2
+        variant_rows = copy.deepcopy(rows)
+        for row in variant_rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "mcts"
         with self.assertRaisesRegex(ValueError, "multiple candidate factors"):
             compare_arms(
-                {"control": rows, "variant": copy.deepcopy(rows)},
+                {"control": rows, "variant": variant_rows},
                 control="control",
                 per_arm_options={"control": options(), "variant": variant_options},
                 iterations=500,
