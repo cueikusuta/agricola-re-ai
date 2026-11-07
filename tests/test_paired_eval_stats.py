@@ -29,6 +29,8 @@ def fixture(blocks=3, players=4):
                     "players": players,
                     "additional_action_space": False,
                     "cards": "none",
+                    "card_set_count": 0,
+                    "card_set_hash": "0" * 64,
                     "finished": True,
                     "rounds_completed": 14,
                     "scores_by_seat": scores,
@@ -60,11 +62,11 @@ def fixture(blocks=3, players=4):
     return records
 
 
-def run(rows, blocks=3, players=4):
+def run(rows, blocks=3, players=4, cards="none"):
     return validate_and_report(
         rows, players=players, seed_start=1000, first_block=0, blocks=blocks,
         candidate="eval", baseline="random", opponent="greedy",
-        extra=False, iterations=500,
+        extra=False, cards=cards, iterations=500,
     )
 
 
@@ -452,6 +454,93 @@ class PairedStatsTests(unittest.TestCase):
                 row["first_place_credit"] = 1 / ranks.count(1)
                 row["score_margin"] = scores[0] - (sum(scores) - scores[0]) / 3
                 self.assertEqual(run(rows)["total_games"], 24)
+
+
+class PairedStatsCardConditionTests(unittest.TestCase):
+    """The card condition is validated, reported, and never silently pooled."""
+
+    def verified_rows(self, **overrides):
+        rows = fixture(blocks=2, players=2)
+        for row in rows:
+            row["cards"] = "verified_basic_2p"
+            row["card_set_count"] = 30
+            row["card_set_hash"] = "b" * 64
+        for key, value in overrides.items():
+            for row in rows:
+                row[key] = value
+        return rows
+
+    def test_cardless_report_states_the_condition_explicitly(self):
+        report = run(fixture(), cards="none")
+        self.assertEqual(report["cards"], "none")
+        self.assertEqual(report["card_set_count"], 0)
+        self.assertIn("cardless", report["mode"])
+
+    def test_verified_card_report_carries_the_deck_identity(self):
+        report = validate_and_report(
+            self.verified_rows(), players=2, seed_start=1000, first_block=0,
+            blocks=2, candidate="eval", baseline="random", opponent="greedy",
+            extra=False, cards="verified_basic_2p", iterations=500,
+        )
+        self.assertEqual(report["cards"], "verified_basic_2p")
+        self.assertEqual(report["card_set_count"], 30)
+        self.assertEqual(report["card_set_hash"], "b" * 64)
+        self.assertIn("verified_card", report["mode"])
+
+    def test_card_condition_must_match_the_argument(self):
+        # Cardless rows passed as a verified experiment, and vice versa.
+        with self.assertRaisesRegex(ValueError, "invalid metadata|card condition|card set"):
+            validate_and_report(
+                fixture(blocks=2, players=2), players=2, seed_start=1000,
+                first_block=0, blocks=2, candidate="eval", baseline="random",
+                opponent="greedy", extra=False, cards="verified_basic_2p",
+                iterations=500,
+            )
+        with self.assertRaisesRegex(ValueError, "invalid metadata|card condition|card set"):
+            validate_and_report(
+                self.verified_rows(), players=2, seed_start=1000, first_block=0,
+                blocks=2, candidate="eval", baseline="random", opponent="greedy",
+                extra=False, cards="none", iterations=500,
+            )
+
+    def test_verified_deck_is_two_player_only(self):
+        with self.assertRaisesRegex(ValueError, "two players only"):
+            validate_and_report(
+                fixture(blocks=2, players=4), players=4, seed_start=1000,
+                first_block=0, blocks=2, candidate="eval", baseline="random",
+                opponent="greedy", extra=False, cards="verified_basic_2p",
+                iterations=500,
+            )
+
+    def test_unknown_card_condition_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "unsupported card condition"):
+            validate_and_report(
+                fixture(blocks=2, players=2), players=2, seed_start=1000,
+                first_block=0, blocks=2, candidate="eval", baseline="random",
+                opponent="greedy", extra=False, cards="all_840",
+                iterations=500,
+            )
+
+    def test_a_different_deck_inside_one_experiment_is_rejected(self):
+        rows = self.verified_rows()
+        rows[-1]["card_set_hash"] = "c" * 64
+        with self.assertRaisesRegex(ValueError, "inconsistent card set"):
+            validate_and_report(
+                rows, players=2, seed_start=1000, first_block=0, blocks=2,
+                candidate="eval", baseline="random", opponent="greedy",
+                extra=False, cards="verified_basic_2p", iterations=500,
+            )
+
+    def test_malformed_deck_hash_is_rejected(self):
+        for bad in ("", "z" * 64, "b" * 63, None, 30):
+            with self.subTest(bad=bad):
+                with self.assertRaisesRegex(ValueError, "invalid card set metadata"):
+                    validate_and_report(
+                        self.verified_rows(card_set_hash=bad), players=2,
+                        seed_start=1000, first_block=0, blocks=2,
+                        candidate="eval", baseline="random", opponent="greedy",
+                        extra=False, cards="verified_basic_2p", iterations=500,
+                    )
 
 
 if __name__ == "__main__":

@@ -35,6 +35,7 @@ def validate_and_report(
     baseline: str,
     opponent: str,
     extra: bool,
+    cards: str = "none",
     iterations: int = 10000,
 ) -> dict:
     if players not in (2, 3, 4) or blocks < 1 or iterations < 100:
@@ -44,6 +45,13 @@ def validate_and_report(
         for name in (candidate, baseline, opponent)
     ):
         raise ValueError("unsupported/identical policy")
+    # The card condition is a separate experiment, never pooled with cardless
+    # games. `verified_basic_2p` is the only deck this harness can build, and
+    # it exists for two players only.
+    if cards not in ("none", "verified_basic_2p"):
+        raise ValueError("unsupported card condition")
+    if cards != "none" and players != 2:
+        raise ValueError("the verified card pool supports two players only")
     expected = {
         (block, arm, seat)
         for block in range(first_block, first_block + blocks)
@@ -67,7 +75,7 @@ def validate_and_report(
             or row["schema_version"] != 1
             or row.get("seed") != seed_start + block
             or row.get("players") != players
-            or row.get("cards") != "none"
+            or row.get("cards") != cards
             or row.get("additional_action_space") is not extra
             or row.get("focus_policy") != (candidate if arm == "candidate" else baseline)
             or row.get("opponent_policy") != opponent
@@ -80,6 +88,21 @@ def validate_and_report(
             or row.get("policy_select_only") is not True
         ):
             raise ValueError(f"invalid metadata/verification: {key}")
+        # Every game in one experiment must provably use the same deck, and a
+        # cardless experiment must report an empty pool rather than a hash of
+        # unknown provenance.
+        card_count = row.get("card_set_count")
+        card_hash = row.get("card_set_hash")
+        if (
+            type(card_count) is not int
+            or card_count < 0
+            or not isinstance(card_hash, str)
+            or len(card_hash) != 64
+            or any(char not in "0123456789abcdef" for char in card_hash)
+        ):
+            raise ValueError(f"invalid card set metadata: {key}")
+        if (cards == "none") != (card_count == 0):
+            raise ValueError(f"card condition does not match the deck size: {key}")
         scores = row.get("scores_by_seat")
         ranks = row.get("ranks_by_seat")
         if (
@@ -197,6 +220,10 @@ def validate_and_report(
     budgets = {row["decision_budget_ms"] for row in rows}
     if len(budgets) != 1:
         raise ValueError("inconsistent decision budgets across game records")
+    card_hashes = {(row["cards"], row["card_set_count"], row["card_set_hash"]) for row in rows}
+    if len(card_hashes) != 1:
+        raise ValueError("inconsistent card set across game records")
+    card_set_count, card_set_hash = next(iter(card_hashes))[1:]
     values = defaultdict(list)
     deltas = []
     for block in range(first_block, first_block + blocks):
@@ -278,8 +305,13 @@ def validate_and_report(
     total_cpu_seconds = sum(g["total_wall_ms"] for g in rows) / 1000.0
     return {
         "schema_version": 1,
-        "mode": "cardless_seat_rotated_candidate_vs_fixed_opponents",
+        "mode": "cardless_seat_rotated_candidate_vs_fixed_opponents"
+        if cards == "none"
+        else "verified_card_seat_rotated_candidate_vs_fixed_opponents",
         "players": players,
+        "cards": cards,
+        "card_set_count": card_set_count,
+        "card_set_hash": card_set_hash,
         "additional_action_space": extra,
         "candidate": candidate,
         "baseline": baseline,
@@ -412,6 +444,7 @@ def main() -> int:
     p.add_argument("--baseline", choices=("random", "greedy", "eval", "mcts"), required=True)
     p.add_argument("--opponent", choices=("random", "greedy", "eval", "mcts"), required=True)
     p.add_argument("--extra", action="store_true")
+    p.add_argument("--cards", choices=("none", "verified_basic_2p"), default="none")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     try:
@@ -420,7 +453,7 @@ def main() -> int:
             seed_start=args.seed_start, first_block=args.first_block,
             blocks=args.blocks, candidate=args.candidate,
             baseline=args.baseline, opponent=args.opponent,
-            extra=args.extra,
+            extra=args.extra, cards=args.cards,
         )
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
         print(json.dumps(report, ensure_ascii=False, indent=2))
