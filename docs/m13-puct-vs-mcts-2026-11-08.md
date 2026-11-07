@@ -1,0 +1,73 @@
+# M13 PUCT vs 既存M7 MCTS 同一予算比較（2026-11-08）
+
+対象 Issue: #106（AI強化）、#110（評価基盤）、#167（時間予算・アブレーション）。
+**本ファイルは実測結果の記録であり、+5pp 目標の達成を主張しない。**
+
+## 1. 何を比較したか
+
+| 項目 | 条件A（2人戦・固定時間） |
+|---|---|
+| モード | 2人戦・カードなし・追加アクションスペースOFF |
+| 候補 | `puct`（M8-3、`PuctConfig::default()` 相当） |
+| 比較対象 | `mcts`（既存M7の再抽選型MCTS） |
+| 他席 | `greedy`（固定） |
+| seed | 900000–900499（未知test seed、座席ローテーション付き） |
+| ブロック | 500 blocks × 2 seats = **各arm 1,000試合** |
+| 停止規則 | `time-budgeted`（**1手 200 ms**、`time_budget_max_simulations=100000`） |
+| 実行 | Actions run [42398823247](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42398823247)（4シャード、GitHub-hosted `ubuntu-24.04`） |
+| コード | main `1658c059b9d10ef9d3c9b2d49898615d0ad89493` |
+
+固定回数の比較とは**混在させていない**（`search_mode=time-budgeted` の単独実行）。
+
+## 2. 結果（条件A）
+
+| 指標 | PUCT | MCTS | 差 |
+|---|---:|---:|---:|
+| 首位クレジット率（1/k 含む） | **100.0%** | 99.0% | **+1.0 pp** |
+| 差の95%区間（seedブロック・ブートストラップ） | — | — | **[+0.4, +1.7] pp** |
+| 単独1位率 | 100.0% | 99.0% | +1.0 pp |
+| 期待順位（1が最良） | 1.00 | 1.01 | −0.01 |
+| 平均得点差（自分−相手平均） | +20.65 | +16.12 | +4.53 |
+| 決断あたり完了シミュレーション | 521.2 | 418.9 | +24.4% |
+| 最大決断時間 | 175.3 ms | 175.2 ms | — |
+| p95 決断時間 | 175.1 ms | — | — |
+| 締切超過 | 0 ms | 0 ms | — |
+| 試合/秒・意思決定/秒 | 0.142 / 10.10 | — | — |
+
+出典: `docs/m13-runs/2026-11-08-puct-vs-mcts/2p-time-budget-200ms.json`。
+
+## 3. 読み方（重要）
+
+1. **+5pp 目標は未達**。点推定 +1.0 pp、区間上限 +1.7 pp で、目標の +5 pp に届いていない。
+2. **この条件は判別力が飽和している**。両AIとも `greedy` 相手にほぼ全勝（100% / 99%）で、天井に張り付いている。天井付近では +5pp の検出力が極端に落ちるため、**2人戦カードなし vs greedy は改善判定に適さない**。
+3. 差の区間が 0 を跨がないことは「PUCT が MCTS より弱い」証拠ではなく、この条件での差が小さいことの観測にすぎない。**首位率の最終判定にはならない**（`docs/roadmap-m7-onward.md` 3.2）。
+4. 得点差 +4.53 は補助指標であり、首位率の代わりにしない。
+5. 1手200msの予算は**探索だけでなく詳細生成を含む**（PR #168 の `DecisionBudget`）。最大 175.3 ms で予算内、締切超過 0 ms。
+
+## 4. 時間上限の実測（PR #168 の機構）
+
+- 全決断が 200 ms 以内（最大 175.3 ms、p95 175.1 ms）。ただし**これは観測値**であり、OS・負荷に対する絶対保証ではない。
+- `timeout_rate = 1.000` は time-budgeted では正常（締切が探索を終わらせた割合）。「決断が予算を超えた率」は `candidate_measured_timeout_rate` 系で 0。
+- フォールバック（合法手への置換）は 0 件。
+- **Web UI のCPU手番は本予算を使っていない**（`src/web.rs::advance_cpu` は回数上限のまま）。PR #149 と競合するため本PRでは変更していない。
+
+## 5. 未実施・次の比較
+
+| 条件 | 状態 |
+|---|---|
+| 2人戦・カードなし・**固定回数**（MCTS/PUCT 同シミュレーション数） | 未実行（本PRでは時間予算条件のみ） |
+| **4人戦**・カードなし・固定回数32 | 別途実行（結果は本ファイルに追記） |
+| 2人/4人・カードあり | M10 の4人プール未整備のため 4人カードありは不可。2人カードありは可能だが未実行 |
+| 10秒上限での1,000試合/arm | **非現実的**（2人でも40決断×10秒×2,000試合 ≈ 220時間）。10秒条件は少数試合の時間検証に限定する |
+| アブレーション（prior温度・c_puct・リーフ評価） | 基盤は `docs/m13-ablation-harness.md`。本PRでは未実行 |
+
+## 6. 再実行
+
+```sh
+gh workflow run paired-eval.yml -f players=2 -f blocks=500 -f seed_start=900000 \
+  -f candidate=puct -f baseline=mcts -f opponent=greedy -f cards=none \
+  -f search_mode=time-budgeted -f decision_budget_ms=200
+python scripts/paired_eval_stats.py --root <dl> --players 2 --seed-start 900000 \
+  --blocks 500 --candidate puct --baseline mcts --opponent greedy \
+  --search-mode time-budgeted --output report.json
+```
