@@ -361,6 +361,51 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_registry_entries_are_fail_closed() {
+        let set = CardSet {
+            definitions: vec![def("A001", CardKind::Occupation)],
+        };
+        let verified = reviewed(
+            "A001",
+            ReviewStatus::Verified,
+            Eligibility::Yes,
+            Eligibility::Yes,
+        );
+        let unverified = reviewed(
+            "A001",
+            ReviewStatus::Unverified,
+            Eligibility::Unverified,
+            Eligibility::Unverified,
+        );
+        // Order must not determine whether an untrusted duplicate is dealt.
+        for registry in [
+            vec![verified.clone(), unverified.clone()],
+            vec![unverified.clone(), verified.clone()],
+            vec![verified.clone(), verified.clone()],
+        ] {
+            assert!(verified_eligible_pool(&set, &registry, 4).is_empty());
+            assert_eq!(usable_occupations(&set, &registry, 4), 0);
+        }
+    }
+
+    #[test]
+    fn duplicate_definitions_do_not_inflate_g1_g2_gate_counts() {
+        let set = CardSet {
+            definitions: vec![
+                def("A001", CardKind::Occupation),
+                def("A001", CardKind::Occupation),
+            ],
+        };
+        let registry = vec![reviewed(
+            "A001",
+            ReviewStatus::Verified,
+            Eligibility::Yes,
+            Eligibility::Yes,
+        )];
+        assert!(verified_eligible_pool(&set, &registry, 4).is_empty());
+    }
+
+    #[test]
     fn player_counts_are_kept_separate() {
         let set = CardSet {
             definitions: vec![
