@@ -4,6 +4,13 @@
 //! under a per-decision wall-clock budget and records whether it timed out or
 //! fell back to the guaranteed-legal evaluation policy.
 //!
+//! #167 A: in `time-budgeted` mode the budget bounds the **whole decision**
+//! (search plus detail generation), not only the search. The search gets the
+//! budget minus a detail reserve, details get the remainder, and a decision that
+//! runs out of budget falls back to the guaranteed-legal automatic details. The
+//! row records whole-decision percentiles, overshoot and fallback counts so a
+//! "10 s is observed, not guaranteed" claim can be checked from the artifacts.
+//!
 //! `--cards` selects the card condition. M13 compares cardless and
 //! implemented-card conditions as separate experiments, so the condition, the
 //! deck size and the deck content hash are recorded on every row and the
@@ -11,14 +18,15 @@
 //! available; no unverified card can enter a deck here.
 #![recursion_limit = "256"]
 use agricola_re_ai::cards::{verified_basic_card_set, CardSet};
+use agricola_re_ai::decision_budget::{percentile_ms, DecisionBudgetSpec, DecisionTimings};
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::harvest::SimpleHarvestDetails;
 use agricola_re_ai::mcts::{MctsOutcome, MctsPolicy, SearchLimit, SearchMode};
 use agricola_re_ai::mcts_puct::{LeafMode, PuctConfig, PuctPolicy};
 use agricola_re_ai::model::Space;
 use agricola_re_ai::policy::{
-    play_to_end_observed, CardChoiceDetails, DetailPolicy, GreedyPolicy, RandomPolicy,
-    SimpleDetails, SpacePolicy,
+    play_to_end_with_budget, BudgetedDecisions, CardChoiceDetails, DetailPolicy, GreedyPolicy,
+    RandomPolicy, SimpleDetails, SpacePolicy,
 };
 use agricola_re_ai::score::{standings, standings_with_cards};
 use agricola_re_ai::{Config, Game, Observation};
@@ -114,6 +122,9 @@ struct Options {
     additional_action_space: bool,
     cards: Cards,
     decision_budget_ms: u64,
+    /// Search window minus this is the search deadline; details get the rest.
+    /// `None` derives it from the budget (#167 A).
+    detail_reserve_ms: Option<u64>,
     search_mode: SearchMode,
     mcts_simulations: usize,
     time_budget_max_simulations: usize,
@@ -185,6 +196,7 @@ fn parse_options() -> Result<Options, String> {
             "additional-action-space",
             "cards",
             "decision-budget-ms",
+            "detail-reserve-ms",
             "search-mode",
             "time-budget-max-simulations",
             "mcts-simulations",
@@ -239,6 +251,13 @@ fn parse_options() -> Result<Options, String> {
         })
         .transpose()?
         .unwrap_or(DEFAULT_DECISION_BUDGET_MS);
+    let detail_reserve_ms = optional_option(&values, "detail-reserve-ms")
+        .map(|value| {
+            value
+                .parse::<u64>()
+                .map_err(|_| "invalid detail-reserve-ms".to_string())
+        })
+        .transpose()?;
     let mcts_simulations = optional_option(&values, "mcts-simulations")
         .map(|value| {
             value
@@ -364,6 +383,16 @@ fn parse_options() -> Result<Options, String> {
     if search_mode == SearchMode::TimeBudgeted && decision_budget_ms == 0 {
         return Err("search-mode time-budgeted requires --decision-budget-ms > 0".into());
     }
+    // The detail reserve only exists inside a decision budget: it is the part of
+    // the budget held back from the search, so it cannot exceed half of it.
+    if let Some(reserve) = detail_reserve_ms {
+        if decision_budget_ms == 0 {
+            return Err("--detail-reserve-ms requires --decision-budget-ms > 0".into());
+        }
+        if reserve > decision_budget_ms / 2 {
+            return Err("--detail-reserve-ms must be at most half of --decision-budget-ms".into());
+        }
+    }
     check_card_condition(cards, players)?;
     Ok(Options {
         players,
@@ -376,6 +405,7 @@ fn parse_options() -> Result<Options, String> {
         additional_action_space,
         cards,
         decision_budget_ms,
+        detail_reserve_ms,
         search_mode,
         mcts_simulations,
         time_budget_max_simulations,
@@ -421,6 +451,17 @@ impl SearchSettings {
             },
         })
     }
+
+    /// The stopping rule for one decision (#167 A).
+    ///
+    /// `search_deadline` comes from the whole-decision budget and is the
+    /// decision deadline minus the detail reserve. It must override the
+    /// template clock: using the full budget here was the defect this function
+    /// fixes, because the search then consumed the reserve and every decision
+    /// ended after its own budget with the detail policy skipped.
+    fn limit_for(self, ai: Ai, search_deadline: Option<Instant>) -> Option<SearchLimit> {
+        Some(self.rule_for(ai)?.resolve(search_deadline))
+    }
 }
 
 #[derive(Default)]
@@ -463,14 +504,17 @@ enum SearchRule {
 }
 
 impl SearchRule {
-    fn resolve(self) -> SearchLimit {
+    /// Resolve the template into a search limit. `search_deadline` is the
+    /// whole-decision budget's search window and wins over the template clock,
+    /// so the search stops before the detail reserve is touched (#167 A).
+    fn resolve(self, search_deadline: Option<Instant>) -> SearchLimit {
         match self {
             SearchRule::Simulations(n) => SearchLimit::Simulations(n),
             SearchRule::TimeBudget {
                 budget,
                 max_simulations,
             } => SearchLimit::TimeBudget {
-                deadline: Instant::now() + budget,
+                deadline: search_deadline.unwrap_or_else(|| Instant::now() + budget),
                 max_simulations,
             },
         }
@@ -488,25 +532,21 @@ fn select_ai(
     obs: &Observation,
     legal: &[Space],
     rng: &mut ChaCha8Rng,
-    search: Option<SearchRule>,
+    search: Option<SearchLimit>,
 ) -> (Option<Space>, MctsOutcome) {
     match ai {
         Ai::Random => (random.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Greedy => (greedy.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Eval => (eval.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Mcts => {
-            let limit = search
-                .map(SearchRule::resolve)
-                .unwrap_or(SearchLimit::Simulations(mcts.simulations));
+            let limit = search.unwrap_or(SearchLimit::Simulations(mcts.simulations));
             match mcts.select_with_limit(obs, legal, rng, limit) {
                 Some((space, outcome)) => (Some(space), outcome),
                 None => (None, MctsOutcome::default()),
             }
         }
         Ai::Puct => {
-            let limit = search
-                .map(SearchRule::resolve)
-                .unwrap_or(SearchLimit::Simulations(puct.config.simulations));
+            let limit = search.unwrap_or(SearchLimit::Simulations(puct.config.simulations));
             match puct.select_with_limit(obs, legal, rng, limit) {
                 Some((space, outcome)) => (Some(space), outcome),
                 None => (None, MctsOutcome::default()),
@@ -515,12 +555,18 @@ fn select_ai(
     }
 }
 
-impl SpacePolicy for SeatSelector<'_> {
-    fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
+impl SeatSelector<'_> {
+    fn choose(
+        &self,
+        obs: &Observation,
+        legal: &[Space],
+        rng: &mut ChaCha8Rng,
+        search_deadline: Option<Instant>,
+    ) -> Option<Space> {
         let is_focus = obs.player_id == self.focus;
         let search = if is_focus {
             self.search
-                .and_then(|settings| settings.rule_for(self.focus_ai))
+                .and_then(|settings| settings.limit_for(self.focus_ai, search_deadline))
         } else {
             None
         };
@@ -574,14 +620,22 @@ impl SpacePolicy for SeatSelector<'_> {
     }
 }
 
-fn percentile_ms(values: &[u64], q: f64) -> f64 {
-    if values.is_empty() {
-        return 0.0;
+impl SpacePolicy for SeatSelector<'_> {
+    fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
+        self.choose(obs, legal, rng, None)
     }
-    let mut sorted = values.to_vec();
-    sorted.sort_unstable();
-    let rank = ((sorted.len() - 1) as f64 * q).ceil() as usize;
-    sorted[rank.min(sorted.len() - 1)] as f64 / 1_000_000.0
+
+    /// The focus seat searches only inside the budget's search window, so the
+    /// detail generation gets its reserve (#167 A).
+    fn select_with_deadline(
+        &self,
+        obs: &Observation,
+        legal: &[Space],
+        rng: &mut ChaCha8Rng,
+        deadline: Option<Instant>,
+    ) -> Option<Space> {
+        self.choose(obs, legal, rng, deadline)
+    }
 }
 
 fn first_credit(ranks: &[usize], seat: usize) -> Result<f64, String> {
@@ -633,6 +687,28 @@ fn run(options: &Options) -> Result<(), String> {
         budget: Duration::from_millis(options.decision_budget_ms),
         time_budget_max_simulations: options.time_budget_max_simulations,
     };
+    // #167 A: the whole-decision budget. `simulation-capped` is reproducible, so
+    // it must not see a clock at all: it gets `None` and its decisions are
+    // identical to the pre-#167 path. `time-budgeted` bounds selection **and**
+    // details with one window, holding back the detail reserve from the search.
+    // The budget is applied to the **focus seat only** (review P1): the opponent
+    // seats must not become wall-clock dependent just because a budget exists.
+    let budget_spec = if deadline_enforced {
+        let limit = Duration::from_millis(options.decision_budget_ms);
+        Some(match options.detail_reserve_ms {
+            Some(reserve) => {
+                DecisionBudgetSpec::with_reserve(limit, Duration::from_millis(reserve))
+            }
+            None => DecisionBudgetSpec::new(limit),
+        })
+    } else {
+        None
+    };
+    let detail_reserve_ms = budget_spec
+        .map(|spec| spec.reserve().as_millis().min(u128::from(u64::MAX)) as u64)
+        .unwrap_or(0);
+    // Derived, not caller-supplied: the reserve is whatever the budget template
+    // actually resolved, so a record cannot claim a reserve that did not run.
     // The deck is built once and validated by the same gate the game uses, so
     // every arm and seat of an experiment provably shares one pool.
     let card_set = match options.cards {
@@ -677,15 +753,17 @@ fn run(options: &Options) -> Result<(), String> {
                     focus_outcomes: RefCell::new(FocusOutcomes::default()),
                 };
                 let game_start = Instant::now();
-                let focus_whole_ns = RefCell::new(Vec::<u64>::new());
-                play_to_end_observed(
+                let timings = RefCell::new(DecisionTimings::new(options.decision_budget_ms));
+                let seat_budget = budget_spec.map(|spec| BudgetedDecisions::focus_only(spec, seat));
+                play_to_end_with_budget(
                     &mut game,
                     &selector,
                     details,
                     &SimpleHarvestDetails,
-                    |player, ns| {
-                        if player == seat {
-                            focus_whole_ns.borrow_mut().push(ns);
+                    seat_budget,
+                    |outcome| {
+                        if outcome.player == seat {
+                            timings.borrow_mut().record(outcome);
                         }
                     },
                 )
@@ -718,15 +796,15 @@ fn run(options: &Options) -> Result<(), String> {
                     (scores.iter().sum::<i32>() - own_score) as f64 / (options.players - 1) as f64;
                 let decision_ns = selector.decision_ns.borrow();
                 let outcomes = selector.focus_outcomes.borrow();
-                let whole_ns = focus_whole_ns.borrow();
+                let timings = timings.borrow();
+                let whole_ns = timings.elapsed_ns();
                 let budget_ns = options.decision_budget_ms * 1_000_000;
-                let focus_timeout_count = if deadline_enforced && focus_ai.is_search() {
+                let focus_timeout_count = if deadline_enforced {
                     whole_ns.iter().filter(|&&ns| ns > budget_ns).count()
                 } else {
                     0
                 };
-                let focus_max_decision_ms =
-                    whole_ns.iter().copied().max().unwrap_or(0) as f64 / 1_000_000.0;
+                let focus_max_decision_ms = timings.max_whole_ms();
                 let record = json!({
                     "schema_version": 1,
                     "block_index": block_index,
@@ -748,8 +826,10 @@ fn run(options: &Options) -> Result<(), String> {
                     "expected_rank_observation": summary.rank[seat],
                     "score_margin": own_score as f64 - others_mean,
                     "decisions": decision_ns.len(),
-                    "focus_decisions": whole_ns.len(),
+                    "focus_decisions": timings.count(),
                     "decision_budget_ms": options.decision_budget_ms,
+                    "whole_decision_budget_enforced": deadline_enforced,
+                    "detail_reserve_ms": detail_reserve_ms,
                     "mcts_deadline_active": focus_ai.is_search() && deadline_enforced,
                     "search_deadline_active": focus_ai.is_search() && deadline_enforced,
                     "search_mode": options.search_mode.as_str(),
@@ -762,17 +842,35 @@ fn run(options: &Options) -> Result<(), String> {
                     "p95_policy_select_ms": percentile_ms(&decision_ns, 0.95),
                     "p99_policy_select_ms": percentile_ms(&decision_ns, 0.99),
                     "focus_max_decision_ms": focus_max_decision_ms,
-                    "focus_p95_decision_ms": percentile_ms(&whole_ns, 0.95),
-                    "focus_p99_decision_ms": percentile_ms(&whole_ns, 0.99),
+                    "focus_p95_decision_ms": timings.p95_whole_ms(),
+                    "focus_p99_decision_ms": timings.p99_whole_ms(),
+                    "focus_max_detail_ms": timings.max_detail_ms(),
+                    "focus_p95_detail_ms": timings.p95_detail_ms(),
                     "focus_timeout_count": focus_timeout_count,
+                    "focus_late_decision_count": timings.late_count(),
+                    "focus_late_beyond_tolerance_count": timings.late_beyond_tolerance_count(),
+                    "focus_budget_tolerance_ms": timings.budget_tolerance_ns() as f64 / 1_000_000.0,
+                    "focus_max_decision_overshoot_ms": timings.max_overshoot_ms(),
+                    "focus_decision_fallback_count": timings.fallback_count(),
+                    "focus_selection_fallback_count": timings.selection_fallbacks(),
+                    "focus_detail_fallback_count": timings.detail_fallbacks(),
+                    "focus_detail_declined_count": timings.detail_declines(),
+                    "focus_budget_exhausted_before_details_count": timings
+                        .budget_exhausted_before_details(),
+                    "focus_observed_all_decisions_within_budget": timings
+                        .observed_all_decisions_within_budget(),
+                    "focus_observed_all_decisions_within_budget_tolerance": timings
+                        .observed_all_decisions_within_budget_tolerance(),
+                    "focus_observed_all_decisions_within_10s": timings
+                        .observed_all_decisions_within_10s(),
                     "timeout_count": outcomes.timeouts,
                     "fallback_count": outcomes.fallbacks,
                     "mcts_simulations_completed": outcomes.simulations,
                     "search_simulations_completed": outcomes.simulations,
-                    "mcts_simulations_per_decision": if whole_ns.is_empty() {
+                    "mcts_simulations_per_decision": if timings.count() == 0 {
                         0.0
                     } else {
-                        outcomes.simulations as f64 / whole_ns.len() as f64
+                        outcomes.simulations as f64 / timings.count() as f64
                     },
                     "max_deadline_overshoot_ms": outcomes.overshoot_ms,
                     "max_search_elapsed_ms": outcomes.elapsed_ms,
@@ -924,6 +1022,42 @@ mod tests {
         let reversed = settings(SearchMode::SimulationCapped, 9, 2);
         assert_eq!(fixed_count(reversed.rule_for(Ai::Mcts).unwrap()), 9);
         assert_eq!(fixed_count(reversed.rule_for(Ai::Puct).unwrap()), 2);
+    }
+
+    /// Regression for the self-review finding in #167 A: the focus seat used
+    /// the template clock (the whole decision budget), so the search consumed the
+    /// detail reserve and every decision ended after its own budget with the
+    /// detail policy skipped.
+    #[test]
+    fn time_budgeted_honours_the_search_window_reserve() {
+        let shared = settings(SearchMode::TimeBudgeted, 3, 7);
+        let window = Instant::now() + Duration::from_millis(30);
+        for ai in [Ai::Mcts, Ai::Puct] {
+            match shared.limit_for(ai, Some(window)).unwrap() {
+                SearchLimit::TimeBudget {
+                    deadline,
+                    max_simulations,
+                } => {
+                    assert_eq!(deadline, window, "the reserve window must win");
+                    assert_eq!(max_simulations, 100_000);
+                }
+                SearchLimit::Simulations(_) => {
+                    panic!("time-budgeted must stay wall-clock bounded")
+                }
+            }
+        }
+        // The template clock is only a fallback when no whole-decision budget was
+        // resolved (for example a direct policy call in a test).
+        assert!(matches!(
+            shared.limit_for(Ai::Mcts, None).unwrap(),
+            SearchLimit::TimeBudget { .. }
+        ));
+        // A fixed count is never converted into a deadline.
+        let capped = settings(SearchMode::SimulationCapped, 3, 7);
+        assert!(matches!(
+            capped.limit_for(Ai::Mcts, Some(window)).unwrap(),
+            SearchLimit::Simulations(3)
+        ));
     }
 
     #[test]

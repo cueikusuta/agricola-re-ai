@@ -555,6 +555,19 @@ impl SpacePolicy for MctsPolicy {
         self.select_with_budget(obs, legal, rng, None)
             .map(|(space, _outcome)| space)
     }
+
+    /// Consume the search window of a whole-decision budget (#167 A). The
+    /// simulation count stays the safety cap, so a slow machine still stops.
+    fn select_with_deadline(
+        &self,
+        obs: &Observation,
+        legal: &[Space],
+        rng: &mut ChaCha8Rng,
+        deadline: Option<Instant>,
+    ) -> Option<Space> {
+        self.select_with_budget(obs, legal, rng, deadline)
+            .map(|(space, _outcome)| space)
+    }
 }
 
 #[cfg(test)]

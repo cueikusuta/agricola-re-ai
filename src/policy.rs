@@ -1,15 +1,47 @@
 //! Replaceable AI and subaction detail policies. Only Observation is accepted.
+use crate::decision_budget::{DecisionBudgetSpec, DecisionOutcome};
 use crate::engine::{Action, AnimalPlan, BakeAllocation, Detail, Plant};
 use crate::harvest::{HarvestDetailPolicy, SimpleHarvestDetails};
 use crate::model::*;
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use std::time::Instant;
 
 pub trait SpacePolicy {
     fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space>;
+
+    /// Deadline-aware selection (#167 A).
+    ///
+    /// The default ignores the deadline: heuristic policies cost microseconds,
+    /// so spending budget on them would not buy anything. Search policies
+    /// (MCTS/PUCT) override this to consume the search window of a
+    /// [`DecisionBudget`]. `deadline = None` must keep the historical, fully
+    /// reproducible behaviour.
+    fn select_with_deadline(
+        &self,
+        obs: &Observation,
+        legal: &[Space],
+        rng: &mut ChaCha8Rng,
+        _deadline: Option<Instant>,
+    ) -> Option<Space> {
+        self.select(obs, legal, rng)
+    }
 }
 pub trait DetailPolicy {
     fn produce(&self, obs: &Observation, space: Space) -> Option<Action>;
+
+    /// Deadline-aware detail generation (#167 A). The deadline is the *whole
+    /// decision* deadline, so a policy that can check it must leave the action
+    /// legal when it gives up. No implementation can be preempted mid-call, so
+    /// the caller still measures and records any overshoot.
+    fn produce_with_deadline(
+        &self,
+        obs: &Observation,
+        space: Space,
+        _deadline: Option<Instant>,
+    ) -> Option<Action> {
+        self.produce(obs, space)
+    }
 }
 pub struct RandomPolicy;
 pub struct GreedyPolicy;
@@ -621,6 +653,105 @@ pub fn play_to_end_observed(
     harvest_policy: &dyn HarvestDetailPolicy,
     mut on_decision: impl FnMut(usize, u64),
 ) -> Result<(), String> {
+    play_to_end_with_budget(
+        game,
+        space_policy,
+        detail_policy,
+        harvest_policy,
+        None,
+        |outcome| on_decision(outcome.player, outcome.elapsed_ns),
+    )
+}
+
+/// The guaranteed-legal automatic detail generation used as a fallback.
+///
+/// `SimpleDetails` returns one legal action for every available space, so a
+/// decision never ends without a legal action even when the configured detail
+/// policy declines or the budget is already spent.
+pub fn fallback_detail(obs: &Observation, space: Space) -> Option<Action> {
+    SimpleDetails.produce(obs, space)
+}
+
+/// Which seats a whole-decision budget applies to (#167 A review P1).
+///
+/// A wall-clock budget makes a decision machine-dependent, so applying it to a
+/// seat that is not being measured silently changes the opponent's behaviour and
+/// can even change a replay. Only the seat under evaluation may be budgeted;
+/// every other seat keeps the clock-free, reproducible path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BudgetScope {
+    /// No seat is budgeted (equivalent to no budget at all).
+    NoSeats,
+    /// Every seat is budgeted. Only for a game where the whole game, not one
+    /// seat, is the thing being timed; never for a paired comparison.
+    AllSeats,
+    /// Only this seat is budgeted; all other seats keep their historical
+    /// behaviour and determinism.
+    FocusSeat(usize),
+}
+
+/// A resolved budget plus the seats it may apply to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BudgetedDecisions {
+    pub spec: DecisionBudgetSpec,
+    pub scope: BudgetScope,
+}
+
+impl BudgetedDecisions {
+    /// The evaluation shape: only the focus seat is time-budgeted.
+    pub fn focus_only(spec: DecisionBudgetSpec, seat: usize) -> Self {
+        Self {
+            spec,
+            scope: BudgetScope::FocusSeat(seat),
+        }
+    }
+
+    pub fn all_seats(spec: DecisionBudgetSpec) -> Self {
+        Self {
+            spec,
+            scope: BudgetScope::AllSeats,
+        }
+    }
+
+    pub fn applies_to(&self, seat: usize) -> bool {
+        match self.scope {
+            BudgetScope::NoSeats => false,
+            BudgetScope::AllSeats => true,
+            BudgetScope::FocusSeat(focus) => focus == seat,
+        }
+    }
+}
+
+/// Play a game to the end under a **whole-decision** wall-clock budget (#167 A).
+///
+/// Unlike [`play_to_end_observed`], this bounds selection *and* detail
+/// generation with one budget: the search receives
+/// [`crate::decision_budget::DecisionBudget::search_deadline`] (the decision
+/// deadline minus the detail reserve), and details receive the decision
+/// deadline. When the budget is
+/// already spent by the time details would start, or the detail policy declines,
+/// the decision falls back to [`fallback_detail`] instead of failing the game.
+///
+/// The budget applies **only to the seats in `budget.scope`** (#167 A review
+/// P1). Every other seat takes the pre-#167 path exactly: no clock, no fallback
+/// substitution, and the same reproducible choices for a fixed RNG seed. A
+/// paired comparison must therefore use [`BudgetedDecisions::focus_only`], never
+/// [`BudgetedDecisions::all_seats`].
+///
+/// `decision_budget = None` keeps the historical behaviour for every seat.
+/// `simulation-capped` evaluation must use `None` so replays stay identical.
+///
+/// Every decision is reported to `on_decision`, including the fallback flags and
+/// the measured overshoot (budgeted seats only). The overshoot is a measurement:
+/// a running function cannot be preempted, so no real-time guarantee is made.
+pub fn play_to_end_with_budget(
+    game: &mut Game,
+    space_policy: &dyn SpacePolicy,
+    detail_policy: &dyn DetailPolicy,
+    harvest_policy: &dyn HarvestDetailPolicy,
+    decision_budget: Option<BudgetedDecisions>,
+    mut on_decision: impl FnMut(DecisionOutcome),
+) -> Result<(), String> {
     for _ in 0..320 {
         if game.public.finished {
             return Ok(());
@@ -640,18 +771,20 @@ pub fn play_to_end_observed(
         let mut choice_rng = ChaCha8Rng::seed_from_u64(
             game.log.action_seed ^ decision_index.wrapping_mul(0x9E37_79B9_7F4A_7C15),
         );
-        let decision_start = std::time::Instant::now();
-        let chosen = space_policy
-            .select(&obs, &legal, &mut choice_rng)
-            .ok_or("policy refused selection")?;
-        let action = detail_policy
-            .produce(&obs, chosen)
-            .ok_or("detail policy declined")?;
-        let elapsed_ns = decision_start
-            .elapsed()
-            .as_nanos()
-            .min(u128::from(u64::MAX)) as u64;
-        on_decision(acting, elapsed_ns);
+        // Only the seats in scope get a clock (#167 A review P1). Everyone else
+        // takes the pre-#167 path, so an opponent's choices cannot drift with the
+        // wall clock and a replay cannot change because a budget was configured.
+        let seat_budget = decision_budget.filter(|budget| budget.applies_to(acting));
+        let (action, outcome) = resolve_decision(
+            &obs,
+            &legal,
+            space_policy,
+            detail_policy,
+            &mut choice_rng,
+            seat_budget.map(|budget| budget.spec),
+        )?;
+        on_decision(outcome);
+        let chosen = action.space;
         game.apply_with_harvest_policy(action, harvest_policy)
             .map_err(|e| format!("policy action {:?} failed: {}", chosen, e))?;
     }
@@ -660,6 +793,95 @@ pub fn play_to_end_observed(
     } else {
         Err("move limit exceeded".into())
     }
+}
+
+/// Resolve exactly one decision under an optional whole-decision budget.
+///
+/// This is the single implementation of "select a space, then generate its
+/// details, inside one wall-clock window". The play loop and the profiling
+/// binary both call it, so a measurement can never come from a different code
+/// path than the one that runs games.
+///
+/// Without a budget the historical contract is preserved: a refusing policy is
+/// an error, and nothing is measured or substituted. With `Some(spec)` the
+/// returned action is always legal even when the search or the detail policy
+/// gives up.
+pub fn resolve_decision(
+    obs: &Observation,
+    legal: &[Space],
+    space_policy: &dyn SpacePolicy,
+    detail_policy: &dyn DetailPolicy,
+    rng: &mut ChaCha8Rng,
+    decision_budget: Option<DecisionBudgetSpec>,
+) -> Result<(Action, DecisionOutcome), String> {
+    if legal.is_empty() {
+        return Err("no legal move".into());
+    }
+    let acting = obs.player_id;
+    let budget = decision_budget.map(|spec| spec.resolve());
+    let decision_start = Instant::now();
+    let selected = space_policy.select_with_deadline(
+        obs,
+        legal,
+        rng,
+        budget.map(|budget| budget.search_deadline()),
+    );
+    let selection_fallback = selected.is_none();
+    let chosen = match selected {
+        Some(space) => space,
+        // Without a budget the historical contract stands: a policy that
+        // refuses is an error, not something to paper over. With a budget the
+        // decision must still end in a legal action, and `legal` is non-empty,
+        // so the first legal space is the documented last resort (search
+        // policies already return their own evaluated fallback before returning
+        // `None`).
+        None if budget.is_some() => legal[0],
+        None => return Err("policy refused selection".into()),
+    };
+    let budget_exhausted_before_details = budget.map(|b| b.is_expired()).unwrap_or(false);
+    let detail_start = Instant::now();
+    let produced = if budget_exhausted_before_details {
+        // The search used the whole budget: hand the decision to the cheap,
+        // guaranteed-legal detail generator instead of letting a slow detail
+        // policy run past the ceiling.
+        None
+    } else {
+        detail_policy.produce_with_deadline(obs, chosen, budget.map(|budget| budget.deadline()))
+    };
+    let detail_fallback = produced.is_none();
+    let detail_declined = detail_fallback && !budget_exhausted_before_details;
+    let action = match produced {
+        Some(action) => action,
+        None if budget.is_some() => fallback_detail(obs, chosen)
+            .ok_or_else(|| format!("no legal detail for {:?} for player {}", chosen, acting))?,
+        None => return Err("detail policy declined".into()),
+    };
+    let detail_ns = detail_start.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64;
+    let elapsed_ns = decision_start
+        .elapsed()
+        .as_nanos()
+        .min(u128::from(u64::MAX)) as u64;
+    let budget_ms = budget.map(|budget| budget.limit_ms()).unwrap_or(0);
+    let overshoot_ns = budget
+        .map(|budget| {
+            u64::try_from(budget.elapsed().saturating_sub(budget.limit()).as_nanos())
+                .unwrap_or(u64::MAX)
+        })
+        .unwrap_or(0);
+    Ok((
+        action,
+        DecisionOutcome {
+            player: acting,
+            budget_ms,
+            elapsed_ns,
+            overshoot_ns,
+            detail_ns,
+            selection_fallback,
+            detail_fallback,
+            detail_declined,
+            budget_exhausted_before_details,
+        },
+    ))
 }
 
 #[cfg(test)]
