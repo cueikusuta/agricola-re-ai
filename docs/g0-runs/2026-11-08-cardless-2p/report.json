@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "gate": "G0",
+  "verdict": "hold",
+  "checks": [
+    {
+      "id": "dataset_integrity",
+      "status": "pass",
+      "detail": "total=1000 finished=1000 corrupt=0 duplicate_seeds=0",
+      "source": "dataset_report"
+    },
+    {
+      "id": "split_manifest_valid",
+      "status": "pass",
+      "detail": "issues=0 private_leaks=0",
+      "source": "manifest"
+    },
+    {
+      "id": "provenance_uniform",
+      "status": "pass",
+      "detail": "engine={\"0.1.0\"} rules={\"agricola-revised-2016-beginner\"} cards={\"none\"} code={\"1658c059b9d10ef9d3c9b2d49898615d0ad89493\"}",
+      "source": "manifest"
+    },
+    {
+      "id": "seed_isolation",
+      "status": "pass",
+      "detail": "train=250 validation=150 test=600 seeds, disjoint",
+      "source": "manifest"
+    },
+    {
+      "id": "initial_state_isolation",
+      "status": "pass",
+      "detail": "no initial state is shared across splits",
+      "source": "manifest"
+    },
+    {
+      "id": "public_training_samples",
+      "status": "pass",
+      "detail": "80801 training samples passed the public-only check",
+      "source": "manifest"
+    },
+    {
+      "id": "verified_card_condition",
+      "status": "pass",
+      "detail": "card_modes={\"none\"}",
+      "source": "manifest"
+    },
+    {
+      "id": "evidence_schema",
+      "status": "pass",
+      "detail": "schema_version=2",
+      "source": "evidence"
+    },
+    {
+      "id": "evaluation_mode_conditions",
+      "status": "pass",
+      "detail": "1 mode(s) match the dataset condition",
+      "source": "evidence"
+    },
+    {
+      "id": "evaluation_matches_digest",
+      "status": "pass",
+      "detail": "cardless_2p: sha256 verified",
+      "source": "evidence"
+    },
+    {
+      "id": "evaluation_scale",
+      "status": "pass",
+      "detail": "cardless_2p: 1000 games/arm recomputed from 2000 rows (1000 required); a smaller run is a plumbing test, not a G0 pass",
+      "source": "evidence"
+    },
+    {
+      "id": "evaluation_completion",
+      "status": "pass",
+      "detail": "cardless_2p: 0 unfinished rows, 0 rows without 14 rounds",
+      "source": "evidence"
+    },
+    {
+      "id": "evaluation_replay",
+      "status": "pass",
+      "detail": "cardless_2p: 0 rows without replay_verified",
+      "source": "evidence"
+    },
+    {
+      "id": "evaluation_block_completeness",
+      "status": "pass",
+      "detail": "cardless_2p: 2000 rows, expected 2000 for 500 blocks x 2 players x 2 arms; duplicate keys []; incomplete blocks (0 total) []; incomplete seat coverage []; out-of-range seats {}; unknown arms {}; blocks missing an arm (0 total) []",
+      "source": "evidence"
+    },
+    {
+      "id": "evaluation_seed_blocks",
+      "status": "pass",
+      "detail": "cardless_2p: 500 blocks, 500 distinct seeds, offsets {920500}; blocks with mixed seeds []; seeds in several blocks []; rows with a different seed-block offset 0",
+      "source": "evidence"
+    },
+    {
+      "id": "evaluation_split_discipline",
+      "status": "pass",
+      "detail": "cardless_2p: 0 of 500 evaluated seeds are outside the locked test range                  [920400, 920999]: []",
+      "source": "evidence"
+    },
+    {
+      "id": "m8_rule_evidence",
+      "status": "hold",
+      "detail": "cardless_2p: attested only (no checks file bound by hash); unverified claims cannot pass G0",
+      "source": "evidence"
+    },
+    {
+      "id": "m8_legal_api_evidence",
+      "status": "hold",
+      "detail": "cardless_2p: attested only (no checks file bound by hash); unverified claims cannot pass G0",
+      "source": "evidence"
+    },
+    {
+      "id": "evaluation_observation_noninterference",
+      "status": "hold",
+      "detail": "cardless_2p: attested only (no checks file bound by hash); unverified claims cannot pass G0",
+      "source": "evidence"
+    },
+    {
+      "id": "evaluation_ci_reproducible",
+      "status": "hold",
+      "detail": "cardless_2p: attested only (no checks file bound by hash); unverified claims cannot pass G0",
+      "source": "evidence"
+    },
+    {
+      "id": "artifact_traceable",
+      "status": "pass",
+      "detail": "cardless_2p: artifact_url_present=true evidence_sha=\"1658c059b9d10ef9d3c9b2d49898615d0ad89493\" manifest_sha={\"1658c059b9d10ef9d3c9b2d49898615d0ad89493\"}",
+      "source": "evidence"
+    }
+  ],
+  "dataset_episodes": 1000,
+  "dataset_training_samples": 80801,
+  "evaluated_modes": [
+    "cardless_2p"
+  ],
+  "not_a_strength_claim": true,
+  "next_action": "produce the missing evidence (see the hold checks) and re-run this gate"
+}

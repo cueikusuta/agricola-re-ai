@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "code_sha": "1658c059b9d10ef9d3c9b2d49898615d0ad89493",
+  "modes": [
+    {
+      "mode": "cardless_2p",
+      "players": 2,
+      "card_mode": "none",
+      "artifact_url": "https://github.com/cueikusuta/agricola-re-ai/actions/runs/42400152935",
+      "matches_sha256": "ad12eef490926a97803000fee170700b66560cf66e2c66aeb42f269329e061aa",
+      "matches_paths": [
+        "shard-0.jsonl",
+        "shard-1.jsonl",
+        "shard-2.jsonl",
+        "shard-3.jsonl"
+      ]
+    }
+  ],
+  "generator_note": "matches_sha256 is computed from the artifact bytes; the gate recomputes it and derives scale/replay/completeness from the rows."
+}

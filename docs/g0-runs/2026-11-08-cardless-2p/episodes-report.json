@@ -1,0 +1,32 @@
+{
+  "total": 1000,
+  "finished": 1000,
+  "schema_versions": [
+    1
+  ],
+  "player_counts": [
+    2
+  ],
+  "duplicate_seeds": [],
+  "corrupt": [],
+  "seed_min": 920000,
+  "seed_max": 920999,
+  "distinct_seeds": 1000,
+  "total_turns": 80801,
+  "total_events": 80801,
+  "formats": [
+    "agricola-episode"
+  ],
+  "engine_versions": [
+    "0.1.0"
+  ],
+  "rules_versions": [
+    "agricola-revised-2016-beginner"
+  ],
+  "card_modes": [
+    "none"
+  ],
+  "code_shas": [
+    "1658c059b9d10ef9d3c9b2d49898615d0ad89493"
+  ]
+}
