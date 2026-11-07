@@ -392,18 +392,34 @@ fn parse_options() -> Result<Options, String> {
     })
 }
 
-/// The per-decision stopping rule for the focus seat (#164).
+/// Per-decision search settings shared by every seat (#164).
 ///
-/// Opponent seats always use the policy's own simulation count without a
-/// deadline, so a time-budgeted experiment does not quietly turn three
-/// opponents into unbounded searches.
-fn focus_search_rule(options: &Options) -> SearchRule {
-    match options.search_mode {
-        SearchMode::SimulationCapped => SearchRule::Simulations(options.mcts_simulations),
-        SearchMode::TimeBudgeted => SearchRule::TimeBudget {
-            budget: Duration::from_millis(options.decision_budget_ms),
-            max_simulations: options.time_budget_max_simulations,
-        },
+/// The fixed simulation count is **per policy**: MCTS and PUCT each keep the
+/// value the caller configured, so a PUCT focus is never silently run with
+/// MCTS's count (and the recorded config never disagrees with what ran).
+#[derive(Clone, Copy, Debug)]
+struct SearchSettings {
+    mode: SearchMode,
+    mcts_simulations: usize,
+    puct_simulations: usize,
+    budget: Duration,
+    time_budget_max_simulations: usize,
+}
+
+impl SearchSettings {
+    fn rule_for(self, ai: Ai) -> Option<SearchRule> {
+        let fixed = match ai {
+            Ai::Mcts => self.mcts_simulations,
+            Ai::Puct => self.puct_simulations,
+            Ai::Random | Ai::Greedy | Ai::Eval => return None,
+        };
+        Some(match self.mode {
+            SearchMode::SimulationCapped => SearchRule::Simulations(fixed),
+            SearchMode::TimeBudgeted => SearchRule::TimeBudget {
+                budget: self.budget,
+                max_simulations: self.time_budget_max_simulations,
+            },
+        })
     }
 }
 
@@ -427,9 +443,10 @@ struct SeatSelector<'a> {
     eval: &'a EvaluationPolicy,
     mcts: &'a MctsPolicy,
     puct: &'a PuctPolicy,
-    /// Stopping rule for a search policy. `None` for heuristic policies and for
-    /// the opponent seats, which always run the deterministic default.
-    search: Option<SearchRule>,
+    /// Stopping rule for the focus seat. `None` for heuristic policies and for
+    /// the opponent seats, which always run the policy's own deterministic
+    /// default.
+    search: Option<SearchSettings>,
     decision_ns: RefCell<Vec<u64>>,
     focus_outcomes: RefCell<FocusOutcomes>,
 }
@@ -501,7 +518,12 @@ fn select_ai(
 impl SpacePolicy for SeatSelector<'_> {
     fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
         let is_focus = obs.player_id == self.focus;
-        let search = if is_focus { self.search } else { None };
+        let search = if is_focus {
+            self.search
+                .and_then(|settings| settings.rule_for(self.focus_ai))
+        } else {
+            None
+        };
         let before = Instant::now();
         let (selected, outcome) = if is_focus {
             select_ai(
@@ -604,7 +626,13 @@ fn run(options: &Options) -> Result<(), String> {
     // simulation-capped mode the search length, not the clock, decides, so the
     // run stays reproducible on any machine.
     let deadline_enforced = options.search_mode == SearchMode::TimeBudgeted;
-    let search_rule = focus_search_rule(options);
+    let search_settings = SearchSettings {
+        mode: options.search_mode,
+        mcts_simulations: options.mcts_simulations,
+        puct_simulations: options.puct_simulations,
+        budget: Duration::from_millis(options.decision_budget_ms),
+        time_budget_max_simulations: options.time_budget_max_simulations,
+    };
     // The deck is built once and validated by the same gate the game uses, so
     // every arm and seat of an experiment provably shares one pool.
     let card_set = match options.cards {
@@ -644,7 +672,7 @@ fn run(options: &Options) -> Result<(), String> {
                     eval: &eval,
                     mcts: &mcts,
                     puct: &puct,
-                    search: Some(search_rule),
+                    search: Some(search_settings),
                     decision_ns: RefCell::new(Vec::new()),
                     focus_outcomes: RefCell::new(FocusOutcomes::default()),
                 };
@@ -859,6 +887,61 @@ mod tests {
                 check_card_condition(Cards::Verified, players).is_err(),
                 "an unverifiable pool must fail closed at {players} players"
             );
+        }
+    }
+
+    fn settings(mode: SearchMode, mcts: usize, puct: usize) -> SearchSettings {
+        SearchSettings {
+            mode,
+            mcts_simulations: mcts,
+            puct_simulations: puct,
+            budget: Duration::from_millis(250),
+            time_budget_max_simulations: 100_000,
+        }
+    }
+
+    fn fixed_count(rule: SearchRule) -> usize {
+        match rule {
+            SearchRule::Simulations(n) => n,
+            SearchRule::TimeBudget { .. } => panic!("expected a fixed simulation rule"),
+        }
+    }
+
+    /// Regression for the review finding on PR #166: a PUCT focus must use
+    /// `--puct-simulations`, never MCTS's count, in simulation-capped mode.
+    #[test]
+    fn simulation_capped_uses_each_search_policys_own_count() {
+        let shared = settings(SearchMode::SimulationCapped, 3, 7);
+        assert_eq!(fixed_count(shared.rule_for(Ai::Mcts).unwrap()), 3);
+        assert_eq!(fixed_count(shared.rule_for(Ai::Puct).unwrap()), 7);
+        for heuristic in [Ai::Random, Ai::Greedy, Ai::Eval] {
+            assert!(
+                shared.rule_for(heuristic).is_none(),
+                "heuristics must not receive a search limit"
+            );
+        }
+        // Unequal counts must not collapse to one value, whichever is larger.
+        let reversed = settings(SearchMode::SimulationCapped, 9, 2);
+        assert_eq!(fixed_count(reversed.rule_for(Ai::Mcts).unwrap()), 9);
+        assert_eq!(fixed_count(reversed.rule_for(Ai::Puct).unwrap()), 2);
+    }
+
+    #[test]
+    fn time_budgeted_uses_the_shared_budget_for_both_search_policies() {
+        let shared = settings(SearchMode::TimeBudgeted, 3, 7);
+        for ai in [Ai::Mcts, Ai::Puct] {
+            match shared.rule_for(ai).unwrap() {
+                SearchRule::TimeBudget {
+                    budget,
+                    max_simulations,
+                } => {
+                    assert_eq!(budget, Duration::from_millis(250));
+                    assert_eq!(max_simulations, 100_000);
+                }
+                SearchRule::Simulations(_) => {
+                    panic!("time-budgeted must not fall back to a fixed count")
+                }
+            }
         }
     }
 }

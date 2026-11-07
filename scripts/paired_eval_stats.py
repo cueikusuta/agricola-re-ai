@@ -462,7 +462,7 @@ def validate_and_report(
         ),
         "search_mode_note": (
             "simulation-capped and time-budgeted are different experiments and "
-            "must not be pooled: the first fixes the amount of search and is "
+            "must not be pooled: the first caps the number of simulation attempts and is "
             "reproducible, the second fixes wall-clock cost and is not. "
             "deterministic_policy_selection is true only when no deadline was "
             "enforced for the focus seat."

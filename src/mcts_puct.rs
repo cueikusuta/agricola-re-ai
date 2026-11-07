@@ -308,6 +308,17 @@ impl PuctPolicy {
         if legal.len() == 1 || max_simulations == 0 {
             return Some((legal[0], immediate));
         }
+        // A budget that is already spent must not pay for root priors or a
+        // single expansion: return the guaranteed legal fallback immediately,
+        // exactly as `MctsPolicy::select_with_limit` does.
+        if let Some(deadline) = deadline {
+            if Instant::now() >= deadline {
+                let space = fallback(obs, legal, rng)
+                    .filter(|space| legal.contains(space))
+                    .or_else(|| legal.first().copied())?;
+                return Some((space, outcome(0, true, true, started.elapsed())));
+            }
+        }
         debug_assert!(matches!(
             mode,
             SearchMode::SimulationCapped | SearchMode::TimeBudgeted
@@ -606,5 +617,74 @@ mod tests {
         assert!(outcome.timed_out);
         assert_eq!(outcome.simulations_completed, 0);
         assert!(outcome.used_fallback);
+    }
+
+    /// Regression for the review finding on PR #166: an expired budget must be
+    /// detected *before* root priors and expansions, so the decision reports a
+    /// measured elapsed time near zero instead of paying for a full prior pass.
+    #[test]
+    fn an_already_spent_budget_returns_before_any_prior_work() {
+        let game = four_player_game();
+        let obs = game.observation(game.public.active_player).unwrap();
+        let legal = game.legal_spaces();
+        assert!(legal.len() > 1);
+        let policy = PuctPolicy {
+            config: PuctConfig {
+                simulations: 100_000,
+                ..PuctConfig::default()
+            },
+        };
+        let mut rng = ChaCha8Rng::seed_from_u64(4);
+        let (space, outcome) = policy
+            .select_with_limit(
+                &obs,
+                &legal,
+                &mut rng,
+                SearchLimit::TimeBudget {
+                    deadline: Instant::now(),
+                    max_simulations: 100_000,
+                },
+            )
+            .unwrap();
+        assert!(legal.contains(&space), "fallback must stay legal");
+        assert_eq!(outcome.mode, SearchMode::TimeBudgeted);
+        assert!(outcome.timed_out);
+        assert!(outcome.used_fallback);
+        assert_eq!(outcome.simulations_completed, 0);
+        assert!(
+            outcome.elapsed_ms < 100,
+            "an expired budget must not pay for root priors, took {}ms",
+            outcome.elapsed_ms
+        );
+        assert_eq!(outcome.overshoot_ms, 0);
+    }
+
+    /// Fixed-seed reproducibility of the capped mode must stay intact after the
+    /// search-limit refactor.
+    #[test]
+    fn simulation_capped_puct_is_seed_reproducible() {
+        let game = four_player_game();
+        let obs = game.observation(game.public.active_player).unwrap();
+        let legal = game.legal_spaces();
+        let policy = PuctPolicy {
+            config: PuctConfig {
+                simulations: 4,
+                ..PuctConfig::default()
+            },
+        };
+        let run = || {
+            let mut rng = ChaCha8Rng::seed_from_u64(17);
+            policy
+                .select_with_limit(&obs, &legal, &mut rng, SearchLimit::Simulations(4))
+                .unwrap()
+        };
+        let (first_space, first) = run();
+        let (second_space, second) = run();
+        assert_eq!(first_space, second_space, "fixed seed must be reproducible");
+        assert_eq!(first.simulations_completed, second.simulations_completed);
+        assert!(first.simulations_completed <= 4);
+        assert_eq!(first.mode, SearchMode::SimulationCapped);
+        assert!(!first.timed_out);
+        assert_eq!(first.overshoot_ms, 0);
     }
 }

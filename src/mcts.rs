@@ -247,13 +247,16 @@ pub(crate) fn rollout(
 /// How a search is allowed to stop (#164).
 ///
 /// These two modes answer different questions and their results must never be
-/// pooled: `SimulationCapped` fixes the amount of search (reproducible), while
-/// `TimeBudgeted` fixes the wall-clock cost (not reproducible).
+/// pooled: `SimulationCapped` caps the number of simulation attempts
+/// (reproducible), while `TimeBudgeted` fixes the wall-clock cost (not
+/// reproducible).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SearchMode {
-    /// Run exactly N completed simulations. No wall-clock limit is applied, so
-    /// a fixed RNG seed reproduces the same choice, score and replay hash.
+    /// Cap the search at N simulation *attempts*. No wall-clock limit is
+    /// applied, so a fixed RNG seed reproduces the same choice. The number of
+    /// **completed** simulations can be lower than N: a sampled simulation that
+    /// turns out invalid is discarded and does not update the tree.
     #[default]
     SimulationCapped,
     /// Keep searching while the wall-clock deadline has not passed, up to a
@@ -280,7 +283,8 @@ impl SearchMode {
 /// The stopping rule handed to [`MctsPolicy::select_with_limit`].
 #[derive(Clone, Copy, Debug)]
 pub enum SearchLimit {
-    /// Stop after exactly this many completed simulations.
+    /// Stop after at most this many simulation attempts (`max_simulations`).
+    /// Completed simulations can be fewer; see [`SearchMode::SimulationCapped`].
     Simulations(usize),
     /// Stop at `deadline`, and never run more than `max_simulations`.
     TimeBudget {

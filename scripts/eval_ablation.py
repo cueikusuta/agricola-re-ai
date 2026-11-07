@@ -30,9 +30,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.paired_eval_stats import validate_and_report  # noqa: E402
+from scripts.paired_eval_stats import SEARCH_MODES, validate_and_report  # noqa: E402
 
-POLICIES = ("random", "greedy", "eval", "mcts")
+# Must stay in step with paired_eval_stats.POLICY_CHOICES, which gained
+# "puct" when PR #146 merged; otherwise a PUCT arm cannot be compared.
+POLICIES = ("random", "greedy", "eval", "mcts", "puct")
 BOOTSTRAP_SEED = 20261106
 
 
@@ -111,6 +113,7 @@ def compare_arms(
             baseline=options["baseline"],
             opponent=options["opponent"],
             extra=options["extra"],
+            search_mode=options["search_mode"],
             iterations=iterations,
         )
 
@@ -273,6 +276,8 @@ def run_arm(binary: Path, arm: dict, output: Path) -> None:
         "--baseline", arm["baseline"],
         "--opponent", arm["opponent"],
         "--additional-action-space", "true" if arm["extra"] else "false",
+        "--search-mode", arm["search_mode"],
+        "--time-budget-max-simulations", str(arm["time_budget_max_simulations"]),
         "--decision-budget-ms", str(arm["decision_budget_ms"]),
         "--mcts-simulations", str(arm["mcts_simulations"]),
         "--mcts-tree-depth", str(arm["mcts_tree_depth"]),
@@ -315,9 +320,24 @@ def main() -> int:
                 "decision_budget_ms": arm.get(
                     "decision_budget_ms", spec.get("decision_budget_ms", 0)
                 ),
+                # #164: the search mode is part of the experiment definition and
+                # must reach the binary and the validator unchanged, otherwise a
+                # time-budgeted arm is rejected as simulation-capped.
+                "search_mode": arm.get(
+                    "search_mode", spec.get("search_mode", "simulation-capped")
+                ),
+                "time_budget_max_simulations": arm.get(
+                    "time_budget_max_simulations",
+                    spec.get("time_budget_max_simulations", 100000),
+                ),
                 "mcts_simulations": arm.get("mcts_simulations", 64),
                 "mcts_tree_depth": arm.get("mcts_tree_depth", 2),
             }
+            if per_arm[label]["search_mode"] not in SEARCH_MODES:
+                raise ValueError(
+                    f"arm {label!r} has an unsupported search mode: "
+                    f"{per_arm[label]['search_mode']!r}"
+                )
         arms = {}
         for label, options in per_arm.items():
             folder = args.root / label

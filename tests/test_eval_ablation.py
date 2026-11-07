@@ -5,7 +5,8 @@ import unittest
 from scripts.eval_ablation import compare_arms
 
 
-def arm_rows(blocks=4, players=2, *, credit, seed_base=1000, replay="a"):
+def arm_rows(blocks=4, players=2, *, credit, seed_base=1000, replay="a",
+             search_mode="simulation-capped"):
     """Rows for one arm.
 
     `credit(block, seat)` decides whether the candidate focus seat wins.
@@ -48,7 +49,8 @@ def arm_rows(blocks=4, players=2, *, credit, seed_base=1000, replay="a"):
                     "score_margin": scores[seat] - (sum(scores) - scores[seat]) / (players - 1),
                     "decisions": 70,
                     "max_policy_select_ms": 1.0,
-                    "decision_budget_ms": 0,
+                    "decision_budget_ms": (
+                        10000 if search_mode == "time-budgeted" else 0),
                     "p50_policy_select_ms": 0.5,
                     "p95_policy_select_ms": 0.9,
                     "p99_policy_select_ms": 0.99,
@@ -62,8 +64,8 @@ def arm_rows(blocks=4, players=2, *, credit, seed_base=1000, replay="a"):
                     "focus_timeout_count": 0,
                     "mcts_deadline_active": False,
                     "deterministic_policy_selection": True,
-                    "search_mode": "simulation-capped",
-                    "search_budget_enforced": False,
+                    "search_mode": search_mode,
+                    "search_budget_enforced": search_mode == "time-budgeted",
                     "mcts_simulations_cap": 64,
                     "time_budget_max_simulations": 100000,
                     "mcts_simulations_per_decision": 0.0,
@@ -77,7 +79,8 @@ def arm_rows(blocks=4, players=2, *, credit, seed_base=1000, replay="a"):
     return rows
 
 
-def options(*, candidate="eval", blocks=4, players=2, seed_start=1000):
+def options(*, candidate="eval", blocks=4, players=2, seed_start=1000,
+            search_mode="simulation-capped"):
     return {
         "players": players,
         "seed_start": seed_start,
@@ -87,7 +90,10 @@ def options(*, candidate="eval", blocks=4, players=2, seed_start=1000):
         "baseline": "random",
         "opponent": "greedy",
         "extra": False,
-        "decision_budget_ms": 0,
+        "decision_budget_ms": (
+            10000 if search_mode == "time-budgeted" else 0),
+        "search_mode": search_mode,
+        "time_budget_max_simulations": 100000,
         "mcts_simulations": 64,
         "mcts_tree_depth": 2,
     }
@@ -227,7 +233,7 @@ class AblationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported policy"):
             compare_arms(
                 {"control": rows, "variant": copy.deepcopy(rows)}, control="control",
-                per_arm_options={"control": options(), "variant": options(candidate="puct")},
+                per_arm_options={"control": options(), "variant": options(candidate="stockfish")},
                 iterations=500,
             )
         with self.assertRaisesRegex(ValueError, "bootstrap iterations"):
@@ -259,6 +265,55 @@ class AblationTests(unittest.TestCase):
             compare_arms(
                 {"control": rows, "variant": []}, control="control",
                 per_arm_options={"control": options(), "variant": options()},
+                iterations=500,
+            )
+
+
+
+class AblationSearchModeTests(unittest.TestCase):
+    """#164: the mode must reach the validator, and modes never mix."""
+
+    def test_time_budgeted_arms_are_accepted_together(self):
+        control = arm_rows(credit=always_wins, search_mode="time-budgeted")
+        variant = arm_rows(credit=wins_seat_zero_only, search_mode="time-budgeted")
+        report = compare_arms(
+            {"control": control, "variant": variant},
+            control="control",
+            per_arm_options={
+                "control": options(search_mode="time-budgeted"),
+                "variant": options(search_mode="time-budgeted"),
+            },
+            iterations=500,
+        )
+        self.assertEqual(report["search_mode"], "time-budgeted")
+        by_arm = {row["arm"]: row for row in report["arms"]}
+        self.assertAlmostEqual(
+            by_arm["variant"]["mean_first_credit_delta_pp_vs_control"], -50.0)
+
+    def test_mixing_search_modes_across_arms_is_rejected(self):
+        control = arm_rows(credit=always_wins)
+        variant = arm_rows(credit=always_wins, search_mode="time-budgeted")
+        with self.assertRaisesRegex(ValueError, "disagrees with control"):
+            compare_arms(
+                {"control": control, "variant": variant},
+                control="control",
+                per_arm_options={
+                    "control": options(),
+                    "variant": options(search_mode="time-budgeted"),
+                },
+                iterations=500,
+            )
+
+    def test_declared_mode_must_match_the_rows(self):
+        rows = arm_rows(credit=always_wins)
+        with self.assertRaisesRegex(ValueError, "simulation-capped"):
+            compare_arms(
+                {"control": rows, "variant": copy.deepcopy(rows)},
+                control="control",
+                per_arm_options={
+                    "control": options(search_mode="time-budgeted"),
+                    "variant": options(search_mode="time-budgeted"),
+                },
                 iterations=500,
             )
 
