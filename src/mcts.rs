@@ -129,7 +129,7 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
     Some((set, cards))
 }
 
-fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
+pub(crate) fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     let seed: u64 = rng.gen();
     let (set, cards) = sample_private_cards(obs, rng)?;
     let mut game = Game::with_cards(
@@ -180,7 +180,7 @@ fn best_root_action(candidates: &[(Space, (f64, f64))]) -> Option<Space> {
         .map(|(space, _)| *space)
 }
 
-fn rollout(
+pub(crate) fn rollout(
     game: &mut Game,
     rng: &mut ChaCha8Rng,
     deadline: Option<Instant>,
