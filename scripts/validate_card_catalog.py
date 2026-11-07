@@ -118,6 +118,7 @@ def review_ledger(
     audit_ids: set[str] = set()
     deck_counts: Counter[str] = Counter()
     verified_count: Counter[str] = Counter()
+    valid_verified_count = 0
     reference_counts: Counter[str] = Counter()
     eligibility_counts: dict[str, Counter[str]] = {
         str(n): Counter() for n in (2, 3, 4)
@@ -146,6 +147,7 @@ def review_ledger(
             fail("structure", f"{card_id}: Japanese display name missing")
 
     for row_number, row in enumerate(audit, 2):
+        row_errors_before = len(errors)
         card_id = row.get("card_id", "")
         if card_id in audit_ids:
             fail("structure", f"audit duplicate ID: {card_id}")
@@ -206,10 +208,14 @@ def review_ledger(
                     "provenance",
                     f"{card_id}: verified without English name in preliminary catalog",
                 )
-            if kind in {"occupation", "minor_improvement"}:
-                for n in (2, 3, 4):
-                    if flags[n] == "yes":
-                        eligible[str(n)][kind] += 1
+            # A raw 'verified' label must never contribute to a playable
+            # pool when its own provenance, eligibility or type is invalid.
+            if len(errors) == row_errors_before:
+                valid_verified_count += 1
+                if kind in {"occupation", "minor_improvement"}:
+                    for n in (2, 3, 4):
+                        if flags[n] == "yes":
+                            eligible[str(n)][kind] += 1
         elif status == "unverified" and any(f == "yes" for f in flags.values()):
             fail(
                 "eligibility",
@@ -291,11 +297,14 @@ def review_ledger(
         },
         "official_verification_progress": {
             "verified": verified_count.get("verified", 0),
+            "verified_with_valid_metadata": valid_verified_count,
             "reviewed-needs-official": verified_count.get("reviewed-needs-official", 0),
             "unverified": verified_count.get("unverified", 0),
             "rejected": verified_count.get("rejected", 0),
-            "official_verification_complete": bool(audit)
-            and verified_count.get("verified", 0) == len(audit),
+            "official_verification_complete": require_full
+            and len(audit) == 840
+            and not errors
+            and valid_verified_count == len(audit),
         },
         "eligibility_progress": {
             n: dict(sorted(eligibility_counts[n].items())) for n in ("2", "3", "4")
