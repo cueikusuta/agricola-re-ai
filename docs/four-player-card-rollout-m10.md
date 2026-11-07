@@ -73,3 +73,27 @@ G1の40枚は配布上の最低必要数であり実戦的なシャッフルの�
 - 固有候補IDの確定：**保留**（#115の正式適格が出るまでは推測選定しない）。
 
 **依存**：#115（照合）、#91（A055費用の疑義）、#108（ルールテスト、GLM担当）、#109（合法詳細）、#104（ドラフト、先に本計画で配布枚数を満たす必要あり）。
+
+## 7. コード側照合ゲート（M10-CORE, Issue #139）
+
+`src/card_pool.rs` が台帳と実装をつなぐ。カード効果エンジン（`src/cards.rs`）と `CardDefinition` の構造には触れず、来歴メタデータを別構造として持つ。
+
+- `ReviewStatus`（`unverified` / `reviewed-needs-official` / `verified` / `rejected`）と `Eligibility`（`yes` / `no` / `unverified`）は `#115` の台帳表記と往復できる。
+- `builtin_review_registry()` は実装済み全カードを `unverified` で返す。**コード側から `verified` へ昇格させる経路は用意しない**。`#115` が公式出典を記録して初めて、その値をレジストリへ取り込む。
+- `verified_eligible_pool(set, registry, players)` は **`verified` かつ該当人数 `yes`** のみを返す。レジストリに無いカードは除外する（fail closed）。
+- `usable_occupations_4p` 相当は `usable_occupations(set, registry, 4)`、`usable_minors_4p` 相当は `usable_minor_improvements(set, registry, 4)`。
+- `pool_gate_report(set, registry, players)` が G1（40+40）と G2（80+80）の達成可否を機械可読に返す。`cargo run --bin card_pool_report` で2/3/4人の JSON を出力する。
+
+### 現時点の実測（2026-11-06）
+
+| 指標 | 値 |
+|---|---:|
+| 実装済みカード（ユニークID、2〜4人の和集合） | 34 |
+| レジストリ件数 | 34 |
+| うち `verified` | 0 |
+| 4人戦で配布可能な職業 | 0 |
+| 4人戦で配布可能な小進歩 | 0 |
+| G1（40+40） | 未達 |
+| G2（80+80） | 未達 |
+
+`0` は集計の失敗ではなく、**公式照合が未完了である正確な報告**。`tests/m10_card_pool.rs` が `docs/card-catalog-ae-audit.csv` の840行とコード定義の ID・正規化種別を突合し、未照合カードが公式プールへ混入しないことを検証する。既存の2人戦プリセット `verified_basic_card_set(2)`（30枚）の挙動は変更しない。

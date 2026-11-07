@@ -5,6 +5,7 @@ on:
     paths:
       - 'docs/card-catalog-ae-*.csv'
       - 'docs/card-catalog-audit-method.md'
+      - 'docs/card-catalog-official-sources.md'
       - 'scripts/validate_card_catalog.py'
       - 'tests/test_card_catalog_validator.py'
       - '.github/workflows/card-catalog-audit.yml'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'docs/card-catalog-ae-*.csv'
       - 'docs/card-catalog-audit-method.md'
+      - 'docs/card-catalog-official-sources.md'
       - 'scripts/validate_card_catalog.py'
       - 'tests/test_card_catalog_validator.py'
       - '.github/workflows/card-catalog-audit.yml'

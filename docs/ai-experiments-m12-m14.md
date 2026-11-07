@@ -102,3 +102,21 @@ ExIt候補：教師として情報集合を守るE2/E3/E4の探索を用い、�
 - 毎コミット：fmt/clippy/test、seed固定回帰、差分レビュー、ブラウザ動作との境界、CIと専用Actions run URL。未測定の結果は書かない。
 
 **この文書に記載のG0〜G3・+5pp・1000試合・10秒を、現時点で合格済みとは扱わない。**
+
+## 9. 実装状況：M12データ層（2026-11-07、Task C / #106）
+
+- `src/episode_data.rs` が独立した変換・検証機構。`EpisodeRecord` は1試合分の観測・行動・報酬・終局結果・seed・ルールモード・AI版・`code_sha`・エンジン版・カード版を保持し、`schema_version = 1` で版管理する。
+- JSONL の書き出し・読み込み（`to_jsonl` / `from_jsonl`）と、件数・スキーマ版・人数・重複seed・再演破損を検出する `inspect_dataset` / `DatasetReport`。
+- `verify()` はコミット済みイベント列を `Game::replay_with_cards` で再演し、最終ハッシュと順位表の一致を確認する。
+- `training_samples(viewer)` は行為者が `viewer` のターンだけを返し、`TrainingSample` には seed もイベント列も含めない。`assert_public()` で秘匿フィールドの混入を拒否する。ドラフト履歴は `DraftEpisode.views[seat]`（各席が正当に観測した `DraftObservation`）からのみ渡す。
+- ローカル小規模生成は `src/bin/episode_export.rs`。大量試合は既存のGitHub Actions専用ワークフロー（`docs/github-actions-mass-simulation-m8-3.md`）で実行し、通常CIには組み込まない。
+- **エピソードAPIとの統合**（2026-11-07）: `record_self_play` は `record_episode` / `record_from_episode` を通じて `src/api.rs` の `Episode` を駆動する。コーディネータが `Episode` を保持し、方策には `PolicyInput`（観測＋候補手）だけを渡し、各行動はエンジンの `validate_action`/`step` を通す。`Episode::game()` は信頼されたコーディネータ用の記録アクセサ（`events()`/`config()` と同じ境界）。API経由の記録が直接Gameドライバと完全一致することは `tests/m12_episode_api_bridge.rs` が固定する。実測の強さ・学習結果は未評価。
+- 本統合はマージ済みの PR #148 と PR #158 の再演検証強化を基盤とする。
+
+## 10. 実装状況：M13評価条件の分離（カード条件、2026-11-07 / #106）
+
+- 3節「モード別に別試験」のうち、**カードなし／実装済みカードあり**の分離を評価基盤へ実装した。`src/bin/paired_eval.rs --cards none|verified` と `scripts/paired_eval_stats.py --cards none|verified_basic_2p` が対になり、片方だけの条件混在を拒否する。詳細は `docs/github-actions-mass-simulation-m8-3.md` 10節。
+- `verified` が使えるのは2人戦のみ（`verified_basic_card_set` の制約）。4人戦カードありは M10 の G1 未達のため、**評価条件として未提供**と明記する。
+- デッキ同一性は `CardSet::content_hash()`（`id`/`kind`/`cost`/`points`/`effects` の秩序非依存ハッシュ）で検証する。seed・配布手札は含めないため、非公開情報の漏洩経路にならない。
+- ドラフト条件（`draft_7_7` / `draft_10_7_simultaneous` / `choose_10_7`）は未提供のまま。#155 の慣行決定と M10 のプール整備が前提。
+- **首位率の比較結果はまだ無い。** 本項は条件分離の実装報告であり、+5pp の達成・未達を判定したものではない。

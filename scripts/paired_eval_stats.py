@@ -16,8 +16,6 @@ import random
 import statistics
 import sys
 
-# Every policy name accepted by the aggregator and the CLI. Keep in sync with
-# the `Ai` enum in src/bin/paired_eval.rs.
 POLICY_CHOICES = ("random", "greedy", "eval", "mcts", "puct")
 SEARCH_POLICIES = ("mcts", "puct")
 
@@ -40,15 +38,23 @@ def validate_and_report(
     baseline: str,
     opponent: str,
     extra: bool,
+    cards: str = "none",
     iterations: int = 10000,
 ) -> dict:
     if players not in (2, 3, 4) or blocks < 1 or iterations < 100:
         raise ValueError("invalid experimental settings")
-    search_policies = SEARCH_POLICIES
     if candidate == baseline or any(
-        name not in POLICY_CHOICES for name in (candidate, baseline, opponent)
+        name not in POLICY_CHOICES
+        for name in (candidate, baseline, opponent)
     ):
         raise ValueError("unsupported/identical policy")
+    # The card condition is a separate experiment, never pooled with cardless
+    # games. `verified_basic_2p` is the only deck this harness can build, and
+    # it exists for two players only.
+    if cards not in ("none", "verified_basic_2p"):
+        raise ValueError("unsupported card condition")
+    if cards != "none" and players != 2:
+        raise ValueError("the verified card pool supports two players only")
     expected = {
         (block, arm, seat)
         for block in range(first_block, first_block + blocks)
@@ -72,7 +78,7 @@ def validate_and_report(
             or row["schema_version"] != 1
             or row.get("seed") != seed_start + block
             or row.get("players") != players
-            or row.get("cards") != "none"
+            or row.get("cards") != cards
             or row.get("additional_action_space") is not extra
             or row.get("focus_policy") != (candidate if arm == "candidate" else baseline)
             or row.get("opponent_policy") != opponent
@@ -85,6 +91,21 @@ def validate_and_report(
             or row.get("policy_select_only") is not True
         ):
             raise ValueError(f"invalid metadata/verification: {key}")
+        # Every game in one experiment must provably use the same deck, and a
+        # cardless experiment must report an empty pool rather than a hash of
+        # unknown provenance.
+        card_count = row.get("card_set_count")
+        card_hash = row.get("card_set_hash")
+        if (
+            type(card_count) is not int
+            or card_count < 0
+            or not isinstance(card_hash, str)
+            or len(card_hash) != 64
+            or any(char not in "0123456789abcdef" for char in card_hash)
+        ):
+            raise ValueError(f"invalid card set metadata: {key}")
+        if (cards == "none") != (card_count == 0):
+            raise ValueError(f"card condition does not match the deck size: {key}")
         scores = row.get("scores_by_seat")
         ranks = row.get("ranks_by_seat")
         if (
@@ -140,6 +161,10 @@ def validate_and_report(
             value = row.get(numeric)
             if not finite_number(value) or value < 0:
                 raise ValueError(f"invalid timing {numeric}: {key}")
+        # A finished 14-round game always took measurable time; a zero here is a
+        # placeholder, not a measurement, and would make throughput divide by zero.
+        if not row["total_wall_ms"] > 0:
+            raise ValueError(f"non-positive game wall time: {key}")
         if row["max_policy_select_ms"] > row["total_wall_ms"]:
             raise ValueError(f"selection time exceeds game wall time: {key}")
         if type(row.get("decisions")) is not int or row["decisions"] <= 0:
@@ -189,7 +214,7 @@ def validate_and_report(
         ):
             raise ValueError(f"invalid policy mode flags: {key}")
         if row["mcts_deadline_active"] != (
-            row.get("focus_policy") in search_policies and row["decision_budget_ms"] > 0
+            row.get("focus_policy") in SEARCH_POLICIES and row["decision_budget_ms"] > 0
         ):
             raise ValueError(f"deadline flag does not match policy/budget: {key}")
         received[key] = row
@@ -198,6 +223,10 @@ def validate_and_report(
     budgets = {row["decision_budget_ms"] for row in rows}
     if len(budgets) != 1:
         raise ValueError("inconsistent decision budgets across game records")
+    card_hashes = {(row["cards"], row["card_set_count"], row["card_set_hash"]) for row in rows}
+    if len(card_hashes) != 1:
+        raise ValueError("inconsistent card set across game records")
+    card_set_count, card_set_hash = next(iter(card_hashes))[1:]
     values = defaultdict(list)
     deltas = []
     for block in range(first_block, first_block + blocks):
@@ -234,8 +263,8 @@ def validate_and_report(
     budget_within_10s = 0 < budget_ms <= 10000
     candidate_max_focus = max(g["focus_max_decision_ms"] for g in values["candidate"])
     baseline_max_focus = max(g["focus_max_decision_ms"] for g in values["baseline"])
-    candidate_deadline_control = candidate in search_policies and budget_enabled
-    baseline_deadline_control = baseline in search_policies and budget_enabled
+    candidate_deadline_control = candidate in SEARCH_POLICIES and budget_enabled
+    baseline_deadline_control = baseline in SEARCH_POLICIES and budget_enabled
     candidate_measured_within = budget_enabled and candidate_max_focus <= budget_ms
     baseline_measured_within = budget_enabled and baseline_max_focus <= budget_ms
     candidate_10s_observed_pass = (
@@ -244,10 +273,48 @@ def validate_and_report(
     baseline_10s_observed_pass = (
         baseline_deadline_control and budget_within_10s and baseline_measured_within
     )
+
+    # Roadmap 3.1 asks for shared/tied first place as separate reference
+    # values, and 6.6 asks for games/sec and decisions/sec. All of these are
+    # derived from already-validated fields; nothing is re-sampled.
+    def first_place_breakdown(games: list[dict]) -> dict:
+        solo = [
+            1.0 if g["expected_rank_observation"] == 1 and g["ranks_by_seat"].count(1) == 1 else 0.0
+            for g in games
+        ]
+        reach = [1.0 if g["expected_rank_observation"] == 1 else 0.0 for g in games]
+        tied = [1.0 if g["ranks_by_seat"].count(1) > 1 else 0.0 for g in games]
+        return {
+            "solo_first_rate": statistics.mean(solo),
+            "first_reach_rate": statistics.mean(reach),
+            "tied_first_game_rate": statistics.mean(tied),
+        }
+
+    candidate_breakdown = first_place_breakdown(values["candidate"])
+    baseline_breakdown = first_place_breakdown(values["baseline"])
+    by_seat = {
+        arm: [
+            statistics.mean(
+                received[(block, arm, seat)]["first_place_credit"]
+                for block in range(first_block, first_block + blocks)
+            )
+            for seat in range(players)
+        ]
+        for arm in ("candidate", "baseline")
+    }
+    # The denominator is summed per-game elapsed wall time (not measured OS
+    # CPU time), appropriate for the serial-run throughput approximation.
+    # Keep the historical `total_cpu_seconds` key for report compatibility.
+    total_cpu_seconds = sum(g["total_wall_ms"] for g in rows) / 1000.0
     return {
         "schema_version": 1,
-        "mode": "cardless_seat_rotated_candidate_vs_fixed_opponents",
+        "mode": "cardless_seat_rotated_candidate_vs_fixed_opponents"
+        if cards == "none"
+        else "verified_card_seat_rotated_candidate_vs_fixed_opponents",
         "players": players,
+        "cards": cards,
+        "card_set_count": card_set_count,
+        "card_set_hash": card_set_hash,
         "additional_action_space": extra,
         "candidate": candidate,
         "baseline": baseline,
@@ -270,6 +337,24 @@ def validate_and_report(
         "required_seed_blocks_estimate_5pp_80pct_power": needed,
         "candidate_expected_rank": statistics.mean(
             g["expected_rank_observation"] for g in values["candidate"]
+        ),
+        "candidate_solo_first_rate": candidate_breakdown["solo_first_rate"],
+        "baseline_solo_first_rate": baseline_breakdown["solo_first_rate"],
+        "candidate_first_reach_rate": candidate_breakdown["first_reach_rate"],
+        "baseline_first_reach_rate": baseline_breakdown["first_reach_rate"],
+        "candidate_tied_first_game_rate": candidate_breakdown["tied_first_game_rate"],
+        "baseline_tied_first_game_rate": baseline_breakdown["tied_first_game_rate"],
+        "candidate_first_credit_by_seat": by_seat["candidate"],
+        "baseline_first_credit_by_seat": by_seat["baseline"],
+        "candidate_seat_credit_spread": max(by_seat["candidate"]) - min(by_seat["candidate"]),
+        "baseline_seat_credit_spread": max(by_seat["baseline"]) - min(by_seat["baseline"]),
+        "total_cpu_seconds": total_cpu_seconds,
+        "games_per_second": len(rows) / total_cpu_seconds,
+        "decisions_per_second": (candidate_decisions + baseline_decisions) / total_cpu_seconds,
+        "throughput_note": (
+            "games_per_second and decisions_per_second use the summed per-game "
+            "wall time of this shard set as the CPU denominator. They are single-"
+            "process throughput measurements, not parallel speedup or latency."
         ),
         "baseline_expected_rank": statistics.mean(
             g["expected_rank_observation"] for g in values["baseline"]
@@ -362,6 +447,7 @@ def main() -> int:
     p.add_argument("--baseline", choices=POLICY_CHOICES, required=True)
     p.add_argument("--opponent", choices=POLICY_CHOICES, required=True)
     p.add_argument("--extra", action="store_true")
+    p.add_argument("--cards", choices=("none", "verified_basic_2p"), default="none")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     try:
@@ -370,7 +456,7 @@ def main() -> int:
             seed_start=args.seed_start, first_block=args.first_block,
             blocks=args.blocks, candidate=args.candidate,
             baseline=args.baseline, opponent=args.opponent,
-            extra=args.extra,
+            extra=args.extra, cards=args.cards,
         )
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
         print(json.dumps(report, ensure_ascii=False, indent=2))

@@ -570,6 +570,11 @@ pub struct GameLog {
     pub action_seed: u64,
     #[serde(default)]
     pub card_set: CardSet,
+    /// Explicit starting hands for a draft-seeded game (#104). `None` means the
+    /// engine dealt from `config.seed`. Stored so save/load and replay rebuild
+    /// the exact initial card state instead of re-dealing randomly.
+    #[serde(default)]
+    pub initial_hands: Option<Vec<Vec<String>>>,
     pub events: Vec<Event>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -592,6 +597,34 @@ impl Game {
         }
         card_set.validate(config.players)?;
         let cards = CardState::deal(&card_set, config.seed, config.players);
+        Self::from_card_state(config, card_set, cards, None)
+    }
+    /// Start a game from explicit, already-drafted hands instead of the random
+    /// [`CardState::deal`]. This is the M11 draft-to-game bridge (#104): only
+    /// the private card state is seeded here, and the caller must have obtained
+    /// the hands from a completed draft. The draft's observation history stays
+    /// with the draft session, not with the game.
+    pub fn with_cards_and_hands(
+        config: Config,
+        card_set: CardSet,
+        hands: Vec<Vec<String>>,
+    ) -> Result<Self, String> {
+        if !(2..=4).contains(&config.players) {
+            return Err("players must be 2..=4".into());
+        }
+        card_set.validate(config.players)?;
+        if hands.len() != config.players {
+            return Err("explicit hands must match the player count".into());
+        }
+        let cards = CardState::from_hands(&card_set, &hands)?;
+        Self::from_card_state(config, card_set, cards, Some(hands))
+    }
+    fn from_card_state(
+        config: Config,
+        card_set: CardSet,
+        cards: CardState,
+        initial_hands: Option<Vec<Vec<String>>>,
+    ) -> Result<Self, String> {
         let round_seed = config.seed ^ 0x38DB_3BE3_DF45_3FAF;
         let action_seed = config.seed ^ 0x6A09_E667_F3BC_C909;
         let mut rng = RngStreams {
@@ -639,6 +672,7 @@ impl Game {
             round_seed,
             action_seed,
             card_set: card_set.clone(),
+            initial_hands: initial_hands.clone(),
             events: vec![],
         };
         let mut result = Self {
@@ -697,7 +731,12 @@ impl Game {
         {
             return Err("saved game metadata/version mismatch".into());
         }
-        let initial = Game::with_cards(result.config.clone(), result.card_set.clone())?;
+        let initial = match result.log.initial_hands.clone() {
+            Some(hands) => {
+                Game::with_cards_and_hands(result.config.clone(), result.card_set.clone(), hands)?
+            }
+            None => Game::with_cards(result.config.clone(), result.card_set.clone())?,
+        };
         if result.log.start_player != initial.public.start_player
             || result.log.initial_state_hash != initial.state_hash()
             || result.log.round_seed != initial.log.round_seed
@@ -715,9 +754,10 @@ impl Game {
         }
         // Check the complete event chain, rather than trusting only the
         // last event hash; otherwise earlier tampering could go unnoticed.
-        let replayed = Game::replay_with_cards(
+        let replayed = Game::replay_with_setup(
             result.config.clone(),
             result.card_set.clone(),
+            result.log.initial_hands.clone(),
             &result.log.events,
         )?;
         if replayed.state_hash() != result.state_hash() {
