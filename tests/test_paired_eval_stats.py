@@ -52,6 +52,23 @@ def fixture(blocks=3, players=4):
                     "focus_p95_decision_ms": 0.6,
                     "focus_p99_decision_ms": 0.7,
                     "focus_timeout_count": 0,
+                    # #167 A: the budget covers selection plus details.
+                    "whole_decision_budget_enforced": False,
+                    "detail_reserve_ms": 0,
+                    "focus_max_detail_ms": 0.2,
+                    "focus_p95_detail_ms": 0.1,
+                    "focus_late_decision_count": 0,
+                    "focus_max_decision_overshoot_ms": 0.0,
+                    "focus_decision_fallback_count": 0,
+                    "focus_selection_fallback_count": 0,
+                    "focus_detail_fallback_count": 0,
+                    "focus_detail_declined_count": 0,
+                    "focus_budget_exhausted_before_details_count": 0,
+                    "focus_observed_all_decisions_within_budget": False,
+                    "focus_observed_all_decisions_within_budget_tolerance": False,
+                    "focus_observed_all_decisions_within_10s": True,
+                    "focus_late_beyond_tolerance_count": 0,
+                    "focus_budget_tolerance_ms": 1.0,
                     "mcts_deadline_active": False,
                     "deterministic_policy_selection": True,
                     "search_mode": "simulation-capped",
@@ -70,10 +87,14 @@ def fixture(blocks=3, players=4):
 
 
 def as_time_budgeted(rows):
-    """Mark every row as a fixed-wall-clock experiment (#164)."""
+    """Mark every row as a fixed-wall-clock experiment (#164, #167 A)."""
     for row in rows:
         row["search_mode"] = "time-budgeted"
         row["search_budget_enforced"] = True
+        row["whole_decision_budget_enforced"] = True
+        row["detail_reserve_ms"] = 100
+        row["focus_observed_all_decisions_within_budget"] = True
+        row["focus_observed_all_decisions_within_budget_tolerance"] = True
     return rows
 
 
@@ -676,5 +697,120 @@ class PairedStatsSearchModeTests(unittest.TestCase):
                     run(rows)
 
 
+class PairedStatsTenSecondFlagTests(unittest.TestCase):
+    """#167 A review P1: the 10 s flag and its explanation must agree.
+
+    The whole-decision budget bounds the focus seat whatever its policy, while
+    the search deadline only exists for a search policy. The old flag required a
+    search policy and its explanation mentioned only MCTS, so a budgeted
+    heuristic seat could never pass and the text did not describe the check.
+    """
+
+    def test_a_budgeted_heuristic_focus_is_observable(self):
+        rows = as_time_budgeted(fixture())
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "eval"
+                row["mcts_deadline_active"] = False
+                row["deterministic_policy_selection"] = True
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="eval", baseline="random", opponent="greedy",
+            extra=False, search_mode="time-budgeted", iterations=500,
+        )
+        self.assertTrue(report["candidate_whole_decision_budget_enforced"])
+        self.assertFalse(report["candidate_focus_search_deadline_control"])
+        self.assertFalse(report["candidate_focus_deadline_control"])
+        self.assertTrue(report["candidate_10s_observed_pass"])
+        self.assertIn("whole-decision budget", report["candidate_10s_observed_pass_basis"])
+
+    def test_a_search_focus_reports_both_questions(self):
+        rows = as_time_budgeted(fixture())
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "puct"
+                row["mcts_deadline_active"] = True
+                row["deterministic_policy_selection"] = False
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="puct", baseline="random", opponent="greedy",
+            extra=False, search_mode="time-budgeted", iterations=500,
+        )
+        self.assertTrue(report["candidate_focus_search_deadline_control"])
+        self.assertTrue(report["candidate_whole_decision_budget_enforced"])
+        self.assertTrue(report["candidate_10s_observed_pass"])
+
+    def test_simulation_capped_never_claims_a_ten_second_observation(self):
+        report = run(fixture())
+        self.assertFalse(report["candidate_whole_decision_budget_enforced"])
+        self.assertFalse(report["candidate_10s_observed_pass"])
+        self.assertIn("not an OS-enforced hard guarantee", report["caveat"])
+        self.assertNotIn("only when the arm is MCTS", report["caveat"])
+
+
+class PairedStatsWholeDecisionBudgetTests(unittest.TestCase):
+    """#167 A: the budget must be reported as covering the whole decision."""
+
+    def test_simulation_capped_rows_cannot_claim_a_whole_decision_budget(self):
+        rows = fixture()
+        for row in rows:
+            row["whole_decision_budget_enforced"] = True
+        with self.assertRaisesRegex(ValueError, "whole-decision budget flag"):
+            run(rows)
+
+    def test_time_budgeted_rows_need_a_reserve_inside_the_budget(self):
+        rows = as_time_budgeted(fixture())
+        rows[0]["detail_reserve_ms"] = 0
+        with self.assertRaisesRegex(ValueError, "detail reserve inside the budget"):
+            run(rows, search_mode="time-budgeted")
+
+    def test_a_reserve_larger_than_the_budget_is_rejected(self):
+        rows = as_time_budgeted(fixture())
+        for row in rows:
+            row["detail_reserve_ms"] = row["decision_budget_ms"] + 1
+        with self.assertRaisesRegex(ValueError, "detail reserve inside the budget"):
+            run(rows, search_mode="time-budgeted")
+
+    def test_detail_time_cannot_exceed_the_whole_decision_time(self):
+        rows = as_time_budgeted(fixture())
+        rows[0]["focus_max_detail_ms"] = rows[0]["focus_max_decision_ms"] + 1.0
+        with self.assertRaisesRegex(ValueError, "detail time cannot exceed"):
+            run(rows, search_mode="time-budgeted")
+
+    def test_fallback_subcounts_must_add_up(self):
+        rows = fixture()
+        rows[0]["focus_decision_fallback_count"] = 2
+        rows[0]["focus_detail_fallback_count"] = 1
+        with self.assertRaisesRegex(ValueError, "fallback counts do not add up"):
+            run(rows)
+
+    def test_overshoot_without_a_late_decision_is_rejected(self):
+        rows = fixture()
+        rows[0]["focus_max_decision_overshoot_ms"] = 3.0
+        with self.assertRaisesRegex(ValueError, "overshoot without a late decision"):
+            run(rows)
+
+    def test_a_row_claiming_compliance_it_did_not_measure_is_not_trusted(self):
+        # The row flag says "within budget" while its own counters say two
+        # decisions were late. The report must follow the counters.
+        rows = as_time_budgeted(fixture())
+        rows[0]["focus_late_decision_count"] = 2
+        rows[0]["focus_max_decision_overshoot_ms"] = 4.0
+        report = run(rows, search_mode="time-budgeted")
+        self.assertFalse(report["candidate_observed_all_decisions_within_budget"])
+        self.assertEqual(report["candidate_late_decision_count"], 2)
+        self.assertEqual(report["whole_decision_budget_enforced"], True)
+        self.assertGreater(report["detail_reserve_ms"], 0)
+
+    def test_simulation_capped_report_states_no_whole_decision_budget(self):
+        report = run(fixture())
+        self.assertFalse(report["whole_decision_budget_enforced"])
+        self.assertEqual(report["detail_reserve_ms"], 0)
+        self.assertFalse(report["candidate_observed_all_decisions_within_budget"])
+        self.assertTrue(report["candidate_observed_all_decisions_within_10s"])
+
+
+if __name__ == "__main__":
+    unittest.main()
 if __name__ == "__main__":
     unittest.main()

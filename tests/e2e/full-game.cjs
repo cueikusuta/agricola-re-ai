@@ -14,6 +14,68 @@ const simpleActions = [
   "採石場", "採石場2", "林", "林地", "粘土の採取", "旅芸人"
 ];
 
+// Issue #92 (M9): the test must prove that every state change went through a
+// rendered control. Counting POSTed game mutations and comparing them with the
+// number of confirmed dialogs makes a hidden fetch() / direct API shortcut fail
+// the run instead of silently passing it.
+const traffic = {
+  submits: 0,
+  api: { play: 0, free: 0, harvest: 0 },
+  journal: []
+};
+
+function watchTraffic(page) {
+  page.on("request", request => {
+    if (request.method() !== "POST") return;
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/play") traffic.api.play++;
+    else if (path === "/api/free") traffic.api.free++;
+    else if (path === "/api/harvest") traffic.api.harvest++;
+  });
+}
+
+function noteAction(label) {
+  traffic.journal.push({ at: new Date().toISOString(), label });
+  if (traffic.journal.length > 400) traffic.journal.shift();
+}
+
+/// Everything a failure needs to be reproducible without the original session.
+async function captureState(page) {
+  const read = async (selector) => {
+    try {
+      return (await page.locator(selector).innerText()).trim();
+    } catch (error) {
+      return "<unreadable: " + error.message + ">";
+    }
+  };
+  return {
+    url: page.url(),
+    turn: await read("#turn"),
+    summary: await read("#summary"),
+    stats: await read("#stats"),
+    notice: await read("#notice"),
+    editorHint: await read("#editorHint"),
+    editorVisible: await page.locator("#editor").isVisible().catch(() => false)
+  };
+}
+
+async function visibleFingerprint(page) {
+  return {
+    turn: (await page.locator("#turn").innerText()).trim(),
+    summary: (await page.locator("#summary").innerText()).trim(),
+    stats: (await page.locator("#stats").innerText()).trim(),
+    farm: await page.locator("#farm .cell").allTextContents(),
+    hand: (await page.locator("#hand").innerText()).trim()
+  };
+}
+
+function writeArtifact(name, payload) {
+  fs.mkdirSync("artifacts", { recursive: true });
+  const path = "artifacts/" + name + ".json";
+  fs.writeFileSync(path, JSON.stringify(payload, null, 2) + "\n");
+  return path;
+}
+
 async function chooseAction(page, priorities) {
   // Canceling a dialog does not reset the active action-page index.
   const previous = page.locator("#actionNav").getByRole("button", { name: "前へ", exact: true });
@@ -61,6 +123,8 @@ async function playAndObserveResponse(page) {
   const responsePromise = page.waitForResponse(response =>
     new URL(response.url()).pathname === "/api/play"
       && response.request().method() === "POST", { timeout: 15000 });
+  traffic.submits++;
+  noteAction("confirm:play");
   await page.locator("#confirm").click();
   const response = await responsePromise;
   if (response.ok()) await page.locator("#editor").waitFor({ state: "hidden", timeout: 15000 });
@@ -69,6 +133,8 @@ async function playAndObserveResponse(page) {
 }
 
 async function submitAndRequireSuccess(page, purpose) {
+  traffic.submits++;
+  noteAction("confirm:" + purpose);
   await page.locator("#confirm").click();
   try {
     await page.locator("#editor").waitFor({ state: "hidden", timeout: 15000 });
@@ -81,6 +147,8 @@ async function submitAndRequireError(page, purpose) {
   const before = await page.locator("#editorHint").innerText();
   const turn = await page.locator("#turn").innerText();
   const history = await page.locator("#history").innerText();
+  traffic.submits++;
+  noteAction("confirm-expected-error:" + purpose);
   await page.locator("#confirm").click();
   await page.waitForFunction(previous => {
     const current = document.querySelector("#editorHint")?.textContent || "";
@@ -377,6 +445,8 @@ async function runGame(page, options) {
     seed: options.seed, extra: options.extra, players, cards, visitedRounds: [],
     workerActions: 0, feeding: 0, breeding: 0,
     feedOrderChanged: false, freeAction: false, pageReloadResumed: false,
+    sessionResumeStatePreserved: false,
+    serializedSaveRestoreAvailable: false,
     dialogsObserved: [],
     invalidInputRejected: false, manualPlow: false, cardPlayed: false,
     manualFence: 0, manualRoom: 0, manualRenovation: 0, manualSow: 0,
@@ -420,6 +490,26 @@ async function runGame(page, options) {
           assert.ok(coverage[key] >= 1, "manual UI operation was never executed: " + key);
         }
       }
+      // Issue #92: the operations the acceptance list names must actually have
+      // been submitted through the UI, in every game mode.
+      assert.ok(coverage.manualPlow, "a field was never ploughed through the UI");
+      assert.equal(coverage.freeAction, true, "free action was not submitted through the UI");
+      assert.equal(coverage.invalidInputRejected, true,
+        "an illegal detail value was not rejected without advancing the game");
+      assert.ok(coverage.feeding >= 1, "a harvest feeding phase never ran in the browser");
+      // Breeding is recorded but not required: whether a harvest has a breeding
+      // step depends on the position, so asserting it would make the test
+      // position-dependent rather than stronger.
+      assert.equal(coverage.pageReloadResumed, true, "the browser never resumed a session");
+      assert.equal(coverage.sessionResumeStatePreserved, true,
+        "reload did not preserve the visible state");
+      assert.deepEqual(
+        traffic.submits,
+        traffic.api.play + traffic.api.free + traffic.api.harvest,
+        "every game-mutating request came from a confirmed UI dialog"
+      );
+      coverage.uiSubmits = traffic.submits;
+      coverage.postedGameMutations = { ...traffic.api };
       coverage.visitedRounds = [...visitedRounds].sort((a, b) => a - b);
       console.log("browser_full_game_coverage=" + JSON.stringify(coverage));
       return coverage;
@@ -433,14 +523,20 @@ async function runGame(page, options) {
         inspectedRounds.add(Number(round[1]));
       }
       if (Number(round[1]) === 7 && !coverage.pageReloadResumed) {
-        // This only verifies reconnecting to a *running server*; it is not
-        // equivalent to a serialized save/restore after a server restart.
-        const handBeforeReload = await page.locator("#hand").innerText();
+        // Issue #92 asks for "save/restore". This server has no persisted save
+        // or restore endpoint, so what can be verified is that a reload
+        // reconnects to the same running session and shows the identical
+        // visible state. `serializedSaveRestoreAvailable: false` records that
+        // limit in the artifact instead of claiming a save/restore pass.
+        const before = await visibleFingerprint(page);
+        noteAction("reload-at-round-7");
         await page.reload();
         await page.waitForFunction(expected =>
-          document.querySelector("#turn")?.textContent === expected, turn);
-        assert.equal(await page.locator("#hand").innerText(), handBeforeReload,
-          "reloaded browser recovers the currently active session and own hand");
+          document.querySelector("#turn")?.textContent === expected, before.turn);
+        const after = await visibleFingerprint(page);
+        assert.deepEqual(after, before,
+          "reloaded browser recovers the same turn, summary, resources, farm and own hand");
+        coverage.sessionResumeStatePreserved = true;
         coverage.pageReloadResumed = true;
         continue;
       }
@@ -488,16 +584,58 @@ test("Issue #92 / M9: actual Chromium UI completes 14 rounds", async (t) => {
     await t.test(label, async () => {
       const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: "ja-JP" });
       const browserErrors = [];
+      const consoleErrors = [];
       page.on("pageerror", error => browserErrors.push(error.message));
+      page.on("console", message => {
+        if (message.type() === "error") consoleErrors.push(message.text());
+      });
+      watchTraffic(page);
+      traffic.submits = 0;
+      traffic.api = { play: 0, free: 0, harvest: 0 };
+      traffic.journal = [];
+      const prefix = "full-game-seed-" + options.seed;
       try {
-        await runGame(page, options);
+        const coverage = await runGame(page, options);
         assert.deepEqual(browserErrors, [], "no uncaught JavaScript exceptions");
+        writeArtifact(prefix + "-coverage", {
+          schema_version: 1,
+          kind: "browser-14-round-coverage",
+          url: baseUrl,
+          seed: options.seed,
+          players: options.players,
+          cards: options.cards,
+          additional_action_space: options.extra,
+          coverage,
+          browser_errors: browserErrors,
+          console_errors: consoleErrors,
+          reproduce: "AGRICOLA_WEB_URL=" + baseUrl + " node --test tests/e2e/full-game.cjs",
+          created_at: new Date().toISOString()
+        });
       } catch (error) {
         fs.mkdirSync("artifacts", { recursive: true });
-        const prefix = "full-game-seed-" + options.seed;
         await page.screenshot({ path: "artifacts/" + prefix + ".png", fullPage: true }).catch(() => {});
-        fs.writeFileSync("artifacts/" + prefix + "-error.txt",
-          String(error.stack || error) + "\nBrowser errors: " + browserErrors.join("\n"));
+        const state = await captureState(page);
+        const failure = writeArtifact(prefix + "-failure", {
+          schema_version: 1,
+          kind: "browser-14-round-failure",
+          url: baseUrl,
+          seed: options.seed,
+          players: options.players,
+          cards: options.cards,
+          additional_action_space: options.extra,
+          error: String(error.stack || error),
+          cause: error.cause ? String(error.cause.message || error.cause) : null,
+          state,
+          browser_errors: browserErrors,
+          console_errors: consoleErrors,
+          ui_submits: traffic.submits,
+          posted_game_mutations: { ...traffic.api },
+          last_ui_actions: traffic.journal.slice(-25),
+          screenshot: "artifacts/" + prefix + ".png",
+          reproduce: "AGRICOLA_WEB_URL=" + baseUrl + " node --test tests/e2e/full-game.cjs --test-name-pattern=\"" + options.players + " players\"",
+          created_at: new Date().toISOString()
+        });
+        console.error("browser_14_round_failure=" + failure);
         throw error;
       } finally {
         await page.close();

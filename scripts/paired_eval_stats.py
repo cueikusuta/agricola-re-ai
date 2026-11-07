@@ -246,8 +246,105 @@ def validate_and_report(
         # The search cap decides how much searching a time-budgeted arm may do,
         # so it is an experiment condition, not a result (#169 re-review). It is
         # reported so a caller can compare it with the plan and with other arms.
-        if type(row.get("time_budget_max_simulations")) is not int                 or row["time_budget_max_simulations"] < 1:
+        if (
+            type(row.get("time_budget_max_simulations")) is not int
+            or row["time_budget_max_simulations"] < 1
+        ):
             raise ValueError(f"invalid time_budget_max_simulations: {key}")
+
+        # #167 A: the budget covers the whole decision, so rows must say whether
+        # that was enforced and how the detail half behaved. A record that claims
+        # whole-decision enforcement in simulation-capped mode (or the reverse)
+        # cannot be pooled with the rest.
+        if type(row.get("whole_decision_budget_enforced")) is not bool:
+            raise ValueError(f"invalid whole_decision_budget_enforced: {key}")
+        reserve = row.get("detail_reserve_ms")
+        if type(reserve) is not int or reserve < 0:
+            raise ValueError(f"invalid detail_reserve_ms: {key}")
+        # Mode-relative checks only apply to rows that actually claim the mode
+        # under test; a row claiming another mode is rejected by the
+        # cross-record mode check with its own error.
+        if row.get("search_mode") == search_mode:
+            if row["whole_decision_budget_enforced"] != (search_mode == "time-budgeted"):
+                raise ValueError(
+                    f"whole-decision budget flag does not match the search mode: {key}"
+                )
+            if search_mode == "time-budgeted":
+                if not 0 < reserve < row["decision_budget_ms"]:
+                    raise ValueError(
+                        f"time-budgeted rows need a detail reserve inside the budget: {key}"
+                    )
+            elif reserve != 0:
+                raise ValueError(
+                    f"simulation-capped rows apply no budget, so no reserve: {key}"
+                )
+        for numeric in ("focus_max_detail_ms", "focus_p95_detail_ms"):
+            value = row.get(numeric)
+            if not finite_number(value) or value < 0:
+                raise ValueError(f"invalid timing {numeric}: {key}")
+        if row["focus_p95_detail_ms"] > row["focus_max_detail_ms"] + 1e-9:
+            raise ValueError(f"detail percentiles out of order: {key}")
+        if row["focus_max_detail_ms"] > row["focus_max_decision_ms"] + 1e-6:
+            raise ValueError(
+                f"detail time cannot exceed the whole decision time: {key}"
+            )
+        for field in (
+            "focus_late_decision_count",
+            "focus_decision_fallback_count",
+            "focus_selection_fallback_count",
+            "focus_detail_fallback_count",
+            "focus_budget_exhausted_before_details_count",
+        ):
+            value = row.get(field)
+            if type(value) is not int or not 0 <= value <= row["focus_decisions"]:
+                raise ValueError(f"invalid {field}: {key}")
+        if row["focus_selection_fallback_count"] + row["focus_detail_fallback_count"] != (
+            row["focus_decision_fallback_count"]
+        ):
+            raise ValueError(f"fallback counts do not add up: {key}")
+        if (
+            type(row.get("focus_max_decision_overshoot_ms")) not in (int, float)
+            or row.get("focus_max_decision_overshoot_ms") < 0
+        ):
+            raise ValueError(f"invalid focus_max_decision_overshoot_ms: {key}")
+        if row["focus_late_decision_count"] == 0 and row[
+            "focus_max_decision_overshoot_ms"
+        ] > 0:
+            raise ValueError(f"overshoot without a late decision: {key}")
+        # The two "observed within" booleans are a convenience copy of the raw
+        # counters. They are type-checked here and *recomputed* for the report
+        # from `focus_late_decision_count` / `focus_max_decision_ms`, so a row
+        # that claims compliance its own timings contradict cannot pass it on.
+        for flag in (
+            "focus_observed_all_decisions_within_budget",
+            "focus_observed_all_decisions_within_budget_tolerance",
+            "focus_observed_all_decisions_within_10s",
+        ):
+            if type(row.get(flag)) is not bool:
+                raise ValueError(f"invalid {flag}: {key}")
+        if (
+            type(row.get("focus_detail_declined_count")) is not int
+            or not 0
+            <= row["focus_detail_declined_count"]
+            <= row["focus_detail_fallback_count"]
+        ):
+            raise ValueError(f"invalid focus_detail_declined_count: {key}")
+        if (
+            type(row.get("focus_late_beyond_tolerance_count")) is not int
+            or not 0
+            <= row["focus_late_beyond_tolerance_count"]
+            <= row["focus_late_decision_count"]
+        ):
+            raise ValueError(f"invalid focus_late_beyond_tolerance_count: {key}")
+        tolerance = row.get("focus_budget_tolerance_ms")
+        if not finite_number(tolerance) or tolerance < 0:
+            raise ValueError(f"invalid focus_budget_tolerance_ms: {key}")
+        if row["focus_late_beyond_tolerance_count"] > 0 and (
+            row["focus_max_decision_overshoot_ms"] <= tolerance + 1e-9
+        ):
+            raise ValueError(
+                f"an over-tolerance decision needs a larger overshoot: {key}"
+            )
         received[key] = row
     if set(received) != expected:
         raise ValueError(f"missing {len(expected - set(received))} game records")
@@ -305,19 +402,41 @@ def validate_and_report(
     budget_within_10s = 0 < budget_ms <= 10000
     candidate_max_focus = max(g["focus_max_decision_ms"] for g in values["candidate"])
     baseline_max_focus = max(g["focus_max_decision_ms"] for g in values["baseline"])
-    # A deadline is only enforced in time-budgeted mode (#164).
-    candidate_deadline_control = (
+    # Two different questions, deliberately kept apart (#164, #167 A review P1).
+    #
+    # 1. `*_focus_search_deadline_control`: did the *search* run under a
+    #    deadline? Only a search policy in time-budgeted mode can answer yes.
+    # 2. `*_whole_decision_budget_enforced`: did the *decision* (selection plus
+    #    details) run under one clock? Since #167 A the budget applies to the
+    #    focus seat whatever its policy, so this is not restricted to MCTS/PUCT.
+    #
+    # The 10 s observation follows (2), not (1). The previous version keyed it to
+    # (1), which both under-reported budgeted heuristic seats and contradicted
+    # its own explanation that named only MCTS.
+    candidate_search_deadline = (
         candidate in SEARCH_POLICIES and search_mode == "time-budgeted")
-    baseline_deadline_control = (
+    baseline_search_deadline = (
         baseline in SEARCH_POLICIES and search_mode == "time-budgeted")
-    candidate_measured_within = budget_enabled and candidate_max_focus <= budget_ms
-    baseline_measured_within = budget_enabled and baseline_max_focus <= budget_ms
+    budget_enforced = rows[0]["whole_decision_budget_enforced"]
+    candidate_budget_enforced = budget_enforced and candidate_focus_decisions > 0
+    baseline_budget_enforced = budget_enforced and baseline_focus_decisions > 0
+    # A cooperative deadline can only be observed between simulations, so
+    # "within budget" uses the same tolerance the rows record (1 % of the
+    # budget, 1 ms floor). The strict overshoot stays in the report.
+    tolerance_ms = max(g["focus_budget_tolerance_ms"] for g in rows)
+    candidate_measured_within = (
+        budget_enabled and candidate_max_focus <= budget_ms + tolerance_ms)
+    baseline_measured_within = (
+        budget_enabled and baseline_max_focus <= budget_ms + tolerance_ms)
     candidate_10s_observed_pass = (
-        candidate_deadline_control and budget_within_10s and candidate_measured_within
+        candidate_budget_enforced and budget_within_10s and candidate_measured_within
     )
     baseline_10s_observed_pass = (
-        baseline_deadline_control and budget_within_10s and baseline_measured_within
+        baseline_budget_enforced and budget_within_10s and baseline_measured_within
     )
+    # Backwards-compatible aliases: the old names described the search deadline.
+    candidate_deadline_control = candidate_search_deadline
+    baseline_deadline_control = baseline_search_deadline
 
     # Roadmap 3.1 asks for shared/tied first place as separate reference
     # values, and 6.6 asks for games/sec and decisions/sec. All of these are
@@ -437,6 +556,85 @@ def validate_and_report(
         "maximum_p99_policy_select_ms": max(g["p99_policy_select_ms"] for g in rows),
         "measurement_scope": "focus-seat whole decision: action-space selection plus detail generation; rates use focus-only decisions as denominator",
         "focus_decision_timing_includes_detail": True,
+        "whole_decision_budget_enforced": rows[0]["whole_decision_budget_enforced"],
+        "detail_reserve_ms": rows[0]["detail_reserve_ms"],
+        "candidate_max_detail_ms": max(
+            g["focus_max_detail_ms"] for g in values["candidate"]
+        ),
+        "baseline_max_detail_ms": max(
+            g["focus_max_detail_ms"] for g in values["baseline"]
+        ),
+        "candidate_p95_detail_ms": max(
+            g["focus_p95_detail_ms"] for g in values["candidate"]
+        ),
+        "candidate_late_decision_rate": sum(
+            g["focus_late_decision_count"] for g in values["candidate"]
+        ) / candidate_focus_decisions,
+        "baseline_late_decision_rate": sum(
+            g["focus_late_decision_count"] for g in values["baseline"]
+        ) / baseline_focus_decisions,
+        "candidate_decision_fallback_rate": sum(
+            g["focus_decision_fallback_count"] for g in values["candidate"]
+        ) / candidate_focus_decisions,
+        "baseline_decision_fallback_rate": sum(
+            g["focus_decision_fallback_count"] for g in values["baseline"]
+        ) / baseline_focus_decisions,
+        "candidate_max_decision_overshoot_ms": max(
+            g["focus_max_decision_overshoot_ms"] for g in values["candidate"]
+        ),
+        "baseline_max_decision_overshoot_ms": max(
+            g["focus_max_decision_overshoot_ms"] for g in values["baseline"]
+        ),
+        # Recomputed from raw counters, never copied from the row flags: the
+        # artifact cannot certify a budget it did not measure.
+        "candidate_observed_all_decisions_within_budget": (
+            rows[0]["whole_decision_budget_enforced"]
+            and candidate_focus_decisions > 0
+            and sum(
+                g["focus_late_decision_count"] for g in values["candidate"]
+            ) == 0
+        ),
+        "candidate_observed_all_decisions_within_10s": (
+            candidate_max_focus <= 10000.0
+        ),
+        "candidate_observed_all_decisions_within_budget_tolerance": (
+            rows[0]["whole_decision_budget_enforced"]
+            and candidate_focus_decisions > 0
+            and sum(
+                g["focus_late_beyond_tolerance_count"] for g in values["candidate"]
+            ) == 0
+        ),
+        "candidate_late_decision_count": sum(
+            g["focus_late_decision_count"] for g in values["candidate"]
+        ),
+        "candidate_late_beyond_tolerance_count": sum(
+            g["focus_late_beyond_tolerance_count"] for g in values["candidate"]
+        ),
+        "budget_tolerance_ms": max(
+            g["focus_budget_tolerance_ms"] for g in rows
+        ),
+        "baseline_late_decision_count": sum(
+            g["focus_late_decision_count"] for g in values["baseline"]
+        ),
+        "candidate_detail_fallback_count": sum(
+            g["focus_detail_fallback_count"] for g in values["candidate"]
+        ),
+        "candidate_detail_declined_count": sum(
+            g["focus_detail_declined_count"] for g in values["candidate"]
+        ),
+        "candidate_budget_exhausted_before_details_count": sum(
+            g["focus_budget_exhausted_before_details_count"] for g in values["candidate"]
+        ),
+        "baseline_detail_fallback_count": sum(
+            g["focus_detail_fallback_count"] for g in values["baseline"]
+        ),
+        "whole_decision_budget_note": (
+            "whole_decision_budget_enforced=true means the reported budget bounds "
+            "selection and detail generation together: the search deadline is the "
+            "budget minus detail_reserve_ms. observed_all_decisions_within_* are "
+            "measurements of the recorded decisions, not an OS real-time guarantee, "
+            "and they are false in simulation-capped mode because no clock applied."
+        ),
         "maximum_focus_p95_decision_ms": max(g["focus_p95_decision_ms"] for g in rows),
         "maximum_focus_p99_decision_ms": max(g["focus_p99_decision_ms"] for g in rows),
         "candidate_max_focus_decision_ms": candidate_max_focus,
@@ -445,6 +643,17 @@ def validate_and_report(
         "baseline_focus_timeout_count": baseline_focus_timeouts,
         "candidate_focus_deadline_control": candidate_deadline_control,
         "baseline_focus_deadline_control": baseline_deadline_control,
+        # #167 A review P1: the search deadline and the whole-decision budget are
+        # different questions and are reported separately.
+        "candidate_focus_search_deadline_control": candidate_search_deadline,
+        "baseline_focus_search_deadline_control": baseline_search_deadline,
+        "candidate_whole_decision_budget_enforced": candidate_budget_enforced,
+        "baseline_whole_decision_budget_enforced": baseline_budget_enforced,
+        "candidate_10s_observed_pass_basis": (
+            "whole-decision budget (selection + details) enforced for the focus "
+            "seat, a positive budget <= 10000 ms, and the measured maximum focus "
+            "decision within budget + tolerance"
+        ),
         "candidate_focus_measured_within_budget": candidate_measured_within,
         "baseline_focus_measured_within_budget": baseline_measured_within,
         "candidate_10s_observed_pass": candidate_10s_observed_pass,
@@ -486,12 +695,17 @@ def validate_and_report(
             "decision timing includes action-space selection plus detail "
             "generation for the arm ordered as candidate/baseline. "
             "*_10s_observed_pass is an observed check, not an OS-enforced hard "
-            "guarantee: MCTS stops at cooperative deadline checks, so it is true "
-            "only when the arm is MCTS, a positive budget <= 10000 ms was "
-            "applied, and the measured maximum focus decision stayed within it. "
-            "A 0 ms budget means no deadline (deterministic MCTS by simulation "
-            "count) and makes all 10s flags false. Official rule fidelity still "
-            "requires independent gates."
+            "guarantee. It is true only when the whole-decision budget was "
+            "enforced for the focus seat (time-budgeted mode; selection *and* "
+            "detail generation under one clock, whatever the focus policy), a "
+            "positive budget <= 10000 ms was applied, and the measured maximum "
+            "focus decision stayed within budget + tolerance. It is not "
+            "restricted to MCTS/PUCT: since #167 A a budgeted heuristic seat is "
+            "also bounded and therefore also observable. *"
+            "focus_search_deadline_control is the narrower question 'did the "
+            "search itself run under a deadline'. A 0 ms budget means no deadline "
+            "(deterministic by simulation count) and makes every 10 s flag false. "
+            "Official rule fidelity still requires independent gates."
         ),
     }
 
