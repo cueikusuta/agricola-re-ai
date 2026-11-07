@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import re
 import statistics
 import subprocess
 import sys
@@ -135,6 +136,22 @@ def compare_arms(
         if report.get("cards") != controls.get("cards"):
             raise ValueError(f"arm {label!r} disagrees with the control on cards")
 
+    # Only one candidate-side factor may differ from the control in a
+    # one-factor-at-a-time ablation. A no-change arm is allowed as a sanity
+    # check, but changing both the policy and its search parameters confounds
+    # any causal attribution.
+    candidate_factors = ("candidate", "mcts_simulations", "mcts_tree_depth")
+    control_options = per_arm_options[control]
+    changed_factors = {}
+    for label, options in per_arm_options.items():
+        changes = [
+            field for field in candidate_factors
+            if options.get(field) != control_options.get(field)
+        ]
+        if label in arms and len(changes) > 1:
+            raise ValueError(f"arm {label!r} changes multiple candidate factors: {changes}")
+        changed_factors[label] = changes
+
     control_baseline = baseline_signature(arms[control])
     for label, rows in arms.items():
         if baseline_signature(rows) != control_baseline:
@@ -155,6 +172,7 @@ def compare_arms(
             {
                 "arm": label,
                 "is_control": label == control,
+                "changed_factors_vs_control": changed_factors[label],
                 "candidate": options["candidate"],
                 "mcts_simulations": options.get("mcts_simulations"),
                 "mcts_tree_depth": options.get("mcts_tree_depth"),
@@ -261,7 +279,12 @@ def main() -> int:
         spec = json.loads(args.arms.read_text(encoding="utf-8"))
         per_arm = {}
         for arm in spec["arms"]:
-            per_arm[arm["label"]] = {
+            label = arm["label"]
+            if not isinstance(label, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", label):
+                raise ValueError(f"unsafe arm label: {label!r}")
+            if label in per_arm:
+                raise ValueError(f"duplicate arm label: {label!r}")
+            per_arm[label] = {
                 "players": spec["players"],
                 "seed_start": spec["seed_start"],
                 "first_block": spec.get("first_block", 0),
