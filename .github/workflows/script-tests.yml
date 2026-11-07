@@ -1,0 +1,63 @@
+name: Script test suites
+# Run every Python unit-test module under tests/ on every change to a script or
+# to a test module.
+#
+# The other workflows each run exactly one module
+# (test_card_catalog_validator.py, test_paired_eval_stats.py,
+# test_mass_batch_smoke.py, test_episode_dataset.py). That per-workflow wiring
+# means a new test module can be added without any workflow ever executing it,
+# so its assertions silently stop protecting anything. This job is the single
+# place that discovers the whole suite, and it is cheap (< 1 s of Python).
+on:
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'tests/test_*.py'
+      - '.github/workflows/script-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: script-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-unittests:
+    name: Python unittest discovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Discover and run tests/test_*.py
+        run: python3 -m unittest discover -s tests -p "test_*.py" -v
+      # Fail closed: a module that is accidentally renamed, moved out of the
+      # discovery pattern, or silently skipped must not turn into a quiet pass.
+      # Import errors already make discovery fail; this guards pattern drift.
+      - name: Assert the suite is still collected
+        run: |
+          python3 - <<'PY'
+          import sys
+          import unittest
+          from pathlib import Path
+
+          sys.path.insert(0, ".")
+          suite = unittest.TestLoader().discover("tests", pattern="test_*.py")
+          collected = suite.countTestCases()
+          modules = sorted(p.name for p in Path("tests").glob("test_*.py"))
+          print(f"collected {collected} tests from {len(modules)} modules")
+          print("modules: " + ", ".join(modules))
+          # A floor, not an exact count, so adding tests never breaks CI.
+          MINIMUM_EXPECTED = 40
+          if collected < MINIMUM_EXPECTED:
+              print(
+                  f"only {collected} tests collected, expected at least "
+                  f"{MINIMUM_EXPECTED}",
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+          PY
