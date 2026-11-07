@@ -12,7 +12,7 @@ on:
   pull_request:
     paths:
       - 'scripts/**'
-      - 'tests/test_*.py'
+      - 'tests/**'
       - '.github/workflows/script-tests.yml'
   workflow_dispatch:
 
@@ -53,6 +53,14 @@ jobs:
           print("modules: " + ", ".join(modules))
           # A floor, not an exact count, so adding tests never breaks CI.
           MINIMUM_EXPECTED = 40
+          empty_modules = []
+          for module in modules:
+              module_suite = unittest.TestLoader().discover("tests", pattern=module)
+              if module_suite.countTestCases() == 0:
+                  empty_modules.append(module)
+          if empty_modules:
+              print(f"test modules with no collected tests: {empty_modules}", file=sys.stderr)
+              raise SystemExit(1)
           if collected < MINIMUM_EXPECTED:
               print(
                   f"only {collected} tests collected, expected at least "
