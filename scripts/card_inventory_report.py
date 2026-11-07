@@ -33,7 +33,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-IMPLEMENTED_PREFIX = "コード内に定義あり"
+IMPLEMENTED_REFERENCES = {\n    "コード内に定義あり（配布対象要照合）",\n    "コード内に定義あり・2人戦プリセット外",\n}
 UNIMPLEMENTED = "未実装または未照合"
 CATEGORY_SEPARATOR = "／"
 OCCUPATION = "職業"
@@ -66,7 +66,7 @@ def normalize_type(raw: str) -> str:
 def is_implemented(reference: str) -> bool:
     if reference == UNIMPLEMENTED:
         return False
-    if reference.startswith(IMPLEMENTED_PREFIX):
+    if reference in IMPLEMENTED_REFERENCES:
         return True
     raise ValueError(f"unknown implementation_reference: {reference!r}")
 
@@ -112,7 +112,7 @@ def inventory(rows: list[dict], source: str = "docs/card-catalog-ae-preliminary.
                 bucket = "1-3" if int(level) <= 3 else "4-5"
                 category_unimplemented_by_level[bucket][category] += 1
 
-    built = implemented[OCCUPATION] + implemented[MINOR]
+    built = sum(implemented.values())
     return {
         "schema_version": 1,
         "source": source,
