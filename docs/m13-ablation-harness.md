@@ -92,7 +92,11 @@ python3 scripts/eval_ablation.py \
 - **未知のキーは拒否する。** 仕様レベル・arm単位のどちらでも、既知でないキーは実行前にエラーにする。typo したパラメータが既定値のまま「効果なし」として通るのを防ぐ。
 - **値域は `paired_eval` と同じ。** `*_simulations` 1..=100000、`*_tree_depth` 1..=6、`puct_c` 0..=100、温度は有限かつ > 0、`puct_leaf` は `heuristic`/`terminal`、`puct_root_limit` 0..=100、`puct_final_prior` 0..=10。整数指定の項目に小数を書くと拒否する。
 - **既定値も明示的に渡す。** arm が指定しなかったパラメータも既定値で `paired_eval` に渡し、レポートの `search_parameters` に実際の値を載せる。
+- **有効／無効をレポートに残す。** 各armは `changed_search_parameters`（制御との差分）に加え、`effective_changed_search_parameters`（その実行で意味を持つ差分）を持つ。無効な差分は実行前に拒否されるため両者は通常一致するが、「この要因は有効である」ことを成果物から読み取れる。
 - **PUCT専用パラメータを PUCT を使わない arm で変えると拒否する。** `candidate` も `baseline` も `puct` でない arm で `puct_*` を動かしても誰も読まないため、「効果ゼロ」の証拠に見えてしまう。
+- **MCTS専用パラメータも同様に拒否する（レビューP1）。** `mcts_simulations` / `mcts_tree_depth` を、`candidate` も `baseline` も `mcts` でない arm で変えても読まれない。PUCT 同士の比較で MCTS の木の深さを動かす、といった指定は無効なのでエラーにする。
+- **time-budgeted では回数パラメータの変更を拒否する（レビューP1）。** このモードの停止条件は壁時計であり、`mcts_simulations` / `puct_simulations` は**暴走防止の安全上限**にすぎない。ここで回数を変えても「効果ゼロ」しか測れないため、比較は `simulation-capped` で行うようエラーで促す。木の深さ（`*_tree_depth`）は探索構造を変えるので time-budgeted でも有効な要因として扱う。
+- **計画段階で検証する。** 上記の検査は試合を1つも走らせる前に実行する（`check_plan`）。集約時の検証も残すが、無駄な計算をしてから落ちることはない。
 - **1要因原則は全検索パラメータに適用する。** 制御armと比べて2つ以上変わる arm は拒否する（`changed_search_parameters` に差分を記録）。
 - **モード混在は従来どおり拒否する。** `simulation-capped` と `time-budgeted` を同じ表に混ぜられない。
 
@@ -115,6 +119,16 @@ python3 scripts/eval_ablation.py \
 - **強さの主張はしない。** 2ブロック（各arm 4試合）では区間幅が最大50 ppで退化しており、首位率の差は判定できない。上の表で言えるのは「配管が通り、各armが1要因だけ変えている」ことまでである。
 - **`leaf_heuristic` の差は強さの証拠ではない。** 同じ表の最大決断時間が 91.9 ms → 1.9 ms と約48倍速いことは**コスト**の観測であり、首位率の改善とは別指標。最終的な採否は `docs/roadmap-m7-onward.md` 3.2節の手順（1,000試合/arm、事前登録した一次比較）で決める。
 - `changed_factors_vs_control` が各armで1要素、`search_parameters` が実行時の実値、`baseline_games_are_shared: true` が付いていることをレポートで確認済み。
+
+### 7.1.1 有効性検証の実測（#167 B レビューP1、2026-11-07）
+
+| 指定 | 結果 |
+|---|---|
+| time-budgeted で `mcts_simulations` を変更 | **拒否**（exit 1）: `arm 'count' changes ['mcts_simulations'] in time-budgeted mode, where the simulation count is only a safety cap ...` |
+| PUCT 同士の arm で `mcts_tree_depth` を変更 | **拒否**: `MCTS-only parameters` |
+| MCTS 同士の arm で `puct_prior_temp` を変更 | **拒否**: `PUCT-only parameters` |
+| simulation-capped で `puct_prior_temp` を変更 | 実行（1ブロック4試合、`changed_search_parameters.puct_prior_temp = {control: 3.0, arm: 1.0}`、`effective_changed_search_parameters = ["puct_prior_temp"]`） |
+| time-budgeted で `mcts_tree_depth` を変更 | 有効な要因として受理（`effective_changed_search_parameters = ["mcts_tree_depth"]`） |
 
 ### 7.2 初期スモーク（2026-11-07 以前、PUCT 非対応時）
 

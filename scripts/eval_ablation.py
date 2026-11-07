@@ -60,6 +60,13 @@ CANDIDATE_FACTORS = ("candidate",) + tuple(SEARCH_PARAMETERS)
 # Knobs that only exist on the PUCT side.
 PUCT_ONLY_PARAMETERS = tuple(
     name for name in SEARCH_PARAMETERS if name.startswith("puct_"))
+MCTS_ONLY_PARAMETERS = ("mcts_simulations", "mcts_tree_depth")
+# Simulation *counts* are only a stopping rule in simulation-capped mode. In
+# time-budgeted mode the wall clock stops the search and the count is a safety
+# cap, so changing the count is not a factor the experiment can attribute.
+# The tree depths stay meaningful in both modes because they change the search
+# structure rather than when it stops.
+SAFETY_CAP_ONLY_IN_TIME_BUDGETED = ("mcts_simulations", "puct_simulations")
 # Experiment-definition keys that only the specification may set.
 SPEC_PARAMETERS = (
     "players", "seed_start", "blocks", "first_block", "baseline", "opponent",
@@ -130,25 +137,116 @@ def validate_parameters(label: str, options: dict) -> None:
 def check_puct_parameters_are_effective(
     label: str, options: dict, control: str, control_options: dict
 ) -> None:
-    """Fail closed on a PUCT knob change in an arm that cannot use it.
+    """Reject a parameter change that cannot affect the run.
 
-    `paired_eval` accepts the PUCT flags on every run, so a mislabelled arm could
-    otherwise "run" a knob no seat reads and report a delta of zero as if it were
-    evidence that the knob does not matter.
+    Three ways a declared factor can be a no-op, all fail closed:
+
+    1. A PUCT-only knob changed while neither the candidate nor the baseline is
+       PUCT: no seat reads it.
+    2. An MCTS-only knob changed while neither policy is MCTS, for the same
+       reason.
+    3. A simulation *count* changed in time-budgeted mode: the wall clock stops
+       the search and the count is only a safety cap, so the arm would report a
+       "zero effect" that says nothing about the parameter.
     """
-    if "puct" in (options.get("candidate"), options.get("baseline")):
-        return
     arm_values = effective_parameters(options)
     control_values = effective_parameters(control_options)
-    changed = [
-        name for name in PUCT_ONLY_PARAMETERS
-        if arm_values[name] != control_values[name]
-    ]
-    if changed:
-        raise ValueError(
-            f"arm {label!r} changes PUCT-only parameters {changed} but neither "
-            f"its candidate nor its baseline is 'puct' (control {control!r})"
+    policies = (options.get("candidate"), options.get("baseline"))
+
+    if "puct" not in policies:
+        changed = [
+            name for name in PUCT_ONLY_PARAMETERS
+            if arm_values[name] != control_values[name]
+        ]
+        if changed:
+            raise ValueError(
+                f"arm {label!r} changes PUCT-only parameters {changed} but neither "
+                f"its candidate nor its baseline is 'puct' (control {control!r})"
+            )
+
+    if "mcts" not in policies:
+        changed = [
+            name for name in MCTS_ONLY_PARAMETERS
+            if arm_values[name] != control_values[name]
+        ]
+        if changed:
+            raise ValueError(
+                f"arm {label!r} changes MCTS-only parameters {changed} but neither "
+                f"its candidate nor its baseline is 'mcts' (control {control!r})"
+            )
+
+    if options.get("search_mode") == "time-budgeted":
+        changed = [
+            name for name in SAFETY_CAP_ONLY_IN_TIME_BUDGETED
+            if arm_values[name] != control_values[name]
+        ]
+        if changed:
+            raise ValueError(
+                f"arm {label!r} changes {changed} in time-budgeted mode, where the "
+                "simulation count is only a safety cap and the wall clock stops the "
+                "search; compare simulation counts in simulation-capped mode instead"
+            )
+
+
+def _is_effective(name: str, options: dict) -> bool:
+    """Whether a search parameter can influence this arm's run.
+
+    Mirrors `check_puct_parameters_are_effective`; kept as a predicate so the
+    report can state the same truth the validation enforces.
+    """
+    policies = (options.get("candidate"), options.get("baseline"))
+    if name in PUCT_ONLY_PARAMETERS and "puct" not in policies:
+        return False
+    if name in MCTS_ONLY_PARAMETERS and "mcts" not in policies:
+        return False
+    if (name in SAFETY_CAP_ONLY_IN_TIME_BUDGETED
+            and options.get("search_mode") == "time-budgeted"):
+        return False
+    return True
+
+
+def check_plan(
+    per_arm_options: dict[str, dict], control: str, *, arms: set[str] | frozenset[str]
+) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """One-factor-at-a-time plus effectiveness checks for a whole plan.
+
+    Runs before any game is played (`main`) and again during aggregation, so a
+    plan that would waste compute on an arm whose change cannot matter is
+    rejected up front instead of after the run.
+
+    Returns `(changed_factors, effective_changes)` per arm. A declared change
+    that the mode or the policies cannot act on is an error, never a silent
+    zero-effect arm.
+    """
+    if control not in per_arm_options:
+        raise ValueError(f"control arm {control!r} is missing")
+    control_options = per_arm_options[control]
+    control_values = effective_parameters(control_options)
+    changed_factors: dict[str, list[str]] = {}
+    effective_changes: dict[str, list[str]] = {}
+    for label, options in per_arm_options.items():
+        if label not in arms:
+            continue
+        values = effective_parameters(options)
+        changes = [
+            field for field in ("candidate",)
+            if options.get(field) != control_options.get(field)
+        ]
+        changes.extend(
+            name for name in SEARCH_PARAMETERS
+            if values[name] != control_values[name]
         )
+        if len(changes) > 1:
+            raise ValueError(f"arm {label!r} changes multiple candidate factors: {changes}")
+        if changes:
+            check_puct_parameters_are_effective(
+                label, options, control, control_options)
+        changed_factors[label] = changes
+        effective_changes[label] = [
+            name for name in changes
+            if name == "candidate" or _is_effective(name, options)
+        ]
+    return changed_factors, effective_changes
 
 
 def baseline_signature(rows: list[dict]) -> dict[tuple[int, int], tuple]:
@@ -260,25 +358,9 @@ def compare_arms(
     # one-factor-at-a-time ablation. A no-change arm is allowed as a sanity
     # check, but changing both the policy and its search parameters confounds
     # any causal attribution.
-    control_options = per_arm_options[control]
-    control_values = effective_parameters(control_options)
-    changed_factors = {}
-    for label, options in per_arm_options.items():
-        values = effective_parameters(options)
-        changes = [
-            field for field in ("candidate",)
-            if options.get(field) != control_options.get(field)
-        ]
-        changes.extend(
-            name for name in SEARCH_PARAMETERS
-            if values[name] != control_values[name]
-        )
-        if label in arms and len(changes) > 1:
-            raise ValueError(f"arm {label!r} changes multiple candidate factors: {changes}")
-        if label in arms and changes:
-            check_puct_parameters_are_effective(
-                label, options, control, control_options)
-        changed_factors[label] = changes
+    changed_factors, effective_changes = check_plan(
+        per_arm_options, control, arms=set(arms))
+    control_values = effective_parameters(per_arm_options[control])
 
     # Deck identity must also match between arms. The paired report checks
     # within-arm consistency (after #160); this cross-arm guard prevents a
@@ -318,6 +400,7 @@ def compare_arms(
                 "changed_factors_vs_control": changed_factors[label],
                 "candidate": options["candidate"],
                 "search_parameters": effective_parameters(options),
+                "effective_changed_search_parameters": effective_changes[label],
                 "changed_search_parameters": {
                     name: {
                         "control": control_values[name],
@@ -508,6 +591,8 @@ def main() -> int:
     try:
         spec = json.loads(args.arms.read_text(encoding="utf-8"))
         per_arm = plan_arms(spec)
+        # Reject an uninterpretable plan before spending compute on it.
+        check_plan(per_arm, args.control, arms=set(per_arm))
         arms = {}
         for label, options in per_arm.items():
             folder = args.root / label

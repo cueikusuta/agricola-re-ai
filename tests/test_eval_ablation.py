@@ -532,6 +532,141 @@ class AblationPuctParameterTests(unittest.TestCase):
 
 
 
+class AblationParameterEffectivenessTests(unittest.TestCase):
+    """#167 B review P1: only parameters that can change the run are factors.
+
+    `paired_eval` accepts every flag on every run, so a mislabelled arm would
+    otherwise "change" a knob that no seat reads (or that the wall clock
+    overrides) and report a zero delta as if it were evidence.
+    """
+
+    def opts(self, **overrides):
+        result = options()
+        result.update(overrides)
+        return result
+
+    def rows_for(self, candidate, baseline="random", search_mode="simulation-capped"):
+        rows = arm_rows(credit=always_wins, search_mode=search_mode)
+        for row in rows:
+            policy = candidate if row["arm_id"] == "candidate" else baseline
+            row["focus_policy"] = policy
+            # The aggregator requires the deadline flags to follow the mode and
+            # the focus policy, so keep the fixture self-consistent.
+            search_policy = policy in ("mcts", "puct")
+            deadline = search_policy and search_mode == "time-budgeted"
+            row["mcts_deadline_active"] = deadline
+            row["deterministic_policy_selection"] = not deadline
+        return rows
+
+    def test_mcts_parameter_change_is_rejected_without_an_mcts_policy(self):
+        rows = self.rows_for("puct")
+        with self.assertRaisesRegex(ValueError, "MCTS-only parameters"):
+            compare_arms(
+                {"control": rows, "variant": copy.deepcopy(rows)},
+                control="control",
+                per_arm_options={
+                    "control": self.opts(candidate="puct"),
+                    "variant": self.opts(candidate="puct", mcts_tree_depth=4),
+                },
+                iterations=500,
+            )
+
+    def test_puct_parameter_change_is_rejected_without_a_puct_policy(self):
+        rows = self.rows_for("mcts")
+        with self.assertRaisesRegex(ValueError, "PUCT-only parameters"):
+            compare_arms(
+                {"control": rows, "variant": copy.deepcopy(rows)},
+                control="control",
+                per_arm_options={
+                    "control": self.opts(candidate="mcts"),
+                    "variant": self.opts(candidate="mcts", puct_prior_temp=1.0),
+                },
+                iterations=500,
+            )
+
+    def test_a_simulation_count_in_time_budgeted_mode_is_rejected(self):
+        # The wall clock stops the search there; the count is only a safety cap.
+        for candidate, knob in (("mcts", "mcts_simulations"),
+                                ("puct", "puct_simulations")):
+            rows = self.rows_for(candidate, search_mode="time-budgeted")
+            with self.assertRaisesRegex(ValueError, "safety cap"):
+                compare_arms(
+                    {"control": rows, "variant": copy.deepcopy(rows)},
+                    control="control",
+                    per_arm_options={
+                        "control": self.opts(
+                            candidate=candidate, search_mode="time-budgeted"),
+                        "variant": self.opts(
+                            candidate=candidate,
+                            search_mode="time-budgeted",
+                            **{knob: 7},
+                        ),
+                    },
+                    iterations=500,
+                )
+
+    def test_a_tree_depth_in_time_budgeted_mode_is_still_a_valid_factor(self):
+        rows = self.rows_for("mcts", search_mode="time-budgeted")
+        report = compare_arms(
+            {"control": rows, "variant": copy.deepcopy(rows)},
+            control="control",
+            per_arm_options={
+                "control": self.opts(candidate="mcts", search_mode="time-budgeted"),
+                "variant": self.opts(
+                    candidate="mcts", search_mode="time-budgeted", mcts_tree_depth=4),
+            },
+            iterations=500,
+        )
+        by_arm = {row["arm"]: row for row in report["arms"]}
+        self.assertEqual(
+            by_arm["variant"]["effective_changed_search_parameters"],
+            ["mcts_tree_depth"],
+        )
+
+    def test_a_simulation_count_in_simulation_capped_mode_is_a_valid_factor(self):
+        rows = self.rows_for("mcts")
+        report = compare_arms(
+            {"control": rows, "variant": copy.deepcopy(rows)},
+            control="control",
+            per_arm_options={
+                "control": self.opts(candidate="mcts"),
+                "variant": self.opts(candidate="mcts", mcts_simulations=8),
+            },
+            iterations=500,
+        )
+        by_arm = {row["arm"]: row for row in report["arms"]}
+        self.assertEqual(
+            by_arm["variant"]["changed_search_parameters"],
+            {"mcts_simulations": {"control": 64, "arm": 8}},
+        )
+        self.assertEqual(
+            by_arm["variant"]["effective_changed_search_parameters"],
+            ["mcts_simulations"],
+        )
+
+    def test_an_ineffective_change_is_rejected_for_candidate_and_baseline(self):
+        for candidate, baseline, knob in (
+            ("puct", "eval", "mcts_simulations"),
+            ("eval", "puct", "mcts_simulations"),
+        ):
+            rows = self.rows_for(candidate, baseline=baseline)
+            with self.assertRaisesRegex(ValueError, "MCTS-only parameters"):
+                compare_arms(
+                    {"control": rows, "variant": copy.deepcopy(rows)},
+                    control="control",
+                    per_arm_options={
+                        "control": self.opts(
+                            candidate=candidate, baseline=baseline),
+                        "variant": self.opts(
+                            candidate=candidate,
+                            baseline=baseline,
+                            mcts_simulations=8,
+                        ),
+                    },
+                    iterations=500,
+                )
+
+
 class AblationSpecificationTests(unittest.TestCase):
     """#167 B: a specification key is validated before any game runs."""
 
