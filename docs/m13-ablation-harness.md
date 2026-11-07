@@ -45,9 +45,24 @@ arm定義はJSONで与える。
   "opponent": "greedy",
   "decision_budget_ms": 0,
   "arms": [
-    {"label": "control_eval", "candidate": "eval"},
-    {"label": "greedy", "candidate": "greedy"},
+    {"label": "control_puct", "candidate": "puct"},
+    {"label": "leaf_heuristic", "candidate": "puct", "puct_leaf": "heuristic"},
+    {"label": "explore_c3", "candidate": "puct", "puct_c": 3.0},
     {"label": "mcts_sim2", "candidate": "mcts", "mcts_simulations": 2, "mcts_tree_depth": 2}
+  ]
+}
+```
+
+検索パラメータは **仕様レベル**（`arms` の外）に既定値として書き、**arm単位**で上書きできる。どちらも同じ名前を使う。
+
+```json
+{
+  "players": 2, "seed_start": 900, "blocks": 2,
+  "baseline": "eval", "opponent": "greedy",
+  "puct_leaf": "terminal",
+  "arms": [
+    {"label": "control", "candidate": "puct"},
+    {"label": "leaf_heuristic", "candidate": "puct", "puct_leaf": "heuristic"}
   ]
 }
 ```
@@ -65,15 +80,74 @@ python3 scripts/eval_ablation.py \
 
 | 要因 | 状態 |
 |---|---|
-| 候補ポリシー（`random`/`greedy`/`eval`/`mcts`） | 実行可能 |
-| MCTS `mcts_simulations` | 実行可能（シミュレーション回数固定＝決定論的） |
-| MCTS `mcts_tree_depth` | 実行可能 |
+| 候補ポリシー（`random`/`greedy`/`eval`/`mcts`/`puct`） | 実行可能 |
+| MCTS `mcts_simulations` / `mcts_tree_depth` | 実行可能（シミュレーション回数固定＝決定論的） |
+| **PUCT の全パラメータ**（`puct_simulations` / `puct_tree_depth` / `puct_c` / `puct_prior_temp` / `puct_value_temp` / `puct_leaf` / `puct_root_limit` / `puct_final_prior`） | **実行可能（#167 B）**。arm単位で指定し、`paired_eval` のフラグへそのまま渡す。既定値は `PuctConfig::default()` と一致 |
 | per-decision思考時間予算 `decision_budget_ms` | 実行可能（時間予算ありの比較は非決定論的。`deterministic_policy_selection` がfalseになる） |
-| PUCTの事前分布・目的関数・リーフ評価の分離 | **未提供**。`src/mcts_puct.rs` はPR #146で未マージであり、本基盤は既存 `src/mcts.rs` のパラメータだけを扱う。マージ後にarmとして追加する |
-| カードあり条件 | **未提供**。`--cards` の受け渡しは別PRで扱う。M10 G1（4人40+40）未達のため4人戦カードありは不可 |
+| カードあり条件 | **実行可能（#169 レビューP2でarm化）**。`cards` を仕様/armに書き、`paired_eval --cards` と集約器へ伝播する。2人戦のみ（`verified_basic_2p`）。M10 G1（4人40+40）未達のため4人戦カードありは不可で、指定すると実行前にエラー |
+| 探索上限 `time_budget_max_simulations` | **比較条件（因子ではない）**。arm別に変えると実行前に拒否。time-budgeted の探索量を揃えるための前提 |
 | ドラフト条件 | **未提供**（#155の慣行決定と M10 のプール整備が前提） |
 
+### 6.1 パラメータ検証（fail closed）
+
+- **未知のキーは拒否する。** 仕様レベル・arm単位のどちらでも、既知でないキーは実行前にエラーにする。typo したパラメータが既定値のまま「効果なし」として通るのを防ぐ。
+- **値域は `paired_eval` と同じ。** `*_simulations` 1..=100000、`*_tree_depth` 1..=6、`puct_c` 0..=100、温度は有限かつ > 0、`puct_leaf` は `heuristic`/`terminal`、`puct_root_limit` 0..=100、`puct_final_prior` 0..=10。整数指定の項目に小数を書くと拒否する。
+- **既定値も明示的に渡す。** arm が指定しなかったパラメータも既定値で `paired_eval` に渡し、レポートの `search_parameters` に実際の値を載せる。
+- **有効／無効をレポートに残す。** 各armは `changed_search_parameters`（制御との差分）に加え、`effective_changed_search_parameters`（その実行で意味を持つ差分）を持つ。無効な差分は実行前に拒否されるため両者は通常一致するが、「この要因は有効である」ことを成果物から読み取れる。
+- **PUCT専用パラメータを PUCT を使わない arm で変えると拒否する。** `candidate` も `baseline` も `puct` でない arm で `puct_*` を動かしても誰も読まないため、「効果ゼロ」の証拠に見えてしまう。
+- **MCTS専用パラメータも同様に拒否する（レビューP1）。** `mcts_simulations` / `mcts_tree_depth` を、`candidate` も `baseline` も `mcts` でない arm で変えても読まれない。PUCT 同士の比較で MCTS の木の深さを動かす、といった指定は無効なのでエラーにする。
+- **time-budgeted では回数パラメータの変更を拒否する（レビューP1）。** このモードの停止条件は壁時計であり、`mcts_simulations` / `puct_simulations` は**暴走防止の安全上限**にすぎない。ここで回数を変えても「効果ゼロ」しか測れないため、比較は `simulation-capped` で行うようエラーで促す。木の深さ（`*_tree_depth`）は探索構造を変えるので time-budgeted でも有効な要因として扱う。
+- **計画段階で検証する。** 上記の検査は試合を1つも走らせる前に実行する（`check_plan`）。集約時の検証も残すが、無駄な計算をしてから落ちることはない。
+- **実験条件は全arm共通（レビューP1）。** `search_mode` / `decision_budget_ms` / **`time_budget_max_simulations`** / `cards` は因子ではなく比較の前提であり、armごとに変えられない（`check_shared_conditions`）。特に time-budgeted の探索上限は「どれだけ探索してよいか」の上限そのものなので、1 と 100,000 を比べた結果は探索量の違いであり1要因比較ではない。**実行前**（`check_plan`）と**集約時**（`compare_arms`）の両方で拒否する。
+- **計画値と実測値の照合（再レビューP1）。** 宣言だけでは足りない。`compare_arms` は各armの生の `matches.jsonl` 行の `time_budget_max_simulations` を読み、*そのarmの計画値*と一致することを必須にし、さらにarm間でも同一であることを確認する（`check_observed_conditions`）。`--run` を付けない**保存済みデータの集約経路**も同じ検査を通る。集約レポートにも `time_budget_max_simulations` を記録する。
+- **`cards` は実際に伝播する（レビューP2）。** 仕様キー `cards` は `paired_eval --cards` と集約器の `cards=` に渡され、レポートに条件が記録される。`none` / `verified_basic_2p`（`verified` も同義として正規化）のみ許可し、2人戦以外でのカードありと未知の条件は実行前に拒否する。**指定したのに無視して実行することはない。**
+- **1要因原則は全検索パラメータに適用する。** 制御armと比べて2つ以上変わる arm は拒否する（`changed_search_parameters` に差分を記録）。
+- **モード混在は従来どおり拒否する。** `simulation-capped` と `time-budgeted` を同じ表に混ぜられない。
+
 ## 7. ローカル小規模スモーク（強さの主張ではない）
+
+### 7.1 PUCT パラメータの1要因比較（#167 B、2026-11-07）
+
+条件：カードなし2人戦、baseline `eval`、他席 `greedy`、seed 900〜901の2ブロック（各arm 4試合）、releaseビルド、ローカルWindows、`--iterations 500`。
+
+| arm | 変更した要因 | 首位クレジット | control比 | 95%区間 | 最大決断時間 |
+|---|---|---:|---:|---|---:|
+| `control_puct` | （制御） | 100.0 pp | 0.0 pp | [0.0, 0.0] | 91.9 ms |
+| `leaf_heuristic` | `puct_leaf` | 75.0 pp | −25.0 pp | [−50.0, 0.0] | **1.9 ms** |
+| `explore_c3` | `puct_c` | 100.0 pp | 0.0 pp | [0.0, 0.0] | 153.5 ms |
+| `prior_temp1` | `puct_prior_temp` | 100.0 pp | 0.0 pp | [0.0, 0.0] | 112.8 ms |
+| `mcts_baseline` | `candidate` | 100.0 pp | 0.0 pp | [0.0, 0.0] | 155.5 ms |
+
+読み方と限界：
+
+- **強さの主張はしない。** 2ブロック（各arm 4試合）では区間幅が最大50 ppで退化しており、首位率の差は判定できない。上の表で言えるのは「配管が通り、各armが1要因だけ変えている」ことまでである。
+- **`leaf_heuristic` の差は強さの証拠ではない。** 同じ表の最大決断時間が 91.9 ms → 1.9 ms と約48倍速いことは**コスト**の観測であり、首位率の改善とは別指標。最終的な採否は `docs/roadmap-m7-onward.md` 3.2節の手順（1,000試合/arm、事前登録した一次比較）で決める。
+- `changed_factors_vs_control` が各armで1要素、`search_parameters` が実行時の実値、`baseline_games_are_shared: true` が付いていることをレポートで確認済み。
+
+### 7.1.1 有効性検証の実測（#167 B レビューP1、2026-11-07）
+
+| 指定 | 結果 |
+|---|---|
+| time-budgeted で `mcts_simulations` を変更 | **拒否**（exit 1）: `arm 'count' changes ['mcts_simulations'] in time-budgeted mode, where the simulation count is only a safety cap ...` |
+| PUCT 同士の arm で `mcts_tree_depth` を変更 | **拒否**: `MCTS-only parameters` |
+| MCTS 同士の arm で `puct_prior_temp` を変更 | **拒否**: `PUCT-only parameters` |
+| simulation-capped で `puct_prior_temp` を変更 | 実行（1ブロック4試合、`changed_search_parameters.puct_prior_temp = {control: 3.0, arm: 1.0}`、`effective_changed_search_parameters = ["puct_prior_temp"]`） |
+| time-budgeted で `mcts_tree_depth` を変更 | 有効な要因として受理（`effective_changed_search_parameters = ["mcts_tree_depth"]`） |
+
+### 7.1.2 共通条件・cards・実測値照合（#169 再レビュー対応、2026-11-07）
+
+| 指定 | 結果 |
+|---|---|
+| time-budgeted・200 ms で `time_budget_max_simulations` を control=1 / arm=100000 | **実行前に拒否**（`... disagrees with control ... on time_budget_max_simulations ...`）。試合は1件も走らない |
+| 同条件で上限を揃え、`puct_c` のみ変更 | 実行され、各arm 2試合/腕。`changed_search_parameters` は `puct_c` のみ |
+| `cards: "verified"` を指定 | `paired_eval --cards verified_basic_2p` へ伝播し、出力 JSONL は `cards=verified_basic_2p`・`card_set_count=30`、レポートの `cards` も `verified_basic_2p` |
+| `cards` を 3人戦で指定 | **実行前に拒否**（`the verified pool supports two players only`） |
+| 未知の `cards` 値（`all_840`） | **実行前に拒否** |
+| **保存済みデータ**（`--run` なし）で control の JSONL が上限1、variant が100000、計画は両方100000 | **集約時に拒否**: `arm 'control': the matches records were produced with time_budget_max_simulations [1], but the plan says 100000` |
+| 同条件で両armの JSONL が上限100000 | 集約成功。レポートの `time_budget_max_simulations` は 100000 |
+| 1arm内で上限が混在、または行に上限フィールドが無い | 拒否（`do not match the declared experiment`） |
+
+### 7.2 初期スモーク（2026-11-07 以前、PUCT 非対応時）
 
 - 条件：カードなし2人戦、baseline `random`、他席 `greedy`、seed 900〜901の2ブロック、各arm 8試合、releaseビルド、`--decision-budget-ms 0`、ローカルWindows。
 - 結果：`control_eval` 100.0pp、`greedy` 50.0pp（control比 −50.0pp）、`mcts_sim2` 0.0pp（control比 −100.0pp）。全armでbaselineゲーム同一（`baseline_games_are_shared: true`）。

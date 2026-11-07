@@ -243,6 +243,15 @@ def validate_and_report(
             value = row.get(numeric)
             if not finite_number(value) or value < 0:
                 raise ValueError(f"invalid {numeric}: {key}")
+        # The search cap decides how much searching a time-budgeted arm may do,
+        # so it is an experiment condition, not a result (#169 re-review). It is
+        # reported so a caller can compare it with the plan and with other arms.
+        if (
+            type(row.get("time_budget_max_simulations")) is not int
+            or row["time_budget_max_simulations"] < 1
+        ):
+            raise ValueError(f"invalid time_budget_max_simulations: {key}")
+
         # #167 A: the budget covers the whole decision, so rows must say whether
         # that was enforced and how the detail half behaved. A record that claims
         # whole-decision enforcement in simulation-capped mode (or the reverse)
@@ -350,6 +359,9 @@ def validate_and_report(
     budgets = {row["decision_budget_ms"] for row in rows}
     if len(budgets) != 1:
         raise ValueError("inconsistent decision budgets across game records")
+    caps = {row["time_budget_max_simulations"] for row in rows}
+    if len(caps) != 1:
+        raise ValueError("inconsistent time_budget_max_simulations across game records")
     card_hashes = {(row["cards"], row["card_set_count"], row["card_set_hash"]) for row in rows}
     if len(card_hashes) != 1:
         raise ValueError("inconsistent card set across game records")
@@ -528,6 +540,7 @@ def validate_and_report(
         "mean_first_credit_delta_pp": point * 100,
         "paired_block_bootstrap_95ci_pp": [lower * 100, upper * 100],
         "decision_budget_ms": rows[0]["decision_budget_ms"],
+        "time_budget_max_simulations": rows[0]["time_budget_max_simulations"],
         "candidate_timeout_rate": sum(g["timeout_count"] for g in values["candidate"]) / candidate_focus_decisions,
         "baseline_timeout_rate": sum(g["timeout_count"] for g in values["baseline"]) / baseline_focus_decisions,
         "candidate_fallback_rate": sum(g["fallback_count"] for g in values["candidate"]) / candidate_focus_decisions,
