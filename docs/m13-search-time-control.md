@@ -97,7 +97,7 @@ time-budgeted は **1手200 ms**（10秒ではない）。固定回数側は16�
 1. **締切超過はゼロ保証ではない。** 締切は各シミュレーション後にしか確認できないため、1シミュレーション分の遅れが生じ得る。本計測では 0〜2 ms だったが、重い局面ではより大きくなる。`max_deadline_overshoot_ms` を常時記録して監視する。
 2. **詳細生成は予算外。** 1手全体の10秒制限を厳密に守るには、選択後の `detail_policy.produce` も予算に含める設計変更が別途必要（本PRの範囲外）。
 3. **`mcts_simulations` の意味がモード依存。** simulation-capped では固定回数、time-budgeted では相手席の回数。`--time-budget-max-simulations` が別途安全上限となる。
-4. **PUCT（PR #146）未マージ**のため、本基盤は既存 `src/mcts.rs` のパラメータのみを比較できる。
+4. **PUCTも同じ2モードで動く。** マージ済みの `src/mcts_puct.rs` に `select_with_limit` を追加し、`MctsOutcome` の新フィールド（`elapsed_ms` / `overshoot_ms` / `mode`）を埋めるようにした。PUCT の `search_mode` も `--search-mode` で切り替わり、集約器のモード検査は PUCT にも同じく適用される。
 
 ## 6. CLI・評価ログ・CI
 

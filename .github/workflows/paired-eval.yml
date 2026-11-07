@@ -27,19 +27,19 @@ on:
         default: '500000'
         required: true
       candidate:
-        description: 'Candidate AI (mcts = M7 card-aware search)'
+        description: 'Candidate AI (mcts = M7 card-aware search, puct = M8-3 PUCT)'
         type: choice
-        options: ['eval', 'greedy', 'random', 'mcts']
+        options: ['eval', 'greedy', 'random', 'mcts', 'puct']
         default: 'eval'
         required: true
       baseline:
         type: choice
-        options: ['random', 'greedy', 'eval', 'mcts']
+        options: ['random', 'greedy', 'eval', 'mcts', 'puct']
         default: 'greedy'
         required: true
       opponent:
         type: choice
-        options: ['random', 'greedy', 'eval', 'mcts']
+        options: ['random', 'greedy', 'eval', 'mcts', 'puct']
         default: 'greedy'
         required: true
       extra:
@@ -52,7 +52,7 @@ on:
         default: 'none'
         required: true
       decision_budget_ms:
-        description: 'Per-decision MCTS budget in ms; required by time-budgeted, unused by simulation-capped'
+        description: 'Per-decision search budget in ms; required by time-budgeted, unused by simulation-capped'
         type: number
         default: 10000
         required: true
@@ -76,6 +76,48 @@ on:
         description: 'MCTS tree depth per simulation (1-6)'
         type: number
         default: 2
+        required: true
+
+      puct_leaf:
+        description: 'PUCT leaf value: terminal (rollout) or heuristic (eval leaf)'
+        type: choice
+        options: ['terminal', 'heuristic']
+        default: 'terminal'
+        required: true
+      puct_simulations:
+        description: 'PUCT simulations per decision'
+        type: number
+        default: 32
+        required: true
+      puct_tree_depth:
+        description: 'PUCT tree depth per simulation (1-6)'
+        type: number
+        default: 2
+        required: true
+      puct_c:
+        description: 'PUCT exploration constant'
+        type: number
+        default: 1.5
+        required: true
+      puct_prior_temp:
+        description: 'Softmax temperature for evaluation priors'
+        type: number
+        default: 3
+        required: true
+      puct_value_temp:
+        description: 'Softmax temperature for heuristic leaf credit'
+        type: number
+        default: 8
+        required: true
+      puct_root_limit:
+        description: 'Top-prior root candidates to search (0 = all)'
+        type: number
+        default: 0
+        required: true
+      puct_final_prior:
+        description: 'Weight of the evaluation prior in the final root choice'
+        type: number
+        default: 0
         required: true
 
 permissions:
@@ -121,21 +163,35 @@ jobs:
             --candidate eval --baseline random --opponent greedy \
             --cards verified_basic_2p \
             --output demo-cards/report.json
-      # #164: prove both stopping rules run end-to-end in CI. The budget is
-      # deliberately tiny so the smoke stays fast; it is not a strength test.
+      - name: PUCT with implemented two-player cards and replay smoke
+        run: |
+          set -euo pipefail
+          mkdir -p demo-puct-cards/shard-0
+          ./target/release/paired_eval \
+            --players 2 --seed-start 62000 --block-start 0 --blocks 1 \
+            --candidate puct --baseline eval --opponent greedy \
+            --additional-action-space false --cards verified \
+            --decision-budget-ms 0 --puct-leaf terminal \
+            --puct-simulations 3 --puct-tree-depth 1 \
+            --output demo-puct-cards/shard-0/matches.jsonl
+          python3 scripts/paired_eval_stats.py \
+            --root demo-puct-cards --players 2 --seed-start 62000 --blocks 1 \
+            --candidate puct --baseline eval --opponent greedy \
+            --cards verified_basic_2p --output demo-puct-cards/report.json
       - name: Real smoke in the time-budgeted search mode
+        shell: bash
         run: |
           set -euo pipefail
           mkdir -p demo-time/shard-0
           ./target/release/paired_eval \
-            --players 2 --seed-start 62000 --block-start 0 --blocks 1 \
+            --players 2 --seed-start 63000 --block-start 0 --blocks 1 \
             --candidate mcts --baseline eval --opponent greedy \
             --additional-action-space false \
             --search-mode time-budgeted --decision-budget-ms 60 \
             --mcts-tree-depth 2 \
             --output demo-time/shard-0/matches.jsonl
           python3 scripts/paired_eval_stats.py \
-            --root demo-time --players 2 --seed-start 62000 --blocks 1 \
+            --root demo-time --players 2 --seed-start 63000 --blocks 1 \
             --candidate mcts --baseline eval --opponent greedy \
             --search-mode time-budgeted \
             --output demo-time/report.json
@@ -147,6 +203,7 @@ jobs:
           path: |
             demo/
             demo-cards/
+            demo-puct-cards/
             demo-time/
           if-no-files-found: warn
           retention-days: 7
@@ -174,6 +231,14 @@ jobs:
       DECISION_BUDGET_MS: ${{ inputs.decision_budget_ms }}
       MCTS_SIMULATIONS: ${{ inputs.mcts_simulations }}
       MCTS_TREE_DEPTH: ${{ inputs.mcts_tree_depth }}
+      PUCT_LEAF: ${{ inputs.puct_leaf }}
+      PUCT_SIMULATIONS: ${{ inputs.puct_simulations }}
+      PUCT_TREE_DEPTH: ${{ inputs.puct_tree_depth }}
+      PUCT_C: ${{ inputs.puct_c }}
+      PUCT_PRIOR_TEMP: ${{ inputs.puct_prior_temp }}
+      PUCT_VALUE_TEMP: ${{ inputs.puct_value_temp }}
+      PUCT_ROOT_LIMIT: ${{ inputs.puct_root_limit }}
+      PUCT_FINAL_PRIOR: ${{ inputs.puct_final_prior }}
     steps:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
@@ -204,6 +269,14 @@ jobs:
             --decision-budget-ms "$DECISION_BUDGET_MS" \
             --mcts-simulations "$MCTS_SIMULATIONS" \
             --mcts-tree-depth "$MCTS_TREE_DEPTH" \
+            --puct-leaf "$PUCT_LEAF" \
+            --puct-simulations "$PUCT_SIMULATIONS" \
+            --puct-tree-depth "$PUCT_TREE_DEPTH" \
+            --puct-c "$PUCT_C" \
+            --puct-prior-temp "$PUCT_PRIOR_TEMP" \
+            --puct-value-temp "$PUCT_VALUE_TEMP" \
+            --puct-root-limit "$PUCT_ROOT_LIMIT" \
+            --puct-final-prior "$PUCT_FINAL_PRIOR" \
             --output "results/shard-$INDEX/matches.jsonl"
       - name: Save results and failure artifacts
         if: always()
@@ -250,7 +323,7 @@ jobs:
             --search-mode "$SEARCH_MODE" \
             --output results/report.json "${FLAGS[@]}"
           echo "Search mode: $SEARCH_MODE (decision budget ${DECISION_BUDGET_MS} ms). Fixed simulation counts and fixed wall-clock budgets are different experiments and are never pooled." >> "$GITHUB_STEP_SUMMARY"
-          echo 'Paired seeded seat-block comparison; MCTS arms use a per-decision search budget. NOT full-decision 10s enforcement or official-rule proof.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Paired seeded seat-block comparison; search arms use a per-decision search budget. NOT full-decision 10s enforcement or official-rule proof.' >> "$GITHUB_STEP_SUMMARY"
       - name: Save confidence interval report
         if: always()
         uses: actions/upload-artifact@v4

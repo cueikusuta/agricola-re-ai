@@ -2,7 +2,7 @@
 import copy
 import unittest
 
-from scripts.paired_eval_stats import validate_and_report
+from scripts.paired_eval_stats import POLICY_CHOICES, validate_and_report
 
 
 def fixture(blocks=3, players=4):
@@ -156,6 +156,14 @@ class PairedStatsReportDiagnosticsTests(unittest.TestCase):
 
 
 class PairedStatsTests(unittest.TestCase):
+    def test_cli_and_validator_accept_every_search_policy(self):
+        # Guards against the CLI choices drifting from the validator (a
+        # workflow_dispatch with candidate=puct previously failed here).
+        for name in ("mcts", "puct"):
+            self.assertIn(name, POLICY_CHOICES)
+        for name in ("random", "greedy", "eval"):
+            self.assertIn(name, POLICY_CHOICES)
+
     def test_complete_seat_blocks_and_effect_size(self):
         report = run(fixture())
         self.assertEqual(report["games_per_arm"], 12)
@@ -290,6 +298,25 @@ class PairedStatsTests(unittest.TestCase):
         self.assertTrue(report["candidate_focus_measured_within_budget"])
         self.assertTrue(report["candidate_10s_observed_pass"])
         self.assertEqual(report["deadline_enforcement"], "cooperative_in_policy_checks")
+
+    def test_puct_focus_is_accepted_with_budget_metrics(self):
+        rows = as_time_budgeted(fixture())
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = "puct"
+                row["mcts_simulations_completed"] = 256
+                row["search_simulations_completed"] = 256
+                row["mcts_deadline_active"] = True
+                row["deterministic_policy_selection"] = False
+                row["puct_leaf"] = "heuristic"
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="puct", baseline="random", opponent="greedy",
+            extra=False, search_mode="time-budgeted", iterations=500,
+        )
+        self.assertEqual(report["total_games"], 24)
+        self.assertTrue(report["candidate_focus_deadline_control"])
+        self.assertEqual(report["candidate_mcts_simulations_completed"], 12 * 256)
 
     def test_mcts_over_budget_disables_full_decision_flag(self):
         rows = as_time_budgeted(fixture())

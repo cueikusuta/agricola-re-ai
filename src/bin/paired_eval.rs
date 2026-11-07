@@ -9,16 +9,12 @@
 //! deck size and the deck content hash are recorded on every row and the
 //! aggregator refuses to pool them. Only the built-in, two-player A/B pool is
 //! available; no unverified card can enter a deck here.
-//!
-//! `--search-mode` selects the stopping rule (#164). `simulation-capped` runs a
-//! fixed number of simulations and is reproducible; `time-budgeted` searches
-//! until a wall-clock deadline and is not. The two are different experiments
-//! and the aggregator refuses to mix them.
 #![recursion_limit = "256"]
 use agricola_re_ai::cards::{verified_basic_card_set, CardSet};
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::harvest::SimpleHarvestDetails;
 use agricola_re_ai::mcts::{MctsOutcome, MctsPolicy, SearchLimit, SearchMode};
+use agricola_re_ai::mcts_puct::{LeafMode, PuctConfig, PuctPolicy};
 use agricola_re_ai::model::Space;
 use agricola_re_ai::policy::{
     play_to_end_observed, CardChoiceDetails, DetailPolicy, GreedyPolicy, RandomPolicy,
@@ -36,8 +32,8 @@ use std::time::{Duration, Instant};
 
 const DEFAULT_DECISION_BUDGET_MS: u64 = 10_000;
 const DEFAULT_SIMULATIONS: usize = 64;
-/// Safety cap for time-budgeted search. It is high enough not to bind on small
-/// games, and low enough that a pathological position cannot loop forever.
+/// Safety cap for one time-budgeted decision. High enough not to bind on small
+/// games, low enough that a pathological position cannot loop forever.
 const DEFAULT_TIME_BUDGET_MAX_SIMULATIONS: usize = 100_000;
 
 /// Card condition of an experiment arm.
@@ -79,6 +75,7 @@ enum Ai {
     Greedy,
     Eval,
     Mcts,
+    Puct,
 }
 
 impl Ai {
@@ -88,6 +85,7 @@ impl Ai {
             "greedy" => Ok(Ai::Greedy),
             "eval" => Ok(Ai::Eval),
             "mcts" => Ok(Ai::Mcts),
+            "puct" => Ok(Ai::Puct),
             _ => Err(format!("unsupported AI: {name}")),
         }
     }
@@ -97,10 +95,11 @@ impl Ai {
             Ai::Greedy => "greedy",
             Ai::Eval => "eval",
             Ai::Mcts => "mcts",
+            Ai::Puct => "puct",
         }
     }
-    fn is_mcts(self) -> bool {
-        self == Ai::Mcts
+    fn is_search(self) -> bool {
+        matches!(self, Ai::Mcts | Ai::Puct)
     }
 }
 
@@ -119,6 +118,14 @@ struct Options {
     mcts_simulations: usize,
     time_budget_max_simulations: usize,
     mcts_tree_depth: usize,
+    puct_simulations: usize,
+    puct_tree_depth: usize,
+    puct_c: f64,
+    puct_prior_temperature: f64,
+    puct_value_temperature: f64,
+    puct_leaf: LeafMode,
+    puct_root_limit: usize,
+    puct_final_prior: f64,
     output: String,
 }
 
@@ -145,6 +152,21 @@ fn optional_option<'a>(values: &'a BTreeMap<String, String>, key: &str) -> Optio
     values.get(key).map(String::as_str)
 }
 
+fn parse_option_or<T>(
+    values: &BTreeMap<String, String>,
+    key: &str,
+    default: T,
+    error: &str,
+) -> Result<T, String>
+where
+    T: std::str::FromStr,
+{
+    match optional_option(values, key) {
+        Some(value) => value.parse::<T>().map_err(|_| error.to_string()),
+        None => Ok(default),
+    }
+}
+
 fn parse_options() -> Result<Options, String> {
     let mut values = BTreeMap::new();
     let mut args = std::env::args().skip(1);
@@ -167,6 +189,14 @@ fn parse_options() -> Result<Options, String> {
             "time-budget-max-simulations",
             "mcts-simulations",
             "mcts-tree-depth",
+            "puct-simulations",
+            "puct-tree-depth",
+            "puct-c",
+            "puct-prior-temp",
+            "puct-value-temp",
+            "puct-leaf",
+            "puct-root-limit",
+            "puct-final-prior",
             "output",
         ]
         .contains(&key)
@@ -217,16 +247,14 @@ fn parse_options() -> Result<Options, String> {
         })
         .transpose()?
         .unwrap_or(DEFAULT_SIMULATIONS);
-    let time_budget_max_simulations = optional_option(&values, "time-budget-max-simulations")
-        .map(|value| {
-            value
-                .parse::<usize>()
-                .map_err(|_| "invalid time-budget-max-simulations".to_string())
-        })
-        .transpose()?
-        .unwrap_or(DEFAULT_TIME_BUDGET_MAX_SIMULATIONS);
-    // The mode is explicit (#164). Defaulting to `simulation-capped` keeps every
-    // existing invocation reproducible and comparable with past results.
+    let time_budget_max_simulations = parse_option_or(
+        &values,
+        "time-budget-max-simulations",
+        DEFAULT_TIME_BUDGET_MAX_SIMULATIONS,
+        "invalid time-budget-max-simulations",
+    )?;
+    // The stopping rule is explicit (#164). The default keeps every existing
+    // invocation reproducible and comparable with past results.
     let search_mode_value = optional_option(&values, "search-mode").unwrap_or("simulation-capped");
     let search_mode = SearchMode::parse(search_mode_value)
         .ok_or_else(|| format!("unsupported search mode: {search_mode_value}"))?;
@@ -238,6 +266,49 @@ fn parse_options() -> Result<Options, String> {
         })
         .transpose()?
         .unwrap_or(2);
+    let default_puct = PuctConfig::default();
+    let puct_simulations = parse_option_or(
+        &values,
+        "puct-simulations",
+        default_puct.simulations,
+        "invalid puct-simulations",
+    )?;
+    let puct_tree_depth = parse_option_or(
+        &values,
+        "puct-tree-depth",
+        default_puct.tree_depth,
+        "invalid puct-tree-depth",
+    )?;
+    let puct_c = parse_option_or(&values, "puct-c", default_puct.c_puct, "invalid puct-c")?;
+    let puct_prior_temperature = parse_option_or(
+        &values,
+        "puct-prior-temp",
+        default_puct.prior_temperature,
+        "invalid puct-prior-temp",
+    )?;
+    let puct_value_temperature = parse_option_or(
+        &values,
+        "puct-value-temp",
+        default_puct.value_temperature,
+        "invalid puct-value-temp",
+    )?;
+    let puct_leaf = match optional_option(&values, "puct-leaf").unwrap_or("terminal") {
+        "heuristic" => LeafMode::Heuristic,
+        "terminal" => LeafMode::Terminal,
+        _ => return Err("puct-leaf must be heuristic or terminal".into()),
+    };
+    let puct_root_limit = parse_option_or(
+        &values,
+        "puct-root-limit",
+        default_puct.root_candidate_limit,
+        "invalid puct-root-limit",
+    )?;
+    let puct_final_prior = parse_option_or(
+        &values,
+        "puct-final-prior",
+        default_puct.final_prior_weight,
+        "invalid puct-final-prior",
+    )?;
     let output = option(&values, "output")?.to_string();
     if !(2..=4).contains(&players) {
         return Err("players must be 2, 3, or 4".into());
@@ -264,11 +335,32 @@ fn parse_options() -> Result<Options, String> {
     if !(1..=6).contains(&mcts_tree_depth) {
         return Err("mcts-tree-depth must be 1..=6".into());
     }
+    if puct_simulations == 0 || puct_simulations > 100_000 {
+        return Err("puct-simulations must be 1..=100000".into());
+    }
+    if !(1..=6).contains(&puct_tree_depth) {
+        return Err("puct-tree-depth must be 1..=6".into());
+    }
+    if !puct_c.is_finite() || puct_c < 0.0 || puct_c > 100.0 {
+        return Err("puct-c must be finite and 0..=100".into());
+    }
+    if !puct_prior_temperature.is_finite() || puct_prior_temperature <= 0.0 {
+        return Err("puct-prior-temp must be finite and > 0".into());
+    }
+    if !puct_value_temperature.is_finite() || puct_value_temperature <= 0.0 {
+        return Err("puct-value-temp must be finite and > 0".into());
+    }
+    if puct_root_limit > 100 {
+        return Err("puct-root-limit must be 0..=100".into());
+    }
+    if !puct_final_prior.is_finite() || !(0.0..=10.0).contains(&puct_final_prior) {
+        return Err("puct-final-prior must be finite and 0..=10".into());
+    }
     if candidate == baseline {
         return Err("candidate and baseline must be different".into());
     }
-    // A time budget of 0 means "no deadline"; that combination has no meaning
-    // for a mode whose whole contract is the deadline.
+    // A budget of 0 means "no deadline", which is meaningless for a mode whose
+    // whole contract is the deadline.
     if search_mode == SearchMode::TimeBudgeted && decision_budget_ms == 0 {
         return Err("search-mode time-budgeted requires --decision-budget-ms > 0".into());
     }
@@ -288,15 +380,23 @@ fn parse_options() -> Result<Options, String> {
         mcts_simulations,
         time_budget_max_simulations,
         mcts_tree_depth,
+        puct_simulations,
+        puct_tree_depth,
+        puct_c,
+        puct_prior_temperature,
+        puct_value_temperature,
+        puct_leaf,
+        puct_root_limit,
+        puct_final_prior,
         output,
     })
 }
 
-/// The per-decision stopping rule for the focus seat.
+/// The per-decision stopping rule for the focus seat (#164).
 ///
-/// Opponent seats always use `MctsPolicy.simulations` without a deadline, so a
-/// time-budgeted experiment does not quietly turn three opponents into
-/// unbounded searches.
+/// Opponent seats always use the policy's own simulation count without a
+/// deadline, so a time-budgeted experiment does not quietly turn three
+/// opponents into unbounded searches.
 fn focus_search_rule(options: &Options) -> SearchRule {
     match options.search_mode {
         SearchMode::SimulationCapped => SearchRule::Simulations(options.mcts_simulations),
@@ -326,6 +426,7 @@ struct SeatSelector<'a> {
     greedy: &'a GreedyPolicy,
     eval: &'a EvaluationPolicy,
     mcts: &'a MctsPolicy,
+    puct: &'a PuctPolicy,
     /// Stopping rule for a search policy. `None` for heuristic policies and for
     /// the opponent seats, which always run the deterministic default.
     search: Option<SearchRule>,
@@ -333,8 +434,8 @@ struct SeatSelector<'a> {
     focus_outcomes: RefCell<FocusOutcomes>,
 }
 
-/// Per-decision stopping rule template. The absolute deadline is resolved at
-/// the moment the decision starts.
+/// Per-decision stopping rule template (#164). The absolute deadline is
+/// resolved at the moment the decision starts.
 #[derive(Clone, Copy, Debug)]
 enum SearchRule {
     Simulations(usize),
@@ -366,6 +467,7 @@ fn select_ai(
     greedy: &GreedyPolicy,
     eval: &EvaluationPolicy,
     mcts: &MctsPolicy,
+    puct: &PuctPolicy,
     obs: &Observation,
     legal: &[Space],
     rng: &mut ChaCha8Rng,
@@ -380,6 +482,15 @@ fn select_ai(
                 .map(SearchRule::resolve)
                 .unwrap_or(SearchLimit::Simulations(mcts.simulations));
             match mcts.select_with_limit(obs, legal, rng, limit) {
+                Some((space, outcome)) => (Some(space), outcome),
+                None => (None, MctsOutcome::default()),
+            }
+        }
+        Ai::Puct => {
+            let limit = search
+                .map(SearchRule::resolve)
+                .unwrap_or(SearchLimit::Simulations(puct.config.simulations));
+            match puct.select_with_limit(obs, legal, rng, limit) {
                 Some((space, outcome)) => (Some(space), outcome),
                 None => (None, MctsOutcome::default()),
             }
@@ -399,6 +510,7 @@ impl SpacePolicy for SeatSelector<'_> {
                 self.greedy,
                 self.eval,
                 self.mcts,
+                self.puct,
                 obs,
                 legal,
                 rng,
@@ -411,6 +523,7 @@ impl SpacePolicy for SeatSelector<'_> {
                 self.greedy,
                 self.eval,
                 self.mcts,
+                self.puct,
                 obs,
                 legal,
                 rng,
@@ -421,7 +534,9 @@ impl SpacePolicy for SeatSelector<'_> {
         self.decision_ns.borrow_mut().push(ns);
         if is_focus {
             let mut outcomes = self.focus_outcomes.borrow_mut();
-            if self.focus_ai.is_mcts() {
+            if self.focus_ai.is_search() {
+                // `timed_out` means the wall-clock deadline ended the decision,
+                // which is the normal case for a time-budgeted run.
                 if outcome.timed_out {
                     outcomes.timeouts += 1;
                 }
@@ -469,9 +584,25 @@ fn run(options: &Options) -> Result<(), String> {
         simulations: options.mcts_simulations,
         tree_depth: options.mcts_tree_depth,
     };
+    let puct = PuctPolicy {
+        config: PuctConfig {
+            simulations: options.puct_simulations,
+            tree_depth: options.puct_tree_depth,
+            c_puct: options.puct_c,
+            prior_temperature: options.puct_prior_temperature,
+            value_temperature: options.puct_value_temperature,
+            leaf_mode: options.puct_leaf,
+            root_candidate_limit: options.puct_root_limit,
+            final_prior_weight: options.puct_final_prior,
+        },
+    };
+    let puct_leaf_name = match options.puct_leaf {
+        LeafMode::Heuristic => "heuristic",
+        LeafMode::Terminal => "terminal",
+    };
     // A wall-clock deadline is only enforced in time-budgeted mode. In
-    // simulation-capped mode the whole point is that the search length, not the
-    // clock, decides, so the run stays reproducible on any machine.
+    // simulation-capped mode the search length, not the clock, decides, so the
+    // run stays reproducible on any machine.
     let deadline_enforced = options.search_mode == SearchMode::TimeBudgeted;
     let search_rule = focus_search_rule(options);
     // The deck is built once and validated by the same gate the game uses, so
@@ -512,6 +643,7 @@ fn run(options: &Options) -> Result<(), String> {
                     greedy: &greedy,
                     eval: &eval,
                     mcts: &mcts,
+                    puct: &puct,
                     search: Some(search_rule),
                     decision_ns: RefCell::new(Vec::new()),
                     focus_outcomes: RefCell::new(FocusOutcomes::default()),
@@ -560,7 +692,7 @@ fn run(options: &Options) -> Result<(), String> {
                 let outcomes = selector.focus_outcomes.borrow();
                 let whole_ns = focus_whole_ns.borrow();
                 let budget_ns = options.decision_budget_ms * 1_000_000;
-                let focus_timeout_count = if deadline_enforced && focus_ai.is_mcts() {
+                let focus_timeout_count = if deadline_enforced && focus_ai.is_search() {
                     whole_ns.iter().filter(|&&ns| ns > budget_ns).count()
                 } else {
                     0
@@ -590,12 +722,13 @@ fn run(options: &Options) -> Result<(), String> {
                     "decisions": decision_ns.len(),
                     "focus_decisions": whole_ns.len(),
                     "decision_budget_ms": options.decision_budget_ms,
+                    "mcts_deadline_active": focus_ai.is_search() && deadline_enforced,
+                    "search_deadline_active": focus_ai.is_search() && deadline_enforced,
                     "search_mode": options.search_mode.as_str(),
                     "mcts_simulations_cap": options.mcts_simulations,
                     "time_budget_max_simulations": options.time_budget_max_simulations,
                     "search_budget_enforced": deadline_enforced,
-                    "mcts_deadline_active": focus_ai.is_mcts() && deadline_enforced,
-                    "deterministic_policy_selection": !(focus_ai.is_mcts() && deadline_enforced),
+                    "deterministic_policy_selection": !(focus_ai.is_search() && deadline_enforced),
                     "max_policy_select_ms": decision_ns.iter().copied().max().unwrap_or(0) as f64 / 1_000_000.0,
                     "p50_policy_select_ms": percentile_ms(&decision_ns, 0.50),
                     "p95_policy_select_ms": percentile_ms(&decision_ns, 0.95),
@@ -607,6 +740,7 @@ fn run(options: &Options) -> Result<(), String> {
                     "timeout_count": outcomes.timeouts,
                     "fallback_count": outcomes.fallbacks,
                     "mcts_simulations_completed": outcomes.simulations,
+                    "search_simulations_completed": outcomes.simulations,
                     "mcts_simulations_per_decision": if whole_ns.is_empty() {
                         0.0
                     } else {
@@ -615,6 +749,14 @@ fn run(options: &Options) -> Result<(), String> {
                     "max_deadline_overshoot_ms": outcomes.overshoot_ms,
                     "max_search_elapsed_ms": outcomes.elapsed_ms,
                     "mcts_tree_depth": options.mcts_tree_depth,
+                    "puct_leaf": puct_leaf_name,
+                    "puct_simulations_config": options.puct_simulations,
+                    "puct_tree_depth": options.puct_tree_depth,
+                    "puct_c": options.puct_c,
+                    "puct_prior_temperature": options.puct_prior_temperature,
+                    "puct_value_temperature": options.puct_value_temperature,
+                    "puct_root_limit": options.puct_root_limit,
+                    "puct_final_prior_weight": options.puct_final_prior,
                     "policy_select_only": true,
                     "total_wall_ms": game_start.elapsed().as_secs_f64() * 1000.0,
                     "replay_hash": hash,
@@ -671,6 +813,10 @@ mod tests {
     #[test]
     fn mcts_is_a_recognized_ai_name() {
         assert_eq!(Ai::parse("mcts").unwrap(), Ai::Mcts);
+        assert_eq!(Ai::parse("puct").unwrap(), Ai::Puct);
+        assert!(Ai::Mcts.is_search() && Ai::Puct.is_search());
+        assert!(!Ai::Eval.is_search() && !Ai::Random.is_search());
+        assert_eq!(PuctConfig::default().leaf_mode, LeafMode::Terminal);
         assert!(Ai::parse("stockfish").is_err());
     }
 

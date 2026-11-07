@@ -16,6 +16,8 @@ import random
 import statistics
 import sys
 
+POLICY_CHOICES = ("random", "greedy", "eval", "mcts", "puct")
+SEARCH_POLICIES = ("mcts", "puct")
 # #164: fixed-simulation and fixed-wall-clock searches are different
 # experiments. Only these names may appear, and never mixed in one report.
 SEARCH_MODES = ("simulation-capped", "time-budgeted")
@@ -46,7 +48,7 @@ def validate_and_report(
     if players not in (2, 3, 4) or blocks < 1 or iterations < 100:
         raise ValueError("invalid experimental settings")
     if candidate == baseline or any(
-        name not in ("random", "greedy", "eval", "mcts")
+        name not in POLICY_CHOICES
         for name in (candidate, baseline, opponent)
     ):
         raise ValueError("unsupported/identical policy")
@@ -211,7 +213,7 @@ def validate_and_report(
             or not 0 <= row["focus_timeout_count"] <= row["focus_decisions"]
         ):
             raise ValueError(f"invalid focus_timeout_count: {key}")
-        # #164: the search mode is explicit, and the deadline flag must match it
+        # #164: the search mode is explicit, and the deadline flag must follow it
         # rather than merely "a budget was configured".
         if row.get("search_mode") not in SEARCH_MODES:
             raise ValueError(f"invalid search mode: {key}")
@@ -225,11 +227,11 @@ def validate_and_report(
         ):
             raise ValueError(f"invalid policy mode flags: {key}")
         if row["mcts_deadline_active"] != (
-            row.get("focus_policy") == "mcts" and time_budgeted
+            row.get("focus_policy") in SEARCH_POLICIES and time_budgeted
         ):
             raise ValueError(f"deadline flag does not match policy/search mode: {key}")
-        # A simulation-capped run applies no deadline, so its "10 s" claim is
-        # meaningless; a time-budgeted run must have a positive budget.
+        # A simulation-capped run applies no deadline, so a "10 s" claim from it
+        # is meaningless; a time-budgeted run must have a positive budget.
         if time_budgeted and row["decision_budget_ms"] <= 0:
             raise ValueError(f"time-budgeted run without a budget: {key}")
         for numeric in ("max_deadline_overshoot_ms", "max_search_elapsed_ms"):
@@ -296,8 +298,10 @@ def validate_and_report(
     candidate_max_focus = max(g["focus_max_decision_ms"] for g in values["candidate"])
     baseline_max_focus = max(g["focus_max_decision_ms"] for g in values["baseline"])
     # A deadline is only enforced in time-budgeted mode (#164).
-    candidate_deadline_control = candidate == "mcts" and search_mode == "time-budgeted"
-    baseline_deadline_control = baseline == "mcts" and search_mode == "time-budgeted"
+    candidate_deadline_control = (
+        candidate in SEARCH_POLICIES and search_mode == "time-budgeted")
+    baseline_deadline_control = (
+        baseline in SEARCH_POLICIES and search_mode == "time-budgeted")
     candidate_measured_within = budget_enabled and candidate_max_focus <= budget_ms
     baseline_measured_within = budget_enabled and baseline_max_focus <= budget_ms
     candidate_10s_observed_pass = (
@@ -503,9 +507,9 @@ def main() -> int:
     p.add_argument("--seed-start", type=int, required=True)
     p.add_argument("--first-block", type=int, default=0)
     p.add_argument("--blocks", type=int, required=True)
-    p.add_argument("--candidate", choices=("random", "greedy", "eval", "mcts"), required=True)
-    p.add_argument("--baseline", choices=("random", "greedy", "eval", "mcts"), required=True)
-    p.add_argument("--opponent", choices=("random", "greedy", "eval", "mcts"), required=True)
+    p.add_argument("--candidate", choices=POLICY_CHOICES, required=True)
+    p.add_argument("--baseline", choices=POLICY_CHOICES, required=True)
+    p.add_argument("--opponent", choices=POLICY_CHOICES, required=True)
     p.add_argument("--extra", action="store_true")
     p.add_argument("--cards", choices=("none", "verified_basic_2p"), default="none")
     p.add_argument("--search-mode", choices=SEARCH_MODES, default="simulation-capped")

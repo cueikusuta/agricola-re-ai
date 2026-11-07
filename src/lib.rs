@@ -1,6 +1,7 @@
 pub mod api;
 pub mod benchmark;
 pub mod breeding;
+pub mod card_pool;
 pub mod cards;
 pub mod draft;
 pub mod draft_ai;
@@ -12,6 +13,7 @@ pub mod harvest;
 pub mod hints;
 pub mod hooks;
 pub mod mcts;
+pub mod mcts_puct;
 pub mod model;
 pub mod policy;
 pub mod score;
