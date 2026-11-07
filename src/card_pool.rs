@@ -181,10 +181,25 @@ pub fn verified_eligible_pool<'a>(
     set.definitions
         .iter()
         .filter(|definition| {
-            registry
+            // A malformed duplicated card definition must not inflate a G1/G2
+            // count. Conflicting or duplicated reviews are ambiguous and must
+            // never be resolved by whichever entry happens to come first.
+            if set
+                .definitions
                 .iter()
-                .find(|review| review.card_id == definition.id)
-                .is_some_and(|review| review.permits_use_at(players))
+                .filter(|card| card.id == definition.id)
+                .count()
+                != 1
+            {
+                return false;
+            }
+            let mut matches = registry
+                .iter()
+                .filter(|review| review.card_id == definition.id);
+            match (matches.next(), matches.next()) {
+                (Some(review), None) => review.permits_use_at(players),
+                _ => false,
+            }
         })
         .collect()
 }
