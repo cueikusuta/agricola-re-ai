@@ -3,12 +3,15 @@ import unittest
 from pathlib import Path
 
 from scripts.card_inventory_report import (
+    QUEUE_FIELDS,
     UNIMPLEMENTED,
     categories,
     inventory,
     is_implemented,
     load_rows,
     normalize_type,
+    verification_queue,
+    write_queue_csv,
 )
 
 LEDGER = Path("docs/card-catalog-ae-preliminary.csv")
@@ -143,6 +146,75 @@ class ClassificationTests(unittest.TestCase):
             report["effect_categories"]["unimplemented_by_difficulty"]["4-5"],
             {"他プレイヤー": 1},
         )
+
+
+class VerificationQueueTests(unittest.TestCase):
+    """The per-card queue is a work list for human review, never a verification."""
+
+    def test_every_queue_row_demands_official_review(self):
+        rows = [row(difficulty="1"), row(card_id="A002", difficulty="2")]
+        queue = verification_queue(rows)
+        self.assertEqual([entry["card_id"] for entry in queue], ["A001", "A002"])
+        for entry in queue:
+            self.assertTrue(entry["official_review_required"])
+            self.assertFalse(entry["distributable_now"])
+            self.assertEqual(entry["implementation_state"], "unimplemented")
+
+    def test_implemented_cards_are_not_in_the_queue(self):
+        rows = [
+            row(card_id="A001", difficulty="1"),
+            row(card_id="A002", difficulty="1",
+                reference="コード内に定義あり（配布対象要照合）"),
+        ]
+        queue = verification_queue(rows)
+        self.assertEqual([entry["card_id"] for entry in queue], ["A001"])
+
+    def test_the_queue_is_ordered_by_difficulty_then_card_id(self):
+        rows = [
+            row(card_id="A003", difficulty="3"),
+            row(card_id="A002", difficulty="2"),
+            row(card_id="A001", difficulty="2"),
+            row(card_id="A004", difficulty="4"),
+        ]
+        queue = verification_queue(rows)
+        self.assertEqual(
+            [entry["card_id"] for entry in queue], ["A001", "A002", "A003"])
+        self.assertEqual(
+            [entry["difficulty_1_to_5_preliminary"] for entry in queue],
+            ["2", "2", "3"],
+        )
+
+    def test_the_difficulty_limit_is_adjustable_and_validated(self):
+        rows = [row(card_id="A001", difficulty="1"), row(card_id="A002", difficulty="3")]
+        self.assertEqual(len(verification_queue(rows, max_difficulty=1)), 1)
+        with self.assertRaisesRegex(ValueError, "max_difficulty"):
+            verification_queue(rows, max_difficulty=0)
+        with self.assertRaisesRegex(ValueError, "max_difficulty"):
+            verification_queue(rows, max_difficulty=6)
+
+    def test_the_real_ledger_queue_is_large_and_unverified(self):
+        rows = load_rows(LEDGER)
+        queue = verification_queue(rows)
+        self.assertEqual(len(queue), 559)
+        self.assertTrue(all(entry["official_review_required"] for entry in queue))
+        self.assertTrue(all(not entry["distributable_now"] for entry in queue))
+        self.assertTrue(all(
+            int(entry["difficulty_1_to_5_preliminary"]) <= 3 for entry in queue))
+
+    def test_writing_the_queue_csv_keeps_the_review_flags(self):
+        import csv
+        import tempfile
+
+        queue = verification_queue([row(card_id="A001", difficulty="1")])
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "queue.csv"
+            write_queue_csv(queue, path)
+            with path.open(encoding="utf-8", newline="") as file:
+                written = list(csv.DictReader(file))
+        self.assertEqual(len(written), 1)
+        self.assertEqual(written[0]["official_review_required"], "True")
+        self.assertEqual(written[0]["distributable_now"], "False")
+        self.assertEqual(list(written[0].keys()), list(QUEUE_FIELDS))
 
 
 if __name__ == "__main__":
