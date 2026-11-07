@@ -164,6 +164,19 @@ class AblationTests(unittest.TestCase):
                 iterations=500,
             )
 
+    def test_different_deck_identity_breaks_arm_comparability(self):
+        control = arm_rows(credit=always_wins)
+        variant = copy.deepcopy(control)
+        for row in variant:
+            row["card_set_hash"] = "b" * 64
+        with self.assertRaisesRegex(ValueError, "different card-set identity"):
+            compare_arms(
+                {"control": control, "variant": variant},
+                control="control",
+                per_arm_options={"control": options(), "variant": options()},
+                iterations=500,
+            )
+
     def test_arms_on_different_seeds_are_rejected(self):
         control = arm_rows(credit=always_wins)
         variant = arm_rows(credit=always_wins, seed_base=2000)
