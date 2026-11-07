@@ -71,11 +71,27 @@ AGRICOLA_WEB_URL=http://127.0.0.1:8791/ node --test tests/e2e/full-game.cjs
 - `node --test tests/e2e/full-game.cjs` を既存の 8787 サーバに対して実行し、**失敗時の証跡が正しく生成されること**を確認。`artifacts/full-game-seed-42-failure.json` に seed・人数・カード条件・画面状態・エラー・再現コマンドが記録され、PNG も保存された（既存サーバは本ブランチより古いUIで `#turnWorkers` を持たないため、全シナリオがその地点で失敗した）。
 - `artifacts/` は `.gitignore` 済みで、PR差分には含まれない。
 
-**したがって「14ラウンド完走を実ブラウザで確認した」とは主張しない。** 実ブラウザ完走の判定は `web-full-game.yml` の実行結果（Actions URL）で行う。
+ローカル環境では完走を確認できていない。**実ブラウザ完走の判定は CI で行う。**
+
+## 4.1 CI での実行結果（2026-11-07、PR #171）
+
+`Browser UI Full Game` が成功した（`browser-full-game` ジョブ、48.5 秒、pass 4 / fail 0）。
+
+| シナリオ | ラウンド | 給餌 | 繁殖 | UI送信 | POST（play/free/harvest） |
+|---|---:|---:|---:|---:|---|
+| 2人・カードあり・追加タイルOFF（seed 42） | 1–14 全観測 | 6 | 6 | 48 | 35/1/12 = 48 |
+| 2人・カードあり・追加タイルON（seed 43） | 1–14 全観測 | 6 | 6 | 56 | 43/1/12 = 56 |
+| 4人・カードなし・追加タイルON（seed 44） | 1–14 全観測 | 6 | 6 | 42 | 29/1/12 = 42 |
+
+- 全シナリオで `manualPlow`・`freeAction`・`invalidInputRejected`・`sessionResumeStatePreserved: true`。
+- 2人カードありの2シナリオは、柵・部屋・改築・種まき・家畜・改善を各1回以上UIから実行し、職業カードも使用した。
+- **UI送信回数とPOST回数が一致**（48/48、56/56、42/42）。テストがAPIを直接叩いていないことが機械的に確認された。
+- `serializedSaveRestoreAvailable: false` は全シナリオで記録され、永続保存/復元が未実装であることを成果物に残している。
+- 成果物: Actions Artifact `browser-full-game-evidence`（`artifacts/full-game-seed-<seed>-coverage.json` と実行ログ）。
 
 ## 5. 未解決・範囲外
 
-1. **実ブラウザ14ラウンドの完走はCI実行待ち。** 上記の環境制約によりローカルでは未確認。
+1. **実ブラウザ14ラウンドの完走は CI で確認済み**（4.1節）。ローカルでは環境制約（ポート使用中・サーバ起動の権限拒否）により未確認。
 2. **永続保存/復元は未実装。** 本試験はセッション復帰のみを検証し、サーバ再起動を跨ぐ保存復帰は対象外（成果物に明示）。
 3. 4人戦はカードなしのみ。4人カードありは M10 のプール整備（40+40）待ちで、`web-full-game.yml` の対象外。
 4. ドラフト込みの14ラウンド完走は `tests/e2e/draft.test.cjs` の範囲で、本ファイルの対象外。
