@@ -99,6 +99,7 @@ python3 scripts/eval_ablation.py \
 - **time-budgeted では回数パラメータの変更を拒否する（レビューP1）。** このモードの停止条件は壁時計であり、`mcts_simulations` / `puct_simulations` は**暴走防止の安全上限**にすぎない。ここで回数を変えても「効果ゼロ」しか測れないため、比較は `simulation-capped` で行うようエラーで促す。木の深さ（`*_tree_depth`）は探索構造を変えるので time-budgeted でも有効な要因として扱う。
 - **計画段階で検証する。** 上記の検査は試合を1つも走らせる前に実行する（`check_plan`）。集約時の検証も残すが、無駄な計算をしてから落ちることはない。
 - **実験条件は全arm共通（レビューP1）。** `search_mode` / `decision_budget_ms` / **`time_budget_max_simulations`** / `cards` は因子ではなく比較の前提であり、armごとに変えられない（`check_shared_conditions`）。特に time-budgeted の探索上限は「どれだけ探索してよいか」の上限そのものなので、1 と 100,000 を比べた結果は探索量の違いであり1要因比較ではない。**実行前**（`check_plan`）と**集約時**（`compare_arms`）の両方で拒否する。
+- **計画値と実測値の照合（再レビューP1）。** 宣言だけでは足りない。`compare_arms` は各armの生の `matches.jsonl` 行の `time_budget_max_simulations` を読み、*そのarmの計画値*と一致することを必須にし、さらにarm間でも同一であることを確認する（`check_observed_conditions`）。`--run` を付けない**保存済みデータの集約経路**も同じ検査を通る。集約レポートにも `time_budget_max_simulations` を記録する。
 - **`cards` は実際に伝播する（レビューP2）。** 仕様キー `cards` は `paired_eval --cards` と集約器の `cards=` に渡され、レポートに条件が記録される。`none` / `verified_basic_2p`（`verified` も同義として正規化）のみ許可し、2人戦以外でのカードありと未知の条件は実行前に拒否する。**指定したのに無視して実行することはない。**
 - **1要因原則は全検索パラメータに適用する。** 制御armと比べて2つ以上変わる arm は拒否する（`changed_search_parameters` に差分を記録）。
 - **モード混在は従来どおり拒否する。** `simulation-capped` と `time-budgeted` を同じ表に混ぜられない。
@@ -133,7 +134,7 @@ python3 scripts/eval_ablation.py \
 | simulation-capped で `puct_prior_temp` を変更 | 実行（1ブロック4試合、`changed_search_parameters.puct_prior_temp = {control: 3.0, arm: 1.0}`、`effective_changed_search_parameters = ["puct_prior_temp"]`） |
 | time-budgeted で `mcts_tree_depth` を変更 | 有効な要因として受理（`effective_changed_search_parameters = ["mcts_tree_depth"]`） |
 
-### 7.1.2 共通条件と cards の実測（#169 再レビュー対応、2026-11-07）
+### 7.1.2 共通条件・cards・実測値照合（#169 再レビュー対応、2026-11-07）
 
 | 指定 | 結果 |
 |---|---|
@@ -142,6 +143,9 @@ python3 scripts/eval_ablation.py \
 | `cards: "verified"` を指定 | `paired_eval --cards verified_basic_2p` へ伝播し、出力 JSONL は `cards=verified_basic_2p`・`card_set_count=30`、レポートの `cards` も `verified_basic_2p` |
 | `cards` を 3人戦で指定 | **実行前に拒否**（`the verified pool supports two players only`） |
 | 未知の `cards` 値（`all_840`） | **実行前に拒否** |
+| **保存済みデータ**（`--run` なし）で control の JSONL が上限1、variant が100000、計画は両方100000 | **集約時に拒否**: `arm 'control': the matches records were produced with time_budget_max_simulations [1], but the plan says 100000` |
+| 同条件で両armの JSONL が上限100000 | 集約成功。レポートの `time_budget_max_simulations` は 100000 |
+| 1arm内で上限が混在、または行に上限フィールドが無い | 拒否（`do not match the declared experiment`） |
 
 ### 7.2 初期スモーク（2026-11-07 以前、PUCT 非対応時）
 

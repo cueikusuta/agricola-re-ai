@@ -6,7 +6,7 @@ from scripts.eval_ablation import check_plan, compare_arms, plan_arms
 
 
 def arm_rows(blocks=4, players=2, *, credit, seed_base=1000, replay="a",
-             search_mode="simulation-capped"):
+             search_mode="simulation-capped", search_cap=100000):
     """Rows for one arm.
 
     `credit(block, seat)` decides whether the candidate focus seat wins.
@@ -88,7 +88,7 @@ def arm_rows(blocks=4, players=2, *, credit, seed_base=1000, replay="a",
                     "search_mode": search_mode,
                     "search_budget_enforced": search_mode == "time-budgeted",
                     "mcts_simulations_cap": 64,
-                    "time_budget_max_simulations": 100000,
+                    "time_budget_max_simulations": search_cap,
                     "mcts_simulations_per_decision": 0.0,
                     "max_deadline_overshoot_ms": 0,
                     "max_search_elapsed_ms": 0,
@@ -826,6 +826,117 @@ class AblationSharedConditionTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "positive integer"):
             plan_arms(spec)
+
+
+class AblationObservedArtifactTests(unittest.TestCase):
+    """#169 re-review P1: the saved artifacts must match the declared plan.
+
+    The aggregation path (`--run` absent) reads existing matches files, so a
+    stale or hand-edited control run can claim any condition. These tests feed
+    rows straight into `compare_arms`, which is exactly what that path does.
+    """
+
+    def opts(self, **overrides):
+        result = options(candidate="puct", search_mode="time-budgeted")
+        result.update(overrides)
+        return result
+
+    def rows(self, search_cap, candidate="puct", baseline="random"):
+        rows = arm_rows(credit=always_wins, search_mode="time-budgeted",
+                        search_cap=search_cap)
+        for row in rows:
+            if row["arm_id"] == "candidate":
+                row["focus_policy"] = candidate
+                deadline = candidate in ("mcts", "puct")
+                row["mcts_deadline_active"] = deadline
+                row["deterministic_policy_selection"] = not deadline
+            else:
+                row["focus_policy"] = baseline
+                row["mcts_deadline_active"] = False
+                row["deterministic_policy_selection"] = True
+        return rows
+
+    def test_artifacts_with_a_cap_that_contradicts_the_plan_are_rejected(self):
+        # The plan says 100000 for both arms, but the stored control matches were
+        # produced with a cap of 1: different search volumes, same baseline rows.
+        with self.assertRaisesRegex(ValueError, "do not match the declared experiment"):
+            compare_arms(
+                {"control": self.rows(1), "variant": self.rows(100000)},
+                control="control",
+                per_arm_options={
+                    "control": self.opts(),
+                    "variant": self.opts(),
+                },
+                iterations=500,
+            )
+
+    def test_a_plan_that_lies_about_the_executed_cap_is_rejected(self):
+        # Both arms really ran with 100000 but the plan claims 1: the reverse
+        # direction must fail just as loudly.
+        with self.assertRaisesRegex(ValueError, "do not match the declared experiment"):
+            compare_arms(
+                {"control": self.rows(100000), "variant": self.rows(100000)},
+                control="control",
+                per_arm_options={
+                    "control": self.opts(time_budget_max_simulations=1),
+                    "variant": self.opts(time_budget_max_simulations=1),
+                },
+                iterations=500,
+            )
+
+    def test_a_single_arm_with_mixed_caps_is_rejected(self):
+        rows = self.rows(100000)
+        rows[0]["time_budget_max_simulations"] = 1
+        with self.assertRaisesRegex(ValueError, "do not match the declared experiment"):
+            compare_arms(
+                {"control": rows, "variant": self.rows(100000)},
+                control="control",
+                per_arm_options={"control": self.opts(), "variant": self.opts()},
+                iterations=500,
+            )
+
+    def test_an_artifact_without_the_cap_field_is_rejected(self):
+        rows = self.rows(100000)
+        for row in rows:
+            row.pop("time_budget_max_simulations")
+        with self.assertRaisesRegex(ValueError, "do not match the declared experiment"):
+            compare_arms(
+                {"control": rows, "variant": self.rows(100000)},
+                control="control",
+                per_arm_options={"control": self.opts(), "variant": self.opts()},
+                iterations=500,
+            )
+
+    def test_matching_artifacts_still_allow_a_one_factor_comparison(self):
+        report = compare_arms(
+            {"control": self.rows(100000), "explore": self.rows(100000)},
+            control="control",
+            per_arm_options={
+                "control": self.opts(),
+                "explore": self.opts(puct_c=3.0),
+            },
+            iterations=500,
+        )
+        by_arm = {row["arm"]: row for row in report["arms"]}
+        self.assertEqual(
+            by_arm["explore"]["changed_search_parameters"],
+            {"puct_c": {"control": 1.5, "arm": 3.0}},
+        )
+        self.assertEqual(report["time_budget_max_simulations"], 100000)
+
+    def test_a_simulation_capped_ablation_is_checked_too(self):
+        rows = arm_rows(credit=always_wins, search_cap=100000)
+        lying = arm_rows(credit=always_wins, search_cap=1)
+        with self.assertRaisesRegex(ValueError, "do not match the declared experiment"):
+            compare_arms(
+                {"control": lying, "variant": rows},
+                control="control",
+                per_arm_options={
+                    "control": options(),
+                    "variant": options(),
+                },
+                iterations=500,
+            )
 
 
 class AblationSpecificationTests(unittest.TestCase):

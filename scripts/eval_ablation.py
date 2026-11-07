@@ -261,6 +261,43 @@ def check_shared_conditions(
                 )
 
 
+def check_observed_conditions(
+    arms: dict[str, list[dict]], per_arm_options: dict[str, dict], control: str
+) -> None:
+    """Verify the artifacts themselves, not just the plan (#169 re-review P1).
+
+    `check_shared_conditions` compares declarations. The aggregation path reads
+    `matches.jsonl` files that may have been produced by an older or hand-edited
+    run, so the *rows* must also carry the search cap the plan declares. Without
+    this, a stored control run with a cap of 1 could be pooled with a variant run
+    at 100000 and still look like a one-factor comparison, as long as both share
+    the same baseline rows.
+    """
+    observed: dict[str, int] = {}
+    for label, rows in arms.items():
+        # A missing declaration is reported by the caller's own check; this
+        # function only compares declared plans against recorded artifacts.
+        if label not in per_arm_options:
+            continue
+        expected = per_arm_options[label]["time_budget_max_simulations"]
+        values = {row.get("time_budget_max_simulations") for row in rows}
+        if len(rows) == 0:
+            continue
+        if values != {expected}:
+            shown = sorted(values, key=lambda value: (value is None, str(value)))
+            raise ValueError(
+                f"arm {label!r}: the matches records were produced with "
+                f"time_budget_max_simulations {shown}, but the plan says {expected!r}; "
+                "the artifacts do not match the declared experiment"
+            )
+        observed[label] = expected
+    if len(set(observed.values())) > 1:
+        raise ValueError(
+            "arms ran with different time_budget_max_simulations: "
+            f"{observed} (control {control!r})"
+        )
+
+
 def check_plan(
     per_arm_options: dict[str, dict], control: str, *, arms: set[str] | frozenset[str]
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
@@ -361,6 +398,9 @@ def compare_arms(
     # assembled from artifacts written by an older or hand-edited plan must not
     # pool arms that ran different search caps, budgets or card conditions.
     check_shared_conditions(per_arm_options, control, arms=set(arms))
+    # Same rule for the saved artifacts: a re-aggregation without `--run` reads
+    # existing matches files, so the executed conditions come from the rows.
+    check_observed_conditions(arms, per_arm_options, control)
     if len(arms) < 2:
         raise ValueError("an ablation needs at least a control and one variant")
     if iterations < 100:
@@ -409,6 +449,9 @@ def compare_arms(
             "additional_action_space",
             "baseline",
             "decision_budget_ms",
+            # Re-aggregation compares the reports too: the cap is an experiment
+            # condition and must be one value across arms (#169 re-review P1).
+            "time_budget_max_simulations",
             # #164: a fixed-simulation arm and a fixed-wall-clock arm answer
             # different questions, so they may not share an ablation table.
             "search_mode",
@@ -513,6 +556,7 @@ def compare_arms(
         "seed_blocks": controls["seed_blocks"],
         "cards": controls.get("cards", "none"),
         "decision_budget_ms": controls["decision_budget_ms"],
+        "time_budget_max_simulations": controls.get("time_budget_max_simulations"),
         "search_mode": controls.get("search_mode", "simulation-capped"),
         "bootstrap_iterations": iterations,
         "bootstrap_seed": BOOTSTRAP_SEED,
