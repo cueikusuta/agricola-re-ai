@@ -257,9 +257,8 @@ impl Session {
         draft_json(self.draft()?, 0)
     }
 
-    /// Start a draft with an explicit ruleset. Missing direction or phase-order
-    /// parameters are rejected rather than defaulted, because those are
-    /// unconfirmed tournament conventions (see `docs/draft-protocol-m11.md`).
+    /// Start a draft using the project-adopted clockwise direction for both
+    /// kinds. The 7-7 phase order remains an explicit choice (#155).
     pub fn start_draft(&mut self, input: &Value) -> Result<(), String> {
         let mode = match input.get("mode").and_then(Value::as_str) {
             Some("deal_7") => DraftMode::Deal7,
@@ -302,7 +301,7 @@ impl Session {
                     set,
                     pool,
                     "test-fixture-v1".to_string(),
-                    format!("fixture-explicit-{}", mode.id()),
+                    format!("fixture-clockwise-v2-{}", mode.id()),
                 )
             }
             "verified_basic" => {
@@ -317,7 +316,7 @@ impl Session {
                     set,
                     pool,
                     format!("verified-basic-{players}p-v1"),
-                    format!("verified-basic-explicit-{}", mode.id()),
+                    format!("verified-basic-clockwise-v2-{}", mode.id()),
                 )
             }
             other => return Err(format!("unknown draft pool kind: {other}")),
@@ -743,8 +742,9 @@ fn draft_json(draft: &DraftWeb, viewer: usize) -> Result<Value, String> {
         "deck_version": &draft.setup.deck_version,
         // Public ruleset parameters, so a player can see which explicitly
         // chosen conventions the server is using. The direction choice is an
-        // undecided house rule (#155): it is echoed, never guessed.
+        // The clockwise passing rule is user-adopted, not a claim of official rules.
         "player_count": draft.setup.player_count,
+        "start_player": obs.start_player,
         "direction_occupation": direction(ruleset.direction_occupation),
         "direction_minor": direction(ruleset.direction_minor),
         "occupation_phase_first": ruleset.occupation_phase_first,
@@ -771,9 +771,8 @@ fn draft_json(draft: &DraftWeb, viewer: usize) -> Result<Value, String> {
 
 fn parse_direction(value: Option<&str>, field: &str) -> Result<Direction, String> {
     match value {
-        Some("left") => Ok(Direction::Left),
-        Some("right") => Ok(Direction::Right),
-        _ => Err(format!("{field} must be explicitly left or right")),
+        None | Some("right") => Ok(Direction::Right),
+        _ => Err(format!("{field} must be right (clockwise) for this ruleset")),
     }
 }
 
@@ -1314,7 +1313,7 @@ mod tests {
             session
                 .start_draft(&json!({
                     "mode":"draft_7_7","players":2,
-                    "direction_occupation":"left","direction_minor":"right"
+                    "direction_occupation":"right","direction_minor":"right"
                 }))
                 .is_err(),
             "7-7 needs an explicit phase order"
@@ -1322,7 +1321,7 @@ mod tests {
         session
             .start_draft(&json!({
                 "mode":"draft_7_7","players":2,"seed":3,
-                "direction_occupation":"left","direction_minor":"right",
+                "direction_occupation":"right","direction_minor":"right",
                 "occupation_phase_first":true
             }))
             .unwrap();
@@ -1335,7 +1334,7 @@ mod tests {
         session
             .start_draft(&json!({
                 "mode":"draft_10_7_simultaneous","players":2,"seed":9,
-                "direction_occupation":"left","direction_minor":"right"
+                "direction_occupation":"right","direction_minor":"right"
             }))
             .unwrap();
         for _ in 0..40 {
@@ -1379,7 +1378,7 @@ mod tests {
         session
             .start_draft(&json!({
                 "mode":"draft_7_7","players":2,"seed":3,
-                "direction_occupation":"left","direction_minor":"right",
+                "direction_occupation":"right","direction_minor":"right",
                 "occupation_phase_first":true
             }))
             .unwrap();
@@ -1482,7 +1481,7 @@ mod tests {
         session
             .start_draft(&json!({
                 "mode":"draft_7_7","players":2,"seed":606,
-                "direction_occupation":"left","direction_minor":"right",
+                "direction_occupation":"right","direction_minor":"right",
                 "occupation_phase_first":true
             }))
             .unwrap();
@@ -1525,7 +1524,7 @@ mod tests {
         session
             .start_draft(&json!({
                 "mode":"draft_7_7","players":2,"seed":1,
-                "direction_occupation":"left","direction_minor":"right",
+                "direction_occupation":"right","direction_minor":"right",
                 "occupation_phase_first":true
             }))
             .unwrap();
@@ -1542,14 +1541,14 @@ mod tests {
         assert!(session
             .start_draft(&json!({
                 "mode":"draft_10_7_simultaneous","players":2,"seed":1,
-                "direction_occupation":"left","direction_minor":"right",
+                "direction_occupation":"right","direction_minor":"right",
                 "pool":"verified_basic"
             }))
             .is_err());
         session
             .start_draft(&json!({
                 "mode":"draft_7_7","players":2,"seed":1,
-                "direction_occupation":"left","direction_minor":"right",
+                "direction_occupation":"right","direction_minor":"right",
                 "occupation_phase_first":true,"pool":"verified_basic"
             }))
             .unwrap();
@@ -1557,7 +1556,7 @@ mod tests {
         session
             .start_draft(&json!({
                 "mode":"draft_7_7","players":2,"seed":1,
-                "direction_occupation":"left","direction_minor":"right",
+                "direction_occupation":"right","direction_minor":"right",
                 "occupation_phase_first":true
             }))
             .unwrap();
@@ -1570,7 +1569,7 @@ mod tests {
         assert!(session
             .start_draft(&json!({
                 "mode":"draft_7_7","players":2,"seed":1,
-                "direction_occupation":"left","direction_minor":"right",
+                "direction_occupation":"right","direction_minor":"right",
                 "occupation_phase_first":true,"draft_ai":"not_a_baseline"
             }))
             .is_err());
@@ -1578,7 +1577,7 @@ mod tests {
             session
                 .start_draft(&json!({
                     "mode":"draft_7_7","players":2,"seed":11,
-                    "direction_occupation":"left","direction_minor":"right",
+                    "direction_occupation":"right","direction_minor":"right",
                     "occupation_phase_first":true,"draft_ai":ai
                 }))
                 .unwrap();
@@ -1594,7 +1593,7 @@ mod tests {
         session
             .start_draft(&json!({
                 "mode":"draft_7_7","players":2,"seed":707,
-                "direction_occupation":"left","direction_minor":"right",
+                "direction_occupation":"right","direction_minor":"right",
                 "occupation_phase_first":true,"pool":"verified_basic"
             }))
             .unwrap();
@@ -1783,8 +1782,8 @@ mod tests {
                 "mode": "draft_7_7",
                 "players": 2,
                 "seed": 5,
-                "direction_occupation": "left",
-                "direction_minor": "left",
+                "direction_occupation": "right",
+                "direction_minor": "right",
                 "occupation_phase_first": true,
                 "pool": "test_fixture",
                 "draft_ai": "random"
@@ -1800,7 +1799,7 @@ mod tests {
         session
             .start_draft(&json!({
                 "mode":"draft_7_7", "players":2, "seed":606,
-                "direction_occupation":"left", "direction_minor":"right",
+                "direction_occupation":"right", "direction_minor":"right",
                 "occupation_phase_first":true
             }))
             .unwrap();
