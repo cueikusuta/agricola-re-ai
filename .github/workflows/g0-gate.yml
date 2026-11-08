@@ -104,13 +104,13 @@ on:
         default: false
         required: true
       search_mode:
-        description: 'simulation-capped (reproducible) or time-budgeted'
+        description: 'G0 uses deterministic simulation-capped evaluation only'
         type: choice
-        options: ['simulation-capped', 'time-budgeted']
+        options: ['simulation-capped']
         default: 'simulation-capped'
         required: true
       decision_budget_ms:
-        description: 'Per-decision budget (time-budgeted mode only)'
+        description: 'Must be 0 for deterministic G0 (not a runtime budget)'
         type: number
         default: 0
         required: true
@@ -213,6 +213,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked --bin episode_inspect
+      # Default v4 artifact source is this run: no external run-id/repository.
       - uses: actions/download-artifact@v4
         with:
           pattern: episode-data-shard-*
@@ -270,7 +271,9 @@ jobs:
           test "$BLOCKS" -ge 4
           test "$CANDIDATE" != "$BASELINE"
           if [[ "$CARDS" != "none" ]]; then test "$PLAYERS" -eq 2; fi
-          if [[ "$SEARCH_MODE" == "time-budgeted" ]]; then test "$DECISION_BUDGET_MS" -gt 0; fi
+          # Fixed-seed reproducibility does not validate time-budgeted decisions.
+          test "$SEARCH_MODE" == "simulation-capped"
+          test "$DECISION_BUDGET_MS" -eq 0
           BLOCK_START=$(( BLOCKS * INDEX / 4 ))
           BLOCK_END=$(( BLOCKS * (INDEX + 1) / 4 ))
           COUNT=$(( BLOCK_END - BLOCK_START ))
@@ -302,14 +305,17 @@ jobs:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked --bin dataset_split
+      # Default v4 artifact source is this run: no external run-id/repository.
       - uses: actions/download-artifact@v4
         with:
           pattern: g0-matches-*
           path: results
+      # Default v4 artifact source is this run: no external run-id/repository.
       - uses: actions/download-artifact@v4
         with:
           name: g0-dataset
           path: gate
+      # Default v4 artifact source is this run: no external run-id/repository.
       - uses: actions/download-artifact@v4
         with:
           name: m8-evidence
@@ -334,6 +340,7 @@ jobs:
             --tests m8/m8-evidence/m8-evidence.json \
             --requirements docs/m8-evidence-requirements.json \
             --code-sha "$GITHUB_SHA" --run-url "$RUN_URL" \
+            --trusted-current-run \
             "${MATCHES[@]}" --out gate/checks.json
           python3 scripts/m8_evidence.py verify \
             --tests m8/m8-evidence/m8-evidence.json \
