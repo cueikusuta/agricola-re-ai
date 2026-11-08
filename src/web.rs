@@ -860,18 +860,33 @@ fn handle(mut stream: TcpStream, session: &mut Session, port: u16) -> Result<(),
         ),
     }
 }
+/// Start the local UI on the port from `AGRICOLA_WEB_PORT`, or 8787.
 pub fn serve(config: Config) -> Result<(), String> {
-    let port: u16 = std::env::var("AGRICOLA_WEB_PORT")
+    let port = std::env::var("AGRICOLA_WEB_PORT")
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(8787);
-    let listener = TcpListener::bind(("127.0.0.1", port)).map_err(|e| e.to_string())?;
+    serve_on(config, port)
+}
+
+/// Bind the loopback-only UI on `port` and serve until the process stops.
+///
+/// Port `0` asks the OS for a free port and prints the bound URL. Only
+/// loopback `Host`/`Origin` values for the bound port are accepted, so the
+/// boundary stays single-user and local regardless of the chosen port.
+pub fn serve_on(config: Config, port: u16) -> Result<(), String> {
+    let listener = TcpListener::bind(("127.0.0.1", port))
+        .map_err(|error| format!("failed to bind 127.0.0.1:{port}: {error}"))?;
+    let bound = listener
+        .local_addr()
+        .map_err(|error| error.to_string())?
+        .port();
     let mut session = Session::new(config)?;
-    println!("Agricola local UI: http://127.0.0.1:{port}/");
+    println!("Agricola local UI: http://127.0.0.1:{bound}/");
     for accepted in listener.incoming() {
         match accepted {
             Ok(stream) => {
-                if let Err(error) = handle(stream, &mut session, port) {
+                if let Err(error) = handle(stream, &mut session, bound) {
                     eprintln!("UI request error: {error}");
                 }
             }
