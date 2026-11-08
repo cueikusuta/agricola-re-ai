@@ -71,6 +71,8 @@
 | `place_on_round_spaces` | `good`, `amount` または `amounts`, `rounds`, `marker_kind`。以後のラウンドスペースに品物・しるしを置く。`rounds` は整数 / `"remaining"` / `"remaining_even"` / `"remaining_odd"` / 閾値表 |
 | `stack_goods_on_card` | `goods`（下から順）。カード上に品物を積む |
 | `take_top_good_from_card` | カード上の一番上の品物を得る |
+| `gain_matching_improvement` | `pairs`。対応する大進歩を所有していれば品物を得る |
+| `capacity(scope="card", per_type=True)` | カード上に種別ごとに家畜を収容 |
 | `count_as_field` | `amount`。カード自体を畑として数える |
 | `gain_each_with_at_least` | `goods`, `threshold`, `amount`。所持数が閾値以上の品物を各1つ得る |
 | `add_good_to_single_good_fields` | `amount`, `same_type`。品物がちょうど1つの畑へ同種を追加 |
@@ -153,6 +155,7 @@
 | `worker_on_space` | `space` | 自分の人物がそのスペースに置かれている |
 | `grain_harvested_at_least` | `n` | 畑フェイズで収穫した小麦が `n` 以上 |
 | `wood_rooms_built_at_least` | `n` | 木の部屋が `n` 部屋以上建設された |
+| `pasture_size` | `n` | 指定サイズの牧場がある（`A001` はちょうど1） |
 | `fenced_stable_count` | `n` | 柵内の厩が `n` 以上 |
 | `animal_count_at_most` | `animal`, `n` | 家畜数が `n` 以下 |
 

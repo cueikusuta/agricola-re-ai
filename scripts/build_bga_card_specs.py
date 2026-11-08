@@ -2266,19 +2266,78 @@ CARDS = {
             case("E048-wood", {"house": "wood"}, {"run_harvest": True}, {"food_delta": 0}),
         ],
     },
-    "E049": {
+    "A001": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play", [stable(1, wood_cost=0)],
+                   cond=[cond("pasture_size", n=1)],
+                   optional=True, decision="owner"),
+        ],
+        "notes": "May build 1 free stable, but only inside a pasture of exactly 1 farmyard space; pass left.",
+        "tests": [
+            case("A001-normal", {"pastures": [{"size": 1}], "stables": 0},
+                 {"play": "A001", "build": 1},
+                 {"stables_delta": 1, "wood_delta": 0}),
+            case("A001-not-triggered", {"pastures": [{"size": 2}], "stables": 0},
+                 {"play": "A001", "build": 1}, {"stables_delta": 0}),
+        ],
+    },
+    "A006": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play", [
+                special("gain_matching_improvement",
+                        pairs=[{"improvement": "well", "good": "stone"},
+                               {"improvement": "joinery", "good": "wood"},
+                               {"improvement": "pottery", "good": "clay"},
+                               {"improvement": "basketmakers_workshop", "good": "reed"}])]),
+        ],
+        "notes": "For each owned Well/Joinery/Pottery/Basketmaker's Workshop, gain 1 stone/wood/clay/reed; pass left.",
+        "tests": [
+            case("A006-normal", {"owned_majors": ["well", "pottery"]}, {"play": "A006"},
+                 {"stone_delta": 1, "clay_delta": 1}),
+            case("A006-zero", {"owned_majors": []}, {"play": "A006"}, {"stone_delta": 0}),
+        ],
+    },
+    "B008": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play",
+                   [exchange(give=[{"good": "grain", "amount": 1}],
+                             receive=[{"good": "vegetable", "amount": 1}])]),
+        ],
+        "notes": "Exchange 1 grain for 1 vegetable; pass left.",
+        "tests": [
+            case("B008-normal", {"grain": 1}, {"play": "B008"},
+                 {"grain_delta": -1, "vegetable_delta": 1}),
+            case("B008-not-triggered", {"grain": 0}, {"play": "B008"},
+                 {"grain_delta": 0, "vegetable_delta": 0}),
+        ],
+    },
+    "C010": {
         "post": "played_area",
         "effects": [
-            effect("after_room_construction", [gain("food", 1)],
-                   cond=[cond("any_player"), cond("wood_rooms_built_at_least", n=1)],
-                   freq="every_use", dur="permanent"),
+            effect("passive", [capacity(scope="house", person_capacity=1)],
+                   cond=[cond("room_count", n=4)],
+                   freq="always", dur="permanent", snap="live_state"),
         ],
-        "notes": "Each time any player builds at least 1 wood room, gain 1 food.",
+        "notes": "With 4 rooms the house holds 5 people.",
         "tests": [
-            case("E049-normal", {"wood_rooms_built": 2}, {"end_turn": True},
-                 {"food_delta": 1}),
-            case("E049-not-triggered", {"wood_rooms_built": 0}, {"end_turn": True},
-                 {"food_delta": 0}),
+            case("C010-normal", {"rooms": 4}, {"play": "C010"}, {"housing_capacity": 5}),
+            case("C010-not-triggered", {"rooms": 3}, {"play": "C010"},
+                 {"housing_capacity": 4}),
+        ],
+    },
+    "C011": {
+        "post": "played_area",
+        "effects": [
+            effect("passive", [capacity(scope="card", animal_capacity=1, per_type=True)],
+                   freq="always", dur="permanent", snap="live_state"),
+        ],
+        "notes": "The card holds up to 1 sheep, 1 wild boar and 1 cattle.",
+        "tests": [
+            case("C011-normal", {"occupations": 1}, {"play": "C011"},
+                 {"per_type_capacity": 1}),
         ],
     },
 }
