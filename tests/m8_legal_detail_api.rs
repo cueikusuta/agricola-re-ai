@@ -258,3 +258,299 @@ fn web_view_exposes_staged_detail_hints_and_available_spaces() {
     assert!(view["detail_hints"].is_object());
     assert!(view["detail_hints"]["farmland"]["plow_cells"].is_array());
 }
+
+// --- #109 follow-up: non-default legal details for the other detail spaces ---
+//
+// The original suite proved the fence case. These tests extend the same
+// property to plowing, sowing and animal placement: the engine accepts a legal
+// detail that `SimpleDetails` never proposes, and rejects an illegal variant of
+// the same shape without mutating state. This is what "the API can express every
+// legal detail" means in practice; it is still not an enumeration of the whole
+// space.
+
+/// Find a seed whose first revealed card is `card`, so that space is available.
+fn game_with_round_card(card: RoundCard) -> Game {
+    for seed in 0..2_000u64 {
+        let game = Game::new(Config {
+            players: 2,
+            seed,
+            additional_action_space_enabled: false,
+        });
+        if game.public.revealed.first() == Some(&card) {
+            return game;
+        }
+    }
+    panic!("no seed revealed {card:?} in round 1");
+}
+
+#[test]
+fn plow_detail_can_target_a_cell_the_default_policy_never_picks() {
+    use agricola_re_ai::model::Tile;
+
+    let mut game = Game::new(Config {
+        players: 2,
+        seed: 17,
+        additional_action_space_enabled: false,
+    });
+    assert!(game.available_spaces().contains(&Space::Farmland));
+    let player = game.public.active_player;
+    let observation = game.observation(player).unwrap();
+    let proposed = SimpleDetails
+        .produce(&observation, Space::Farmland)
+        .expect("default policy proposes a plow target");
+    let Detail::Plow { cell: default_cell } = proposed.detail else {
+        panic!("the default farmland detail is a plow");
+    };
+    // Any other empty, stable-free cell is legal too; the default policy only
+    // ever names the first one.
+    let other = (0..15)
+        .find(|&index| {
+            index != default_cell
+                && matches!(game.public.players[player].farm[index].tile, Tile::Empty)
+                && !game.public.players[player].farm[index].stable
+        })
+        .expect("a second empty cell exists");
+    let action = Action {
+        space: Space::Farmland,
+        detail: Detail::Plow { cell: other },
+    };
+    let before = game.state_hash();
+    game.validate_action(&action)
+        .expect("a non-default plow cell is legal");
+    assert_eq!(
+        game.state_hash(),
+        before,
+        "validation must not mutate state"
+    );
+    game.apply(action).expect("engine applies the chosen cell");
+    assert!(matches!(
+        game.public.players[player].farm[other].tile,
+        Tile::Field { crop: None, .. }
+    ));
+    game.validate().unwrap();
+}
+
+#[test]
+fn plow_detail_rejects_a_room_cell_atomically() {
+    let mut game = Game::new(Config {
+        players: 2,
+        seed: 17,
+        additional_action_space_enabled: false,
+    });
+    let before = game.state_hash();
+    let room = (0..15)
+        .find(|&index| {
+            !matches!(
+                game.public.players[game.public.active_player].farm[index].tile,
+                agricola_re_ai::model::Tile::Empty
+            )
+        })
+        .expect("the starting rooms are not empty");
+    let action = Action {
+        space: Space::Farmland,
+        detail: Detail::Plow { cell: room },
+    };
+    assert!(game.validate_action(&action).is_err());
+    assert!(game.apply(action).is_err());
+    assert_eq!(game.state_hash(), before);
+}
+
+#[test]
+fn sow_detail_can_choose_a_layout_the_default_policy_never_picks() {
+    use agricola_re_ai::engine::Plant;
+    use agricola_re_ai::model::{Crop, Tile};
+
+    let mut game = game_with_round_card(RoundCard::GrainUtilization);
+    let player = game.public.active_player;
+    // Two empty fields and one grain plus one vegetable: the default policy
+    // fills the lowest field with grain, so grain-in-the-second-field is outside
+    // its candidate set.
+    for cell in [1usize, 2] {
+        game.public.players[player].farm[cell].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+    }
+    game.public.players[player].supply.grain = 1;
+    game.public.players[player].supply.vegetable = 1;
+    let observation = game.observation(player).unwrap();
+    let proposed = SimpleDetails
+        .produce(&observation, Space::GrainUtilization)
+        .expect("default policy proposes a sowing");
+    let Detail::SowDetailed {
+        plantings: default_plantings,
+        ..
+    } = &proposed.detail
+    else {
+        panic!("the default grain-utilization detail is a detailed sowing");
+    };
+    let chosen = vec![
+        Plant {
+            cell: 1,
+            crop: Crop::Vegetable,
+        },
+        Plant {
+            cell: 2,
+            crop: Crop::Grain,
+        },
+    ];
+    assert_ne!(default_plantings, &chosen);
+    let action = Action {
+        space: Space::GrainUtilization,
+        detail: Detail::Sow {
+            plantings: chosen.clone(),
+            bake: 0,
+        },
+    };
+    game.validate_action(&action)
+        .expect("a non-default but legal sowing layout is accepted");
+    game.apply(action)
+        .expect("engine applies the chosen layout");
+    assert!(matches!(
+        game.public.players[player].farm[1].tile,
+        Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2
+        }
+    ));
+    assert!(matches!(
+        game.public.players[player].farm[2].tile,
+        Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 3
+        }
+    ));
+    game.validate().unwrap();
+}
+
+#[test]
+fn sow_detail_rejects_a_duplicate_or_non_field_cell() {
+    use agricola_re_ai::engine::Plant;
+    use agricola_re_ai::model::{Crop, Tile};
+
+    let mut game = game_with_round_card(RoundCard::GrainUtilization);
+    let player = game.public.active_player;
+    game.public.players[player].farm[1].tile = Tile::Field {
+        crop: None,
+        remaining: 0,
+    };
+    game.public.players[player].supply.grain = 2;
+    let before = game.state_hash();
+    for plantings in [
+        // The same field twice.
+        vec![
+            Plant {
+                cell: 1,
+                crop: Crop::Grain,
+            },
+            Plant {
+                cell: 1,
+                crop: Crop::Grain,
+            },
+        ],
+        // A room is not a field.
+        vec![Plant {
+            cell: 0,
+            crop: Crop::Grain,
+        }],
+    ] {
+        let action = Action {
+            space: Space::GrainUtilization,
+            detail: Detail::Sow { plantings, bake: 0 },
+        };
+        assert!(game.validate_action(&action).is_err());
+        assert!(game.apply(action).is_err());
+        assert_eq!(game.state_hash(), before);
+    }
+}
+
+#[test]
+fn animal_detail_can_place_stock_where_the_default_policy_never_does() {
+    use agricola_re_ai::engine::AnimalPlan;
+    use agricola_re_ai::model::{Animal, Tile};
+
+    let mut game = game_with_round_card(RoundCard::SheepMarket);
+    let player = game.public.active_player;
+    // Two stables and a one-cell pasture. The default policy takes the pet
+    // first, then the pasture, so "both sheep in stables" is outside its set.
+    let stables = (0..15)
+        .filter(|&index| {
+            matches!(game.public.players[player].farm[index].tile, Tile::Empty)
+                && !game.public.players[player].farm[index].stable
+        })
+        .take(2)
+        .collect::<Vec<_>>();
+    assert_eq!(stables.len(), 2, "two empty cells exist");
+    for stable in &stables {
+        game.public.players[player].farm[*stable].stable = true;
+    }
+    game.public
+        .animal_accumulations
+        .insert(Space::SheepMarket, 2);
+    game.public.players[player].pet = None;
+    let observation = game.observation(player).unwrap();
+    let proposed = SimpleDetails
+        .produce(&observation, Space::SheepMarket)
+        .expect("default policy proposes an animal placement");
+    let Detail::Animals(default_plan) = proposed.detail else {
+        panic!("the default sheep-market detail places animals");
+    };
+    let chosen = AnimalPlan {
+        animal: Animal::Sheep,
+        to_pastures: vec![],
+        to_stables: stables.clone(),
+        pet: false,
+        cook: 0,
+        discard: 0,
+    };
+    assert_ne!(default_plan, chosen);
+    let action = Action {
+        space: Space::SheepMarket,
+        detail: Detail::Animals(chosen),
+    };
+    game.validate_action(&action)
+        .expect("a stable-only placement is legal when capacity allows");
+    game.apply(action).expect("engine applies the placement");
+    for stable in &stables {
+        assert_eq!(
+            game.public.players[player].farm[*stable].stable_animal,
+            Some(Animal::Sheep)
+        );
+    }
+    game.validate().unwrap();
+}
+
+#[test]
+fn animal_detail_rejects_a_plan_that_exceeds_capacity() {
+    use agricola_re_ai::engine::AnimalPlan;
+    use agricola_re_ai::model::{Animal, Tile};
+
+    let mut game = game_with_round_card(RoundCard::SheepMarket);
+    let player = game.public.active_player;
+    let stable = (0..15)
+        .find(|&index| {
+            matches!(game.public.players[player].farm[index].tile, Tile::Empty)
+                && !game.public.players[player].farm[index].stable
+        })
+        .expect("an empty cell exists");
+    game.public.players[player].farm[stable].stable = true;
+    game.public
+        .animal_accumulations
+        .insert(Space::SheepMarket, 2);
+    let before = game.state_hash();
+    // Two sheep into one stable, which holds one.
+    let action = Action {
+        space: Space::SheepMarket,
+        detail: Detail::Animals(AnimalPlan {
+            animal: Animal::Sheep,
+            to_pastures: vec![],
+            to_stables: vec![stable, stable],
+            pet: false,
+            cook: 0,
+            discard: 0,
+        }),
+    };
+    assert!(game.validate_action(&action).is_err());
+    assert!(game.apply(action).is_err());
+    assert_eq!(game.state_hash(), before);
+}
