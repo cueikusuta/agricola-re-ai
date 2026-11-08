@@ -1,0 +1,30 @@
+name: BGA Card Spec Contract
+
+on:
+  pull_request:
+    paths:
+      - "data/bga-card-specs/**"
+      - "data/bga-card-tests/**"
+      - "schemas/bga-card-*.schema.json"
+      - "scripts/validate_bga_card_specs.py"
+      - "docs/card-catalog-ae-preliminary.csv"
+      - ".github/workflows/bga-card-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "data/bga-card-specs/**"
+      - "data/bga-card-tests/**"
+      - "schemas/bga-card-*.schema.json"
+      - "scripts/validate_bga_card_specs.py"
+      - "docs/card-catalog-ae-preliminary.csv"
+      - ".github/workflows/bga-card-contract.yml"
+
+jobs:
+  bga-spec-contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate BGA card-spec coverage and references
+        run: python3 scripts/validate_bga_card_specs.py

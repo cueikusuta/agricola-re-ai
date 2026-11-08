@@ -1,0 +1,516 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cueikusuta/agricola-re-ai/blob/main/schemas/bga-card-spec.schema.json",
+  "title": "BGA-reference Agricola card implementation contract",
+  "description": "One record per existing A-E card ID. Describes independently authored executable semantics, not verbatim card text. Official verification is a separate ledger.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "card_id",
+    "identity",
+    "bga",
+    "play",
+    "effects",
+    "post_play",
+    "review"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "card_id": {
+      "type": "string",
+      "pattern": "^[A-E][0-9]{3}$"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "name_ja",
+        "name_en"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "occupation",
+            "minor_improvement",
+            "multi_type"
+          ]
+        },
+        "name_ja": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name_en": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "bga": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "listed",
+        "playable",
+        "ban_status",
+        "base_2016",
+        "eligibility",
+        "references"
+      ],
+      "properties": {
+        "listed": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ]
+        },
+        "playable": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ]
+        },
+        "ban_status": {
+          "enum": [
+            "none",
+            "weak",
+            "strong",
+            "unknown"
+          ]
+        },
+        "base_2016": {
+          "enum": [
+            "yes",
+            "no",
+            "unknown"
+          ]
+        },
+        "eligibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "2",
+            "3",
+            "4"
+          ],
+          "properties": {
+            "2": {
+              "$ref": "#/$defs/tristate"
+            },
+            "3": {
+              "$ref": "#/$defs/tristate"
+            },
+            "4": {
+              "$ref": "#/$defs/tristate"
+            }
+          }
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "url",
+              "language",
+              "checked_on"
+            ],
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "language": {
+                "enum": [
+                  "ja",
+                  "en",
+                  "other"
+                ]
+              },
+              "checked_on": {
+                "type": "string",
+                "format": "date"
+              },
+              "page_version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "play": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "cost",
+        "prerequisites",
+        "printed_points"
+      ],
+      "properties": {
+        "action": {
+          "enum": [
+            "occupation",
+            "minor_improvement",
+            "major_improvement",
+            "special",
+            "unknown"
+          ]
+        },
+        "cost": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "null = unknown; [] = confirmed free",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "good",
+              "amount"
+            ],
+            "properties": {
+              "good": {
+                "type": "string",
+                "minLength": 1
+              },
+              "amount": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "prerequisites": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "null = unknown, [] = confirmed no prerequisites",
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        },
+        "printed_points": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "null = not yet checked; zero = confirmed zero"
+        },
+        "alternative_cost_notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "effects": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "description": "null = not yet captured; [] = confirmed no effect",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trigger",
+          "conditions",
+          "steps",
+          "optional",
+          "frequency",
+          "duration",
+          "snapshot",
+          "order"
+        ],
+        "properties": {
+          "trigger": {
+            "type": "string",
+            "minLength": 1
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/condition"
+            }
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/step"
+            }
+          },
+          "optional": {
+            "type": "boolean"
+          },
+          "frequency": {
+            "type": "string",
+            "minLength": 1
+          },
+          "duration": {
+            "type": "string",
+            "minLength": 1
+          },
+          "snapshot": {
+            "enum": [
+              "before_event",
+              "before_effect",
+              "live_state",
+              "after_event"
+            ]
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "decision_owner": {
+            "enum": [
+              "none",
+              "owner",
+              "affected_player",
+              "random",
+              "other"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "post_play": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "destination"
+      ],
+      "properties": {
+        "destination": {
+          "enum": [
+            "played_area",
+            "left_neighbor_hand",
+            "owner_hand",
+            "discard",
+            "other",
+            "unknown"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "unresolved_fields",
+        "test_case_ids"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "inventory_only",
+            "partial",
+            "bga_checked",
+            "needs_resolution",
+            "blocked"
+          ]
+        },
+        "unresolved_fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "test_case_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "checked_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checked_on": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "implementation_status": {
+          "enum": [
+            "not_started",
+            "in_progress",
+            "implemented",
+            "tested"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "tristate": {
+      "enum": [
+        "yes",
+        "no",
+        "unknown"
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "predicate",
+        "params"
+      ],
+      "properties": {
+        "predicate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "params": {
+          "type": "object"
+        },
+        "negate": {
+          "type": "boolean"
+        }
+      }
+    },
+    "expression": {
+      "oneOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "args"
+          ],
+          "properties": {
+            "op": {
+              "enum": [
+                "constant",
+                "resource_count",
+                "room_count",
+                "family_count",
+                "field_count",
+                "card_count",
+                "pasture_count",
+                "floor_div",
+                "add",
+                "subtract",
+                "multiply",
+                "min",
+                "max",
+                "custom"
+              ]
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object"
+                  }
+                ]
+              }
+            },
+            "snapshot": {
+              "enum": [
+                "before_event",
+                "before_effect",
+                "live_state",
+                "after_event"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "target",
+        "params"
+      ],
+      "properties": {
+        "operation": {
+          "enum": [
+            "gain_resource",
+            "spend_resource",
+            "gain_points",
+            "plow_field",
+            "build_stable",
+            "build_room",
+            "renovate",
+            "move_card",
+            "modify_capacity",
+            "discount_cost",
+            "grant_action",
+            "exchange",
+            "other"
+          ]
+        },
+        "target": {
+          "enum": [
+            "owner",
+            "left_neighbor",
+            "right_neighbor",
+            "all_other_players",
+            "selected_player",
+            "card",
+            "board",
+            "other"
+          ]
+        },
+        "params": {
+          "type": "object"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
