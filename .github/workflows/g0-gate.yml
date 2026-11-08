@@ -199,7 +199,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: g0-episode-shard-${{ matrix.shard }}
+          name: episode-data-shard-${{ matrix.shard }}
           path: results/episode-data-shard-${{ matrix.shard }}/
           if-no-files-found: warn
           retention-days: 30
@@ -215,7 +215,7 @@ jobs:
       - run: cargo build --release --locked --bin episode_inspect
       - uses: actions/download-artifact@v4
         with:
-          pattern: g0-episode-shard-*
+          pattern: episode-data-shard-*
           path: results
       - name: Cross-check shards and build one dataset report
         shell: bash
@@ -331,12 +331,12 @@ jobs:
             MATCHES+=(--matches "results/g0-matches-$index/matches.jsonl")
           done
           python3 scripts/m8_evidence.py checks \
-            --tests m8/m8-evidence.json \
+            --tests m8/m8-evidence/m8-evidence.json \
             --requirements docs/m8-evidence-requirements.json \
             --code-sha "$GITHUB_SHA" --run-url "$RUN_URL" \
             "${MATCHES[@]}" --out gate/checks.json
           python3 scripts/m8_evidence.py verify \
-            --tests m8/m8-evidence.json \
+            --tests m8/m8-evidence/m8-evidence.json \
             --requirements docs/m8-evidence-requirements.json \
             --checks gate/checks.json
       - name: Bind the checks to the evaluation artifact
