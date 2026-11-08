@@ -38,6 +38,7 @@ Game の完全な状態
 | `Game::validate_action(&Action)` | `src/engine.rs` | `self`を複製し、`apply_with_plans`を試す読み取り専用の事前検査。実行後の`self`は不変 |
 | `Game::preview_harvest(&Action, Option<&[FeedingPlan]>)` | `src/engine.rs` | 収穫直前の配置・畑収穫・指定給餌から`PublicState`を試算。最終的なゲーム確定・全繁殖選択を代替しない |
 | `Game::apply(action)` / `apply_with_harvest_policy` | `src/engine.rs` | 共通の状態遷移、必要な収穫処理。コミットされた行動はイベントに記録され、再演経路で検証される |
+| `Game::validate_free(player, &FreeAction)` | `src/engine.rs` | `self`をクローンして`apply_free`を実行する読み取り専用事前検証（#206）。成功・失敗を問わず元のゲーム/ログは不変 |
 | `Game::apply_free(player, FreeAction)` | `src/engine.rs` | フリーアクションをコピー上で実行・`validate()`した後に原子的に確定。失敗時は`self`を置換しない |
 
 **重要**：`validate_action`は読み取り専用だが、別のスナップショットで確認した詳細が、その後の状態で必ず合法とは限らない。確定時のエンジン検証を省かない。
@@ -58,7 +59,7 @@ Game の完全な状態
 
 **引き続き未実装または未完了**（#109のフォローアップとして別PRで扱う）:
 
-1. `Game::validate_free(&self, player, &FreeAction)`相当の公開・読み取り専用フリーアクション事前検査。現在は`apply_free`が原子的に拒否するが、実行前プレビューAPIが存在するとは主張しない。
+1. `Game::validate_free(&self, player, &FreeAction)`の読み取り専用事前検査は#206で追加。既存`apply_free`と同じ経路を共有する。APIからの入力UI連携・検査種類の拡充は引き続き別件とする。
 2. 畑・柵・種まき・部屋/厩・改築・家畜・フリーアクションの**横断的な合法/不正マトリクステスト**（給餌・繁殖は別プレビュー経路）。個別テストと網羅テストを混同しない。
 3. 家畜収容先、改善費用、給餌順、繁殖前配置換えなどの段階的ヒント拡充。ヒント強化は人間が入力できる合法詳細の集合を制限しない。
 4. 公式ルールの全状態・全詳細の形式的証明。各モードで1,000試合完走してもこれに代わらない。
