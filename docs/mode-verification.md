@@ -47,6 +47,8 @@ cargo build --release --locked --bin mode_verify
 
 `Mode-wide Simulator Verification` を手動実行する（`workflow_dispatch`）。
 
+**初回実行の制約**：GitHubは既定ブランチに存在するワークフローしか `workflow_dispatch` で公開しないため、このPRがmainへ統合されるまで手動実行できない。統合前にワークフロー定義と集約規則を検証するため、`pull_request`（`scripts/mode_verify_summary.py` / `tests/test_mode_verify_summary.py` / 本ワークフローに限定）で `aggregator` ジョブだけを実行する。試合を走らせる `verify` / `aggregate` は `workflow_dispatch` 限定のまま。
+
 - 入力：`seeds`（各モードの試合数、既定1,000）、`seed_start`、`policy`。
 - 6ジョブ（2/3/4人 × 追加タイルOFF/ON）が並列に走り、各モード同じseed範囲を使う。
 - 各ジョブは `games.jsonl` / `summary.json` をArtifactへ保存する。

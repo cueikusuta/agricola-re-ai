@@ -14,7 +14,16 @@ name: Mode-wide Simulator Verification
 # `aggregate` is fail closed: `scripts/mode_verify_summary.py` re-derives the
 # dispatched inputs, the six modes, every summary field and every per-game
 # record, so a missing, duplicated, empty or mismatched artifact set fails.
+# GitHub only exposes `workflow_dispatch` for workflows that exist on the
+# default branch, so the first dispatch is possible only after merge. The
+# pull_request trigger therefore validates the workflow file and the aggregation
+# rules before merge; the game jobs stay dispatch-only.
 on:
+  pull_request:
+    paths:
+      - 'scripts/mode_verify_summary.py'
+      - 'tests/test_mode_verify_summary.py'
+      - '.github/workflows/mode-verification.yml'
   workflow_dispatch:
     inputs:
       seeds:
@@ -52,6 +61,7 @@ jobs:
 
   verify:
     name: ${{ matrix.players }}P additional-tile-${{ matrix.extra }}
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -95,7 +105,7 @@ jobs:
 
   aggregate:
     name: Aggregate mode evidence
-    if: always()
+    if: always() && github.event_name == 'workflow_dispatch'
     needs: [aggregator, verify]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
