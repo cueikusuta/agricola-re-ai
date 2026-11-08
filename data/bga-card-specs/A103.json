@@ -37,54 +37,7 @@
     "prerequisites": [],
     "printed_points": 0
   },
-  "effects": [
-    {
-      "trigger": "after_worker_space",
-      "conditions": [
-        {
-          "predicate": "worker_space_used",
-          "params": {
-            "spaces": [
-              "fishing",
-              "traveling_players"
-            ]
-          }
-        }
-      ],
-      "steps": [
-        {
-          "operation": "other",
-          "target": "owner",
-          "params": {
-            "tiers": [
-              {
-                "taken_max": 1,
-                "good": "vegetable"
-              },
-              {
-                "taken_exact": 2,
-                "good": "grain"
-              },
-              {
-                "taken_min": 3,
-                "good": "reed"
-              }
-            ],
-            "amount": 1,
-            "mode": "positional_exact",
-            "kind": "gain_good_by_food_tier"
-          }
-        }
-      ],
-      "optional": false,
-      "frequency": "every_use",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none",
-      "notes": "The amount taken maps to exactly one tier; the cumulative alternative is unresolved."
-    }
-  ],
+  "effects": null,
   "post_play": {
     "destination": "played_area"
   },
@@ -97,11 +50,12 @@
       "A103-normal",
       "A103-boundary-two",
       "A103-boundary-three",
-      "A103-not-triggered"
+      "A103-not-triggered",
+      "A103-tier-contract-pending"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Taking 1/2/3+ food from a food accumulation space gains 1 vegetable/grain/reed. Encoded with the positional-exact leading reading; wiki usage note pairings conflict, so left unresolved."
+    "notes": "The relationship between 1/2/3+ food and vegetable/grain/reed is not settled by conflicting third-party descriptions. Fail closed: do not execute provisional tier logic until source confirmed."
   }
 }
