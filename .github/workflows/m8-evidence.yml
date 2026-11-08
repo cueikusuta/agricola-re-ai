@@ -1,0 +1,132 @@
+name: M8 evidence
+
+# Produce the attested M8 evidence the G0 gate needs (#108 rule expectations,
+# #109 legal detail API, observation non-interference, seed reproducibility).
+#
+# The four checks are derived from a real test run, not typed in:
+# `scripts/m8_evidence.py collect` reads one `cargo test` log per target and
+# fails closed on a missing, renamed, ignored or failing test. The evidence is
+# bound to this commit and this run URL; `scripts/m8_evidence.py checks` later
+# binds it to the evaluation matches bytes.
+#
+# Reusable: the G0 gate workflow calls this so the evidence is always produced
+# by the same steps at the same commit as the evaluation it attests.
+on:
+  workflow_dispatch:
+  # A reusable caller downloads the artifact from the same run directly.
+  # workflow_call.outputs must reference a job output, not an artifact name.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m8-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # One log per target, because the log name becomes the test target prefix.
+  M8_TARGETS: >-
+    rule_regressions
+    official_improvements
+    harvest_feeding
+    scoring_categories
+    variant_action_matrix
+    round_additional
+    farm_buildings
+    legal_invariants
+    m8_legal_detail_api
+    m8_observation_noninterference
+    m8_eval_reproducibility
+    m8_mcts_repro
+    integration_acceptance
+
+jobs:
+  evidence:
+    name: Derive checks from executed tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-test-v3
+          add-job-id-key: 'false'
+          cache-workspace-crates: 'true'
+          cache-on-failure: 'true'
+      - name: Run every required test target
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p m8-logs
+          status=0
+          for target in $M8_TARGETS; do
+            echo "::group::$target"
+            if ! cargo test --release --locked --test "$target" > "m8-logs/$target.log" 2>&1; then
+              echo "::error::$target reported a failure"
+              status=1
+            fi
+            tail -n 5 "m8-logs/$target.log" || true
+            echo "::endgroup::"
+          done
+          # Do not exit yet: the evidence file must record which tests failed.
+          echo "M8_TEST_STATUS=$status" >> "$GITHUB_ENV"
+      - name: Derive the evidence from the test logs
+        id: collect
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/m8_evidence.py collect \
+            --requirements docs/m8-evidence-requirements.json \
+            --log-dir m8-logs \
+            --code-sha "$GITHUB_SHA" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --trusted-current-run \
+            --command "cargo test --release --locked --test <target>" \
+            --out m8-evidence/m8-evidence.json
+      - name: Upload the M8 evidence and raw logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m8-evidence
+          path: |
+            m8-evidence/
+            m8-logs/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail closed when any required test did not pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${M8_TEST_STATUS:-1}" != "0" ]]; then
+            echo "at least one required test target failed" >&2
+            exit 1
+          fi
+          if [[ "${{ steps.collect.outcome }}" != "success" ]]; then
+            echo "evidence collection reported incomplete evidence" >&2
+            exit 1
+          fi
+      - name: Summarise the evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f m8-evidence/m8-evidence.json ]]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          data = json.loads(Path("m8-evidence/m8-evidence.json").read_text(encoding="utf-8"))
+          print("| check | required | passed | failed | missing |")
+          print("|---|---:|---:|---:|---:|")
+          for name, entry in data["checks"].items():
+              print(f"| `{name}` | {entry['required']} | {entry['passed']} | "
+                    f"{entry['failed']} | {entry['missing']} |")
+          print()
+          print(f"all_checks_ok: `{data['all_checks_ok']}`  ")
+          print(f"test_report_sha256: `{data['test_report_sha256']}`  ")
+          print(f"run: {data['run_url']}")
+          PY
+          else
+            echo "no evidence file was produced" >> "$GITHUB_STEP_SUMMARY"
+          fi
