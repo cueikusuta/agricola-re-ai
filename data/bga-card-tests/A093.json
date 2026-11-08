@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "A093",
+  "cases": [
+    {
+      "id": "A093-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1,
+        "grain": 1
+      },
+      "action": {
+        "build_rooms": 1,
+        "use_card": true
+      },
+      "expected": {
+        "wood_delta": -1,
+        "grain_delta": -1,
+        "family_growth_granted": true
+      }
+    },
+    {
+      "id": "A093-declined",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1,
+        "grain": 1
+      },
+      "action": {
+        "build_rooms": 1,
+        "use_card": false
+      },
+      "expected": {
+        "wood_delta": 0
+      }
+    }
+  ]
+}

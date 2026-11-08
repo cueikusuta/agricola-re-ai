@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A095",
+  "cases": [
+    {
+      "id": "A095-normal",
+      "scope": "effect_only",
+      "setup": {
+        "fishing_accumulation": 2
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "improvement_action_granted": true
+      }
+    },
+    {
+      "id": "A095-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "fishing_accumulation": 3
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "improvement_action_granted": false
+      }
+    }
+  ]
+}

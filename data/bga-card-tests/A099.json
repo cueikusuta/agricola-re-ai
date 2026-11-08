@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A099",
+  "cases": [
+    {
+      "id": "A099-normal",
+      "scope": "effect_only",
+      "setup": {
+        "pastures_at_least_3": 2
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 4
+      }
+    },
+    {
+      "id": "A099-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "pastures_at_least_3": 0
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    }
+  ]
+}

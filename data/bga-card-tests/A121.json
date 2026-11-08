@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "A121",
+  "cases": [
+    {
+      "id": "A121-normal",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0
+      },
+      "action": {
+        "play": "A121"
+      },
+      "expected": {
+        "clay_delta": 1
+      }
+    },
+    {
+      "id": "A121-lessons",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0
+      },
+      "action": {
+        "use_space": "lessons"
+      },
+      "expected": {
+        "clay_delta": 1
+      }
+    },
+    {
+      "id": "A121-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "clay_delta": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A101",
+  "cases": [
+    {
+      "id": "A101-normal",
+      "scope": "effect_only",
+      "setup": {
+        "cooking_improvements": 3
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 3
+      }
+    },
+    {
+      "id": "A101-zero",
+      "scope": "effect_only",
+      "setup": {
+        "cooking_improvements": 0
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    }
+  ]
+}

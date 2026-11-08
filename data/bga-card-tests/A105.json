@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "A105",
+  "cases": [
+    {
+      "id": "A105-normal",
+      "scope": "effect_only",
+      "setup": {
+        "field_tiles_gained": 2
+      },
+      "action": {
+        "plow": 2
+      },
+      "expected": {
+        "clay_delta": 2,
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "A105-zero",
+      "scope": "effect_only",
+      "setup": {
+        "field_tiles_gained": 0
+      },
+      "action": {
+        "plow": 0
+      },
+      "expected": {
+        "clay_delta": 0
+      }
+    }
+  ]
+}
