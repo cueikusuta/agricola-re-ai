@@ -118,6 +118,12 @@ def remaining_rounds():
     return {"op": "count", "args": ["remaining_rounds"]}
 
 
+def threshold_table(key, pairs):
+    args = ["threshold_table", key]
+    args.extend({"threshold": t, "amount": a} for t, a in pairs)
+    return {"op": "custom", "args": args}
+
+
 # --- effect helper -------------------------------------------------------
 def effect(
     trigger,
@@ -179,6 +185,14 @@ PREREQ = {
     "C036": [cond("occupation_count", n=1)],
     "C050": [cond("stable_count", n=3), cond("pasture_count", n=3)],
     "C058": [cond("occupation_count", n=1)],
+    "A013": [cond("house_is", house="wood"), cond("room_count", n=2)],
+    "A027": [cond("has_improvement", kind="fireplace"),
+             cond("has_improvement", kind="cooking_hearth")],
+    "A057": [cond("unused_farmyard_spaces_at_least", n=4)],
+    "B154": [cond("animal_count_less", animal="sheep", n=7)],
+    "C001": [cond("occupation_count", n=2)],
+    "C007": [cond("pasture_count", n=1)],
+    "C017": [cond("field_count", n=3)],
 }
 
 # --- curated card table --------------------------------------------------
@@ -815,6 +829,415 @@ CARDS = {
                  {"wood_delta": 3}),
             case("C004-zero", {"occupations_played": 0}, {"play": "C004"},
                  {"wood_delta": 0}),
+        ],
+    },
+    "A013": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("clay", 3)]),
+            effect("on_play", [renovate(free_building_resources=True)],
+                   optional=True, order=1, decision="owner"),
+        ],
+        "notes": "Gain 3 clay; immediately after, may renovate without paying building resources.",
+        "tests": [
+            case("A013-normal", {"clay": 0}, {"play": "A013", "renovate": True},
+                 {"clay_delta": 3, "house": "clay", "building_resources_spent": 0}),
+            case("A013-no-renovate", {"clay": 0}, {"play": "A013", "renovate": False},
+                 {"clay_delta": 3, "house": "wood"}),
+        ],
+    },
+    "A017": {
+        "post": "played_area",
+        "effects": [
+            effect("after_animal_accommodation", [plow(1)],
+                   cond=[cond("all_accumulated_animals_accommodated")],
+                   optional=True, freq="once_per_game", dur="permanent", decision="owner"),
+        ],
+        "notes": "Once: after accommodating all animals taken from an accumulation space, plow 1 field.",
+        "tests": [
+            case("A017-normal", {"animals_pending": 2, "capacity": 2},
+                 {"accommodate_accumulation_animals": True}, {"fields_delta": 1}),
+            case("A017-not-triggered", {"animals_pending": 2, "capacity": 1},
+                 {"accommodate_accumulation_animals": False}, {"fields_delta": 0}),
+            case("A017-once", {"already_used": True, "animals_pending": 2, "capacity": 2},
+                 {"accommodate_accumulation_animals": True}, {"fields_delta": 0}),
+        ],
+    },
+    "A027": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("wood", 2)]),
+            effect("on_play", [special("build_improvement",
+                                       options=["clay_oven", "stone_oven"],
+                                       cost=[{"good": "clay", "amount": 1},
+                                             {"good": "stone", "amount": 1}])],
+                   optional=True, order=1, decision="owner"),
+        ],
+        "notes": "Gain 2 wood; may immediately build Clay Oven or Stone Oven for 1 clay and 1 stone.",
+        "tests": [
+            case("A027-normal", {"wood": 0, "clay": 1, "stone": 1},
+                 {"play": "A027", "build": "clay_oven"},
+                 {"wood_delta": 2, "clay_delta": -1, "stone_delta": -1,
+                  "improvement_built": "clay_oven"}),
+            case("A027-declined", {"wood": 0}, {"play": "A027", "build": None},
+                 {"wood_delta": 2, "improvement_built": None}),
+        ],
+    },
+    "A056": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [exchange(give=[{"good": "wood", "amount": 2}],
+                             receive=[{"good": "food", "amount": 3}],
+                             return_to="accumulation_space")],
+                   cond=[cond("worker_space_used", spaces=["forest", "copse", "grove"])],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "After a wood accumulation space: may exchange 2 wood for 3 food and return the wood there.",
+        "tests": [
+            case("A056-normal", {"wood": 2}, {"use_space": "forest", "exchange": True},
+                 {"wood_delta": -2, "food_delta": 3, "space_wood_delta": 2}),
+            case("A056-not-triggered", {"wood": 2}, {"use_space": "clay_pit", "exchange": True},
+                 {"wood_delta": 0, "food_delta": 0}),
+        ],
+    },
+    "A057": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play",
+                   [gain("food", threshold_table("sheep", [(1, 2), (3, 3), (4, 4)]))]),
+            effect("on_play",
+                   [gain("food", threshold_table("cattle", [(1, 2), (2, 3), (3, 4)]))],
+                   order=1),
+        ],
+        "notes": "1/3/4+ sheep give 2/3/4 food and 1/2/3+ cattle give 2/3/4 food.",
+        "tests": [
+            case("A057-normal", {"sheep": 3, "cattle": 2}, {"play": "A057"},
+                 {"food_delta": 6}),
+            case("A057-boundary", {"sheep": 1, "cattle": 1}, {"play": "A057"},
+                 {"food_delta": 4}),
+            case("A057-zero", {"sheep": 0, "cattle": 0}, {"play": "A057"},
+                 {"food_delta": 0}),
+        ],
+    },
+    "A108": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [exchange(give=[{"good": "wood", "amount": 1}],
+                             receive=[{"good": "food", "amount": 2}],
+                             return_to="accumulation_space")],
+                   cond=[cond("worker_space_used", spaces=["forest", "copse", "grove"])],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "After a wood accumulation space: may exchange 1 wood for 2 food and return the wood there.",
+        "tests": [
+            case("A108-normal", {"wood": 1}, {"use_space": "copse", "exchange": True},
+                 {"wood_delta": -1, "food_delta": 2, "space_wood_delta": 1}),
+            case("A108-not-triggered", {"wood": 1}, {"use_space": "fishing", "exchange": True},
+                 {"wood_delta": 0, "food_delta": 0}),
+        ],
+    },
+    "A120": {
+        "post": "played_area",
+        "effects": [
+            effect("after_renovation",
+                   [special("place_on_round_spaces", good="clay", amount=2, rounds=5)],
+                   cond=[cond("house_is", house="wood", negate=True)],
+                   freq="once_per_game", dur="permanent",
+                   notes="once, when the house is no longer wooden"),
+            effect("round_start", [gain("clay", 2)],
+                   cond=[cond("round_space_has_placed_good", good="clay")],
+                   freq="every_round", dur="permanent", order=1),
+        ],
+        "notes": "Once the house is no longer wooden: place 2 clay on each of the next 5 round spaces and collect it at those round starts.",
+        "tests": [
+            case("A120-normal", {"house": "wood", "round": 5},
+                 {"renovate_to": "clay"},
+                 {"round_spaces_marked": 5, "placed_good": "clay", "placed_amount": 2}),
+            case("A120-round", {"placed_rounds": [6, 7]}, {"start_round": 6},
+                 {"clay_delta": 2}),
+            case("A120-not-triggered", {"house": "wood", "round": 5},
+                 {"renovate_to": "wood"}, {"round_spaces_marked": 0}),
+        ],
+    },
+    "A139": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [action("major_improvement", only="fireplace")]),
+            effect("after_worker_space", [gain("food", 1)],
+                   cond=[cond("worker_space_used", space="hollow")],
+                   freq="every_use", dur="permanent", order=1),
+        ],
+        "notes": "Gain a Major Improvement action restricted to a Fireplace; each Hollow use gives 1 food.",
+        "tests": [
+            case("A139-normal", {"food": 0}, {"play": "A139"},
+                 {"major_improvement_granted": True, "only": "fireplace"}),
+            case("A139-hollow", {"food": 0}, {"use_space": "hollow"}, {"food_delta": 1}),
+            case("A139-not-triggered", {"food": 0}, {"use_space": "forest"},
+                 {"food_delta": 0}),
+        ],
+    },
+    "B002": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play", [special("fence_pasture", spaces=1, wood_cost=0,
+                                       must_be_adjacent=True)]),
+        ],
+        "notes": "Immediately fence a 1-space pasture for free; it must touch an existing pasture; pass left.",
+        "tests": [
+            case("B002-normal", {"pastures": 1, "wood": 0}, {"play": "B002"},
+                 {"pastures_delta": 1, "wood_delta": 0,
+                  "post_play": "left_neighbor_hand"}),
+            case("B002-no-pasture", {"pastures": 0, "wood": 0}, {"play": "B002"},
+                 {"pastures_delta": 1, "wood_delta": 0}),
+        ],
+    },
+    "B105": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [special("gain_each_with_at_least",
+                                       goods=["food", "grain", "vegetable", "reed", "wood"],
+                                       threshold=2, amount=1)]),
+        ],
+        "notes": "Gain 1 of each of food, grain, vegetable, reed and wood that the owner already has at least 2 of.",
+        "tests": [
+            case("B105-normal", {"food": 2, "grain": 1, "vegetable": 3, "reed": 2, "wood": 0},
+                 {"play": "B105"},
+                 {"food_delta": 1, "grain_delta": 0, "vegetable_delta": 1,
+                  "reed_delta": 1, "wood_delta": 0}),
+            case("B105-zero", {"food": 0, "grain": 0, "vegetable": 0, "reed": 0, "wood": 0},
+                 {"play": "B105"}, {"food_delta": 0, "wood_delta": 0}),
+            case("B105-boundary", {"food": 2}, {"play": "B105"}, {"food_delta": 1}),
+        ],
+    },
+    "B117": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("wood", 1)]),
+            effect("after_work_phase", [gain("wood", 1)],
+                   cond=[cond("resource_greater_than", good="stone", than="clay")],
+                   freq="every_round", dur="permanent", order=1),
+        ],
+        "notes": "Gain 1 wood; after each work phase with more stone than clay in supply, gain 1 wood.",
+        "tests": [
+            case("B117-normal", {"wood": 0}, {"play": "B117"}, {"wood_delta": 1}),
+            case("B117-work-phase", {"stone": 3, "clay": 2}, {"end_work_phase": True},
+                 {"wood_delta": 1}),
+            case("B117-not-triggered", {"stone": 2, "clay": 2}, {"end_work_phase": True},
+                 {"wood_delta": 0}),
+        ],
+    },
+    "B141": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play",
+                   [choice(options=[
+                       {"kind": "exchange", "give": [{"good": "clay", "amount": 0}],
+                        "receive": [{"good": "grain", "amount": 1}]},
+                       {"kind": "exchange", "give": [{"good": "clay", "amount": 1}],
+                        "receive": [{"good": "grain", "amount": 2}]},
+                       {"kind": "exchange", "give": [{"good": "clay", "amount": 3}],
+                        "receive": [{"good": "grain", "amount": 3}]},
+                   ])],
+                   optional=True, decision="owner"),
+            effect("passive", [special("count_as_field", amount=1)],
+                   freq="always", dur="permanent", snap="live_state", order=1),
+        ],
+        "notes": "Exchange 0/1/3 clay for 1/2/3 grain; the card itself counts as 1 field.",
+        "tests": [
+            case("B141-normal", {"clay": 3}, {"play": "B141", "choose": 3},
+                 {"clay_delta": -3, "grain_delta": 3, "field_count_delta": 1}),
+            case("B141-free", {"clay": 0}, {"play": "B141", "choose": 0},
+                 {"clay_delta": 0, "grain_delta": 1}),
+            case("B141-not-triggered", {"clay": 3}, {"play": "B141", "choose": None},
+                 {"clay_delta": 0, "grain_delta": 0}),
+        ],
+    },
+    "B148": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("sheep", 1)]),
+            effect("passive", [capacity(scope="occupation", animal="sheep", animal_capacity=1)],
+                   freq="always", dur="permanent", snap="live_state", order=1),
+        ],
+        "notes": "Gain 1 sheep; each occupation in front of the owner holds 1 sheep.",
+        "tests": [
+            case("B148-normal", {"sheep": 0}, {"play": "B148"}, {"sheep_delta": 1}),
+            case("B148-capacity", {"occupations_played": 3}, {"play": "B148"},
+                 {"sheep_capacity": 3}),
+        ],
+    },
+    "B151": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("stone", 1)]),
+            effect("passive", [special("ignore_occupation", except_space="meeting_place")],
+                   cond=[cond("house_is", house="wood"), cond("room_count", n=2)],
+                   freq="always", dur="permanent", snap="live_state", order=1),
+        ],
+        "notes": "Gain 1 stone; while living in a 2-room wooden house all action spaces except Meeting Place count as unoccupied.",
+        "tests": [
+            case("B151-normal", {"stone": 0}, {"play": "B151"}, {"stone_delta": 1}),
+            case("B151-passive", {"house": "wood", "rooms": 2, "space_occupied": True},
+                 {"use_space": "forest"}, {"action_allowed": True}),
+            case("B151-not-triggered", {"house": "wood", "rooms": 3, "space_occupied": True},
+                 {"use_space": "forest"}, {"action_allowed": False}),
+        ],
+    },
+    "B154": {
+        "post": "played_area",
+        "effects": [
+            effect("after_animal_acquisition", [points(3), gain("food", 2)],
+                   cond=[cond("animal_count_at_least", animal="sheep", n=7)],
+                   freq="once_per_game", dur="permanent"),
+        ],
+        "notes": "Playable only with fewer than 7 sheep; once at 7 sheep gain 3 points and 2 food.",
+        "tests": [
+            case("B154-normal", {"sheep": 6}, {"acquire_sheep": 1},
+                 {"points_delta": 3, "food_delta": 2}),
+            case("B154-boundary", {"sheep": 7}, {"acquire_sheep": 0},
+                 {"points_delta": 3, "food_delta": 2}),
+            case("B154-not-triggered", {"sheep": 5}, {"acquire_sheep": 1},
+                 {"points_delta": 0, "food_delta": 0}),
+            case("B154-once", {"sheep": 7, "already_scored": True}, {"acquire_sheep": 1},
+                 {"points_delta": 0, "food_delta": 0}),
+        ],
+    },
+    "C001": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play", [special("rebuild_fences", add_up_to=3, keep_animals=True)]),
+        ],
+        "notes": "Raze all fences, add up to 3 fences from supply and rebuild; animals are kept; pass left.",
+        "tests": [
+            case("C001-normal", {"fences_built": 5, "fences_in_supply": 4}, {"play": "C001"},
+                 {"fences_built": 8, "fences_in_supply": 1, "animals_lost": 0}),
+            case("C001-boundary", {"fences_built": 2, "fences_in_supply": 1}, {"play": "C001"},
+                 {"fences_built": 3, "fences_in_supply": 0}),
+        ],
+    },
+    "C002": {
+        "post": "left_neighbor_hand",
+        "effects": [effect("on_play", [stable(1, wood_cost=0)])],
+        "notes": "Build 1 stable for free (the card cost is still paid); pass left.",
+        "tests": [
+            case("C002-normal", {"stables": 0, "wood": 0}, {"play": "C002"},
+                 {"stables_delta": 1, "wood_delta": 0,
+                  "post_play": "left_neighbor_hand"}),
+        ],
+    },
+    "C005": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play", [gain("clay", per(count("clay_room"), 1)),
+                               gain("clay", per(count("improvement"), 1))]),
+        ],
+        "notes": "Gain 1 clay per clay room and 1 clay per major improvement owned; pass left.",
+        "tests": [
+            case("C005-normal", {"clay_rooms": 2, "major_improvements": 1},
+                 {"play": "C005"}, {"clay_delta": 3}),
+            case("C005-zero", {"clay_rooms": 0, "major_improvements": 0},
+                 {"play": "C005"}, {"clay_delta": 0}),
+        ],
+    },
+    "C007": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play",
+                   [choice(options=[{"kind": "gain", "good": "food", "amount": 3},
+                                    {"kind": "gain", "good": "food",
+                                     "amount": per(count("sheep"), 1)}])],
+                   optional=True, decision="owner"),
+        ],
+        "notes": "Gain 3 food or 1 food per sheep owned (sheep are kept); pass left.",
+        "tests": [
+            case("C007-flat", {"sheep": 1}, {"play": "C007", "choose": "flat"},
+                 {"food_delta": 3, "sheep_delta": 0}),
+            case("C007-per-sheep", {"sheep": 4}, {"play": "C007", "choose": "per_sheep"},
+                 {"food_delta": 4, "sheep_delta": 0}),
+            case("C007-zero-sheep", {"sheep": 0}, {"play": "C007", "choose": "per_sheep"},
+                 {"food_delta": 0}),
+        ],
+    },
+    "C008": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play", [special("add_good_to_single_good_fields",
+                                       amount=1, same_type=True)]),
+        ],
+        "notes": "Each field holding exactly 1 good immediately gets 1 more good of the same type; pass left.",
+        "tests": [
+            case("C008-normal", {"fields_with_one_good": 2}, {"play": "C008"},
+                 {"goods_added": 2}),
+            case("C008-zero", {"fields_with_one_good": 0}, {"play": "C008"},
+                 {"goods_added": 0}),
+        ],
+    },
+    "C017": {
+        "post": "played_area",
+        "effects": [effect("on_play", [plow(1, adjacent=False)])],
+        "notes": "Immediately plow 1 field; it needs no adjacency to another field.",
+        "tests": [
+            case("C017-normal", {"fields": 3}, {"play": "C017"},
+                 {"fields_delta": 1, "adjacency_required": False}),
+        ],
+    },
+    "C026": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("food", 2)]),
+            effect("after_worker_space", [action("bake_bread")],
+                   cond=[cond("worker_space_used", spaces=["farmland", "cultivation"])],
+                   freq="every_use", dur="permanent", order=1),
+        ],
+        "notes": "Gain 2 food; after Farmland or Cultivation get an additional Bake Bread action.",
+        "tests": [
+            case("C026-normal", {"food": 0}, {"play": "C026"}, {"food_delta": 2}),
+            case("C026-bake", {"bread_oven": True}, {"use_space": "farmland"},
+                 {"bake_bread_granted": True}),
+            case("C026-not-triggered", {"bread_oven": True}, {"use_space": "forest"},
+                 {"bake_bread_granted": False}),
+        ],
+    },
+    "C083": {
+        "post": "played_area",
+        "effects": [effect("on_play", [gain("cattle", 2)])],
+        "notes": "Gain 2 cattle on play; the card prints -3 points.",
+        "tests": [
+            case("C083-normal", {"cattle": 0}, {"play": "C083"}, {"cattle_delta": 2}),
+            case("C083-capacity-full", {"cattle": 0, "free_cattle_capacity": 0},
+                 {"play": "C083"}, {"cattle_delta": 0, "play_rejected": True}),
+        ],
+    },
+    "C086": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("grain", 1)]),
+            effect("passive", [capacity(scope="grain_in_supply", animal_capacity=1,
+                                        any_type=True)],
+                   freq="always", dur="permanent", snap="live_state", order=1),
+        ],
+        "notes": "Gain 1 grain; each grain in supply can hold 1 animal of any type.",
+        "tests": [
+            case("C086-normal", {"grain": 0}, {"play": "C086"}, {"grain_delta": 1}),
+            case("C086-capacity", {"grain": 3}, {"play": "C086"}, {"animal_capacity": 3}),
+        ],
+    },
+    "C095": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [special("build_improvement", options=["basketmakers_workshop"],
+                                       cost=[{"good": "stone", "amount": 1},
+                                             {"good": "reed", "amount": 1}])]),
+        ],
+        "notes": "Immediately build the Basketmaker's Workshop major improvement for 1 stone and 1 reed.",
+        "tests": [
+            case("C095-normal", {"stone": 1, "reed": 1}, {"play": "C095"},
+                 {"stone_delta": -1, "reed_delta": -1,
+                  "improvement_built": "basketmakers_workshop"}),
+            case("C095-not-triggered", {"stone": 0, "reed": 1}, {"play": "C095"},
+                 {"improvement_built": None}),
         ],
     },
 }

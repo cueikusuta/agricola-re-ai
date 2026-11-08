@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "A108",
+  "cases": [
+    {
+      "id": "A108-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1
+      },
+      "action": {
+        "use_space": "copse",
+        "exchange": true
+      },
+      "expected": {
+        "wood_delta": -1,
+        "food_delta": 2,
+        "space_wood_delta": 1
+      }
+    },
+    {
+      "id": "A108-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1
+      },
+      "action": {
+        "use_space": "fishing",
+        "exchange": true
+      },
+      "expected": {
+        "wood_delta": 0,
+        "food_delta": 0
+      }
+    }
+  ]
+}

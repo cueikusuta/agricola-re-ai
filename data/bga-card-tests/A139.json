@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "card_id": "A139",
+  "cases": [
+    {
+      "id": "A139-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "A139"
+      },
+      "expected": {
+        "major_improvement_granted": true,
+        "only": "fireplace"
+      }
+    },
+    {
+      "id": "A139-hollow",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "use_space": "hollow"
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "A139-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

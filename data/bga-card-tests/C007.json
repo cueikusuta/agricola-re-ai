@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "card_id": "C007",
+  "cases": [
+    {
+      "id": "C007-flat",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 1
+      },
+      "action": {
+        "play": "C007",
+        "choose": "flat"
+      },
+      "expected": {
+        "food_delta": 3,
+        "sheep_delta": 0
+      }
+    },
+    {
+      "id": "C007-per-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 4
+      },
+      "action": {
+        "play": "C007",
+        "choose": "per_sheep"
+      },
+      "expected": {
+        "food_delta": 4,
+        "sheep_delta": 0
+      }
+    },
+    {
+      "id": "C007-zero-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 0
+      },
+      "action": {
+        "play": "C007",
+        "choose": "per_sheep"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "C095",
+  "cases": [
+    {
+      "id": "C095-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 1,
+        "reed": 1
+      },
+      "action": {
+        "play": "C095"
+      },
+      "expected": {
+        "stone_delta": -1,
+        "reed_delta": -1,
+        "improvement_built": "basketmakers_workshop"
+      }
+    },
+    {
+      "id": "C095-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 0,
+        "reed": 1
+      },
+      "action": {
+        "play": "C095"
+      },
+      "expected": {
+        "improvement_built": null
+      }
+    }
+  ]
+}

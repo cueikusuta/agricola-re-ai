@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "B117",
+  "cases": [
+    {
+      "id": "B117-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0
+      },
+      "action": {
+        "play": "B117"
+      },
+      "expected": {
+        "wood_delta": 1
+      }
+    },
+    {
+      "id": "B117-work-phase",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 3,
+        "clay": 2
+      },
+      "action": {
+        "end_work_phase": true
+      },
+      "expected": {
+        "wood_delta": 1
+      }
+    },
+    {
+      "id": "B117-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 2,
+        "clay": 2
+      },
+      "action": {
+        "end_work_phase": true
+      },
+      "expected": {
+        "wood_delta": 0
+      }
+    }
+  ]
+}

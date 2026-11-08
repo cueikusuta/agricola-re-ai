@@ -27,6 +27,9 @@
 | `after_animal_acquisition` | 家畜を取得した後 | 所有者 |
 | `when_buying` | 進歩・部屋・改築の支払い時（割引の適用） | 所有者 |
 | `end_scoring` | 最終得点計算時 | 所有者（他プレイヤーに及ぶ場合は `target`） |
+| `after_animal_accommodation` | 累積スペースから得た家畜を農場に収容した後 | 所有者 |
+| `after_work_phase` | 労働フェイズ終了時 | 所有者 |
+| `after_renovation` | 改築後（`house_is` + `negate` で「木の家でなくなった」を表す） | 所有者 |
 
 ## 原子操作（`effects[].steps[].operation`）
 
@@ -54,8 +57,15 @@
 |---|---|
 | `choice` | `options` から1つを選ぶ。選択者は `decision_owner` |
 | `substitute_cost` | `material_from` / `material_to` / `scope`。支払い材料の置換権限 |
-| `ignore_occupation` | `space`, `occupied_by_others`。占有されていても使える権限 |
+| `ignore_occupation` | `space`, `occupied_by_others`, `except_space`。占有されていても使える権限 |
 | `forbid_renovation` | 以後の改築を禁止する継続効果 |
+| `build_improvement` | `options`（カード名配列）, `cost`。指定コストで大進歩を建設 |
+| `fence_pasture` | `spaces`, `wood_cost`, `must_be_adjacent`。柵で牧場を作る |
+| `rebuild_fences` | `add_up_to`, `keep_animals`。全柵を撤去して建て直す |
+| `place_on_round_spaces` | `good`, `amount`, `rounds`。以後のラウンドスペースに品物を置く |
+| `count_as_field` | `amount`。カード自体を畑として数える |
+| `gain_each_with_at_least` | `goods`, `threshold`, `amount`。所持数が閾値以上の品物を各1つ得る |
+| `add_good_to_single_good_fields` | `amount`, `same_type`。品物がちょうど1つの畑へ同種を追加 |
 
 ## 数量式（`amount` / `points` に入る式木）
 
@@ -69,6 +79,7 @@
 | `if_else` | `[cond_expr, a, b]` | 条件式で分岐 |
 | `played_on_space` | `[space]` | そのカードを出したアクションスペース |
 | `player_count_table` | `[{map}]` | 人数別の値 |
+| `custom` | `["threshold_table", key, {threshold, amount}...]` | 閾値表。所持数が閾値以上なら対応する値（`A057` など） |
 
 ### カウント源（`count` / `per` の `source`）
 
@@ -76,6 +87,7 @@
 `stable` `room` `clay_room` `person` `occupation` `improvement` `major_improvement_bottom_row`
 `person_on_accumulation_space` `hand_occupation_count` `remaining_rounds` `fence`
 `vegetable_taken_from_field` `sheep` `wild_boar` `cattle` `completed_harvest`
+`grain_in_supply` `unused_farmyard_space`
 
 ## 条件（`effects[].conditions[]`）
 
@@ -105,6 +117,12 @@
 | `declined_improvement` | `kind`（`minor` / `major`） | 進歩アクションを使わなかった |
 | `sow_unconditional` | — | 制約のない「種をまく」アクション |
 | `raw_text` | `text` | 上記で表現できない前提条件。原文の要約を保持し、`review.status` を `needs_resolution` にする |
+| `has_improvement` | `kind` | 指定の進歩を所有している |
+| `all_accumulated_animals_accommodated` | — | 累積スペースから得た家畜を全て収容できた |
+| `round_space_has_placed_good` | `good` | 対象ラウンドスペースに置かれた品物が残っている |
+| `resource_greater_than` | `good`, `than` | ストックの `good` が `than` より多い |
+| `unused_farmyard_spaces_at_least` | `n` | 未使用の農場スペースが `n` 以上 |
+| `animal_count_less` | `animal`, `n` | 家畜数が `n` 未満 |
 
 ## 発動頻度・持続・状態参照
 

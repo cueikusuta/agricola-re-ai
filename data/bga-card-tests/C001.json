@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "C001",
+  "cases": [
+    {
+      "id": "C001-normal",
+      "scope": "effect_only",
+      "setup": {
+        "fences_built": 5,
+        "fences_in_supply": 4
+      },
+      "action": {
+        "play": "C001"
+      },
+      "expected": {
+        "fences_built": 8,
+        "fences_in_supply": 1,
+        "animals_lost": 0
+      }
+    },
+    {
+      "id": "C001-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "fences_built": 2,
+        "fences_in_supply": 1
+      },
+      "action": {
+        "play": "C001"
+      },
+      "expected": {
+        "fences_built": 3,
+        "fences_in_supply": 0
+      }
+    }
+  ]
+}

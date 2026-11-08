@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "B105",
+  "cases": [
+    {
+      "id": "B105-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2,
+        "grain": 1,
+        "vegetable": 3,
+        "reed": 2,
+        "wood": 0
+      },
+      "action": {
+        "play": "B105"
+      },
+      "expected": {
+        "food_delta": 1,
+        "grain_delta": 0,
+        "vegetable_delta": 1,
+        "reed_delta": 1,
+        "wood_delta": 0
+      }
+    },
+    {
+      "id": "B105-zero",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0,
+        "grain": 0,
+        "vegetable": 0,
+        "reed": 0,
+        "wood": 0
+      },
+      "action": {
+        "play": "B105"
+      },
+      "expected": {
+        "food_delta": 0,
+        "wood_delta": 0
+      }
+    },
+    {
+      "id": "B105-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2
+      },
+      "action": {
+        "play": "B105"
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    }
+  ]
+}

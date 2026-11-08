@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "B148",
+  "cases": [
+    {
+      "id": "B148-normal",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 0
+      },
+      "action": {
+        "play": "B148"
+      },
+      "expected": {
+        "sheep_delta": 1
+      }
+    },
+    {
+      "id": "B148-capacity",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 3
+      },
+      "action": {
+        "play": "B148"
+      },
+      "expected": {
+        "sheep_capacity": 3
+      }
+    }
+  ]
+}

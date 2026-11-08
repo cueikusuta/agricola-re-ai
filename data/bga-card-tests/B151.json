@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "B151",
+  "cases": [
+    {
+      "id": "B151-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 0
+      },
+      "action": {
+        "play": "B151"
+      },
+      "expected": {
+        "stone_delta": 1
+      }
+    },
+    {
+      "id": "B151-passive",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "rooms": 2,
+        "space_occupied": true
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "action_allowed": true
+      }
+    },
+    {
+      "id": "B151-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "rooms": 3,
+        "space_occupied": true
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "action_allowed": false
+      }
+    }
+  ]
+}

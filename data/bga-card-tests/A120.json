@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "card_id": "A120",
+  "cases": [
+    {
+      "id": "A120-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "round": 5
+      },
+      "action": {
+        "renovate_to": "clay"
+      },
+      "expected": {
+        "round_spaces_marked": 5,
+        "placed_good": "clay",
+        "placed_amount": 2
+      }
+    },
+    {
+      "id": "A120-round",
+      "scope": "effect_only",
+      "setup": {
+        "placed_rounds": [
+          6,
+          7
+        ]
+      },
+      "action": {
+        "start_round": 6
+      },
+      "expected": {
+        "clay_delta": 2
+      }
+    },
+    {
+      "id": "A120-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "round": 5
+      },
+      "action": {
+        "renovate_to": "wood"
+      },
+      "expected": {
+        "round_spaces_marked": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "card_id": "A120",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "レンガ大工",
+    "name_en": "Clay Hut Builder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3305",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_renovation",
+      "conditions": [
+        {
+          "predicate": "house_is",
+          "params": {
+            "house": "wood",
+            "negate": true
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "clay",
+            "amount": 2,
+            "rounds": 5
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "once, when the house is no longer wooden"
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "round_space_has_placed_good",
+          "params": {
+            "good": "clay"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A120-normal",
+      "A120-round",
+      "A120-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Once the house is no longer wooden: place 2 clay on each of the next 5 round spaces and collect it at those round starts."
+  }
+}

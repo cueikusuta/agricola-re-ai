@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "C008",
+  "cases": [
+    {
+      "id": "C008-normal",
+      "scope": "effect_only",
+      "setup": {
+        "fields_with_one_good": 2
+      },
+      "action": {
+        "play": "C008"
+      },
+      "expected": {
+        "goods_added": 2
+      }
+    },
+    {
+      "id": "C008-zero",
+      "scope": "effect_only",
+      "setup": {
+        "fields_with_one_good": 0
+      },
+      "action": {
+        "play": "C008"
+      },
+      "expected": {
+        "goods_added": 0
+      }
+    }
+  ]
+}

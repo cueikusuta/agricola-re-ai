@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "card_id": "C005",
+  "cases": [
+    {
+      "id": "C005-normal",
+      "scope": "effect_only",
+      "setup": {
+        "clay_rooms": 2,
+        "major_improvements": 1
+      },
+      "action": {
+        "play": "C005"
+      },
+      "expected": {
+        "clay_delta": 3
+      }
+    },
+    {
+      "id": "C005-zero",
+      "scope": "effect_only",
+      "setup": {
+        "clay_rooms": 0,
+        "major_improvements": 0
+      },
+      "action": {
+        "play": "C005"
+      },
+      "expected": {
+        "clay_delta": 0
+      }
+    }
+  ]
+}
