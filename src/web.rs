@@ -772,7 +772,9 @@ fn draft_json(draft: &DraftWeb, viewer: usize) -> Result<Value, String> {
 fn parse_direction(value: Option<&str>, field: &str) -> Result<Direction, String> {
     match value {
         None | Some("right") => Ok(Direction::Right),
-        _ => Err(format!("{field} must be right (clockwise) for this ruleset")),
+        _ => Err(format!(
+            "{field} must be right (clockwise) for this ruleset"
+        )),
     }
 }
 
