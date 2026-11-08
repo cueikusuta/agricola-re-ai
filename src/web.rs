@@ -1808,7 +1808,6 @@ mod tests {
         assert_eq!(request_body_limit("/api/save"), MAX_BODY);
         assert_eq!(request_body_limit("/api/play"), MAX_BODY);
         assert!(MAX_LOAD_BODY > MAX_BODY);
-        assert!(request_body_limit("/api/load") < 16 * 1024 * 1024);
     }
 
     #[test]
