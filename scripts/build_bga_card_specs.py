@@ -4259,6 +4259,126 @@ CARDS = {
                  {"food_delta": -2, "cattle_delta": 1}),
         ],
     },
+    "B003": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play", [special("pick_random_from_hand", pool="occupation",
+                                       sample_size=1, then="play_for_2_food_or_pass_left")],
+                   decision="random",
+                   notes="random selection; may pay 2 food to play it, or it goes to the left neighbour"),
+        ],
+        "notes": "Draw 1 random occupation; play it for 2 food or pass it left; the card also passes left.",
+        "tests": [
+            case("B003-normal", {"hand_occupations": 4, "food": 2}, {"play": "B003", "pay": True},
+                 {"food_delta": -2, "occupation_played": 1}),
+            case("B003-pass", {"hand_occupations": 4, "food": 2}, {"play": "B003", "pay": False},
+                 {"occupation_passed": True}),
+        ],
+    },
+    "B009": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play",
+                   [choice(options=[{"kind": "gain", "good": "reed", "amount": 1},
+                                    {"kind": "exchange",
+                                     "give": [{"good": "reed", "amount": 1}],
+                                     "receive": [{"good": "cattle", "amount": 1}]}])],
+                   optional=True, decision="owner"),
+        ],
+        "notes": "Gain 1 reed, or exchange 1 reed for 1 cattle; pass left.",
+        "tests": [
+            case("B009-normal", {"reed": 0}, {"play": "B009", "choose": "gain_reed"},
+                 {"reed_delta": 1}),
+            case("B009-exchange", {"reed": 1}, {"play": "B009", "choose": "exchange_cattle"},
+                 {"reed_delta": -1, "cattle_delta": 1}),
+        ],
+    },
+    "B017": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [spend("wood", 2, return_to="accumulation_space"), plow(1)],
+                   cond=[cond("worker_space_used", spaces=["forest", "copse", "grove"])],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "After a wood accumulation space: may pay 2 wood to plow 1 field; the wood stays there.",
+        "tests": [
+            case("B017-normal", {"wood": 2}, {"use_space": "forest", "use_card": True},
+                 {"wood_delta": -2, "fields_delta": 1, "space_wood_delta": 2}),
+            case("B017-declined", {"wood": 2}, {"use_space": "forest", "use_card": False},
+                 {"wood_delta": 0}),
+        ],
+    },
+    "B018": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [special("place_field_on_round_space",
+                                       offset="per_building_resource")]),
+            effect("round_start", [plow(1)],
+                   cond=[cond("round_space_has_marker", kind="field_tile")],
+                   freq="every_round", dur="permanent", order=1),
+        ],
+        "notes": "Place 1 field tile on the round (current + building resources); plow it at that round's start.",
+        "tests": [
+            case("B018-normal", {"round": 3, "building_resources": 2}, {"play": "B018"},
+                 {"marked_round": 5}),
+            case("B018-round", {"current_round": 5, "marker": True}, {"start_round": 5},
+                 {"fields_delta": 1}),
+        ],
+    },
+    "B019": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [special("place_field_tiles_on_card", amount=2)]),
+            effect("after_worker_space", [special("plow_extra_from_card", max=1)],
+                   cond=[cond("worker_space_used", space="farmland")],
+                   optional=True, freq="once_per_game", dur="permanent", order=1,
+                   decision="owner"),
+        ],
+        "notes": "2 field tiles on the card; twice per game, Farmland also plows 1 from the card.",
+        "tests": [
+            case("B019-normal", {"card_fields": 2}, {"use_space": "farmland", "use_card": True},
+                 {"fields_delta": 1, "card_fields": 1}),
+            case("B019-exhausted", {"card_fields": 0}, {"use_space": "farmland", "use_card": True},
+                 {"fields_delta": 0}),
+        ],
+    },
+    "B020": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [special("place_on_round_spaces", marker_kind="field_tile", offsets=[7, 8, 9])]),
+            effect("round_start", [plow(1)],
+                   cond=[cond("round_space_has_marker", kind="field_tile")],
+                   freq="every_round", dur="permanent", order=1),
+        ],
+        "notes": "Place 1 field tile on rounds +7/+8/+9; plow it at each marked round's start.",
+        "tests": [
+            case("B020-normal", {"round": 2}, {"play": "B020"}, {"marked_rounds": [9, 10, 11]}),
+            case("B020-round", {"current_round": 9, "marker": True}, {"start_round": 9},
+                 {"fields_delta": 1}),
+        ],
+    },
+    "B021": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [special("place_food_on_card", amount=4)]),
+            effect("after_wood_gain", [gain("food", 1, source="card")],
+                   cond=[cond("resource_at_least", good="wood", n=1)],
+                   freq="every_use", dur="permanent", order=1),
+            effect("after_wood_gain", [action("family_growth", without_room=True)],
+                   cond=[cond("card_food_empty")],
+                   freq="once_per_game", dur="permanent", order=2),
+        ],
+        "notes": "4 food on the card; gaining wood takes 1 card food; once the card is empty: Family Growth without room.",
+        "tests": [
+            case("B021-normal", {"food_on_card": 4, "wood": 0}, {"play": "B021"},
+                 {"food_on_card": 4}),
+            case("B021-gain", {"food_on_card": 4, "wood": 1}, {"gain_wood": 1},
+                 {"food_on_card": 3, "food_delta": 1}),
+            case("B021-family", {"food_on_card": 0}, {"gain_wood": 1},
+                 {"family_growth_granted": True}),
+        ],
+    },
 }
 
 

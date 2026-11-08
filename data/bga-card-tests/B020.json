@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "B020",
+  "cases": [
+    {
+      "id": "B020-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 2
+      },
+      "action": {
+        "play": "B020"
+      },
+      "expected": {
+        "marked_rounds": [
+          9,
+          10,
+          11
+        ]
+      }
+    },
+    {
+      "id": "B020-round",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 9,
+        "marker": true
+      },
+      "action": {
+        "start_round": 9
+      },
+      "expected": {
+        "fields_delta": 1
+      }
+    }
+  ]
+}

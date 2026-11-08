@@ -88,12 +88,11 @@
     "unresolved_fields": [],
     "test_case_ids": [
       "B009-normal",
-      "B009-exchange",
-      "B009-not-triggered"
+      "B009-exchange"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Gain 1 reed, or exchange 1 reed for 1 cattle."
+    "notes": "Gain 1 reed, or exchange 1 reed for 1 cattle; pass left."
   }
 }
