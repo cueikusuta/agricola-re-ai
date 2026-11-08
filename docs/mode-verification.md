@@ -50,7 +50,7 @@ cargo build --release --locked --bin mode_verify
 - 入力：`seeds`（各モードの試合数、既定1,000）、`seed_start`、`policy`。
 - 6ジョブ（2/3/4人 × 追加タイルOFF/ON）が並列に走り、各モード同じseed範囲を使う。
 - 各ジョブは `games.jsonl` / `summary.json` をArtifactへ保存する。
-- `aggregator` ジョブが集約規則の単体テスト（`tests/test_mode_verify_summary.py`）を先に実行する。
+- `aggregator` ジョブが集約規則の単体テスト（`tests/test_mode_verify_summary.py`）を先に実行する。このジョブは `pull_request`（対象3ファイル限定）でも走るため、集約規則やワークフロー定義の破損を統合前に検出できる。ゲームを実行する `verify` / `aggregate` は `workflow_dispatch` 限定。
 - `aggregate` ジョブは `scripts/mode_verify_summary.py` で**fail closed**に検査する。検査内容：
   - 6モード（2/3/4 × OFF/ON）が過不足なく存在し、同一モードの `summary.json` が重複せず、想定外モードが無い
   - 各 `summary.json` がディスパッチ入力と一致（`seeds_requested` / `seeds_run` / `seed_start` / `policy` / `commit_sha`）、`shard==0` / `shards==1`、`passed+failed==seeds_run`、`failed==0`、チェック別合計が `seeds_run` と一致
