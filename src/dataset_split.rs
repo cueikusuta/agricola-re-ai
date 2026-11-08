@@ -751,6 +751,10 @@ pub struct ChecksAttestation {
     pub passed_tests: usize,
     pub failed_tests: usize,
     pub missing_tests: usize,
+    /// Exact required test IDs by check, derived from the committed requirement
+    /// manifest. Counts or an arbitrary digest are insufficient evidence.
+    #[serde(default)]
+    pub test_ids_by_check: BTreeMap<String, Vec<String>>,
     pub checks: BTreeMap<String, CheckAttestation>,
 }
 
@@ -800,18 +804,16 @@ pub fn validate_attestation(
         ));
     }
     if attestation.producer != ATTESTATION_PRODUCER {
-        return Err(format!(
-            "attestation producer {:?} is not {ATTESTATION_PRODUCER:?}",
-            attestation.producer
-        ));
+        return Err(format!("attestation producer {:?} is not {ATTESTATION_PRODUCER:?}",
+            attestation.producer));
     }
-    if !attestation.run_url.starts_with("https://github.com/")
-        || !attestation.run_url.contains("/actions/runs/")
-    {
-        return Err(format!(
-            "attestation run_url {:?} is not a GitHub Actions run URL",
-            attestation.run_url
-        ));
+    // A substring such as /actions/runs/ inside an unrelated URL is not a run.
+    let prefix = "https://github.com/cueikusuta/agricola-re-ai/actions/runs/";
+    let run_id = attestation.run_url.strip_prefix(prefix)
+        .ok_or_else(|| "attestation run_url is not a repository Actions run".to_string())?;
+    if run_id.is_empty() || run_id.starts_with('0')
+        || !run_id.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err("attestation run_url has an invalid run id".into());
     }
     if !is_sha256_hex(&attestation.test_report_sha256) {
         return Err("attestation test_report_sha256 is not a SHA-256 hex digest".into());
@@ -819,56 +821,73 @@ pub fn validate_attestation(
     if !is_sha256_hex(&attestation.requirements_sha256) {
         return Err("attestation requirements_sha256 is not a SHA-256 hex digest".into());
     }
-    if attestation.required_tests == 0 {
-        return Err("attestation required_tests is zero".into());
+
+    // Read the requirements compiled into this exact executable, not self-
+    // reported counts from a checks JSON supplied by an arbitrary caller.
+    let manifest_bytes = include_bytes!("../docs/m8-evidence-requirements.json");
+    if attestation.requirements_sha256 != sha256_hex(manifest_bytes) {
+        return Err("attestation requirements digest differs from committed manifest".into());
     }
-    if attestation.failed_tests > 0 {
-        return Err(format!(
-            "attestation records {} failed tests",
-            attestation.failed_tests
-        ));
+    let requirements: serde_json::Value = serde_json::from_slice(manifest_bytes)
+        .map_err(|error| format!("invalid compiled requirements: {error}"))?;
+    if requirements["schema_version"].as_u64() != Some(1) {
+        return Err("unsupported compiled requirement schema".into());
     }
-    if attestation.missing_tests > 0 {
-        return Err(format!(
-            "attestation records {} missing tests",
-            attestation.missing_tests
-        ));
+    if attestation.checks.len() != ATTESTED_CHECKS.len()
+        || attestation.test_ids_by_check.len() != ATTESTED_CHECKS.len() {
+        return Err("attestation check or test-ID set is incomplete or contains extras".into());
     }
-    if attestation.passed_tests != attestation.required_tests {
-        return Err(format!(
-            "attestation passed {} of {} required tests",
-            attestation.passed_tests, attestation.required_tests
-        ));
-    }
+    let mut canonical = Vec::new();
+    let mut required_total = 0usize;
     for id in ATTESTED_CHECKS {
-        let entry = attestation
-            .checks
-            .get(id)
+        let manifest_check = &requirements["checks"][id];
+        let expected_ids = manifest_check["tests"].as_array()
+            .ok_or_else(|| format!("requirements lack tests for {id}"))?
+            .iter().map(|test| test["id"].as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("requirements contain invalid test id in {id}")))
+            .collect::<Result<Vec<_>, _>>()?;
+        if expected_ids.is_empty() {
+            return Err(format!("requirements list no tests for {id}"));
+        }
+        let provided_ids = attestation.test_ids_by_check.get(id)
+            .ok_or_else(|| format!("attestation misses required test IDs for {id}"))?;
+        if provided_ids != &expected_ids {
+            return Err(format!("attestation test IDs differ from manifest for {id}"));
+        }
+        let entry = attestation.checks.get(id)
             .ok_or_else(|| format!("attestation has no entry for {id}"))?;
-        if entry.required == 0 {
-            return Err(format!("attestation {id} requires no tests"));
+        let issue = manifest_check["issue"].as_u64()
+            .ok_or_else(|| format!("requirements lack issue for {id}"))?;
+        if entry.issue as u64 != issue {
+            return Err(format!("attestation issue differs from requirements for {id}"));
         }
-        if entry.failed > 0 || entry.missing > 0 {
-            return Err(format!(
-                "attestation {id} records {} failed and {} missing tests",
-                entry.failed, entry.missing
-            ));
+        if entry.required != expected_ids.len() || entry.passed != expected_ids.len()
+            || entry.failed != 0 || entry.missing != 0 {
+            return Err(format!("attestation {id} has inconsistent required/test counts"));
         }
-        if entry.passed != entry.required {
-            return Err(format!(
-                "attestation {id} passed {} of {} tests",
-                entry.passed, entry.required
-            ));
+        if checks.attested_value(id) != Some(true) {
+            return Err(format!("attestation {id} contradicts a declared false check"));
         }
-        let declared = checks
-            .attested_value(id)
-            .ok_or_else(|| format!("unknown attested check {id}"))?;
-        if declared != (entry.passed == entry.required && entry.required > 0) {
-            return Err(format!(
-                "attestation {id} reports {}/{} passed but the file declares {declared}",
-                entry.passed, entry.required
-            ));
+        required_total += expected_ids.len();
+        for test_id in expected_ids {
+            canonical.push(serde_json::json!({"id": test_id, "status": "passed"}));
         }
+    }
+    canonical.sort_by(|left, right| {
+        left["id"].as_str().cmp(&right["id"].as_str())
+    });
+    let serialized = serde_json::to_vec(&canonical)
+        .map_err(|error| format!("cannot serialize canonical tests: {error}"))?;
+    if attestation.test_report_sha256 != sha256_hex(&serialized) {
+        return Err("attestation test report digest is inconsistent with test IDs/outcomes".into());
+    }
+    if attestation.required_tests != required_total
+        || attestation.passed_tests != required_total
+        || attestation.failed_tests != 0
+        || attestation.missing_tests != 0 {
+        return Err(format!("attestation global totals do not match {} committed tests",
+            required_total));
     }
     Ok(())
 }
