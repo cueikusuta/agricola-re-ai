@@ -171,6 +171,81 @@ def inventory(rows: list[dict], source: str = "docs/card-catalog-ae-preliminary.
     }
 
 
+QUEUE_FIELDS = (
+    "card_id",
+    "deck",
+    "card_type",
+    "name_en",
+    "name_ja",
+    "difficulty_1_to_5_preliminary",
+    "effect_categories_preliminary",
+    "in_base_2016",
+    "implementation_state",
+    "official_review_required",
+    "distributable_now",
+)
+
+
+def verification_queue(rows: list[dict], max_difficulty: int = 3) -> list[dict]:
+    """Per-card work queue for the 40+40 gate, ordered by preliminary difficulty.
+
+    The queue lets a human reviewer work through candidates in the A-3 priority
+    order (cheap effects first). It is **not** a verification: every row says
+    `official_review_required: true` and `distributable_now: false`, because no
+    card in this repository is officially verified and this tool cannot verify
+    one. A queue row never adds a card to a distributable pool.
+    """
+    if not 1 <= max_difficulty <= 5:
+        raise ValueError("max_difficulty must be 1..=5")
+    queue = []
+    for row in rows:
+        if is_implemented(row["implementation_reference"]):
+            continue
+        level = row["difficulty_1_to_5_preliminary"]
+        if level not in {"1", "2", "3", "4", "5"}:
+            raise ValueError(
+                f"{row['card_id']}: invalid preliminary difficulty {level!r}")
+        if int(level) > max_difficulty:
+            continue
+        queue.append({
+            "card_id": row["card_id"],
+            "deck": row["deck"],
+            "card_type": normalize_type(row["card_type"]),
+            "name_en": row.get("name_en", ""),
+            "name_ja": row.get("name_ja", ""),
+            "difficulty_1_to_5_preliminary": level,
+            "effect_categories_preliminary": row["effect_categories_preliminary"],
+            "in_base_2016": row["in_base_2016"],
+            "implementation_state": "unimplemented",
+            # Never true until docs/card-catalog-ae-audit.csv records an
+            # official source for this card.
+            "official_review_required": True,
+            "distributable_now": False,
+        })
+    queue.sort(
+        key=lambda entry: (int(entry["difficulty_1_to_5_preliminary"]), entry["card_id"])
+    )
+    return queue
+
+
+def write_queue_csv(queue: list[dict], path: Path) -> None:
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=QUEUE_FIELDS)
+        writer.writeheader()
+        writer.writerows(queue)
+
+
+def validate_queue_paths(ledger: Path, output: Path | None, cards_csv: Path | None) -> None:
+    """Do not overwrite the input ledger or the JSON report with a queue CSV."""
+    if cards_csv is None:
+        return
+    queue_path = cards_csv.resolve()
+    if queue_path == ledger.resolve():
+        raise ValueError("--cards-csv must differ from --ledger (input ledger)")
+    if output is not None and queue_path == output.resolve():
+        raise ValueError("--cards-csv must differ from --output (JSON report)")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -179,9 +254,37 @@ def main() -> int:
         default=Path("docs/card-catalog-ae-preliminary.csv"),
     )
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--cards-csv",
+        type=Path,
+        help="Write the per-card official-review queue (unimplemented, difficulty<=3)",
+    )
+    parser.add_argument(
+        "--max-difficulty",
+        type=int,
+        default=3,
+        help="Highest preliminary difficulty to include in --cards-csv (1..5)",
+    )
     args = parser.parse_args()
     try:
-        report = inventory(load_rows(args.ledger), source=str(args.ledger))
+        validate_queue_paths(args.ledger, args.output, args.cards_csv)
+        rows = load_rows(args.ledger)
+        report = inventory(rows, source=str(args.ledger))
+        if args.cards_csv:
+            queue = verification_queue(rows, max_difficulty=args.max_difficulty)
+            args.cards_csv.parent.mkdir(parents=True, exist_ok=True)
+            write_queue_csv(queue, args.cards_csv)
+            report["verification_queue"] = {
+                "path": str(args.cards_csv),
+                "cards": len(queue),
+                "max_difficulty": args.max_difficulty,
+                "official_review_required": True,
+                "distributable_now": False,
+                "note": (
+                    "A work queue for human official review. A queue row is not "
+                    "a verified card and never enters a distributable pool."
+                ),
+            }
     except (OSError, ValueError, KeyError) as exc:
         print(f"card inventory failed: {exc}", file=sys.stderr)
         return 1

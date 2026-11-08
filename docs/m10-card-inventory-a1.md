@@ -1,6 +1,6 @@
 # M10 A-1 カード実装インベントリ（Issue #105 / #115）
 
-更新: 2026-11-07。`scripts/card_inventory_report.py` の出力に基づく。**公式照合の完了を意味しない。** 台帳・公式照合・実装・配布可否は別々に扱う。
+更新: 2026-11-08（再計算）。`scripts/card_inventory_report.py` の出力に基づく。**公式照合の完了を意味しない。** 台帳・公式照合・実装・配布可否は別々に扱う。
 
 ## 1. 4つを分けて数える
 
@@ -70,6 +70,26 @@ python3 -m unittest discover -s tests -p test_card_inventory_report.py -v
 
 - 台帳の行が重複した場合、未知の `card_type`、未知の `implementation_reference`、不正な難易度は**失敗**させる（分類から静かに消える行を作らない）。
 - `official_verification_included: false` を必ず出力し、公式照合済みと誤読できないようにする。
+
+## 5.1 2026-11-08 の再計算と、照合待ちキューの出力
+
+main `1658c05` 時点で再実行した結果、**1節の数値は変わっていない**（台帳840、実装34＝職業18／小進歩16、複合0、公式照合0、4人配布可0）。したがって 40+40 ゲート（職業40＋小進歩40）は、実装枚数だけでも職業+22／小進歩+24 が不足したままである。
+
+照合作業を前に進められるよう、台帳から**カード単位の照合待ちキュー**を書き出せるようにした。
+
+```sh
+python3 scripts/card_inventory_report.py \
+  --output card-inventory.json \
+  --cards-csv card-verification-queue.csv
+```
+
+- 出力対象は「未実装かつ一次難易度 ≤ 3」の **559枚**（`--max-difficulty` で変更可、既定3）。A-3 の優先順（即時獲得→ラウンド→収穫→終了時得点→建築・費用…）に対応づけるため、**難易度昇順・カードID順**で並ぶ。
+- 各行は `card_id` / `deck` / `card_type` / 名称 / 一次難易度 / 一次カテゴリ / `in_base_2016` と、**`official_review_required: true` / `distributable_now: false`** を持つ。
+- `--cards-csv` は入力台帳 `--ledger` やJSON出力 `--output` と同じパスへ指定できない（台帳やレポートの誤上書きを拒否）。
+- これは**作業キューであり照合結果ではない**。キューに載った時点で配布可能にはならず、`docs/card-catalog-ae-audit.csv` に公式出典が記録されるまで `unverified` のままである。ツールはキュー行から配布プールを作らない。
+- `verification_queue` の要約は JSON レポートにも出る（`official_review_required: true`, `distributable_now: false` を明示）。
+
+この環境では公式カード原文・画像・公式PDFを取得できず、転載も禁止のため（`docs/card-catalog-official-sources.md` 2節）、**照合完了枚数は0のまま**である。キューは「人間が一次資料で確認する」ための入力であり、コードだけで `verified` を作る経路は存在しない。
 
 ## 6. 未解決と阻害要因
 
