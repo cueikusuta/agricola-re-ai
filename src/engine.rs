@@ -825,6 +825,15 @@ impl Game {
         Ok(next.public)
     }
 
+    /// Read-only legality probe for free actions. Reuse the *same* transactional
+    /// path as `apply_free`, including its invariant checks, so the probe
+    /// cannot disagree with the committed rule engine. No events or state are
+    /// added to `self` (only to the discarded clone).
+    pub fn validate_free(&self, player: usize, free: &FreeAction) -> Result<()> {
+        let mut probe = self.clone();
+        probe.apply_free(player, free.clone())
+    }
+
     pub fn apply_free(&mut self, player: usize, free: FreeAction) -> Result<()> {
         if self.public.finished || player >= self.public.players.len() {
             return Err("not an active game/player".into());
