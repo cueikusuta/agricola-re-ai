@@ -91,3 +91,10 @@ GitHub Actions では `.github/workflows/m8-evidence.yml` が 1〜2 を実行し
 
 - `integration_acceptance` の100試合再演テストを含むため、`m8-evidence.yml` は通常 CI ではなく手動・呼び出し専用ワークフローに置く。
 - Artifact の保持は30日。長期監査で生ログが必要な場合は、保持期間と容量を確認して別途保存する。
+
+
+## 同一Actions runの信頼境界（#185 P1対策）
+
+`m8_evidence.py collect` と `checks` は本番ゲートの実行時に `--trusted-current-run` を付け、`GITHUB_ACTIONS=true`、`GITHUB_SHA`、`GITHUB_REPOSITORY`、`GITHUB_RUN_ID` と同一のcode SHA・実行URLを要求する。テストログは同一runの `m8-evidence` ジョブから生成し、後続ジョブは当該runのArtifactのみダウンロードする。Rust側はコンパイル時に固定された公式要件JSONとtest ID・件数・issue・ダイジェストを検証し、自己申告の4件だけではpassしない。
+
+**限界**：これは「実行済みテストを持つ同一Actions runからの証拠」を信頼する運用境界であり、JSONだけに署名・GitHub API照合があるわけではない。ローカルで偽造したJSONを正式なG0実験の証明として扱ってはいけない。正式な判定にはG0 workflowの成功runとArtifact URLが必要。
