@@ -23,6 +23,12 @@ use std::net::{TcpListener, TcpStream};
 
 const INDEX: &str = include_str!("../web/index.html");
 const MAX_BODY: usize = 65_536;
+/// Marker for a browser save file. A file without it is rejected instead of
+/// being interpreted as some other JSON.
+const SAVE_FORMAT: &str = "agricola-web-save";
+/// On-disk version of the save envelope. Bumped when the envelope changes; the
+/// inner `Game` save has its own version checks in `Game::load_json`.
+const SAVE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Clone)]
 pub struct Session {
@@ -411,6 +417,115 @@ impl Session {
 
     pub fn reset_draft(&mut self) {
         self.draft = None;
+    }
+
+    // ---- M9 save / restore (Issue #92) ------------------------------------
+
+    /// Points where a save cannot faithfully represent the session.
+    ///
+    /// A pending harvest holds a preview that is not part of `Game`, and an
+    /// in-progress draft holds a separate state machine. Saving there would
+    /// silently drop a decision, so the export is refused instead.
+    fn save_blocker(&self) -> Option<&'static str> {
+        if self.pending.is_some() {
+            return Some(
+                "収穫の給餌・繁殖を選択している間は保存できません。選択を完了してから保存してください。",
+            );
+        }
+        if self.draft.as_ref().is_some_and(|draft| !draft.game_started) {
+            return Some("ドラフト進行中は保存できません。対戦開始後に保存してください。");
+        }
+        None
+    }
+
+    /// A self-contained save of the match, written by the browser.
+    ///
+    /// The payload embeds the engine's own save (`Game::save_json` shape) so a
+    /// restored game is validated by the same code path as any other save: the
+    /// event chain, the initial state, the rule/engine versions and the config
+    /// must all agree. Hidden information is included on purpose — this is the
+    /// player's own local file — so it must never be served by `/api/state`.
+    pub fn export_save(&self) -> Result<Value, String> {
+        if let Some(reason) = self.save_blocker() {
+            return Err(reason.into());
+        }
+        let game = serde_json::to_value(&self.game).map_err(|error| error.to_string())?;
+        Ok(json!({
+            "format": SAVE_FORMAT,
+            "schema_version": SAVE_SCHEMA_VERSION,
+            "session": { "mcts": self.mcts, "budget": self.budget },
+            "game": game,
+        }))
+    }
+
+    /// File name offered to the browser.
+    pub fn save_name(&self) -> String {
+        format!(
+            "agricola-{}p-seed{}-round{}.json",
+            self.game.public.players.len(),
+            self.game.config.seed,
+            self.game.public.round
+        )
+    }
+
+    /// Restore a save produced by [`Self::export_save`].
+    ///
+    /// Accepts either `{"save": <save>}` or the save object itself. The second
+    /// form is what the browser sends: the file is posted verbatim, because a
+    /// JavaScript `JSON.parse`/`JSON.stringify` round trip would silently round
+    /// the 64-bit seeds to the nearest double.
+    ///
+    /// Transactional: the whole payload is validated into a copy first, so a
+    /// corrupted or tampered file leaves the running match untouched.
+    pub fn import_save(&mut self, input: &Value) -> Result<(), String> {
+        let save = match input.get("save") {
+            Some(save) => save,
+            None if input.get("format").is_some() => input,
+            None => return Err("save payload is required".into()),
+        };
+        let mut next = self.clone();
+        next.restore_save(save)?;
+        *self = next;
+        Ok(())
+    }
+
+    fn restore_save(&mut self, save: &Value) -> Result<(), String> {
+        if save.get("format").and_then(Value::as_str) != Some(SAVE_FORMAT) {
+            return Err("アグリコラの保存ファイルではありません".into());
+        }
+        let version = save
+            .get("schema_version")
+            .and_then(Value::as_u64)
+            .ok_or("保存ファイルの schema_version がありません")?;
+        if version != u64::from(SAVE_SCHEMA_VERSION) {
+            return Err(format!(
+                "保存ファイルの形式 {version} は未対応です（対応: {SAVE_SCHEMA_VERSION}）"
+            ));
+        }
+        let game = save
+            .get("game")
+            .ok_or("保存ファイルにゲーム状態がありません")?;
+        let text = serde_json::to_string(game).map_err(|error| error.to_string())?;
+        // Reuses the engine's own validator: version/config/card-set metadata,
+        // the initial state snapshot and every event hash are re-checked.
+        let game =
+            Game::load_json(&text).map_err(|error| format!("保存データが不正です: {error}"))?;
+        let session = save.get("session").cloned().unwrap_or(Value::Null);
+        let mcts = session
+            .get("mcts")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let budget = session.get("budget").and_then(Value::as_u64).unwrap_or(8);
+        if !(1..=256).contains(&budget) {
+            return Err("保存ファイルのシミュレーション回数が不正です".into());
+        }
+        self.game = game;
+        self.mcts = mcts;
+        self.budget = budget as usize;
+        // Neither a pending harvest nor a draft is part of the save envelope.
+        self.pending = None;
+        self.draft = None;
+        Ok(())
     }
     pub fn reset(&mut self, input: &Value) -> Result<(), String> {
         let players = input.get("players").and_then(Value::as_u64).unwrap_or(2);
@@ -813,6 +928,25 @@ fn handle(mut stream: TcpStream, session: &mut Session, port: u16) -> Result<(),
                 "/api/draft/start-game" => session.start_draft_game(&value)?,
                 _ => session.reset_draft(),
             }
+            Ok(session.view())
+        }
+        ("POST", "/api/save") => {
+            // The save is an explicit user action: it returns the full state,
+            // including hidden information, so it is never served by GET.
+            //
+            // It is returned as *text*, not as a JSON object: the 64-bit seeds
+            // exceed 2^53, so a JavaScript `JSON.parse`/`JSON.stringify` round
+            // trip would round them and the file would no longer load.
+            let save = session.export_save()?;
+            let text = serde_json::to_string_pretty(&save).map_err(|e| e.to_string())?;
+            Ok(json!({
+                "save_text": text,
+                "download_name": session.save_name(),
+            }))
+        }
+        ("POST", "/api/load") => {
+            let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            session.import_save(&value)?;
             Ok(session.view())
         }
         ("POST", "/api/new")
@@ -1435,5 +1569,237 @@ mod tests {
         assert_eq!(session.view()["hand"].as_array().unwrap().len(), 14);
         // Opponent hands stay hidden in the serialized session view.
         assert!(session.view().get("hidden_round_deck").is_none());
+    }
+
+    // ---- M9 save / restore (Issue #92) ------------------------------------
+
+    /// Play a few human turns through the same endpoint the UI uses, so the
+    /// save is taken from a realistic mid-game state.
+    fn play_turns(session: &mut Session, turns: usize) {
+        for _ in 0..turns {
+            if session.game.public.finished {
+                return;
+            }
+            if session.pending.is_some() {
+                let pending = session.pending.clone().expect("pending");
+                match pending {
+                    PendingHarvest::Feeding(_) => session
+                        .harvest(&json!({"feeding": FeedingPlan::default()}))
+                        .unwrap(),
+                    PendingHarvest::Breeding(action, feeding) => {
+                        let preview = session
+                            .game
+                            .preview_harvest(&action, Some(&feeding))
+                            .unwrap();
+                        let choice = BreedingPlan::simple(&preview.players[0]);
+                        session.harvest(&json!({"breeding": choice})).unwrap();
+                    }
+                }
+                continue;
+            }
+            if session.game.public.active_player != 0 {
+                session.advance_cpu().unwrap();
+                continue;
+            }
+            let space = session.game.legal_spaces()[0];
+            play_simple(session, space);
+        }
+    }
+
+    fn seeded_session(seed: u64) -> Session {
+        Session::new(Config {
+            players: 2,
+            seed,
+            additional_action_space_enabled: false,
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn a_saved_match_restores_into_a_fresh_session() {
+        let mut session = seeded_session(42);
+        play_turns(&mut session, 12);
+        assert!(!session.game.public.finished, "the test saves mid-game");
+        let save = session.export_save().unwrap();
+        let hash = session.game.state_hash();
+        let view = session.view();
+
+        // A new process starts from `Session::new`; nothing of the old session
+        // is reused, so the restore must carry every part of the state.
+        let mut restarted = seeded_session(7);
+        restarted.import_save(&json!({ "save": save })).unwrap();
+        assert_eq!(restarted.game.state_hash(), hash);
+        assert_eq!(restarted.view(), view);
+        assert_eq!(restarted.game.public.round, session.game.public.round);
+        assert_eq!(restarted.game.cards.hands[0], session.game.cards.hands[0]);
+        assert_eq!(
+            restarted.game.public.players[0].supply,
+            session.game.public.players[0].supply
+        );
+        restarted.game.validate().unwrap();
+    }
+
+    #[test]
+    fn a_save_posted_verbatim_keeps_the_64_bit_seeds() {
+        // The browser posts the file text unchanged. Parsing it into JavaScript
+        // numbers first would round `round_seed`/`action_seed` (they exceed
+        // 2^53), and the engine would then reject the file as an initial-state
+        // mismatch. This test pins the server-side contract.
+        let mut session = seeded_session(42);
+        play_turns(&mut session, 6);
+        let save = session.export_save().unwrap();
+        let text = serde_json::to_string(&save).unwrap();
+        let round_seed = save["game"]["log"]["round_seed"].as_u64().unwrap();
+        assert!(
+            round_seed > (1u64 << 53),
+            "the seed must exceed 2^53: {round_seed}"
+        );
+
+        let posted: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(
+            posted["game"]["log"]["round_seed"].as_u64(),
+            Some(round_seed)
+        );
+
+        let hash = session.game.state_hash();
+        let mut restarted = seeded_session(3);
+        // Top-level save object, not `{"save": ...}`.
+        restarted.import_save(&posted).unwrap();
+        assert_eq!(restarted.game.state_hash(), hash);
+        assert_eq!(restarted.game.log.round_seed, session.game.log.round_seed);
+        assert_eq!(restarted.game.log.action_seed, session.game.log.action_seed);
+    }
+
+    #[test]
+    fn a_restored_match_finishes_and_replays() {
+        let mut session = seeded_session(43);
+        play_turns(&mut session, 20);
+        let save = session.export_save().unwrap();
+        let mut restarted = seeded_session(1);
+        restarted.import_save(&json!({ "save": save })).unwrap();
+        for _ in 0..400 {
+            if restarted.game.public.finished {
+                break;
+            }
+            play_turns(&mut restarted, 1);
+        }
+        assert!(
+            restarted.game.public.finished,
+            "the restored match must finish"
+        );
+        let replay = Game::replay_with_cards(
+            restarted.game.config.clone(),
+            restarted.game.card_set.clone(),
+            &restarted.game.log.events,
+        )
+        .unwrap();
+        assert_eq!(replay.state_hash(), restarted.game.state_hash());
+    }
+
+    /// Play one decision without resolving a queued harvest, so a test can
+    /// observe the pending state itself.
+    fn play_one_step(session: &mut Session) -> bool {
+        if session.pending.is_some() {
+            return true;
+        }
+        if session.game.public.finished {
+            return false;
+        }
+        if session.game.public.active_player != 0 {
+            session.advance_cpu().unwrap();
+            return session.pending.is_some();
+        }
+        let space = session.game.legal_spaces()[0];
+        let detail = SimpleDetails
+            .produce(&session.game.observation(0).unwrap(), space)
+            .expect("test policy detail")
+            .detail;
+        session
+            .play(&json!({"space": space, "detail": detail}))
+            .unwrap();
+        session.pending.is_some()
+    }
+
+    #[test]
+    fn a_save_is_refused_while_a_harvest_decision_is_pending() {
+        let mut session = seeded_session(44);
+        for _ in 0..400 {
+            if play_one_step(&mut session) {
+                break;
+            }
+        }
+        assert!(session.pending.is_some(), "a harvest must be pending");
+        let error = session.export_save().unwrap_err();
+        assert!(error.contains("収穫"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn a_save_is_refused_while_a_draft_is_in_progress() {
+        let mut session = seeded_session(45);
+        session
+            .start_draft(&json!({
+                "mode": "draft_7_7",
+                "players": 2,
+                "seed": 5,
+                "direction_occupation": "left",
+                "direction_minor": "left",
+                "occupation_phase_first": true,
+                "pool": "test_fixture",
+                "draft_ai": "random"
+            }))
+            .unwrap();
+        let error = session.export_save().unwrap_err();
+        assert!(error.contains("ドラフト"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn a_corrupted_save_is_rejected_without_touching_the_session() {
+        let mut session = seeded_session(46);
+        play_turns(&mut session, 8);
+        let hash = session.game.state_hash();
+        for broken in [
+            json!({"save": "not an object"}),
+            json!({"save": {}}),
+            json!({"save": {"format": "other", "schema_version": 1}}),
+            json!({"save": {"format": "agricola-web-save", "schema_version": 99}}),
+            json!({"save": {"format": "agricola-web-save", "schema_version": 1}}),
+            json!({}),
+        ] {
+            assert!(session.import_save(&broken).is_err(), "{broken}");
+            assert_eq!(session.game.state_hash(), hash, "{broken}");
+        }
+    }
+
+    #[test]
+    fn a_tampered_save_is_rejected_by_the_engine_validation() {
+        let mut session = seeded_session(47);
+        play_turns(&mut session, 10);
+        let save = session.export_save().unwrap();
+        let mut tampered = save.clone();
+        // Give the human free food without any logged action: the event chain
+        // no longer reproduces the stored state.
+        let food = tampered["game"]["public"]["players"][0]["supply"]["food"]
+            .as_i64()
+            .unwrap_or(0);
+        tampered["game"]["public"]["players"][0]["supply"]["food"] = json!(food + 5);
+        let hash = session.game.state_hash();
+        let error = session.import_save(&json!({"save": tampered})).unwrap_err();
+        assert!(
+            error.contains("保存データが不正") || error.contains("replay"),
+            "unexpected error: {error}"
+        );
+        assert_eq!(
+            session.game.state_hash(),
+            hash,
+            "a rejected save changes nothing"
+        );
+    }
+
+    #[test]
+    fn a_save_name_is_a_safe_file_name() {
+        let session = seeded_session(48);
+        let name = session.save_name();
+        assert!(name.starts_with("agricola-2p-seed48-round1"), "{name}");
+        assert!(!name.contains('/') && !name.contains('\\'), "{name}");
     }
 }

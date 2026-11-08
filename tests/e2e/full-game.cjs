@@ -446,7 +446,12 @@ async function runGame(page, options) {
     workerActions: 0, feeding: 0, breeding: 0,
     feedOrderChanged: false, freeAction: false, pageReloadResumed: false,
     sessionResumeStatePreserved: false,
-    serializedSaveRestoreAvailable: false,
+    // A page reload reconnects to the same server process. The real
+    // save -> process restart -> restore path is covered separately by
+    // tests/e2e/save-restore.test.cjs; both are kept because they fail
+    // differently.
+    reloadOnlyResume: false,
+    saveRestoreCoveredBy: "tests/e2e/save-restore.test.cjs",
     dialogsObserved: [],
     invalidInputRejected: false, manualPlow: false, cardPlayed: false,
     manualFence: 0, manualRoom: 0, manualRenovation: 0, manualSow: 0,
@@ -523,11 +528,9 @@ async function runGame(page, options) {
         inspectedRounds.add(Number(round[1]));
       }
       if (Number(round[1]) === 7 && !coverage.pageReloadResumed) {
-        // Issue #92 asks for "save/restore". This server has no persisted save
-        // or restore endpoint, so what can be verified is that a reload
-        // reconnects to the same running session and shows the identical
-        // visible state. `serializedSaveRestoreAvailable: false` records that
-        // limit in the artifact instead of claiming a save/restore pass.
+        // Reloading reconnects to the same running session. The save file and
+        // the process restart are exercised by tests/e2e/save-restore.test.cjs;
+        // this check stays because a reload is a different failure mode.
         const before = await visibleFingerprint(page);
         noteAction("reload-at-round-7");
         await page.reload();
@@ -538,6 +541,7 @@ async function runGame(page, options) {
           "reloaded browser recovers the same turn, summary, resources, farm and own hand");
         coverage.sessionResumeStatePreserved = true;
         coverage.pageReloadResumed = true;
+        coverage.reloadOnlyResume = true;
         continue;
       }
     }
