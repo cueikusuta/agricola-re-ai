@@ -814,6 +814,42 @@ class ComparisonDesignTests(unittest.TestCase):
     """#106 C-2/C-4: a report must say what was compared, and whether the
     condition can resolve a +5 pp difference at all."""
 
+    def test_four_player_puct_mcts_direct_match_has_mirror_baseline(self):
+        """#212: full seat rotation makes the all-MCTS mirror exactly 25% credit."""
+        rows = fixture(blocks=4, players=4)
+        for row in rows:
+            row["focus_policy"] = "puct" if row["arm_id"] == "candidate" else "mcts"
+            row["opponent_policy"] = "mcts"
+            row["decision_budget_ms"] = 0
+            row["mcts_simulations_cap"] = 4
+            if row["arm_id"] == "baseline":
+                # An all-MCTS baseline has the SAME outcome across the four
+                # focus-seat replays for each seed block: no hidden changes.
+                winner = row["block_index"] % 4
+                seat = row["candidate_seat"]
+                row["scores_by_seat"] = [30 if i == winner else 20 for i in range(4)]
+                row["ranks_by_seat"] = [1 if i == winner else 2 for i in range(4)]
+                row["first_place_credit"] = float(seat == winner)
+                row["expected_rank_observation"] = 1 if seat == winner else 2
+                row["score_margin"] = (
+                    row["scores_by_seat"][seat] -
+                    (sum(row["scores_by_seat"]) - row["scores_by_seat"][seat]) / 3
+                )
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=4,
+            candidate="puct", baseline="mcts", opponent="mcts",
+            extra=False, cards="none", search_mode="simulation-capped",
+            iterations=500,
+        )
+        self.assertTrue(report["comparison_design"]["head_to_head"])
+        self.assertTrue(report["comparison_design"]["mirror_baseline"])
+        self.assertEqual(report["comparison_design"]["candidate_opponent_policies"], ["mcts"])
+        self.assertEqual(report["comparison_design"]["baseline_opponent_policies"], ["mcts"])
+        self.assertEqual(report["games_per_arm"], 16)
+        self.assertEqual(report["total_games"], 32)
+        self.assertAlmostEqual(report["baseline_first_credit"], 0.25)
+        self.assertEqual(len(report["paired_block_bootstrap_95ci"]), 2)
+
     def test_common_opponent_is_not_head_to_head(self):
         report = run(fixture())
         design = report["comparison_design"]
