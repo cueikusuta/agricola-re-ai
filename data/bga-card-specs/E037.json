@@ -78,15 +78,18 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "on_play_food_ja_en_discrepancy"
+    ],
     "test_case_ids": [
       "E037-normal",
-      "E037-not-triggered"
+      "E037-not-triggered",
+      "E037-source-conflict"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "At scoring, 3 bonus points if you own no cattle."
+    "notes": "At scoring gain 3 bonus points without cattle. The English list adds 1 immediate food, absent in Japanese; implementation remains blocked pending source resolution."
   }
 }
