@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "A048",
+  "cases": [
+    {
+      "id": "A048-optional",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 5
+      },
+      "action": {
+        "gain_wood": 1,
+        "exchange": true
+      },
+      "expected": {
+        "wood_delta": -1,
+        "food_delta": 3
+      }
+    },
+    {
+      "id": "A048-mandatory",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 7
+      },
+      "action": {
+        "gain_wood": 1,
+        "exchange": false
+      },
+      "expected": {
+        "wood_delta": -1,
+        "food_delta": 3
+      }
+    },
+    {
+      "id": "A048-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4
+      },
+      "action": {
+        "gain_wood": 1,
+        "exchange": true
+      },
+      "expected": {
+        "wood_delta": 1,
+        "food_delta": 0
+      }
+    }
+  ]
+}

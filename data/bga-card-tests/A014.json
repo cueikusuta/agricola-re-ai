@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "A014",
+  "cases": [
+    {
+      "id": "A014-normal",
+      "scope": "effect_only",
+      "setup": {
+        "rooms_built": 2,
+        "house": "wood"
+      },
+      "action": {
+        "build_rooms": 2
+      },
+      "expected": {
+        "reed_discount": 2,
+        "wood_discount": 2
+      }
+    },
+    {
+      "id": "A014-stone",
+      "scope": "effect_only",
+      "setup": {
+        "rooms_built": 2,
+        "house": "stone"
+      },
+      "action": {
+        "build_rooms": 2
+      },
+      "expected": {
+        "stone_discount": 4
+      }
+    },
+    {
+      "id": "A014-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "rooms_built": 1
+      },
+      "action": {
+        "build_rooms": 1
+      },
+      "expected": {
+        "reed_discount": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "A019",
+  "cases": [
+    {
+      "id": "A019-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 3
+      },
+      "action": {
+        "play": "A019"
+      },
+      "expected": {
+        "marked_round": 8
+      }
+    },
+    {
+      "id": "A019-round",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 8,
+        "marker": true
+      },
+      "action": {
+        "start_round": 8
+      },
+      "expected": {
+        "field_tile_taken": true
+      }
+    }
+  ]
+}
