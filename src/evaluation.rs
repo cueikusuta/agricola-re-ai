@@ -125,9 +125,32 @@ fn next_harvest_food_capacity(p: &Player) -> u32 {
     available
 }
 
+/// Which calibrated feature set an evaluation call must use.
+///
+/// `Baseline` is the M2 calibration and must stay byte-for-byte identical: every
+/// existing policy, test and replay depends on it. A variant is only reachable
+/// through an explicitly selected policy (`VegetableFirstEvaluationPolicy`), so
+/// comparing variants cannot silently change the baseline AI.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum EvaluationVariant {
+    #[default]
+    Baseline,
+    /// #106 candidate: the scoring table values grain and vegetables identically
+    /// (both give 0..4 points for 0..4 units, and a missing category is -1), and
+    /// vegetables can be eaten without baking. The baseline nevertheless prices
+    /// the first vegetable below the first grain, so taking `VegetableSeeds` is
+    /// dominated. This variant prices them equally.
+    VegetableFirst,
+}
+
 /// A transparent, deterministic heuristic. It depends on public data only;
 /// its units are heuristic utility, not victory probabilities.
 pub fn evaluate_player(p: &Player, round: u8) -> Evaluation {
+    evaluate_player_with(p, round, EvaluationVariant::Baseline)
+}
+
+/// Same heuristic with an explicit feature variant (see [`EvaluationVariant`]).
+pub fn evaluate_player_with(p: &Player, round: u8, variant: EvaluationVariant) -> Evaluation {
     let remaining = (15u8.saturating_sub(round)) as f64;
     let next_harvest = HARVEST_ROUNDS
         .iter()
@@ -197,7 +220,11 @@ pub fn evaluate_player(p: &Player, round: u8) -> Evaluation {
     let clay = marginal(p.supply.clay, 5, 2.1, 0.7);
     let stone = marginal(p.supply.stone, 3, if round >= 7 { 3.3 } else { 2.1 }, 1.2);
     let grain = marginal(p.supply.grain, 1, 8.0, 2.0);
-    let vegetables = marginal(p.supply.vegetable, 1, 7.0, 2.0);
+    let first_vegetable = match variant {
+        EvaluationVariant::Baseline => 7.0,
+        EvaluationVariant::VegetableFirst => 8.0,
+    };
+    let vegetables = marginal(p.supply.vegetable, 1, first_vegetable, 2.0);
     let resources = wood + reed + clay + stone + grain + vegetables;
     Evaluation {
         scoring: f64::from(score(p).total) * 3.0,
@@ -610,12 +637,23 @@ pub fn action_value_with_details(
     space: Space,
     details: &dyn DetailPolicy,
 ) -> Option<f64> {
-    let before = evaluate_observation(obs, obs.player_id)?.total();
+    action_value_with_details_variant(obs, space, details, EvaluationVariant::Baseline)
+}
+
+/// Same as [`action_value_with_details`] with an explicit feature variant.
+pub fn action_value_with_details_variant(
+    obs: &Observation,
+    space: Space,
+    details: &dyn DetailPolicy,
+    variant: EvaluationVariant,
+) -> Option<f64> {
+    let current = obs.public.players.get(obs.player_id)?;
+    let before = evaluate_player_with(current, obs.public.round, variant).total();
     let card_bonus_before = crate::cards::end_game_bonus_for_definitions(
         &obs.card_definitions,
         obs.public.players.get(obs.player_id)?,
     );
-    action_value_with_baseline(obs, space, details, before, card_bonus_before)
+    action_value_with_baseline(obs, space, details, before, card_bonus_before, variant)
 }
 
 /// The per-action value with the state-only terms already evaluated.
@@ -630,10 +668,11 @@ fn action_value_with_baseline(
     details: &dyn DetailPolicy,
     before: f64,
     card_bonus_before: i32,
+    variant: EvaluationVariant,
 ) -> Option<f64> {
     let action = details.produce(obs, space)?;
     let after = project_action(obs, &action)?;
-    let mut value = evaluate_player(&after, obs.public.round).total() - before;
+    let mut value = evaluate_player_with(&after, obs.public.round, variant).total() - before;
     // Card end-game bonuses are intentionally not included in score(Player)
     // because their value depends on the public, externally defined card set.
     // They contribute 3 utility units per point, just like score(Player).
@@ -668,6 +707,52 @@ mod projection_tests {
         let mut obs = game.observation(game.public.active_player).unwrap();
         update(&mut obs.public.players[obs.player_id]);
         obs
+    }
+
+    /// #106 candidate: the variant must actually change the seed choice, and the
+    /// baseline must keep its original ordering.
+    #[test]
+    fn vegetable_first_variant_flips_the_seed_priority() {
+        let obs = observed(|_| {});
+        let base_grain = action_value_with_details_variant(
+            &obs,
+            Space::GrainSeeds,
+            &SimpleDetails,
+            EvaluationVariant::Baseline,
+        )
+        .unwrap();
+        let base_veg = action_value_with_details_variant(
+            &obs,
+            Space::VegetableSeeds,
+            &SimpleDetails,
+            EvaluationVariant::Baseline,
+        )
+        .unwrap();
+        let veg_grain = action_value_with_details_variant(
+            &obs,
+            Space::GrainSeeds,
+            &SimpleDetails,
+            EvaluationVariant::VegetableFirst,
+        )
+        .unwrap();
+        let veg_veg = action_value_with_details_variant(
+            &obs,
+            Space::VegetableSeeds,
+            &SimpleDetails,
+            EvaluationVariant::VegetableFirst,
+        )
+        .unwrap();
+        assert!(
+            base_grain > base_veg,
+            "baseline must price grain above vegetables"
+        );
+        // The variant lifts the first vegetable to the first grain value. The
+        // remaining tie is broken by the tactical prior (vegetables 25 vs grain
+        // 23), which is what makes VegetableSeeds the preferred space.
+        assert!((veg_veg - veg_grain).abs() < 1e-9);
+        assert!(veg_veg > base_veg);
+        // The variant must not move the grain price; only the vegetable term.
+        assert!((veg_grain - base_grain).abs() < 1e-9);
     }
 
     #[test]
@@ -988,18 +1073,35 @@ impl WeightedEvaluationPolicy {
         rng: &mut ChaCha8Rng,
         details: &dyn DetailPolicy,
     ) -> Option<Space> {
+        self.select_with_variant(obs, legal, rng, details, EvaluationVariant::Baseline)
+    }
+
+    /// Same selection with an explicit feature variant.
+    pub fn select_with_variant(
+        &self,
+        obs: &Observation,
+        legal: &[Space],
+        rng: &mut ChaCha8Rng,
+        details: &dyn DetailPolicy,
+        variant: EvaluationVariant,
+    ) -> Option<Space> {
         let mut best = f64::NEG_INFINITY;
         let mut candidates = Vec::new();
         // State-only terms do not depend on the candidate action, so they are
         // evaluated once per decision instead of once per legal space.
-        let before = evaluate_observation(obs, obs.player_id)?.total();
+        let before = evaluate_player_with(
+            obs.public.players.get(obs.player_id)?,
+            obs.public.round,
+            variant,
+        )
+        .total();
         let card_bonus_before = crate::cards::end_game_bonus_for_definitions(
             &obs.card_definitions,
             obs.public.players.get(obs.player_id)?,
         );
         for &space in legal {
             let Some(state_delta) =
-                action_value_with_baseline(obs, space, details, before, card_bonus_before)
+                action_value_with_baseline(obs, space, details, before, card_bonus_before, variant)
             else {
                 continue;
             };
@@ -1014,6 +1116,27 @@ impl WeightedEvaluationPolicy {
             }
         }
         candidates.choose(rng).copied()
+    }
+}
+
+/// #106 candidate: same blend as [`EvaluationPolicy`] with
+/// [`EvaluationVariant::VegetableFirst`]. Kept separate so the baseline stays
+/// unchanged and a paired evaluation can attribute any difference to the variant.
+pub struct VegetableFirstEvaluationPolicy;
+
+impl SpacePolicy for VegetableFirstEvaluationPolicy {
+    fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
+        WeightedEvaluationPolicy {
+            prior_weight: 0.5,
+            state_weight: 2.0,
+        }
+        .select_with_variant(
+            obs,
+            legal,
+            rng,
+            &SimpleDetails,
+            EvaluationVariant::VegetableFirst,
+        )
     }
 }
 

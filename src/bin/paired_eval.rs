@@ -19,7 +19,7 @@
 #![recursion_limit = "256"]
 use agricola_re_ai::cards::{verified_basic_card_set, CardSet};
 use agricola_re_ai::decision_budget::{percentile_ms, DecisionBudgetSpec, DecisionTimings};
-use agricola_re_ai::evaluation::EvaluationPolicy;
+use agricola_re_ai::evaluation::{EvaluationPolicy, VegetableFirstEvaluationPolicy};
 use agricola_re_ai::harvest::SimpleHarvestDetails;
 use agricola_re_ai::mcts::{MctsOutcome, MctsPolicy, SearchLimit, SearchMode};
 use agricola_re_ai::mcts_puct::{LeafMode, PuctConfig, PuctPolicy};
@@ -82,6 +82,7 @@ enum Ai {
     Random,
     Greedy,
     Eval,
+    EvalVeg,
     Mcts,
     Puct,
 }
@@ -92,6 +93,7 @@ impl Ai {
             "random" => Ok(Ai::Random),
             "greedy" => Ok(Ai::Greedy),
             "eval" => Ok(Ai::Eval),
+            "eval_veg" => Ok(Ai::EvalVeg),
             "mcts" => Ok(Ai::Mcts),
             "puct" => Ok(Ai::Puct),
             _ => Err(format!("unsupported AI: {name}")),
@@ -102,6 +104,7 @@ impl Ai {
             Ai::Random => "random",
             Ai::Greedy => "greedy",
             Ai::Eval => "eval",
+            Ai::EvalVeg => "eval_veg",
             Ai::Mcts => "mcts",
             Ai::Puct => "puct",
         }
@@ -441,7 +444,7 @@ impl SearchSettings {
         let fixed = match ai {
             Ai::Mcts => self.mcts_simulations,
             Ai::Puct => self.puct_simulations,
-            Ai::Random | Ai::Greedy | Ai::Eval => return None,
+            Ai::Random | Ai::Greedy | Ai::Eval | Ai::EvalVeg => return None,
         };
         Some(match self.mode {
             SearchMode::SimulationCapped => SearchRule::Simulations(fixed),
@@ -482,6 +485,7 @@ struct SeatSelector<'a> {
     random: &'a RandomPolicy,
     greedy: &'a GreedyPolicy,
     eval: &'a EvaluationPolicy,
+    eval_veg: &'a VegetableFirstEvaluationPolicy,
     mcts: &'a MctsPolicy,
     puct: &'a PuctPolicy,
     /// Stopping rule for the focus seat. `None` for heuristic policies and for
@@ -527,6 +531,7 @@ fn select_ai(
     random: &RandomPolicy,
     greedy: &GreedyPolicy,
     eval: &EvaluationPolicy,
+    eval_veg: &VegetableFirstEvaluationPolicy,
     mcts: &MctsPolicy,
     puct: &PuctPolicy,
     obs: &Observation,
@@ -538,6 +543,7 @@ fn select_ai(
         Ai::Random => (random.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Greedy => (greedy.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Eval => (eval.select(obs, legal, rng), MctsOutcome::default()),
+        Ai::EvalVeg => (eval_veg.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Mcts => {
             let limit = search.unwrap_or(SearchLimit::Simulations(mcts.simulations));
             match mcts.select_with_limit(obs, legal, rng, limit) {
@@ -577,6 +583,7 @@ impl SeatSelector<'_> {
                 self.random,
                 self.greedy,
                 self.eval,
+                self.eval_veg,
                 self.mcts,
                 self.puct,
                 obs,
@@ -590,6 +597,7 @@ impl SeatSelector<'_> {
                 self.random,
                 self.greedy,
                 self.eval,
+                self.eval_veg,
                 self.mcts,
                 self.puct,
                 obs,
@@ -656,6 +664,7 @@ fn run(options: &Options) -> Result<(), String> {
     let random = RandomPolicy;
     let greedy = GreedyPolicy;
     let eval = EvaluationPolicy;
+    let eval_veg = VegetableFirstEvaluationPolicy;
     let mcts = MctsPolicy {
         simulations: options.mcts_simulations,
         tree_depth: options.mcts_tree_depth,
@@ -746,6 +755,7 @@ fn run(options: &Options) -> Result<(), String> {
                     random: &random,
                     greedy: &greedy,
                     eval: &eval,
+                    eval_veg: &eval_veg,
                     mcts: &mcts,
                     puct: &puct,
                     search: Some(search_settings),
@@ -940,6 +950,7 @@ mod tests {
     fn mcts_is_a_recognized_ai_name() {
         assert_eq!(Ai::parse("mcts").unwrap(), Ai::Mcts);
         assert_eq!(Ai::parse("puct").unwrap(), Ai::Puct);
+        assert_eq!(Ai::parse("eval_veg").unwrap(), Ai::EvalVeg);
         assert!(Ai::Mcts.is_search() && Ai::Puct.is_search());
         assert!(!Ai::Eval.is_search() && !Ai::Random.is_search());
         assert_eq!(PuctConfig::default().leaf_mode, LeafMode::Terminal);
@@ -1012,7 +1023,7 @@ mod tests {
         let shared = settings(SearchMode::SimulationCapped, 3, 7);
         assert_eq!(fixed_count(shared.rule_for(Ai::Mcts).unwrap()), 3);
         assert_eq!(fixed_count(shared.rule_for(Ai::Puct).unwrap()), 7);
-        for heuristic in [Ai::Random, Ai::Greedy, Ai::Eval] {
+        for heuristic in [Ai::Random, Ai::Greedy, Ai::Eval, Ai::EvalVeg] {
             assert!(
                 shared.rule_for(heuristic).is_none(),
                 "heuristics must not receive a search limit"
