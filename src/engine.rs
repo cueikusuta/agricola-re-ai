@@ -874,17 +874,32 @@ impl Game {
     ) -> Result<Self> {
         Self::replay_with_setup(config, cards, None, events)
     }
-    /// Replay with an explicit initial card state. `hands = Some(..)` rebuilds a
-    /// draft-seeded game (#104); `None` re-deals randomly from the seed.
+    /// Replay with explicitly drafted hands, or with a seed-based random deal.
+    /// Existing callers preserve the historical game-seed start-player draw.
     pub fn replay_with_setup(
         config: Config,
         cards: crate::cards::CardSet,
         hands: Option<Vec<Vec<String>>>,
         events: &[Event],
     ) -> Result<Self> {
-        let mut g = match hands {
-            Some(hands) => Game::with_cards_and_hands(config, cards, hands)?,
-            None => Game::with_cards(config, cards)?,
+        Self::replay_with_setup_and_start_player(config, cards, hands, None, events)
+    }
+
+    /// Replay a draft whose first start player was publicly drawn before picking.
+    pub fn replay_with_setup_and_start_player(
+        config: Config,
+        cards: crate::cards::CardSet,
+        hands: Option<Vec<Vec<String>>>,
+        first_start_player: Option<usize>,
+        events: &[Event],
+    ) -> Result<Self> {
+        let mut g = match (hands, first_start_player) {
+            (Some(hands), Some(starter)) => {
+                Game::with_cards_and_hands_with_start_player(config, cards, hands, starter)?
+            }
+            (Some(hands), None) => Game::with_cards_and_hands(config, cards, hands)?,
+            (None, None) => Game::with_cards(config, cards)?,
+            (None, Some(_)) => return Err("start player override requires draft hands".into()),
         };
         for event in events {
             g.apply_recorded(event)?;

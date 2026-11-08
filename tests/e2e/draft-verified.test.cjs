@@ -31,7 +31,7 @@ async function startDraft(page, options) {
   await page.locator("#draftMode").selectOption(options.mode);
   await page.locator("#draftPlayers").selectOption(String(options.players || 2));
   await page.locator("#draftSeed").fill(String(options.seed));
-  await page.locator("#draftDirOcc").selectOption(options.dirOcc || "left");
+  await page.locator("#draftDirOcc").selectOption(options.dirOcc || "right");
   await page.locator("#draftDirMinor").selectOption(options.dirMinor || "right");
   if (options.occFirst === false) await page.locator("#draftOccFirst").uncheck();
   else await page.locator("#draftOccFirst").check();
@@ -72,7 +72,7 @@ async function startDraft(page, options) {
     ai: options.ai || "card_value",
     pool: options.pool || "verified_basic",
     players: options.players || 2,
-    dirOcc: options.dirOcc || "left",
+    dirOcc: options.dirOcc || "right",
     dirMinor: options.dirMinor || "right",
     occFirst: options.occFirst !== false
   }, { timeout: 15000 });
@@ -175,7 +175,8 @@ test("Issue #104: verified draft pool and draft-to-game path in the browser", as
     assert.match(status, /実装済みカードプール/);
     // The explicitly chosen conventions must be visible to the player.
     assert.match(status, /人数 2人/);
-    assert.match(status, /受渡 職業:左へ 小進歩:右へ/);
+    assert.match(status, /受渡 職業:右へ 小進歩:右へ/);
+    assert.match(status, /初回スタート/);
     assert.match(status, /順序:職業→小進歩/);
     assert.match(status, /verify|verified-basic/);
 
@@ -196,6 +197,7 @@ test("Issue #104: verified draft pool and draft-to-game path in the browser", as
     await page.locator("#draftStartGame").click();
     await page.waitForFunction(() => Boolean(state.draft && state.draft.game_started),
       null, { timeout: 20000 });
+    assert.equal(await page.evaluate(() => state.public.start_player), completed.start_player);
     assert.match(await page.locator("#turn").innerText(), /ラウンド 1\/14・1Pの手番/);
 
     const hand = await page.evaluate(() => [...state.hand].sort());
@@ -239,13 +241,13 @@ test("Issue #104: verified draft pool and draft-to-game path in the browser", as
       "a refused four-seat draft does not replace the running session");
   });
 
-  await scenario("explicit_direction_and_phase_order_are_reported", async () => {
+  await scenario("clockwise_direction_and_phase_order_are_reported", async () => {
     await startDraft(page, {
-      mode: "draft_7_7", seed: 609, dirOcc: "right", dirMinor: "left",
+      mode: "draft_7_7", seed: 609, dirOcc: "right", dirMinor: "right",
       occFirst: false, pool: "test_fixture", ai: "synergy"
     });
     const status = await page.locator("#draftStatus").innerText();
-    assert.match(status, /受渡 職業:右へ 小進歩:左へ/);
+    assert.match(status, /受渡 職業:右へ 小進歩:右へ/);
     assert.match(status, /順序:小進歩→職業/);
     assert.match(status, /CPU:synergy/);
     // The first phase follows the explicit order, not a hard-coded default.
@@ -266,6 +268,7 @@ test("Issue #104: verified draft pool and draft-to-game path in the browser", as
     const after = await draftView(page);
     // The whole public observation must survive the reload unchanged.
     assert.equal(after.request_token, before.request_token);
+    assert.equal(after.start_player, before.start_player);
     assert.equal(after.phase, before.phase);
     assert.equal(after.round, before.round);
     assert.equal(after.active_kind, before.active_kind);

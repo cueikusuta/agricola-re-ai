@@ -563,6 +563,9 @@ pub struct GameLog {
     pub rules_version: String,
     pub config: Config,
     pub start_player: usize,
+    /// None is the historical game-seed draw; Some fixes the pre-draft draw.
+    #[serde(default)]
+    pub initial_start_player_override: Option<usize>,
     pub initial_state_hash: String,
     #[serde(default)]
     pub initial_public_state: Option<PublicState>,
@@ -597,7 +600,7 @@ impl Game {
         }
         card_set.validate(config.players)?;
         let cards = CardState::deal(&card_set, config.seed, config.players);
-        Self::from_card_state(config, card_set, cards, None)
+        Self::from_card_state(config, card_set, cards, None, None)
     }
     /// Start a game from explicit, already-drafted hands instead of the random
     /// [`CardState::deal`]. This is the M11 draft-to-game bridge (#104): only
@@ -617,13 +620,33 @@ impl Game {
             return Err("explicit hands must match the player count".into());
         }
         let cards = CardState::from_hands(&card_set, &hands)?;
-        Self::from_card_state(config, card_set, cards, Some(hands))
+        Self::from_card_state(config, card_set, cards, Some(hands), None)
     }
+    /// Reuse a start player selected and announced *before* drafting. The
+    /// round deck keeps its own game seed and independent shuffle stream.
+    pub fn with_cards_and_hands_with_start_player(
+        config: Config,
+        card_set: CardSet,
+        hands: Vec<Vec<String>>,
+        start_player: usize,
+    ) -> Result<Self, String> {
+        if !(2..=4).contains(&config.players) || start_player >= config.players {
+            return Err("invalid drafted start player or player count".into());
+        }
+        card_set.validate(config.players)?;
+        if hands.len() != config.players {
+            return Err("explicit hands must match the player count".into());
+        }
+        let cards = CardState::from_hands(&card_set, &hands)?;
+        Self::from_card_state(config, card_set, cards, Some(hands), Some(start_player))
+    }
+
     fn from_card_state(
         config: Config,
         card_set: CardSet,
         cards: CardState,
         initial_hands: Option<Vec<Vec<String>>>,
+        initial_start_player_override: Option<usize>,
     ) -> Result<Self, String> {
         let round_seed = config.seed ^ 0x38DB_3BE3_DF45_3FAF;
         let action_seed = config.seed ^ 0x6A09_E667_F3BC_C909;
@@ -631,7 +654,13 @@ impl Game {
             round: ChaCha8Rng::seed_from_u64(round_seed),
             ai: ChaCha8Rng::seed_from_u64(action_seed),
         };
-        let start_player = rng.round.gen_range(0..config.players);
+        // Keep the game RNG stream stable even when a draft already selected
+        // the first seat with its separate, domain-separated draw.
+        let drawn_start_player = rng.round.gen_range(0..config.players);
+        let start_player = initial_start_player_override.unwrap_or(drawn_start_player);
+        if start_player >= config.players {
+            return Err("drafted start player out of range".into());
+        }
         let mut deck = Vec::new();
         for stage in 1..=6 {
             let mut cards = RoundCard::ALL
@@ -667,6 +696,7 @@ impl Game {
             rules_version: RULES_VERSION.into(),
             config: config.clone(),
             start_player,
+            initial_start_player_override,
             initial_state_hash: String::new(),
             initial_public_state: None,
             round_seed,
@@ -731,11 +761,21 @@ impl Game {
         {
             return Err("saved game metadata/version mismatch".into());
         }
-        let initial = match result.log.initial_hands.clone() {
-            Some(hands) => {
+        let initial = match (
+            result.log.initial_hands.clone(),
+            result.log.initial_start_player_override,
+        ) {
+            (Some(hands), Some(starter)) => Game::with_cards_and_hands_with_start_player(
+                result.config.clone(),
+                result.card_set.clone(),
+                hands,
+                starter,
+            )?,
+            (Some(hands), None) => {
                 Game::with_cards_and_hands(result.config.clone(), result.card_set.clone(), hands)?
             }
-            None => Game::with_cards(result.config.clone(), result.card_set.clone())?,
+            (None, None) => Game::with_cards(result.config.clone(), result.card_set.clone())?,
+            (None, Some(_)) => return Err("start player override requires draft hands".into()),
         };
         if result.log.start_player != initial.public.start_player
             || result.log.initial_state_hash != initial.state_hash()
@@ -754,10 +794,11 @@ impl Game {
         }
         // Check the complete event chain, rather than trusting only the
         // last event hash; otherwise earlier tampering could go unnoticed.
-        let replayed = Game::replay_with_setup(
+        let replayed = Game::replay_with_setup_and_start_player(
             result.config.clone(),
             result.card_set.clone(),
             result.log.initial_hands.clone(),
+            result.log.initial_start_player_override,
             &result.log.events,
         )?;
         if replayed.state_hash() != result.state_hash() {
