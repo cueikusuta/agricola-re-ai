@@ -29,17 +29,17 @@ on:
       candidate:
         description: 'Candidate AI (mcts = M7 card-aware search, puct = M8-3 PUCT)'
         type: choice
-        options: ['eval', 'greedy', 'random', 'mcts', 'puct']
+        options: ['eval', 'eval_veg', 'eval_food', 'eval_veg_cond', 'eval_room', 'greedy', 'random', 'mcts', 'puct']
         default: 'eval'
         required: true
       baseline:
         type: choice
-        options: ['random', 'greedy', 'eval', 'mcts', 'puct']
+        options: ['random', 'greedy', 'eval', 'eval_veg', 'eval_food', 'eval_veg_cond', 'eval_room', 'mcts', 'puct']
         default: 'greedy'
         required: true
       opponent:
         type: choice
-        options: ['random', 'greedy', 'eval', 'mcts', 'puct']
+        options: ['random', 'greedy', 'eval', 'eval_veg', 'eval_food', 'eval_veg_cond', 'eval_room', 'mcts', 'puct']
         default: 'greedy'
         required: true
       extra:
