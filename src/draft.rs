@@ -19,14 +19,14 @@
 //! [`DraftRuleset`] with no silent default. Callers that have not decided a
 //! convention must not start a draft.
 
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Version of the on-disk/server draft schema.
-pub const DRAFT_SCHEMA_VERSION: u32 = 1;
+pub const DRAFT_SCHEMA_VERSION: u32 = 2;
 
 /// A card is either an occupation or a minor improvement for draft purposes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -103,8 +103,9 @@ pub enum Direction {
 impl Direction {
     pub fn step(self, seat: usize, players: usize) -> usize {
         match self {
-            Direction::Left => (seat + 1) % players,
-            Direction::Right => (seat + players - 1) % players,
+            // Seats are numbered in clockwise order (1P -> 2P -> 3P -> 4P).
+            Direction::Left => (seat + players - 1) % players,
+            Direction::Right => (seat + 1) % players,
         }
     }
 }
@@ -218,6 +219,12 @@ pub struct DraftSetup {
 impl DraftSetup {
     pub fn validate(&self) -> Result<(), String> {
         self.pool.check_supply(self.mode, self.player_count)?;
+        if matches!(self.mode, DraftMode::Draft77 | DraftMode::Draft10_7Simultaneous)
+            && (self.ruleset.direction_occupation != Direction::Right
+                || self.ruleset.direction_minor != Direction::Right)
+        {
+            return Err("draft packets must pass clockwise (right) for both kinds".into());
+        }
         if self.ruleset.id.trim().is_empty() {
             return Err("draft ruleset id must not be empty".into());
         }
@@ -234,6 +241,10 @@ impl DraftSetup {
         let players = self.player_count;
         let mode = self.mode;
         let dealt = mode.dealt_per_kind();
+        // Separate the pre-draft starting-seat draw from both card shuffles.
+        // A fixed seed reproduces the choice without leaking the deck RNG.
+        let mut starter_rng = ChaCha8Rng::seed_from_u64(self.seed ^ 0x5354_4152_545F_5031);
+        let start_player = starter_rng.gen_range(0..players);
         let occupations = shuffle(&self.pool.occupations, self.seed, 0x0CC0_0001);
         let minors = shuffle(&self.pool.minors, self.seed, 0x0CC0_0002);
         let mut kind_of = BTreeMap::new();
@@ -300,6 +311,7 @@ impl DraftSetup {
             mode,
             ruleset: self.ruleset.clone(),
             player_count: players,
+            start_player,
             seed: self.seed,
             deck_version: self.deck_version.clone(),
             round: if complete { 0 } else { 1 },
@@ -415,6 +427,8 @@ pub struct DraftCardInfo {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DraftObservation {
     pub viewer: usize,
+    /// Public initial start-player seat, drawn before the draft begins.
+    pub start_player: usize,
     pub mode: DraftMode,
     pub ruleset_id: String,
     pub phase: DraftPhase,
@@ -449,6 +463,8 @@ pub struct DraftState {
     pub mode: DraftMode,
     pub ruleset: DraftRuleset,
     pub player_count: usize,
+    /// Public first start-player seat, chosen before the draft begins.
+    pub start_player: usize,
     /// Server-only deck seed. Never placed in [`DraftObservation`].
     pub seed: u64,
     pub deck_version: String,
@@ -545,6 +561,7 @@ impl DraftState {
         };
         Ok(DraftObservation {
             viewer,
+            start_player: self.start_player,
             mode: self.mode,
             ruleset_id: self.ruleset.id.clone(),
             phase: self.phase,
@@ -881,6 +898,7 @@ impl DraftState {
             self.mode,
             &self.ruleset,
             self.player_count,
+            self.start_player,
             self.seed,
             &self.deck_version,
             self.round,
@@ -901,7 +919,7 @@ impl DraftState {
     /// Server-side complete-log hash. Kept separate from the observable view.
     pub fn log_hash(&self) -> String {
         let data =
-            serde_json::to_vec(&(self.seed, &self.deck_version, &self.actions, &self.history))
+            serde_json::to_vec(&(self.seed, self.start_player, &self.deck_version, &self.actions, &self.history))
                 .expect("draft log serialization");
         format!("{:x}", Sha256::digest(&data))
     }
@@ -913,6 +931,9 @@ impl DraftState {
         }
         if !(2..=4).contains(&self.player_count) {
             return Err("draft player_count out of range".into());
+        }
+        if self.start_player >= self.player_count {
+            return Err("draft initial start player out of range".into());
         }
         if self.picked.len() != self.player_count
             || self.commitments.len() != self.player_count
