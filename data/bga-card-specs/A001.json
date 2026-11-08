@@ -54,7 +54,9 @@
           "target": "board",
           "params": {
             "amount": 1,
-            "wood_cost": 0
+            "wood_cost": 0,
+            "placement_scope": "one_cell_pasture",
+            "pasture_size": 1
           }
         }
       ],
@@ -74,11 +76,12 @@
     "unresolved_fields": [],
     "test_case_ids": [
       "A001-normal",
-      "A001-not-triggered"
+      "A001-not-triggered",
+      "A001-outside-pasture"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "May build 1 free stable, but only inside a pasture of exactly 1 farmyard space; pass left."
+    "notes": "May build 1 free stable only on the exact cell of a fenced one-cell pasture; pass left."
   }
 }
