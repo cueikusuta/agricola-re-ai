@@ -219,9 +219,11 @@ pub struct DraftSetup {
 impl DraftSetup {
     pub fn validate(&self) -> Result<(), String> {
         self.pool.check_supply(self.mode, self.player_count)?;
-        if matches!(self.mode, DraftMode::Draft77 | DraftMode::Draft10_7Simultaneous)
-            && (self.ruleset.direction_occupation != Direction::Right
-                || self.ruleset.direction_minor != Direction::Right)
+        if matches!(
+            self.mode,
+            DraftMode::Draft77 | DraftMode::Draft10_7Simultaneous
+        ) && (self.ruleset.direction_occupation != Direction::Right
+            || self.ruleset.direction_minor != Direction::Right)
         {
             return Err("draft packets must pass clockwise (right) for both kinds".into());
         }
