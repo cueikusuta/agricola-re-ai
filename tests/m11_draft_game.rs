@@ -177,7 +177,10 @@ fn verified_draft77_hand_is_injected_without_random_redistribution() {
     assert_hand_matches_set(&game, 1, &hands[1]);
     assert_eq!(game.public.start_player, state.start_player);
     assert_eq!(game.log.start_player, state.start_player);
-    assert_eq!(game.log.initial_start_player_override, Some(state.start_player));
+    assert_eq!(
+        game.log.initial_start_player_override,
+        Some(state.start_player)
+    );
     assert_eq!(game.public.players[state.start_player].supply.food, 2);
     game.validate().unwrap();
     assert_eq!(game.log.initial_hands.as_deref(), Some(hands.as_slice()));
@@ -203,7 +206,10 @@ fn draft_seeded_game_saves_loads_and_replays_by_hash() {
         "save/load must round-trip exactly"
     );
     assert_eq!(loaded.public.start_player, state.start_player);
-    assert_eq!(loaded.log.initial_start_player_override, Some(state.start_player));
+    assert_eq!(
+        loaded.log.initial_start_player_override,
+        Some(state.start_player)
+    );
     assert_hand_matches_set(&loaded, 0, &hands[0]);
 
     let replayed = Game::replay_with_setup_and_start_player(
