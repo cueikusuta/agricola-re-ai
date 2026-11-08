@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "card_id": "A104",
+  "cases": [
+    {
+      "id": "A104-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood_spaces": {
+          "forest": 2,
+          "copse": 2
+        }
+      },
+      "action": {
+        "advance_to_harvest_field_phase": true
+      },
+      "expected": {
+        "owner_wood_delta": 2,
+        "owner_food_delta": 0
+      }
+    },
+    {
+      "id": "A104-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood_spaces": {
+          "forest": 4
+        }
+      },
+      "action": {
+        "advance_to_harvest_field_phase": true
+      },
+      "expected": {
+        "owner_wood_delta": 0,
+        "owner_food_delta": 1
+      }
+    },
+    {
+      "id": "A104-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood_spaces": {}
+      },
+      "action": {
+        "advance_to_harvest_field_phase": true
+      },
+      "expected": {
+        "owner_wood_delta": 0,
+        "owner_food_delta": 0
+      },
+      "notes": "Wood counts of 0-1 give nothing."
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "card_id": "A106",
+  "cases": [
+    {
+      "id": "A106-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "field_phase_takes": [
+          {
+            "field": 0,
+            "crop": "grain",
+            "taken": 3,
+            "left": 0
+          }
+        ]
+      },
+      "action": {
+        "advance_to_harvest_field_phase": true
+      },
+      "expected": {
+        "owner_food_delta": 2
+      }
+    },
+    {
+      "id": "A106-vegetable",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "field_phase_takes": [
+          {
+            "field": 0,
+            "crop": "vegetable",
+            "taken": 1,
+            "left": 0
+          }
+        ]
+      },
+      "action": {
+        "advance_to_harvest_field_phase": true
+      },
+      "expected": {
+        "owner_food_delta": 1
+      },
+      "notes": "Taking a field's last vegetable gives 1 food."
+    },
+    {
+      "id": "A106-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "field_phase_takes": [
+          {
+            "field": 0,
+            "crop": "grain",
+            "taken": 2,
+            "left": 1
+          }
+        ]
+      },
+      "action": {
+        "advance_to_harvest_field_phase": true
+      },
+      "expected": {
+        "owner_food_delta": 0
+      },
+      "notes": "Only taking the very last grain or vegetable counts, per field."
+    }
+  ]
+}

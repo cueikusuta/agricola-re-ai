@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "A095",
+  "cases": [
+    {
+      "id": "A095-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_food": 2
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "major_or_minor_improvement_action_granted": 1
+      }
+    },
+    {
+      "id": "A095-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_food": 3
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "major_or_minor_improvement_action_granted": 0
+      }
+    },
+    {
+      "id": "A095-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_food": 2
+      },
+      "action": {
+        "use_space": "traveling_players"
+      },
+      "expected": {
+        "major_or_minor_improvement_action_granted": 0
+      },
+      "notes": "Only the Fishing space qualifies."
+    }
+  ]
+}

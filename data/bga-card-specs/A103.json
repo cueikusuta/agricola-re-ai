@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "card_id": "A103",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "港の商人",
+    "name_en": "Portmonger"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3322",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "fishing",
+              "traveling_players"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "tiers": [
+              {
+                "taken_max": 1,
+                "good": "vegetable"
+              },
+              {
+                "taken_exact": 2,
+                "good": "grain"
+              },
+              {
+                "taken_min": 3,
+                "good": "reed"
+              }
+            ],
+            "amount": 1,
+            "mode": "positional_exact",
+            "kind": "gain_good_by_food_tier"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "The amount taken maps to exactly one tier; the cumulative alternative is unresolved."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "tier_mapping_positional_or_cumulative"
+    ],
+    "test_case_ids": [
+      "A103-normal",
+      "A103-boundary-two",
+      "A103-boundary-three",
+      "A103-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Taking 1/2/3+ food from a food accumulation space gains 1 vegetable/grain/reed. Encoded with the positional-exact leading reading; wiki usage note pairings conflict, so left unresolved."
+  }
+}

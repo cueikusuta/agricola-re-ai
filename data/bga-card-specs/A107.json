@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "card_id": "A107",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "待ち構え",
+    "name_en": "Catcher"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3318",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "forest",
+              "copse",
+              "clay_pit",
+              "reed_bank",
+              "western_quarry",
+              "eastern_quarry"
+            ]
+          }
+        },
+        {
+          "predicate": "own_placement_index_this_round",
+          "params": {
+            "index": 1
+          }
+        },
+        {
+          "predicate": "accumulation_exactly",
+          "params": {
+            "n": 5
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Building-material accumulation spaces only, counted at the moment of use."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "forest",
+              "copse",
+              "clay_pit",
+              "reed_bank",
+              "western_quarry",
+              "eastern_quarry"
+            ]
+          }
+        },
+        {
+          "predicate": "own_placement_index_this_round",
+          "params": {
+            "index": 2
+          }
+        },
+        {
+          "predicate": "accumulation_exactly",
+          "params": {
+            "n": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Building-material accumulation spaces only, counted at the moment of use."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "forest",
+              "copse",
+              "clay_pit",
+              "reed_bank",
+              "western_quarry",
+              "eastern_quarry"
+            ]
+          }
+        },
+        {
+          "predicate": "own_placement_index_this_round",
+          "params": {
+            "index": 3
+          }
+        },
+        {
+          "predicate": "accumulation_exactly",
+          "params": {
+            "n": 3
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 2,
+      "decision_owner": "none",
+      "notes": "Building-material accumulation spaces only, counted at the moment of use."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A107-normal",
+      "A107-not-triggered",
+      "A107-boundary",
+      "A107-food-space"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Using a building-material accumulation space holding exactly 5/4/3 with the owner's 1st/2nd/3rd person of the round gives 1 food; food spaces excluded."
+  }
+}

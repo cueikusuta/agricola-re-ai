@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "card_id": "A092",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "養父母",
+    "name_en": "Adoptive Parents"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3333",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_family_growth",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "member": "family_member_born_this_round",
+            "counts_as_newborn": false,
+            "kind": "allow_family_member_to_act"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_growth",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Member grown in the current round acts at once and stopped being newborn."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A092-normal",
+      "A092-not-triggered",
+      "A092-boundary"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Pay 1 food so a family member grown this round may act at once; it does not count as newborn."
+  }
+}

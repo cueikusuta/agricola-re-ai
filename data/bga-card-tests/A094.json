@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "A094",
+  "cases": [
+    {
+      "id": "A094-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "obtained_sow": "unconditional",
+        "persons_unplaced": 1
+      },
+      "action": {
+        "decline_sow": true
+      },
+      "expected": {
+        "place_unplaced_person": 1,
+        "allowed_occupied_space": true
+      }
+    },
+    {
+      "id": "A094-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "obtained_sow": "conditional",
+        "persons_unplaced": 1
+      },
+      "action": {
+        "decline_sow": true
+      },
+      "expected": {
+        "place_unplaced_person": 0
+      },
+      "notes": "Restricted sow grants do not qualify."
+    },
+    {
+      "id": "A094-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "obtained_sow": "unconditional",
+        "persons_unplaced": 0
+      },
+      "action": {
+        "decline_sow": true
+      },
+      "expected": {
+        "place_unplaced_person": 0
+      },
+      "notes": "No still-unplaced person: nothing is placed."
+    }
+  ]
+}

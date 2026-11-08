@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "card_id": "A092",
+  "cases": [
+    {
+      "id": "A092-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "round": 3,
+        "owner_food": 2,
+        "family_grown_this_round": 1
+      },
+      "action": {
+        "apply_card_on_family_growth": true
+      },
+      "expected": {
+        "owner_food_delta": -1,
+        "member_acts_this_round": true,
+        "counts_as_newborn": false
+      }
+    },
+    {
+      "id": "A092-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": false,
+        "family_grown_this_round": 1
+      },
+      "action": {
+        "apply_card_on_family_growth": true
+      },
+      "expected": {
+        "member_acts_this_round": false,
+        "counts_as_newborn": true
+      },
+      "notes": "Without this occupation the normal newborn rule applies."
+    },
+    {
+      "id": "A092-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "owner_food": 0,
+        "family_grown_this_round": 1
+      },
+      "action": {
+        "apply_card_on_family_growth": true
+      },
+      "expected": {
+        "member_acts_this_round": false,
+        "counts_as_newborn": true
+      },
+      "notes": "Paying 1 food is required for the early action."
+    }
+  ]
+}

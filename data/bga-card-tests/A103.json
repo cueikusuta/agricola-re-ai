@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "card_id": "A103",
+  "cases": [
+    {
+      "id": "A103-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_type": "food_accumulation"
+      },
+      "action": {
+        "take_food": 1
+      },
+      "expected": {
+        "bonus_good": "vegetable"
+      }
+    },
+    {
+      "id": "A103-boundary-two",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_type": "food_accumulation"
+      },
+      "action": {
+        "take_food": 2
+      },
+      "expected": {
+        "bonus_good": "grain"
+      },
+      "notes": "Tier 2 taken positionally; the cumulative reading would differ."
+    },
+    {
+      "id": "A103-boundary-three",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_type": "food_accumulation"
+      },
+      "action": {
+        "take_food": 4
+      },
+      "expected": {
+        "bonus_good": "reed"
+      },
+      "notes": "Tier three-or-more read positionally; unresolved against the other reading."
+    },
+    {
+      "id": "A103-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_type": "wood_accumulation"
+      },
+      "action": {
+        "take_food": 1
+      },
+      "expected": {
+        "bonus_good": null
+      }
+    }
+  ]
+}
