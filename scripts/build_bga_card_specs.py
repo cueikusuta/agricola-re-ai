@@ -1694,7 +1694,7 @@ CARDS = {
                        {"kind": "exchange",
                         "give": [{"good": "stone", "amount": 4}],
                         "receive": [{"good": "cattle", "amount": 1}]},
-                   ])],
+                   ], max_uses=2)],
                    optional=True, decision="owner",
                    notes="up to two exchanges; each option may be taken at most once"),
         ],
@@ -1740,6 +1740,10 @@ CARDS = {
     },
     "E022": {
         "post": "played_area",
+        "status": "needs_resolution",
+        "unresolved": [
+            "effects.1.timing: the card is usable once per round at any time, which the trigger vocabulary cannot express; modeled as a round-end action"
+        ],
         "effects": [
             effect("on_play", [special("place_food_on_card", any_amount=True)],
                    optional=True, decision="owner"),
@@ -2006,8 +2010,8 @@ def build_spec(row: dict) -> dict:
         play["alternative_cost_notes"] = row["cost_alternative"]
     tests = entry["tests"]
     review = {
-        "status": "bga_checked",
-        "unresolved_fields": [],
+        "status": entry.get("status", "bga_checked"),
+        "unresolved_fields": entry.get("unresolved", []),
         "test_case_ids": [c["id"] for c in tests],
         "checked_by": "AI source comparison",
         "checked_on": CHECKED_ON,

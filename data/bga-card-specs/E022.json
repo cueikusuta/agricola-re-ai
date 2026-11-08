@@ -100,8 +100,10 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.1.timing: the card is usable once per round at any time, which the trigger vocabulary cannot express; modeled as a round-end action"
+    ],
     "test_case_ids": [
       "E022-normal",
       "E022-use",
