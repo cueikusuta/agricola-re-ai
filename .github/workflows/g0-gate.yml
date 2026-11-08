@@ -1,0 +1,414 @@
+name: G0 gate (real data)
+
+# One manual run produces every artifact the M14 G0 gate needs, at one commit:
+#
+#   M8 evidence  -> tests actually executed (rule expectations, legal detail API,
+#                   observation non-interference, seed reproducibility)
+#   episodes     -> 1,000 replay-verified self-play episodes (learning data)
+#   evaluation   -> 1,000 games per arm, seat-rotated, seed blocks
+#   gate         -> manifest + evidence + checks -> G0 verdict
+#
+# Nothing here is typed in: the four attested checks are derived by
+# `scripts/m8_evidence.py` from the test logs of *this* run, then bound to the
+# matches bytes and this commit. A missing test, a changed digest or an
+# incomplete artifact makes the gate `hold`/`fail`; it never passes silently.
+#
+# The verdict is `pass` only when every check passes. The job then fails unless
+# the verdict is `pass`, so a workflow run cannot be read as a green light when
+# the gate is `hold`. Artifacts are uploaded first, so a `hold` still leaves the
+# evidence for review.
+#
+# Cost: standard GitHub-hosted CPU runners only. No GPU, no paid runner.
+on:
+  workflow_dispatch:
+    inputs:
+      episodes:
+        description: 'Learning episodes (must match the split ranges)'
+        type: number
+        default: 1000
+        required: true
+      dataset_shards:
+        description: 'Seed shards for episode generation (1..16)'
+        type: number
+        default: 4
+        required: true
+      dataset_policy:
+        description: 'Space policy for every learning seat'
+        type: choice
+        options: ['eval', 'greedy', 'random']
+        default: 'eval'
+        required: true
+      dataset_seed_start:
+        description: 'First learning seed'
+        type: string
+        default: '920000'
+        required: true
+      train_range:
+        description: 'Train seed range LOW:HIGH (inclusive)'
+        type: string
+        default: '920000:920249'
+        required: true
+      validation_range:
+        description: 'Validation seed range LOW:HIGH (inclusive)'
+        type: string
+        default: '920250:920399'
+        required: true
+      test_range:
+        description: 'Locked test seed range LOW:HIGH (inclusive)'
+        type: string
+        default: '920400:920999'
+        required: true
+      players:
+        description: 'Players in the evaluated mode'
+        type: choice
+        options: ['2', '3', '4']
+        default: '2'
+        required: true
+      blocks:
+        description: 'Seed blocks (blocks x players seats x 2 arms games)'
+        type: number
+        default: 500
+        required: true
+      eval_seed_start:
+        description: 'First evaluation seed block seed'
+        type: string
+        default: '920500'
+        required: true
+      candidate:
+        description: 'Candidate AI arm'
+        type: choice
+        options: ['eval', 'greedy', 'random', 'mcts', 'puct']
+        default: 'eval'
+        required: true
+      baseline:
+        description: 'Baseline AI arm'
+        type: choice
+        options: ['random', 'greedy', 'eval', 'mcts', 'puct']
+        default: 'random'
+        required: true
+      opponent:
+        description: 'Fixed opponent for the other seats'
+        type: choice
+        options: ['random', 'greedy', 'eval', 'mcts', 'puct']
+        default: 'greedy'
+        required: true
+      cards:
+        description: 'Card condition (verified is the built-in two-player pool)'
+        type: choice
+        options: ['none', 'verified_basic_2p']
+        default: 'none'
+        required: true
+      extra:
+        description: 'Enable the additional action space'
+        type: boolean
+        default: false
+        required: true
+      search_mode:
+        description: 'simulation-capped (reproducible) or time-budgeted'
+        type: choice
+        options: ['simulation-capped', 'time-budgeted']
+        default: 'simulation-capped'
+        required: true
+      decision_budget_ms:
+        description: 'Per-decision budget (time-budgeted mode only)'
+        type: number
+        default: 0
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g0-gate-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  EPISODES: ${{ inputs.episodes }}
+  DATASET_SHARDS: ${{ inputs.dataset_shards }}
+  DATASET_POLICY: ${{ inputs.dataset_policy }}
+  DATASET_SEED_START: ${{ inputs.dataset_seed_start }}
+  TRAIN_RANGE: ${{ inputs.train_range }}
+  VALIDATION_RANGE: ${{ inputs.validation_range }}
+  TEST_RANGE: ${{ inputs.test_range }}
+  PLAYERS: ${{ inputs.players }}
+  BLOCKS: ${{ inputs.blocks }}
+  EVAL_SEED_START: ${{ inputs.eval_seed_start }}
+  CANDIDATE: ${{ inputs.candidate }}
+  BASELINE: ${{ inputs.baseline }}
+  OPPONENT: ${{ inputs.opponent }}
+  CARDS: ${{ inputs.cards }}
+  EXTRA: ${{ inputs.extra }}
+  SEARCH_MODE: ${{ inputs.search_mode }}
+  DECISION_BUDGET_MS: ${{ inputs.decision_budget_ms }}
+
+jobs:
+  m8-evidence:
+    name: M8 evidence
+    uses: ./.github/workflows/m8-evidence.yml
+
+  dataset-plan:
+    name: Plan disjoint episode shards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      shard_indices: ${{ steps.plan.outputs.shard_indices }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import os
+          from scripts.episode_dataset import plan
+          rows = plan(int(os.environ["EPISODES"]), int(os.environ["PLAYERS"]),
+                      int(os.environ["DATASET_SEED_START"]), int(os.environ["DATASET_SHARDS"]))
+          print("shard_indices=" + json.dumps([row["index"] for row in rows]))
+          PY
+
+  dataset-shard:
+    name: Episodes shard ${{ matrix.shard }}
+    needs: [dataset-plan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.dataset-plan.outputs.shard_indices) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bins
+      - name: Generate and replay-verify the shard
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          if [[ "$CARDS" == "verified_basic_2p" ]]; then FLAGS+=(--cards); fi
+          if [[ "$EXTRA" == "true" ]]; then FLAGS+=(--extra); fi
+          python3 scripts/episode_dataset.py shard \
+            --episodes "$EPISODES" --players "$PLAYERS" \
+            --seed-start "$DATASET_SEED_START" --shards "$DATASET_SHARDS" \
+            --shard "${{ matrix.shard }}" --policy "$DATASET_POLICY" \
+            --sha "$GITHUB_SHA" \
+            --out "results/episode-data-shard-${{ matrix.shard }}" \
+            --binary ./target/release/episode_export \
+            --inspect-binary ./target/release/episode_inspect "${FLAGS[@]}"
+      - name: Save shard data and logs, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g0-episode-shard-${{ matrix.shard }}
+          path: results/episode-data-shard-${{ matrix.shard }}/
+          if-no-files-found: warn
+          retention-days: 30
+
+  dataset-aggregate:
+    name: Aggregate episodes and inspect the dataset
+    needs: [dataset-shard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bin episode_inspect
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: g0-episode-shard-*
+          path: results
+      - name: Cross-check shards and build one dataset report
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          if [[ "$CARDS" == "verified_basic_2p" ]]; then FLAGS+=(--cards); fi
+          if [[ "$EXTRA" == "true" ]]; then FLAGS+=(--extra); fi
+          python3 scripts/episode_dataset.py aggregate \
+            --episodes "$EPISODES" --players "$PLAYERS" \
+            --seed-start "$DATASET_SEED_START" --shards "$DATASET_SHARDS" \
+            --policy "$DATASET_POLICY" --sha "$GITHUB_SHA" \
+            --out results "${FLAGS[@]}"
+          mkdir -p gate
+          cat results/episode-data-shard-*/episodes.jsonl > gate/episodes.jsonl
+          ./target/release/episode_inspect \
+            --in gate/episodes.jsonl --report gate/episodes-report.json
+          cp results/summary.json gate/episode-summary.json
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          summary = json.loads(Path("gate/episode-summary.json").read_text(encoding="utf-8"))
+          print(f"episodes: {summary['episodes']} finished: {summary['finished']}  ")
+          print(f"shards: {summary['shards']}  seeds: {summary['seed_start']}..{summary['seed_end']}")
+          PY
+      - name: Save the learning dataset for the gate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g0-dataset
+          path: gate/
+          if-no-files-found: warn
+          retention-days: 30
+
+  eval-shard:
+    name: Evaluation shard ${{ matrix.shard }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bin paired_eval
+      - name: Evaluate distinct complete seed blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          INDEX=${{ matrix.shard }}
+          test "$BLOCKS" -ge 4
+          test "$CANDIDATE" != "$BASELINE"
+          if [[ "$CARDS" != "none" ]]; then test "$PLAYERS" -eq 2; fi
+          if [[ "$SEARCH_MODE" == "time-budgeted" ]]; then test "$DECISION_BUDGET_MS" -gt 0; fi
+          BLOCK_START=$(( BLOCKS * INDEX / 4 ))
+          BLOCK_END=$(( BLOCKS * (INDEX + 1) / 4 ))
+          COUNT=$(( BLOCK_END - BLOCK_START ))
+          mkdir -p "results/shard-$INDEX"
+          ./target/release/paired_eval \
+            --players "$PLAYERS" --seed-start "$EVAL_SEED_START" \
+            --block-start "$BLOCK_START" --blocks "$COUNT" \
+            --candidate "$CANDIDATE" --baseline "$BASELINE" \
+            --opponent "$OPPONENT" --additional-action-space "$EXTRA" \
+            --cards "$CARDS" \
+            --search-mode "$SEARCH_MODE" \
+            --decision-budget-ms "$DECISION_BUDGET_MS" \
+            --output "results/shard-$INDEX/matches.jsonl"
+      - name: Save matches, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g0-matches-${{ matrix.shard }}
+          path: results/shard-${{ matrix.shard }}/
+          if-no-files-found: warn
+          retention-days: 30
+
+  gate:
+    name: Evaluate G0
+    needs: [m8-evidence, dataset-aggregate, eval-shard]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bin dataset_split
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: g0-matches-*
+          path: results
+      - uses: actions/download-artifact@v4
+        with:
+          name: g0-dataset
+          path: gate
+      - uses: actions/download-artifact@v4
+        with:
+          name: m8-evidence
+          path: m8
+      - name: Build the split manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./target/release/dataset_split manifest \
+            --in gate/episodes.jsonl --out gate/manifest.json \
+            --train "$TRAIN_RANGE" --validation "$VALIDATION_RANGE" --test "$TEST_RANGE"
+      - name: Derive the attested checks from this run's tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          MATCHES=()
+          for index in 0 1 2 3; do
+            MATCHES+=(--matches "results/g0-matches-$index/matches.jsonl")
+          done
+          python3 scripts/m8_evidence.py checks \
+            --tests m8/m8-evidence.json \
+            --requirements docs/m8-evidence-requirements.json \
+            --code-sha "$GITHUB_SHA" --run-url "$RUN_URL" \
+            "${MATCHES[@]}" --out gate/checks.json
+          python3 scripts/m8_evidence.py verify \
+            --tests m8/m8-evidence.json \
+            --requirements docs/m8-evidence-requirements.json \
+            --checks gate/checks.json
+      - name: Bind the checks to the evaluation artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          MATCHES=()
+          for index in 0 1 2 3; do
+            MATCHES+=(--matches "results/g0-matches-$index/matches.jsonl")
+          done
+          if [[ "$CARDS" == "none" ]]; then
+            MODE="cardless_${PLAYERS}p"
+          else
+            MODE="verified_basic_${PLAYERS}p"
+          fi
+          python3 scripts/g0_evidence.py \
+            --mode "$MODE" --players "$PLAYERS" --card-mode "$CARDS" \
+            "${MATCHES[@]}" --artifact-url "$RUN_URL" --code-sha "$GITHUB_SHA" \
+            --checks gate/checks.json --out gate/evidence.json
+      - name: Run the gate
+        id: gate
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./target/release/dataset_split g0 \
+            --manifest gate/manifest.json \
+            --dataset-report gate/episodes-report.json \
+            --evidence gate/evidence.json \
+            --out gate/report.json
+      - name: Save the G0 report, evidence and checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g0-report
+          path: |
+            gate/report.json
+            gate/evidence.json
+            gate/checks.json
+            gate/manifest.json
+            gate/episodes-report.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Summarise the verdict
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f gate/report.json ]]; then
+            echo "no G0 report was produced" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          report = json.loads(Path("gate/report.json").read_text(encoding="utf-8"))
+          print(f"**G0 verdict: `{report['verdict']}`**")
+          print()
+          print(f"run: {report.get('evaluated_modes')}")
+          print()
+          print("| check | status | detail |")
+          print("|---|---|---|")
+          for check in report["checks"]:
+              detail = check["detail"].replace("|", "\\|")
+              print(f"| `{check['id']}` | {check['status']} | {detail[:160]} |")
+          PY
+      - name: Fail unless G0 passed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.gate.outcome }}" != "success" ]]; then
+            echo "G0 is not pass; see the g0-report artifact for the hold/fail checks" >&2
+            exit 1
+          fi
