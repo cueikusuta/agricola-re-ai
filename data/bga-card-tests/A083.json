@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "A083",
+  "cases": [
+    {
+      "id": "A083-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "fence_action_spaces": 8
+      },
+      "action": {
+        "fence_new_pasture_spaces": 4
+      },
+      "expected": {
+        "sheep_on_new_pasture": 2
+      }
+    },
+    {
+      "id": "A083-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "fence_action_spaces": 6
+      },
+      "action": {
+        "fence_new_pasture_spaces": 2
+      },
+      "expected": {
+        "sheep_on_new_pasture": 0
+      }
+    },
+    {
+      "id": "A083-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "fence_action_spaces": 16,
+        "new_pastures": 2,
+        "pasture_spaces": [
+          4,
+          4
+        ]
+      },
+      "action": {
+        "fence_new_pastures_spaces": [
+          4,
+          4
+        ]
+      },
+      "expected": {
+        "sheep_on_pastures": [
+          2,
+          2
+        ]
+      },
+      "notes": "Fencing two four-space pastures in one action yields 2 sheep per new pasture."
+    }
+  ]
+}

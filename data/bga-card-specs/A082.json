@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "card_id": "A082",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "労働証明書",
+    "name_en": "Work Certificate"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3343",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "at_least_occupations",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "accumulation_at_least",
+          "params": {
+            "space": "any_building_resource_space",
+            "n": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "good_type": "building_resource",
+            "amount": 1,
+            "kind": "take_good_from_accumulation"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "wood/clay/reed/stone accumulating spaces are eligible even if just used by the owner."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A082-normal",
+      "A082-not-triggered",
+      "A082-boundary"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "After each action-space use, optionally take 1 building material from any accumulating space then holding at least 4."
+  }
+}

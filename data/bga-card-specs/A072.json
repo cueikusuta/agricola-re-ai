@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "A072",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "石灰肥料",
+    "name_en": "Calcium Fertilizers"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3353",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "field_count",
+        "params": {
+          "n": 0
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "western_quarry",
+              "eastern_quarry"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "same_type": true,
+            "amount_per_field": 1,
+            "scope": "planted_fields",
+            "kind": "add_good_to_single_crop_type_fields"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Quarry accumulation spaces only; the added crops are evaluated after the used resolution."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A072-normal",
+      "A072-not-triggered",
+      "A072-boundary"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Prerequisite no field tiles; each quarry accumulation-space use adds 1 more of its own crop type to every field planted with a single crop type."
+  }
+}

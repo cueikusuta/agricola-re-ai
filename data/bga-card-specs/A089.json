@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "card_id": "A089",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "厩設計士",
+    "name_en": "Stable Planner"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3336",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "marker_kind": "stable_marker",
+            "offsets": [
+              3,
+              6,
+              9
+            ],
+            "relative_to": "current_play_round",
+            "kind": "place_on_round_spaces"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "One stable marker is placed on each round space current+3/+6/+9."
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "round_space_has_marker",
+          "params": {
+            "kind": "stable_marker"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "board",
+          "params": {
+            "amount": 1,
+            "wood_cost": 0,
+            "consume_marker": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_round",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "At the start of each marked round the owner may place that stable freely; never earlier."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "round_space_marker_when_current_round_plus_offset_exceeds_14"
+    ],
+    "test_case_ids": [
+      "A089-normal",
+      "A089-not-triggered",
+      "A089-boundary"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Rounds current+3/+6/+9 receive stable markers; those round starts allow one cost-free stable each. Unresolved: computed round beyond 14 at late play."
+  }
+}
