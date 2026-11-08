@@ -21,7 +21,7 @@ fn fixture_setup(mode: DraftMode, players: usize, seed: u64) -> DraftSetup {
     );
     DraftSetup {
         mode,
-        ruleset: DraftRuleset::explicit("test-explicit", Direction::Left, Direction::Right, true),
+        ruleset: DraftRuleset::explicit("test-clockwise-v2", Direction::Right, Direction::Right, true),
         pool,
         player_count: players,
         seed,
