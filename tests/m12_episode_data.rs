@@ -45,7 +45,7 @@ fn completed_draft(
     let n = mode.dealt_per_kind() * players;
     let setup = DraftSetup {
         mode,
-        ruleset: DraftRuleset::explicit("test-explicit", Direction::Left, Direction::Right, true),
+        ruleset: DraftRuleset::explicit("test-clockwise-v2", Direction::Right, Direction::Right, true),
         pool: DraftPool::new(
             (0..n).map(|i| format!("FIX-OCC-{i:02}")).collect(),
             (0..n).map(|i| format!("FIX-MIN-{i:02}")).collect(),
