@@ -810,6 +810,74 @@ class PairedStatsWholeDecisionBudgetTests(unittest.TestCase):
         self.assertTrue(report["candidate_observed_all_decisions_within_10s"])
 
 
+class ComparisonDesignTests(unittest.TestCase):
+    """#106 C-2/C-4: a report must say what was compared, and whether the
+    condition can resolve a +5 pp difference at all."""
+
+    def test_common_opponent_is_not_head_to_head(self):
+        report = run(fixture())
+        design = report["comparison_design"]
+        self.assertFalse(design["head_to_head"])
+        self.assertFalse(design["mirror_baseline"])
+        self.assertEqual(design["candidate_opponent_policies"], ["greedy"])
+        self.assertEqual(design["baseline_opponent_policies"], ["greedy"])
+
+    def test_head_to_head_is_detected_when_the_opponent_is_the_baseline(self):
+        rows = fixture()
+        for row in rows:
+            row["opponent_policy"] = "random"
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="eval", baseline="random", opponent="random",
+            extra=False, cards="none", search_mode="simulation-capped",
+            iterations=500,
+        )
+        design = report["comparison_design"]
+        self.assertTrue(design["head_to_head"])
+        self.assertTrue(design["mirror_baseline"])
+        self.assertEqual(design["baseline_opponent_policies"], ["random"])
+
+    def test_candidate_equal_to_the_opponent_is_a_mirror_not_head_to_head(self):
+        rows = fixture()
+        for row in rows:
+            row["opponent_policy"] = "eval"
+        report = validate_and_report(
+            rows, players=4, seed_start=1000, first_block=0, blocks=3,
+            candidate="eval", baseline="random", opponent="eval",
+            extra=False, cards="none", search_mode="simulation-capped",
+            iterations=500,
+        )
+        self.assertFalse(report["comparison_design"]["head_to_head"])
+
+    def test_a_ceiling_condition_is_flagged_as_undiscriminating(self):
+        report = run(fixture())
+        saturation = report["saturation"]
+        self.assertTrue(saturation["ceiling_limited"])
+        self.assertEqual(saturation["max_first_credit_pct"], 100.0)
+
+    def test_a_balanced_condition_is_not_flagged(self):
+        players = 4
+        rows = fixture(blocks=4)
+        for row in rows:
+            if row["block_index"] % 2 == 1:
+                # The focus seat loses this block, so both arms sit at 50%.
+                seat = row["candidate_seat"]
+                scores = [20] * players
+                ranks = [2] * players
+                winner = (seat + 1) % players
+                scores[winner], ranks[winner] = 30, 1
+                row["scores_by_seat"] = scores
+                row["ranks_by_seat"] = ranks
+                row["first_place_credit"] = 1.0 if ranks[seat] == 1 else 0.0
+                row["expected_rank_observation"] = ranks[seat]
+                row["score_margin"] = (
+                    scores[seat] - (sum(scores) - scores[seat]) / (players - 1))
+        report = run(rows, blocks=4)
+        saturation = report["saturation"]
+        self.assertFalse(saturation["ceiling_limited"])
+        self.assertAlmostEqual(saturation["max_first_credit_pct"], 50.0)
+
+
 if __name__ == "__main__":
     unittest.main()
 if __name__ == "__main__":

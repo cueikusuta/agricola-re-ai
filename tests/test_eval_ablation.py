@@ -1,6 +1,8 @@
 """Fail-closed tests for one-factor-at-a-time ablation comparisons."""
 import copy
+import json
 import unittest
+from pathlib import Path
 
 from scripts.eval_ablation import check_plan, compare_arms, plan_arms
 
@@ -998,6 +1000,66 @@ class AblationSpecificationTests(unittest.TestCase):
         spec["arms"] = [{"label": "control", "candidate": "puct", "puct_c": -1.0}]
         with self.assertRaisesRegex(ValueError, "must be 0..=100"):
             plan_arms(spec)
+
+
+class CommittedHeadToHeadPlanTests(unittest.TestCase):
+    """#106 C-2/C-4: the committed experiment definition is machine-checked.
+
+    The earlier 2-player comparison ranked PUCT and MCTS against a common
+    `greedy` field and saturated at ~100%, so it could not resolve a +5 pp
+    difference. This plan makes the baseline AI the fixed opponent instead:
+    the candidate seat meets MCTS directly and the baseline arm is a mirror
+    control.
+    """
+
+    def load(self):
+        repository = Path(__file__).resolve().parent.parent
+        return json.loads(
+            (repository / "docs" / "m13-head-to-head-arms.json").read_text(encoding="utf-8"))
+
+    def test_the_committed_plan_is_a_valid_one_factor_ablation(self):
+        per_arm = plan_arms(self.load())
+        changed, effective = check_plan(
+            per_arm, "control_puct", arms=set(per_arm))
+        for label, factors in changed.items():
+            self.assertLessEqual(len(factors), 1, f"{label} changes {factors}")
+        self.assertEqual(set(changed), set(per_arm))
+        self.assertEqual(effective, changed)
+
+    def test_the_committed_plan_is_head_to_head_on_a_time_budget(self):
+        per_arm = plan_arms(self.load())
+        control = per_arm["control_puct"]
+        # Direct match: the fixed opponent is the baseline AI.
+        self.assertEqual(control["baseline"], "mcts")
+        self.assertEqual(control["opponent"], "mcts")
+        self.assertNotEqual(control["candidate"], control["baseline"])
+        # Primary comparison is the shared wall-clock budget, not a sim count.
+        self.assertEqual(control["search_mode"], "time-budgeted")
+        self.assertGreater(control["decision_budget_ms"], 0)
+        for label, options in per_arm.items():
+            self.assertEqual(options["search_mode"], "time-budgeted", label)
+            self.assertEqual(options["decision_budget_ms"],
+                             control["decision_budget_ms"], label)
+            self.assertEqual(options["cards"], "none", label)
+
+    def test_the_committed_plan_covers_the_required_factors(self):
+        per_arm = plan_arms(self.load())
+        changed, _ = check_plan(per_arm, "control_puct", arms=set(per_arm))
+        factors = {name for values in changed.values() for name in values}
+        self.assertIn("puct_prior_temp", factors, "prior contribution")
+        self.assertIn("puct_c", factors, "exploration constant")
+        self.assertIn("puct_leaf", factors, "leaf evaluation")
+        self.assertIn("puct_tree_depth", factors, "search shape")
+
+    def test_a_simulation_count_is_not_used_as_a_factor_on_a_time_budget(self):
+        spec = self.load()
+        spec["arms"] = [
+            {"label": "control_puct", "candidate": "puct"},
+            {"label": "more_sims", "candidate": "puct", "puct_simulations": 128},
+        ]
+        per_arm = plan_arms(spec)
+        with self.assertRaisesRegex(ValueError, "simulation count is only a safety cap"):
+            check_plan(per_arm, "control_puct", arms=set(per_arm))
 
 
 if __name__ == "__main__":

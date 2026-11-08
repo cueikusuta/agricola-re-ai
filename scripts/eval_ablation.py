@@ -718,13 +718,28 @@ def main() -> int:
     parser.add_argument("--binary", type=Path, default=Path("target/release/paired_eval"))
     parser.add_argument("--run", action="store_true",
                         help="invoke the binary; omit to aggregate existing output")
+    parser.add_argument("--check-plan", action="store_true",
+                        help="validate the arm plan and exit without reading or writing data")
     parser.add_argument("--iterations", type=int, default=10000)
     args = parser.parse_args()
     try:
         spec = json.loads(args.arms.read_text(encoding="utf-8"))
         per_arm = plan_arms(spec)
         # Reject an uninterpretable plan before spending compute on it.
-        check_plan(per_arm, args.control, arms=set(per_arm))
+        changed, effective = check_plan(per_arm, args.control, arms=set(per_arm))
+        if args.check_plan:
+            print(json.dumps({
+                "plan_valid": True,
+                "control": args.control,
+                "arms": sorted(per_arm),
+                "changed_factors": changed,
+                "effective_changed_factors": effective,
+                "baseline": per_arm[args.control]["baseline"],
+                "opponent": per_arm[args.control]["opponent"],
+                "search_mode": per_arm[args.control]["search_mode"],
+                "decision_budget_ms": per_arm[args.control]["decision_budget_ms"],
+            }, ensure_ascii=False, indent=2))
+            return 0
         arms = {}
         for label, options in per_arm.items():
             folder = args.root / label
