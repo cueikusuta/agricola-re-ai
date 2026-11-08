@@ -16,7 +16,17 @@ import random
 import statistics
 import sys
 
-POLICY_CHOICES = ("random", "greedy", "eval", "eval_veg", "mcts", "puct")
+POLICY_CHOICES = (
+    "random",
+    "greedy",
+    "eval",
+    "eval_veg",
+    "eval_food",
+    "eval_veg_cond",
+    "eval_room",
+    "mcts",
+    "puct",
+)
 SEARCH_POLICIES = ("mcts", "puct")
 # #164: fixed-simulation and fixed-wall-clock searches are different
 # experiments. Only these names may appear, and never mixed in one report.

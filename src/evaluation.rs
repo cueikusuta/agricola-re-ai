@@ -129,7 +129,7 @@ fn next_harvest_food_capacity(p: &Player) -> u32 {
 ///
 /// `Baseline` is the M2 calibration and must stay byte-for-byte identical: every
 /// existing policy, test and replay depends on it. A variant is only reachable
-/// through an explicitly selected policy (`VegetableFirstEvaluationPolicy`), so
+/// through an explicitly selected policy (`VariantEvaluationPolicy`), so
 /// comparing variants cannot silently change the baseline AI.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum EvaluationVariant {
@@ -139,8 +139,20 @@ pub enum EvaluationVariant {
     /// (both give 0..4 points for 0..4 units, and a missing category is -1), and
     /// vegetables can be eaten without baking. The baseline nevertheless prices
     /// the first vegetable below the first grain, so taking `VegetableSeeds` is
-    /// dominated. This variant prices them equally.
+    /// dominated. This variant prices them equally. **Measured worse in 2-player
+    /// games** (`docs/m13-eval-veg-2026-11-08.md`); kept only as a control.
     VegetableFirst,
+    /// #106 candidate 1: require one extra food before the next harvest. Aimed at
+    /// the `begged` correlate (4-player non-first rate 18%).
+    FoodBuffer,
+    /// #106 candidate 2: raise the first vegetable only when the state can afford
+    /// it (a cooking improvement exists, or food is already sufficient). The
+    /// unconditional variant above lost to the baseline, so this isolates the
+    /// condition instead of the price.
+    VegetableConditional,
+    /// #106 candidate 3: value rooms and grown family more while the family can
+    /// still grow. Aimed at the `late_third_worker` correlate (−0.20 in 2-player).
+    GrowthRoomPriority,
 }
 
 /// A transparent, deterministic heuristic. It depends on public data only;
@@ -159,17 +171,29 @@ pub fn evaluate_player_with(p: &Player, round: u8, variant: EvaluationVariant) -
         .unwrap_or(14);
     let distance = next_harvest.saturating_sub(round) as f64;
     let urgency = 1.0 / (1.0 + 0.45 * distance);
-    let required = (2 * i32::from(p.family) - i32::from(p.newborns)).max(0) as f64;
+    let food_buffer = match variant {
+        EvaluationVariant::FoodBuffer => 1.0,
+        _ => 0.0,
+    };
+    let required = (2 * i32::from(p.family) - i32::from(p.newborns)).max(0) as f64 + food_buffer;
     let usable_food = f64::from(next_harvest_food_capacity(p));
     let shortage = (required - usable_food).max(0.0);
     let safety = -shortage * 10.0 * urgency
         + usable_food.min(required) * 1.7 * urgency
         + (f64::from(p.supply.food) - required).max(0.0) * 0.35;
     let unused_rooms = p.rooms().saturating_sub(p.family as usize) as f64;
-    let housing = unused_rooms * if p.family < 5 { 12.0 + remaining } else { 2.0 };
+    let room_value = match variant {
+        EvaluationVariant::GrowthRoomPriority => 18.0 + 1.5 * remaining,
+        _ => 12.0 + remaining,
+    };
+    let housing = unused_rooms * if p.family < 5 { room_value } else { 2.0 };
     // Family members added during the current round can only act from the next round.
     let future_action_rounds = f64::from(14u8.saturating_sub(round));
-    let growing = f64::from(p.family.saturating_sub(2)) * 3.0 * future_action_rounds;
+    let growth_value = match variant {
+        EvaluationVariant::GrowthRoomPriority => 3.5,
+        _ => 3.0,
+    };
+    let growing = f64::from(p.family.saturating_sub(2)) * growth_value * future_action_rounds;
     let planted = p
         .farm
         .iter()
@@ -221,8 +245,18 @@ pub fn evaluate_player_with(p: &Player, round: u8, variant: EvaluationVariant) -
     let stone = marginal(p.supply.stone, 3, if round >= 7 { 3.3 } else { 2.1 }, 1.2);
     let grain = marginal(p.supply.grain, 1, 8.0, 2.0);
     let first_vegetable = match variant {
-        EvaluationVariant::Baseline => 7.0,
         EvaluationVariant::VegetableFirst => 8.0,
+        // Raise the price only when the state can carry an extra crop: a cooking
+        // improvement converts it to food, or food is already sufficient.
+        EvaluationVariant::VegetableConditional => {
+            let has_cooking = p.improvements.iter().any(|i| i.is_cooking());
+            if has_cooking || usable_food >= required {
+                8.0
+            } else {
+                7.0
+            }
+        }
+        _ => 7.0,
     };
     let vegetables = marginal(p.supply.vegetable, 1, first_vegetable, 2.0);
     let resources = wood + reed + clay + stone + grain + vegetables;
@@ -755,6 +789,75 @@ mod projection_tests {
         assert!((veg_grain - base_grain).abs() < 1e-9);
     }
 
+    /// #106 candidate 1: a one-food buffer must make a tight position less safe.
+    #[test]
+    fn food_buffer_variant_lowers_food_safety_under_shortage() {
+        let obs = observed(|p| {
+            p.family = 3;
+            p.supply.food = 0;
+        });
+        let player = obs.public.players[obs.player_id].clone();
+        let baseline = evaluate_player_with(&player, 10, EvaluationVariant::Baseline);
+        let buffered = evaluate_player_with(&player, 10, EvaluationVariant::FoodBuffer);
+        assert!(baseline.food_safety > buffered.food_safety);
+        // A player with plenty of food must not be penalised relatively more for
+        // the buffer than for the shortage; the buffer only shifts the threshold.
+        let safe = observed(|p| {
+            p.family = 2;
+            p.supply.food = 20;
+        });
+        let safe_player = safe.public.players[safe.player_id].clone();
+        let safe_baseline = evaluate_player_with(&safe_player, 2, EvaluationVariant::Baseline);
+        let safe_buffered = evaluate_player_with(&safe_player, 2, EvaluationVariant::FoodBuffer);
+        assert!((safe_baseline.food_safety - safe_buffered.food_safety).abs() < 1.0);
+    }
+
+    /// #106 candidate 2: the conditional variant must equal the unconditional one
+    /// when a cooking improvement exists, and equal the baseline when food is
+    /// tight and nothing can cook.
+    #[test]
+    fn conditional_vegetable_variant_depends_on_the_state() {
+        let can_cook = observed(|p| {
+            p.improvements.push(Improvement::Fireplace2);
+        });
+        let cook_player = can_cook.public.players[can_cook.player_id].clone();
+        let cond = evaluate_player_with(&cook_player, 5, EvaluationVariant::VegetableConditional);
+        let unconditional =
+            evaluate_player_with(&cook_player, 5, EvaluationVariant::VegetableFirst);
+        assert!((cond.resources - unconditional.resources).abs() < 1e-9);
+
+        let tight = observed(|p| {
+            p.family = 2;
+            p.supply.food = 0;
+        });
+        let tight_player = tight.public.players[tight.player_id].clone();
+        let tight_baseline = evaluate_player_with(&tight_player, 10, EvaluationVariant::Baseline);
+        let tight_cond =
+            evaluate_player_with(&tight_player, 10, EvaluationVariant::VegetableConditional);
+        assert!((tight_baseline.resources - tight_cond.resources).abs() < 1e-9);
+    }
+
+    /// #106 candidate 3: an empty room and a growable family must be worth more.
+    #[test]
+    fn growth_room_variant_values_rooms_and_family_higher() {
+        let obs = observed(|p| {
+            p.family = 2;
+            // A third room gives the family one unused room to grow into.
+            if let Some(cell) = p
+                .farm
+                .iter_mut()
+                .find(|cell| matches!(cell.tile, Tile::Empty))
+            {
+                cell.tile = Tile::Room;
+            }
+        });
+        let player = obs.public.players[obs.player_id].clone();
+        let baseline = evaluate_player_with(&player, 3, EvaluationVariant::Baseline);
+        let variant = evaluate_player_with(&player, 3, EvaluationVariant::GrowthRoomPriority);
+        assert!(variant.housing > baseline.housing);
+        assert!(variant.family_growth >= baseline.family_growth);
+    }
+
     #[test]
     fn the_hoisted_baseline_keeps_the_per_action_ranking() {
         // `select_with_details` now evaluates the state-only baseline once. Its
@@ -1119,24 +1222,21 @@ impl WeightedEvaluationPolicy {
     }
 }
 
-/// #106 candidate: same blend as [`EvaluationPolicy`] with
-/// [`EvaluationVariant::VegetableFirst`]. Kept separate so the baseline stays
-/// unchanged and a paired evaluation can attribute any difference to the variant.
-pub struct VegetableFirstEvaluationPolicy;
+/// A `#106` candidate: the same blend as [`EvaluationPolicy`] (prior 0.5, state
+/// 2.0) with one [`EvaluationVariant`]. Keeping candidates as explicit variants
+/// means the baseline stays byte-for-byte identical and a paired evaluation can
+/// attribute any difference to the single feature that changed.
+pub struct VariantEvaluationPolicy {
+    pub variant: EvaluationVariant,
+}
 
-impl SpacePolicy for VegetableFirstEvaluationPolicy {
+impl SpacePolicy for VariantEvaluationPolicy {
     fn select(&self, obs: &Observation, legal: &[Space], rng: &mut ChaCha8Rng) -> Option<Space> {
         WeightedEvaluationPolicy {
             prior_weight: 0.5,
             state_weight: 2.0,
         }
-        .select_with_variant(
-            obs,
-            legal,
-            rng,
-            &SimpleDetails,
-            EvaluationVariant::VegetableFirst,
-        )
+        .select_with_variant(obs, legal, rng, &SimpleDetails, self.variant)
     }
 }
 

@@ -19,7 +19,7 @@
 #![recursion_limit = "256"]
 use agricola_re_ai::cards::{verified_basic_card_set, CardSet};
 use agricola_re_ai::decision_budget::{percentile_ms, DecisionBudgetSpec, DecisionTimings};
-use agricola_re_ai::evaluation::{EvaluationPolicy, VegetableFirstEvaluationPolicy};
+use agricola_re_ai::evaluation::{EvaluationPolicy, EvaluationVariant, VariantEvaluationPolicy};
 use agricola_re_ai::harvest::SimpleHarvestDetails;
 use agricola_re_ai::mcts::{MctsOutcome, MctsPolicy, SearchLimit, SearchMode};
 use agricola_re_ai::mcts_puct::{LeafMode, PuctConfig, PuctPolicy};
@@ -83,6 +83,9 @@ enum Ai {
     Greedy,
     Eval,
     EvalVeg,
+    EvalFood,
+    EvalVegConditional,
+    EvalRoom,
     Mcts,
     Puct,
 }
@@ -94,6 +97,9 @@ impl Ai {
             "greedy" => Ok(Ai::Greedy),
             "eval" => Ok(Ai::Eval),
             "eval_veg" => Ok(Ai::EvalVeg),
+            "eval_food" => Ok(Ai::EvalFood),
+            "eval_veg_cond" => Ok(Ai::EvalVegConditional),
+            "eval_room" => Ok(Ai::EvalRoom),
             "mcts" => Ok(Ai::Mcts),
             "puct" => Ok(Ai::Puct),
             _ => Err(format!("unsupported AI: {name}")),
@@ -105,6 +111,9 @@ impl Ai {
             Ai::Greedy => "greedy",
             Ai::Eval => "eval",
             Ai::EvalVeg => "eval_veg",
+            Ai::EvalFood => "eval_food",
+            Ai::EvalVegConditional => "eval_veg_cond",
+            Ai::EvalRoom => "eval_room",
             Ai::Mcts => "mcts",
             Ai::Puct => "puct",
         }
@@ -444,7 +453,13 @@ impl SearchSettings {
         let fixed = match ai {
             Ai::Mcts => self.mcts_simulations,
             Ai::Puct => self.puct_simulations,
-            Ai::Random | Ai::Greedy | Ai::Eval | Ai::EvalVeg => return None,
+            Ai::Random
+            | Ai::Greedy
+            | Ai::Eval
+            | Ai::EvalVeg
+            | Ai::EvalFood
+            | Ai::EvalVegConditional
+            | Ai::EvalRoom => return None,
         };
         Some(match self.mode {
             SearchMode::SimulationCapped => SearchRule::Simulations(fixed),
@@ -485,7 +500,10 @@ struct SeatSelector<'a> {
     random: &'a RandomPolicy,
     greedy: &'a GreedyPolicy,
     eval: &'a EvaluationPolicy,
-    eval_veg: &'a VegetableFirstEvaluationPolicy,
+    eval_veg: &'a VariantEvaluationPolicy,
+    eval_food: &'a VariantEvaluationPolicy,
+    eval_veg_cond: &'a VariantEvaluationPolicy,
+    eval_room: &'a VariantEvaluationPolicy,
     mcts: &'a MctsPolicy,
     puct: &'a PuctPolicy,
     /// Stopping rule for the focus seat. `None` for heuristic policies and for
@@ -531,7 +549,10 @@ fn select_ai(
     random: &RandomPolicy,
     greedy: &GreedyPolicy,
     eval: &EvaluationPolicy,
-    eval_veg: &VegetableFirstEvaluationPolicy,
+    eval_veg: &VariantEvaluationPolicy,
+    eval_food: &VariantEvaluationPolicy,
+    eval_veg_cond: &VariantEvaluationPolicy,
+    eval_room: &VariantEvaluationPolicy,
     mcts: &MctsPolicy,
     puct: &PuctPolicy,
     obs: &Observation,
@@ -544,6 +565,12 @@ fn select_ai(
         Ai::Greedy => (greedy.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Eval => (eval.select(obs, legal, rng), MctsOutcome::default()),
         Ai::EvalVeg => (eval_veg.select(obs, legal, rng), MctsOutcome::default()),
+        Ai::EvalFood => (eval_food.select(obs, legal, rng), MctsOutcome::default()),
+        Ai::EvalVegConditional => (
+            eval_veg_cond.select(obs, legal, rng),
+            MctsOutcome::default(),
+        ),
+        Ai::EvalRoom => (eval_room.select(obs, legal, rng), MctsOutcome::default()),
         Ai::Mcts => {
             let limit = search.unwrap_or(SearchLimit::Simulations(mcts.simulations));
             match mcts.select_with_limit(obs, legal, rng, limit) {
@@ -584,6 +611,9 @@ impl SeatSelector<'_> {
                 self.greedy,
                 self.eval,
                 self.eval_veg,
+                self.eval_food,
+                self.eval_veg_cond,
+                self.eval_room,
                 self.mcts,
                 self.puct,
                 obs,
@@ -598,6 +628,9 @@ impl SeatSelector<'_> {
                 self.greedy,
                 self.eval,
                 self.eval_veg,
+                self.eval_food,
+                self.eval_veg_cond,
+                self.eval_room,
                 self.mcts,
                 self.puct,
                 obs,
@@ -664,7 +697,18 @@ fn run(options: &Options) -> Result<(), String> {
     let random = RandomPolicy;
     let greedy = GreedyPolicy;
     let eval = EvaluationPolicy;
-    let eval_veg = VegetableFirstEvaluationPolicy;
+    let eval_veg = VariantEvaluationPolicy {
+        variant: EvaluationVariant::VegetableFirst,
+    };
+    let eval_food = VariantEvaluationPolicy {
+        variant: EvaluationVariant::FoodBuffer,
+    };
+    let eval_veg_cond = VariantEvaluationPolicy {
+        variant: EvaluationVariant::VegetableConditional,
+    };
+    let eval_room = VariantEvaluationPolicy {
+        variant: EvaluationVariant::GrowthRoomPriority,
+    };
     let mcts = MctsPolicy {
         simulations: options.mcts_simulations,
         tree_depth: options.mcts_tree_depth,
@@ -756,6 +800,9 @@ fn run(options: &Options) -> Result<(), String> {
                     greedy: &greedy,
                     eval: &eval,
                     eval_veg: &eval_veg,
+                    eval_food: &eval_food,
+                    eval_veg_cond: &eval_veg_cond,
+                    eval_room: &eval_room,
                     mcts: &mcts,
                     puct: &puct,
                     search: Some(search_settings),
@@ -951,6 +998,9 @@ mod tests {
         assert_eq!(Ai::parse("mcts").unwrap(), Ai::Mcts);
         assert_eq!(Ai::parse("puct").unwrap(), Ai::Puct);
         assert_eq!(Ai::parse("eval_veg").unwrap(), Ai::EvalVeg);
+        assert_eq!(Ai::parse("eval_food").unwrap(), Ai::EvalFood);
+        assert_eq!(Ai::parse("eval_veg_cond").unwrap(), Ai::EvalVegConditional);
+        assert_eq!(Ai::parse("eval_room").unwrap(), Ai::EvalRoom);
         assert!(Ai::Mcts.is_search() && Ai::Puct.is_search());
         assert!(!Ai::Eval.is_search() && !Ai::Random.is_search());
         assert_eq!(PuctConfig::default().leaf_mode, LeafMode::Terminal);
@@ -1023,7 +1073,15 @@ mod tests {
         let shared = settings(SearchMode::SimulationCapped, 3, 7);
         assert_eq!(fixed_count(shared.rule_for(Ai::Mcts).unwrap()), 3);
         assert_eq!(fixed_count(shared.rule_for(Ai::Puct).unwrap()), 7);
-        for heuristic in [Ai::Random, Ai::Greedy, Ai::Eval, Ai::EvalVeg] {
+        for heuristic in [
+            Ai::Random,
+            Ai::Greedy,
+            Ai::Eval,
+            Ai::EvalVeg,
+            Ai::EvalFood,
+            Ai::EvalVegConditional,
+            Ai::EvalRoom,
+        ] {
             assert!(
                 shared.rule_for(heuristic).is_none(),
                 "heuristics must not receive a search limit"
