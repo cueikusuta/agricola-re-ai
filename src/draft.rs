@@ -941,6 +941,20 @@ impl DraftState {
         if self.start_player >= self.player_count {
             return Err("draft initial start player out of range".into());
         }
+        if matches!(
+            self.mode,
+            DraftMode::Draft77 | DraftMode::Draft10_7Simultaneous
+        ) && (self.ruleset.direction_occupation != Direction::Right
+            || self.ruleset.direction_minor != Direction::Right)
+        {
+            return Err("draft packet direction is not clockwise".into());
+        }
+        // Re-derive the public draw from the server-only seed. Reject a
+        // superficially valid but forged starter in a restored draft state.
+        let mut starter_rng = ChaCha8Rng::seed_from_u64(self.seed ^ 0x5354_4152_545F_5031);
+        if self.start_player != starter_rng.gen_range(0..self.player_count) {
+            return Err("draft initial start player does not match seed".into());
+        }
         if self.picked.len() != self.player_count
             || self.commitments.len() != self.player_count
             || self.history.len() != self.player_count
