@@ -12,10 +12,9 @@
 use agricola_re_ai::cards::CardSet;
 use agricola_re_ai::dataset_split::{
     build_manifest, evaluate_g0, load_matches, normalise_card_mode, recompute_mode, sha256_hex,
-    validate_attestation,
-    CheckAttestation, ChecksAttestation, ChecksEvidence, DatasetSplitManifest, G0Evidence,
-    GateStatus, ModeBundle, ModeEvidence, Split, SplitPlan, ATTESTATION_PRODUCER,
-    ATTESTATION_SCHEMA_VERSION, ATTESTED_CHECKS,
+    validate_attestation, CheckAttestation, ChecksAttestation, ChecksEvidence,
+    DatasetSplitManifest, G0Evidence, GateStatus, ModeBundle, ModeEvidence, Split, SplitPlan,
+    ATTESTATION_PRODUCER, ATTESTATION_SCHEMA_VERSION, ATTESTED_CHECKS,
 };
 use agricola_re_ai::episode_data::{inspect_dataset, record_self_play, EpisodeMeta, EpisodeRecord};
 use agricola_re_ai::evaluation::EvaluationPolicy;
@@ -112,19 +111,26 @@ fn checks_json_with(
     let mut required_tests = 0usize;
     for id in ATTESTED_CHECKS {
         let requirement = &requirements["checks"][id];
-        let ids: Vec<String> = requirement["tests"].as_array().unwrap().iter()
-            .map(|item| item["id"].as_str().unwrap().to_string()).collect();
+        let ids: Vec<String> = requirement["tests"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["id"].as_str().unwrap().to_string())
+            .collect();
         required_tests += ids.len();
         for test_id in &ids {
             canonical.push(serde_json::json!({"id": test_id, "status": "passed"}));
         }
-        per_check.insert(id.to_string(), CheckAttestation {
-            issue: requirement["issue"].as_u64().unwrap() as u32,
-            required: ids.len(),
-            passed: ids.len(),
-            failed: 0,
-            missing: 0,
-        });
+        per_check.insert(
+            id.to_string(),
+            CheckAttestation {
+                issue: requirement["issue"].as_u64().unwrap() as u32,
+                required: ids.len(),
+                passed: ids.len(),
+                failed: 0,
+                missing: 0,
+            },
+        );
         test_ids_by_check.insert(id.to_string(), ids);
     }
     canonical.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
@@ -199,16 +205,21 @@ fn evidence_for(
 
 #[test]
 fn forged_small_count_attestation_cannot_satisfy_committed_requirements() {
-    let fabricated = checks_json_with("test-sha", &sha256_hex(b"matches"), |_| {}, |a| {
-        a.required_tests = 4;
-        a.passed_tests = 4;
-        for value in a.checks.values_mut() {
-            value.required = 1;
-            value.passed = 1;
-        }
-        // Exactly the original P1 exploit: four self-reported passes.
-        a.test_report_sha256 = "0".repeat(64);
-    });
+    let fabricated = checks_json_with(
+        "test-sha",
+        &sha256_hex(b"matches"),
+        |_| {},
+        |a| {
+            a.required_tests = 4;
+            a.passed_tests = 4;
+            for value in a.checks.values_mut() {
+                value.required = 1;
+                value.passed = 1;
+            }
+            // Exactly the original P1 exploit: four self-reported passes.
+            a.test_report_sha256 = "0".repeat(64);
+        },
+    );
     let checks: ChecksEvidence = serde_json::from_str(&fabricated).unwrap();
     assert!(validate_attestation(checks.attestation.as_ref().unwrap(), &checks).is_err());
 }
@@ -217,7 +228,10 @@ fn forged_small_count_attestation_cannot_satisfy_committed_requirements() {
 fn a_missing_or_forged_test_id_cannot_open_g0() {
     for edit in [
         (|a: &mut ChecksAttestation| {
-            a.test_ids_by_check.get_mut("m8_rule_evidence").unwrap().pop();
+            a.test_ids_by_check
+                .get_mut("m8_rule_evidence")
+                .unwrap()
+                .pop();
         }) as fn(&mut ChecksAttestation),
         |a: &mut ChecksAttestation| {
             a.test_ids_by_check.get_mut("m8_rule_evidence").unwrap()[0] =
