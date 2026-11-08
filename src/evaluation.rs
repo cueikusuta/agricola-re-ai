@@ -610,19 +610,38 @@ pub fn action_value_with_details(
     space: Space,
     details: &dyn DetailPolicy,
 ) -> Option<f64> {
-    let action = details.produce(obs, space)?;
     let before = evaluate_observation(obs, obs.player_id)?.total();
+    let card_bonus_before = crate::cards::end_game_bonus_for_definitions(
+        &obs.card_definitions,
+        obs.public.players.get(obs.player_id)?,
+    );
+    action_value_with_baseline(obs, space, details, before, card_bonus_before)
+}
+
+/// The per-action value with the state-only terms already evaluated.
+///
+/// `before` and `card_bonus_before` depend on the observation, not on the
+/// candidate action, so the selection loop computes them once. Nothing after
+/// this point may read hidden state: only the observation and the produced
+/// action are used.
+fn action_value_with_baseline(
+    obs: &Observation,
+    space: Space,
+    details: &dyn DetailPolicy,
+    before: f64,
+    card_bonus_before: i32,
+) -> Option<f64> {
+    let action = details.produce(obs, space)?;
     let after = project_action(obs, &action)?;
     let mut value = evaluate_player(&after, obs.public.round).total() - before;
     // Card end-game bonuses are intentionally not included in score(Player)
     // because their value depends on the public, externally defined card set.
     // They contribute 3 utility units per point, just like score(Player).
-    let set = crate::cards::CardSet {
-        definitions: obs.card_definitions.clone(),
-    };
-    let player_before = obs.public.players.get(obs.player_id)?;
-    let card_bonus_delta = crate::cards::end_game_bonus(&set, &after)
-        - crate::cards::end_game_bonus(&set, player_before);
+    // The definitions are borrowed from the observation: rebuilding a `CardSet`
+    // here would clone every definition once per candidate action.
+    let card_bonus_delta =
+        crate::cards::end_game_bonus_for_definitions(&obs.card_definitions, &after)
+            - card_bonus_before;
     value += f64::from(card_bonus_delta) * 3.0;
     if space == Space::MeetingPlace && obs.public.start_player != obs.player_id {
         value += if obs.public.round < 10 { 4.0 } else { 1.0 };
@@ -649,6 +668,43 @@ mod projection_tests {
         let mut obs = game.observation(game.public.active_player).unwrap();
         update(&mut obs.public.players[obs.player_id]);
         obs
+    }
+
+    #[test]
+    fn the_hoisted_baseline_keeps_the_per_action_ranking() {
+        // `select_with_details` now evaluates the state-only baseline once. Its
+        // choice must still be one of the spaces with the maximum per-action
+        // value, so a regression here means the hoist changed the ranking.
+        for seed in 0..6u64 {
+            let game = Game::new(Config {
+                players: 2,
+                seed,
+                additional_action_space_enabled: false,
+            });
+            let obs = game.observation(game.public.active_player).unwrap();
+            let legal = game.legal_spaces();
+            let mut rng = <rand_chacha::ChaCha8Rng as rand::SeedableRng>::seed_from_u64(seed);
+            let chosen = EvaluationPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("a legal choice");
+            let values = legal
+                .iter()
+                .filter_map(|&space| action_value(&obs, space).map(|value| (space, value)))
+                .collect::<Vec<_>>();
+            let best = values
+                .iter()
+                .map(|(_, value)| *value)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let chosen_value = values
+                .iter()
+                .find(|(space, _)| *space == chosen)
+                .map(|(_, value)| *value)
+                .expect("the chosen space has a value");
+            assert!(
+                best - chosen_value <= 1e-9,
+                "seed {seed}: chosen {chosen:?} is not a maximum"
+            );
+        }
     }
 
     #[test]
@@ -934,8 +990,17 @@ impl WeightedEvaluationPolicy {
     ) -> Option<Space> {
         let mut best = f64::NEG_INFINITY;
         let mut candidates = Vec::new();
+        // State-only terms do not depend on the candidate action, so they are
+        // evaluated once per decision instead of once per legal space.
+        let before = evaluate_observation(obs, obs.player_id)?.total();
+        let card_bonus_before = crate::cards::end_game_bonus_for_definitions(
+            &obs.card_definitions,
+            obs.public.players.get(obs.player_id)?,
+        );
         for &space in legal {
-            let Some(state_delta) = action_value_with_details(obs, space, details) else {
+            let Some(state_delta) =
+                action_value_with_baseline(obs, space, details, before, card_bonus_before)
+            else {
                 continue;
             };
             let value =

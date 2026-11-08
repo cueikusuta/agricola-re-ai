@@ -628,10 +628,21 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
 /// Calculated at read time from public played cards; it is never added to the
 /// immutable printed-points counter and therefore cannot be counted twice.
 pub fn end_game_bonus(set: &CardSet, player: &Player) -> i32 {
+    end_game_bonus_for_definitions(&set.definitions, player)
+}
+
+/// Same computation as [`end_game_bonus`] over a borrowed definition slice.
+///
+/// The evaluation hot path owns only `Observation::card_definitions`, and
+/// rebuilding a `CardSet` there would clone every definition once per candidate
+/// action. This entry point keeps the lookup borrowed so search cost does not
+/// scale with the size of the card pool.
+pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &Player) -> i32 {
+    let definition = |id: &String| definitions.iter().find(|card| &card.id == id);
     player
         .played_cards
         .iter()
-        .filter_map(|id| set.definition(id))
+        .filter_map(definition)
         .flat_map(|card| card.effects.iter())
         .map(|effect| match effect {
             CardEffect::EndGameBonus { rule } => match rule {
@@ -654,7 +665,7 @@ pub fn end_game_bonus(set: &CardSet, player: &Player) -> i32 {
                         .played_cards
                         .iter()
                         .filter(|id| {
-                            set.definition(id)
+                            definition(id)
                                 .is_some_and(|card| card.kind == CardKind::MinorImprovement)
                         })
                         .count();
@@ -682,7 +693,7 @@ pub fn end_game_bonus(set: &CardSet, player: &Player) -> i32 {
                     .count() as i32,
                 ScoreBonusRule::LaterOccupations => {
                     let tutor = player.played_cards.iter().position(|id| {
-                        set.definition(id).is_some_and(|card| {
+                        definition(id).is_some_and(|card| {
                             card.effects.iter().any(|effect| {
                                 matches!(
                                     effect,
@@ -697,8 +708,7 @@ pub fn end_game_bonus(set: &CardSet, player: &Player) -> i32 {
                         player.played_cards[index + 1..]
                             .iter()
                             .filter(|id| {
-                                set.definition(id)
-                                    .is_some_and(|card| card.kind == CardKind::Occupation)
+                                definition(id).is_some_and(|card| card.kind == CardKind::Occupation)
                             })
                             .count() as i32
                     })
@@ -722,6 +732,31 @@ mod verified_scoring_card_tests {
         player.played_cards.push(id.into());
         edit(&mut player);
         end_game_bonus(&set, &player)
+    }
+
+    #[test]
+    fn borrowed_definitions_give_the_same_end_game_bonus_as_the_card_set() {
+        let set = CardSet {
+            definitions: verified_scoring_cards(4),
+        };
+        let mut player = Player::new(0, 0);
+        player.played_cards.push("A032".into());
+        player.played_cards.push("A038".into());
+        player.pastures.push(Pasture {
+            id: 0,
+            cells: (0..7).collect(),
+            animal: None,
+            quantity: 0,
+        });
+        assert_eq!(
+            end_game_bonus_for_definitions(&set.definitions, &player),
+            end_game_bonus(&set, &player)
+        );
+        assert_eq!(
+            end_game_bonus_for_definitions(&[], &player),
+            0,
+            "an unknown definition must not score"
+        );
     }
 
     #[test]

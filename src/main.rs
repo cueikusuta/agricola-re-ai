@@ -9,7 +9,7 @@ use agricola_re_ai::policy::{
     SpacePolicy,
 };
 use agricola_re_ai::score::standings;
-use agricola_re_ai::web::serve;
+use agricola_re_ai::web::serve_on;
 use agricola_re_ai::{Config, Game};
 use std::collections::BTreeMap;
 use std::time::Instant;
@@ -19,6 +19,7 @@ fn main() {
     let mut greedy = false;
     let mut evaluated = false;
     let mut web = false;
+    let mut web_port: Option<u16> = None;
     let mut player_option_supplied = false;
     let mut mcts_budget: Option<usize> = None;
     let mut benchmark: Option<usize> = None;
@@ -47,6 +48,14 @@ fn main() {
             "--greedy" => greedy = true,
             "--eval" => evaluated = true,
             "--web" => web = true,
+            "--port" => {
+                web_port = Some(
+                    it.next()
+                        .expect("--port requires a number")
+                        .parse()
+                        .expect("invalid port"),
+                )
+            }
             "--players" => {
                 player_option_supplied = true;
                 config.players = it
@@ -85,7 +94,7 @@ fn main() {
                 state_file = Some(it.next().expect("--state-file requires path").clone())
             }
             "--help" | "-h" => {
-                println!("Usage: agricola-re-ai [--seed N] [--players 2|3|4] [--web] [--batch N] [--additional-action-space] [--greedy | --eval | --mcts | --mcts-simulations N] [--benchmark N | --benchmark-cards N] [--log-file FILE] [--state-file FILE]");
+                println!("Usage: agricola-re-ai [--seed N] [--players 2|3|4] [--web [--port N]] [--batch N] [--additional-action-space] [--greedy | --eval | --mcts | --mcts-simulations N] [--benchmark N | --benchmark-cards N] [--log-file FILE] [--state-file FILE]");
                 return;
             }
             x => {
@@ -102,8 +111,18 @@ fn main() {
         if !player_option_supplied {
             config.players = 4;
         }
-        if let Err(error) = serve(config) {
+        let port = web_port
+            .or_else(|| {
+                std::env::var("AGRICOLA_WEB_PORT")
+                    .ok()
+                    .and_then(|value| value.parse().ok())
+            })
+            .unwrap_or(8787);
+        if let Err(error) = serve_on(config, port) {
             eprintln!("web UI error: {error}");
+            eprintln!(
+                "hint: if the port is busy, stop the other program or run with a different --port (e.g. --port 8790)."
+            );
             std::process::exit(1);
         }
         return;
