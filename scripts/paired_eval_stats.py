@@ -438,6 +438,22 @@ def validate_and_report(
     candidate_deadline_control = candidate_search_deadline
     baseline_deadline_control = baseline_search_deadline
 
+    # #106 (M13) C-2/C-4: state what was compared, instead of leaving it to the
+    # reader. A *head-to-head* condition puts the baseline AI in every other
+    # seat, so the candidate arm is a direct match and the baseline arm is a
+    # mirror control. A *common-opponent* condition only ranks both arms against
+    # the same fixed field and must not be reported as a direct result.
+    candidate_opponents = sorted({g["opponent_policy"] for g in values["candidate"]})
+    baseline_opponents = sorted({g["opponent_policy"] for g in values["baseline"]})
+    head_to_head = opponent == baseline and candidate != opponent
+    # A condition whose better arm already takes almost every first place
+    # cannot resolve a +5 pp difference: the interval collapses at the ceiling.
+    ceiling_pct = max(
+        statistics.mean(g["first_place_credit"] for g in values["candidate"]),
+        statistics.mean(g["first_place_credit"] for g in values["baseline"]),
+    ) * 100
+    ceiling_threshold_pct = 95.0
+
     # Roadmap 3.1 asks for shared/tied first place as separate reference
     # values, and 6.6 asks for games/sec and decisions/sec. All of these are
     # derived from already-validated fields; nothing is re-sampled.
@@ -483,6 +499,32 @@ def validate_and_report(
         "candidate": candidate,
         "baseline": baseline,
         "opponent": opponent,
+        "comparison_design": {
+            "head_to_head": head_to_head,
+            "candidate_opponent_policies": candidate_opponents,
+            "baseline_opponent_policies": baseline_opponents,
+            "mirror_baseline": head_to_head,
+            "note": (
+                "head_to_head=true means the fixed opponent is the baseline AI, so "
+                "the candidate seat meets it directly and the baseline arm is a "
+                "mirror control. head_to_head=false is a common-opponent "
+                "benchmark: both arms face the same fixed field and never each "
+                "other. The two designs answer different questions and are not "
+                "pooled."
+            ),
+        },
+        "saturation": {
+            "ceiling_limited": ceiling_pct >= ceiling_threshold_pct,
+            "max_first_credit_pct": ceiling_pct,
+            "threshold_pct": ceiling_threshold_pct,
+            "note": (
+                "ceiling_limited=true means the stronger arm already takes at "
+                "least threshold_pct of first-place credit in this condition, so "
+                "a +5 pp difference cannot be resolved here. Change the opponent "
+                "field or the mode rather than reporting a small delta as a "
+                "strength difference."
+            ),
+        },
         "seed_start": seed_start,
         "first_block": first_block,
         "seed_blocks": blocks,

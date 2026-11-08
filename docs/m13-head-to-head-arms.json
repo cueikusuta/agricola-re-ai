@@ -1,0 +1,21 @@
+{
+  "players": 2,
+  "seed_start": 940000,
+  "blocks": 500,
+  "baseline": "mcts",
+  "opponent": "mcts",
+  "search_mode": "time-budgeted",
+  "decision_budget_ms": 200,
+  "time_budget_max_simulations": 100000,
+  "cards": "none",
+  "extra": false,
+  "arms": [
+    {"label": "control_puct", "candidate": "puct"},
+    {"label": "prior_temp1", "candidate": "puct", "puct_prior_temp": 1.0},
+    {"label": "prior_temp6", "candidate": "puct", "puct_prior_temp": 6.0},
+    {"label": "explore_c3", "candidate": "puct", "puct_c": 3.0},
+    {"label": "explore_c06", "candidate": "puct", "puct_c": 0.6},
+    {"label": "leaf_heuristic", "candidate": "puct", "puct_leaf": "heuristic"},
+    {"label": "depth3", "candidate": "puct", "puct_tree_depth": 3}
+  ]
+}
