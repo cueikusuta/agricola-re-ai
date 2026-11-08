@@ -235,6 +235,17 @@ def write_queue_csv(queue: list[dict], path: Path) -> None:
         writer.writerows(queue)
 
 
+def validate_queue_paths(ledger: Path, output: Path | None, cards_csv: Path | None) -> None:
+    """Do not overwrite the input ledger or the JSON report with a queue CSV."""
+    if cards_csv is None:
+        return
+    queue_path = cards_csv.resolve()
+    if queue_path == ledger.resolve():
+        raise ValueError("--cards-csv must differ from --ledger (input ledger)")
+    if output is not None and queue_path == output.resolve():
+        raise ValueError("--cards-csv must differ from --output (JSON report)")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -256,6 +267,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
+        validate_queue_paths(args.ledger, args.output, args.cards_csv)
         rows = load_rows(args.ledger)
         report = inventory(rows, source=str(args.ledger))
         if args.cards_csv:
