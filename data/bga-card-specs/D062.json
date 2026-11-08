@@ -68,41 +68,58 @@
       "conditions": [],
       "steps": [
         {
-          "operation": "exchange",
+          "operation": "other",
           "target": "owner",
           "params": {
-            "give": [
+            "kind": "choice",
+            "options": [
               {
-                "good": "grain",
-                "amount": {
-                  "op": "table",
-                  "args": [
-                    "exchange_grain",
-                    {
-                      "2": 2,
-                      "3": 3,
-                      "4": 4
-                    }
-                  ]
-                }
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 2
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "food",
+                    "amount": 3
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 3
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "food",
+                    "amount": 6
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 4
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "food",
+                    "amount": 9
+                  }
+                ]
               }
             ],
-            "receive": [
-              {
-                "good": "food",
-                "amount": {
-                  "op": "table",
-                  "args": [
-                    "exchange_food",
-                    {
-                      "2": 3,
-                      "3": 6,
-                      "4": 9
-                    }
-                  ]
-                }
-              }
-            ]
+            "max_uses": 1
           }
         }
       ],
@@ -111,7 +128,8 @@
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 1,
-      "decision_owner": "owner"
+      "decision_owner": "owner",
+      "notes": "Select one linked amount pair, then validate grain payment before awarding food."
     }
   ],
   "post_play": {
@@ -123,12 +141,13 @@
     "test_case_ids": [
       "D062-normal",
       "D062-exchange-2",
+      "D062-exchange-3",
       "D062-exchange-4",
       "D062-not-enough"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Gain 2 food on play; each feeding phase may turn 2/3/4 grain into 3/6/9 food."
+    "notes": "Gain 2 food on play; in each feeding phase exchange exactly 2/3/4 grain for 3/6/9 food by one shared choice."
   }
 }
