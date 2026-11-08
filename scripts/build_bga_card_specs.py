@@ -91,6 +91,11 @@ def choice(**extra):
     return {"operation": "other", "target": "owner", "params": params}
 
 
+def discount_cost(**extra):
+    params = dict(extra)
+    return {"operation": "discount_cost", "target": "owner", "params": params}
+
+
 def special(kind, **extra):
     params = {"kind": kind}
     params.update(extra)
@@ -122,6 +127,14 @@ def threshold_table(key, pairs):
     args = ["threshold_table", key]
     args.extend({"threshold": t, "amount": a} for t, a in pairs)
     return {"op": "custom", "args": args}
+
+
+def round_food(good="food", amounts=None):
+    """Place goods on upcoming round spaces (see place_on_round_spaces)."""
+    params = {"good": good}
+    if amounts is not None:
+        params["amounts"] = amounts
+    return params
 
 
 # --- effect helper -------------------------------------------------------
@@ -1980,6 +1993,292 @@ CARDS = {
                  {"clay_delta": -1, "points_delta": 1}),
             case("E039-no-clay", {"clay": 0}, {"run_harvest": True, "choose": "food"},
                  {"clay_delta": 0, "food_delta": 0}),
+        ],
+    },
+    "D062": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("food", 2)]),
+            effect("harvest_feeding",
+                   [exchange(give=[{"good": "grain", "amount": table("exchange_grain",
+                                                                 {"2": 2, "3": 3, "4": 4})}],
+                             receive=[{"good": "food",
+                                       "amount": table("exchange_food",
+                                                       {"2": 3, "3": 6, "4": 9})}])],
+                   optional=True, freq="every_harvest", dur="permanent", order=1,
+                   decision="owner"),
+        ],
+        "notes": "Gain 2 food on play; each feeding phase may turn 2/3/4 grain into 3/6/9 food.",
+        "tests": [
+            case("D062-normal", {"food": 0}, {"play": "D062"}, {"food_delta": 2}),
+            case("D062-exchange-2", {"grain": 2}, {"run_harvest": True, "exchange": 2},
+                 {"grain_delta": -2, "food_delta": 3}),
+            case("D062-exchange-4", {"grain": 4}, {"run_harvest": True, "exchange": 4},
+                 {"grain_delta": -4, "food_delta": 9}),
+            case("D062-not-enough", {"grain": 1}, {"run_harvest": True, "exchange": 2},
+                 {"grain_delta": 0, "food_delta": 0}),
+        ],
+    },
+    "D063": {
+        "post": "played_area",
+        "effects": [
+            effect("harvest_field_phase",
+                   [gain("food", per(count("harvested_field_adjacent_house"), 1))],
+                   freq="every_harvest", dur="permanent"),
+        ],
+        "notes": "Field phase: 1 food per harvested field tile orthogonally adjacent to the house.",
+        "tests": [
+            case("D063-normal", {"harvested_fields_adjacent_house": 2},
+                 {"run_harvest": True}, {"food_delta": 2}),
+            case("D063-zero", {"harvested_fields_adjacent_house": 0},
+                 {"run_harvest": True}, {"food_delta": 0}),
+        ],
+    },
+    "D065": {
+        "post": "played_area",
+        "effects": [
+            effect("harvest_field_phase", [gain("grain", 1)],
+                   cond=[cond("grain_harvested_at_least", n=2)],
+                   freq="every_harvest", dur="permanent"),
+        ],
+        "notes": "Field phase: 1 extra grain from the general supply when at least 2 grain are harvested.",
+        "tests": [
+            case("D065-normal", {"grain_harvested": 2}, {"run_harvest": True},
+                 {"grain_delta": 1}),
+            case("D065-boundary", {"grain_harvested": 1}, {"run_harvest": True},
+                 {"grain_delta": 0}),
+        ],
+    },
+    "D066": {
+        "post": "played_area",
+        "effects": [
+            effect("before_bake_bread",
+                   [exchange(give=[{"good": "clay", "amount": 1}],
+                             receive=[{"good": "grain", "amount": 1}])],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "Before each Bake Bread action: may exchange exactly 1 clay for 1 grain.",
+        "tests": [
+            case("D066-normal", {"clay": 1, "grain": 0}, {"bake_bread": 1, "exchange": True},
+                 {"clay_delta": -1, "grain_delta": 1}),
+            case("D066-declined", {"clay": 1}, {"bake_bread": 1, "exchange": False},
+                 {"clay_delta": 0, "grain_delta": 0}),
+            case("D066-not-triggered", {"clay": 1}, {"use_space": "forest", "exchange": True},
+                 {"clay_delta": 0}),
+        ],
+    },
+    "D078": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [special("place_on_round_spaces", good="reed", amount=1, rounds=3)]),
+        ],
+        "notes": "Place 1 reed on each of the next 3 round spaces.",
+        "tests": [
+            case("D078-normal", {"round": 5}, {"play": "D078"},
+                 {"rounds_with_reed": 3, "reed_per_space": 1}),
+            case("D078-late", {"round": 13}, {"play": "D078"},
+                 {"rounds_with_reed": 2}),
+        ],
+    },
+    "D079": {
+        "post": "played_area",
+        "effects": [
+            effect("round_end",
+                   [gain("stone", per(count("vegetable_field"), 1)),
+                    gain("wood", per(count("vegetable_in_supply"), 1))],
+                   cond=[cond("round_in", values=[8, 10, 12])],
+                   freq="every_round", dur="permanent"),
+        ],
+        "notes": "At the end of rounds 8, 10 and 12: 1 stone per vegetable field and 1 wood per vegetable in supply.",
+        "tests": [
+            case("D079-normal", {"round": 8, "vegetable_fields": 2, "vegetable": 3},
+                 {"run_round": True}, {"stone_delta": 2, "wood_delta": 3}),
+            case("D079-not-triggered", {"round": 9, "vegetable_fields": 2, "vegetable": 3},
+                 {"run_round": True}, {"stone_delta": 0, "wood_delta": 0}),
+        ],
+    },
+    "D081": {
+        "post": "played_area",
+        "effects": [
+            effect("after_renovation",
+                   [discount_cost(good="reed", amount=1, scope="renovation"),
+                    gain("stone", 1)],
+                   freq="every_use", dur="permanent"),
+        ],
+        "notes": "Each renovation costs 1 less reed and gives 1 stone at the end of the action.",
+        "tests": [
+            case("D081-normal", {"house": "wood", "reed": 1, "stone": 0},
+                 {"renovate": 1}, {"reed_delta": 0, "stone_delta": 1}),
+            case("D081-stone-house", {"house": "clay", "reed": 2, "stone": 0},
+                 {"renovate": 1}, {"reed_delta": -1, "stone_delta": 1}),
+        ],
+    },
+    "D083": {
+        "post": "played_area",
+        "status": "needs_resolution",
+        "unresolved": [
+            "play.cost: the wiki shows only alternative costs (2 food / 1 grain); the base resource cost is not stated"
+        ],
+        "effects": [
+            effect("after_worker_space", [gain("wild_boar", 1)],
+                   cond=[cond("worker_space_used", space="fencing")],
+                   freq="every_use", dur="permanent"),
+        ],
+        "notes": "Each Fencing action also gives 1 wild boar. Cost unresolved: the wiki lists only alternative costs.",
+        "tests": [
+            case("D083-normal", {"wild_boar": 0}, {"use_space": "fencing"},
+                 {"wild_boar_delta": 1}),
+            case("D083-not-triggered", {"wild_boar": 0}, {"use_space": "forest"},
+                 {"wild_boar_delta": 0}),
+        ],
+    },
+    "D084": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("sheep", 1)]),
+            effect("harvest_feeding",
+                   [exchange(give=[{"good": "vegetable", "amount": 1}],
+                             receive=[{"good": "animal_of_owned_type", "amount": 1}])],
+                   optional=True, freq="every_harvest", dur="permanent", order=1,
+                   decision="owner"),
+        ],
+        "notes": "Gain 1 sheep on play; each feeding phase may turn 1 vegetable into an animal of a type already owned.",
+        "tests": [
+            case("D084-normal", {"sheep": 0}, {"play": "D084"}, {"sheep_delta": 1}),
+            case("D084-exchange", {"vegetable": 1, "owned_animal_types": ["sheep"]},
+                 {"run_harvest": True, "exchange": True},
+                 {"vegetable_delta": -1, "sheep_delta": 1}),
+            case("D084-not-triggered", {"vegetable": 1, "owned_animal_types": []},
+                 {"run_harvest": True, "exchange": True}, {"vegetable_delta": 0}),
+        ],
+    },
+    "E040": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [special("stack_goods_on_card",
+                                       goods=["vegetable", "stone", "grain", "stone", "grain"])]),
+            effect("after_worker_space", [special("take_top_good_from_card")],
+                   cond=[cond("worker_space_used", space="day_laborer")],
+                   freq="every_use", dur="permanent", order=1),
+        ],
+        "notes": "Stack vegetable, stone, grain, stone, grain (bottom to top); each Day Laborer use takes the top good.",
+        "tests": [
+            case("E040-normal", {"stack": ["vegetable", "stone", "grain", "stone", "grain"]},
+                 {"play": "E040"}, {"stack_size": 5}),
+            case("E040-take", {"stack": ["vegetable", "stone", "grain", "stone", "grain"]},
+                 {"use_space": "day_laborer"}, {"gained": "grain", "stack_size": 4}),
+        ],
+    },
+    "E041": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play",
+                   [special("place_on_round_spaces", good="food", amount=1, rounds="remaining_even"),
+                    special("place_on_round_spaces", good="clay", amount=1, rounds="remaining_even")],
+                   notes="food first, then clay, alternating over remaining even rounds"),
+        ],
+        "notes": "Alternate 1 food and 1 clay on each remaining even round space, starting with food.",
+        "tests": [
+            case("E041-normal", {"round": 5, "cards_in_play": 5}, {"play": "E041"},
+                 {"even_rounds_marked": 5}),
+            case("E041-last", {"round": 14, "cards_in_play": 5}, {"play": "E041"},
+                 {"even_rounds_marked": 1}),
+        ],
+    },
+    "E042": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play",
+                   [special("place_on_round_spaces", amounts=[{"good": "cattle", "amount": 1},
+                                                             {"good": "grain", "amount": 1},
+                                                             {"good": "cattle", "amount": 1}])]),
+        ],
+        "notes": "Place 1 cattle, 1 grain and 1 cattle on the next 3 round spaces in that order.",
+        "tests": [
+            case("E042-normal", {"round": 5}, {"play": "E042"},
+                 {"round_space_goods": ["cattle", "grain", "cattle"]}),
+            case("E042-late", {"round": 13}, {"play": "E042"},
+                 {"round_space_goods": ["cattle"]}),
+        ],
+    },
+    "E043": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play",
+                   [special("place_on_round_spaces", good="food", amount=1,
+                            rounds=threshold_table("stable", [(1, 2), (2, 3), (3, 4), (4, 5)]))]),
+        ],
+        "notes": "With 1/2/3/4 stables, place 1 food on each of the next 2/3/4/5 round spaces.",
+        "tests": [
+            case("E043-normal", {"stables": 2}, {"play": "E043"}, {"rounds_with_food": 3}),
+            case("E043-four", {"stables": 4}, {"play": "E043"}, {"rounds_with_food": 5}),
+        ],
+    },
+    "E044": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play",
+                   [special("place_on_round_spaces", good="food", amount=1, rounds="remaining_odd")]),
+        ],
+        "notes": "Place 1 food on each remaining odd-numbered round space.",
+        "tests": [
+            case("E044-normal", {"round": 6}, {"play": "E044"}, {"odd_rounds_marked": 5}),
+            case("E044-last", {"round": 13}, {"play": "E044"}, {"odd_rounds_marked": 1}),
+        ],
+    },
+    "E045": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play",
+                   [special("place_on_round_spaces", good="food", amount=1, rounds="remaining_even")]),
+        ],
+        "notes": "Place 1 food on each remaining even-numbered round space.",
+        "tests": [
+            case("E045-normal", {"round": 5}, {"play": "E045"}, {"even_rounds_marked": 5}),
+            case("E045-last", {"round": 14}, {"play": "E045"}, {"even_rounds_marked": 1}),
+        ],
+    },
+    "E046": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [special("place_on_round_spaces", good="food", amount=1, rounds=2)]),
+        ],
+        "notes": "Place 1 food on each of the next 2 round spaces.",
+        "tests": [
+            case("E046-normal", {"round": 8}, {"play": "E046"}, {"rounds_with_food": 2}),
+            case("E046-last", {"round": 14}, {"play": "E046"}, {"rounds_with_food": 1}),
+        ],
+    },
+    "E048": {
+        "post": "played_area",
+        "status": "needs_resolution",
+        "unresolved": [
+            "play.cost: the wiki shows only the alternative cost (2 wood + 2 clay); the base resource cost is not stated"
+        ],
+        "effects": [
+            effect("harvest_feeding", [gain("food", table("house", {"clay": 1, "stone": 2}))],
+                   freq="every_harvest", dur="permanent"),
+        ],
+        "notes": "Feeding phase: 1 food in a clay house, 2 in a stone house.",
+        "tests": [
+            case("E048-clay", {"house": "clay"}, {"run_harvest": True}, {"food_delta": 1}),
+            case("E048-stone", {"house": "stone"}, {"run_harvest": True}, {"food_delta": 2}),
+            case("E048-wood", {"house": "wood"}, {"run_harvest": True}, {"food_delta": 0}),
+        ],
+    },
+    "E049": {
+        "post": "played_area",
+        "effects": [
+            effect("after_room_construction", [gain("food", 1)],
+                   cond=[cond("any_player"), cond("wood_rooms_built_at_least", n=1)],
+                   freq="every_use", dur="permanent"),
+        ],
+        "notes": "Each time any player builds at least 1 wood room, gain 1 food.",
+        "tests": [
+            case("E049-normal", {"wood_rooms_built": 2}, {"end_turn": True},
+                 {"food_delta": 1}),
+            case("E049-not-triggered", {"wood_rooms_built": 0}, {"end_turn": True},
+                 {"food_delta": 0}),
         ],
     },
 }

@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "card_id": "D062",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ビールタップ",
+    "name_en": "Beer Tap"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2859",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "harvest_feeding",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "grain",
+                "amount": {
+                  "op": "table",
+                  "args": [
+                    "exchange_grain",
+                    {
+                      "2": 2,
+                      "3": 3,
+                      "4": 4
+                    }
+                  ]
+                }
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": {
+                  "op": "table",
+                  "args": [
+                    "exchange_food",
+                    {
+                      "2": 3,
+                      "3": 6,
+                      "4": 9
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "D062-normal",
+      "D062-exchange-2",
+      "D062-exchange-4",
+      "D062-not-enough"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Gain 2 food on play; each feeding phase may turn 2/3/4 grain into 3/6/9 food."
+  }
+}

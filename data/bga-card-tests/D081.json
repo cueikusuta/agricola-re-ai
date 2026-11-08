@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "D081",
+  "cases": [
+    {
+      "id": "D081-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "reed": 1,
+        "stone": 0
+      },
+      "action": {
+        "renovate": 1
+      },
+      "expected": {
+        "reed_delta": 0,
+        "stone_delta": 1
+      }
+    },
+    {
+      "id": "D081-stone-house",
+      "scope": "effect_only",
+      "setup": {
+        "house": "clay",
+        "reed": 2,
+        "stone": 0
+      },
+      "action": {
+        "renovate": 1
+      },
+      "expected": {
+        "reed_delta": -1,
+        "stone_delta": 1
+      }
+    }
+  ]
+}

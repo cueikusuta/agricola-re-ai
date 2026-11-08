@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "E046",
+  "cases": [
+    {
+      "id": "E046-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 8
+      },
+      "action": {
+        "play": "E046"
+      },
+      "expected": {
+        "rounds_with_food": 2
+      }
+    },
+    {
+      "id": "E046-last",
+      "scope": "effect_only",
+      "setup": {
+        "round": 14
+      },
+      "action": {
+        "play": "E046"
+      },
+      "expected": {
+        "rounds_with_food": 1
+      }
+    }
+  ]
+}

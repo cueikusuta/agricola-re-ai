@@ -16,6 +16,8 @@
 | `harvest_field_phase` | 収穫の畑フェイズ | 所有者 |
 | `after_harvest` | 収穫の解決後 | 所有者 |
 | `after_bake_bread` | 「パンを焼く」アクション解決後 | 所有者 |
+| `before_bake_bread` | 「パンを焼く」アクションの直前 | 所有者 |
+| `after_room_construction` | 部屋が建設された後（他プレイヤーを含む場合は `any_player`） | 所有者 |
 | `after_worker_space` | いずれかのプレイヤーが特定のアクションスペースを使った後 | `conditions` の `any_player` / `other_player_only` で限定 |
 | `after_improvement` | 大小進歩を建設した後（このカード自身を含む場合は `include_this_card`） | 所有者 |
 | `after_improvement_declined` | 進歩アクションを得たが使わないことを選んだとき | 所有者 |
@@ -66,7 +68,9 @@
 | `build_improvement` | `options`（カード名配列）, `cost`。指定コストで大進歩を建設 |
 | `fence_pasture` | `spaces`, `wood_cost`, `must_be_adjacent`。柵で牧場を作る |
 | `rebuild_fences` | `add_up_to`, `keep_animals`。全柵を撤去して建て直す |
-| `place_on_round_spaces` | `good`, `amount` または `amounts`, `rounds`, `marker_kind`。以後のラウンドスペースに品物・しるしを置く |
+| `place_on_round_spaces` | `good`, `amount` または `amounts`, `rounds`, `marker_kind`。以後のラウンドスペースに品物・しるしを置く。`rounds` は整数 / `"remaining"` / `"remaining_even"` / `"remaining_odd"` / 閾値表 |
+| `stack_goods_on_card` | `goods`（下から順）。カード上に品物を積む |
+| `take_top_good_from_card` | カード上の一番上の品物を得る |
 | `count_as_field` | `amount`。カード自体を畑として数える |
 | `gain_each_with_at_least` | `goods`, `threshold`, `amount`。所持数が閾値以上の品物を各1つ得る |
 | `add_good_to_single_good_fields` | `amount`, `same_type`。品物がちょうど1つの畑へ同種を追加 |
@@ -147,6 +151,8 @@
 | `cards_in_play_at_least` | `n` | 自分の前のカード（職業＋進歩）が `n` 枚以上 |
 | `fences_built_at_least` | `n` | 建設済みの柵が `n` 本以上 |
 | `worker_on_space` | `space` | 自分の人物がそのスペースに置かれている |
+| `grain_harvested_at_least` | `n` | 畑フェイズで収穫した小麦が `n` 以上 |
+| `wood_rooms_built_at_least` | `n` | 木の部屋が `n` 部屋以上建設された |
 | `fenced_stable_count` | `n` | 柵内の厩が `n` 以上 |
 | `animal_count_at_most` | `animal`, `n` | 家畜数が `n` 以下 |
 

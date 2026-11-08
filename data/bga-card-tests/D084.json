@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "card_id": "D084",
+  "cases": [
+    {
+      "id": "D084-normal",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 0
+      },
+      "action": {
+        "play": "D084"
+      },
+      "expected": {
+        "sheep_delta": 1
+      }
+    },
+    {
+      "id": "D084-exchange",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 1,
+        "owned_animal_types": [
+          "sheep"
+        ]
+      },
+      "action": {
+        "run_harvest": true,
+        "exchange": true
+      },
+      "expected": {
+        "vegetable_delta": -1,
+        "sheep_delta": 1
+      }
+    },
+    {
+      "id": "D084-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 1,
+        "owned_animal_types": []
+      },
+      "action": {
+        "run_harvest": true,
+        "exchange": true
+      },
+      "expected": {
+        "vegetable_delta": 0
+      }
+    }
+  ]
+}

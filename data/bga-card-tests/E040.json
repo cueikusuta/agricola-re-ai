@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "E040",
+  "cases": [
+    {
+      "id": "E040-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stack": [
+          "vegetable",
+          "stone",
+          "grain",
+          "stone",
+          "grain"
+        ]
+      },
+      "action": {
+        "play": "E040"
+      },
+      "expected": {
+        "stack_size": 5
+      }
+    },
+    {
+      "id": "E040-take",
+      "scope": "effect_only",
+      "setup": {
+        "stack": [
+          "vegetable",
+          "stone",
+          "grain",
+          "stone",
+          "grain"
+        ]
+      },
+      "action": {
+        "use_space": "day_laborer"
+      },
+      "expected": {
+        "gained": "grain",
+        "stack_size": 4
+      }
+    }
+  ]
+}

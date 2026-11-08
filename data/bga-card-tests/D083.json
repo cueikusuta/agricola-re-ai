@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "D083",
+  "cases": [
+    {
+      "id": "D083-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wild_boar": 0
+      },
+      "action": {
+        "use_space": "fencing"
+      },
+      "expected": {
+        "wild_boar_delta": 1
+      }
+    },
+    {
+      "id": "D083-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "wild_boar": 0
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "wild_boar_delta": 0
+      }
+    }
+  ]
+}

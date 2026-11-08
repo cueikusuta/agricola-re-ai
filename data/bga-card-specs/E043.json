@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "E043",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "納屋の猫",
+    "name_en": "Barn Cats"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2710",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 1
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "food",
+            "amount": 1,
+            "rounds": {
+              "op": "custom",
+              "args": [
+                "threshold_table",
+                "stable",
+                {
+                  "threshold": 1,
+                  "amount": 2
+                },
+                {
+                  "threshold": 2,
+                  "amount": 3
+                },
+                {
+                  "threshold": 3,
+                  "amount": 4
+                },
+                {
+                  "threshold": 4,
+                  "amount": 5
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E043-normal",
+      "E043-four"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "With 1/2/3/4 stables, place 1 food on each of the next 2/3/4/5 round spaces."
+  }
+}

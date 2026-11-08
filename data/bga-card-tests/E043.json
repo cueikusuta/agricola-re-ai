@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "E043",
+  "cases": [
+    {
+      "id": "E043-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 2
+      },
+      "action": {
+        "play": "E043"
+      },
+      "expected": {
+        "rounds_with_food": 3
+      }
+    },
+    {
+      "id": "E043-four",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 4
+      },
+      "action": {
+        "play": "E043"
+      },
+      "expected": {
+        "rounds_with_food": 5
+      }
+    }
+  ]
+}
