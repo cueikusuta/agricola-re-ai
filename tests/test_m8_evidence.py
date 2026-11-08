@@ -156,6 +156,32 @@ class M8EvidenceTests(unittest.TestCase):
             self.write_logs({"target_m8_rule_evidence::test_0": "FAILED"}))
         self.assertNotEqual(tests["test_report_sha256"], changed["test_report_sha256"])
 
+    def test_another_run_cannot_rebind_the_test_report(self):
+        tests = self.collect(self.write_logs())
+        matches = self.root / "matches.jsonl"
+        matches.write_text('{"block_index":0}\n', encoding="utf-8")
+        with self.assertRaisesRegex(EvidenceError, "different Actions run"):
+            self.checks(tests, matches, run_url="https://github.com/o/r/actions/runs/999")
+
+    def test_trusted_run_requires_real_matching_actions_environment(self):
+        from unittest.mock import patch
+        from scripts.m8_evidence import validate_trusted_current_run
+        url = "https://github.com/cueikusuta/agricola-re-ai/actions/runs/123"
+        vars = {
+            "GITHUB_ACTIONS": "true",
+            "GITHUB_SHA": "abc123",
+            "GITHUB_RUN_ID": "123",
+            "GITHUB_REPOSITORY": "cueikusuta/agricola-re-ai",
+            "GITHUB_SERVER_URL": "https://github.com",
+        }
+        with patch.dict("os.environ", vars, clear=True):
+            validate_trusted_current_run(code_sha="abc123", run_url=url)
+            with self.assertRaisesRegex(EvidenceError, "current Actions run"):
+                validate_trusted_current_run(code_sha="abc123",
+                                            run_url="https://github.com/o/r/actions/runs/999")
+            with self.assertRaisesRegex(EvidenceError, "current Actions revision"):
+                validate_trusted_current_run(code_sha="forged", run_url=url)
+
     # --- binding to the matches artifact ---------------------------------
 
     def test_the_checks_file_is_bound_to_code_and_matches(self):
