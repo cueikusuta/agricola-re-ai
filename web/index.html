@@ -54,14 +54,14 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <label>方式 <select id="draftMode"><option value="deal_7">通常7枚配布</option><option value="draft_7_7">7-7ドラフト</option><option value="draft_10_7_simultaneous">10-7同時ドラフト</option><option value="choose_10_7">10-7選択</option></select></label>
 <label>人数 <select id="draftPlayers"><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option></select></label>
 <label>乱数シード <input id="draftSeed" type="number" value="42" min="0" step="1"></label>
-<label>職業の受渡方向 <select id="draftDirOcc"><option value="">選択してください</option><option value="left">左へ</option><option value="right">右へ</option></select></label>
-<label>小進歩の受渡方向 <select id="draftDirMinor"><option value="">選択してください</option><option value="left">左へ</option><option value="right">右へ</option></select></label>
+<label>職業の受渡方向 <select id="draftDirOcc"><option value="right">右へ（時計回り）</option></select></label>
+<label>小進歩の受渡方向 <select id="draftDirMinor"><option value="right">右へ（時計回り）</option></select></label>
 <label><input id="draftOccFirst" type="checkbox" checked>7-7は職業を先に選ぶ</label>
 <label>カードプール <select id="draftPool"><option value="test_fixture">テスト用フィクスチャ</option><option value="verified_basic">実装済みカードプール（2人・通常/7-7、公式照合中）</option></select></label>
 <label>CPUのドラフトAI <select id="draftAi"><option value="random">ランダム</option><option value="card_value">カード価値</option><option value="synergy">シナジー</option></select></label>
 <button id="draftNew">ドラフト開始</button><button id="draftReset">ドラフト解除</button>
 </div>
-<p class="minor">受渡方向・フェーズ順は公式未確定の対戦慣行です。未選択なら開始しません。カードプールで「テスト用フィクスチャ」を選んだ場合、カードは<strong>検証用の架空カード</strong>です。「実装済み公式カードプール」は収録数が限られ、公式照合も継続中です。人間は1Pとして選択し、他席は観測可能情報だけで選ぶCPUです。</p>
+<p class="minor">受渡方向は両カード種別とも時計回り（1P→2P→3P→4P→1P）です。初回スタートプレイヤーはドラフト前に抽選します。フェーズ順は選択式で、出版社付録にある左回りの変則ルールとは異なるプロジェクト採用ルールです。カードプールで「テスト用フィクスチャ」を選んだ場合、カードは<strong>検証用の架空カード</strong>です。「実装済み公式カードプール」は収録数が限られ、公式照合も継続中です。人間は1Pとして選択し、他席は観測可能情報だけで選ぶCPUです。</p>
 <div id="draftStatus"></div><div id="draftOffered" class="chips"></div><div id="draftActions" class="buttons"></div><div id="draftLog" class="minor"></div>
 </section>
 <section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
@@ -363,7 +363,7 @@ else if(d.phase==="choosing")phase="自分の10枚から7枚を選ぶ";
 else if(d.active_kind)phase=label[d.active_kind]+"を1枚選ぶ";
 else phase="職業と小進歩を同時に1枚ずつ選ぶ";
 const poolLabel=d.pool_kind==="verified_basic"?"実装済みカードプール（公式照合中）":"テスト用フィクスチャ";
-const dirs={left:"左へ",right:"右へ"};const ruleSet="人数 "+d.player_count+"人 / 受渡 職業:"+(dirs[d.direction_occupation]||d.direction_occupation)+" 小進歩:"+(dirs[d.direction_minor]||d.direction_minor)+" / 順序:"+(d.occupation_phase_first?"職業→小進歩":"小進歩→職業")+" / ルールセット "+d.ruleset_id+"（明示設定・公式未確定）";
+const dirs={left:"左へ",right:"右へ"};const ruleSet="人数 "+d.player_count+"人 / 初回スタート:"+(d.start_player+1)+"P（ドラフト前抽選） / 受渡 職業:"+(dirs[d.direction_occupation]||d.direction_occupation)+" 小進歩:"+(dirs[d.direction_minor]||d.direction_minor)+" / 順序:"+(d.occupation_phase_first?"職業→小進歩":"小進歩→職業")+" / ルールセット "+d.ruleset_id+"（時計回り・プロジェクト採用）";
 status.textContent="方式 "+d.mode+" / "+phase+" / 選んだ枚数 "+d.hand_counts.map((n,i)=>(i+1)+"P:"+n).join(" ")+" / 残り "+d.remaining_to_pick+"（"+poolLabel+"・CPU:"+d.ai+"）"+(d.game_started?" / ゲーム開始済み":"")+" / "+ruleSet;
 offered.replaceChildren();
 if(d.complete){
@@ -416,10 +416,9 @@ actions.append(confirm);
 renderDraftHistory(log,d.history||[],"自分のピック: "+(d.own_picked.length?d.own_picked.map(draftCardLabel).join(" / "):"なし"));
 }
 $("draftNew").onclick=async()=>{
-const mode=val("draftMode"),do_=val("draftDirOcc"),dm=val("draftDirMinor");
-if(mode!=="deal_7"&&mode!=="choose_10_7"&&(!do_||!dm)){$("draftStatus").textContent="受渡方向を明示してください（公式未確定の対戦慣行）。";return;}
+const mode=val("draftMode"),do_="right",dm="right";
 resetDraftSel();
-await request("/api/draft/new",{mode,players:Number(val("draftPlayers")),seed:Number(val("draftSeed")),direction_occupation:do_||"left",direction_minor:dm||"left",occupation_phase_first:checked("draftOccFirst"),pool:val("draftPool"),draft_ai:val("draftAi")});
+await request("/api/draft/new",{mode,players:Number(val("draftPlayers")),seed:Number(val("draftSeed")),direction_occupation:do_,direction_minor:dm,occupation_phase_first:checked("draftOccFirst"),pool:val("draftPool"),draft_ai:val("draftAi")});
 };
 $("draftReset").onclick=async()=>{resetDraftSel();await request("/api/draft/reset",{});};
 </script></body></html>
