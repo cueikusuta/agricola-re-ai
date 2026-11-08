@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "card_id": "A016",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "踏み粘土",
+    "name_en": "Rammed Clay"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'When you play this card, you immediately get 1 clay. You can use clay instead of wood to build fences.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'このカードを出したとき、すぐにレンガ1を得る。柵を建設するとき、木材の代わりにレンガを使うことができる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 1
+          },
+          "notes": "Immediately gain 1 clay"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Immediate clay gain"
+    },
+    {
+      "trigger": "on_build_fence",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "wood": -1,
+            "clay": 1
+          },
+          "notes": "Substitute 1 clay for 1 wood when building fences"
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Ongoing: when building fences, owner may use clay instead of wood"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing fence substitution effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.1.trigger",
+      "effects.1.steps.0.params"
+    ],
+    "test_case_ids": [
+      "A016-basic-clay-gain",
+      "A016-fence-with-clay",
+      "A016-fence-with-wood"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Two effects: immediate clay gain, then ongoing clay-for-wood substitution on fences. Stays in play area."
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "card_id": "A007",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "園芸用ナイフ",
+    "name_en": "Gardener's Knife"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'You immediately get 1 food for each grain field you have and 1 grain for each vegetable field you have.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'すぐに小麦畑1つにつき食料1を得る。さらに野菜畑1つにつき小麦1を得る。このカードはあなたの前に置かず、左隣のプレイヤーの手札に入れる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "field_count",
+              "args": [{"crop": "grain"}],
+              "snapshot": "before_effect"
+            }
+          },
+          "notes": "1 food per grain field"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": {
+              "op": "field_count",
+              "args": [{"crop": "vegetable"}],
+              "snapshot": "before_effect"
+            }
+          },
+          "notes": "1 grain per vegetable field"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Automatic based on field counts"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "Card does not stay in play area; moves to left neighbor's hand after resolution"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A007-grain-fields-only",
+      "A007-vegetable-fields-only",
+      "A007-both"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Both JP/EN sources agree. Cost/prerequisites confirmed as none."
+  }
+}

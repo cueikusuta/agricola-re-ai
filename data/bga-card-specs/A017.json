@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "A017",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "開墾鋤",
+    "name_en": "Reclamation Plow"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'After the next time you take animals from an accumulation space and accommodate all of them on your farm, you can plow 1 field.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'これ以降に初めて、累積スペースから得た家畜をすべて農場に飼えたとき1度だけ、その後に畑を1つ耕せる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_accommodate_animals_from_accumulation",
+      "conditions": [
+        {
+          "predicate": "all_animals_accommodated",
+          "params": {},
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "plow_field",
+          "target": "owner",
+          "params": {
+            "count": 1
+          },
+          "notes": "Plow 1 field"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "First time after playing this card that you take animals from accumulation and accommodate all, plow 1 field. Once per game."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing trigger"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.conditions.0.predicate"
+    ],
+    "test_case_ids": [
+      "A017-accommodate-all",
+      "A017-cannot-accommodate-all",
+      "A017-already-triggered"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "One-time trigger: first successful animal accommodation from accumulation after playing. Stays in play area until triggered."
+  }
+}

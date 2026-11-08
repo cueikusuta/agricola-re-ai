@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "A003",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ペーパーナイフ",
+    "name_en": "Paper Knife"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Select 3 occupations in your hand. Select one of them randomly, which you can play immediately without paying an occupation cost.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '手札の職業から3枚選び、そこから1枚を無作為に選ぶ。その職業をすぐに職業コストを払わずに出せる。このカードはあなたの前に置かず、左隣のプレイヤーの手札に入れる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "has_at_least_n_cards_in_hand",
+          "params": { "n": 3, "type": "occupation" },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": { "action": "select_cards_from_hand", "count": 3, "type": "occupation" },
+          "notes": "Owner selects 3 occupation cards from hand. Custom operation needs engine mapping."
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": { "action": "random_select_and_play_occupation", "cost_override": "free" },
+          "notes": "Randomly select 1 of the 3, play it immediately for free. Custom operation needs engine mapping."
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "random",
+      "notes": "Owner chooses the 3; random selection of 1; played without occupation cost"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "Card does not stay in play area; moves to left neighbor's hand after resolution"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.1.engine_mapping"
+    ],
+    "test_case_ids": [
+      "A003-basic-3-occupations",
+      "A003-fewer-than-3-occupations"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Both JP/EN sources agree. Random selection and free play of occupation need engine mapping. Cost/prerequisites confirmed as none."
+  }
+}

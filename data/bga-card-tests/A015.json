@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "card_id": "A015",
+  "cases": [
+    {
+      "id": "A015-wood-ge-7",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "wood": 7
+        },
+        "farm": {
+          "pastures": [{"size": 2, "stables": 0, "animals": {}}]
+        },
+        "played_cards": ["A015"],
+        "card_location": {
+          "card_id": "A015",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "use_wood_accumulation",
+        "wood_gained": 3,
+        "choices": {"build_stable": true}
+      },
+      "expected": {
+        "resource_stock": {
+          "wood": 9
+        },
+        "farm": {
+          "pastures": [{"size": 2, "stables": 1, "animals": {}}]
+        }
+      },
+      "notes": "Had 7 wood, gained 3 = 10. Choose to build stable for 1 wood -> 9 wood, 1 stable."
+    },
+    {
+      "id": "A015-wood-lt-7",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "wood": 5
+        },
+        "farm": {
+          "pastures": [{"size": 2, "stables": 0, "animals": {}}]
+        },
+        "played_cards": ["A015"],
+        "card_location": {
+          "card_id": "A015",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "use_wood_accumulation",
+        "wood_gained": 1,
+        "choices": {}
+      },
+      "expected": {
+        "resource_stock": {
+          "wood": 6
+        },
+        "farm": {
+          "pastures": [{"size": 2, "stables": 0, "animals": {}}]
+        }
+      },
+      "notes": "Had 5 wood, gained 1 = 6. Less than 7 -> no stable build option."
+    },
+    {
+      "id": "A015-optional-decline",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "wood": 8
+        },
+        "farm": {
+          "pastures": [{"size": 2, "stables": 0, "animals": {}}]
+        },
+        "played_cards": ["A015"],
+        "card_location": {
+          "card_id": "A015",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "use_wood_accumulation",
+        "wood_gained": 2,
+        "choices": {"build_stable": false}
+      },
+      "expected": {
+        "resource_stock": {
+          "wood": 10
+        },
+        "farm": {
+          "pastures": [{"size": 2, "stables": 0, "animals": {}}]
+        }
+      },
+      "notes": "Wood >= 7 but owner chooses not to build stable. Wood stays at 10."
+    }
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "card_id": "A016",
+  "cases": [
+    {
+      "id": "A016-basic-clay-gain",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "clay": 0,
+          "wood": 5
+        },
+        "card_location": {
+          "card_id": "A016",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A016"
+      },
+      "expected": {
+        "resource_stock": {
+          "clay": 1,
+          "wood": 5
+        },
+        "played_cards": ["A016"],
+        "card_location": {
+          "card_id": "A016",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "On play: gain 1 clay. Card stays in play area for ongoing fence effect."
+    },
+    {
+      "id": "A016-fence-with-clay",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "clay": 3,
+          "wood": 0
+        },
+        "farm": {
+          "fences": 0
+        },
+        "played_cards": ["A016"],
+        "card_location": {
+          "card_id": "A016",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "build_fences",
+        "count": 2,
+        "choices": {"use_clay": true}
+      },
+      "expected": {
+        "resource_stock": {
+          "clay": 1,
+          "wood": 0
+        },
+        "farm": {
+          "fences": 2
+        }
+      },
+      "notes": "Build 2 fences using clay instead of wood. Cost: 2 clay. Remaining: 1 clay."
+    },
+    {
+      "id": "A016-fence-with-wood",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "clay": 3,
+          "wood": 4
+        },
+        "farm": {
+          "fences": 0
+        },
+        "played_cards": ["A016"],
+        "card_location": {
+          "card_id": "A016",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "build_fences",
+        "count": 2,
+        "choices": {"use_clay": false}
+      },
+      "expected": {
+        "resource_stock": {
+          "clay": 3,
+          "wood": 0
+        },
+        "farm": {
+          "fences": 2
+        }
+      },
+      "notes": "Build 2 fences using wood (normal cost). Cost: 2 wood. Clay unchanged."
+    }
+  ]
+}

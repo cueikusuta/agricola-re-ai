@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "A010",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "板張りの小屋",
+    "name_en": "Wooden Shed"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'This card can only be played via a \"Major Improvement\" action. It provides room for one person. You may no longer renovate.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'このカードは「大きい進歩」アクションでだけ出せる、人物1人分の住む場所になる。今後改築ができなくなる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "major_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": "Played via Major Improvement action only"
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "build_room",
+          "target": "owner",
+          "params": {
+            "capacity": 1,
+            "material": "wood"
+          },
+          "notes": "Provides room for 1 person"
+        },
+        {
+          "operation": "modify_capacity",
+          "target": "owner",
+          "params": {
+            "renovation_allowed": false
+          },
+          "notes": "Can no longer renovate"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "permanent",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Room built; renovation permanently disabled for this player"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area (unlike most minor improvements in this batch)"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "play.action",
+      "effects.0.steps.1.engine_mapping"
+    ],
+    "test_case_ids": [
+      "A010-basic",
+      "A010-renovation-blocked"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Unique: played via Major Improvement action, stays in play area, permanently disables renovation."
+  }
+}

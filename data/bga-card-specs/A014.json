@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "A014",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "大工の金槌",
+    "name_en": "Carpenter's Hammer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Each time you build at least 2 wood/clay/stone rooms at once, you get a total discount of 2 reed as well as 2 wood/3 clay/4 stone.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '同時に2部屋以上建設するたびに、資材の合計から葦2と、木/レンガ/石の家ならば木材2/レンガ3/石材4安くなる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_build_rooms",
+      "conditions": [
+        {
+          "predicate": "rooms_built_in_action",
+          "params": {
+            "min_count": 2,
+            "materials": ["wood", "clay", "stone"]
+          },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "reed": 2,
+            "wood": 2,
+            "clay": 3,
+            "stone": 4
+          },
+          "notes": "Discount: 2 reed + 2 wood (wood rooms) / 3 clay (clay rooms) / 4 stone (stone rooms)"
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Triggered each time 2+ rooms built at once. Discount applies per room material type."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing discount effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.conditions.0.predicate",
+      "effects.0.steps.0.params"
+    ],
+    "test_case_ids": [
+      "A014-build-2-wood-rooms",
+      "A014-build-2-clay-rooms",
+      "A014-build-2-stone-rooms",
+      "A014-build-1-room-no-discount"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Complex ongoing discount effect. Ban status 'strong' per BGA list. Trigger and discount calculation need engine mapping."
+  }
+}

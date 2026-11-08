@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "card_id": "A018",
+  "cases": [
+    {
+      "id": "A018-first-person-farmland",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "fields": []
+        },
+        "round": 3,
+        "is_first_person_this_round": true,
+        "played_cards": ["A018"],
+        "card_location": {
+          "card_id": "A018",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "use_action_space",
+        "space": "Farmland"
+      },
+      "expected": {
+        "farm": {
+          "fields": [
+            {"planted": false},
+            {"planted": false}
+          ]
+        },
+        "card_location": {
+          "card_id": "A018",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "First person this round uses Farmland -> plow 2 additional fields. Trigger used once per game."
+    },
+    {
+      "id": "A018-not-first-person",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "fields": []
+        },
+        "round": 3,
+        "is_first_person_this_round": false,
+        "played_cards": ["A018"],
+        "card_location": {
+          "card_id": "A018",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "use_action_space",
+        "space": "Farmland"
+      },
+      "expected": {
+        "farm": {
+          "fields": []
+        },
+        "card_location": {
+          "card_id": "A018",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "Not first person -> no extra plow. Trigger remains active."
+    },
+    {
+      "id": "A018-already-used",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "fields": [{"planted": false}, {"planted": false}]
+        },
+        "round": 5,
+        "is_first_person_this_round": true,
+        "played_cards": ["A018"],
+        "triggered": true,
+        "card_location": {
+          "card_id": "A018",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "use_action_space",
+        "space": "Cultivation"
+      },
+      "expected": {
+        "farm": {
+          "fields": [{"planted": false}, {"planted": false}]
+        },
+        "card_location": {
+          "card_id": "A018",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "Already triggered once per game. No additional plow."
+    }
+  ]
+}

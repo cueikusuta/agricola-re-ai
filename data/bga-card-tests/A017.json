@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "card_id": "A017",
+  "cases": [
+    {
+      "id": "A017-accommodate-all",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "pastures": [{"size": 2, "stables": 0, "animals": {}}]
+        },
+        "played_cards": ["A017"],
+        "card_location": {
+          "card_id": "A017",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "take_animals_from_accumulation",
+        "animals": {"sheep": 2},
+        "accommodate_all": true
+      },
+      "expected": {
+        "farm": {
+          "pastures": [{"size": 2, "stables": 0, "animals": {"sheep": 2}}],
+          "fields": [{"planted": false}]
+        },
+        "card_location": {
+          "card_id": "A017",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "Take 2 sheep from accumulation, accommodate all in pasture. Trigger: plow 1 field. Card stays (but trigger used)."
+    },
+    {
+      "id": "A017-cannot-accommodate-all",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "pastures": [{"size": 1, "stables": 0, "animals": {}}]
+        },
+        "played_cards": ["A017"],
+        "card_location": {
+          "card_id": "A017",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "take_animals_from_accumulation",
+        "animals": {"sheep": 2},
+        "accommodate_all": false
+      },
+      "expected": {
+        "farm": {
+          "pastures": [{"size": 1, "stables": 0, "animals": {"sheep": 1}}],
+          "fields": []
+        },
+        "card_location": {
+          "card_id": "A017",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "Cannot accommodate all 2 sheep (only space for 1). No field plowed. Trigger remains active for future."
+    },
+    {
+      "id": "A017-already-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "pastures": [{"size": 2, "stables": 0, "animals": {"sheep": 2}}],
+          "fields": [{"planted": false}]
+        },
+        "played_cards": ["A017"],
+        "triggered": true,
+        "card_location": {
+          "card_id": "A017",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "take_animals_from_accumulation",
+        "animals": {"sheep": 2},
+        "accommodate_all": true
+      },
+      "expected": {
+        "farm": {
+          "pastures": [{"size": 2, "stables": 0, "animals": {"sheep": 4}}],
+          "fields": [{"planted": false}]
+        },
+        "card_location": {
+          "card_id": "A017",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "Trigger already used once per game. No additional field plowed."
+    }
+  ]
+}

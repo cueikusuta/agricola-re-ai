@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "A009",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "子供の動物市場",
+    "name_en": "Young Animal Market"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'You immediately get 1 cattle. (Effectively, you are exchanging 1 sheep for 1 cattle.)'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'すぐに牛1を得る（つまり、羊1を牛1 に替える）。このカードは自分の前に置かず、左隣のプレイヤーの手札に入れる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "has_resource",
+          "params": {
+            "good": "sheep",
+            "amount": 1
+          },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "sheep",
+            "amount": 1
+          },
+          "notes": "Spend 1 sheep"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "cattle",
+            "amount": 1
+          },
+          "notes": "Gain 1 cattle"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Exchange 1 sheep for 1 cattle; requires having a sheep"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "Card does not stay in play area; moves to left neighbor's hand after resolution"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.conditions.0.predicate"
+    ],
+    "test_case_ids": [
+      "A009-basic",
+      "A009-no-sheep"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Japanese text implies exchange (羊1を牛1に替える). English says 'get 1 cattle' but parenthetically notes exchange. Modeled as conditional exchange."
+  }
+}

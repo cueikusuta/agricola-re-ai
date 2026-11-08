@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "card_id": "A002",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "移動耕作",
+    "name_en": "Shifting Cultivation"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Immediately plow 1 field. This card is not placed in front of you, but goes to the hand of the player to your left.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'すぐに畑を1つ耕す。このカードはあなたの前に置かずに、あなたの左隣のプレイヤーの手札に入れる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "plow_field",
+          "target": "owner",
+          "params": { "count": 1 },
+          "notes": "Immediately plow 1 field"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Owner chooses where to place the field tile"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "Card does not stay in play area; moves to left neighbor's hand after resolution"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A002-basic-plow",
+      "A002-no-space-for-field"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Both JP/EN sources agree. Cost/prerequisites confirmed as none. BGA shows OFF for 2P but this is likely a BGA implementation detail, not eligibility."
+  }
+}

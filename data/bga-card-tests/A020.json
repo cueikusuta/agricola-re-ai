@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "card_id": "A020",
+  "cases": [
+    {
+      "id": "A020-round-1-3",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 2,
+        "resource_stock": {
+          "grain": 1,
+          "food": 2
+        },
+        "farm": {
+          "empty_field_slots": 3
+        },
+        "card_location": {
+          "card_id": "A020",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A020",
+        "choices": {"plow_count": 2}
+      },
+      "expected": {
+        "resource_stock": {
+          "grain": 0,
+          "food": 2
+        },
+        "farm": {
+          "empty_field_slots": 1,
+          "fields": [
+            {"planted": false},
+            {"planted": false}
+          ]
+        },
+        "card_location": {
+          "card_id": "A020",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "Round 2: cost 1 grain. Plow 2 fields. Card moves to left neighbor (assumed per similar cards)."
+    },
+    {
+      "id": "A020-round-4-5",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 4,
+        "resource_stock": {
+          "grain": 1,
+          "food": 2
+        },
+        "farm": {
+          "empty_field_slots": 3
+        },
+        "card_location": {
+          "card_id": "A020",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A020",
+        "choices": {"plow_count": 1}
+      },
+      "expected": {
+        "resource_stock": {
+          "grain": 0,
+          "food": 1
+        },
+        "farm": {
+          "empty_field_slots": 2,
+          "fields": [
+            {"planted": false}
+          ]
+        },
+        "card_location": {
+          "card_id": "A020",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "Round 4: cost 1 grain + 1 food. Plow 1 field. Card moves to left neighbor."
+    },
+    {
+      "id": "A020-plow-0-1-2",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 3,
+        "resource_stock": {
+          "grain": 1,
+          "food": 2
+        },
+        "farm": {
+          "empty_field_slots": 1
+        },
+        "card_location": {
+          "card_id": "A020",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A020",
+        "choices": {"plow_count": 1}
+      },
+      "expected": {
+        "resource_stock": {
+          "grain": 0,
+          "food": 2
+        },
+        "farm": {
+          "empty_field_slots": 0,
+          "fields": [
+            {"planted": false}
+          ]
+        },
+        "card_location": {
+          "card_id": "A020",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "Only 1 field slot available -> plow 1 (max). Cost 1 grain (round 3)."
+    }
+  ]
+}

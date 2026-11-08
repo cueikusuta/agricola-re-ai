@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "A020",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "畝立て鋤",
+    "name_en": "Double-Turn Plow"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'When you play this card, you can immediately plow up to 2 fields. (This card costs 1 grain until round 3, then 1 grain and 1 food in rounds 4-5.)'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'このカードを出したとき、すぐに畑2つまで耕せる。（このカードのコストはラウンド3までは小麦1、ラウンド4か5では小麦1と食料1）'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": null,
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": "Round 1-3: 1 grain. Round 4-5: 1 grain + 1 food. Cost varies by round."
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "plow_field",
+          "target": "owner",
+          "params": {
+            "count": 2,
+            "max": true
+          },
+          "notes": "Plow up to 2 fields"
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Optional: plow up to 2 fields. Cost depends on current round."
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "Card does not stay in play area; moves to left neighbor's hand after resolution (per JP source: 'このカードはあなたの前に置かず、左隣のプレイヤーの手札に入れる' - but this text is not explicitly in the A020 snippet. Need verification.)"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost",
+      "post_play.destination"
+    ],
+    "test_case_ids": [
+      "A020-round-1-3",
+      "A020-round-4-5",
+      "A020-plow-0-1-2"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Cost varies by round (1 grain rounds 1-3, 1 grain + 1 food rounds 4-5). Post-play destination unclear from snippets - most similar cards go to left neighbor but not explicitly confirmed for A020. Marked needs_resolution."
+  }
+}

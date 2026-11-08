@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "card_id": "A001",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "雨除け",
+    "name_en": "Shelter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_1/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese page: immediate stable build in 1-space pasture; card moves to left neighbor hand"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row confirms effect and BGA status"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "has_pasture_of_size",
+          "params": { "size": 1 },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "owner",
+          "params": {
+            "pasture_size": 1,
+            "cost_override": { "wood": 0, "stone": 0, "reed": 0 }
+          },
+          "notes": "Build exactly 1 stable in a pasture covering exactly 1 farmyard space, at no cost"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Owner chooses which eligible 1-space pasture receives the stable"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "Card does not stay in play area; moves to left neighbor's hand after resolution"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A001-basic-1space-pasture",
+      "A001-no-eligible-pasture",
+      "A001-multiple-eligible-pastures"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Both JP/EN sources agree on effect and post-play movement. Cost/prerequisites confirmed as none."
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "card_id": "A001",
+  "cases": [
+    {
+      "id": "A001-basic-1space-pasture",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "wood": 5,
+          "stone": 3,
+          "reed": 2
+        },
+        "farm": {
+          "pastures": [
+            { "size": 1, "stables": 0, "animals": {} },
+            { "size": 2, "stables": 0, "animals": {} }
+          ]
+        },
+        "card_location": {
+          "card_id": "A001",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A001",
+        "choices": { "target_pasture_index": 0 }
+      },
+      "expected": {
+        "farm": {
+          "pastures": [
+            { "size": 1, "stables": 1, "animals": {} },
+            { "size": 2, "stables": 0, "animals": {} }
+          ]
+        },
+        "resource_stock": {
+          "wood": 5,
+          "stone": 3,
+          "reed": 2
+        },
+        "card_location": {
+          "card_id": "A001",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "Owner has a 1-space pasture; chooses it; stable built for free; card moves to left neighbor (player 1)"
+    },
+    {
+      "id": "A001-no-eligible-pasture",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "wood": 5,
+          "stone": 3,
+          "reed": 2
+        },
+        "farm": {
+          "pastures": [
+            { "size": 2, "stables": 0, "animals": {} },
+            { "size": 3, "stables": 1, "animals": {} }
+          ]
+        },
+        "card_location": {
+          "card_id": "A001",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A001",
+        "choices": {}
+      },
+      "expected": {
+        "farm": {
+          "pastures": [
+            { "size": 2, "stables": 0, "animals": {} },
+            { "size": 3, "stables": 1, "animals": {} }
+          ]
+        },
+        "resource_stock": {
+          "wood": 5,
+          "stone": 3,
+          "reed": 2
+        },
+        "card_location": {
+          "card_id": "A001",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "No 1-space pasture exists; effect does nothing but card still moves to left neighbor"
+    },
+    {
+      "id": "A001-multiple-eligible-pastures",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "wood": 5,
+          "stone": 3,
+          "reed": 2
+        },
+        "farm": {
+          "pastures": [
+            { "size": 1, "stables": 0, "animals": {} },
+            { "size": 1, "stables": 0, "animals": {} },
+            { "size": 2, "stables": 0, "animals": {} }
+          ]
+        },
+        "card_location": {
+          "card_id": "A001",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A001",
+        "choices": { "target_pasture_index": 1 }
+      },
+      "expected": {
+        "farm": {
+          "pastures": [
+            { "size": 1, "stables": 0, "animals": {} },
+            { "size": 1, "stables": 1, "animals": {} },
+            { "size": 2, "stables": 0, "animals": {} }
+          ]
+        },
+        "resource_stock": {
+          "wood": 5,
+          "stone": 3,
+          "reed": 2
+        },
+        "card_location": {
+          "card_id": "A001",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "Owner chooses second 1-space pasture (index 1); only that one gets a stable"
+    }
+  ]
+}

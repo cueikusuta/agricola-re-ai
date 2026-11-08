@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "card_id": "A012",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "水飲み場",
+    "name_en": "Drinking Trough"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Each of your pastures (with or without a stable) can hold up to 2 more animals.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '自分の牧場は（厩の有無に関わらず）いずれも、家畜を2頭多く収容できるようになる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "modify_capacity",
+          "target": "owner",
+          "params": {
+            "pasture_capacity_bonus": 2
+          },
+          "notes": "Each pasture holds 2 more animals"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "permanent",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Permanent +2 capacity to all pastures, regardless of stables"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing pasture capacity effect"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A012-basic"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Simple permanent pasture capacity bonus. Stays in play area."
+  }
+}

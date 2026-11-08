@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "card_id": "A013",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "改築事業所",
+    "name_en": "Renovation Company"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'When you play this card, you immediately get 3 clay. Immediately after, you can renovate without paying any building resources.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'このカードを出した時、すぐにレンガ3を得る。その直後に建設資材を払わずに改築できる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 3
+          },
+          "notes": "Gain 3 clay"
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "renovate",
+            "cost_override": {
+              "wood": 0,
+              "clay": 0,
+              "stone": 0,
+              "reed": 0
+            }
+          },
+          "notes": "Immediately renovate for free"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Gain 3 clay; then immediately perform a free renovation (owner chooses whether and what to renovate)"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area (no post-play hand transfer mentioned)"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.1.engine_mapping"
+    ],
+    "test_case_ids": [
+      "A013-basic",
+      "A013-no-renovation"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Two-step effect: gain clay, then free renovation. Renovation is optional (can choose not to)."
+  }
+}

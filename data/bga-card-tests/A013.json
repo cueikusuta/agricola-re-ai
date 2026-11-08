@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "A013",
+  "cases": [
+    {
+      "id": "A013-basic",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "clay": 0
+        },
+        "farm": {
+          "rooms": 2,
+          "house_type": "wood",
+          "can_renovate": true
+        },
+        "card_location": {
+          "card_id": "A013",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A013",
+        "choices": {"renovate": true, "target_house_type": "clay"}
+      },
+      "expected": {
+        "resource_stock": {
+          "clay": 3
+        },
+        "farm": {
+          "rooms": 2,
+          "house_type": "clay",
+          "can_renovate": true
+        },
+        "card_location": {
+          "card_id": "A013",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "Gain 3 clay. Then free renovation from wood to clay house. Card stays in play area."
+    },
+    {
+      "id": "A013-no-renovation",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "clay": 0
+        },
+        "farm": {
+          "rooms": 2,
+          "house_type": "wood",
+          "can_renovate": true
+        },
+        "card_location": {
+          "card_id": "A013",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A013",
+        "choices": {"renovate": false}
+      },
+      "expected": {
+        "resource_stock": {
+          "clay": 3
+        },
+        "farm": {
+          "rooms": 2,
+          "house_type": "wood",
+          "can_renovate": true
+        },
+        "card_location": {
+          "card_id": "A013",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "Gain 3 clay. Choose not to renovate. Card stays in play area."
+    }
+  ]
+}

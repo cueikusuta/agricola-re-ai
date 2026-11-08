@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "A018",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "車輪鋤",
+    "name_en": "Wheel Plow"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Once this game, when you use the \"Farmland\" or \"Cultivation\" action space with the first person you place in a round, you can plow 2 additional fields.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'ゲーム中に1回、アクションスペース「農地」または「耕作」をあなたのそのラウンドの1番目の人物で使ったとき、追加で畑2つ耕せる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_action_space_use",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "names": ["Farmland", "Cultivation", "農地", "耕作"]
+          },
+          "negate": false
+        },
+        {
+          "predicate": "is_first_person_placed_this_round",
+          "params": {},
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "plow_field",
+          "target": "owner",
+          "params": {
+            "count": 2
+          },
+          "notes": "Plow 2 additional fields"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Once per game: when using Farmland/Cultivation with first person placed this round, plow 2 extra fields."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing trigger"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.conditions.0.predicate",
+      "effects.0.conditions.1.predicate"
+    ],
+    "test_case_ids": [
+      "A018-first-person-farmland",
+      "A018-not-first-person",
+      "A018-already-used"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "One-time trigger with specific conditions: Farmland/Cultivation action, first person placed this round. Stays in play area until triggered."
+  }
+}

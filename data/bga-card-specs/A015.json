@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "card_id": "A015",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "大工の手斧",
+    "name_en": "Carpenter's Axe"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Each time after you use a wood accumulation space, if you then have at least 7 wood in your supply, you can build exactly 1 stable for 1 wood.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '木材の累積スペースを使うたびに、その後あなたのストックに木材7以上あれば、木材1を払って厩1軒だけ建設できる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_wood_accumulation",
+      "conditions": [
+        {
+          "predicate": "resource_count",
+          "params": {
+            "good": "wood",
+            "min": 7
+          },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "owner",
+          "params": {
+            "cost_override": {
+              "wood": 1
+            }
+          },
+          "notes": "Build exactly 1 stable for 1 wood"
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "After using wood accumulation space, if wood >= 7, may build 1 stable for 1 wood. Optional."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.conditions.0.predicate"
+    ],
+    "test_case_ids": [
+      "A015-wood-ge-7",
+      "A015-wood-lt-7",
+      "A015-optional-decline"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Ongoing conditional effect triggered by wood accumulation. Optional - owner chooses whether to build stable."
+  }
+}

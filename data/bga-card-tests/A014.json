@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "card_id": "A014",
+  "cases": [
+    {
+      "id": "A014-build-2-wood-rooms",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "rooms": 2
+        },
+        "resource_stock": {
+          "wood": 6,
+          "reed": 3
+        },
+        "played_cards": ["A014"],
+        "card_location": {
+          "card_id": "A014",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "build_rooms",
+        "rooms": [{"material": "wood"}, {"material": "wood"}]
+      },
+      "expected": {
+        "resource_stock": {
+          "wood": 2,
+          "reed": 1
+        },
+        "farm": {
+          "rooms": 4
+        }
+      },
+      "notes": "Build 2 wood rooms. Normal cost: 4 wood + 2 reed. With A014: -2 wood -2 reed = 2 wood + 0 reed? Actually discount is 2 reed + 2 wood = 4 wood + 0 reed. But reed can't go negative. Expected: 2 wood, 1 reed (min 0)."
+    },
+    {
+      "id": "A014-build-2-clay-rooms",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "rooms": 2
+        },
+        "resource_stock": {
+          "clay": 8,
+          "reed": 3
+        },
+        "played_cards": ["A014"],
+        "card_location": {
+          "card_id": "A014",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "build_rooms",
+        "rooms": [{"material": "clay"}, {"material": "clay"}]
+      },
+      "expected": {
+        "resource_stock": {
+          "clay": 2,
+          "reed": 1
+        },
+        "farm": {
+          "rooms": 4
+        }
+      },
+      "notes": "Build 2 clay rooms. Normal: 6 clay + 2 reed. Discount: 2 reed + 3 clay = 3 clay + 0 reed."
+    },
+    {
+      "id": "A014-build-2-stone-rooms",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "rooms": 2
+        },
+        "resource_stock": {
+          "stone": 10,
+          "reed": 3
+        },
+        "played_cards": ["A014"],
+        "card_location": {
+          "card_id": "A014",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "build_rooms",
+        "rooms": [{"material": "stone"}, {"material": "stone"}]
+      },
+      "expected": {
+        "resource_stock": {
+          "stone": 2,
+          "reed": 1
+        },
+        "farm": {
+          "rooms": 4
+        }
+      },
+      "notes": "Build 2 stone rooms. Normal: 8 stone + 2 reed. Discount: 2 reed + 4 stone = 4 stone + 0 reed."
+    },
+    {
+      "id": "A014-build-1-room-no-discount",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "rooms": 2
+        },
+        "resource_stock": {
+          "wood": 4,
+          "reed": 2
+        },
+        "played_cards": ["A014"],
+        "card_location": {
+          "card_id": "A014",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "build_rooms",
+        "rooms": [{"material": "wood"}]
+      },
+      "expected": {
+        "resource_stock": {
+          "wood": 0,
+          "reed": 0
+        },
+        "farm": {
+          "rooms": 3
+        }
+      },
+      "notes": "Build only 1 room -> no discount. Full cost: 2 wood + 1 reed."
+    }
+  ]
+}

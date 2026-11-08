@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "card_id": "A006",
+  "cases": [
+    {
+      "id": "A006-all-four",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "major_improvements": ["Well", "Joinery", "Pottery", "Basketmaker's Workshop"],
+        "resource_stock": {
+          "stone": 0,
+          "wood": 0,
+          "clay": 0,
+          "reed": 0
+        },
+        "card_location": {
+          "card_id": "A006",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A006"
+      },
+      "expected": {
+        "resource_stock": {
+          "stone": 1,
+          "wood": 1,
+          "clay": 1,
+          "reed": 1
+        },
+        "card_location": {
+          "card_id": "A006",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "All four major improvements owned; gain 1 of each corresponding resource. Card moves to left neighbor."
+    },
+    {
+      "id": "A006-only-well",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "major_improvements": ["Well"],
+        "resource_stock": {
+          "stone": 0,
+          "wood": 0,
+          "clay": 0,
+          "reed": 0
+        },
+        "card_location": {
+          "card_id": "A006",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A006"
+      },
+      "expected": {
+        "resource_stock": {
+          "stone": 1,
+          "wood": 0,
+          "clay": 0,
+          "reed": 0
+        },
+        "card_location": {
+          "card_id": "A006",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "Only Well owned; gain 1 stone only."
+    },
+    {
+      "id": "A006-none",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "major_improvements": [],
+        "resource_stock": {
+          "stone": 0,
+          "wood": 0,
+          "clay": 0,
+          "reed": 0
+        },
+        "card_location": {
+          "card_id": "A006",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A006"
+      },
+      "expected": {
+        "resource_stock": {
+          "stone": 0,
+          "wood": 0,
+          "clay": 0,
+          "reed": 0
+        },
+        "card_location": {
+          "card_id": "A006",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "No major improvements; gain nothing. Card still moves to left neighbor."
+    }
+  ]
+}

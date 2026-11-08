@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "card_id": "A009",
+  "cases": [
+    {
+      "id": "A009-basic",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "sheep": 1,
+          "cattle": 0
+        },
+        "card_location": {
+          "card_id": "A009",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A009"
+      },
+      "expected": {
+        "resource_stock": {
+          "sheep": 0,
+          "cattle": 1
+        },
+        "card_location": {
+          "card_id": "A009",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "Has 1 sheep -> exchange for 1 cattle. Card moves to left neighbor."
+    },
+    {
+      "id": "A009-no-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {
+          "sheep": 0,
+          "cattle": 0
+        },
+        "card_location": {
+          "card_id": "A009",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A009"
+      },
+      "expected": {
+        "resource_stock": {
+          "sheep": 0,
+          "cattle": 0
+        },
+        "card_location": {
+          "card_id": "A009",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "No sheep -> no exchange. Card still moves to left neighbor."
+    }
+  ]
+}

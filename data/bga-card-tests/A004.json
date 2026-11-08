@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "card_id": "A004",
+  "cases": [
+    {
+      "id": "A004-basic",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "rooms": 3,
+          "people": 2
+        },
+        "resource_stock": {
+          "wood": 0
+        },
+        "card_location": {
+          "card_id": "A004",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A004"
+      },
+      "expected": {
+        "resource_stock": {
+          "wood": 4
+        },
+        "card_location": {
+          "card_id": "A004",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "3 rooms, 2 people -> 3 wood + 1 bonus (rooms > people) = 4 wood. Card moves to left neighbor."
+    },
+    {
+      "id": "A004-rooms-gt-people",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "rooms": 4,
+          "people": 2
+        },
+        "resource_stock": {
+          "wood": 0
+        },
+        "card_location": {
+          "card_id": "A004",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A004"
+      },
+      "expected": {
+        "resource_stock": {
+          "wood": 5
+        },
+        "card_location": {
+          "card_id": "A004",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "4 rooms, 2 people -> 4 wood + 1 bonus = 5 wood."
+    },
+    {
+      "id": "A004-rooms-le-people",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "rooms": 2,
+          "people": 3
+        },
+        "resource_stock": {
+          "wood": 0
+        },
+        "card_location": {
+          "card_id": "A004",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A004"
+      },
+      "expected": {
+        "resource_stock": {
+          "wood": 2
+        },
+        "card_location": {
+          "card_id": "A004",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "2 rooms, 3 people -> 2 wood, no bonus (rooms <= people)."
+    }
+  ]
+}

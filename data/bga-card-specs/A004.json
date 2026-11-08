@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "A004",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "幅木",
+    "name_en": "Baseboards"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'You immediately get 1 wood for each room you have. If you have more rooms than people, you get 1 additional wood.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '1部屋につき木材1をすぐに得る。人物より部屋が多ければ追加で木材1を得る。このカードはあなたの前に置かず、左隣のプレイヤーの手札に入れる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": {
+              "op": "room_count",
+              "args": [],
+              "snapshot": "before_effect"
+            }
+          },
+          "notes": "1 wood per room"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": {
+              "op": "custom",
+              "args": ["rooms_gt_people"],
+              "snapshot": "before_effect"
+            }
+          },
+          "notes": "Extra 1 wood if rooms > people"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Automatic calculation based on room count and family count. Second step uses custom op for comparison."
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "Card does not stay in play area; moves to left neighbor's hand after resolution"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.1.params.amount.op"
+    ],
+    "test_case_ids": [
+      "A004-basic",
+      "A004-rooms-gt-people",
+      "A004-rooms-le-people"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Both JP/EN sources agree. Conditional extra wood needs engine mapping for comparison operation."
+  }
+}

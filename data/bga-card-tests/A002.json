@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "card_id": "A002",
+  "cases": [
+    {
+      "id": "A002-basic-plow",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "empty_field_slots": 3
+        },
+        "card_location": {
+          "card_id": "A002",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A002",
+        "choices": { "field_position": 0 }
+      },
+      "expected": {
+        "farm": {
+          "empty_field_slots": 2,
+          "fields": [
+            { "planted": false, "crop": null }
+          ]
+        },
+        "card_location": {
+          "card_id": "A002",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "Plow 1 field; card moves to left neighbor (player 1)"
+    },
+    {
+      "id": "A002-no-space-for-field",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "empty_field_slots": 0
+        },
+        "card_location": {
+          "card_id": "A002",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A002",
+        "choices": {}
+      },
+      "expected": {
+        "farm": {
+          "empty_field_slots": 0
+        },
+        "card_location": {
+          "card_id": "A002",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "No space for field; effect does nothing but card still moves to left neighbor"
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "card_id": "A007",
+  "cases": [
+    {
+      "id": "A007-grain-fields-only",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "fields": [
+            {"crop": "grain"},
+            {"crop": "grain"},
+            {"crop": null}
+          ]
+        },
+        "resource_stock": {
+          "food": 0,
+          "grain": 0
+        },
+        "card_location": {
+          "card_id": "A007",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A007"
+      },
+      "expected": {
+        "resource_stock": {
+          "food": 2,
+          "grain": 0
+        },
+        "card_location": {
+          "card_id": "A007",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "2 grain fields -> 2 food. No vegetable fields -> 0 grain. Card moves to left neighbor."
+    },
+    {
+      "id": "A007-vegetable-fields-only",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "fields": [
+            {"crop": "vegetable"},
+            {"crop": null}
+          ]
+        },
+        "resource_stock": {
+          "food": 0,
+          "grain": 0
+        },
+        "card_location": {
+          "card_id": "A007",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A007"
+      },
+      "expected": {
+        "resource_stock": {
+          "food": 0,
+          "grain": 1
+        },
+        "card_location": {
+          "card_id": "A007",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "1 vegetable field -> 1 grain. No grain fields -> 0 food."
+    },
+    {
+      "id": "A007-both",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "farm": {
+          "fields": [
+            {"crop": "grain"},
+            {"crop": "vegetable"},
+            {"crop": "vegetable"}
+          ]
+        },
+        "resource_stock": {
+          "food": 0,
+          "grain": 0
+        },
+        "card_location": {
+          "card_id": "A007",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A007"
+      },
+      "expected": {
+        "resource_stock": {
+          "food": 1,
+          "grain": 2
+        },
+        "card_location": {
+          "card_id": "A007",
+          "player": 1,
+          "zone": "hand"
+        }
+      },
+      "notes": "1 grain field -> 1 food. 2 vegetable fields -> 2 grain."
+    }
+  ]
+}

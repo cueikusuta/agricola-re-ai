@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "card_id": "A006",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "納屋",
+    "name_en": "Storage Barn"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'If you have the Well, Joinery, Pottery, and/or Basketmaker's Workshop, you immediately get 1 stone, 1 wood, 1 clay, and/or 1 reed, respectively.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '大きい進歩の井戸、家具製作所、製陶所、カゴ製作所のいずれかがあれば、すぐに石材、木材、レンガ、葦の対応する1つをそれぞれ得る。このカードはあなたの前に置かず、左隣のプレイヤーの手札に入れる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "stone",
+            "amount": 1
+          },
+          "notes": "If owner has Well major improvement"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          },
+          "notes": "If owner has Joinery major improvement"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 1
+          },
+          "notes": "If owner has Pottery major improvement"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "reed",
+            "amount": 1
+          },
+          "notes": "If owner has Basketmaker's Workshop major improvement"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each resource gained only if corresponding major improvement is owned. Conditions need engine mapping for 'has_major_improvement' predicate."
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "Card does not stay in play area; moves to left neighbor's hand after resolution"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.0.conditions",
+      "effects.0.steps.1.conditions",
+      "effects.0.steps.2.conditions",
+      "effects.0.steps.3.conditions"
+    ],
+    "test_case_ids": [
+      "A006-all-four",
+      "A006-only-well",
+      "A006-none"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Conditional gains based on major improvements owned. Need engine mapping for 'has_major_improvement' predicate."
+  }
+}

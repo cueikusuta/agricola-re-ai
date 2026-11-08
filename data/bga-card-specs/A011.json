@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "card_id": "A011",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ぬかるんだ畑",
+    "name_en": "Mud Patch"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'When you play this card, you immediately get 1 wild boar. You can hold 1 wild boar on each of your unplanted field tiles.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'このカードを出したとき、すぐに猪1を得る。なにも植えていない畑タイルは、1つにつき猪1ずつ飼う場所にできる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "boar",
+            "amount": 1
+          },
+          "notes": "Immediately gain 1 boar"
+        },
+        {
+          "operation": "modify_capacity",
+          "target": "owner",
+          "params": {
+            "field_boar_capacity": 1
+          },
+          "notes": "Each empty field tile can hold 1 boar"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "permanent",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Gain 1 boar; empty fields gain capacity for 1 boar each"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing field capacity effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.1.engine_mapping"
+    ],
+    "test_case_ids": [
+      "A011-basic",
+      "A011-multiple-empty-fields"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Ongoing effect: empty fields can hold boars. Stays in play area."
+  }
+}
