@@ -37,8 +37,16 @@ async function startDraft(page, options) {
   else await page.locator("#draftOccFirst").check();
   await page.locator("#draftPool").selectOption(options.pool || "verified_basic");
   await page.locator("#draftAi").selectOption(options.ai || "card_value");
+  // A matching status line may belong to the previous session. The server may
+  // already be holding a completed draft with the same mode; do not count that
+  // stale DOM as proof that the new POST has finished and been rendered.
+  const responsePromise = page.waitForResponse(response =>
+    new URL(response.url()).pathname === "/api/draft/new"
+      && response.request().method() === "POST", { timeout: 15000 });
   await page.locator("#draftNew").click();
+  const response = await responsePromise;
   if (options.expectError) {
+    assert.equal(response.ok(), false, "the unsupported mode is rejected");
     // A refused draft leaves the previous session untouched; the reason is
     // reported through the alert/notice line, not the draft status line.
     await page.waitForFunction(pattern => {
@@ -48,9 +56,26 @@ async function startDraft(page, options) {
     }, options.errorPattern, { timeout: 15000 });
     return;
   }
-  await page.waitForFunction(expected =>
-    (document.querySelector("#draftStatus")?.textContent || "").includes("方式 " + expected),
-  options.mode);
+  assert.equal(response.ok(), true, "the draft/new request succeeded");
+  await page.waitForFunction(expected => {
+    const d = state?.draft;
+    return !busy && d?.mode === expected.mode
+      && d.ai === expected.ai
+      && d.pool_kind === expected.pool
+      && d.player_count === expected.players
+      && d.direction_occupation === expected.dirOcc
+      && d.direction_minor === expected.dirMinor
+      && d.occupation_phase_first === expected.occFirst
+      && (document.querySelector("#draftStatus")?.textContent || "").includes("方式 " + expected.mode);
+  }, {
+    mode: options.mode,
+    ai: options.ai || "card_value",
+    pool: options.pool || "verified_basic",
+    players: options.players || 2,
+    dirOcc: options.dirOcc || "left",
+    dirMinor: options.dirMinor || "right",
+    occFirst: options.occFirst !== false
+  }, { timeout: 15000 });
 }
 
 async function draftView(page) {
