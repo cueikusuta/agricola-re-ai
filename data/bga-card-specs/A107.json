@@ -80,10 +80,10 @@
       "optional": false,
       "frequency": "every_use",
       "duration": "instant",
-      "snapshot": "after_event",
+      "snapshot": "before_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Building-material accumulation spaces only, counted at the moment of use."
+      "notes": "Evaluate the number of resources on the material accumulation space BEFORE normal removal; grant food AFTER the action."
     },
     {
       "trigger": "after_worker_space",
@@ -127,10 +127,10 @@
       "optional": false,
       "frequency": "every_use",
       "duration": "instant",
-      "snapshot": "after_event",
+      "snapshot": "before_event",
       "order": 1,
       "decision_owner": "none",
-      "notes": "Building-material accumulation spaces only, counted at the moment of use."
+      "notes": "Evaluate the number of resources on the material accumulation space BEFORE normal removal; grant food AFTER the action."
     },
     {
       "trigger": "after_worker_space",
@@ -174,10 +174,10 @@
       "optional": false,
       "frequency": "every_use",
       "duration": "instant",
-      "snapshot": "after_event",
+      "snapshot": "before_event",
       "order": 2,
       "decision_owner": "none",
-      "notes": "Building-material accumulation spaces only, counted at the moment of use."
+      "notes": "Evaluate the number of resources on the material accumulation space BEFORE normal removal; grant food AFTER the action."
     }
   ],
   "post_play": {
@@ -190,11 +190,12 @@
       "A107-normal",
       "A107-not-triggered",
       "A107-boundary",
-      "A107-food-space"
+      "A107-food-space",
+      "A107-second-worker-correct"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Using a building-material accumulation space holding exactly 5/4/3 with the owner's 1st/2nd/3rd person of the round gives 1 food; food spaces excluded."
+    "notes": "For 1st/2nd/3rd worker: compare the building-resource pile's PRE-use count with exactly 5/4/3, then give food after normal pickup."
   }
 }
