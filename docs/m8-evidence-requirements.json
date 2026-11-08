@@ -157,6 +157,42 @@
           "mode": "cardless_2p",
           "expectation": "the web view exposes the staged hints and the available spaces for the same state",
           "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::plow_detail_can_target_a_cell_the_default_policy_never_picks",
+          "mode": "cardless_2p",
+          "expectation": "a plow cell other than the default policy's first empty cell is validated and applied",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::plow_detail_rejects_a_room_cell_atomically",
+          "mode": "cardless_2p",
+          "expectation": "plowing a room cell is rejected and leaves the state unchanged",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::sow_detail_can_choose_a_layout_the_default_policy_never_picks",
+          "mode": "cardless_2p",
+          "expectation": "a sowing layout that puts the vegetable before the grain is accepted, although the default policy would sow grain first",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::sow_detail_rejects_a_duplicate_or_non_field_cell",
+          "mode": "cardless_2p",
+          "expectation": "sowing the same field twice, or a room cell, is rejected atomically",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::animal_detail_can_place_stock_where_the_default_policy_never_does",
+          "mode": "cardless_2p",
+          "expectation": "placing both sheep in stables instead of the pet and the pasture is accepted when capacity allows",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::animal_detail_rejects_a_plan_that_exceeds_capacity",
+          "mode": "cardless_2p",
+          "expectation": "two sheep in one stable is rejected and the state is unchanged",
+          "basis": "appendix_p7_8"
         }
       ]
     },
