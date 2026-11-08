@@ -92,7 +92,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: m13-direct-shard-${{ matrix.shard }}
+          name: shard-${{ matrix.shard }}
           path: results/shard-${{ matrix.shard }}/
           if-no-files-found: warn
           retention-days: 30
@@ -109,7 +109,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4
         with:
-          pattern: m13-direct-shard-*
+          pattern: shard-*
           path: results
       - name: Reject absent or incomplete shard results and mismatched SHA
         shell: bash
@@ -124,7 +124,7 @@ jobs:
           import os
           from pathlib import Path
           for shard in range(8):
-              root = Path("results") / f"m13-direct-shard-{shard}"
+              root = Path("results") / f"shard-{shard}"
               metadata = root / "metadata.json"
               matches = root / "matches.jsonl"
               if not metadata.is_file() or not matches.is_file():
