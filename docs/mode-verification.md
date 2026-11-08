@@ -81,13 +81,26 @@ cargo build --release --locked --bin mode_verify
 
 この実行は**ローカルWindows機**であり、ロードマップが原則とするGitHub-hostedランナーでの実行ではない。ハードウェア・負荷が異なるため、ms/試合は性能保証ではない。
 
-### 4.3 GitHub Actions（未実施）
+### 4.3 GitHub Actions 実行（2026-11-08）
 
-`Mode-wide Simulator Verification` の `workflow_dispatch` は、本セッションでは**権限で拒否**され実行できなかった（大量評価の外部実行に承認が必要）。そのため公式な1,000試合のActions実行URL・SHA・Artifactは未取得である。実行できる環境では次を行う。
+PR #181 の統合後、`main` 上で初回の手動実行を行った。
 
-```bash
-gh workflow run mode-verification.yml --ref main \
-  -f seeds=1000 -f seed_start=700000 -f policy=eval
-```
+- Run: https://github.com/cueikusuta/agricola-re-ai/actions/runs/42497743020
+- 実行SHA: `12f24d3079b33033db9bbaa7bbda5b87bcad74e3`（`main`）
+- 設定: `seeds=1000` / `seed_start=700000` / `policy=eval` / 6モード
 
-実行後、Run URL・実行SHA・モード別の失敗数を本節へ追記する。**未実行の結果をここへ書かない。**
+| モード | 追加タイル | 試合数 | 合格 | 失敗 | 平均 ms/試合 |
+|---|---|---:|---:|---:|---:|
+| 2人 | OFF | 1,000 | 1,000 | 0 | 18.9 |
+| 2人 | ON | 1,000 | 1,000 | 0 | 35.8 |
+| 3人 | OFF | 1,000 | 1,000 | 0 | 59.9 |
+| 3人 | ON | 1,000 | 1,000 | 0 | 65.1 |
+| 4人 | OFF | 1,000 | 1,000 | 0 | 95.3 |
+| 4人 | ON | 1,000 | 1,000 | 0 | 97.9 |
+
+合計 **6,000試合、チェック失敗0**。`aggregate` は fail-closed 検証（モード集合・ディスパッチ入力・summary・JSONLの件数/seed集合/6チェック）を通過し、`total games: 6000` を出力した。
+
+#### この実行で見つかったワークフローの不具合（修正済み）
+
+1. **`tee` が出力先ディレクトリより先に開かれる**：`2P OFF` ジョブだけが `tee: results/mode-2p-extra-false.stdout.json: No such file or directory` で失敗した。検証自体は1,000試合すべて合格しており、`results/` が無い状態で `tee` が起動する競合が原因。`mkdir -p results "$OUT"` を先に行い、stdoutを `$OUT/stdout.json` に置くよう修正した。
+2. **集約がジョブ成否を見ていなかった**：上記の失敗ジョブがあっても `aggregate` は成功した（成果物自体は完全だったため）。`needs.verify.result == 'success'` を要求するステップを集約の先頭に追加した。

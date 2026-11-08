@@ -79,17 +79,20 @@ jobs:
           FLAGS=()
           if [[ "$EXTRA" == "true" ]]; then FLAGS+=(--additional-action-space); fi
           OUT="results/mode-${PLAYERS}p-extra-${EXTRA}"
+          # `tee` opens its file before the binary creates the output directory,
+          # so a missing `results/` used to fail the job after a successful run
+          # (observed in run 42497743020). Create both directories first and keep
+          # stdout inside the run directory that the artifact upload already covers.
+          mkdir -p results "$OUT"
           ./target/release/mode_verify \
             --players "$PLAYERS" --seeds "$SEEDS" --seed-start "$SEED_START" \
-            --policy "$POLICY" --out "$OUT" "${FLAGS[@]}" | tee "$OUT.stdout.json"
+            --policy "$POLICY" --out "$OUT" "${FLAGS[@]}" | tee "$OUT/stdout.json"
       - name: Preserve evidence, including failures
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: mode-verify-${{ matrix.players }}p-extra-${{ matrix.extra }}
-          path: |
-            results/
-            *.stdout.json
+          path: results/
           if-no-files-found: warn
           retention-days: 14
 
@@ -110,6 +113,17 @@ jobs:
           pattern: mode-verify-*
           path: results
           merge-multiple: false
+      - name: Require every verification job to succeed
+        shell: bash
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+        run: |
+          set -euo pipefail
+          echo "verify matrix result: $VERIFY_RESULT"
+          if [[ "$VERIFY_RESULT" != "success" ]]; then
+            echo "at least one mode job did not succeed; evidence is incomplete" >&2
+            exit 1
+          fi
       - name: Verify every mode summary (fail closed)
         shell: bash
         run: |
