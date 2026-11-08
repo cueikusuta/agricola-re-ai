@@ -11,6 +11,7 @@ from scripts.card_inventory_report import (
     load_rows,
     normalize_type,
     verification_queue,
+    validate_queue_paths,
     write_queue_csv,
 )
 
@@ -200,6 +201,19 @@ class VerificationQueueTests(unittest.TestCase):
         self.assertTrue(all(not entry["distributable_now"] for entry in queue))
         self.assertTrue(all(
             int(entry["difficulty_1_to_5_preliminary"]) <= 3 for entry in queue))
+
+    def test_queue_output_must_not_overwrite_ledger_or_json_report(self):
+        with self.assertRaisesRegex(ValueError, "--ledger"):
+            validate_queue_paths(
+                Path("data/../ledger.csv"), None, Path("ledger.csv")
+            )
+        with self.assertRaisesRegex(ValueError, "--output"):
+            validate_queue_paths(
+                Path("ledger.csv"), Path("out/../report.json"), Path("report.json")
+            )
+        # Different paths are valid, including no CSV export.
+        validate_queue_paths(Path("ledger.csv"), Path("report.json"), Path("queue.csv"))
+        validate_queue_paths(Path("ledger.csv"), Path("report.json"), None)
 
     def test_writing_the_queue_csv_keeps_the_review_flags(self):
         import csv
