@@ -8,6 +8,8 @@
 - `src/bin/mode_verify.rs`：seed範囲を回して `games.jsonl` と `summary.json` を出力するCLI
 - `tests/mode_verification.rs`：必須CIに残す小さなスイープ（各モード2 seed）
 - `.github/workflows/mode-verification.yml`：1,000試合目標の手動実行（通常PR CIとは分離）
+- `scripts/mode_verify_summary.py`：集約のfail-closed検証（後述）
+- `tests/test_mode_verify_summary.py`：集約規則の回帰テスト（正常・欠落・0件・重複・不一致）
 
 ## 1. 検証項目と、その限界
 
@@ -17,7 +19,7 @@
 | `final_state_invariants` | 終局状態が `Game::validate` を通る | 途中状態の不変条件（次項が担当） |
 | `replay_matches_log` | `Game::replay` が全イベントを再適用し、前後ハッシュが一致する。`apply_recorded` は各行動後に `Game::validate` を呼ぶため、**行動ごとの不変条件**もここで検査される | ログに記録されない外部要因 |
 | `save_restore_round_trip` | `save_json` → `load_json` が同じ状態ハッシュを返す。`load_json` 自身がイベント連鎖・版・初期手札を再検証する | ブラウザUIの永続保存（未実装） |
-| `observation_hides_private_hands` | 各視点の `Observation` の手札が本人の手札と完全一致し、相手手札・未配布カード・`hidden_round_deck`/`rng` をJSONに含まない | AIが履歴から論理的に推定できる情報の制限（別途M11の観測履歴） |
+| `observation_structural_privacy` | 各視点の `Observation` の手札が本人の手札と完全一致し、シリアライズ結果に `hidden_round_deck` / `undealt` / `rng` / `hands` が現れない | **カードなしモードでは全員の手札が空**なので、このチェック単独では「非空の秘密手札の誤露出」を実証しない。`tests` 内のカードありフィクスチャ（`verified_basic_card_set(2)`、非空手札）で、他者カード混入と手札枚数の不一致を検出できることを別途証明している。非空秘匿の受入は #108/#110 のカードあり検証が担う |
 | `seed_reproducible` | 同一設定・同一ポリシーで同じ最終ハッシュになる | ポリシー内部の壁時計依存（eval/greedy/randomは持たない） |
 
 **1,000試合完走は安定性の試験であり、ルール正確性の証明ではない**（`docs/roadmap-m7-onward.md` 4.1）。本ツールは「完走した」だけでなく「再演・保存復帰・秘匿・再現が成立した」ことを要求するが、公式ルールとの照合は #108 の期待結果テストが担う。
@@ -35,9 +37,11 @@ cargo build --release --locked --bin mode_verify
 # 分割実行は --shard 0 --shards 4（seedを index % shards で分割）
 ```
 
-- 出力：`<out>/games.jsonl`（1試合1行の証拠）と `<out>/summary.json`（チェック別の合計・失敗一覧・平均時間・`GITHUB_SHA`）。
+- 出力：`<out>/games.jsonl`（1試合1行の証拠）と `<out>/summary.json`（チェック別の合計・失敗一覧・平均時間・`seed_start`/`seed_end`・`GITHUB_SHA`）。
 - 1試合でもチェックに失敗した場合、CLIは終了コード1を返す。
 - 失敗は seed とチェック名で再現できる。同じ `--seed-start` と seed を指定すれば同じ試合になる。
+- **seed範囲の契約**：開始前に `seed_start + seeds - 1` を検査し、`u64` を超える指定は終了コード2で拒否する（releaseビルドでのwrapによるseed再使用を防ぐ）。
+- **シャード契約**：`--shards <= --seeds` を必須とし、seedが1つも割り当てられないシャードを許さない。
 
 ## 3. GitHub Actions（大量実行）
 
@@ -45,7 +49,13 @@ cargo build --release --locked --bin mode_verify
 
 - 入力：`seeds`（各モードの試合数、既定1,000）、`seed_start`、`policy`。
 - 6ジョブ（2/3/4人 × 追加タイルOFF/ON）が並列に走り、各モード同じseed範囲を使う。
-- 各ジョブは `games.jsonl` / `summary.json` をArtifactへ保存し、`aggregate` ジョブが6モード全部の存在と `failed_games == 0` を検査する。1モードでも欠落・失敗があれば集約ジョブが失敗する。
+- 各ジョブは `games.jsonl` / `summary.json` をArtifactへ保存する。
+- `aggregator` ジョブが集約規則の単体テスト（`tests/test_mode_verify_summary.py`）を先に実行する。
+- `aggregate` ジョブは `scripts/mode_verify_summary.py` で**fail closed**に検査する。検査内容：
+  - 6モード（2/3/4 × OFF/ON）が過不足なく存在し、同一モードの `summary.json` が重複せず、想定外モードが無い
+  - 各 `summary.json` がディスパッチ入力と一致（`seeds_requested` / `seeds_run` / `seed_start` / `policy` / `commit_sha`）、`shard==0` / `shards==1`、`passed+failed==seeds_run`、`failed==0`、チェック別合計が `seeds_run` と一致
+  - 各 `games.jsonl` の行数が `seeds_run` と一致し、seedが**ディスパッチ範囲と完全一致**（重複・欠落・範囲外なし）、全試合が `finished` / ラウンド14 / 6チェック合格・最終 `state_hash` あり
+  - `seeds_run=0` の空証拠、破損JSON、モード不一致はすべて失敗
 - 通常PRの必須CIには含めない。必須CI側は `tests/mode_verification.rs` の小スイープ（12試合）だけを実行する。
 
 ## 4. 実行記録

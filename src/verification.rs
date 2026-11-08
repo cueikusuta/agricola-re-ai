@@ -18,9 +18,12 @@
 //!   check as well as the replay check.
 //! - `save_restore_round_trip`: `save_json` -> `load_json` (which itself
 //!   re-verifies the event chain) returns the same state hash.
-//! - `observation_hides_private_hands`: each viewer's `Observation` carries
-//!   exactly their own hand and no other player's, undealt or hidden-round
-//!   data.
+//! - `observation_structural_privacy`: each viewer's `Observation` carries
+//!   exactly their own hand, and the serialised observation contains no hidden
+//!   key (`hidden_round_deck`, `undealt`, `rng`, `hands`). In the cardless modes
+//!   verified here every hand is empty, so this check is a **structural**
+//!   privacy check; non-empty hand secrecy is covered by the card-mode fixture
+//!   test in this module and by the card-mode tests (#108/#110).
 //! - `seed_reproducible`: the same config and policy produce the same final
 //!   state hash when the game is played again.
 //!
@@ -28,7 +31,7 @@
 //! and this module must not imply that an arbitrary card set is verified.
 
 use crate::evaluation::EvaluationPolicy;
-use crate::model::{Config, Game};
+use crate::model::{Config, Game, Observation};
 use crate::policy::{
     play_to_end, DetailPolicy, GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy,
 };
@@ -78,6 +81,22 @@ impl VerifiedPolicy {
             Self::Eval => &EVALUATION_POLICY,
         }
     }
+}
+
+/// The inclusive `(first, last)` seed range of a verification run.
+///
+/// Sharding assigns seeds by index, so an overflowing end would wrap in a
+/// release build and repeat seeds across a mass run. Callers validate this once,
+/// before any game is played.
+pub fn seed_range(seed_start: u64, seeds: usize) -> Result<(u64, u64), String> {
+    if seeds == 0 {
+        return Err("seeds must be greater than zero".into());
+    }
+    let last_offset = u64::try_from(seeds - 1).map_err(|_| "seed count does not fit in u64")?;
+    let last = seed_start
+        .checked_add(last_offset)
+        .ok_or("seed range overflows u64")?;
+    Ok((seed_start, last))
 }
 
 /// A supported cardless mode: player count and additional-tile setting.
@@ -223,9 +242,9 @@ pub fn verify_game(mode: ModeSpec, seed: u64, policy: VerifiedPolicy) -> GameRep
         Ok(()) => VerificationCheck::pass("save_restore_round_trip"),
         Err(error) => VerificationCheck::fail("save_restore_round_trip", error),
     });
-    report.checks.push(match observation_check(&game) {
-        Ok(()) => VerificationCheck::pass("observation_hides_private_hands"),
-        Err(error) => VerificationCheck::fail("observation_hides_private_hands", error),
+    report.checks.push(match privacy_check(&game) {
+        Ok(()) => VerificationCheck::pass("observation_structural_privacy"),
+        Err(error) => VerificationCheck::fail("observation_structural_privacy", error),
     });
     report
         .checks
@@ -288,11 +307,25 @@ fn save_restore_check(game: &Game) -> Result<(), String> {
     Ok(())
 }
 
-fn observation_check(game: &Game) -> Result<(), String> {
-    let hands = &game.cards.hands;
+fn privacy_check(game: &Game) -> Result<(), String> {
+    let observations = (0..game.public.players.len())
+        .map(|viewer| game.observation(viewer))
+        .collect::<Result<Vec<_>, _>>()?;
+    check_observations(&game.cards.hands, &observations)
+}
+
+/// Structural privacy check, factored out so a card-mode fixture can exercise it
+/// with non-empty hands. Cardless runs have empty hands, so this function alone
+/// would not detect a non-empty leak; the fixture test supplies private data.
+fn check_observations(hands: &[Vec<String>], observations: &[Observation]) -> Result<(), String> {
+    if observations.len() != hands.len() {
+        return Err("observation count differs from the number of hands".into());
+    }
     let counts: Vec<usize> = hands.iter().map(Vec::len).collect();
-    for viewer in 0..game.public.players.len() {
-        let observation = game.observation(viewer)?;
+    for (viewer, observation) in observations.iter().enumerate() {
+        if observation.player_id != viewer {
+            return Err(format!("observation {viewer} reports another viewer id"));
+        }
         if observation.hand != hands[viewer] {
             return Err(format!("viewer {viewer} sees a hand that is not their own"));
         }
@@ -300,7 +333,7 @@ fn observation_check(game: &Game) -> Result<(), String> {
             return Err(format!("viewer {viewer} sees wrong hand counts"));
         }
         let encoded =
-            serde_json::to_string(&observation).map_err(|error| format!("encode: {error}"))?;
+            serde_json::to_string(observation).map_err(|error| format!("encode: {error}"))?;
         // Structural leak guard: hidden state must not be part of the JSON that
         // is handed to a policy.
         for forbidden in ["hidden_round_deck", "undealt", "\"rng\"", "\"hands\""] {
@@ -310,14 +343,15 @@ fn observation_check(game: &Game) -> Result<(), String> {
                 ));
             }
         }
-        let other_cards = hands
-            .iter()
-            .enumerate()
-            .filter(|(other, _)| *other != viewer)
-            .flat_map(|(_, hand)| hand.iter());
-        for card in other_cards {
-            if observation.hand.contains(card) {
-                return Err(format!("viewer {viewer} sees another player's card {card}"));
+        let own: std::collections::BTreeSet<&String> = observation.hand.iter().collect();
+        for (other, hand) in hands.iter().enumerate() {
+            if other == viewer {
+                continue;
+            }
+            for card in hand {
+                if own.contains(card) {
+                    return Err(format!("viewer {viewer} sees another player's card {card}"));
+                }
             }
         }
     }
@@ -365,9 +399,54 @@ mod tests {
     fn observation_serialisation_has_no_hidden_keys() {
         let mode = ModeSpec::new(4, false).unwrap();
         let game = play(&mode.config(9), VerifiedPolicy::Random).unwrap();
-        observation_check(&game).unwrap();
+        privacy_check(&game).unwrap();
         let encoded = serde_json::to_string(&game.observation(0).unwrap()).unwrap();
         assert!(!encoded.contains("hidden_round_deck"));
         assert!(!encoded.contains("undealt"));
+    }
+
+    /// P2 review item: the cardless run has empty hands, so the structural check
+    /// is proven here against a card-mode fixture with non-empty private hands.
+    #[test]
+    fn privacy_check_rejects_a_leaked_card_in_a_card_mode_fixture() {
+        let config = Config {
+            seed: 42,
+            players: 2,
+            additional_action_space_enabled: false,
+        };
+        let card_set = crate::cards::verified_basic_card_set(2).unwrap();
+        let game = Game::with_cards(config, card_set).unwrap();
+        let hands = game.cards.hands.clone();
+        assert!(
+            hands.iter().all(|hand| !hand.is_empty()),
+            "the fixture must carry non-empty private hands"
+        );
+        let observations = (0..2)
+            .map(|viewer| game.observation(viewer).unwrap())
+            .collect::<Vec<_>>();
+        check_observations(&hands, &observations).unwrap();
+        // A viewer that sees an opponent's card must be rejected.
+        let mut leaked = observations.clone();
+        leaked[0].hand.push(hands[1][0].clone());
+        let error = check_observations(&hands, &leaked).unwrap_err();
+        assert!(error.contains("not their own") || error.contains("another player"));
+        // Hand counts must describe every seat, not only the viewer. Both seats
+        // hold the same number of cards here, so a wrong count is what is tested.
+        let mut counts_leaked = observations.clone();
+        counts_leaked[0].hand_counts = vec![hands[0].len() + 1, hands[1].len()];
+        assert!(check_observations(&hands, &counts_leaked).is_err());
+    }
+
+    /// P2 review item: an overflowing seed range must be refused, not wrapped.
+    #[test]
+    fn seed_range_rejects_overflow_and_zero() {
+        assert_eq!(seed_range(700_000, 1_000).unwrap(), (700_000, 700_999));
+        assert_eq!(seed_range(u64::MAX, 1).unwrap(), (u64::MAX, u64::MAX));
+        assert_eq!(
+            seed_range(u64::MAX - 1, 2).unwrap(),
+            (u64::MAX - 1, u64::MAX)
+        );
+        assert!(seed_range(u64::MAX - 1, 3).is_err());
+        assert!(seed_range(0, 0).is_err());
     }
 }

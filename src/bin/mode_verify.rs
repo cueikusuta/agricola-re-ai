@@ -4,7 +4,7 @@
 //! and writes per-game evidence plus a summary that the workflow gates on.
 //! See `src/verification.rs` for what each check proves.
 use agricola_re_ai::verification::{
-    verify_game, ModeSpec, VerifiedPolicy, VERIFICATION_SCHEMA_VERSION,
+    seed_range, verify_game, ModeSpec, VerifiedPolicy, VERIFICATION_SCHEMA_VERSION,
 };
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -33,6 +33,7 @@ struct Summary {
     seeds_requested: usize,
     seeds_run: usize,
     seed_start: u64,
+    seed_end: u64,
     shard: usize,
     shards: usize,
     passed_games: usize,
@@ -134,6 +135,13 @@ fn main() {
     if shards == 0 || shard >= shards {
         fail_usage("--shard must be in 0..--shards and --shards must be positive");
     }
+    // Every shard must actually receive seeds; a shard with none would produce a
+    // zero-game artifact that a later aggregation could mistake for evidence.
+    if shards > seeds {
+        fail_usage("--shards must not exceed --seeds: every shard must run at least one seed");
+    }
+    let (first_seed, last_seed) =
+        seed_range(seed_start, seeds).unwrap_or_else(|error| fail_usage(&error));
     let mode = ModeSpec::new(players, extra).unwrap_or_else(|error| fail_usage(&error));
     if let Err(error) = std::fs::create_dir_all(&out) {
         eprintln!("cannot create {}: {error}", out.display());
@@ -150,7 +158,8 @@ fn main() {
         if index % shards != shard {
             continue;
         }
-        let seed = seed_start + index as u64;
+        // `seed_range` already proved that this addition cannot overflow.
+        let seed = first_seed + index as u64;
         let report = verify_game(mode, seed, policy);
         seeds_run += 1;
         if report.passed() {
@@ -191,7 +200,8 @@ fn main() {
         policy: policy.as_str(),
         seeds_requested: seeds,
         seeds_run,
-        seed_start,
+        seed_start: first_seed,
+        seed_end: last_seed,
         shard,
         shards,
         passed_games,
