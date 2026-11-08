@@ -18,6 +18,7 @@ pub mod mcts_puct;
 pub mod model;
 pub mod policy;
 pub mod score;
+pub mod verification;
 pub mod web;
 // Declared at the end of the list on purpose: #168 adds `decision_budget` in the
 // alphabetical position above, and keeping this line in a different hunk lets

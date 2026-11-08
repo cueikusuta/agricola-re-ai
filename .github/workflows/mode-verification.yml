@@ -1,0 +1,151 @@
+name: Mode-wide Simulator Verification
+
+# Issue #108 / #110: per-game verification for every supported cardless mode.
+#
+# The required PR CI only runs the short sweep in `tests/mode_verification.rs`.
+# This workflow is a manual, separate job for the 1,000-game target so a mass run
+# never extends the 60-second PR gate.
+#
+# Every game is checked for: 14-round completion, final-state invariants,
+# full-log replay with per-action invariant checks, save/restore round-trip,
+# private-hand observation secrecy and fixed-seed reproducibility. Any failed
+# game fails the job; the per-game JSONL and summary stay as artifacts.
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: 'Seeds per mode (2/3/4 players x additional tile OFF/ON)'
+        type: number
+        default: 1000
+        required: true
+      seed_start:
+        description: 'First seed (each mode uses the same range)'
+        type: string
+        default: '700000'
+        required: true
+      policy:
+        description: 'Policy for every seat'
+        type: choice
+        options: ['eval', 'greedy', 'random']
+        default: 'eval'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mode-verification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: ${{ matrix.players }}P additional-tile-${{ matrix.extra }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        players: [2, 3, 4]
+        extra: [false, true]
+    env:
+      SEEDS: ${{ inputs.seeds }}
+      SEED_START: ${{ inputs.seed_start }}
+      POLICY: ${{ inputs.policy }}
+      PLAYERS: ${{ matrix.players }}
+      EXTRA: ${{ matrix.extra }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: mode-verify
+      - name: Build verification binary
+        run: cargo build --release --locked --bin mode_verify
+      - name: Run per-game verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS=()
+          if [[ "$EXTRA" == "true" ]]; then FLAGS+=(--additional-action-space); fi
+          OUT="results/mode-${PLAYERS}p-extra-${EXTRA}"
+          ./target/release/mode_verify \
+            --players "$PLAYERS" --seeds "$SEEDS" --seed-start "$SEED_START" \
+            --policy "$POLICY" --out "$OUT" "${FLAGS[@]}" | tee "$OUT.stdout.json"
+      - name: Preserve evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mode-verify-${{ matrix.players }}p-extra-${{ matrix.extra }}
+          path: |
+            results/
+            *.stdout.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  aggregate:
+    name: Aggregate mode evidence
+    if: always()
+    needs: [verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mode-verify-*
+          path: results
+          merge-multiple: false
+      - name: Verify every mode summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, pathlib, sys
+
+          expected = {(p, e) for p in (2, 3, 4) for e in (False, True)}
+          found = {}
+          for path in pathlib.Path("results").rglob("summary.json"):
+              data = json.loads(path.read_text(encoding="utf-8"))
+              key = (data["players"], data["additional_action_space_enabled"])
+              found[key] = data
+          missing = expected - set(found)
+          if missing:
+              print(f"missing mode summaries: {sorted(missing)}", file=sys.stderr)
+              sys.exit(1)
+          failed = []
+          rows = []
+          for key in sorted(found):
+              data = found[key]
+              rows.append(
+                  "| {}P | {} | {} | {} | {} | {:.1f} |".format(
+                      data["players"],
+                      "ON" if data["additional_action_space_enabled"] else "OFF",
+                      data["seeds_run"],
+                      data["passed_games"],
+                      data["failed_games"],
+                      data["mean_game_millis"],
+                  )
+              )
+              if data["failed_games"]:
+                  failed.append(key)
+          lines = [
+              "| mode | additional tile | seeds | passed | failed | mean ms/game |",
+              "|---|---|---:|---:|---:|---:|",
+              *rows,
+          ]
+          print("\n".join(lines))
+          pathlib.Path("combined-mode-evidence.md").write_text(
+              "\n".join(lines) + "\n", encoding="utf-8"
+          )
+          if failed:
+              print(f"modes with failed games: {sorted(failed)}", file=sys.stderr)
+              sys.exit(1)
+          PY
+          cat combined-mode-evidence.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload combined evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mode-verify-combined
+          path: combined-mode-evidence.md
+          if-no-files-found: warn
+          retention-days: 14
