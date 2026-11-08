@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "card_id": "A165",
+  "cases": [
+    {
+      "id": "A165-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "A165"
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "A165-breed",
+      "scope": "effect_only",
+      "setup": {
+        "round": 12,
+        "empty_pasture": true
+      },
+      "action": {
+        "run_round": true
+      },
+      "expected": {
+        "breeding_granted": true
+      }
+    },
+    {
+      "id": "A165-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "round": 11
+      },
+      "action": {
+        "run_round": true
+      },
+      "expected": {
+        "breeding_granted": false
+      }
+    }
+  ]
+}

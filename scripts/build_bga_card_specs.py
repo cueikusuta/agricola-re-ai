@@ -4189,6 +4189,76 @@ CARDS = {
                  {"wood_delta": 1}),
         ],
     },
+    "A165": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("food", 1)]),
+            effect("round_end", [special("free_breeding_if_room")],
+                   cond=[cond("round_in", values=[12])],
+                   freq="once_per_game", dur="permanent", order=1),
+        ],
+        "notes": "Gain 1 food on play; at the end of round 12 breed for free if there is room.",
+        "tests": [
+            case("A165-normal", {"food": 0}, {"play": "A165"}, {"food_delta": 1}),
+            case("A165-breed", {"round": 12, "empty_pasture": True}, {"run_round": True},
+                 {"breeding_granted": True}),
+            case("A165-not-triggered", {"round": 11}, {"run_round": True},
+                 {"breeding_granted": False}),
+        ],
+    },
+    "A166": {
+        "post": "played_area",
+        "effects": [
+            effect("harvest_end",
+                   [spend("food", table("animal_price", {"sheep": 4, "wild_boar": 4, "cattle": 4})),
+                    gain(table("market_animal", {"sheep": "sheep", "pig": "wild_boar", "cattle": "cattle"}), 1)],
+                   optional=True, freq="every_harvest", dur="permanent", decision="owner",
+                   notes="food cost is capped by the number of animals already owned (minimum 0)"),
+        ],
+        "notes": "At harvest end: may buy 1 animal for 4 food minus the number already owned (minimum 0).",
+        "tests": [
+            case("A166-normal", {"sheep": 2, "food": 4}, {"run_harvest": True, "buy": "sheep"},
+                 {"food_delta": -2, "sheep_delta": 1}),
+            case("A166-free", {"sheep": 4, "food": 0}, {"run_harvest": True, "buy": "sheep"},
+                 {"food_delta": 0, "sheep_delta": 1}),
+        ],
+    },
+    "A167": {
+        "post": "played_area",
+        "effects": [
+            effect("after_stable_construction",
+                   [gain(table("house", {"wood": "sheep", "clay": "wild_boar", "stone": "cattle"}), 1)],
+                   cond=[cond("stables_at_least", n=1),
+                         cond("house_is", house=["wood", "clay", "stone"])],
+                   freq="every_use", dur="permanent"),
+        ],
+        "notes": "Building a stable while owning at least 1 of the house material: 1 sheep/boar/cattle.",
+        "tests": [
+            case("A167-wood", {"house": "wood", "wood": 2}, {"build_stable": 1},
+                 {"sheep_delta": 1}),
+            case("A167-stone", {"house": "stone", "stone": 2}, {"build_stable": 1},
+                 {"cattle_delta": 1}),
+            case("A167-no-material", {"house": "wood", "wood": 0}, {"build_stable": 1},
+                 {"sheep_delta": 0}),
+        ],
+    },
+    "A168": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [spend("food", table("lessons_food", {"sheep": 0, "wild_boar": 1, "cattle": 2})),
+                    gain(table("lessons_animal", {"sheep": "sheep", "pig": "wild_boar", "cattle": "cattle"}), 1)],
+                   cond=[cond("worker_space_used", space="lessons")],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "Lessons use: may additionally buy 1 sheep/wild boar/cattle for 0/1/2 food.",
+        "tests": [
+            case("A168-sheep", {"food": 0}, {"use_space": "lessons", "buy": "sheep"},
+                 {"food_delta": 0, "sheep_delta": 1}),
+            case("A168-cattle", {"food": 2}, {"use_space": "lessons", "buy": "cattle"},
+                 {"food_delta": -2, "cattle_delta": 1}),
+        ],
+    },
 }
 
 
