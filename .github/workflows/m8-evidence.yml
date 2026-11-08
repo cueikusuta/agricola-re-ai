@@ -13,11 +13,9 @@ name: M8 evidence
 # by the same steps at the same commit as the evaluation it attests.
 on:
   workflow_dispatch:
+  # A reusable caller downloads the artifact from the same run directly.
+  # workflow_call.outputs must reference a job output, not an artifact name.
   workflow_call:
-    outputs:
-      evidence-artifact:
-        description: Name of the uploaded M8 evidence artifact
-        value: m8-evidence
 
 permissions:
   contents: read
