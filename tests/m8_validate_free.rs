@@ -25,12 +25,12 @@ fn validate_free_accepts_legal_discard_without_mutating_game() {
             };
             let before_hash = game.state_hash();
             let before_public = game.public.clone();
-            let before_log = game.log.clone();
+            let before_log = serde_json::to_value(&game.log).unwrap();
             game.validate_free(who, &free).unwrap();
             game.validate_free(who, &free).unwrap();
             assert_eq!(game.state_hash(), before_hash);
             assert_eq!(game.public, before_public);
-            assert_eq!(game.log, before_log);
+            assert_eq!(serde_json::to_value(&game.log).unwrap(), before_log);
 
             let old_event_count = game.log.events.len();
             game.apply_free(who, free).unwrap();
@@ -60,14 +60,14 @@ fn validate_free_rejects_invalid_action_and_preserves_original() {
         },
     ] {
         let before_hash = game.state_hash();
-        let before_log = game.log.clone();
+        let before_log = serde_json::to_value(&game.log).unwrap();
         assert!(game.validate_free(who, &action).is_err());
         assert_eq!(game.state_hash(), before_hash);
-        assert_eq!(game.log, before_log);
+        assert_eq!(serde_json::to_value(&game.log).unwrap(), before_log);
 
         assert!(game.apply_free(who, action).is_err());
         assert_eq!(game.state_hash(), before_hash);
-        assert_eq!(game.log, before_log);
+        assert_eq!(serde_json::to_value(&game.log).unwrap(), before_log);
     }
     let before_hash = game.state_hash();
     assert!(game
@@ -101,8 +101,8 @@ fn validate_free_matches_crop_conversion_and_finished_rejection() {
 
     game.public.finished = true;
     let before_finished = game.state_hash();
-    let before_log = game.log.clone();
+    let before_log = serde_json::to_value(&game.log).unwrap();
     assert!(game.validate_free(who, &free).is_err());
     assert_eq!(game.state_hash(), before_finished);
-    assert_eq!(game.log, before_log);
+    assert_eq!(serde_json::to_value(&game.log).unwrap(), before_log);
 }
