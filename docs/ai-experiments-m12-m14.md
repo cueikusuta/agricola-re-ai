@@ -122,3 +122,36 @@ ExIt候補：教師として情報集合を守るE2/E3/E4の探索を用い、�
 - デッキ同一性は `CardSet::content_hash()`（`id`/`kind`/`cost`/`points`/`effects` の秩序非依存ハッシュ）で検証する。seed・配布手札は含めないため、非公開情報の漏洩経路にならない。
 - ドラフト条件（`draft_7_7` / `draft_10_7_simultaneous` / `choose_10_7`）は未提供のまま。#155 の慣行決定と M10 のプール整備が前提。
 - **首位率の比較結果はまだ無い。** 本項は条件分離の実装報告であり、+5pp の達成・未達を判定したものではない。
+
+
+## 11. #212：4人カードなし PUCT 対 MCTS の直接比較（事前登録）
+
+**目的**：M13の`PUCT`と`MCTS`を同じシード・4席ローテーションで直接比較する。カード実装の完了を待たない。今回のPRは比較プロトコルと小規模CI実走まで。結果の大小で事前登録条件を後から変更しない。
+
+### 小規模pilot（PRで実走・採用判断禁止）
+
+- `players=4`、`cards=none`、追加タイルOFF、`candidate=puct`、`baseline=mcts`、`opponent=mcts`。PUCTが1席、残り3席がMCTSの直接対戦。baseline armは全席MCTSで**mirror control**。一般的な「1対1」ではない。
+- `seed_start=64000`、4seedブロック×4席×2arm＝**計32試合**。試験の統計は見ても強さの結論を出さない。
+- `search_mode=simulation-capped`、`decision_budget_ms=0`、MCTS/PUCT各4シミュレーション・depth1、PUCT leaf=terminal。**同シミュレーション数であって同CPU時間ではない**。再現性を確認する配管テスト。
+- `paired_eval`自身が全14ラウンド・イベント再演ハッシュを検証し、`paired_eval_stats.py`が各block×arm×seatの件数・モード・seed・同一性、首位クレジットと95%ブロックbootstrapを検証する。Artifactに行データと集約JSONを保存。
+
+### 初期正式比較（別の手動/エージェント明示起動・CIと分離）
+
+- 事前登録した**1つの一次比較**：`players=4`、`cards=none`、追加タイルOFF、`candidate=puct`、`baseline=mcts`、`opponent=mcts`、同一シード席順交代（MCTS mirror対照）。`seed_start=965000`、`blocks=250`、4席＝**1,000試合/arm、合計2,000試合**。pilot seed 64000台/G0 seed 920000台とは分ける。
+- 正式比較は各16シミュレーション・depth2、PUCT leaf terminal（ほかのパラメータはworkflow既定）、`simulation-capped`、`decision_budget_ms=0`。これで探索方式の違いを見る。**同時間・最大10秒の判定は#167の別実験**とし、混ぜない。
+- 実行用コマンド（権限のあるエージェントからGitHub標準CPU上で明示起動）：
+
+```sh
+gh workflow run paired-eval.yml --ref main \
+  -f players=4 -f blocks=250 -f seed_start=965000 \
+  -f candidate=puct -f baseline=mcts -f opponent=mcts \
+  -f cards=none -f extra=false \
+  -f search_mode=simulation-capped -f decision_budget_ms=0 \
+  -f mcts_simulations=16 -f mcts_tree_depth=2 \
+  -f puct_simulations=16 -f puct_tree_depth=2 \
+  -f puct_leaf=terminal
+```
+
+- 必須成果：Run URL、実行SHA、入力パラメータ、`paired-eval-report` Artifact、`comparison_design.head_to_head=true`と`mirror_baseline=true`、1/k首位クレジット差・同着・期待順位・得点差・全4席内訳・95%CI・必要ブロック数・CPU費用・ルール/再演失敗0。
+- PUCTの差が**点推定+5pp以上、かつ95%CI下限>0**ならこの限定条件で暫定採用候補。区間が0を含めば保留、負方向なら不採用。pilotの数字を正式実験の意思決定に用いない。正式test結果に合わせて参数を再選択した場合は**新しい未知seed**で別の一次評価を行う。
+- この条件は4人戦カードなし・固定シミュレーション数であり、BGA対戦時間設定、ドラフト、カードあり4人戦、G1/G2、10秒上限、全プレイ条件での+5pp達成を意味しない。
