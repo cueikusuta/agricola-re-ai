@@ -300,4 +300,18 @@ fn draft_starter_is_randomized_by_seed_and_old_direction_is_rejected() {
         invalid.start().is_err(),
         "opposite pass directions are not adopted"
     );
+
+    let mut forged_starter = setup(DraftMode::Draft77, 4, 42).start().unwrap();
+    forged_starter.start_player = (forged_starter.start_player + 1) % 4;
+    assert!(
+        forged_starter.validate_invariants().is_err(),
+        "a restored draft cannot change the public starter independently of its seed"
+    );
+
+    let mut forged_direction = setup(DraftMode::Draft77, 4, 43).start().unwrap();
+    forged_direction.ruleset.direction_minor = Direction::Left;
+    assert!(
+        forged_direction.validate_invariants().is_err(),
+        "a restored draft cannot silently re-enable counterclockwise passing"
+    );
 }
