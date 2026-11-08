@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "A089",
+  "cases": [
+    {
+      "id": "A089-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 3
+      },
+      "action": {
+        "play": "A089"
+      },
+      "expected": {
+        "marked_rounds": [
+          6,
+          9,
+          12
+        ]
+      }
+    },
+    {
+      "id": "A089-round",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 6,
+        "marker": true
+      },
+      "action": {
+        "start_round": 6
+      },
+      "expected": {
+        "free_stable_granted": true
+      }
+    }
+  ]
+}

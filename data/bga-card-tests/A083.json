@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A083",
+  "cases": [
+    {
+      "id": "A083-normal",
+      "scope": "effect_only",
+      "setup": {
+        "new_pasture_size": 4
+      },
+      "action": {
+        "build_fences": 4
+      },
+      "expected": {
+        "sheep_on_pasture": 2
+      }
+    },
+    {
+      "id": "A083-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "new_pasture_size": 3
+      },
+      "action": {
+        "build_fences": 3
+      },
+      "expected": {
+        "sheep_on_pasture": 0
+      }
+    }
+  ]
+}

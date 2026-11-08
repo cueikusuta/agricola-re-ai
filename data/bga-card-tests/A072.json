@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A072",
+  "cases": [
+    {
+      "id": "A072-normal",
+      "scope": "effect_only",
+      "setup": {
+        "single_type_fields": 2
+      },
+      "action": {
+        "use_space": "western_quarry"
+      },
+      "expected": {
+        "fields_gained_good": 2
+      }
+    },
+    {
+      "id": "A072-mixed",
+      "scope": "effect_only",
+      "setup": {
+        "single_type_fields": 0
+      },
+      "action": {
+        "use_space": "western_quarry"
+      },
+      "expected": {
+        "fields_gained_good": 0
+      }
+    }
+  ]
+}

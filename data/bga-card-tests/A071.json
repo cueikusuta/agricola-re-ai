@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "A071",
+  "cases": [
+    {
+      "id": "A071-normal",
+      "scope": "effect_only",
+      "setup": {
+        "source_field_crops": 2,
+        "empty_fields": 1
+      },
+      "action": {
+        "move_crop": true
+      },
+      "expected": {
+        "source_field_crops": 1,
+        "empty_fields": 0
+      }
+    },
+    {
+      "id": "A071-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "source_field_crops": 1,
+        "empty_fields": 1
+      },
+      "action": {
+        "move_crop": true
+      },
+      "expected": {
+        "move_allowed": false
+      }
+    }
+  ]
+}

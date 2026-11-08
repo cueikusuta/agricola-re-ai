@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "A070",
+  "cases": [
+    {
+      "id": "A070-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "vegetable_fields": 1
+      },
+      "action": {
+        "use_card": true
+      },
+      "expected": {
+        "vegetable_delta": 1,
+        "field_vegetables": -1
+      }
+    },
+    {
+      "id": "A070-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "vegetable_fields": 0
+      },
+      "action": {
+        "use_card": true
+      },
+      "expected": {
+        "vegetable_delta": 0
+      }
+    }
+  ]
+}

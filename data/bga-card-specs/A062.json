@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "card_id": "A062",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "樽詰ビール",
+    "name_en": "Beer Keg"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3363",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_feeding",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "grain",
+                "amount": {
+                  "op": "table",
+                  "args": [
+                    "exchange_grain",
+                    {
+                      "1": 1,
+                      "2": 2,
+                      "3": 3
+                    }
+                  ]
+                }
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 3
+              },
+              {
+                "good": "points",
+                "amount": {
+                  "op": "table",
+                  "args": [
+                    "exchange_points",
+                    {
+                      "1": 0,
+                      "2": 1,
+                      "3": 2
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A062-one",
+      "A062-three",
+      "A062-not-enough"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Feeding phase: exchange 1/2/3 grain for exactly 3 food and 0/1/2 points."
+  }
+}

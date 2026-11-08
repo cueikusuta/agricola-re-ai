@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "A081",
+  "cases": [
+    {
+      "id": "A081-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood_on_card": 0
+      },
+      "action": {
+        "use_space": "clay_pit"
+      },
+      "expected": {
+        "wood_on_card_delta": 1
+      }
+    },
+    {
+      "id": "A081-round7",
+      "scope": "effect_only",
+      "setup": {
+        "wood_on_card": 3
+      },
+      "action": {
+        "start_round": 7
+      },
+      "expected": {
+        "wood_delta": 3,
+        "wood_on_card": 0
+      }
+    }
+  ]
+}
