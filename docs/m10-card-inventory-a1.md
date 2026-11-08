@@ -85,6 +85,7 @@ python3 scripts/card_inventory_report.py \
 
 - 出力対象は「未実装かつ一次難易度 ≤ 3」の **559枚**（`--max-difficulty` で変更可、既定3）。A-3 の優先順（即時獲得→ラウンド→収穫→終了時得点→建築・費用…）に対応づけるため、**難易度昇順・カードID順**で並ぶ。
 - 各行は `card_id` / `deck` / `card_type` / 名称 / 一次難易度 / 一次カテゴリ / `in_base_2016` と、**`official_review_required: true` / `distributable_now: false`** を持つ。
+- `--cards-csv` は入力台帳 `--ledger` やJSON出力 `--output` と同じパスへ指定できない（台帳やレポートの誤上書きを拒否）。
 - これは**作業キューであり照合結果ではない**。キューに載った時点で配布可能にはならず、`docs/card-catalog-ae-audit.csv` に公式出典が記録されるまで `unverified` のままである。ツールはキュー行から配布プールを作らない。
 - `verification_queue` の要約は JSON レポートにも出る（`official_review_required: true`, `distributable_now: false` を明示）。
 
