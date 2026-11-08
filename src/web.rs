@@ -1301,14 +1301,8 @@ mod tests {
     }
 
     #[test]
-    fn draft_endpoints_require_explicit_directions_and_phase_order() {
+    fn draft_endpoints_fix_clockwise_direction_and_require_explicit_phase_order() {
         let mut session = Session::new(Config::default()).unwrap();
-        assert!(
-            session
-                .start_draft(&json!({"mode":"draft_7_7","players":2}))
-                .is_err(),
-            "missing directions must be rejected, not defaulted"
-        );
         assert!(
             session
                 .start_draft(&json!({
@@ -1316,16 +1310,31 @@ mod tests {
                     "direction_occupation":"right","direction_minor":"right"
                 }))
                 .is_err(),
-            "7-7 needs an explicit phase order"
+            "7-7 still needs an explicit phase order"
         );
+        assert!(
+            session
+                .start_draft(&json!({
+                    "mode":"draft_7_7","players":2,
+                    "direction_occupation":"left","direction_minor":"right",
+                    "occupation_phase_first":true
+                }))
+                .is_err(),
+            "old reverse direction must not silently pass"
+        );
+        // Omitted direction now deliberately adopts the user-selected
+        // clockwise rule instead of an unconfirmed tournament convention.
         session
             .start_draft(&json!({
                 "mode":"draft_7_7","players":2,"seed":3,
-                "direction_occupation":"right","direction_minor":"right",
                 "occupation_phase_first":true
             }))
             .unwrap();
-        assert!(session.draft_view().is_ok());
+        let view = session.draft_view().unwrap();
+        assert_eq!(view["direction_occupation"], "right");
+        assert_eq!(view["direction_minor"], "right");
+        let first = view["start_player"].as_u64().unwrap() as usize;
+        assert!(first < 2);
     }
 
     #[test]
