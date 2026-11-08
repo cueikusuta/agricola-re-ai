@@ -601,11 +601,23 @@ fn draft_json(draft: &DraftWeb, viewer: usize) -> Result<Value, String> {
     } else {
         None
     };
+    let ruleset = &draft.state.ruleset;
+    let direction = |d: Direction| match d {
+        Direction::Left => "left",
+        Direction::Right => "right",
+    };
     Ok(json!({
         "mode": obs.mode.id(),
         "ruleset_id": obs.ruleset_id,
         "pool_kind": &draft.pool_kind,
         "deck_version": &draft.setup.deck_version,
+        // Public ruleset parameters, so a player can see which explicitly
+        // chosen conventions the server is using. The direction choice is an
+        // undecided house rule (#155): it is echoed, never guessed.
+        "player_count": draft.setup.player_count,
+        "direction_occupation": direction(ruleset.direction_occupation),
+        "direction_minor": direction(ruleset.direction_minor),
+        "occupation_phase_first": ruleset.occupation_phase_first,
         "ai": draft.draft_ai.id(),
         "phase": match obs.phase {
             DraftPhase::Drafting => "drafting",
