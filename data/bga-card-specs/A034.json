@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "card_id": "A034",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "剪定ばさみ",
+    "name_en": "Loppers"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Each time you build 1 or more fences, you can also use this card to exchange 1 wood and 1 fence in your supply for 2 food and 1 bonus point.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '柵を1本以上建設するたびに、追加で木材1とストックの柵1本を、食料2とボーナス1点に交換できる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_build_fences",
+      "conditions": [
+        {
+          "predicate": "fences_built",
+          "params": {
+            "min": 1
+          },
+          "negate": false
+        },
+        {
+          "predicate": "has_resource",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          },
+          "negate": false
+        },
+        {
+          "predicate": "has_resource",
+          "params": {
+            "good": "fence",
+            "amount": 1
+          },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          },
+          "notes": "Spend 1 wood"
+        },
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "fence",
+            "amount": 1
+          },
+          "notes": "Spend 1 fence from supply"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 2
+          },
+          "notes": "Gain 2 food"
+        },
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": 1,
+            "type": "bonus"
+          },
+          "notes": "Gain 1 bonus point"
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Optional each time fences built: exchange 1 wood + 1 fence for 2 food + 1 bonus point"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.conditions.0.predicate"
+    ],
+    "test_case_ids": [
+      "A034-build-fences-exchange",
+      "A034-build-fences-no-exchange",
+      "A034-no-wood-or-fence"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Ongoing conditional exchange on fence building. Not in base 2016 set."
+  }
+}

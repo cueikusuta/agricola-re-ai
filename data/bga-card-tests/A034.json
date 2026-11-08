@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "card_id": "A034",
+  "cases": [
+    {
+      "id": "A034-build-fences-exchange",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {"wood": 2, "fence": 1, "food": 0},
+        "farm": {"fences": 0},
+        "played_cards": ["A034"],
+        "card_location": {"card_id": "A034", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "build_fences", "count": 2, "choices": {"exchange": true}},
+      "expected": {
+        "resource_stock": {"wood": 1, "fence": 0, "food": 2},
+        "bonus_points": 1,
+        "farm": {"fences": 2}
+      },
+      "notes": "Build 2 fences, exchange 1 wood + 1 fence for 2 food + 1 bonus point."
+    },
+    {
+      "id": "A034-build-fences-no-exchange",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {"wood": 2, "fence": 1, "food": 0},
+        "farm": {"fences": 0},
+        "played_cards": ["A034"],
+        "card_location": {"card_id": "A034", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "build_fences", "count": 2, "choices": {"exchange": false}},
+      "expected": {
+        "resource_stock": {"wood": 0, "fence": 1, "food": 0},
+        "bonus_points": 0,
+        "farm": {"fences": 2}
+      },
+      "notes": "Build 2 fences normally (cost 2 wood), no exchange."
+    },
+    {
+      "id": "A034-no-wood-or-fence",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "resource_stock": {"wood": 0, "fence": 0, "food": 0},
+        "farm": {"fences": 0},
+        "played_cards": ["A034"],
+        "card_location": {"card_id": "A034", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "build_fences", "count": 1},
+      "expected": {
+        "resource_stock": {"wood": 0, "fence": 0, "food": 0},
+        "bonus_points": 0,
+        "farm": {"fences": 0}
+      },
+      "notes": "No wood or fence -> cannot build fences, no exchange possible."
+    }
+  ]
+}

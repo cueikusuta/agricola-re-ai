@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "card_id": "A022",
+  "cases": [
+    {
+      "id": "A022-basic",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 3,
+        "resource_stock": {
+          "fence": 2
+        },
+        "card_location": {
+          "card_id": "A022",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A022"
+      },
+      "expected": {
+        "scheduled_effects": [
+          {
+            "card_id": "A022",
+            "target_round": 5,
+            "action": "place_person_from_supply"
+          }
+        ],
+        "card_location": {
+          "card_id": "A022",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "Round 3 + 2 fences = Round 5. Schedule extra person placement at round 5."
+    },
+    {
+      "id": "A022-zero-fences",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 4,
+        "resource_stock": {
+          "fence": 0
+        },
+        "card_location": {
+          "card_id": "A022",
+          "player": 0,
+          "zone": "hand"
+        }
+      },
+      "action": {
+        "kind": "resolve_on_play_effect",
+        "card_id": "A022"
+      },
+      "expected": {
+        "scheduled_effects": [
+          {
+            "card_id": "A022",
+            "target_round": 4,
+            "action": "place_person_from_supply"
+          }
+        ],
+        "card_location": {
+          "card_id": "A022",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "notes": "Zero fences -> target round = current round (4)."
+    }
+  ]
+}

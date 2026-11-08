@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "card_id": "A027",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "窯置き場",
+    "name_en": "Oven Site"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'When you play this card, you get 2 wood and you can immediately build the \"Clay Oven\" or \"Stone Oven\" major improvement. Either way, it only costs you 1 clay and 1 stone.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'このカードを出したとき、木材2を得て、すぐに大きい進歩の「レンガ窯」または「石窯」を建設できる。このときの建設コストはどちらを建設してもレンガ1と石材1だけ。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 2
+          },
+          "notes": "Gain 2 wood"
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "build_major_improvement",
+            "options": ["Clay Oven", "Stone Oven", "レンガ窯", "石窯"],
+            "cost_override": {
+              "clay": 1,
+              "stone": 1
+            }
+          },
+          "notes": "Build Clay Oven or Stone Oven for 1 clay + 1 stone"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Gain 2 wood, then build Clay Oven or Stone Oven at reduced cost (1 clay + 1 stone)"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area (no post-play hand transfer mentioned)"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.1.params"
+    ],
+    "test_case_ids": [
+      "A027-clay-oven",
+      "A027-stone-oven"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Two-step effect. Ban status 'weak' per BGA. In base 2016 set."
+  }
+}

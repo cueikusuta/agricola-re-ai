@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "card_id": "A037",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "大枠のこぎり",
+    "name_en": "Bucksaw"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Each time you renovate, you can pay an additional 1 wood to get 1 bonus point and 1 grain.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '改築するたびに、追加で木材1を払えばボーナス1点と小麦1を得られる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_renovate",
+      "conditions": [
+        {
+          "predicate": "has_resource",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          },
+          "notes": "Pay 1 wood"
+        },
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": 1,
+            "type": "bonus"
+          },
+          "notes": "Gain 1 bonus point"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          },
+          "notes": "Gain 1 grain"
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Optional each renovation: pay 1 wood -> 1 bonus point + 1 grain"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger"
+    ],
+    "test_case_ids": [
+      "A037-renovate-pay-wood",
+      "A037-renovate-decline",
+      "A037-no-wood"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Ongoing effect on renovation. Optional payment. Not in base 2016 set."
+  }
+}

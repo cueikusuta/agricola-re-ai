@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "card_id": "A029",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ビールベンチ",
+    "name_en": "Ale-Benches"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'In the returning home phase of each round, you can pay exactly 1 grain from your supply to get 1 bonus point. If you do, each other player gets 1 food.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '各ラウンドの帰宅フェイズに、小麦1だけを払えばボーナス1点を得られる。そうしたなら、ほかの各プレイヤーは食料1を得る。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_returning_home_phase",
+      "conditions": [
+        {
+          "predicate": "has_resource",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          },
+          "notes": "Pay 1 grain"
+        },
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": 1,
+            "type": "bonus"
+          },
+          "notes": "Gain 1 bonus point"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "all_other_players",
+          "params": {
+            "good": "food",
+            "amount": 1
+          },
+          "notes": "Each other player gains 1 food"
+        }
+      ],
+      "optional": true,
+      "frequency": "each_round",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Optional each round: pay 1 grain -> 1 bonus point + each other player gets 1 food"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger"
+    ],
+    "test_case_ids": [
+      "A029-pay-grain",
+      "A029-decline",
+      "A029-no-grain"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Ongoing round effect with optional payment. Affects all other players. Not in base 2016 set."
+  }
+}

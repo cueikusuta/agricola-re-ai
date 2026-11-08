@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "A026",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "寝室",
+    "name_en": "Sleeping Corner"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'You can use any \"Wish for Children\" action space even if it is occupied by one other player\\'s person.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '「子供がほしい」のアクションスペースはすべて、ほかのプレイヤー1人の家族コマが置いてあっても使うことができる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_action_space_use",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "names": ["Wish for Children", "子供がほしい"]
+          },
+          "negate": false
+        },
+        {
+          "predicate": "space_occupied_by_one_other",
+          "params": {},
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "use_occupied_wish_for_children"
+          },
+          "notes": "Use Wish for Children space even if occupied by one other player"
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Can use Wish for Children spaces occupied by exactly one other player"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.conditions.0.predicate",
+      "effects.0.conditions.1.predicate",
+      "effects.0.steps.0.operation"
+    ],
+    "test_case_ids": [
+      "A026-occupied-by-one",
+      "A026-occupied-by-two"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Ongoing effect modifying space occupancy rules. In base 2016 set."
+  }
+}

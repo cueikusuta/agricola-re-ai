@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "card_id": "A040",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "陶工の中庭",
+    "name_en": "Potter's Yard"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Place 1 clay on each of your unused farmyard spaces. Each time one becomes used, you gain that clay. You may immediately exchange that clay for 2 food.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '未使用の各農場スペースにすぐにレンガ1ずつ置く。そこが使用済みに変わるたびに、置いたレンガを得る。このレンガはすぐに食料2に交換してもよい。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "place_clay_on_unused_spaces",
+            "amount_per_space": 1
+          },
+          "notes": "Place 1 clay on each unused farmyard space"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Immediate: place 1 clay on each unused farmyard space"
+    },
+    {
+      "trigger": "on_farmyard_space_used",
+      "conditions": [
+        {
+          "predicate": "space_has_clay",
+          "params": {},
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 1
+          },
+          "notes": "Gain the clay placed on this space"
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "optional_exchange_clay_for_food",
+            "rate": { "clay": 1, "food": 2 }
+          },
+          "notes": "Optionally exchange that clay for 2 food"
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "When a space with clay becomes used, gain the clay; optionally exchange for 2 food"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.0.operation",
+      "effects.0.steps.0.params",
+      "effects.1.trigger",
+      "effects.1.conditions.0.predicate",
+      "effects.1.steps.1.operation"
+    ],
+    "test_case_ids": [
+      "A040-place-clay",
+      "A040-space-used-exchange",
+      "A040-space-used-keep-clay"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Two effects: immediate clay placement, then ongoing gain/exchange when spaces used. Not in base 2016 set."
+  }
+}

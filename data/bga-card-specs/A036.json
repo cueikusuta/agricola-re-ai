@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "A036",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ファサード彫刻",
+    "name_en": "Facades Carving"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'When you play this card, you can exchange any amount of food for 1 bonus point each, up to the number of completed harvests.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'このカードを出したとき、食料を好きなだけ1つにつきボーナス1点に交換できる。ただし最大で終わっている収穫の数まで。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "exchange_food_for_points",
+            "max_amount": {
+              "op": "harvests_completed",
+              "args": [],
+              "snapshot": "before_effect"
+            }
+          },
+          "notes": "Exchange food for bonus points, max = completed harvests"
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Optional: exchange up to (completed harvests) food for 1 bonus point each"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "Card does not stay in play area; moves to left neighbor's hand after resolution (per similar cards)"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.0.operation",
+      "effects.0.steps.0.params",
+      "post_play.destination"
+    ],
+    "test_case_ids": [
+      "A036-exchange-some",
+      "A036-exchange-max",
+      "A036-no-harvests"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Immediate optional exchange. Max exchanges = completed harvests. Post-play destination uncertain. Not in base 2016 set."
+  }
+}

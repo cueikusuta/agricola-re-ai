@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "A023",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "採石事業所",
+    "name_en": "Stone Company"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Immediately after each time you use a \"Quarry\" accumulation space, you get a \"Major or Minor Improvement\" action during which you must spend at least 1 stone.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '累積スペース「石切り場」を使うたびに、その直後に「大きいまたは小さい進歩」アクションを得る。ただし進歩のコストとして石材1つ以上消費するものでなければならない。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_quarry_accumulation",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "major_or_minor_improvement",
+            "cost_constraint": { "must_spend_stone": 1 }
+          },
+          "notes": "Gain Major or Minor Improvement action that must spend at least 1 stone"
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Triggered after using Quarry accumulation space. Action must spend >=1 stone."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.steps.0.params.cost_constraint"
+    ],
+    "test_case_ids": [
+      "A023-basic",
+      "A023-must-spend-stone"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Ongoing effect with cost constraint. Trigger and constraint need engine mapping. Not in base 2016 set."
+  }
+}

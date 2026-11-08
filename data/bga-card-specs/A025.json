@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "card_id": "A025",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "乳母車",
+    "name_en": "Bassinet"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Each work phase, you can place a(nother) person on the first non-accumulating action space used by any player (including you), as long as there is only 1 person on that space.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '各労働フェイズに、最初に使われた累積でないアクションスペース（使ったプレイヤーはあなたを含め誰でもよい）は、置いてある人物が1人だけであるかぎり、あなたが使える。（新生児も1人と数える）'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_work_phase",
+      "conditions": [
+        {
+          "predicate": "first_non_accumulating_space_single_occupant",
+          "params": {},
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "use_action_space",
+            "space": "first_non_accumulating_single"
+          },
+          "notes": "Place person on first non-accumulating space with single occupant"
+        }
+      ],
+      "optional": true,
+      "frequency": "each_round",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each work phase, may place person on first non-accumulating space with 1 person"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.conditions.0.predicate",
+      "effects.0.steps.0.params"
+    ],
+    "test_case_ids": [
+      "A025-basic",
+      "A025-newborn-counts"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Complex ongoing effect. Newborn counts as person. Not in base 2016 set. BGA shows implemented."
+  }
+}

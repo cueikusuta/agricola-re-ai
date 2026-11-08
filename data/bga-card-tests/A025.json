@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "A025",
+  "cases": [
+    {
+      "id": "A025-basic",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 2,
+        "phase": "work",
+        "action_spaces": [
+          {"name": "Action1", "occupants": 1, "accumulating": false},
+          {"name": "Action2", "occupants": 2, "accumulating": false}
+        ],
+        "played_cards": ["A025"],
+        "card_location": {"card_id": "A025", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "work_phase_start"},
+      "expected": {
+        "available_actions": [{"action": "use_action_space", "space": "Action1"}]
+      },
+      "notes": "First non-accumulating space with 1 occupant (Action1) available for extra person."
+    },
+    {
+      "id": "A025-newborn-counts",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 2,
+        "phase": "work",
+        "action_spaces": [
+          {"name": "Action1", "occupants": 2, "accumulating": false, "one_is_newborn": true}
+        ],
+        "played_cards": ["A025"],
+        "card_location": {"card_id": "A025", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "work_phase_start"},
+      "expected": {
+        "available_actions": []
+      },
+      "notes": "Newborn counts as person; 2 occupants (1 newborn + 1 regular) = not single occupant."
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "A031",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "担保",
+    "name_en": "Debt Security"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'During scoring, you get 1 bonus point for each major improvement you have, up to the number of your unused farmyard spaces.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '得点計算時に、大きい進歩1つにつきボーナス1点を得る。ただし最大でも未使用の農場スペースの数まで。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": {
+              "op": "min",
+              "args": [
+                { "op": "card_count", "args": [{"type": "major_improvement"}], "snapshot": "live_state" },
+                { "op": "empty_farmyard_spaces", "args": [], "snapshot": "live_state" }
+              ]
+            },
+            "type": "bonus"
+          },
+          "notes": "1 bonus point per major improvement, capped at unused farmyard spaces"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Scoring effect: bonus points = min(major improvements, empty farmyard spaces)"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for scoring effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.steps.0.params.amount.op",
+      "effects.0.steps.0.params.amount.args"
+    ],
+    "test_case_ids": [
+      "A031-fewer-improvements",
+      "A031-more-improvements-than-spaces",
+      "A031-no-improvements"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Scoring effect with min() calculation. Not in base 2016 set."
+  }
+}

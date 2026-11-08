@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "A033",
+  "cases": [
+    {
+      "id": "A033-early-game",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 2,
+        "resource_stock": {"food": 0},
+        "card_location": {"card_id": "A033", "player": 0, "zone": "hand"}
+      },
+      "action": {"kind": "resolve_on_play_effect", "card_id": "A033"},
+      "expected": {
+        "resource_stock": {"food": 26},
+        "bonus_points": 13,
+        "card_location": {"card_id": "A033", "player": 1, "zone": "hand"}
+      },
+      "notes": "Round 2: 14-2 = 12 rounds remaining? Actually game has 14 rounds. Round 2 means 12 rounds left? Need clarification. Assuming 12 rounds left -> 12 food + 12 points? But Japanese says 'まだ始まっていないラウンド' = rounds not yet started. At round 2, rounds 3-14 = 12 rounds. 12*2=24 food, 12 points. Card moves to left neighbor."
+    },
+    {
+      "id": "A033-late-game",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 12,
+        "resource_stock": {"food": 0},
+        "card_location": {"card_id": "A033", "player": 0, "zone": "hand"}
+      },
+      "action": {"kind": "resolve_on_play_effect", "card_id": "A033"},
+      "expected": {
+        "resource_stock": {"food": 4},
+        "bonus_points": 2,
+        "card_location": {"card_id": "A033", "player": 1, "zone": "hand"}
+      },
+      "notes": "Round 12: rounds 13-14 = 2 rounds remaining -> 4 food, 2 points."
+    },
+    {
+      "id": "A033-final-round",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 14,
+        "resource_stock": {"food": 0},
+        "card_location": {"card_id": "A033", "player": 0, "zone": "hand"}
+      },
+      "action": {"kind": "resolve_on_play_effect", "card_id": "A033"},
+      "expected": {
+        "resource_stock": {"food": 0},
+        "bonus_points": 0,
+        "card_location": {"card_id": "A033", "player": 1, "zone": "hand"}
+      },
+      "notes": "Round 14: no rounds remaining -> 0 food, 0 points."
+    }
+  ]
+}

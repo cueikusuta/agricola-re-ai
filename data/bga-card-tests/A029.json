@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "card_id": "A029",
+  "cases": [
+    {
+      "id": "A029-pay-grain",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 2,
+        "phase": "returning_home",
+        "resource_stock": {"grain": 1},
+        "other_players_resources": [{"food": 0}, {"food": 0}],
+        "played_cards": ["A029"],
+        "card_location": {"card_id": "A029", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "returning_home_phase", "choices": {"pay_grain": true}},
+      "expected": {
+        "resource_stock": {"grain": 0},
+        "bonus_points": 1,
+        "other_players_resources": [{"food": 1}, {"food": 1}]
+      },
+      "notes": "Pay 1 grain -> 1 bonus point + each other player gets 1 food."
+    },
+    {
+      "id": "A029-decline",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 2,
+        "phase": "returning_home",
+        "resource_stock": {"grain": 1},
+        "other_players_resources": [{"food": 0}, {"food": 0}],
+        "played_cards": ["A029"],
+        "card_location": {"card_id": "A029", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "returning_home_phase", "choices": {"pay_grain": false}},
+      "expected": {
+        "resource_stock": {"grain": 1},
+        "bonus_points": 0,
+        "other_players_resources": [{"food": 0}, {"food": 0}]
+      },
+      "notes": "Decline to pay -> no bonus, no food to others."
+    },
+    {
+      "id": "A029-no-grain",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 2,
+        "phase": "returning_home",
+        "resource_stock": {"grain": 0},
+        "played_cards": ["A029"],
+        "card_location": {"card_id": "A029", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "returning_home_phase", "choices": {}},
+      "expected": {
+        "resource_stock": {"grain": 0},
+        "bonus_points": 0
+      },
+      "notes": "No grain -> cannot pay, effect does nothing."
+    }
+  ]
+}

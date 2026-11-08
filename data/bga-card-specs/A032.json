@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "card_id": "A032",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "かいば桶",
+    "name_en": "Manger"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'During scoring, if your pastures cover at least 6/7/8/10 farm yard spaces, you get 1/2/3/4 bonus points.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '得点計算のとき、牧場の広さの合計が 6/7/8/10スペース以上あれば、1/2/3/4 点ボーナスを得る。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": {
+              "op": "custom",
+              "args": ["pasture_space_tier_bonus"],
+              "snapshot": "live_state"
+            },
+            "type": "bonus"
+          },
+          "notes": "Bonus points based on total pasture spaces: 6->1, 7->2, 8->3, 10->4"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Scoring effect with tiered bonus based on total pasture spaces"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for scoring effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.steps.0.params.amount.op",
+      "effects.0.steps.0.params.amount.args"
+    ],
+    "test_case_ids": [
+      "A032-5-spaces",
+      "A032-6-spaces",
+      "A032-7-spaces",
+      "A032-8-spaces",
+      "A032-9-spaces",
+      "A032-10-spaces"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Scoring effect with tiered thresholds. In base 2016 set. BGA shows implemented in code."
+  }
+}

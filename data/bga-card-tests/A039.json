@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "card_id": "A039",
+  "cases": [
+    {
+      "id": "A039-owner-uses",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "bonus_points": 0,
+        "resource_stock": {"grain": 0},
+        "action_spaces": [{"name": "Chapel", "type": "shared"}],
+        "played_cards": ["A039"],
+        "card_location": {"card_id": "A039", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "use_action_space", "space": "Chapel", "player": 0},
+      "expected": {
+        "bonus_points": 3,
+        "resource_stock": {"grain": 0}
+      },
+      "notes": "Owner uses Chapel -> 3 bonus points, no grain payment."
+    },
+    {
+      "id": "A039-other-uses-pays",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "bonus_points": 0,
+        "resource_stock": {"grain": 1},
+        "player1_resources": {"grain": 1},
+        "action_spaces": [{"name": "Chapel", "type": "shared"}],
+        "played_cards": ["A039"],
+        "card_location": {"card_id": "A039", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "use_action_space", "space": "Chapel", "player": 1},
+      "expected": {
+        "bonus_points": 3,
+        "resource_stock": {"grain": 2},
+        "player1_resources": {"grain": 0}
+      },
+      "notes": "Player 1 uses Chapel -> pays 1 grain to owner, gets 3 bonus points. Owner gains 1 grain."
+    },
+    {
+      "id": "A039-other-no-grain",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "bonus_points": 0,
+        "resource_stock": {"grain": 0},
+        "player1_resources": {"grain": 0},
+        "action_spaces": [{"name": "Chapel", "type": "shared"}],
+        "played_cards": ["A039"],
+        "card_location": {"card_id": "A039", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "use_action_space", "space": "Chapel", "player": 1},
+      "expected": {
+        "bonus_points": 0,
+        "resource_stock": {"grain": 0},
+        "player1_resources": {"grain": 0}
+      },
+      "notes": "Player 1 has no grain -> cannot use Chapel."
+    }
+  ]
+}

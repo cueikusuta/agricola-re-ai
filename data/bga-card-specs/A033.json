@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "card_id": "A033",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "新しい土地",
+    "name_en": "Big Country"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'For each complete round left to play, you immediately get 1 bonus point and 2 food.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'まだ始まっていないラウンド1つにつき、すぐに食料2と1点ボーナスを得る。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": {
+              "op": "rounds_remaining",
+              "args": [],
+              "snapshot": "before_effect"
+            },
+            "type": "bonus"
+          },
+          "notes": "1 bonus point per round remaining"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "multiply",
+              "args": [
+                { "op": "rounds_remaining", "args": [], "snapshot": "before_effect" },
+                2
+              ]
+            }
+          },
+          "notes": "2 food per round remaining"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Immediate gain based on rounds remaining. Ban status 'strong' per BGA."
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "Card does not stay in play area; moves to left neighbor's hand after resolution (per similar cards)"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.0.params.amount.op",
+      "effects.0.steps.1.params.amount.op",
+      "post_play.destination"
+    ],
+    "test_case_ids": [
+      "A033-early-game",
+      "A033-late-game",
+      "A033-final-round"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Immediate effect based on rounds remaining. Ban status 'strong'. Post-play destination uncertain (similar cards go to left neighbor). In base 2016 set."
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "card_id": "A028",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "森の学校",
+    "name_en": "Forest School"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'You can consider the \"Lessons\" action spaces not occupied. You can replace each food that an occupation costs with wood.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'アクションスペース「授業」は占有されていないものとして使うことができる。職業コストの食料を木材で代用できる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_action_space_use",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "names": ["Lessons", "授業"]
+          },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "ignore_occupation",
+            "space": "lessons"
+          },
+          "notes": "Treat Lessons spaces as unoccupied"
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Lessons action spaces treated as unoccupied"
+    },
+    {
+      "trigger": "on_play_occupation",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "substitute_food_with_wood",
+            "for": "occupation_cost"
+          },
+          "notes": "Replace food cost with wood for occupations"
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Food cost for occupations can be paid with wood instead"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effects"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.conditions.0.predicate",
+      "effects.0.steps.0.operation",
+      "effects.1.trigger",
+      "effects.1.steps.0.operation"
+    ],
+    "test_case_ids": [
+      "A028-lessons-unoccupied",
+      "A028-occupation-food-to-wood"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Two ongoing effects. Complex rule modifications. Not in base 2016 set."
+  }
+}

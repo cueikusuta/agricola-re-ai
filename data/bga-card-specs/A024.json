@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "card_id": "A024",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "脱穀板",
+    "name_en": "Threshing Board"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Each time you use the \"Farmland\" or \"Cultivation\" action space, you get an additional \"Bake Bread\" action.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '「農地」「耕作」のいずれかのアクションスペースを使うたびに、追加で「パンを焼く」のアクションが1回できる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_action_space_use",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "names": ["Farmland", "Cultivation", "農地", "耕作"]
+          },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "bake_bread"
+          },
+          "notes": "Gain additional Bake Bread action"
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Triggered each time Farmland or Cultivation action space used"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.conditions.0.predicate"
+    ],
+    "test_case_ids": [
+      "A024-farmland",
+      "A024-cultivation"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Ongoing effect. Trigger and condition need engine mapping. In base 2016 set."
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "card_id": "A035",
+  "cases": [
+    {
+      "id": "A035-fishing-with-newborns",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 5,
+        "phase": "returning_home",
+        "returned_from": "Fishing",
+        "newborns_returned": 2,
+        "played_cards": ["A035"],
+        "card_location": {"card_id": "A035", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "returning_home_phase"},
+      "expected": {"bonus_points": 4},
+      "notes": "Return from Fishing with 2 newborns -> 2*2 = 4 bonus points."
+    },
+    {
+      "id": "A035-fishing-no-newborns",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 5,
+        "phase": "returning_home",
+        "returned_from": "Fishing",
+        "newborns_returned": 0,
+        "played_cards": ["A035"],
+        "card_location": {"card_id": "A035", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "returning_home_phase"},
+      "expected": {"bonus_points": 0},
+      "notes": "Return from Fishing with no newborns -> 0 bonus points."
+    },
+    {
+      "id": "A035-not-fishing",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "round": 5,
+        "phase": "returning_home",
+        "returned_from": "Forest",
+        "newborns_returned": 2,
+        "played_cards": ["A035"],
+        "card_location": {"card_id": "A035", "player": 0, "zone": "played_area"}
+      },
+      "action": {"kind": "returning_home_phase"},
+      "expected": {"bonus_points": 0},
+      "notes": "Return from Forest (not Fishing) -> no bonus even with newborns."
+    }
+  ]
+}

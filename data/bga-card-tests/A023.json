@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "card_id": "A023",
+  "cases": [
+    {
+      "id": "A023-basic",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "played_cards": ["A023"],
+        "card_location": {
+          "card_id": "A023",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "use_accumulation_space",
+        "space": "Quarry"
+      },
+      "expected": {
+        "granted_actions": [
+          {
+            "action": "major_or_minor_improvement",
+            "must_spend_stone": 1
+          }
+        ]
+      },
+      "notes": "After using Quarry, gain Major/Minor Improvement action that must spend >=1 stone."
+    },
+    {
+      "id": "A023-must-spend-stone",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "played_cards": ["A023"],
+        "resource_stock": {
+          "stone": 0
+        },
+        "card_location": {
+          "card_id": "A023",
+          "player": 0,
+          "zone": "played_area"
+        }
+      },
+      "action": {
+        "kind": "use_accumulation_space",
+        "space": "Quarry"
+      },
+      "expected": {
+        "granted_actions": [
+          {
+            "action": "major_or_minor_improvement",
+            "must_spend_stone": 1,
+            "available_choices": []
+          }
+        ]
+      },
+      "notes": "Granted action requires spending stone; if no stone available, no valid improvements to choose."
+    }
+  ]
+}

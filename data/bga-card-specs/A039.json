@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "card_id": "A039",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "礼拝所",
+    "name_en": "Chapel"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'This card becomes an action space usable by all players. When used, the player gets 3 bonus points. Other players must pay you 1 grain to use it.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'このカードは全員が使えるアクションスペースとなる。ここを使ったプレイヤーはボーナス3点を得る。ほかのプレイヤーが使うときは、まずあなたに小麦1を渡さなければならない。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "create_action_space",
+            "space": "chapel",
+            "owner_bonus": 3,
+            "other_cost": { "grain": 1 }
+          },
+          "notes": "Create Chapel action space: all players can use; user gets 3 bonus points; others pay owner 1 grain"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "permanent",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Creates a shared action space with payment to owner. Ban status 'strong' per BGA."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area as action space"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.0.operation",
+      "effects.0.steps.0.params"
+    ],
+    "test_case_ids": [
+      "A039-owner-uses",
+      "A039-other-uses-pays",
+      "A039-other-no-grain"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Creates shared action space with payment mechanic. Ban status 'strong'. Not in base 2016 set."
+  }
+}

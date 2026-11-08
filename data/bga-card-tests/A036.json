@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "A036",
+  "cases": [
+    {
+      "id": "A036-exchange-some",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "harvests_completed": 3,
+        "resource_stock": {"food": 5},
+        "card_location": {"card_id": "A036", "player": 0, "zone": "hand"}
+      },
+      "action": {"kind": "resolve_on_play_effect", "card_id": "A036", "choices": {"exchange_amount": 2}},
+      "expected": {
+        "resource_stock": {"food": 3},
+        "bonus_points": 2,
+        "card_location": {"card_id": "A036", "player": 1, "zone": "hand"}
+      },
+      "notes": "3 harvests completed, exchange 2 food -> 2 bonus points. 3 food remaining. Card to left neighbor."
+    },
+    {
+      "id": "A036-exchange-max",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "harvests_completed": 2,
+        "resource_stock": {"food": 5},
+        "card_location": {"card_id": "A036", "player": 0, "zone": "hand"}
+      },
+      "action": {"kind": "resolve_on_play_effect", "card_id": "A036", "choices": {"exchange_amount": 2}},
+      "expected": {
+        "resource_stock": {"food": 3},
+        "bonus_points": 2,
+        "card_location": {"card_id": "A036", "player": 1, "zone": "hand"}
+      },
+      "notes": "2 harvests completed, max exchange = 2. Exchange 2 food -> 2 bonus points."
+    },
+    {
+      "id": "A036-no-harvests",
+      "scope": "effect_only",
+      "setup": {
+        "players": 3,
+        "owner": 0,
+        "harvests_completed": 0,
+        "resource_stock": {"food": 5},
+        "card_location": {"card_id": "A036", "player": 0, "zone": "hand"}
+      },
+      "action": {"kind": "resolve_on_play_effect", "card_id": "A036", "choices": {}},
+      "expected": {
+        "resource_stock": {"food": 5},
+        "bonus_points": 0,
+        "card_location": {"card_id": "A036", "player": 1, "zone": "hand"}
+      },
+      "notes": "0 harvests completed -> cannot exchange. Card still moves to left neighbor."
+    }
+  ]
+}

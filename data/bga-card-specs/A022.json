@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "A022",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "電報",
+    "name_en": "Telegram"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Add 1 to the current round for each fence in your supply and mark the corresponding round space. In that round only, you can place a person from your supply.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: 'あなたのストックにある柵の本数を現在のラウンド数に足し、そのラウンドのスペースにしるしをつける。そのラウンドのあいだだけ、あなたのストックにある人物を1人配置できる。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "schedule_extra_person_placement",
+            "target_round": {
+              "op": "add",
+              "args": [
+                { "op": "current_round", "args": [], "snapshot": "before_effect" },
+                { "op": "resource_count", "args": ["fence"], "snapshot": "before_effect" }
+              ]
+            }
+          },
+          "notes": "Schedule extra person placement at round (current + fence count). Custom operation needs engine mapping."
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "delayed",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Current round + fence count = target round. At that round, place 1 person from supply."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for scheduled effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.steps.0.operation",
+      "effects.0.steps.0.params"
+    ],
+    "test_case_ids": [
+      "A022-basic",
+      "A022-zero-fences"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Complex scheduling effect. Custom operation needs engine mapping. Not in base 2016 set."
+  }
+}

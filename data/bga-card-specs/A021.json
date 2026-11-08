@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "A021",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "家族向け住宅",
+    "name_en": "Family Friendly Home"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'Each time you take a \"Build Rooms\" action while having more rooms than people already, you also get a \"Family Growth\" action and 1 food.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '人物よりも部屋の数が多い状態で、さらに「部屋の建設」アクションをするたびに、追加で「家族を増やす」アクションと食料1を得る。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_build_rooms",
+      "conditions": [
+        {
+          "predicate": "rooms_gt_people",
+          "params": {},
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "family_growth"
+          },
+          "notes": "Gain a Family Growth action"
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          },
+          "notes": "Gain 1 food"
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Triggered each time Build Rooms action taken while rooms > people"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for ongoing effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.conditions.0.predicate"
+    ],
+    "test_case_ids": [
+      "A021-rooms-gt-people",
+      "A021-rooms-le-people"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Ongoing conditional effect. Trigger and condition need engine mapping. Not in base 2016 set."
+  }
+}

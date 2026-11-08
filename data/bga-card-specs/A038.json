@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "A038",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "羊の毛布",
+    "name_en": "Wool Blankets"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English table row: 'During scoring, if you live in a wood/clay/stone house, you get 3/2/0 bonus points.'"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_img/",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "Japanese image list: '得点計算のとき、木/レンガ/石の家に住んでいれば、3/2/0点ボーナスを得る。'"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": {
+              "op": "custom",
+              "args": ["house_type_bonus"],
+              "snapshot": "live_state"
+            },
+            "type": "bonus"
+          },
+          "notes": "Bonus points by house type: wood=3, clay=2, stone=0"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Scoring effect: bonus points based on house type (wood=3, clay=2, stone=0)"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Card stays in play area for scoring effect"
+  },
+  "review": {
+    "status": "partial",
+    "unresolved_fields": [
+      "effects.0.trigger",
+      "effects.0.steps.0.params.amount.op",
+      "effects.0.steps.0.params.amount.args"
+    ],
+    "test_case_ids": [
+      "A038-wood-house",
+      "A038-clay-house",
+      "A038-stone-house"
+    ],
+    "checked_by": "AI BGA reference comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Scoring effect based on house type. In base 2016 set. BGA shows implemented in code."
+  }
+}
