@@ -17,7 +17,7 @@ fn pool(occ: usize, minor: usize) -> DraftPool {
 fn setup(mode: DraftMode, players: usize, seed: u64) -> DraftSetup {
     DraftSetup {
         mode,
-        ruleset: DraftRuleset::explicit("test-explicit", Direction::Left, Direction::Right, true),
+        ruleset: DraftRuleset::explicit("test-clockwise-v2", Direction::Right, Direction::Right, true),
         pool: pool(
             mode.dealt_per_kind() * players + 6,
             mode.dealt_per_kind() * players + 6,
@@ -227,4 +227,53 @@ fn choose107_selects_seven_and_discards_three_privately() {
         assert_eq!(occ.len(), 7);
         assert_eq!(minor.len(), 7);
     }
+}
+
+#[test]
+fn draft_passes_clockwise_in_every_supported_player_count() {
+    for players in [2, 3, 4] {
+        let setup = setup(DraftMode::Draft77, players, 9000 + players as u64);
+        let mut draft = setup.start().unwrap();
+        assert_eq!(draft.start_player, setup.start().unwrap().start_player);
+        assert!(draft.start_player < players);
+        assert_eq!(
+            draft.observe(0, draft.current_token()).unwrap().start_player,
+            draft.start_player
+        );
+
+        for seat in 0..players {
+            assert_eq!(
+                Direction::Right.step(seat, players),
+                (seat + 1) % players,
+                "clockwise must be 1P -> 2P -> ... -> 1P"
+            );
+        }
+        let packet_id = draft
+            .packets
+            .iter()
+            .find(|p| p.owner_seat == 0 && p.kind == CardKind::Occupation)
+            .unwrap()
+            .packet_id;
+        let token = draft.current_token();
+        for seat in 0..players {
+            let choice = cpu_pick(&draft.observe(seat, token).unwrap()).unwrap();
+            draft
+                .commit_pick(seat, token, choice.occupation, choice.minor)
+                .unwrap();
+        }
+        let packet = draft.packets.iter().find(|p| p.packet_id == packet_id).unwrap();
+        assert_eq!(packet.owner_seat, 1, "seat 0 passes its packet to seat 1");
+    }
+}
+
+#[test]
+fn draft_starter_is_randomized_by_seed_and_old_direction_is_rejected() {
+    let mut observed = std::collections::BTreeSet::new();
+    for seed in 0..96 {
+        observed.insert(setup(DraftMode::Draft77, 4, seed).start().unwrap().start_player);
+    }
+    assert_eq!(observed, (0usize..4).collect(), "every seat must be reachable");
+    let mut invalid = setup(DraftMode::Draft77, 4, 42);
+    invalid.ruleset.direction_minor = Direction::Left;
+    assert!(invalid.start().is_err(), "opposite pass directions are not adopted");
 }
