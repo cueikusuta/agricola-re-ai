@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "E039",
+  "cases": [
+    {
+      "id": "E039-food",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 1
+      },
+      "action": {
+        "run_harvest": true,
+        "choose": "food"
+      },
+      "expected": {
+        "clay_delta": -1,
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "E039-point",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 1
+      },
+      "action": {
+        "run_harvest": true,
+        "choose": "point"
+      },
+      "expected": {
+        "clay_delta": -1,
+        "points_delta": 1
+      }
+    },
+    {
+      "id": "E039-no-clay",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "choose": "food"
+      },
+      "expected": {
+        "clay_delta": 0,
+        "food_delta": 0
+      }
+    }
+  ]
+}

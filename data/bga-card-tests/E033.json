@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "E033",
+  "cases": [
+    {
+      "id": "E033-normal",
+      "scope": "effect_only",
+      "setup": {
+        "pastures_with_stable": 2
+      },
+      "action": {
+        "play": "E033"
+      },
+      "expected": {
+        "usable_pastures_with_stable": 1
+      }
+    },
+    {
+      "id": "E033-point",
+      "scope": "effect_only",
+      "setup": {
+        "points": 0
+      },
+      "action": {
+        "use_space": "reed_bank"
+      },
+      "expected": {
+        "points_delta": 1
+      }
+    },
+    {
+      "id": "E033-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "points": 0
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    }
+  ]
+}

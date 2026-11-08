@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "E022",
+  "cases": [
+    {
+      "id": "E022-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 4
+      },
+      "action": {
+        "play": "E022",
+        "place": 4
+      },
+      "expected": {
+        "food_on_card": 4,
+        "food_delta": -4
+      }
+    },
+    {
+      "id": "E022-use",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 1
+      },
+      "action": {
+        "use_card": true
+      },
+      "expected": {
+        "food_on_card": 0,
+        "person_placed": 1
+      }
+    },
+    {
+      "id": "E022-empty",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 0
+      },
+      "action": {
+        "use_card": true
+      },
+      "expected": {
+        "person_placed": 0
+      }
+    }
+  ]
+}

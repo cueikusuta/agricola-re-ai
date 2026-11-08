@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "card_id": "E009",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "物々交換所",
+    "name_en": "Bartering Hut"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2744",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "wood",
+                    "amount": 2
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "sheep",
+                    "amount": 1
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "clay",
+                    "amount": 3
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "wild_boar",
+                    "amount": 1
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "stone",
+                    "amount": 4
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "cattle",
+                    "amount": 1
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "up to two exchanges; each option may be taken at most once"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E009-normal",
+      "E009-declined"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Up to twice: exchange 2/3/4 building resources for 1 sheep/wild boar/cattle; pass left."
+  }
+}

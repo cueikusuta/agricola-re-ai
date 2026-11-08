@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "E035",
+  "cases": [
+    {
+      "id": "E035-four",
+      "scope": "effect_only",
+      "setup": {
+        "family": 4
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 2
+      }
+    },
+    {
+      "id": "E035-two",
+      "scope": "effect_only",
+      "setup": {
+        "family": 2
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 5
+      }
+    },
+    {
+      "id": "E035-five",
+      "scope": "effect_only",
+      "setup": {
+        "family": 5
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    }
+  ]
+}

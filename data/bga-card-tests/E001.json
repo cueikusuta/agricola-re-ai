@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "E001",
+  "cases": [
+    {
+      "id": "E001-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 0,
+        "wood": 0
+      },
+      "action": {
+        "play": "E001",
+        "build": 3
+      },
+      "expected": {
+        "stables_delta": 3,
+        "wood_delta": 0
+      }
+    },
+    {
+      "id": "E001-partial",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 0,
+        "wood": 0
+      },
+      "action": {
+        "play": "E001",
+        "build": 1
+      },
+      "expected": {
+        "stables_delta": 1,
+        "wood_delta": 0
+      }
+    }
+  ]
+}

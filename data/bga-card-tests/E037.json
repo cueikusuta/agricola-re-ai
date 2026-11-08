@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "E037",
+  "cases": [
+    {
+      "id": "E037-normal",
+      "scope": "effect_only",
+      "setup": {
+        "cattle": 0
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 3
+      }
+    },
+    {
+      "id": "E037-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "cattle": 1
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    }
+  ]
+}

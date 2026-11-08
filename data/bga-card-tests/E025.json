@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "E025",
+  "cases": [
+    {
+      "id": "E025-normal",
+      "scope": "effect_only",
+      "setup": {
+        "sown_grain": 2
+      },
+      "action": {
+        "play": "E025"
+      },
+      "expected": {
+        "grain_delta": 2,
+        "fields_harvested": true
+      }
+    },
+    {
+      "id": "E025-no-crops",
+      "scope": "effect_only",
+      "setup": {
+        "sown_grain": 0
+      },
+      "action": {
+        "play": "E025"
+      },
+      "expected": {
+        "grain_delta": 0
+      }
+    }
+  ]
+}

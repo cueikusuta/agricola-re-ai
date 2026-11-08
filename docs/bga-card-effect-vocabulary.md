@@ -66,12 +66,21 @@
 | `build_improvement` | `options`（カード名配列）, `cost`。指定コストで大進歩を建設 |
 | `fence_pasture` | `spaces`, `wood_cost`, `must_be_adjacent`。柵で牧場を作る |
 | `rebuild_fences` | `add_up_to`, `keep_animals`。全柵を撤去して建て直す |
-| `place_on_round_spaces` | `good`, `amount`, `rounds`。以後のラウンドスペースに品物を置く |
+| `place_on_round_spaces` | `good`, `amount` または `amounts`, `rounds`, `marker_kind`。以後のラウンドスペースに品物・しるしを置く |
 | `count_as_field` | `amount`。カード自体を畑として数える |
 | `gain_each_with_at_least` | `goods`, `threshold`, `amount`。所持数が閾値以上の品物を各1つ得る |
 | `add_good_to_single_good_fields` | `amount`, `same_type`。品物がちょうど1つの畑へ同種を追加 |
 | `forbid_house_animals` | 家に家畜を収容できなくする継続効果 |
-| `allow_major_via_minor` | `improvements`。「小さい進歩」アクションでも指定の大進歩を建設できる |
+| `allow_major_via_minor` | `improvements`（配列または `"any"`）。「小さい進歩」アクションでも大進歩を建設できる |
+| `discard_field_grain` | `wood_per_grain`。1つの畑の小麦を捨てて木材に交換 |
+| `take_from_accumulations` | `count`, `distinct_types`。累積スペースから建築資材を取る |
+| `free_outer_edge_fences` | 農場外周の柵を無料にする継続効果 |
+| `place_food_on_card` | `any_amount`。食料をカード上に置く |
+| `run_field_phase` | `only_owner`。畑フェイズを即座に実行 |
+| `place_reed_for_point` | `max`。葦を置いて得点（上限あり） |
+| `disable_one_stable_pasture` | 厩つき牧場1つを使えなくする |
+| `require_empty_pasture` | `count`。空の牧場を維持する制約 |
+| `place_up_to_two_wood_on_card` | カード上に木材を置く |
 
 ## 数量式（`amount` / `points` に入る式木）
 
@@ -94,6 +103,7 @@
 `person_on_accumulation_space` `hand_occupation_count` `remaining_rounds` `fence`
 `vegetable_taken_from_field` `sheep` `wild_boar` `cattle` `completed_harvest`
 `grain_in_supply` `unused_farmyard_space` `sown_field` `stone_in_supply`
+`column_with_room` `wood_on_card`
 
 ## 条件（`effects[].conditions[]`）
 
@@ -135,6 +145,10 @@
 | `goods_in_fields_before_final_harvest_at_least` | `n` | 最後の収穫前に畑上にあった品物が `n` 以上 |
 | `accumulation_at_least` | `space`, `n` | 対象の累積スペースに品物が `n` 以上ある |
 | `cards_in_play_at_least` | `n` | 自分の前のカード（職業＋進歩）が `n` 枚以上 |
+| `fences_built_at_least` | `n` | 建設済みの柵が `n` 本以上 |
+| `worker_on_space` | `space` | 自分の人物がそのスペースに置かれている |
+| `fenced_stable_count` | `n` | 柵内の厩が `n` 以上 |
+| `animal_count_at_most` | `animal`, `n` | 家畜数が `n` 以下 |
 
 ## 発動頻度・持続・状態参照
 

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "E016",
+  "cases": [
+    {
+      "id": "E016-normal",
+      "scope": "effect_only",
+      "setup": {
+        "outer_edge_fences": 2,
+        "wood": 0
+      },
+      "action": {
+        "play": "E016",
+        "build_fences": 2
+      },
+      "expected": {
+        "wood_delta": 0,
+        "fences_built": 2
+      }
+    },
+    {
+      "id": "E016-inner",
+      "scope": "effect_only",
+      "setup": {
+        "inner_fences": 2,
+        "wood": 2
+      },
+      "action": {
+        "build_fences": 2
+      },
+      "expected": {
+        "wood_delta": -2,
+        "fences_built": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "card_id": "E029",
+  "cases": [
+    {
+      "id": "E029-normal",
+      "scope": "effect_only",
+      "setup": {
+        "points": 0
+      },
+      "action": {
+        "play": "E029"
+      },
+      "expected": {
+        "points_delta": 2
+      }
+    }
+  ]
+}

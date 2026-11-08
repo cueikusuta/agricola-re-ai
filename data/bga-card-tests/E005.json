@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "card_id": "E005",
+  "cases": [
+    {
+      "id": "E005-normal",
+      "scope": "effect_only",
+      "setup": {
+        "forest_wood": 2,
+        "clay_pit_clay": 1
+      },
+      "action": {
+        "play": "E005",
+        "take": [
+          "wood",
+          "clay"
+        ]
+      },
+      "expected": {
+        "wood_delta": 2,
+        "clay_delta": 1
+      }
+    },
+    {
+      "id": "E005-same-type",
+      "scope": "effect_only",
+      "setup": {
+        "forest_wood": 2,
+        "clay_pit_clay": 1
+      },
+      "action": {
+        "play": "E005",
+        "take": [
+          "wood",
+          "wood"
+        ]
+      },
+      "expected": {
+        "play_rejected": true
+      }
+    }
+  ]
+}

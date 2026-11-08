@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "E009",
+  "cases": [
+    {
+      "id": "E009-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 2
+      },
+      "action": {
+        "play": "E009",
+        "choose": 0
+      },
+      "expected": {
+        "wood_delta": -2,
+        "sheep_delta": 1
+      }
+    },
+    {
+      "id": "E009-declined",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 2
+      },
+      "action": {
+        "play": "E009",
+        "choose": null
+      },
+      "expected": {
+        "wood_delta": 0,
+        "sheep_delta": 0
+      }
+    }
+  ]
+}

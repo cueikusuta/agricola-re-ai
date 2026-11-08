@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "E031",
+  "cases": [
+    {
+      "id": "E031-normal",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 3,
+        "reeds_placed": 1
+      },
+      "action": {
+        "play_improvement": "B037"
+      },
+      "expected": {
+        "points_delta": 1,
+        "reeds_placed": 2
+      }
+    },
+    {
+      "id": "E031-cap",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 2,
+        "reeds_placed": 2
+      },
+      "action": {
+        "play_improvement": "B037"
+      },
+      "expected": {
+        "points_delta": 0,
+        "reeds_placed": 2
+      }
+    }
+  ]
+}
