@@ -23,6 +23,13 @@ use std::net::{TcpListener, TcpStream};
 
 const INDEX: &str = include_str!("../web/index.html");
 const MAX_BODY: usize = 65_536;
+/// Browser game logs grow throughout fourteen rounds. Loading uses a larger,
+/// still bounded limit; ordinary POST endpoints retain the smaller limit.
+const MAX_LOAD_BODY: usize = 8 * 1024 * 1024;
+
+fn request_body_limit(path: &str) -> usize {
+    if path == "/api/load" { MAX_LOAD_BODY } else { MAX_BODY }
+}
 /// Marker for a browser save file. A file without it is rejected instead of
 /// being interpreted as some other JSON.
 const SAVE_FORMAT: &str = "agricola-web-save";
@@ -432,8 +439,12 @@ impl Session {
                 "収穫の給餌・繁殖を選択している間は保存できません。選択を完了してから保存してください。",
             );
         }
-        if self.draft.as_ref().is_some_and(|draft| !draft.game_started) {
-            return Some("ドラフト進行中は保存できません。対戦開始後に保存してください。");
+        // A finished draft still holds private observations, selection history
+        // and its explicit ruleset outside Game. Until the save envelope can
+        // authenticate and restore that state, refuse *all* draft-derived
+        // saves instead of silently dropping the history on import.
+        if self.draft.is_some() {
+            return Some("ドラフト由来の対戦は履歴を復元できないため、現在は保存できません。通常対戦の保存をご利用ください。");
         }
         None
     }
@@ -911,12 +922,12 @@ fn handle(mut stream: TcpStream, session: &mut Session, port: u16) -> Result<(),
             "{\"error\":\"application/json required\"}",
         );
     }
-    if length > MAX_BODY {
+    if length > request_body_limit(path) {
         return response(
             &mut stream,
             "413 Content Too Large",
             "application/json",
-            "{\"error\":\"body too large\"}",
+            "{\"error\":\"body too large for this endpoint\"}",
         );
     }
     let mut bytes = vec![0u8; length];
@@ -1762,6 +1773,57 @@ mod tests {
             .unwrap();
         let error = session.export_save().unwrap_err();
         assert!(error.contains("ドラフト"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn a_completed_draft_game_must_not_save_without_its_observation_history() {
+        let mut session = seeded_session(55);
+        session
+            .start_draft(&json!({
+                "mode":"draft_7_7", "players":2, "seed":606,
+                "direction_occupation":"left", "direction_minor":"right",
+                "occupation_phase_first":true
+            }))
+            .unwrap();
+        drive_draft_to_completion(&mut session);
+        session.start_draft_game(&json!({})).unwrap();
+        let before = session.draft_view().unwrap();
+        assert!(before["history"].as_array().is_some_and(|history| !history.is_empty()));
+        let hash = session.game.state_hash();
+        let error = session.export_save().unwrap_err();
+        assert!(error.contains("ドラフト"), "unexpected error: {error}");
+        assert_eq!(session.game.state_hash(), hash);
+        assert_eq!(session.draft_view().unwrap(), before);
+    }
+
+    #[test]
+    fn save_upload_limit_is_specific_to_the_load_endpoint() {
+        assert_eq!(request_body_limit("/api/load"), MAX_LOAD_BODY);
+        assert_eq!(request_body_limit("/api/save"), MAX_BODY);
+        assert_eq!(request_body_limit("/api/play"), MAX_BODY);
+        assert!(MAX_LOAD_BODY > MAX_BODY);
+        assert!(request_body_limit("/api/load") < 16 * 1024 * 1024);
+    }
+
+    #[test]
+    fn four_player_endgame_save_fits_the_bounded_load_limit() {
+        let mut session = Session::new(Config {
+            players: 4, seed: 66, additional_action_space_enabled: false,
+        }).unwrap();
+        for _ in 0..1500 {
+            if session.game.public.finished { break; }
+            play_turns(&mut session, 1);
+        }
+        assert!(session.game.public.finished, "four player match did not finish");
+        let save = session.export_save().unwrap();
+        let text = serde_json::to_string_pretty(&save).unwrap();
+        assert!(
+            text.len() <= request_body_limit("/api/load"),
+            "four-player endgame save is {} bytes", text.len()
+        );
+        let mut reloaded = seeded_session(9);
+        reloaded.import_save(&save).unwrap();
+        assert_eq!(reloaded.game.state_hash(), session.game.state_hash());
     }
 
     #[test]
