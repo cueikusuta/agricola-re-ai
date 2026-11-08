@@ -8,9 +8,11 @@ on:
       - "schemas/bga-card-*.schema.json"
       - "scripts/validate_bga_card_specs.py"
       - "scripts/build_bga_card_specs.py"
+      - "scripts/apply_card_eligibility.py"
       - "scripts/validate_json_schema.py"
       - "tests/test_bga_card_specs_builder.py"
       - "docs/card-catalog-ae-preliminary.csv"
+      - "docs/bga-card-eligibility.md"
       - ".github/workflows/bga-card-contract.yml"
   push:
     branches: [main]
@@ -20,9 +22,11 @@ on:
       - "schemas/bga-card-*.schema.json"
       - "scripts/validate_bga_card_specs.py"
       - "scripts/build_bga_card_specs.py"
+      - "scripts/apply_card_eligibility.py"
       - "scripts/validate_json_schema.py"
       - "tests/test_bga_card_specs_builder.py"
       - "docs/card-catalog-ae-preliminary.csv"
+      - "docs/bga-card-eligibility.md"
       - ".github/workflows/bga-card-contract.yml"
 
 jobs:

@@ -12,9 +12,9 @@
     "ban_status": "none",
     "base_2016": "no",
     "eligibility": {
-      "2": "unknown",
-      "3": "unknown",
-      "4": "unknown"
+      "2": "no",
+      "3": "no",
+      "4": "yes"
     },
     "references": [
       {

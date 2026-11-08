@@ -37,6 +37,15 @@ KINDS = {"小進歩": "minor_improvement", "職業": "occupation"}
 GOODS = {"food", "wood", "clay", "stone", "reed", "grain", "vegetable"}
 STATUSES = {"inventory_only", "partial", "bga_checked", "needs_resolution", "blocked"}
 ACTIONS = {"occupation", "minor_improvement", "major_improvement", "special", "unknown"}
+RULEBOOK = "https://shop.asmodee.ca/img/product/description/EN-AGRICOLA-CONSUL_DIRIGENS-RULES.pdf"
+# deck A-D card-number eligibility rule from the official Consul Dirigens rules
+ELIGIBILITY_RANGES = [
+    (1, 84, "yes", "yes", "yes"),
+    (85, 126, "yes", "yes", "yes"),
+    (127, 147, "no", "yes", "yes"),
+    (148, 168, "no", "no", "yes"),
+]
+DECKS_WITH_RULE = {"A", "B", "C", "D"}
 REQUIRED = {
     "schema_version",
     "card_id",
@@ -91,6 +100,28 @@ def load_base() -> tuple[list[dict], list[str]]:
             errors.append(f"{card_id}: invalid printed_points {points!r}")
         if row.get("review_status") not in STATUSES:
             errors.append(f"{card_id}: invalid review_status {row.get('review_status')!r}")
+        basis = row.get("eligibility_basis", "")
+        if basis not in ("consul_dirigens_rule", "unknown", ""):
+            errors.append(f"{card_id}: invalid eligibility_basis {basis!r}")
+        if basis == "consul_dirigens_rule":
+            if row.get("eligibility_source_url") != RULEBOOK:
+                errors.append(f"{card_id}: rule-based eligibility lacks the rulebook URL")
+            expected = next(
+                (
+                    (two, three, four)
+                    for first, last, two, three, four in ELIGIBILITY_RANGES
+                    if first <= int(card_id[1:]) <= last
+                ),
+                None,
+            )
+            if expected and (
+                row.get("eligible_2"),
+                row.get("eligible_3"),
+                row.get("eligible_4"),
+            ) != expected:
+                errors.append(f"{card_id}: eligibility disagrees with the card-number rule")
+        elif card_id[0] in DECKS_WITH_RULE:
+            errors.append(f"{card_id}: A-D row has no eligibility basis")
         if row.get("bga_listed") == "yes" and not row.get("source_url", "").startswith(
             "https://agricola.cloudfree.jp/"
         ):
@@ -235,11 +266,15 @@ def run() -> int:
         errors.append(f"test cases without spec: {card_id}")
 
     base_status = Counter(row.get("review_status", "") for row in base_rows)
+    base_eligible4 = Counter(row.get("eligible_4", "") for row in base_rows)
+    base_eligible_basis = Counter(row.get("eligibility_basis", "") for row in base_rows)
     output = {
         "primary_ledger_ids": len(ledger),
         "base_ledger_rows": len(base_rows),
         "base_by_review": dict(sorted(base_status.items())),
         "base_bga_listed": sum(1 for row in base_rows if row.get("bga_listed") == "yes"),
+        "base_eligible_4": dict(sorted(base_eligible4.items())),
+        "base_eligibility_basis": dict(sorted(base_eligible_basis.items())),
         "base_bga_unimplemented": sum(
             1 for row in base_rows if row.get("bga_unimplemented") == "yes"
         ),
