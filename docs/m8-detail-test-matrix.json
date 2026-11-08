@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "description": "Representative Rust integration tests per M8-2 detailed action category. Every referenced test is run by ordinary cargo test CI; this registry does not prove exhaustive legal coverage.",
+  "categories": {
+    "fencing": {
+      "legal": {
+        "target": "m8_legal_detail_api",
+        "test": "engine_accepts_a_legal_detail_that_simple_details_never_proposes"
+      },
+      "illegal": {
+        "target": "m8_legal_detail_api",
+        "test": "illegal_details_are_rejected_without_changing_state"
+      }
+    },
+    "plowing": {
+      "legal": {
+        "target": "m8_legal_detail_api",
+        "test": "plow_detail_can_target_a_cell_the_default_policy_never_picks"
+      },
+      "illegal": {
+        "target": "m8_legal_detail_api",
+        "test": "plow_detail_rejects_a_room_cell_atomically"
+      }
+    },
+    "sowing": {
+      "legal": {
+        "target": "m8_legal_detail_api",
+        "test": "sow_detail_can_choose_a_layout_the_default_policy_never_picks"
+      },
+      "illegal": {
+        "target": "m8_legal_detail_api",
+        "test": "sow_detail_rejects_a_duplicate_or_non_field_cell"
+      }
+    },
+    "animals": {
+      "legal": {
+        "target": "m8_legal_detail_api",
+        "test": "animal_detail_can_place_stock_where_the_default_policy_never_does"
+      },
+      "illegal": {
+        "target": "m8_legal_detail_api",
+        "test": "animal_detail_rejects_a_plan_that_exceeds_capacity"
+      }
+    },
+    "rooms_stables": {
+      "legal": {
+        "target": "farm_buildings",
+        "test": "build_multiple_rooms_uses_correct_material_and_reed"
+      },
+      "illegal": {
+        "target": "farm_buildings",
+        "test": "exceeding_four_stables_does_not_change_state"
+      }
+    },
+    "renovation": {
+      "legal": {
+        "target": "renovation_details",
+        "test": "house_renovation_can_pay_for_hearth_instead_of_exchanging_owned_fireplace"
+      },
+      "illegal": {
+        "target": "renovation_details",
+        "test": "invalid_redevelopment_followup_does_not_spend_renovation_resources"
+      }
+    },
+    "free_actions": {
+      "legal": {
+        "target": "m8_validate_free",
+        "test": "validate_free_accepts_legal_discard_without_mutating_game"
+      },
+      "illegal": {
+        "target": "m8_validate_free",
+        "test": "validate_free_rejects_invalid_action_and_preserves_original"
+      }
+    }
+  }
+}
