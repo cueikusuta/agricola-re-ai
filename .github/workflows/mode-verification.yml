@@ -3,8 +3,8 @@ name: Mode-wide Simulator Verification
 # Issue #108 / #110: per-game verification for every supported cardless mode.
 #
 # The required PR CI only runs the short sweep in `tests/mode_verification.rs`.
-# This workflow is a manual, separate job for the 1,000-game target so a mass run
-# never extends the 60-second PR gate.
+# This workflow auto-runs on relevant main changes, and remains manually runnable.
+# Heavy verification never extends the 60-second pull-request CI gate.
 #
 # Every game is checked for: 14-round completion, final-state invariants,
 # full-log replay with per-action invariant checks, save/restore round-trip,
@@ -12,9 +12,23 @@ name: Mode-wide Simulator Verification
 # game fails the job; the per-game JSONL and summary stay as artifacts.
 #
 # `aggregate` is fail closed: `scripts/mode_verify_summary.py` re-derives the
-# dispatched inputs, the six modes, every summary field and every per-game
+# triggered inputs, the six modes, every summary field and every per-game
 # record, so a missing, duplicated, empty or mismatched artifact set fails.
 on:
+  push:
+    branches: [main]
+    paths:
+      # Core game changes only; do not re-run 6,000 games for UI/draft-only work.
+      - 'src/**'
+      - '!src/web.rs'
+      - '!src/draft*.rs'
+      - '!src/bin/**'
+      - 'src/bin/mode_verify.rs'
+      - 'scripts/mode_verify_summary.py'
+      - 'tests/mode_verification.rs'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - '.github/workflows/mode-verification.yml'
   workflow_dispatch:
     inputs:
       seeds:
@@ -60,9 +74,9 @@ jobs:
         players: [2, 3, 4]
         extra: [false, true]
     env:
-      SEEDS: ${{ inputs.seeds }}
-      SEED_START: ${{ inputs.seed_start }}
-      POLICY: ${{ inputs.policy }}
+      SEEDS: ${{ github.event_name == 'push' && '1000' || inputs.seeds }}
+      SEED_START: ${{ github.event_name == 'push' && '700000' || inputs.seed_start }}
+      POLICY: ${{ github.event_name == 'push' && 'eval' || inputs.policy }}
       PLAYERS: ${{ matrix.players }}
       EXTRA: ${{ matrix.extra }}
     steps:
@@ -103,9 +117,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      SEEDS: ${{ inputs.seeds }}
-      SEED_START: ${{ inputs.seed_start }}
-      POLICY: ${{ inputs.policy }}
+      SEEDS: ${{ github.event_name == 'push' && '1000' || inputs.seeds }}
+      SEED_START: ${{ github.event_name == 'push' && '700000' || inputs.seed_start }}
+      POLICY: ${{ github.event_name == 'push' && 'eval' || inputs.policy }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4

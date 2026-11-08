@@ -108,7 +108,7 @@ pub fn hands_from_completed_draft(
 /// Start a real game from a completed draft's final hands.
 ///
 /// This is the only supported path from draft to play: it validates the draft,
-/// matches the player count, and calls [`Game::with_cards_and_hands`], which
+/// matches the player count, and calls [`Game::with_cards_and_hands_with_start_player`], which
 /// bypasses the normal random deal. A rejected call never constructs or mutates
 /// a game, so an invalid start request cannot leave a partial state behind.
 pub fn start_game_from_draft(
@@ -119,8 +119,9 @@ pub fn start_game_from_draft(
     if state.player_count != config.players {
         return Err("draft player count does not match the game configuration".into());
     }
+    state.validate_invariants()?;
     let hands = hands_from_completed_draft(state, &set)?;
-    Game::with_cards_and_hands(config, set, hands)
+    Game::with_cards_and_hands_with_start_player(config, set, hands, state.start_player)
 }
 
 fn to_draft_kind(kind: DefinitionKind) -> CardKind {

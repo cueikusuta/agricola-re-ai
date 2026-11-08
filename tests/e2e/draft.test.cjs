@@ -20,7 +20,7 @@ async function offeredButtons(page) {
     })));
 }
 
-async function startDraft(page, { mode, players = 2, seed, occFirst = true, dirOcc = "left", dirMinor = "right" }) {
+async function startDraft(page, { mode, players = 2, seed, occFirst = true, dirOcc = "right", dirMinor = "right" }) {
   await page.locator("#draftMode").selectOption(mode);
   await page.locator("#draftPlayers").selectOption(String(players));
   await page.locator("#draftSeed").fill(String(seed));
@@ -130,18 +130,15 @@ test("Issue #104: Japanese draft UI completes every pick", async (t) => {
     });
   }
 
-  await scenario("explicit_direction_required_before_start", async () => {
+  await scenario("clockwise_direction_and_pre_draft_starter_are_fixed", async () => {
     await page.goto(baseUrl);
     await page.locator("#draftReset").click();
-    await page.locator("#draftMode").selectOption("draft_7_7");
-    await page.locator("#draftDirOcc").selectOption("");
-    await page.locator("#draftDirMinor").selectOption("");
-    await page.locator("#draftNew").click();
-    assert.match(await page.locator("#draftStatus").innerText(), /受渡方向を明示/);
-    assert.equal(
-      await page.evaluate(() => Boolean(state.draft)),
-      false,
-      "an unconfirmed convention must not start a draft");
+    await startDraft(page, { mode: "draft_7_7", seed: 100 });
+    const view = await page.evaluate(() => state.draft);
+    assert.equal(view.direction_occupation, "right");
+    assert.equal(view.direction_minor, "right");
+    assert.ok(view.start_player >= 0 && view.start_player < view.player_count);
+    assert.match(await page.locator("#draftStatus").innerText(), /初回スタート/);
   });
 
   await scenario("seven_seven_all_picks", async () => {
@@ -224,6 +221,7 @@ test("Issue #104: Japanese draft UI completes every pick", async (t) => {
     await page.waitForFunction(() => Boolean(state.draft && state.draft.game_started),
       null, { timeout: 20000 });
     assert.equal(await page.evaluate(() => state.draft.game_started), true);
+    assert.equal(await page.evaluate(() => state.public.start_player), drafted.start_player);
     assert.match(await page.locator("#turn").innerText(), /ラウンド 1\/14・1Pの手番/);
     assert.match(await page.locator("#draftStatus").innerText(), /ゲーム開始済み/);
 
