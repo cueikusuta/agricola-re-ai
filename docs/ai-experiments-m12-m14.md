@@ -103,7 +103,7 @@ ExIt候補：教師として情報集合を守るE2/E3/E4の探索を用い、�
 - 毎処理単位：同一seed×席の比較、全4席ブロック、評価データの不正混入、報酬の定義一致。
 - 毎コミット：fmt/clippy/test、seed固定回帰、差分レビュー、ブラウザ動作との境界、CIと専用Actions run URL。未測定の結果は書かない。
 
-**この文書に記載のG0〜G3・+5pp・1000試合・10秒を、現時点で合格済みとは扱わない。**
+**進捗更新（2026-11-09）**：G0評価基盤だけは [GitHub Actions Run #42511558662](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42511558662) で正式に`pass`を確認した。G1〜G3、カードあり4人戦、AIの首位率+5pp改善、可変思考予算の厳密な10秒実測は未達のまま。G0の`pass`をAI強化達成と誤解しない。
 
 ## 9. 実装状況：M12データ層（2026-11-07、Task C / #106）
 
@@ -155,3 +155,14 @@ gh workflow run paired-eval.yml --ref main \
 - 必須成果：Run URL、実行SHA、入力パラメータ、`paired-eval-report` Artifact、`comparison_design.head_to_head=true`と`mirror_baseline=true`、1/k首位クレジット差・同着・期待順位・得点差・全4席内訳・95%CI・必要ブロック数・CPU費用・ルール/再演失敗0。
 - PUCTの差が**点推定+5pp以上、かつ95%CI下限>0**ならこの限定条件で暫定採用候補。区間が0を含めば保留、負方向なら不採用。pilotの数字を正式実験の意思決定に用いない。正式test結果に合わせて参数を再選択した場合は**新しい未知seed**で別の一次評価を行う。
 - この条件は4人戦カードなし・固定シミュレーション数であり、BGA対戦時間設定、ドラフト、カードあり4人戦、G1/G2、10秒上限、全プレイ条件での+5pp達成を意味しない。
+
+
+## 12. #214：AIエージェントによる正式直接対戦の明示起動
+
+`.github/workflows/m13-direct-puct-mcts.yml`は§11で事前登録した正式比較**だけ**を行う。通常PRやmain pushで2,000試合を自動実行しない。
+
+- 本人のGitHub上のIssue #106に、**本文全体が次の1行だけ**のコメントを投稿すると起動する：`/run-m13-4p-puct-vs-mcts-20261109`。GitHub Actions側で`issue_comment.created`、`github.ref=refs/heads/main`、`github.repository`、Issue番号106、GitHub投稿者/actor `cueikusuta` をすべて検査する。別人のコメント/PR/無関係なIssueはジョブを開始できない。
+- GitHub CLIでの明示起動も可能：`gh workflow run m13-direct-puct-mcts.yml --ref main`。両経路ともユーザー入力はシェルに埋め込まず、**固定**の`candidate=puct, baseline=mcts, opponent=mcts`、4人カードなし、250ブロック×4席×2arm、seed 965000、各16 simulations/depth2を実行する。
+- 8シャードをGitHub-hosted `ubuntu-24.04`で分散し、全実行runとコミットSHAのmeta情報・シャード固有block範囲を確認。Rust側で全試合再演ハッシュを照合し、`scripts/paired_eval_stats.py`が2,000行・全seat/seedの完全性・95%区間/期待順位・score margin・速度を検証する。失敗シャードがあれば集約はFAILし、不完全結果を強さの証拠にしない。
+- PR #213での**32試合pilot**はGitHub-hostedのスモークとしてSUCCESS、PUCT 93.75%・MCTS mirror25.00%、しかし独立seedが4ブロックしかなく4 simulations/depth1の探索的観測である。これを正式な改善主張には用いず、今回の250ブロックの結果を別に評価する。
+- 本正式比較でも両探索の**シミュレーション回数を一致**させたのであり、同時間の10秒条件にはなっていない。時間上限の可変化と対局時計は#167/#92、カード・ドラフト追加は#105/#104で別に扱う。
