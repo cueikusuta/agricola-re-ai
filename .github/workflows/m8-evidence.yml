@@ -84,6 +84,7 @@ jobs:
             --log-dir m8-logs \
             --code-sha "$GITHUB_SHA" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --trusted-current-run \
             --command "cargo test --release --locked --test <target>" \
             --out m8-evidence/m8-evidence.json
       - name: Upload the M8 evidence and raw logs
