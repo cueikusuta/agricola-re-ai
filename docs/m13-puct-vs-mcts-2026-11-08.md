@@ -19,6 +19,8 @@
 
 固定回数の比較とは**混在させていない**（`search_mode=time-budgeted` の単独実行）。
 
+**比較の形式**: candidate=`puct` と baseline=`mcts` を、それぞれ同じ `greedy` 席構成へ別試合で投入した共通相手ベンチマーク。**PUCTとMCTSが互いに直接対戦した試合の勝率ではない**。両AIの相対評価は、この相手構成と実測予算の範囲に限定される。
+
 ## 2. 結果（条件A）
 
 | 指標 | PUCT | MCTS | 差 |
@@ -60,7 +62,7 @@
 | 4 | mcts | **10 s** | 9,900.1 ms | 0.001 ms | 0 | yes |
 | 4 | puct | 10 s | 144.5 ms | 0.001 ms | 0 | yes |
 
-  PUCT は既定の安全上限（32回）で早期に終わるため短い。MCTS は予備（予算の1/8、上限100 ms）を残して停止し、10 s 予算で 9.9 s を使う。**いずれも1局ではなく固定局面1手の測定**であり、試合全体の保証ではない。
+  この単一局面 probe での PUCT は既定の探索回数32回で早期に終わるため短い。MCTS は予備（予算の1/8、上限100 ms）を残して停止し、10 s 予算で 9.9 s を使う。**いずれも1局ではなく固定局面1手の測定**であり、試合全体の保証ではない。
 
 - **Web UI のCPU手番は本予算を使っていない**（`src/web.rs::advance_cpu` は回数上限のまま）。PR #149 と競合するため本PRでは変更していない。
 
@@ -113,3 +115,5 @@ python scripts/paired_eval_stats.py --root <dl> --players 2 --seed-start 900000 
   --blocks 500 --candidate puct --baseline mcts --opponent greedy \
   --search-mode time-budgeted --output report.json
 ```
+
+**再現性の限界**: GitHub Actions の生試合 Artifact は `paired-eval.yml` で7日保存される。期限後は当時の生JSONLを直接再集約できない。特に `time-budgeted` は壁時計依存であり、同じ SHA・seed・引数で再実行しても決断ごとの探索回数や集計値のビット単位一致は保証しない。コミット済みの集計JSONは**当時の測定記録**であり、完全な再計算用アーカイブではない。
