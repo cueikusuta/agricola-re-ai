@@ -52,6 +52,7 @@ gh workflow run g0-gate.yml \
 - `blocks=500` × `players=2` 席 × 2arm = 各arm 1,000試合。
 - `test_range` は評価 seed を必ず含む（評価 seed が train/validation に入るとゲートが `fail` する）。
 - `candidate` / `baseline` は G0 の配管検証用であり、**強さの比較ではない**（`not_a_strength_claim: true`）。
+- `search_mode=simulation-capped` のみG0判定対象。M8の「固定seed・固定探索回数で再現」は時間予算実行の方策決定再現性を保証しないため、`time-budgeted` はG0入力から除外し、`decision_budget_ms=0` のみ許可（#187 P2）。時間予算の性能評価はG0とは独立した統計評価として扱う。
 - 標準の GitHub-hosted `ubuntu-24.04` のみ。GPU・有料ランナーは使わない。
 
 ## 5. 現在の状態（2026-11-08 時点）
@@ -78,3 +79,8 @@ gh workflow run g0-gate.yml \
 - Artifact 保持は30日。長期監査で当時の matches を再計算する必要がある場合は、保持期間と容量を確認して別途保存する。
 - `attestation` はテストの再実行ではなく、実行記録の完全性・内部整合・SHA 束縛の検証である（`docs/m8-evidence.md` 4節）。
 - 4人戦・カードありは、M10 の適法カードプールが40+40に達していないため G0 の対象にしない（`cards=verified_basic_2p` は2人戦のみ）。
+
+
+## #185 P1の証拠信頼境界
+
+`m8-evidence` はこのワークフローから呼び出される同一runで必須テストを実行する。`actions/download-artifact@v4` は外部runを指定せず同一runの成果物だけを利用する。`m8_evidence.py checks --trusted-current-run` はGITHUB_SHA/REPOSITORY/RUN_IDに一致しないテスト結果を拒否する。Rustではコミットに取り込まれた要件ファイルから全必須テストID/件数/ダイジェストを再導出する。G0が成功したと言えるのは、これらの検査を通過したGitHub Actions実行とそのArtifactが確認できた場合のみ。
