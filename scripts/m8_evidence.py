@@ -236,6 +236,28 @@ def matches_digest(paths: list[Path]) -> tuple[str, int]:
     return sha256_hex(payload), rows
 
 
+def validate_trusted_current_run(*, code_sha: str, run_url: str) -> None:
+    """Production trust boundary: this process must be the current Actions run.
+
+    The G0 workflow downloads M8 logs from its own run only. Local synthetic
+    JSON can exercise parser behavior, but it cannot attest a production pass.
+    """
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        raise EvidenceError("trusted evidence generation requires GitHub Actions")
+    expected_sha = os.environ.get("GITHUB_SHA", "")
+    expected_run = (
+        f"{os.environ.get('GITHUB_SERVER_URL', '')}/"
+        f"{os.environ.get('GITHUB_REPOSITORY', '')}/actions/runs/"
+        f"{os.environ.get('GITHUB_RUN_ID', '')}"
+    )
+    if not expected_sha or code_sha != expected_sha:
+        raise EvidenceError("code SHA is not the current Actions revision")
+    if not os.environ.get("GITHUB_RUN_ID") or run_url != expected_run:
+        raise EvidenceError("run URL is not the current Actions run")
+    if os.environ.get("GITHUB_REPOSITORY") != "cueikusuta/agricola-re-ai":
+        raise EvidenceError("current Actions repository does not match trusted producer")
+
+
 def build_checks(
     *,
     tests: dict,
@@ -251,6 +273,8 @@ def build_checks(
         raise EvidenceError(
             f"tests report was produced at code {tests.get('code_sha')!r}, not {code_sha!r}; "
             "the gate binds the evidence to one revision")
+    if tests.get("run_url") != run_url:
+        raise EvidenceError("test evidence came from a different Actions run")
     if tests.get("requirements_sha256") != sha256_hex(requirements_path.read_bytes()):
         raise EvidenceError("requirements changed after the tests ran; re-collect the evidence")
     # Re-derive from the recorded statuses instead of trusting the stored
@@ -285,6 +309,10 @@ def build_checks(
             "passed_tests": summary["passed_tests"],
             "failed_tests": summary["failed_tests"] + summary["ignored_tests"],
             "missing_tests": summary["missing_tests"],
+            "test_ids_by_check": {
+                check: [row["id"] for row in report[check]["tests"]]
+                for check in ATTESTED_CHECKS
+            },
             "matches_rows": rows,
             "checks": {
                 check: {
@@ -308,6 +336,8 @@ def write_json(path: Path, payload: dict) -> None:
 
 
 def command_collect(args: argparse.Namespace) -> int:
+    if args.trusted_current_run:
+        validate_trusted_current_run(code_sha=args.code_sha, run_url=args.run_url)
     requirements = load_requirements(args.requirements)
     statuses, targets = collect_statuses(args.log_dir)
     tests = build_tests(
@@ -344,6 +374,8 @@ def command_collect(args: argparse.Namespace) -> int:
 
 
 def command_checks(args: argparse.Namespace) -> int:
+    if args.trusted_current_run:
+        validate_trusted_current_run(code_sha=args.code_sha, run_url=args.run_url)
     requirements = load_requirements(args.requirements)
     tests = load_json(args.tests)
     checks = build_checks(
@@ -422,6 +454,8 @@ def main() -> int:
                          help="directory with one <target>.log per test binary")
     collect.add_argument("--code-sha", required=True)
     collect.add_argument("--run-url", required=True)
+    collect.add_argument("--trusted-current-run", action="store_true",
+                         help="require code SHA/repository/run URL to match this Actions run")
     collect.add_argument("--command", default="",
                          help="the exact cargo test command that produced the logs")
     collect.add_argument("--out", type=Path, required=True)
@@ -434,6 +468,8 @@ def main() -> int:
     checks.add_argument("--code-sha", required=True)
     checks.add_argument("--run-url", required=True)
     checks.add_argument("--out", type=Path, required=True)
+    checks.add_argument("--trusted-current-run", action="store_true",
+                        help="refuse an externally supplied or cross-run claim")
     checks.set_defaults(handler=command_checks)
 
     verify = sub.add_parser("verify", help="re-derive and compare with a checks file")
