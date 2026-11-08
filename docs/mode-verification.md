@@ -45,9 +45,12 @@ cargo build --release --locked --bin mode_verify
 
 ## 3. GitHub Actions（大量実行）
 
-`Mode-wide Simulator Verification` を手動実行する（`workflow_dispatch`）。
+`Mode-wide Simulator Verification` は**関連する`main`へのpush時に自動実行**する。従来どおり**手動実行（`workflow_dispatch`）も可能**。
 
 - 入力：`seeds`（各モードの試合数、既定1,000）、`seed_start`、`policy`。
+- 自動起動時の固定値：`seeds=1000`、`seed_start=700000`、`policy=eval`。手動実行時は指定値を使用し、不正な値を黙って既定値に置換しない。イベントの`GITHUB_SHA`に全証拠を束縛する。
+- 自動起動は`main`における`src/**`の主要ゲームコード・`mode_verify`・集約スクリプト・該当workflow・Cargo変更に限定。Web UI／ドラフト専用の差分、無関係な文書、PRでは6,000試合を実行しない。
+- `concurrency`は実行中を中断しない。連続pushで保留が統合され得るため、すべてのコミットで証拠が残るとは限らない。完全な合格は各runの6モード/集約成功とArtifactで確認する。
 - 6ジョブ（2/3/4人 × 追加タイルOFF/ON）が並列に走り、各モード同じseed範囲を使う。
 - 各ジョブは `games.jsonl` / `summary.json` をArtifactへ保存する。
 - `aggregator` ジョブが集約規則の単体テスト（`tests/test_mode_verify_summary.py`）を先に実行する。
@@ -56,7 +59,7 @@ cargo build --release --locked --bin mode_verify
   - 各 `summary.json` がディスパッチ入力と一致（`seeds_requested` / `seeds_run` / `seed_start` / `policy` / `commit_sha`）、`shard==0` / `shards==1`、`passed+failed==seeds_run`、`failed==0`、チェック別合計が `seeds_run` と一致
   - 各 `games.jsonl` の行数が `seeds_run` と一致し、seedが**ディスパッチ範囲と完全一致**（重複・欠落・範囲外なし）、全試合が `finished` / ラウンド14 / 6チェック合格・最終 `state_hash` あり
   - `seeds_run=0` の空証拠、破損JSON、モード不一致はすべて失敗
-- 通常PRの必須CIには含めない。必須CI側は `tests/mode_verification.rs` の小スイープ（12試合）だけを実行する。
+- 通常PRの必須CIには**大量実行を含めない**。必須CI側は `tests/mode_verification.rs` の小スイープ（12試合）だけを実行する。
 
 ## 4. 実行記録
 

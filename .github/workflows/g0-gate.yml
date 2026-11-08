@@ -1,6 +1,7 @@
 name: G0 gate (real data)
 
-# One manual run produces every artifact the M14 G0 gate needs, at one commit:
+# A relevant main push (or explicit manual dispatch) produces every artifact
+# the M14 G0 gate needs at the exact triggering commit:
 #
 #   M8 evidence  -> tests actually executed (rule expectations, legal detail API,
 #                   observation non-interference, seed reproducibility)
@@ -20,6 +21,29 @@ name: G0 gate (real data)
 #
 # Cost: standard GitHub-hosted CPU runners only. No GPU, no paid runner.
 on:
+  push:
+    branches: [main]
+    paths:
+      # Source and data changes affecting simulator rules, observations or G0.
+      # Exclude UI and CLI tools unrelated to G0 to avoid expensive redundant runs.
+      - 'src/**'
+      - '!src/web.rs'
+      - '!src/draft*.rs'
+      - '!src/bin/**'
+      - 'src/bin/dataset_split.rs'
+      - 'src/bin/episode_export.rs'
+      - 'src/bin/episode_inspect.rs'
+      - 'src/bin/paired_eval.rs'
+      - 'scripts/episode_dataset.py'
+      - 'scripts/g0_evidence.py'
+      - 'scripts/m8_evidence.py'
+      - 'scripts/paired_eval_stats.py'
+      - 'docs/m8-evidence-requirements.json'
+      - 'tests/m8_*.rs'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - '.github/workflows/g0-gate.yml'
+      - '.github/workflows/m8-evidence.yml'
   workflow_dispatch:
     inputs:
       episodes:
@@ -123,23 +147,23 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EPISODES: ${{ inputs.episodes }}
-  DATASET_SHARDS: ${{ inputs.dataset_shards }}
-  DATASET_POLICY: ${{ inputs.dataset_policy }}
-  DATASET_SEED_START: ${{ inputs.dataset_seed_start }}
-  TRAIN_RANGE: ${{ inputs.train_range }}
-  VALIDATION_RANGE: ${{ inputs.validation_range }}
-  TEST_RANGE: ${{ inputs.test_range }}
-  PLAYERS: ${{ inputs.players }}
-  BLOCKS: ${{ inputs.blocks }}
-  EVAL_SEED_START: ${{ inputs.eval_seed_start }}
-  CANDIDATE: ${{ inputs.candidate }}
-  BASELINE: ${{ inputs.baseline }}
-  OPPONENT: ${{ inputs.opponent }}
-  CARDS: ${{ inputs.cards }}
-  EXTRA: ${{ inputs.extra }}
-  SEARCH_MODE: ${{ inputs.search_mode }}
-  DECISION_BUDGET_MS: ${{ inputs.decision_budget_ms }}
+  EPISODES: ${{ github.event_name == 'push' && '1000' || inputs.episodes }}
+  DATASET_SHARDS: ${{ github.event_name == 'push' && '4' || inputs.dataset_shards }}
+  DATASET_POLICY: ${{ github.event_name == 'push' && 'eval' || inputs.dataset_policy }}
+  DATASET_SEED_START: ${{ github.event_name == 'push' && '920000' || inputs.dataset_seed_start }}
+  TRAIN_RANGE: ${{ github.event_name == 'push' && '920000:920249' || inputs.train_range }}
+  VALIDATION_RANGE: ${{ github.event_name == 'push' && '920250:920399' || inputs.validation_range }}
+  TEST_RANGE: ${{ github.event_name == 'push' && '920400:920999' || inputs.test_range }}
+  PLAYERS: ${{ github.event_name == 'push' && '2' || inputs.players }}
+  BLOCKS: ${{ github.event_name == 'push' && '500' || inputs.blocks }}
+  EVAL_SEED_START: ${{ github.event_name == 'push' && '920500' || inputs.eval_seed_start }}
+  CANDIDATE: ${{ github.event_name == 'push' && 'eval' || inputs.candidate }}
+  BASELINE: ${{ github.event_name == 'push' && 'random' || inputs.baseline }}
+  OPPONENT: ${{ github.event_name == 'push' && 'greedy' || inputs.opponent }}
+  CARDS: ${{ github.event_name == 'push' && 'none' || inputs.cards }}
+  EXTRA: ${{ github.event_name == 'push' && 'false' || inputs.extra }}
+  SEARCH_MODE: ${{ github.event_name == 'push' && 'simulation-capped' || inputs.search_mode }}
+  DECISION_BUDGET_MS: ${{ github.event_name == 'push' && '0' || inputs.decision_budget_ms }}
 
 jobs:
   m8-evidence:

@@ -1,10 +1,10 @@
 # G0 ゲートの自動化（#110 / #106）
 
-M14 の G0 判定を **1回の手動実行**で「証拠生成 → 束縛 → 判定」まで通すワークフロー。2026-11-08 の初回判定（`docs/m12-g0-real-data-2026-11-08.md`）は `hold` で、理由は M8 証拠4項目の未提出だった。本ワークフローはその4項目を**同じコミット・同じ run の実行結果**から生成する。
+M14 の G0 判定を **関連コードのmain統合後に自動実行**し、必要に応じて**1回の手動実行**でも「証拠生成 → 束縛 → 判定」まで通すワークフロー。2026-11-08 の初回判定（`docs/m12-g0-real-data-2026-11-08.md`）は `hold` で、理由は M8 証拠4項目の未提出だった。本ワークフローはその4項目を**同じコミット・同じ run の実行結果**から生成する。
 
 ## 1. 何をするか
 
-`.github/workflows/g0-gate.yml`（`workflow_dispatch`）は次の順に動く。
+`.github/workflows/g0-gate.yml`（関連する`push(main)`と`workflow_dispatch`）は次の順に動く。
 
 | ジョブ | 内容 | Artifact |
 |---|---|---|
@@ -14,6 +14,14 @@ M14 の G0 判定を **1回の手動実行**で「証拠生成 → 束縛 → �
 | `gate` | Manifest 作成 → `m8_evidence.py checks`（実行記録を matches へ束縛）→ `g0_evidence.py` → `dataset_split g0` | `g0-report` |
 
 判定は `pass` のときだけジョブが成功する。`hold` / `fail` でも Artifact は保存するが、**ワークフローの結論は失敗**になる（未完了の証拠を緑で隠さない）。
+
+## 1.1 mainへの関連変更で自動起動する
+
+- `push`イベントの対象ブランチは`main`のみ。`src/**`のうちWeb表示・ドラフト専用・無関係なbinを除いたゲーム・AI・データ生成コード、G0関連スクリプトと証拠定義、G0/M8-evidenceワークフロー、Cargo定義の変更で起動する。PR更新、ドキュメントのみ、UIのみでは重いG0を起動しない。
+- 自動実行はイベントの`GITHUB_SHA`をそのまま使う。値は**手動入力の既定値と同じ**：1,000エピソード、4シャード、学習seed 920000・train 920000:920249・validation 920250:920399・test 920400:920999、2人×500ブロック、評価seed 920500、candidate=eval / baseline=random / opponent=greedy、カードなし・追加タイルOFF、`simulation-capped`・`decision_budget_ms=0`。
+- 手動実行では`inputs.*`の指定値をそのまま使用し、ゼロなどの不正値を`|| default`で無言補正しない。自動実行時のみ明示的な固定値を採用し、双方とも後続の既存fail-closedチェックに通す。
+- `concurrency: group: g0-gate-${{ github.ref }}`、`cancel-in-progress: false`で実行中の結果はキャンセルしない。連続push時、GitHubが同じgroupの保留実行を新しい保留実行に置き換える場合があるため、**全mainコミットで1回ずつの実走を保証するものではない**。報告には実際のrun URLとSHAを記載。
+- これは**G0評価基盤の品質ゲート**であり、AIが強いことの証明でも、全カード・公式ルールの完全検証でもない。AIの大規模比較・学習は無条件のpush自動起動対象から外す。
 
 ## 2. 判定の意味
 
@@ -35,10 +43,10 @@ M14 の G0 判定を **1回の手動実行**で「証拠生成 → 束縛 → �
 
 したがって**過去に成功した別 run の証拠を流用できない**。コードSHA・データSHAが変われば束縛が切れ、ゲートは `fail` を返す。再実行するときは同じ run で全ジョブを回す。
 
-## 4. 実行方法
+## 4. 明示的な手動実行方法（main統合後の自動実行に加えて）
 
 ```sh
-gh workflow run g0-gate.yml \
+gh workflow run g0-gate.yml --ref main \
   -f episodes=1000 -f dataset_shards=4 -f dataset_policy=eval \
   -f dataset_seed_start=920000 \
   -f train_range=920000:920249 -f validation_range=920250:920399 \

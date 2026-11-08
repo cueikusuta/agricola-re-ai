@@ -109,5 +109,81 @@ class G0EvidenceTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
 
 
+
+class AutoGateWorkflowContractTests(unittest.TestCase):
+    """Regression guard: heavy jobs run only on relevant main pushes or dispatch."""
+
+    @staticmethod
+    def workflow(name):
+        return (Path(__file__).resolve().parents[1] /
+                ".github" / "workflows" / name).read_text(encoding="utf-8")
+
+    def test_g0_main_push_and_manual_dispatch_are_both_supported(self):
+        content = self.workflow("g0-gate.yml")
+        self.assertIn("  push:\n    branches: [main]\n    paths:", content)
+        self.assertIn("  workflow_dispatch:", content)
+        self.assertNotIn("  pull_request:", content)
+        self.assertIn("'!src/web.rs'", content)
+        self.assertIn("'!src/draft*.rs'", content)
+        self.assertIn("'src/bin/dataset_split.rs'", content)
+        self.assertIn("'scripts/g0_evidence.py'", content)
+        self.assertIn("  cancel-in-progress: false", content)
+
+    def test_g0_push_defaults_preserve_manual_invalid_values(self):
+        content = self.workflow("g0-gate.yml")
+        defaults = {
+            "EPISODES": ("episodes", "1000"),
+            "DATASET_SHARDS": ("dataset_shards", "4"),
+            "DATASET_POLICY": ("dataset_policy", "eval"),
+            "DATASET_SEED_START": ("dataset_seed_start", "920000"),
+            "TRAIN_RANGE": ("train_range", "920000:920249"),
+            "VALIDATION_RANGE": ("validation_range", "920250:920399"),
+            "TEST_RANGE": ("test_range", "920400:920999"),
+            "PLAYERS": ("players", "2"),
+            "BLOCKS": ("blocks", "500"),
+            "EVAL_SEED_START": ("eval_seed_start", "920500"),
+            "CANDIDATE": ("candidate", "eval"),
+            "BASELINE": ("baseline", "random"),
+            "OPPONENT": ("opponent", "greedy"),
+            "CARDS": ("cards", "none"),
+            "EXTRA": ("extra", "false"),
+            "SEARCH_MODE": ("search_mode", "simulation-capped"),
+            "DECISION_BUDGET_MS": ("decision_budget_ms", "0"),
+        }
+        for env_name, (input_name, default_value) in defaults.items():
+            with self.subTest(name=env_name):
+                expected = (f"{env_name}: ${{{{ github.event_name == 'push' "
+                            f"&& '{default_value}' || inputs.{input_name} }}}}")
+                self.assertIn(expected, content)
+                self.assertNotIn(f"inputs.{input_name} ||", content)
+        self.assertIn("--trusted-current-run", content)
+        self.assertIn('test "$SEARCH_MODE" == "simulation-capped"', content)
+        self.assertIn('test "$DECISION_BUDGET_MS" -eq 0', content)
+
+    def test_six_mode_main_push_keeps_manual_override_and_fail_closed(self):
+        content = self.workflow("mode-verification.yml")
+        self.assertIn("  push:\n    branches: [main]\n    paths:", content)
+        self.assertIn("  workflow_dispatch:", content)
+        self.assertNotIn("  pull_request:", content)
+        self.assertIn("'src/bin/mode_verify.rs'", content)
+        self.assertIn("'!src/web.rs'", content)
+        for env_name, input_name, default_value in (
+            ("SEEDS", "seeds", "1000"),
+            ("SEED_START", "seed_start", "700000"),
+            ("POLICY", "policy", "eval"),
+        ):
+            with self.subTest(name=env_name):
+                expected = (f"{env_name}: ${{{{ github.event_name == 'push' "
+                            f"&& '{default_value}' || inputs.{input_name} }}}}")
+                self.assertEqual(content.count(expected), 2)
+        self.assertIn("needs.verify.result", content)
+        self.assertIn("if: always()", content)
+
+    def test_long_running_ai_comparisons_are_not_unconditionally_push_triggered(self):
+        content = self.workflow("paired-eval.yml")
+        self.assertIn("  workflow_dispatch:", content)
+        self.assertNotIn("  push:", content)
+
+
 if __name__ == "__main__":
     unittest.main()
