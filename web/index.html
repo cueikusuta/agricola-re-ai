@@ -42,6 +42,9 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <label>対戦AI <select id="ai"><option value="eval">評価関数</option><option value="mcts">MCTS</option></select></label>
 <label>乱数シード <input id="seed" type="number" value="42" min="0" step="1"></label>
 <button id="new">新しい対戦</button>
+<button id="saveGame" title="現在の対戦をファイルに保存します">対戦を保存</button>
+<label class="minor">対戦を読込<input id="loadGame" type="file" accept="application/json,.json"></label>
+<span id="saveStatus" class="minor" role="status"></span>
 <label>カード <select id="cards"><option value="none">カードなし</option><option value="verified">A/B実装済み（2人戦）</option><option value="json">外部定義JSON</option></select></label>
 <details><summary>外部カード定義JSONを読み込む</summary><textarea id="cardJson" placeholder='{"definitions":[]}'></textarea><p class="minor">空欄ならカードなし。原文や画像は不要です。公式カードを自動収録する機能はありません。</p></details>
 </section>
@@ -266,9 +269,9 @@ const births=$("fields").dataset.eligible.split(",").filter(Boolean).map(species
 });
 return {breeding:{births,before_birth:checked("arrange")?getArrangement():null}};
 }
-async function request(path,payload){
+async function request(path,payload,rawBody){
 if(busy)return false;busy=true;let refreshed=false;$("new").disabled=true;$("confirm").disabled=true;
-try{const opts=payload===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)};
+try{const opts=rawBody!==undefined?{method:"POST",headers:{"Content-Type":"application/json"},body:rawBody}:payload===undefined?{}:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)};
 const response=await fetch(path,opts),result=await response.json();if(!response.ok)throw Error(result.error||"通信エラー");
 const first=state===null;state=result;if(first){$("players").value=String(state.public.players.length);$("extra").checked=state.public.additional_action_space_enabled;$("ai").value=state.mcts?"mcts":"eval";$("seed").value=String(state.seed);}
 viewPlayer=Math.min(viewPlayer,state.public.players.length-1);if(path!=="/api/state")actionPage=0;refreshed=true;clearAlert();return true;
@@ -293,6 +296,37 @@ $("free").onclick=openFree;
 $("new").onclick=async()=>{viewPlayer=0;let card_set;const cards=val("cards");
 try{if(cards==="json"){card_set=JSON.parse($("cardJson").value);}}catch(e){$("notice").textContent="カード定義JSONが不正です: "+e.message;return;}
 await request("/api/new",{players:Number($("players").value),extra:$("extra").checked,ai:$("ai").value,seed:Number($("seed").value),budget:8,...(cards==="verified"?{preset:"verified"}:cards==="json"?{card_set}: {})});};
+// Issue #92: a real save file the player owns. The server returns the full
+// state (including hidden information), so the download is explicit and the
+// warning stays visible next to the controls.
+$("saveGame").onclick=async()=>{
+$("saveStatus").textContent="保存中...";
+try{
+const response=await fetch("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+const result=await response.json();
+if(!response.ok)throw Error(result.error||"通信エラー");
+const name=result.download_name||"agricola-save.json";
+// Saved verbatim from the server text: re-serialising the object would round
+// the 64-bit seeds and make the file unloadable.
+const blob=new Blob([result.save_text],{type:"application/json"});
+const url=URL.createObjectURL(blob);const a=document.createElement("a");
+a.href=url;a.download=name;document.body.append(a);a.click();a.remove();
+setTimeout(()=>URL.revokeObjectURL(url),1000);
+$("saveStatus").textContent="保存しました: "+name+"（非公開情報を含むため共有しないでください）";
+}catch(e){$("saveStatus").textContent="保存できません: "+e.message;}
+};
+$("loadGame").onchange=async e=>{
+const file=e.target.files&&e.target.files[0];e.target.value="";
+if(!file)return;
+$("saveStatus").textContent="読み込み中...";
+try{
+const text=await file.text();
+// Posted verbatim: parsing and re-serialising would round the 64-bit seeds.
+if(!text.includes("agricola-web-save"))throw Error("アグリコラの保存ファイルではありません");
+if(await request("/api/load",undefined,text))$("saveStatus").textContent="読み込みました: "+file.name;
+else $("saveStatus").textContent="読み込めませんでした";
+}catch(err){$("saveStatus").textContent="読み込めません: "+err.message;showAlert(err.message);}
+};
 request("/api/state");
 let draftSel={occupation:new Set(),minor:new Set()},draftSelToken=null;
 function draftCardLabel(id){return cardNames[id]?cardLabel(id):id;}
