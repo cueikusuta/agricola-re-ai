@@ -14,10 +14,6 @@ name: M8 evidence
 on:
   workflow_dispatch:
   workflow_call:
-    outputs:
-      evidence-artifact:
-        description: Name of the uploaded M8 evidence artifact
-        value: m8-evidence
 
 permissions:
   contents: read
