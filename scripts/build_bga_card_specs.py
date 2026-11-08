@@ -3814,6 +3814,153 @@ CARDS = {
                  {"end_scoring": True}, {"points_delta": 1}),
         ],
     },
+    "A136": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("wood", table("remaining_rounds", {"1": 1, "3": 2, "6": 3, "9": 4}))]),
+            effect("end_scoring", [points(table("all_resource_threshold", {"1": 1, "2": 3, "3": 5}))],
+                   freq="end_of_game", dur="permanent", snap="live_state", order=1),
+        ],
+        "notes": "1/2/3/4 wood for 1/3/6/9 rounds left; at scoring 1/3/5 points for 1+/2+/3+ of each building resource.",
+        "tests": [
+            case("A136-normal", {"remaining_rounds": 9}, {"play": "A136"}, {"wood_delta": 4}),
+            case("A136-score", {"wood": 3, "clay": 3, "reed": 3, "stone": 3},
+                 {"end_scoring": True}, {"points_delta": 5}),
+        ],
+    },
+    "A137": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [special("take_from_other_accumulation", count=1)],
+                   cond=[cond("worker_space_used", spaces=["sheep_market", "reed_bank"])],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "Sheep Market or Reed Bank use: may take 1 good from the respective other accumulation space.",
+        "tests": [
+            case("A137-sheep", {"reed_bank_reed": 2}, {"use_space": "sheep_market", "take": True},
+                 {"reed_delta": 1}),
+            case("A137-reed", {"sheep_market_sheep": 1}, {"use_space": "reed_bank", "take": True},
+                 {"sheep_delta": 1}),
+            case("A137-empty", {"reed_bank_reed": 0}, {"use_space": "sheep_market", "take": True},
+                 {"reed_delta": 0}),
+        ],
+    },
+    "A138": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [spend("wood", 1),
+                    gain("food", per(count("person"), 1)), gain("reed", 1)],
+                   cond=[cond("worker_space_used", space="fishing")],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "Fishing use: may pay 1 wood for 1 food per person and 1 reed.",
+        "tests": [
+            case("A138-normal", {"wood": 1, "people": 3}, {"use_space": "fishing", "pay": True},
+                 {"wood_delta": -1, "food_delta": 3, "reed_delta": 1}),
+            case("A138-declined", {"wood": 1, "people": 3}, {"use_space": "fishing", "pay": False},
+                 {"wood_delta": 0}),
+        ],
+    },
+    "A140": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [gain("food", {"op": "count", "args": ["clay_on_other_accumulation"]})],
+                   cond=[cond("worker_space_used", spaces=["clay_pit", "hollow"])],
+                   freq="every_use", dur="permanent"),
+        ],
+        "notes": "Clay Pit or Hollow use: food equal to the clay on the respective other accumulation space.",
+        "tests": [
+            case("A140-normal", {"other_space_clay": 2}, {"use_space": "clay_pit"},
+                 {"food_delta": 2}),
+            case("A140-empty", {"other_space_clay": 0}, {"use_space": "hollow"},
+                 {"food_delta": 0}),
+        ],
+    },
+    "A141": {
+        "post": "played_area",
+        "effects": [
+            effect("round_end", [gain("vegetable", 1)],
+                   cond=[cond("space_occupied", space="day_laborer"),
+                         cond("space_occupied", space="grain_seeds")],
+                   freq="every_round", dur="permanent"),
+        ],
+        "notes": "At the start of each returning-home phase: 1 vegetable if both Day Laborer and Grain Seeds are occupied.",
+        "tests": [
+            case("A141-normal", {"day_laborer_occupied": True, "grain_seeds_occupied": True},
+                 {"run_round": True}, {"vegetable_delta": 1}),
+            case("A141-not-triggered", {"day_laborer_occupied": True, "grain_seeds_occupied": False},
+                 {"run_round": True}, {"vegetable_delta": 0}),
+        ],
+    },
+    "A144": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [special("place_rewards_on_card",
+                                       rewards=[{"trigger": "pastures_at_least", "n": 3,
+                                                 "good": "reed", "amount": 3},
+                                                {"trigger": "field_tiles_at_least", "n": 5,
+                                                 "good": "clay", "amount": 4}])]),
+        ],
+        "notes": "Place 3 reed and 4 clay on the card; the next player reaching 3 pastures / 5 field tiles takes them (not retroactive).",
+        "tests": [
+            case("A144-normal", {"pastures": 2}, {"play": "A144"},
+                 {"rewards_pending": 2}),
+            case("A144-claim", {"pastures": 3, "rewards_pending": 2}, {"claim": "reed"},
+                 {"reed_delta": 3, "rewards_pending": 1}),
+            case("A144-not-retroactive", {"pastures": 4}, {"play": "A144"},
+                 {"reeds_claimable": False}),
+        ],
+    },
+    "A145": {
+        "post": "played_area",
+        "effects": [
+            effect("after_harvest", [gain("reed", 1)],
+                   freq="every_harvest", dur="permanent"),
+        ],
+        "notes": "At the end of each harvest: 1 reed from the general supply.",
+        "tests": [
+            case("A145-normal", {"reed": 0}, {"run_harvest": True}, {"reed_delta": 1}),
+        ],
+    },
+    "A146": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [gain(table("food_taken", {"2": "stone", "3": "reed", "4": "clay", "5": "wood"}), 1)],
+                   cond=[cond("worker_space_used", space="fishing"),
+                         cond("food_taken_in", values=[2, 3, 4, 5])],
+                   freq="every_use", dur="permanent"),
+        ],
+        "notes": "Taking exactly 2/3/4/5 food from a food accumulation also gives 1 stone/reed/clay/wood (not at 6+).",
+        "tests": [
+            case("A146-two", {"food_taken": 2}, {"use_space": "fishing"}, {"stone_delta": 1}),
+            case("A146-five", {"food_taken": 5}, {"use_space": "fishing"}, {"wood_delta": 1}),
+            case("A146-six", {"food_taken": 6}, {"use_space": "fishing"},
+                 {"wood_delta": 0, "stone_delta": 0}),
+        ],
+    },
+    "A147": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [spend("food", 1),
+                    gain(table("market_animal", {"sheep_market": "sheep",
+                                                 "pig_market": "wild_boar",
+                                                 "cattle_market": "cattle"}), 1)],
+                   cond=[cond("worker_space_used", spaces=["sheep_market", "pig_market", "cattle_market"])],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "Animal market use: may buy 1 more animal of the same type for 1 food.",
+        "tests": [
+            case("A147-sheep", {"food": 1, "sheep": 0}, {"use_space": "sheep_market", "buy": True},
+                 {"food_delta": -1, "sheep_delta": 1}),
+            case("A147-declined", {"food": 1}, {"use_space": "sheep_market", "buy": False},
+                 {"food_delta": 0}),
+        ],
+    },
 }
 
 
