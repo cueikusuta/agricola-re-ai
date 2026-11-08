@@ -1,0 +1,192 @@
+name: M13 PUCT vs MCTS 4P Formal Direct Evaluation
+
+# Explicit experiment only: an authorized issue #106 command or workflow_dispatch.
+# Never run 2,000 search games on pull_request or ordinary main pushes.
+on:
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m13-puct-mcts-formal-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Authorize exact owner command (no arbitrary shell inputs)
+    if: ${{ github.repository == 'cueikusuta/agricola-re-ai' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.number == 106 && github.event.issue.pull_request == null && github.event.comment.body == '/run-m13-4p-puct-vs-mcts-20261109' && github.event.comment.user.login == 'cueikusuta' && github.actor == 'cueikusuta')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Declare frozen experiment contract
+        run: |
+          echo 'M13 #106 four-player cardless direct match: PUCT vs 3 MCTS, all-MCTS mirror control.'
+          echo '250 seed blocks, 4 focus seats, 2 arms => 1000 games/arm, 2000 total.'
+          echo 'Fixed 16 simulations / depth 2 per search policy; NOT a fixed-time comparison.'
+          echo "SHA: $GITHUB_SHA  run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+  shard:
+    name: Formal seat-block shard ${{ matrix.shard }}
+    needs: [authorize]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: m13-puct-mcts-release
+      - run: cargo build --release --locked --bin paired_eval
+      - name: Play paired seat-rotated blocks and replay-verify every game
+        shell: bash
+        run: |
+          set -euo pipefail
+          INDEX=${{ matrix.shard }}
+          FIRST=$(( 250 * INDEX / 8 ))
+          LIMIT=$(( 250 * (INDEX + 1) / 8 ))
+          COUNT=$(( LIMIT - FIRST ))
+          test "$COUNT" -gt 0
+          mkdir -p "results/shard-$INDEX"
+          ./target/release/paired_eval \
+            --players 4 --seed-start 965000 --block-start "$FIRST" --blocks "$COUNT" \
+            --candidate puct --baseline mcts --opponent mcts \
+            --additional-action-space false --cards none \
+            --search-mode simulation-capped --decision-budget-ms 0 \
+            --mcts-simulations 16 --mcts-tree-depth 2 \
+            --puct-simulations 16 --puct-tree-depth 2 --puct-leaf terminal \
+            --output "results/shard-$INDEX/matches.jsonl"
+          export INDEX FIRST COUNT
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path("results") / f"shard-{os.environ['INDEX']}"
+          record = {
+              "schema_version": 1,
+              "source": "github-actions-m13-explicit",
+              "code_sha": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "shard": int(os.environ["INDEX"]),
+              "block_start": int(os.environ["FIRST"]),
+              "blocks": int(os.environ["COUNT"]),
+              "seed_start": 965000,
+              "players": 4,
+              "candidate": "puct",
+              "baseline": "mcts",
+              "opponent": "mcts",
+              "cards": "none",
+              "search_mode": "simulation-capped",
+              "mcts_simulations": 16,
+              "puct_simulations": 16,
+              "tree_depth": 2,
+          }
+          (root / "metadata.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+          PY
+      - name: Preserve match records and shard metadata, even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          path: results/shard-${{ matrix.shard }}/
+          if-no-files-found: warn
+          retention-days: 30
+
+  aggregate:
+    name: Fail-closed official PUCT/MCTS report
+    needs: [authorize, shard]
+    if: ${{ always() && needs.authorize.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SHARD_RESULT: ${{ needs.shard.result }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shard-*
+          path: results
+      - name: Reject absent or incomplete shard results and mismatched SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$SHARD_RESULT" != "success" ]]; then
+            echo "At least one shard failed or was skipped: $SHARD_RESULT" >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          for shard in range(8):
+              root = Path("results") / f"shard-{shard}"
+              metadata = root / "metadata.json"
+              matches = root / "matches.jsonl"
+              if not metadata.is_file() or not matches.is_file():
+                  raise SystemExit(f"missing artifact for shard {shard}")
+              data = json.loads(metadata.read_text(encoding="utf-8"))
+              expected_start = 250 * shard // 8
+              expected_count = 250 * (shard + 1) // 8 - expected_start
+              if (data.get("code_sha") != os.environ["GITHUB_SHA"] or
+                  data.get("run_id") != os.environ["GITHUB_RUN_ID"] or
+                  data.get("shard") != shard or
+                  data.get("block_start") != expected_start or
+                  data.get("blocks") != expected_count or
+                  data.get("seed_start") != 965000 or
+                  data.get("players") != 4 or
+                  data.get("candidate") != "puct" or
+                  data.get("baseline") != "mcts" or
+                  data.get("opponent") != "mcts" or
+                  data.get("cards") != "none" or
+                  data.get("search_mode") != "simulation-capped" or
+                  data.get("mcts_simulations") != 16 or
+                  data.get("puct_simulations") != 16 or
+                  data.get("tree_depth") != 2):
+                  raise SystemExit(f"artifact metadata mismatch for shard {shard}")
+          print("All 8 shards have validated run/SHA/seed-block metadata")
+          PY
+      - name: Validate all 2,000 games and calculate the seed-block 95% interval
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/paired_eval_stats.py \
+            --root results --players 4 --seed-start 965000 --blocks 250 \
+            --candidate puct --baseline mcts --opponent mcts \
+            --cards none --search-mode simulation-capped \
+            --output results/report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("results/report.json").read_text(encoding="utf-8"))
+          if not (report["comparison_design"]["head_to_head"] is True
+                  and report["comparison_design"]["mirror_baseline"] is True
+                  and report["seed_blocks"] == 250
+                  and report["games_per_arm"] == 1000
+                  and report["total_games"] == 2000
+                  and report["players"] == 4
+                  and report["cards"] == "none"
+                  and report["search_mode"] == "simulation-capped"
+                  and len(report["paired_block_bootstrap_95ci"]) == 2):
+              raise SystemExit("formal direct match report is incomplete")
+          print(f"PUCT credit: {report['candidate_first_credit_pct']:.2f}%")
+          print(f"MCTS mirror: {report['baseline_first_credit_pct']:.2f}%")
+          print(f"Difference: {report['mean_first_credit_delta_pp']:.2f} pp")
+          print(f"95% block bootstrap CI (pp): {report['paired_block_bootstrap_95ci_pp']}")
+          print("This is a fixed-simulations comparison; NOT same-time 10s proof.")
+          PY
+          echo "Formal 4P PUCT vs MCTS on SHA $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
+          echo "250 seed blocks / 1000 games per arm / 2000 total, fixed simulations." >> "$GITHUB_STEP_SUMMARY"
+      - name: Save complete formal report even if checking fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m13-direct-formal-report
+          path: results/report.json
+          if-no-files-found: warn
+          retention-days: 30

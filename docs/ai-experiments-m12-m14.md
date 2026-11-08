@@ -103,7 +103,7 @@ ExIt候補：教師として情報集合を守るE2/E3/E4の探索を用い、�
 - 毎処理単位：同一seed×席の比較、全4席ブロック、評価データの不正混入、報酬の定義一致。
 - 毎コミット：fmt/clippy/test、seed固定回帰、差分レビュー、ブラウザ動作との境界、CIと専用Actions run URL。未測定の結果は書かない。
 
-**この文書に記載のG0〜G3・+5pp・1000試合・10秒を、現時点で合格済みとは扱わない。**
+**進捗更新（2026-11-09）**：G0評価基盤だけは [GitHub Actions Run #42511558662](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42511558662) で正式に`pass`を確認した。G1〜G3、カードあり4人戦、AIの首位率+5pp改善、可変思考予算の厳密な10秒実測は未達のまま。G0の`pass`をAI強化達成と誤解しない。
 
 ## 9. 実装状況：M12データ層（2026-11-07、Task C / #106）
 
@@ -122,3 +122,47 @@ ExIt候補：教師として情報集合を守るE2/E3/E4の探索を用い、�
 - デッキ同一性は `CardSet::content_hash()`（`id`/`kind`/`cost`/`points`/`effects` の秩序非依存ハッシュ）で検証する。seed・配布手札は含めないため、非公開情報の漏洩経路にならない。
 - ドラフト条件（`draft_7_7` / `draft_10_7_simultaneous` / `choose_10_7`）は未提供のまま。#155 の慣行決定と M10 のプール整備が前提。
 - **首位率の比較結果はまだ無い。** 本項は条件分離の実装報告であり、+5pp の達成・未達を判定したものではない。
+
+
+## 11. #212：4人カードなし PUCT 対 MCTS の直接比較（事前登録）
+
+**目的**：M13の`PUCT`と`MCTS`を同じシード・4席ローテーションで直接比較する。カード実装の完了を待たない。今回のPRは比較プロトコルと小規模CI実走まで。結果の大小で事前登録条件を後から変更しない。
+
+### 小規模pilot（PRで実走・採用判断禁止）
+
+- `players=4`、`cards=none`、追加タイルOFF、`candidate=puct`、`baseline=mcts`、`opponent=mcts`。PUCTが1席、残り3席がMCTSの直接対戦。baseline armは全席MCTSで**mirror control**。一般的な「1対1」ではない。
+- `seed_start=64000`、4seedブロック×4席×2arm＝**計32試合**。試験の統計は見ても強さの結論を出さない。
+- `search_mode=simulation-capped`、`decision_budget_ms=0`、MCTS/PUCT各4シミュレーション・depth1、PUCT leaf=terminal。**同シミュレーション数であって同CPU時間ではない**。再現性を確認する配管テスト。
+- `paired_eval`自身が全14ラウンド・イベント再演ハッシュを検証し、`paired_eval_stats.py`が各block×arm×seatの件数・モード・seed・同一性、首位クレジットと95%ブロックbootstrapを検証する。Artifactに行データと集約JSONを保存。
+
+### 初期正式比較（別の手動/エージェント明示起動・CIと分離）
+
+- 事前登録した**1つの一次比較**：`players=4`、`cards=none`、追加タイルOFF、`candidate=puct`、`baseline=mcts`、`opponent=mcts`、同一シード席順交代（MCTS mirror対照）。`seed_start=965000`、`blocks=250`、4席＝**1,000試合/arm、合計2,000試合**。pilot seed 64000台/G0 seed 920000台とは分ける。
+- 正式比較は各16シミュレーション・depth2、PUCT leaf terminal（ほかのパラメータはworkflow既定）、`simulation-capped`、`decision_budget_ms=0`。これで探索方式の違いを見る。**同時間・最大10秒の判定は#167の別実験**とし、混ぜない。
+- 実行用コマンド（権限のあるエージェントからGitHub標準CPU上で明示起動）：
+
+```sh
+gh workflow run paired-eval.yml --ref main \
+  -f players=4 -f blocks=250 -f seed_start=965000 \
+  -f candidate=puct -f baseline=mcts -f opponent=mcts \
+  -f cards=none -f extra=false \
+  -f search_mode=simulation-capped -f decision_budget_ms=0 \
+  -f mcts_simulations=16 -f mcts_tree_depth=2 \
+  -f puct_simulations=16 -f puct_tree_depth=2 \
+  -f puct_leaf=terminal
+```
+
+- 必須成果：Run URL、実行SHA、入力パラメータ、`paired-eval-report` Artifact、`comparison_design.head_to_head=true`と`mirror_baseline=true`、1/k首位クレジット差・同着・期待順位・得点差・全4席内訳・95%CI・必要ブロック数・CPU費用・ルール/再演失敗0。
+- PUCTの差が**点推定+5pp以上、かつ95%CI下限>0**ならこの限定条件で暫定採用候補。区間が0を含めば保留、負方向なら不採用。pilotの数字を正式実験の意思決定に用いない。正式test結果に合わせて参数を再選択した場合は**新しい未知seed**で別の一次評価を行う。
+- この条件は4人戦カードなし・固定シミュレーション数であり、BGA対戦時間設定、ドラフト、カードあり4人戦、G1/G2、10秒上限、全プレイ条件での+5pp達成を意味しない。
+
+
+## 12. #214：AIエージェントによる正式直接対戦の明示起動
+
+`.github/workflows/m13-direct-puct-mcts.yml`は§11で事前登録した正式比較**だけ**を行う。通常PRやmain pushで2,000試合を自動実行しない。
+
+- 本人のGitHub上のIssue #106に、**本文全体が次の1行だけ**のコメントを投稿すると起動する：`/run-m13-4p-puct-vs-mcts-20261109`。GitHub Actions側で`issue_comment.created`、`github.ref=refs/heads/main`、`github.repository`、Issue番号106、GitHub投稿者/actor `cueikusuta` をすべて検査する。別人のコメント/PR/無関係なIssueはジョブを開始できない。
+- GitHub CLIでの明示起動も可能：`gh workflow run m13-direct-puct-mcts.yml --ref main`。両経路ともユーザー入力はシェルに埋め込まず、**固定**の`candidate=puct, baseline=mcts, opponent=mcts`、4人カードなし、250ブロック×4席×2arm、seed 965000、各16 simulations/depth2を実行する。
+- 8シャードをGitHub-hosted `ubuntu-24.04`で分散し、全実行runとコミットSHAのmeta情報・シャード固有block範囲を確認。Rust側で全試合再演ハッシュを照合し、`scripts/paired_eval_stats.py`が2,000行・全seat/seedの完全性・95%区間/期待順位・score margin・速度を検証する。失敗シャードがあれば集約はFAILし、不完全結果を強さの証拠にしない。
+- PR #213での**32試合pilot**はGitHub-hostedのスモークとしてSUCCESS、PUCT 93.75%・MCTS mirror25.00%、しかし独立seedが4ブロックしかなく4 simulations/depth1の探索的観測である。これを正式な改善主張には用いず、今回の250ブロックの結果を別に評価する。
+- 本正式比較でも両探索の**シミュレーション回数を一致**させたのであり、同時間の10秒条件にはなっていない。時間上限の可変化と対局時計は#167/#92、カード・ドラフト追加は#105/#104で別に扱う。
