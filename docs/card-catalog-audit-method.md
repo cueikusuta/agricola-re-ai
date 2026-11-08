@@ -50,7 +50,7 @@ python3 -m unittest discover -s tests -p test_card_catalog_validator.py -v
 
 ## 残作業・受け入れ
 
-1. 公式カード・Lookoutの一次資料で、カードごとに**人数適格、費用、効果、発動時点、型、名称**を照合し記録する。特にD159・A005・複合4件を優先する。手順と一次資料の区分は [card-catalog-official-sources.md](card-catalog-official-sources.md) に従う。
+1. 公式カード・Lookoutの一次資料で、カードごとに**人数適格、費用、効果、発動時点、型、名称**を照合し記録する。特にD159・A005・複合4件を優先する。手順と一次資料の区分は [card-catalog-official-sources.md](card-catalog-official-sources.md) に従う。16枚の証拠整理（実装との差異・確認項目つき、`verified` 0枚）は [m10-card-verification-pilot.md](m10-card-verification-pilot.md)。
 2. 照合済み件数、2/3/4人ごとの候補数をレポートに出す。未照合を配布可能としない。
 3. #105側で公式照合済み候補を実装し、個別効果/相互作用テスト、4人10-7用40+40の実効配布可能枚数を確認する。
 4. 40+40の最低ゲートと80+80の実戦目標を別々に監査。公式カード原文・画像は公開リポジトリに収録しない。

@@ -363,7 +363,8 @@ else if(d.phase==="choosing")phase="自分の10枚から7枚を選ぶ";
 else if(d.active_kind)phase=label[d.active_kind]+"を1枚選ぶ";
 else phase="職業と小進歩を同時に1枚ずつ選ぶ";
 const poolLabel=d.pool_kind==="verified_basic"?"実装済みカードプール（公式照合中）":"テスト用フィクスチャ";
-status.textContent="方式 "+d.mode+" / "+phase+" / 選んだ枚数 "+d.hand_counts.map((n,i)=>(i+1)+"P:"+n).join(" ")+" / 残り "+d.remaining_to_pick+"（"+poolLabel+"・CPU:"+d.ai+"）"+(d.game_started?" / ゲーム開始済み":"");
+const dirs={left:"左へ",right:"右へ"};const ruleSet="人数 "+d.player_count+"人 / 受渡 職業:"+(dirs[d.direction_occupation]||d.direction_occupation)+" 小進歩:"+(dirs[d.direction_minor]||d.direction_minor)+" / 順序:"+(d.occupation_phase_first?"職業→小進歩":"小進歩→職業")+" / ルールセット "+d.ruleset_id+"（明示設定・公式未確定）";
+status.textContent="方式 "+d.mode+" / "+phase+" / 選んだ枚数 "+d.hand_counts.map((n,i)=>(i+1)+"P:"+n).join(" ")+" / 残り "+d.remaining_to_pick+"（"+poolLabel+"・CPU:"+d.ai+"）"+(d.game_started?" / ゲーム開始済み":"")+" / "+ruleSet;
 offered.replaceChildren();
 if(d.complete){
   const own=d.own_final_hands||{occupations:[],minors:[]};

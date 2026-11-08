@@ -60,12 +60,26 @@ async function captureState(page) {
 }
 
 async function visibleFingerprint(page) {
+  // Every rendered seat, not only the human's, so a four-player reload cannot
+  // silently lose another player's public farm or expose a hidden hand.
+  const tabs = page.locator("#tabs button");
+  const perSeat = [];
+  for (let seat = 0; seat < await tabs.count(); seat++) {
+    await tabs.nth(seat).click();
+    perSeat.push({
+      tab: (await tabs.nth(seat).innerText()).trim(),
+      farm: await page.locator("#farm .cell").allTextContents(),
+      stats: (await page.locator("#stats").innerText()).trim(),
+      hand: (await page.locator("#hand").innerText()).trim()
+    });
+  }
+  await tabs.first().click();
   return {
     turn: (await page.locator("#turn").innerText()).trim(),
     summary: (await page.locator("#summary").innerText()).trim(),
-    stats: (await page.locator("#stats").innerText()).trim(),
-    farm: await page.locator("#farm .cell").allTextContents(),
-    hand: (await page.locator("#hand").innerText()).trim()
+    actions: (await page.locator("#turnActions").innerText()).trim(),
+    history: (await page.locator("#history").innerText()).trim(),
+    perSeat
   };
 }
 
@@ -193,10 +207,56 @@ async function attemptOccupation(page) {
 }
 
 async function verifyPrivateHand(page) {
-  await page.locator("#tabs button").nth(1).click();
-  assert.equal((await page.locator("#hand").innerText()).trim(), "手札: 非公開");
+  // Every seat other than the human's own must be hidden, not just seat 2.
+  const seats = await page.locator("#tabs button").count();
+  for (let seat = 1; seat < seats; seat++) {
+    await page.locator("#tabs button").nth(seat).click();
+    assert.equal((await page.locator("#hand").innerText()).trim(), "手札: 非公開",
+      "seat " + (seat + 1) + " must not expose its hand");
+  }
   await page.locator("#tabs button").first().click();
   assert.match(await page.locator("#hand").innerText(), /^手札: (?!非公開)/);
+}
+
+async function verifyRanking(page, players) {
+  const notice = await page.locator("#notice").innerText();
+  assert.match(notice, /最終順位/);
+  const seats = notice.match(/\dP \d+位/g) || [];
+  assert.equal(seats.length, players, "every seat appears in the final ranking");
+  const tabs = await page.locator("#tabs button").count();
+  assert.equal(tabs, players);
+  for (let seat = 0; seat < tabs; seat++) {
+    assert.match(await page.locator("#tabs button").nth(seat).innerText(),
+      new RegExp("^" + (seat + 1) + "P -?[0-9]+点 残[0-9]+$"),
+      "seat " + (seat + 1) + " shows a numeric score");
+  }
+}
+
+// The implemented A/B pool is two-player only. A four-player card game must be
+// refused with a message instead of silently starting without cards.
+async function verifyUnsupportedFourPlayerCardsRejected(page) {
+  await page.goto(baseUrl);
+  await page.locator("#players").selectOption("4");
+  await page.locator("#cards").selectOption("verified");
+  await page.locator("#seed").fill("46");
+  // The running server may already hold an earlier session; record what the
+  // page shows so the rejection can be proven not to replace it.
+  const summaryBefore = await page.locator("#summary").innerText();
+  const turnBefore = await page.locator("#turn").innerText();
+  const responsePromise = page.waitForResponse(response =>
+    new URL(response.url()).pathname === "/api/new"
+      && response.request().method() === "POST", { timeout: 15000 });
+  await page.locator("#new").click();
+  const response = await responsePromise;
+  assert.equal(response.ok(), false,
+    "the server refuses a four-player game with the two-player card pool");
+  const notice = await page.locator("#notice").innerText();
+  assert.match(notice, /two players|2人/,
+    "the refusal explains the two-player pool limit");
+  assert.equal(await page.locator("#summary").innerText(), summaryBefore,
+    "the refused request does not start a four-player card game");
+  assert.equal(await page.locator("#turn").innerText(), turnBefore,
+    "the refused request does not advance any game");
 }
 
 async function doHarvest(page, coverage) {
@@ -282,7 +342,8 @@ async function attemptManualOperations(page, coverage) {
   // Goal-directed resource gathering: the naive "first simple action" policy
   // would always take 森林 and never accumulate reed or grain.
   const gather = async (spaceName, purpose) => {
-    if (!await chooseAction(page, [spaceName])) return false;
+    const names = Array.isArray(spaceName) ? spaceName : [spaceName];
+    if (!await chooseAction(page, names)) return false;
     if (await submitOrCancel(page, purpose)) {
       coverage.manualResource = (coverage.manualResource || 0) + 1;
       return true;
@@ -295,6 +356,9 @@ async function attemptManualOperations(page, coverage) {
   if (once("manualRoom") && supply.wood < 5 && await gather("森林", "gather room wood")) return true;
   if (once("manualRoom") && supply.reed < 2 && await gather("葦", "gather room reed")) return true;
   if (once("manualSow") && supply.grain === 0 && await gather("穀物", "gather grain")) return true;
+  if (once("manualImprovement") && supply.clay < 2 && await gather("粘土坑", "gather improvement clay")) {
+    return true;
+  }
 
   if (once("manualFence") && await chooseAction(page, ["柵"])) {
     const header = await page.locator("#fields").innerText();
@@ -400,14 +464,51 @@ async function attemptManualOperations(page, coverage) {
     }
   }
 
-  if (once("manualImprovement") && await chooseAction(page, ["改善"])) {
+  if (once("manualImprovement")) {
+    const opened = await chooseAction(page, ["改善"]);
+    if (!opened) noteAction("improvement-space-unavailable");
+    if (opened) {
+    noteAction("improvement-dialog-open");
     await page.locator("#buyKind").selectOption("major");
-    await page.locator("#buy").selectOption("fireplace2");
-    if (await submitOrCancel(page, "manual improvement")) {
-      coverage.manualImprovement++;
+    let bought = false;
+    // Try every major improvement the dialog offers: in a four-player game the
+    // CPU seats may already own the cheap cooking improvements, and the
+    // human's affordable market changes every round.
+    const offered = await page.locator("#buy option").evaluateAll(options =>
+      options.map(option => option.value).filter(Boolean));
+    for (const choice of offered.slice(0, 8)) {
+      // A rejected purchase keeps the dialog open, so the next candidate can be
+      // tried without reopening it (submitOrCancel would close it).
+      if (!await page.locator("#buy").isVisible()) {
+        noteAction("improvement-buy-hidden");
+        break;
+      }
+      await page.locator("#buy").selectOption(choice);
+      if (await playAndObserveResponse(page)) {
+        noteAction("improvement-bought-" + choice);
+        coverage.manualImprovement++;
+        bought = true;
+        break;
+      }
+      noteAction("improvement-rejected-" + choice + ":"
+        + (await page.locator("#editorHint").innerText().catch(() => "")));
+    }
+    if (!bought) {
+      const hint = await page.locator("#editorHint").innerText().catch(() => "");
+      await cancelEditor(page);
+      // The remaining market may simply be unaffordable. Gather the missing
+      // resource with a real placement and retry on the next human turn,
+      // instead of silently skipping the manual improvement operation.
+      const need = /Stone/.test(hint) ? ["採石場", "採石場2"]
+        : /Clay/.test(hint) ? "粘土坑"
+          : /Wood/.test(hint) ? "森林"
+            : /Reed/.test(hint) ? "葦" : null;
+      if (need && await gather(need, "gather for improvement")) return true;
+      note("improvement:rejected " + hint);
+    } else {
       return true;
     }
-    await cancelEditor(page);
+    }
   }
 
   return false;
@@ -486,14 +587,16 @@ async function runGame(page, options) {
       assert.deepEqual([...visitedRounds].sort((a, b) => a - b),
         Array.from({ length: 14 }, (_, index) => index + 1),
         "Every round was observed in the live browser");
-      assert.match(await page.locator("#notice").innerText(), /最終順位/);
+      await verifyRanking(page, players);
       await verifyPrivateHand(page);
-      if (players === 2 && cards === "verified") {
+      // Issue #92: the manual detail dialogs must be exercised in every mode,
+      // not only in the two-player card game.
+      for (const key of ["manualFence", "manualRoom", "manualRenovation",
+        "manualSow", "manualAnimal", "manualImprovement"]) {
+        assert.ok(coverage[key] >= 1, "manual UI operation was never executed: " + key);
+      }
+      if (cards === "verified") {
         assert.equal(coverage.cardPlayed, true, "verified-card match must play an occupation");
-        for (const key of ["manualFence", "manualRoom", "manualRenovation",
-          "manualSow", "manualAnimal", "manualImprovement"]) {
-          assert.ok(coverage[key] >= 1, "manual UI operation was never executed: " + key);
-        }
       }
       // Issue #92: the operations the acceptance list names must actually have
       // been submitted through the UI, in every game mode.
@@ -516,6 +619,7 @@ async function runGame(page, options) {
       coverage.uiSubmits = traffic.submits;
       coverage.postedGameMutations = { ...traffic.api };
       coverage.visitedRounds = [...visitedRounds].sort((a, b) => a - b);
+      coverage.finalRanking = await page.locator("#notice").innerText();
       console.log("browser_full_game_coverage=" + JSON.stringify(coverage));
       return coverage;
     }
@@ -550,7 +654,7 @@ async function runGame(page, options) {
       continue;
     }
     assert.match(turn, /^ラウンド \d+\/14・1Pの手番$/, "UI remains on human turn");
-    if (players === 2 && await attemptManualOperations(page, coverage)) {
+    if (await attemptManualOperations(page, coverage)) {
       coverage.workerActions++;
       continue;
     }
@@ -579,8 +683,20 @@ test("Issue #92 / M9: actual Chromium UI completes 14 rounds", async (t) => {
   const games = [
     { seed: 42, extra: false, players: 2, cards: "verified" },
     { seed: 43, extra: true, players: 2, cards: "verified" },
-    { seed: 44, extra: true, players: 4, cards: "none" }
+    { seed: 44, extra: true, players: 4, cards: "none" },
+    // Issue #92: four-player games are supported without cards only until the
+    // M10 pool is large enough, so both additional-tile settings run here.
+    { seed: 45, extra: false, players: 4, cards: "none" }
   ];
+  await t.test("four player verified card pool is refused", async () => {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, locale: "ja-JP" });
+    try {
+      await verifyUnsupportedFourPlayerCardsRejected(page);
+    } finally {
+      await page.close();
+    }
+  });
+
   for (const options of games) {
     const label = options.players + " players, "
       + (options.cards === "verified" ? "verified cards" : "no cards")

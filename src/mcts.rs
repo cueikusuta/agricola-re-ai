@@ -129,7 +129,12 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
     Some((set, cards))
 }
 
-pub(crate) fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
+/// Build a hypothetical position from public information only.
+///
+/// Public so the profiler (`src/bin/mcts_profile.rs`) can measure the
+/// sampling cost separately from the rollout; policies must not use it to look
+/// at hidden state.
+pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     let seed: u64 = rng.gen();
     let (set, cards) = sample_private_cards(obs, rng)?;
     let mut game = Game::with_cards(
@@ -196,7 +201,9 @@ fn best_root_action(candidates: &[(Space, (f64, f64))]) -> Option<Space> {
         .map(|(space, _)| *space)
 }
 
-pub(crate) fn rollout(
+/// Play one hypothetical game to the end with the search's playout policy.
+/// Public for the profiler so the rollout cost can be measured on its own.
+pub fn rollout(
     game: &mut Game,
     rng: &mut ChaCha8Rng,
     deadline: Option<Instant>,
