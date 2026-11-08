@@ -28,7 +28,11 @@ const MAX_BODY: usize = 65_536;
 const MAX_LOAD_BODY: usize = 8 * 1024 * 1024;
 
 fn request_body_limit(path: &str) -> usize {
-    if path == "/api/load" { MAX_LOAD_BODY } else { MAX_BODY }
+    if path == "/api/load" {
+        MAX_LOAD_BODY
+    } else {
+        MAX_BODY
+    }
 }
 /// Marker for a browser save file. A file without it is rejected instead of
 /// being interpreted as some other JSON.
@@ -1788,7 +1792,9 @@ mod tests {
         drive_draft_to_completion(&mut session);
         session.start_draft_game(&json!({})).unwrap();
         let before = session.draft_view().unwrap();
-        assert!(before["history"].as_array().is_some_and(|history| !history.is_empty()));
+        assert!(before["history"]
+            .as_array()
+            .is_some_and(|history| !history.is_empty()));
         let hash = session.game.state_hash();
         let error = session.export_save().unwrap_err();
         assert!(error.contains("ドラフト"), "unexpected error: {error}");
@@ -1808,18 +1814,27 @@ mod tests {
     #[test]
     fn four_player_endgame_save_fits_the_bounded_load_limit() {
         let mut session = Session::new(Config {
-            players: 4, seed: 66, additional_action_space_enabled: false,
-        }).unwrap();
+            players: 4,
+            seed: 66,
+            additional_action_space_enabled: false,
+        })
+        .unwrap();
         for _ in 0..1500 {
-            if session.game.public.finished { break; }
+            if session.game.public.finished {
+                break;
+            }
             play_turns(&mut session, 1);
         }
-        assert!(session.game.public.finished, "four player match did not finish");
+        assert!(
+            session.game.public.finished,
+            "four player match did not finish"
+        );
         let save = session.export_save().unwrap();
         let text = serde_json::to_string_pretty(&save).unwrap();
         assert!(
             text.len() <= request_body_limit("/api/load"),
-            "four-player endgame save is {} bytes", text.len()
+            "four-player endgame save is {} bytes",
+            text.len()
         );
         let mut reloaded = seeded_session(9);
         reloaded.import_save(&save).unwrap();
