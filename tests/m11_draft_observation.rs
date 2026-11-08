@@ -15,7 +15,7 @@ fn pool(dealt: usize, players: usize) -> DraftPool {
 fn setup(mode: DraftMode, players: usize, seed: u64) -> DraftSetup {
     DraftSetup {
         mode,
-        ruleset: DraftRuleset::explicit("test-explicit", Direction::Left, Direction::Right, true),
+        ruleset: DraftRuleset::explicit("test-clockwise-v2", Direction::Right, Direction::Right, true),
         pool: pool(mode.dealt_per_kind(), players),
         player_count: players,
         seed,
