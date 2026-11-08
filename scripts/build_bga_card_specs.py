@@ -1240,6 +1240,360 @@ CARDS = {
                  {"improvement_built": None}),
         ],
     },
+    "D002": {
+        "post": "left_neighbor_hand",
+        "effects": [effect("on_play", [action("renovation")])],
+        "notes": "Immediately take a Renovation action; pass left.",
+        "tests": [
+            case("D002-normal", {"house": "wood", "clay": 2, "reed": 1},
+                 {"play": "D002", "renovate": True},
+                 {"house": "clay", "renovation_granted": True}),
+            case("D002-declined", {"house": "wood"}, {"play": "D002", "renovate": False},
+                 {"house": "wood", "renovation_granted": True}),
+        ],
+    },
+    "D003": {
+        "post": "left_neighbor_hand",
+        "effects": [effect("on_play", [action("sow", fields=1)])],
+        "notes": "Immediately sow in exactly 1 field; pass left.",
+        "tests": [
+            case("D003-normal", {"empty_fields": 1, "grain": 1},
+                 {"play": "D003", "sow": 1}, {"sown_fields": 1, "grain_delta": -1}),
+            case("D003-no-field", {"empty_fields": 0, "grain": 1},
+                 {"play": "D003", "sow": 1}, {"sown_fields": 0, "grain_delta": 0}),
+        ],
+    },
+    "D004": {
+        "post": "left_neighbor_hand",
+        "effects": [effect("on_play", [gain("wood", per(count("stone_in_supply"), 1))])],
+        "notes": "Gain 1 wood per stone in supply; pass left.",
+        "tests": [
+            case("D004-normal", {"stone": 3}, {"play": "D004"}, {"wood_delta": 3}),
+            case("D004-zero", {"stone": 0}, {"play": "D004"}, {"wood_delta": 0}),
+        ],
+    },
+    "D005": {
+        "post": "left_neighbor_hand",
+        "effects": [effect("on_play", [gain("clay", per(count("sown_field"), 1))])],
+        "notes": "Gain 1 clay per planted field; pass left.",
+        "tests": [
+            case("D005-normal", {"sown_fields": 2}, {"play": "D005"}, {"clay_delta": 2}),
+            case("D005-zero", {"sown_fields": 0}, {"play": "D005"}, {"clay_delta": 0}),
+        ],
+    },
+    "D006": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play",
+                   [choice(options=[{"kind": "exchange",
+                                     "give": [{"good": "wood", "amount": n}],
+                                     "receive": [{"good": "stone", "amount": n}]}
+                                    for n in (0, 1, 2, 3)])],
+                   optional=True, decision="owner"),
+        ],
+        "notes": "Exchange up to 3 wood for 1 stone each; pass left.",
+        "tests": [
+            case("D006-normal", {"wood": 3}, {"play": "D006", "choose": 2},
+                 {"wood_delta": -2, "stone_delta": 2}),
+            case("D006-zero", {"wood": 0}, {"play": "D006", "choose": 0},
+                 {"wood_delta": 0, "stone_delta": 0}),
+        ],
+    },
+    "D007": {
+        "post": "left_neighbor_hand",
+        "effects": [
+            effect("on_play",
+                   [gain("food", table("round", {"3": 3, "6": 4, "9": 5, "12": 6}))],
+                   cond=[cond("round_in", values=[3, 6, 9, 12])]),
+        ],
+        "notes": "Playing in round 3/6/9/12 gives 3/4/5/6 food; pass left.",
+        "tests": [
+            case("D007-normal", {"round": 3}, {"play": "D007"}, {"food_delta": 3}),
+            case("D007-round12", {"round": 12}, {"play": "D007"}, {"food_delta": 6}),
+            case("D007-not-triggered", {"round": 4}, {"play": "D007"}, {"food_delta": 0}),
+        ],
+    },
+    "D010": {
+        "post": "played_area",
+        "effects": [
+            effect("round_end",
+                   [spend("food", 1), action("family_growth")],
+                   cond=[cond("rooms_exceed_people")],
+                   optional=True, freq="once_per_round", dur="permanent",
+                   decision="owner"),
+        ],
+        "notes": "Returning-home phase: with more rooms than people, pay 1 food for a Family Growth action.",
+        "tests": [
+            case("D010-normal", {"rooms": 3, "people": 2, "food": 1},
+                 {"use_card": True},
+                 {"food_delta": -1, "family_growth_granted": True}),
+            case("D010-not-triggered", {"rooms": 2, "people": 2, "food": 1},
+                 {"use_card": True}, {"food_delta": 0, "family_growth_granted": False}),
+        ],
+    },
+    "D011": {
+        "post": "played_area",
+        "effects": [
+            effect("passive", [capacity(scope="pasture_size_1", animal_capacity=3)],
+                   freq="always", dur="permanent", snap="live_state"),
+            effect("passive", [capacity(scope="pasture_size_1_with_stable", animal_capacity=6)],
+                   freq="always", dur="permanent", snap="live_state", order=1),
+        ],
+        "notes": "A 1-space pasture holds 3 animals (6 with a stable).",
+        "tests": [
+            case("D011-normal", {"pasture_size": 1, "stables": 0}, {"play": "D011"},
+                 {"animal_capacity": 3}),
+            case("D011-stable", {"pasture_size": 1, "stables": 1}, {"play": "D011"},
+                 {"animal_capacity": 6}),
+        ],
+    },
+    "D012": {
+        "post": "played_area",
+        "effects": [
+            effect("harvest_feeding", [gain("food", 1)],
+                   freq="every_harvest", dur="permanent"),
+            effect("passive", [special("forbid_house_animals")],
+                   freq="always", dur="permanent", snap="live_state", order=1),
+        ],
+        "notes": "Gain 1 food in each feeding phase; may no longer keep animals in the house.",
+        "tests": [
+            case("D012-normal", {"food": 0}, {"run_harvest": True}, {"food_delta": 1}),
+            case("D012-house-animals", {"house_animal_slots": 1}, {"play": "D012"},
+                 {"house_animal_slots": 0}),
+        ],
+    },
+    "D016": {
+        "post": "played_area",
+        "effects": [
+            effect("before_worker_space", [stable(1, wood_cost=1)],
+                   cond=[cond("worker_space_used", space="sheep_market")],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+            effect("before_worker_space", [stable(1, wood_cost=0)],
+                   cond=[cond("worker_space_used", space="cattle_market")],
+                   optional=True, freq="every_use", dur="permanent", order=1,
+                   decision="owner"),
+        ],
+        "notes": "Before Sheep Market build 1 stable for 1 wood; before Cattle Market build it free.",
+        "tests": [
+            case("D016-sheep", {"wood": 1, "stables": 0}, {"use_space": "sheep_market"},
+                 {"stables_delta": 1, "wood_delta": -1}),
+            case("D016-cattle", {"wood": 0, "stables": 0}, {"use_space": "cattle_market"},
+                 {"stables_delta": 1, "wood_delta": 0}),
+            case("D016-not-triggered", {"wood": 1, "stables": 0}, {"use_space": "forest"},
+                 {"stables_delta": 0}),
+        ],
+    },
+    "D017": {
+        "post": "played_area",
+        "effects": [
+            effect("before_sow", [spend("food", 3), plow(1)],
+                   cond=[cond("sow_unconditional")],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "Before each unconditional Sow, may pay 3 food to plow 1 field.",
+        "tests": [
+            case("D017-normal", {"food": 3, "fields": 2}, {"sow": 1, "use_card": True},
+                 {"food_delta": -3, "fields_delta": 1}),
+            case("D017-declined", {"food": 3, "fields": 2}, {"sow": 1, "use_card": False},
+                 {"food_delta": 0, "fields_delta": 0}),
+        ],
+    },
+    "D019": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [spend("clay", 1, return_to="accumulation_space"), plow(1)],
+                   cond=[cond("worker_space_used", spaces=["clay_pit"])],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "After a clay accumulation space, may pay 1 clay to plow 1 field and return the clay there.",
+        "tests": [
+            case("D019-normal", {"clay": 2, "fields": 2},
+                 {"use_space": "clay_pit", "use_card": True},
+                 {"clay_delta": -1, "fields_delta": 1, "space_clay_delta": 1}),
+            case("D019-not-triggered", {"clay": 2, "fields": 2},
+                 {"use_space": "forest", "use_card": True}, {"fields_delta": 0}),
+        ],
+    },
+    "D021": {
+        "post": "played_area",
+        "effects": [
+            effect("after_improvement_declined", [action("family_growth")],
+                   cond=[cond("declined_improvement", kind="minor"),
+                         cond("has_empty_room")],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "Declining a Minor Improvement action while a room is free: may take Family Growth instead.",
+        "tests": [
+            case("D021-normal", {"empty_rooms": 1}, {"decline_improvement": "minor"},
+                 {"family_growth_granted": True}),
+            case("D021-not-triggered", {"empty_rooms": 0}, {"decline_improvement": "minor"},
+                 {"family_growth_granted": False}),
+        ],
+    },
+    "D026": {
+        "post": "played_area",
+        "effects": [
+            effect("passive", [special("allow_major_via_minor",
+                                       improvements=["joinery", "well"])],
+                   freq="always", dur="permanent", snap="live_state"),
+        ],
+        "notes": "Joinery and Well may be built with a Minor Improvement action; both at once with one Major Improvement action.",
+        "tests": [
+            case("D026-normal", {"hand": ["joinery"]}, {"use_space": "minor_improvement"},
+                 {"can_build": ["joinery", "well"]}),
+            case("D026-other-major", {"hand": ["clay_oven"]}, {"use_space": "minor_improvement"},
+                 {"can_build": []}),
+        ],
+    },
+    "D028": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space", [spend("food", 2), action("play_occupation")],
+                   cond=[cond("worker_space_used", space="lessons")],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "After Lessons: pay 2 food to play 1 additional occupation.",
+        "tests": [
+            case("D028-normal", {"food": 2, "hand_occupations": 2}, {"use_space": "lessons"},
+                 {"food_delta": -2, "extra_occupation_granted": True}),
+            case("D028-declined", {"food": 2, "hand_occupations": 2},
+                 {"use_space": "lessons", "use_card": False}, {"food_delta": 0}),
+        ],
+    },
+    "D032": {
+        "post": "played_area",
+        "effects": [
+            effect("end_scoring", [points(2)],
+                   cond=[cond("goods_in_fields_before_final_harvest_at_least", n=7)],
+                   freq="end_of_game", dur="permanent", snap="live_state"),
+        ],
+        "notes": "At scoring, 2 bonus points if at least 7 goods stood in the fields before the final harvest.",
+        "tests": [
+            case("D032-normal", {"goods_in_fields_before_final_harvest": 7},
+                 {"end_scoring": True}, {"points_delta": 2}),
+            case("D032-boundary", {"goods_in_fields_before_final_harvest": 6},
+                 {"end_scoring": True}, {"points_delta": 0}),
+        ],
+    },
+    "D034": {
+        "post": "played_area",
+        "effects": [
+            effect("end_scoring", [points(4)],
+                   cond=[cond("stone_rooms_exceed_people")],
+                   freq="end_of_game", dur="permanent", snap="live_state"),
+        ],
+        "notes": "At scoring, 4 bonus points if stone rooms outnumber people; only one card may award this.",
+        "tests": [
+            case("D034-normal", {"stone_rooms": 3, "people": 2}, {"end_scoring": True},
+                 {"points_delta": 4}),
+            case("D034-boundary", {"stone_rooms": 2, "people": 2}, {"end_scoring": True},
+                 {"points_delta": 0}),
+        ],
+    },
+    "D038": {
+        "post": "played_area",
+        "effects": [
+            effect("harvest_field_phase",
+                   [gain("food", table("cattle", {"1": 1, "3": 2, "5": 3}))],
+                   freq="every_harvest", dur="permanent"),
+            effect("end_scoring", [points(per(count("cattle"), 0.5))],
+                   freq="end_of_game", dur="permanent", snap="live_state", order=1),
+        ],
+        "notes": "Each harvest: 1/2/3 food for at least 1/3/5 cattle. At scoring: 1 point per 2 cattle.",
+        "tests": [
+            case("D038-normal", {"cattle": 3}, {"run_harvest": True}, {"food_delta": 2}),
+            case("D038-zero", {"cattle": 0}, {"run_harvest": True}, {"food_delta": 0}),
+            case("D038-scoring", {"cattle": 5}, {"end_scoring": True}, {"points_delta": 2}),
+        ],
+    },
+    "D043": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play",
+                   [special("place_on_round_spaces", good="food", amounts=[0, 1, 2, 3])]),
+        ],
+        "notes": "Place 0, 1, 2 and 3 food on the next 4 round spaces in that order.",
+        "tests": [
+            case("D043-normal", {"round": 4}, {"play": "D043"},
+                 {"round_space_food": [0, 1, 2, 3]}),
+            case("D043-late", {"round": 12}, {"play": "D043"},
+                 {"round_space_food": [0, 1]}),
+        ],
+    },
+    "D047": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play",
+                   [special("place_on_round_spaces", good="food", amount=2, rounds="remaining")]),
+        ],
+        "notes": "Place 2 food on each remaining round space.",
+        "tests": [
+            case("D047-normal", {"round": 10}, {"play": "D047"},
+                 {"rounds_with_food": 5, "food_per_space": 2}),
+            case("D047-last-round", {"round": 14}, {"play": "D047"},
+                 {"rounds_with_food": 1}),
+        ],
+    },
+    "D052": {
+        "post": "played_area",
+        "effects": [
+            effect("round_end", [gain("food", 1)],
+                   cond=[cond("resource_greater_than", good="clay", than="wood")],
+                   freq="every_round", dur="permanent"),
+        ],
+        "notes": "Returning-home phase: 1 food if clay in supply exceeds wood.",
+        "tests": [
+            case("D052-normal", {"clay": 3, "wood": 2}, {"run_round": True},
+                 {"food_delta": 1}),
+            case("D052-not-triggered", {"clay": 2, "wood": 2}, {"run_round": True},
+                 {"food_delta": 0}),
+        ],
+    },
+    "D054": {
+        "post": "played_area",
+        "effects": [
+            effect("work_phase_start", [gain("food", 1)],
+                   cond=[cond("accumulation_at_least", space="fishing", n=3)],
+                   freq="every_round", dur="permanent"),
+        ],
+        "notes": "At the start of each work phase, 1 food from the general supply if Fishing holds at least 3 food.",
+        "tests": [
+            case("D054-normal", {"fishing_accumulation": 3}, {"run_round": True},
+                 {"food_delta": 1}),
+            case("D054-not-triggered", {"fishing_accumulation": 2}, {"run_round": True},
+                 {"food_delta": 0}),
+        ],
+    },
+    "D057": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play",
+                   [special("place_on_round_spaces", good="food", amount=1, rounds="remaining")]),
+        ],
+        "notes": "Place 1 food on each remaining round space.",
+        "tests": [
+            case("D057-normal", {"round": 9}, {"play": "D057"},
+                 {"rounds_with_food": 6, "food_per_space": 1}),
+            case("D057-last-round", {"round": 14}, {"play": "D057"},
+                 {"rounds_with_food": 1}),
+        ],
+    },
+    "D061": {
+        "post": "played_area",
+        "effects": [
+            effect("harvest_start", [gain("food", 2)],
+                   cond=[cond("grain_field_count", n=3)],
+                   freq="every_harvest", dur="permanent"),
+        ],
+        "notes": "At the start of each harvest, 2 food if you have at least 3 grain fields.",
+        "tests": [
+            case("D061-normal", {"grain_fields": 3}, {"run_harvest": True},
+                 {"food_delta": 2}),
+            case("D061-not-triggered", {"grain_fields": 2}, {"run_harvest": True},
+                 {"food_delta": 0}),
+        ],
+    },
 }
 
 

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "D004",
+  "cases": [
+    {
+      "id": "D004-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 3
+      },
+      "action": {
+        "play": "D004"
+      },
+      "expected": {
+        "wood_delta": 3
+      }
+    },
+    {
+      "id": "D004-zero",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 0
+      },
+      "action": {
+        "play": "D004"
+      },
+      "expected": {
+        "wood_delta": 0
+      }
+    }
+  ]
+}

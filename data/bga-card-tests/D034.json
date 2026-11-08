@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "card_id": "D034",
+  "cases": [
+    {
+      "id": "D034-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stone_rooms": 3,
+        "people": 2
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 4
+      }
+    },
+    {
+      "id": "D034-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "stone_rooms": 2,
+        "people": 2
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    }
+  ]
+}

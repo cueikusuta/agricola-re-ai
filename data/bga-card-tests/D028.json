@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "D028",
+  "cases": [
+    {
+      "id": "D028-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2,
+        "hand_occupations": 2
+      },
+      "action": {
+        "use_space": "lessons"
+      },
+      "expected": {
+        "food_delta": -2,
+        "extra_occupation_granted": true
+      }
+    },
+    {
+      "id": "D028-declined",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2,
+        "hand_occupations": 2
+      },
+      "action": {
+        "use_space": "lessons",
+        "use_card": false
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

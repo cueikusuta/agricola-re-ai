@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "D007",
+  "cases": [
+    {
+      "id": "D007-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 3
+      },
+      "action": {
+        "play": "D007"
+      },
+      "expected": {
+        "food_delta": 3
+      }
+    },
+    {
+      "id": "D007-round12",
+      "scope": "effect_only",
+      "setup": {
+        "round": 12
+      },
+      "action": {
+        "play": "D007"
+      },
+      "expected": {
+        "food_delta": 6
+      }
+    },
+    {
+      "id": "D007-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4
+      },
+      "action": {
+        "play": "D007"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "D038",
+  "cases": [
+    {
+      "id": "D038-normal",
+      "scope": "effect_only",
+      "setup": {
+        "cattle": 3
+      },
+      "action": {
+        "run_harvest": true
+      },
+      "expected": {
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "D038-zero",
+      "scope": "effect_only",
+      "setup": {
+        "cattle": 0
+      },
+      "action": {
+        "run_harvest": true
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "D038-scoring",
+      "scope": "effect_only",
+      "setup": {
+        "cattle": 5
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "D047",
+  "cases": [
+    {
+      "id": "D047-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 10
+      },
+      "action": {
+        "play": "D047"
+      },
+      "expected": {
+        "rounds_with_food": 5,
+        "food_per_space": 2
+      }
+    },
+    {
+      "id": "D047-last-round",
+      "scope": "effect_only",
+      "setup": {
+        "round": 14
+      },
+      "action": {
+        "play": "D047"
+      },
+      "expected": {
+        "rounds_with_food": 1
+      }
+    }
+  ]
+}

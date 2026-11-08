@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "D002",
+  "cases": [
+    {
+      "id": "D002-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "clay": 2,
+        "reed": 1
+      },
+      "action": {
+        "play": "D002",
+        "renovate": true
+      },
+      "expected": {
+        "house": "clay",
+        "renovation_granted": true
+      }
+    },
+    {
+      "id": "D002-declined",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood"
+      },
+      "action": {
+        "play": "D002",
+        "renovate": false
+      },
+      "expected": {
+        "house": "wood",
+        "renovation_granted": true
+      }
+    }
+  ]
+}

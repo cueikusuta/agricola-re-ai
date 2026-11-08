@@ -29,6 +29,10 @@
 | `end_scoring` | 最終得点計算時 | 所有者（他プレイヤーに及ぶ場合は `target`） |
 | `after_animal_accommodation` | 累積スペースから得た家畜を農場に収容した後 | 所有者 |
 | `after_work_phase` | 労働フェイズ終了時 | 所有者 |
+| `before_worker_space` | 特定のアクションスペースを使う直前（割引・追加建設） | 所有者 |
+| `before_sow` | 「種をまく」アクションの直前 | 所有者 |
+| `work_phase_start` | 各ラウンドの労働フェイズ開始時 | 所有者 |
+| `harvest_start` | 各収穫の開始時（畑フェイズより前） | 所有者 |
 | `after_renovation` | 改築後（`house_is` + `negate` で「木の家でなくなった」を表す） | 所有者 |
 
 ## 原子操作（`effects[].steps[].operation`）
@@ -66,6 +70,8 @@
 | `count_as_field` | `amount`。カード自体を畑として数える |
 | `gain_each_with_at_least` | `goods`, `threshold`, `amount`。所持数が閾値以上の品物を各1つ得る |
 | `add_good_to_single_good_fields` | `amount`, `same_type`。品物がちょうど1つの畑へ同種を追加 |
+| `forbid_house_animals` | 家に家畜を収容できなくする継続効果 |
+| `allow_major_via_minor` | `improvements`。「小さい進歩」アクションでも指定の大進歩を建設できる |
 
 ## 数量式（`amount` / `points` に入る式木）
 
@@ -87,7 +93,7 @@
 `stable` `room` `clay_room` `person` `occupation` `improvement` `major_improvement_bottom_row`
 `person_on_accumulation_space` `hand_occupation_count` `remaining_rounds` `fence`
 `vegetable_taken_from_field` `sheep` `wild_boar` `cattle` `completed_harvest`
-`grain_in_supply` `unused_farmyard_space`
+`grain_in_supply` `unused_farmyard_space` `sown_field` `stone_in_supply`
 
 ## 条件（`effects[].conditions[]`）
 
@@ -123,6 +129,12 @@
 | `resource_greater_than` | `good`, `than` | ストックの `good` が `than` より多い |
 | `unused_farmyard_spaces_at_least` | `n` | 未使用の農場スペースが `n` 以上 |
 | `animal_count_less` | `animal`, `n` | 家畜数が `n` 未満 |
+| `round_in` | `values` | 現在のラウンドが `values` のいずれか |
+| `has_empty_room` | — | 家に空き部屋がある |
+| `stone_rooms_exceed_people` | — | 石の部屋数 > 人物数 |
+| `goods_in_fields_before_final_harvest_at_least` | `n` | 最後の収穫前に畑上にあった品物が `n` 以上 |
+| `accumulation_at_least` | `space`, `n` | 対象の累積スペースに品物が `n` 以上ある |
+| `cards_in_play_at_least` | `n` | 自分の前のカード（職業＋進歩）が `n` 枚以上 |
 
 ## 発動頻度・持続・状態参照
 

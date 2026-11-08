@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "D026",
+  "cases": [
+    {
+      "id": "D026-normal",
+      "scope": "effect_only",
+      "setup": {
+        "hand": [
+          "joinery"
+        ]
+      },
+      "action": {
+        "use_space": "minor_improvement"
+      },
+      "expected": {
+        "can_build": [
+          "joinery",
+          "well"
+        ]
+      }
+    },
+    {
+      "id": "D026-other-major",
+      "scope": "effect_only",
+      "setup": {
+        "hand": [
+          "clay_oven"
+        ]
+      },
+      "action": {
+        "use_space": "minor_improvement"
+      },
+      "expected": {
+        "can_build": []
+      }
+    }
+  ]
+}
