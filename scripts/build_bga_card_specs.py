@@ -3649,6 +3649,171 @@ CARDS = {
                  {"clay_delta": 0}),
         ],
     },
+    "A123": {
+        "post": "played_area",
+        "effects": [
+            effect("after_room_construction",
+                   [exchange(give=[{"good": "clay_or_stone", "amount": 2}],
+                             receive=[{"good": "wood", "amount": 1}])],
+                   optional=True, freq="every_use", dur="permanent", decision="owner",
+                   notes="once per room or action"),
+        ],
+        "notes": "Each room built or renovation: once, may replace 2 clay or 2 stone with 1 wood.",
+        "tests": [
+            case("A123-normal", {"clay": 2, "wood": 0}, {"build_rooms": 1, "use_card": True},
+                 {"clay_delta": -2, "wood_delta": 1}),
+            case("A123-once-per-room", {"clay": 4, "wood": 0}, {"build_rooms": 1, "use_card": True},
+                 {"clay_delta": -2, "wood_delta": 1}),
+        ],
+    },
+    "A124": {
+        "post": "played_area",
+        "effects": [
+            effect("before_worker_space", [gain("stone", 1)],
+                   cond=[cond("round_space_in", values=[5, 6, 7])],
+                   freq="every_use", dur="permanent"),
+        ],
+        "notes": "Before using an action space card on rounds 5-7: 1 stone.",
+        "tests": [
+            case("A124-normal", {"round": 5}, {"use_space": "farmland"}, {"stone_delta": 1}),
+            case("A124-not-triggered", {"round": 8}, {"use_space": "farmland"},
+                 {"stone_delta": 0}),
+        ],
+    },
+    "A126": {
+        "post": "played_area",
+        "effects": [
+            effect("before_worker_space",
+                   [gain(table("round", {"1": "wood", "2": "clay", "3": "reed", "4": "stone"}), 1)],
+                   cond=[cond("round_in", values=[1, 2, 3, 4])],
+                   freq="every_use", dur="permanent"),
+        ],
+        "notes": "Before using an action space card on rounds 1/2/3/4: 1 wood/clay/reed/stone.",
+        "tests": [
+            case("A126-round1", {"round": 1}, {"use_space": "farmland"}, {"wood_delta": 1}),
+            case("A126-round4", {"round": 4}, {"use_space": "farmland"}, {"stone_delta": 1}),
+            case("A126-not-triggered", {"round": 5}, {"use_space": "farmland"},
+                 {"wood_delta": 0}),
+        ],
+    },
+    "A127": {
+        "post": "played_area",
+        "effects": [
+            effect("passive", [capacity(scope="card", person_capacity=1,
+                                       until_round=9)],
+                   freq="always", dur="permanent", snap="live_state"),
+            effect("round_end", [special("remove_person_if_no_housing")],
+                   cond=[cond("round_in", values=[9])],
+                   freq="once_per_game", dur="permanent", order=1),
+        ],
+        "notes": "Houses 1 person until the round-9 returning-home phase; then removed if no other room exists.",
+        "tests": [
+            case("A127-normal", {"family": 2, "rooms": 2}, {"play": "A127"},
+                 {"housing_capacity": 3}),
+            case("A127-expiry", {"round": 9, "no_other_housing": True}, {"run_round": True},
+                 {"person_removed": True}),
+            case("A127-kept", {"round": 9, "no_other_housing": False}, {"run_round": True},
+                 {"person_removed": False}),
+        ],
+    },
+    "A128": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space", [special("build_room_with_discount",
+                                                  discount={"clay": 1, "stone": 2})],
+                   cond=[cond("worker_space_used", space="reed_bank"),
+                         cond("other_player_only")],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "When another player uses Reed Bank: may build a room with 1 clay or 2 stone cheaper.",
+        "tests": [
+            case("A128-normal", {"other_player_uses": "reed_bank"}, {"build_room": True},
+                 {"clay_discount": 1}),
+            case("A128-not-triggered", {"owner_uses": "reed_bank"}, {"build_room": True},
+                 {"clay_discount": 0}),
+        ],
+    },
+    "A129": {
+        "post": "played_area",
+        "effects": [
+            effect("after_worker_space",
+                   [special("use_other_space_with_same_person", even_occupied=True)],
+                   cond=[cond("worker_space_used", spaces=["farm_expansion", "grain_seeds"])],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "After Farm Expansion or Grain Seeds: may use the other space with the same person, even if occupied.",
+        "tests": [
+            case("A129-normal", {"used": "farm_expansion"}, {"use_other": True},
+                 {"other_space_used": "grain_seeds", "even_occupied": True}),
+            case("A129-declined", {"used": "farm_expansion"}, {"use_other": False},
+                 {"other_space_used": None}),
+        ],
+    },
+    "A130": {
+        "post": "played_area",
+        "effects": [
+            effect("passive", [special("reuse_second_person_space", once_per_round=True)],
+                   freq="always", dur="permanent", snap="live_state"),
+        ],
+        "notes": "Once per round: a person after the 2nd may be placed on the 2nd person's space and reuse it.",
+        "tests": [
+            case("A130-normal", {"people_placed": 3}, {"reuse": True},
+                 {"reuse_allowed": True}),
+            case("A130-twice", {"people_placed": 3}, {"reuse": True, "already_used": True},
+                 {"reuse_allowed": False}),
+        ],
+    },
+    "A131": {
+        "post": "played_area",
+        "effects": [
+            effect("after_improvement",
+                   [action("play_occupation", free=True, max_count=2)],
+                   cond=[cond("has_improvement", kind="joinery"),
+                         cond("has_improvement", kind="pottery"),
+                         cond("has_improvement", kind="basketmakers_workshop")],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "After building Joinery, Pottery and Basketmaker's Workshop: up to 2 free occupations.",
+        "tests": [
+            case("A131-normal", {"owned": ["joinery", "pottery", "basketmakers_workshop"]},
+                 {"use_card": True}, {"free_occupations": 2}),
+            case("A131-incomplete", {"owned": ["joinery", "pottery"]}, {"use_card": True},
+                 {"free_occupations": 0}),
+        ],
+    },
+    "A132": {
+        "post": "played_area",
+        "effects": [
+            effect("before_sow",
+                   [spend("grain", 1, source="owner_supply", target="other_player"),
+                    points(1)],
+                   cond=[cond("other_player_only"), cond("sow_unconditional")],
+                   optional=True, freq="every_use", dur="permanent", decision="owner"),
+        ],
+        "notes": "Before another player's unconditional Sow: may give them 1 grain for 1 point.",
+        "tests": [
+            case("A132-normal", {"grain": 1}, {"other_player_sows": True, "give": True},
+                 {"grain_delta": -1, "points_delta": 1}),
+            case("A132-declined", {"grain": 1}, {"other_player_sows": True, "give": False},
+                 {"grain_delta": 0}),
+        ],
+    },
+    "A135": {
+        "post": "played_area",
+        "effects": [
+            effect("on_play", [gain("wood", table("remaining_rounds", {"1": 1, "3": 2, "6": 3, "9": 4}))]),
+            effect("end_scoring", [points(table("all_animal_threshold", {"2": 1, "3": 3, "4": 5}))],
+                   freq="end_of_game", dur="permanent", snap="live_state", order=1),
+        ],
+        "notes": "1/2/3/4 wood for 1/3/6/9 rounds left; at scoring 1/3/5 points for 2+/3+/4+ of each animal.",
+        "tests": [
+            case("A135-normal", {"remaining_rounds": 6}, {"play": "A135"}, {"wood_delta": 3}),
+            case("A135-score", {"sheep": 3, "wild_boar": 3, "cattle": 3},
+                 {"end_scoring": True}, {"points_delta": 3}),
+            case("A135-not-triggered", {"sheep": 2, "wild_boar": 3, "cattle": 3},
+                 {"end_scoring": True}, {"points_delta": 1}),
+        ],
+    },
 }
 
 

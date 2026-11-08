@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "A126",
+  "cases": [
+    {
+      "id": "A126-round1",
+      "scope": "effect_only",
+      "setup": {
+        "round": 1
+      },
+      "action": {
+        "use_space": "farmland"
+      },
+      "expected": {
+        "wood_delta": 1
+      }
+    },
+    {
+      "id": "A126-round4",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4
+      },
+      "action": {
+        "use_space": "farmland"
+      },
+      "expected": {
+        "stone_delta": 1
+      }
+    },
+    {
+      "id": "A126-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "use_space": "farmland"
+      },
+      "expected": {
+        "wood_delta": 0
+      }
+    }
+  ]
+}
