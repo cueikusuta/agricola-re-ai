@@ -27,6 +27,23 @@
       "expected": {
         "points_delta": 0
       }
+    },
+    {
+      "id": "E037-source-conflict",
+      "scope": "effect_only",
+      "setup": {
+        "card_id": "E037"
+      },
+      "action": {
+        "verify_sources": [
+          "ja",
+          "en"
+        ]
+      },
+      "expected": {
+        "review_status": "needs_resolution",
+        "unresolved_field": "on_play_food_ja_en_discrepancy"
+      }
     }
   ]
 }
