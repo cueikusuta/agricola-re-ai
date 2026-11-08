@@ -73,11 +73,14 @@
       ],
       "steps": [
         {
-          "operation": "gain_resource",
+          "operation": "other",
           "target": "owner",
           "params": {
+            "kind": "take_all_goods_from_round_space",
             "good": "food",
-            "amount": 1
+            "source": "this_card_round_markers",
+            "consume_markers": true,
+            "amount": "all"
           }
         }
       ],
@@ -86,7 +89,8 @@
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 1,
-      "decision_owner": "none"
+      "decision_owner": "none",
+      "notes": "Claim and consume ALL food markers deposited by this card on the current round, including duplicates from multiple room-building events."
     }
   ],
   "post_play": {
@@ -98,11 +102,12 @@
     "test_case_ids": [
       "A111-normal",
       "A111-collect",
-      "A111-boundary"
+      "A111-boundary",
+      "A111-overlapping-events"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "After each own build of at least 1 room, place 1 food on each of the next 4 round spaces and collect it as those rounds start."
+    "notes": "Each own room-building event places one food on each of next four rounds. On a marked round start collect all markers from this card (including stacked duplicates), consuming them atomically."
   }
 }
