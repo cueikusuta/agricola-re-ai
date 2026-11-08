@@ -12,8 +12,9 @@
 use agricola_re_ai::cards::CardSet;
 use agricola_re_ai::dataset_split::{
     build_manifest, evaluate_g0, load_matches, normalise_card_mode, recompute_mode, sha256_hex,
-    ChecksEvidence, DatasetSplitManifest, G0Evidence, GateStatus, ModeBundle, ModeEvidence, Split,
-    SplitPlan,
+    CheckAttestation, ChecksAttestation, ChecksEvidence, DatasetSplitManifest, G0Evidence,
+    GateStatus, ModeBundle, ModeEvidence, Split, SplitPlan, ATTESTATION_PRODUCER,
+    ATTESTATION_SCHEMA_VERSION, ATTESTED_CHECKS,
 };
 use agricola_re_ai::episode_data::{inspect_dataset, record_self_play, EpisodeMeta, EpisodeRecord};
 use agricola_re_ai::evaluation::EvaluationPolicy;
@@ -90,7 +91,44 @@ fn matches_jsonl(blocks: usize, players: usize, first_seed: u64) -> String {
 }
 
 fn checks_json(code_sha: &str, matches_sha256: &str) -> String {
-    serde_json::to_string(&ChecksEvidence {
+    checks_json_with(code_sha, matches_sha256, |_| {}, |_| {})
+}
+
+/// Build a checks file with an attestation. The two closures let a test break
+/// exactly one part of the claim (a boolean, or an attested count).
+fn checks_json_with(
+    code_sha: &str,
+    matches_sha256: &str,
+    edit_evidence: impl FnOnce(&mut ChecksEvidence),
+    edit_attestation: impl FnOnce(&mut ChecksAttestation),
+) -> String {
+    let mut per_check = BTreeMap::new();
+    for (index, id) in ATTESTED_CHECKS.iter().enumerate() {
+        per_check.insert(
+            (*id).to_string(),
+            CheckAttestation {
+                issue: 108 + index as u32,
+                required: 3,
+                passed: 3,
+                failed: 0,
+                missing: 0,
+            },
+        );
+    }
+    let mut attestation = ChecksAttestation {
+        schema_version: ATTESTATION_SCHEMA_VERSION,
+        producer: ATTESTATION_PRODUCER.to_string(),
+        run_url: "https://github.com/cueikusuta/agricola-re-ai/actions/runs/1".to_string(),
+        test_report_sha256: sha256_hex(b"test report"),
+        requirements_sha256: sha256_hex(b"requirements"),
+        required_tests: 12,
+        passed_tests: 12,
+        failed_tests: 0,
+        missing_tests: 0,
+        checks: per_check,
+    };
+    edit_attestation(&mut attestation);
+    let mut evidence = ChecksEvidence {
         schema_version: 2,
         code_sha: code_sha.into(),
         matches_sha256: matches_sha256.into(),
@@ -98,8 +136,10 @@ fn checks_json(code_sha: &str, matches_sha256: &str) -> String {
         m8_legal_api_evidence: true,
         observation_noninterference_passed: true,
         ci_reproducible: true,
-    })
-    .expect("checks json")
+        attestation: Some(attestation),
+    };
+    edit_evidence(&mut evidence);
+    serde_json::to_string(&evidence).expect("checks json")
 }
 
 /// Build evidence plus the bytes it points at for one mode.
@@ -496,6 +536,160 @@ fn attestations_without_a_bound_checks_file_are_only_hold() {
     }
 }
 
+/// Replace the checks file a mode points at, keeping the declared digest
+/// consistent, so a test can probe one specific claim.
+fn reinstall_checks(
+    evidence: &mut G0Evidence,
+    bundles: &mut BTreeMap<String, ModeBundle>,
+    mode: &str,
+    checks: &str,
+) {
+    bundles.get_mut(mode).unwrap().checks = Some(checks.as_bytes().to_vec());
+    evidence.modes[0].checks_sha256 = Some(sha256_hex(checks.as_bytes()));
+}
+
+#[test]
+fn a_checks_file_without_an_attestation_stays_on_hold() {
+    // Regression for "type `true` into JSON": a boolean that no executed test
+    // run backs is a declaration, so it may not open the gate.
+    let matches = matches_jsonl(500, 2, 120);
+    let digest = sha256_hex(matches.as_bytes());
+    let (mut evidence, mut bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
+    let mut checks: ChecksEvidence =
+        serde_json::from_str(&checks_json("test-sha", &digest)).expect("checks json");
+    checks.attestation = None;
+    let text = serde_json::to_string(&checks).unwrap();
+    reinstall_checks(&mut evidence, &mut bundles, "cardless_2p", &text);
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(
+        report.verdict,
+        GateStatus::Hold,
+        "checks: {:?}",
+        report.checks
+    );
+    for id in ATTESTED_CHECKS {
+        let check = report
+            .checks
+            .iter()
+            .find(|check| check.id == id)
+            .unwrap_or_else(|| panic!("{id} missing"));
+        assert_eq!(check.status, GateStatus::Hold, "{id}: {}", check.detail);
+        assert!(check.detail.contains("no attestation"), "{}", check.detail);
+    }
+}
+
+#[test]
+fn a_hand_flipped_boolean_against_the_attestation_fails() {
+    let matches = matches_jsonl(500, 2, 120);
+    let digest = sha256_hex(matches.as_bytes());
+    let (mut evidence, mut bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
+    // The attestation says every required test passed, but the boolean claims
+    // otherwise (and vice versa): the file contradicts itself.
+    let text = checks_json_with(
+        "test-sha",
+        &digest,
+        |checks| checks.m8_rule_evidence = false,
+        |_| {},
+    );
+    reinstall_checks(&mut evidence, &mut bundles, "cardless_2p", &text);
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+    assert!(
+        report
+            .checks
+            .iter()
+            .any(|check| check.id == "checks_attested" && check.status == GateStatus::Fail),
+        "checks: {:?}",
+        report.checks
+    );
+}
+
+#[test]
+fn an_attestation_with_a_failed_or_missing_test_fails() {
+    for (label, edit) in [
+        (
+            "failed",
+            (|attestation: &mut ChecksAttestation| {
+                attestation.failed_tests = 1;
+            }) as fn(&mut ChecksAttestation),
+        ),
+        ("missing", |attestation: &mut ChecksAttestation| {
+            attestation.missing_tests = 2;
+        }),
+        ("short", |attestation: &mut ChecksAttestation| {
+            attestation.passed_tests = attestation.required_tests - 1;
+        }),
+        ("per-check", |attestation: &mut ChecksAttestation| {
+            let entry = attestation.checks.get_mut("m8_legal_api_evidence").unwrap();
+            entry.missing = 1;
+            entry.passed -= 1;
+        }),
+        ("foreign producer", |attestation: &mut ChecksAttestation| {
+            attestation.producer = "manual".into();
+        }),
+        ("no run url", |attestation: &mut ChecksAttestation| {
+            attestation.run_url = "local".into();
+        }),
+    ] {
+        let matches = matches_jsonl(500, 2, 120);
+        let digest = sha256_hex(matches.as_bytes());
+        let (mut evidence, mut bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
+        let text = checks_json_with("test-sha", &digest, |_| {}, edit);
+        reinstall_checks(&mut evidence, &mut bundles, "cardless_2p", &text);
+        let report = evaluate_g0(
+            &manifest(),
+            &inspect_dataset(&dataset()),
+            Some(&evidence),
+            &bundles,
+        );
+        assert_eq!(report.verdict, GateStatus::Fail, "{label}");
+        assert!(
+            report
+                .checks
+                .iter()
+                .any(|check| check.id == "checks_attested" && check.status == GateStatus::Fail),
+            "{label}: {:?}",
+            report.checks
+        );
+    }
+}
+
+#[test]
+fn a_tampered_checks_file_breaks_the_declared_digest() {
+    let matches = matches_jsonl(500, 2, 120);
+    let digest = sha256_hex(matches.as_bytes());
+    let (evidence, mut bundles) = evidence_for("cardless_2p", 2, "none", &matches, true);
+    let text = checks_json("test-sha", &digest);
+    // Swap the bytes but keep the old declared checks_sha256.
+    bundles.get_mut("cardless_2p").unwrap().checks =
+        Some(text.replace("true", "false").into_bytes());
+    let report = evaluate_g0(
+        &manifest(),
+        &inspect_dataset(&dataset()),
+        Some(&evidence),
+        &bundles,
+    );
+    assert_eq!(report.verdict, GateStatus::Fail);
+    assert!(
+        report
+            .checks
+            .iter()
+            .any(|check| check.id == "checks_attested" && check.status == GateStatus::Fail),
+        "checks: {:?}",
+        report.checks
+    );
+}
+
 #[test]
 fn a_checks_file_that_does_not_match_the_matches_digest_fails() {
     let matches = matches_jsonl(500, 2, 120);
@@ -857,6 +1051,7 @@ fn a_checks_file_with_an_unsupported_schema_is_rejected() {
         m8_legal_api_evidence: true,
         observation_noninterference_passed: true,
         ci_reproducible: true,
+        attestation: None,
     })
     .expect("checks json");
     bundles.get_mut("cardless_2p").unwrap().checks = Some(stale_checks.clone().into_bytes());

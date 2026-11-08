@@ -705,6 +705,172 @@ pub struct ChecksEvidence {
     pub m8_legal_api_evidence: bool,
     pub observation_noninterference_passed: bool,
     pub ci_reproducible: bool,
+    /// How the four booleans above were derived. Without it the file is only a
+    /// declaration, so the gate keeps those checks on `hold` instead of
+    /// trusting a hand-written `true`.
+    #[serde(default)]
+    pub attestation: Option<ChecksAttestation>,
+}
+
+/// Version of the attestation block inside a checks file.
+pub const ATTESTATION_SCHEMA_VERSION: u32 = 1;
+/// The producer that is allowed to write an attestation. A checks file from any
+/// other tool has no verified derivation, so it is not trusted.
+pub const ATTESTATION_PRODUCER: &str = "scripts/m8_evidence.py";
+
+/// Per-check test counts, all derived from one test-run report.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CheckAttestation {
+    /// Issue the evidence answers, for traceability.
+    pub issue: u32,
+    pub required: usize,
+    pub passed: usize,
+    pub failed: usize,
+    pub missing: usize,
+}
+
+/// Proof that the four attested booleans came from executed tests.
+///
+/// This is an attestation, not a formal proof: the gate cannot re-run a test
+/// suite, so it verifies that the claim is *complete and internally
+/// consistent* (every required test ran and passed, the report and requirement
+/// digests are present, the run is a real Actions run) and that the file is
+/// bound to the same code revision and matches bytes. A tampered boolean, a
+/// missing test, a failed test or a re-bound file is rejected.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChecksAttestation {
+    pub schema_version: u32,
+    pub producer: String,
+    /// GitHub Actions run that executed the tests.
+    pub run_url: String,
+    /// SHA-256 of the parsed test-run report the booleans were derived from.
+    pub test_report_sha256: String,
+    /// SHA-256 of the requirement manifest that defines the required tests.
+    pub requirements_sha256: String,
+    pub required_tests: usize,
+    pub passed_tests: usize,
+    pub failed_tests: usize,
+    pub missing_tests: usize,
+    pub checks: BTreeMap<String, CheckAttestation>,
+}
+
+/// The four checks an attestation must cover, with the boolean field each one
+/// maps to.
+pub const ATTESTED_CHECKS: [&str; 4] = [
+    "m8_rule_evidence",
+    "m8_legal_api_evidence",
+    "evaluation_observation_noninterference",
+    "evaluation_ci_reproducible",
+];
+
+impl ChecksEvidence {
+    /// The boolean this struct exposes for an attested check id.
+    pub fn attested_value(&self, id: &str) -> Option<bool> {
+        match id {
+            "m8_rule_evidence" => Some(self.m8_rule_evidence),
+            "m8_legal_api_evidence" => Some(self.m8_legal_api_evidence),
+            "evaluation_observation_noninterference" => {
+                Some(self.observation_noninterference_passed)
+            }
+            "evaluation_ci_reproducible" => Some(self.ci_reproducible),
+            _ => None,
+        }
+    }
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Validate an attestation block against the checks file it belongs to.
+///
+/// Every failure is a contradiction (a claim that cannot be true as written),
+/// so the caller reports `fail` rather than `hold`.
+pub fn validate_attestation(
+    attestation: &ChecksAttestation,
+    checks: &ChecksEvidence,
+) -> Result<(), String> {
+    if attestation.schema_version != ATTESTATION_SCHEMA_VERSION {
+        return Err(format!(
+            "attestation schema {} is not {ATTESTATION_SCHEMA_VERSION}",
+            attestation.schema_version
+        ));
+    }
+    if attestation.producer != ATTESTATION_PRODUCER {
+        return Err(format!(
+            "attestation producer {:?} is not {ATTESTATION_PRODUCER:?}",
+            attestation.producer
+        ));
+    }
+    if !attestation.run_url.starts_with("https://github.com/")
+        || !attestation.run_url.contains("/actions/runs/")
+    {
+        return Err(format!(
+            "attestation run_url {:?} is not a GitHub Actions run URL",
+            attestation.run_url
+        ));
+    }
+    if !is_sha256_hex(&attestation.test_report_sha256) {
+        return Err("attestation test_report_sha256 is not a SHA-256 hex digest".into());
+    }
+    if !is_sha256_hex(&attestation.requirements_sha256) {
+        return Err("attestation requirements_sha256 is not a SHA-256 hex digest".into());
+    }
+    if attestation.required_tests == 0 {
+        return Err("attestation required_tests is zero".into());
+    }
+    if attestation.failed_tests > 0 {
+        return Err(format!(
+            "attestation records {} failed tests",
+            attestation.failed_tests
+        ));
+    }
+    if attestation.missing_tests > 0 {
+        return Err(format!(
+            "attestation records {} missing tests",
+            attestation.missing_tests
+        ));
+    }
+    if attestation.passed_tests != attestation.required_tests {
+        return Err(format!(
+            "attestation passed {} of {} required tests",
+            attestation.passed_tests, attestation.required_tests
+        ));
+    }
+    for id in ATTESTED_CHECKS {
+        let entry = attestation
+            .checks
+            .get(id)
+            .ok_or_else(|| format!("attestation has no entry for {id}"))?;
+        if entry.required == 0 {
+            return Err(format!("attestation {id} requires no tests"));
+        }
+        if entry.failed > 0 || entry.missing > 0 {
+            return Err(format!(
+                "attestation {id} records {} failed and {} missing tests",
+                entry.failed, entry.missing
+            ));
+        }
+        if entry.passed != entry.required {
+            return Err(format!(
+                "attestation {id} passed {} of {} tests",
+                entry.passed, entry.required
+            ));
+        }
+        let declared = checks
+            .attested_value(id)
+            .ok_or_else(|| format!("unknown attested check {id}"))?;
+        if declared != (entry.passed == entry.required && entry.required > 0) {
+            return Err(format!(
+                "attestation {id} reports {}/{} passed but the file declares {declared}",
+                entry.passed, entry.required
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// One evaluated condition. It points at real files; the gate reads them and
@@ -1377,29 +1543,70 @@ pub fn evaluate_g0(
                         ),
                     ));
                 } else {
-                    for (id, passed) in [
-                        ("m8_rule_evidence", checks_file.m8_rule_evidence),
-                        ("m8_legal_api_evidence", checks_file.m8_legal_api_evidence),
-                        (
-                            "evaluation_observation_noninterference",
-                            checks_file.observation_noninterference_passed,
-                        ),
-                        ("evaluation_ci_reproducible", checks_file.ci_reproducible),
-                    ] {
-                        checks.push(GateCheck::new(
-                            id,
-                            if passed {
-                                GateStatus::Pass
-                            } else {
-                                GateStatus::Fail
-                            },
-                            "evidence",
-                            format!(
-                                "{}: {} attested in a checks file bound to code {:?} and the \
-                                 matches digest",
-                                mode.mode, passed, evidence.code_sha
-                            ),
-                        ));
+                    // A checks file without an attestation is a declaration.
+                    // Its booleans are not derived from executed tests, so they
+                    // stay on hold exactly like an absent file (M8-1 evidence).
+                    match checks_file.attestation.as_ref() {
+                        None => {
+                            for id in ATTESTED_CHECKS {
+                                checks.push(GateCheck::new(
+                                    id,
+                                    GateStatus::Hold,
+                                    "evidence",
+                                    format!(
+                                        "{}: no attestation; a hand-written boolean is not \
+                                         evidence of an executed test run",
+                                        mode.mode
+                                    ),
+                                ));
+                            }
+                        }
+                        Some(attestation) => {
+                            match validate_attestation(attestation, &checks_file) {
+                                Err(error) => {
+                                    checks.push(GateCheck::new(
+                                        "checks_attested",
+                                        GateStatus::Fail,
+                                        "evidence",
+                                        format!("{}: {error}", mode.mode),
+                                    ));
+                                    for id in ATTESTED_CHECKS {
+                                        checks.push(GateCheck::new(
+                                            id,
+                                            GateStatus::Fail,
+                                            "evidence",
+                                            format!("{}: unattestable ({error})", mode.mode),
+                                        ));
+                                    }
+                                }
+                                Ok(()) => {
+                                    for id in ATTESTED_CHECKS {
+                                        let passed =
+                                            checks_file.attested_value(id).unwrap_or(false);
+                                        let entry = attestation.checks.get(id);
+                                        checks.push(GateCheck::new(
+                                            id,
+                                            if passed {
+                                                GateStatus::Pass
+                                            } else {
+                                                GateStatus::Fail
+                                            },
+                                            "evidence",
+                                            format!(
+                                                "{}: {} of {} required tests passed at code {:?} \
+                                             ({}); run {}",
+                                                mode.mode,
+                                                entry.map(|entry| entry.passed).unwrap_or(0),
+                                                entry.map(|entry| entry.required).unwrap_or(0),
+                                                evidence.code_sha,
+                                                checks_file.matches_sha256,
+                                                attestation.run_url
+                                            ),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1410,12 +1617,7 @@ pub fn evaluate_g0(
                 format!("{}: {error}", mode.mode),
             )),
             None => {
-                for id in [
-                    "m8_rule_evidence",
-                    "m8_legal_api_evidence",
-                    "evaluation_observation_noninterference",
-                    "evaluation_ci_reproducible",
-                ] {
+                for id in ATTESTED_CHECKS {
                     checks.push(GateCheck::new(
                         id,
                         GateStatus::Hold,

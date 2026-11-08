@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "description": "Required test evidence for the four attested G0 checks. Each entry names one executed test, the rule mode it covers, the expected result in words, and the official basis for that expectation. scripts/m8_evidence.py derives the checks-file booleans from a real test run against this list; a missing, failed or renamed test makes the corresponding check false instead of silently passing.",
+  "basis_references": {
+    "rules_p8": "2016 Revised rulebook p.8: farm expansion, stables, pastures and fencing",
+    "rules_p10": "2016 Revised rulebook p.10: baking and food conversion",
+    "rules_p12": "2016 Revised rulebook p.12: component limits (family 5, stables 4, fences 15)",
+    "appendix_p2": "2016 Revised appendix p.2: the ten major improvements, their costs, scores and conversion rates",
+    "appendix_p7_8": "2016 Revised appendix p.7-8: fencing, optional/compulsory action parts, the two-player additional action tiles",
+    "appendix_p11_12": "2016 Revised appendix p.11-12: scoring categories, leftover-resource bonus and beggar cards"
+  },
+  "checks": {
+    "m8_rule_evidence": {
+      "issue": 108,
+      "summary": "Official-rule expected-result tests. A passing run of this list is evidence that the documented expectations still hold; it is not a proof over the whole state space.",
+      "tests": [
+        {
+          "id": "rule_regressions::field_count_scoring_follows_2016_appendix",
+          "mode": "cardless_2p",
+          "expectation": "0-1 fields score -1, 2 fields 1, 3 fields 2, and a field with a remaining crop still counts as a field",
+          "basis": "appendix_p11_12"
+        },
+        {
+          "id": "rule_regressions::clay_oven_bakes_one_grain_per_action",
+          "mode": "cardless_2p",
+          "expectation": "a clay oven converts exactly one grain into five food per bake; asking for three is rejected atomically",
+          "basis": "appendix_p2"
+        },
+        {
+          "id": "rule_regressions::stone_oven_bakes_at_most_two_grain",
+          "mode": "cardless_2p",
+          "expectation": "a stone oven converts at most two grain into four food each; a third grain is rejected",
+          "basis": "appendix_p2"
+        },
+        {
+          "id": "rule_regressions::vegetable_conversion_uses_cooking_hearth_rate",
+          "mode": "cardless_2p",
+          "expectation": "a cooking hearth converts one vegetable into three food as a free action",
+          "basis": "appendix_p2"
+        },
+        {
+          "id": "rule_regressions::animal_market_cattle_requires_food_and_is_atomic",
+          "mode": "cardless_2p_additional",
+          "expectation": "the animal market cattle transaction costs one food, and an unaffordable attempt leaves the state unchanged",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "official_improvements::each_major_improvement_uses_its_official_cost_and_score",
+          "mode": "cardless_2p",
+          "expectation": "all ten major improvements charge their documented cost and award their documented score",
+          "basis": "appendix_p2"
+        },
+        {
+          "id": "official_improvements::all_three_workshops_award_official_leftover_resource_bonus_tiers",
+          "mode": "cardless_2p",
+          "expectation": "the three workshops award the documented leftover-resource bonus tiers",
+          "basis": "appendix_p2"
+        },
+        {
+          "id": "harvest_feeding::only_the_six_official_rounds_have_harvest",
+          "mode": "cardless_2p",
+          "expectation": "harvests occur after rounds 4, 7, 9, 11, 13 and 14 only",
+          "basis": "rules_p8"
+        },
+        {
+          "id": "scoring_categories::first_fields_and_animal_have_negative_zero_and_one_point",
+          "mode": "cardless_2p",
+          "expectation": "the first field and the first animal score -1, and the zero cases score 0",
+          "basis": "appendix_p11_12"
+        },
+        {
+          "id": "scoring_categories::tiebreaker_uses_only_unspent_building_materials",
+          "mode": "cardless_2p",
+          "expectation": "the tie-break compares only unspent wood, clay, reed and stone",
+          "basis": "appendix_p11_12"
+        },
+        {
+          "id": "variant_action_matrix::two_player_animal_market_has_three_distinct_transactions",
+          "mode": "cardless_2p_additional",
+          "expectation": "the two-player animal market offers three distinct transactions with their documented costs",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "variant_action_matrix::resource_market_provides_stone_and_food_not_reed",
+          "mode": "cardless_2p_additional",
+          "expectation": "the two-player resource market provides stone and food and never reed",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "round_additional::copse_accumulation_survives_use_of_other_additional_space",
+          "mode": "cardless_2p_additional",
+          "expectation": "wood accumulated on the copse is kept when another additional tile is used",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "round_additional::modest_family_growth_requires_round_five_and_a_free_room",
+          "mode": "cardless_2p_additional",
+          "expectation": "the additional family-growth tile is available only from round five with a free room",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "farm_buildings::renovation_upgrades_all_rooms_and_costs_one_reed",
+          "mode": "cardless_2p",
+          "expectation": "renovation upgrades every room and costs one reed in addition to the per-room material",
+          "basis": "rules_p8"
+        },
+        {
+          "id": "legal_invariants::invariants_reject_mutually_exclusive_actions_and_unrevealed_spaces",
+          "mode": "cardless_2p",
+          "expectation": "a used or unrevealed space is never offered and is rejected when forced",
+          "basis": "rules_p8"
+        }
+      ]
+    },
+    "m8_legal_api_evidence": {
+      "issue": 109,
+      "summary": "The legal-detail API accepts legal details that the default policy never proposes and rejects illegal ones without mutating state. SimpleDetails is a policy, not the definition of the legal action set.",
+      "tests": [
+        {
+          "id": "m8_legal_detail_api::engine_accepts_a_legal_detail_that_simple_details_never_proposes",
+          "mode": "cardless_2p",
+          "expectation": "a two-cell pasture that SimpleDetails never proposes is validated and applied, charging six fence segments",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::illegal_details_are_rejected_without_changing_state",
+          "mode": "cardless_2p",
+          "expectation": "a fence layout that overlaps a room is rejected and the state hash is unchanged",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::missing_detail_and_unrevealed_space_are_rejected",
+          "mode": "cardless_2p",
+          "expectation": "a detail-bearing space without a detail, and an unrevealed space, are both rejected atomically",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::human_and_ai_paths_agree_on_the_shared_validator",
+          "mode": "cardless_2p",
+          "expectation": "human input and the AI detail policy pass the same validator, and a deliberately illegal variant fails it",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::detail_hints_list_legal_elementary_parameters",
+          "mode": "cardless_2p",
+          "expectation": "the staged hint API exposes the legal elementary parameters for a detail-bearing space",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::detail_hints_never_include_the_opponent_hand",
+          "mode": "verified_basic_2p",
+          "expectation": "the hint payload contains only the acting player's own hand and public information",
+          "basis": "appendix_p7_8"
+        },
+        {
+          "id": "m8_legal_detail_api::web_view_exposes_staged_detail_hints_and_available_spaces",
+          "mode": "cardless_2p",
+          "expectation": "the web view exposes the staged hints and the available spaces for the same state",
+          "basis": "appendix_p7_8"
+        }
+      ]
+    },
+    "evaluation_observation_noninterference": {
+      "issue": 108,
+      "summary": "A change to hidden state (opponent hand order or identity, unrevealed round order, internal RNG) must not change the acting player's public observation.",
+      "tests": [
+        {
+          "id": "m8_observation_noninterference::opponent_hand_order_and_identity_are_not_observable",
+          "mode": "verified_basic_2p",
+          "expectation": "reordering or substituting the opponent's hidden cards changes the state hash but not the own observation",
+          "basis": "rules_p8"
+        },
+        {
+          "id": "m8_observation_noninterference::unrevealed_round_order_and_internal_rng_are_not_observable",
+          "mode": "cardless_2p",
+          "expectation": "changing unrevealed round order or the internal RNG state does not change the public observation",
+          "basis": "rules_p8"
+        },
+        {
+          "id": "m8_observation_noninterference::observation_contains_only_intended_public_fields_and_own_hand",
+          "mode": "verified_basic_2p",
+          "expectation": "the observation carries only public fields plus the acting player's own hand",
+          "basis": "rules_p8"
+        }
+      ]
+    },
+    "evaluation_ci_reproducible": {
+      "issue": 110,
+      "summary": "The same seed and policies reproduce the same evaluation game, and the committed log replays to the same final state.",
+      "tests": [
+        {
+          "id": "m8_eval_reproducibility::two_player_cardless_games_reproduce_exactly",
+          "mode": "cardless_2p",
+          "expectation": "three seeds reproduce identical actions, final hash, scores and ranks with the additional tile off and on",
+          "basis": "rules_p8"
+        },
+        {
+          "id": "m8_eval_reproducibility::four_player_cardless_games_reproduce_exactly",
+          "mode": "cardless_4p",
+          "expectation": "two seeds reproduce identical four-player games",
+          "basis": "rules_p8"
+        },
+        {
+          "id": "m8_eval_reproducibility::verified_card_games_reproduce_exactly",
+          "mode": "verified_basic_2p",
+          "expectation": "the seeded card deal reproduces the same game and the card log replays with the same card set",
+          "basis": "appendix_p2"
+        },
+        {
+          "id": "m8_eval_reproducibility::different_seeds_produce_different_games",
+          "mode": "cardless_2p",
+          "expectation": "different seeds produce different final states, so a seed really selects the game",
+          "basis": "rules_p8"
+        },
+        {
+          "id": "m8_eval_reproducibility::the_seat_rotation_uses_the_same_seed_for_both_arms",
+          "mode": "cardless_2p",
+          "expectation": "identical seed and policies give identical hashes, scores and ranks for both comparison arms",
+          "basis": "rules_p8"
+        },
+        {
+          "id": "m8_mcts_repro::deterministic_mcts_seat_rotation_is_reproducible",
+          "mode": "cardless_2p",
+          "expectation": "simulation-count MCTS replays the same action log and final state for the same seed",
+          "basis": "rules_p8"
+        },
+        {
+          "id": "integration_acceptance::one_hundred_seeded_games_per_mode_are_replayable",
+          "mode": "cardless_2p",
+          "expectation": "100 seeded games per additional-tile setting replay and round-trip through save/load",
+          "basis": "rules_p8"
+        }
+      ]
+    }
+  }
+}
