@@ -898,8 +898,7 @@ impl DraftState {
             self.mode,
             &self.ruleset,
             self.player_count,
-            self.start_player,
-            self.seed,
+            (self.start_player, self.seed),
             &self.deck_version,
             self.round,
             self.phase,
@@ -918,9 +917,14 @@ impl DraftState {
 
     /// Server-side complete-log hash. Kept separate from the observable view.
     pub fn log_hash(&self) -> String {
-        let data =
-            serde_json::to_vec(&(self.seed, self.start_player, &self.deck_version, &self.actions, &self.history))
-                .expect("draft log serialization");
+        let data = serde_json::to_vec(&(
+            self.seed,
+            self.start_player,
+            &self.deck_version,
+            &self.actions,
+            &self.history,
+        ))
+        .expect("draft log serialization");
         format!("{:x}", Sha256::digest(&data))
     }
 
