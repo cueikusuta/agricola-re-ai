@@ -73,7 +73,7 @@
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "owner",
-      "notes": "wood/clay/reed/stone accumulating spaces are eligible even if just used by the owner."
+      "notes": "After the normal action's resource removal, select an accumulation space that still holds at least 4 resources; the just-used space is normally empty."
     }
   ],
   "post_play": {
@@ -85,11 +85,12 @@
     "test_case_ids": [
       "A082-normal",
       "A082-not-triggered",
-      "A082-boundary"
+      "A082-boundary",
+      "A082-normal-action-drains-space"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "After each action-space use, optionally take 1 building material from any accumulating space then holding at least 4."
+    "notes": "After each action-space use, optionally take 1 building material from one accumulating space with at least 4 remaining AFTER resolving the ordinary action. A just-used accumulation space is normally empty."
   }
 }
