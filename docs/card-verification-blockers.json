@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "description": "Known blockers for the highest-risk cards named in Issue #105/#115. This is not a review queue (that is scripts/card_inventory_report.py --cards-csv, PR #172): it records, per card, what the ledger already says, what is still unknown, which official document would resolve it, and what blocks implementation. Nothing here may be used to mark a card verified.",
+  "policy": {
+    "verified_requires": [
+      "reference_type in {official_print, official_pdf, official_other}",
+      "primary_reference_id naming the exact card or page/section",
+      "eligible_at_2/3/4 confirmed as yes or no",
+      "source_language, reviewed_by, reviewed_on",
+      "primary_reference_url when the source is digital"
+    ],
+    "forbidden": [
+      "marking verified from a secondary catalog or a fan wiki",
+      "adding a card to the four-player distribution pool before its player eligibility is confirmed",
+      "guessing A055's payment resources or the scope of its improved effect"
+    ]
+  },
+  "cards": [
+    {
+      "card_id": "A005",
+      "known": {
+        "card_type": "minor_improvement",
+        "in_base_2016": true,
+        "implementation": "コード内に定義あり（配布対象要照合）",
+        "difficulty_preliminary": 5
+      },
+      "unknown": [
+        "公式の人数適格（2/3/4人）",
+        "公式の費用と前提条件",
+        "効果と発動時点（自動一次分類は横断処理を含むと推定しているだけ）"
+      ],
+      "needed_source": "2016改訂版の印刷カード（デッキA・A005）または発行元の公式カード一覧で該当箇所を特定できるもの",
+      "blocker": "効果が他プレイヤー・手札操作に関わり、一次分類の difficulty 5 は事実ではない。公式照合なしに効果フックへ落とすと誤った相互作用を実装する恐れがある。",
+      "next_action": "公式カードの目視確認者が、上記 unknown をすべて埋めたうえで audit CSV の該当行を更新する。実装はその後に別Issueで行う。"
+    },
+    {
+      "card_id": "D159",
+      "known": {
+        "card_type": "occupation",
+        "in_base_2016": false,
+        "implementation": "未実装または未照合"
+      },
+      "unknown": [
+        "英語名（一次台帳の name_en が空欄）",
+        "公式の人数適格",
+        "効果と発動時点"
+      ],
+      "needed_source": "2016改訂版の印刷カード（デッキD・D159）。名称が空欄のため、まず公式表記の確認が必要",
+      "blocker": "名称が未確定のカードは、たとえ効果が推定できても台帳の安定キーと印刷カードの対応を確認できない。",
+      "next_action": "公式表記の確認 → name_en と日本語名の確定 → 人数適格・効果の照合。"
+    },
+    {
+      "card_id": "A060",
+      "known": {
+        "card_type": "multi_type",
+        "in_base_2016": false,
+        "implementation": "未実装または未照合"
+      },
+      "unknown": [
+        "複合カードとしての公式の扱い（職業/小進歩のどちらとして数えるか）",
+        "公式の人数適格",
+        "費用・効果・発動時点"
+      ],
+      "needed_source": "2016改訂版の印刷カード（デッキA・A060）",
+      "blocker": "複合カードは40+40の枚数へ機械的に加算できない。公式の扱いを確認するまで配布プールに入れない。",
+      "next_action": "複合カードの数え方をルール典拠つきで確定し、audit CSV の card_type と人数適格を更新する。"
+    },
+    {
+      "card_id": "D025",
+      "known": {
+        "card_type": "multi_type",
+        "in_base_2016": false,
+        "implementation": "未実装または未照合"
+      },
+      "unknown": [
+        "複合カードとしての公式の扱い",
+        "公式の人数適格",
+        "費用・効果・発動時点"
+      ],
+      "needed_source": "2016改訂版の印刷カード（デッキD・D025）",
+      "blocker": "A060 と同じ。複合カードの数え方が未確定。",
+      "next_action": "A060 と同じ確認をまとめて行い、複合カードの扱いを1箇所（audit method）に記録する。"
+    },
+    {
+      "card_id": "D059",
+      "known": {
+        "card_type": "multi_type",
+        "in_base_2016": false,
+        "implementation": "未実装または未照合"
+      },
+      "unknown": [
+        "複合カードとしての公式の扱い",
+        "公式の人数適格",
+        "費用・効果・発動時点"
+      ],
+      "needed_source": "2016改訂版の印刷カード（デッキD・D059）",
+      "blocker": "A060 と同じ。複合カードの数え方が未確定。",
+      "next_action": "A060 と同じ確認をまとめて行う。"
+    },
+    {
+      "card_id": "D060",
+      "known": {
+        "card_type": "multi_type",
+        "in_base_2016": false,
+        "implementation": "未実装または未照合"
+      },
+      "unknown": [
+        "複合カードとしての公式の扱い",
+        "公式の人数適格",
+        "費用・効果・発動時点"
+      ],
+      "needed_source": "2016改訂版の印刷カード（デッキD・D060）",
+      "blocker": "A060 と同じ。複合カードの数え方が未確定。",
+      "next_action": "A060 と同じ確認をまとめて行う。"
+    }
+  ],
+  "related_open_rule_questions": [
+    {
+      "issue": 91,
+      "topic": "A055 の支払い資源と改善後効果の適用範囲",
+      "status": "未確定",
+      "action": "推測で確定しない。公式カードまたは公式回答を確認できるまで実装しない。"
+    }
+  ]
+}

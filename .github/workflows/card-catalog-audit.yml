@@ -7,7 +7,10 @@ on:
       - 'docs/card-catalog-audit-method.md'
       - 'docs/card-catalog-official-sources.md'
       - 'scripts/validate_card_catalog.py'
+      - 'scripts/card_verification_blockers.py'
+      - 'docs/card-verification-blockers.json'
       - 'tests/test_card_catalog_validator.py'
+      - 'tests/test_card_verification_blockers.py'
       - '.github/workflows/card-catalog-audit.yml'
   push:
     branches: [main]
@@ -16,7 +19,10 @@ on:
       - 'docs/card-catalog-audit-method.md'
       - 'docs/card-catalog-official-sources.md'
       - 'scripts/validate_card_catalog.py'
+      - 'scripts/card_verification_blockers.py'
+      - 'docs/card-verification-blockers.json'
       - 'tests/test_card_catalog_validator.py'
+      - 'tests/test_card_verification_blockers.py'
       - '.github/workflows/card-catalog-audit.yml'
   workflow_dispatch:
 
@@ -31,8 +37,12 @@ jobs:
       - uses: actions/checkout@v6
       - name: Validate CSV structure, provenance, and eligibility
         run: python3 scripts/validate_card_catalog.py --report "$RUNNER_TEMP/card-catalog-audit-report.json"
+      - name: Check the blocked-card register is still fail closed
+        run: python3 scripts/card_verification_blockers.py
       - name: Unit tests (no external dependencies)
-        run: python3 -m unittest discover -s tests -p test_card_catalog_validator.py -v
+        run: |
+          python3 -m unittest discover -s tests -p test_card_catalog_validator.py -v
+          python3 -m unittest discover -s tests -p test_card_verification_blockers.py -v
       - name: Save validation report
         if: always()
         uses: actions/upload-artifact@v4
