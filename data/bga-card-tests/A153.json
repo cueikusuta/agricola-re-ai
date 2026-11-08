@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "A153",
+  "cases": [
+    {
+      "id": "A153-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wild_boar": 4
+      },
+      "action": {
+        "acquire_wild_boar": 1
+      },
+      "expected": {
+        "points_delta": 3
+      }
+    },
+    {
+      "id": "A153-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "wild_boar": 5
+      },
+      "action": {
+        "acquire_wild_boar": 0
+      },
+      "expected": {
+        "points_delta": 3
+      }
+    },
+    {
+      "id": "A153-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "wild_boar": 3
+      },
+      "action": {
+        "acquire_wild_boar": 1
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    },
+    {
+      "id": "A153-once",
+      "scope": "effect_only",
+      "setup": {
+        "wild_boar": 5,
+        "already_scored": true
+      },
+      "action": {
+        "acquire_wild_boar": 1
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    }
+  ]
+}

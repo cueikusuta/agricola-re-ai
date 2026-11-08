@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "B102",
+  "cases": [
+    {
+      "id": "B102-normal-two-players",
+      "scope": "legal_play",
+      "setup": {
+        "players": 2,
+        "hand": [
+          "B102"
+        ]
+      },
+      "action": {
+        "play_occupation": "B102"
+      },
+      "expected": {
+        "owner_clay_delta": 3
+      }
+    },
+    {
+      "id": "B102-normal-three-players",
+      "scope": "legal_play",
+      "setup": {
+        "players": 3,
+        "hand": [
+          "B102"
+        ]
+      },
+      "action": {
+        "play_occupation": "B102"
+      },
+      "expected": {
+        "owner_reed_delta": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "card_id": "B103",
+  "cases": [
+    {
+      "id": "B103-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0,
+        "reed": 0
+      },
+      "action": {
+        "play": "B103"
+      },
+      "expected": {
+        "wood_delta": 1,
+        "reed_delta": 1
+      }
+    },
+    {
+      "id": "B103-minor",
+      "scope": "effect_only",
+      "setup": {
+        "declined": "minor"
+      },
+      "action": {
+        "decline_improvement": "minor"
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "B103-major",
+      "scope": "effect_only",
+      "setup": {
+        "declined": "major"
+      },
+      "action": {
+        "decline_improvement": "major"
+      },
+      "expected": {
+        "vegetable_delta": 1
+      }
+    },
+    {
+      "id": "B103-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "declined": null
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "food_delta": 0,
+        "vegetable_delta": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "C004",
+  "cases": [
+    {
+      "id": "C004-normal",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 3
+      },
+      "action": {
+        "play": "C004"
+      },
+      "expected": {
+        "wood_delta": 3
+      }
+    },
+    {
+      "id": "C004-zero",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 0
+      },
+      "action": {
+        "play": "C004"
+      },
+      "expected": {
+        "wood_delta": 0
+      }
+    }
+  ]
+}

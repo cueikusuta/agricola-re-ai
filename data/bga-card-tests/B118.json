@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "card_id": "B118",
+  "cases": [
+    {
+      "id": "B118-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "rooms": 2
+      },
+      "action": {
+        "start_round": 2
+      },
+      "expected": {
+        "owner_wood_delta": 1
+      }
+    },
+    {
+      "id": "B118-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "rooms": 3
+      },
+      "action": {
+        "start_round": 2
+      },
+      "expected": {
+        "owner_wood_delta": 0
+      }
+    }
+  ]
+}

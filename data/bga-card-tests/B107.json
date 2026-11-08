@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "card_id": "B107",
+  "cases": [
+    {
+      "id": "B107-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "house": "stone"
+      },
+      "action": {
+        "start_round": 2
+      },
+      "expected": {
+        "owner_food_delta": 3
+      }
+    },
+    {
+      "id": "B107-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "house": "clay"
+      },
+      "action": {
+        "start_round": 2
+      },
+      "expected": {
+        "owner_food_delta": 0
+      }
+    }
+  ]
+}

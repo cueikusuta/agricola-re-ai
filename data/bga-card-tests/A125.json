@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "card_id": "A125",
+  "cases": [
+    {
+      "id": "A125-normal",
+      "scope": "legal_play",
+      "setup": {
+        "house": "clay",
+        "rooms": 2,
+        "hand": [
+          "A125"
+        ]
+      },
+      "action": {
+        "play_occupation": "A125"
+      },
+      "expected": {
+        "owner_clay_delta": 3,
+        "owner_reed_delta": 2,
+        "owner_stone_delta": 2
+      }
+    },
+    {
+      "id": "A125-not-triggered",
+      "scope": "legal_play",
+      "setup": {
+        "house": "clay",
+        "rooms": 3,
+        "hand": [
+          "A125"
+        ]
+      },
+      "action": {
+        "play_occupation": "A125"
+      },
+      "expected": {
+        "owner_clay_delta": 0,
+        "owner_reed_delta": 0,
+        "owner_stone_delta": 0
+      }
+    }
+  ]
+}

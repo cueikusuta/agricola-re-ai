@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "A012",
+  "cases": [
+    {
+      "id": "A012-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures": 1,
+        "pasture_cells": 4,
+        "stables": 0
+      },
+      "action": {
+        "end_round": 1
+      },
+      "expected": {
+        "pasture_capacity": 8
+      }
+    },
+    {
+      "id": "A012-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": false,
+        "pastures": 1,
+        "pasture_cells": 4,
+        "stables": 0
+      },
+      "action": {
+        "end_round": 1
+      },
+      "expected": {
+        "pasture_capacity": 4
+      }
+    }
+  ]
+}

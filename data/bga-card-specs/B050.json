@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "card_id": "B050",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "撹乳器",
+    "name_en": "Butter Churn"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3207",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "at_most_occupations",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
+    "printed_points": 1
+  },
+  "effects": [
+    {
+      "trigger": "harvest_field_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "floor_div",
+                  "args": [
+                    {
+                      "op": "count",
+                      "args": [
+                        "sheep"
+                      ]
+                    },
+                    3
+                  ]
+                },
+                {
+                  "op": "floor_div",
+                  "args": [
+                    {
+                      "op": "count",
+                      "args": [
+                        "cattle"
+                      ]
+                    },
+                    2
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_harvest",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B050-normal",
+      "B050-boundary"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "implemented",
+    "notes": "BGA wiki content structured; official verification remains separate."
+  }
+}

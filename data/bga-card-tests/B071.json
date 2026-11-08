@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "B071",
+  "cases": [
+    {
+      "id": "B071-normal",
+      "scope": "effect_only",
+      "setup": {
+        "completed_harvests": 2,
+        "occupations_played": 2
+      },
+      "action": {
+        "play": "B071"
+      },
+      "expected": {
+        "food_delta": 1,
+        "grain_delta": 1,
+        "vegetable_delta": 1
+      }
+    },
+    {
+      "id": "B071-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "completed_harvests": 2,
+        "occupations_played": 1
+      },
+      "action": {
+        "play": "B071"
+      },
+      "expected": {
+        "food_delta": 0,
+        "grain_delta": 0,
+        "vegetable_delta": 0
+      }
+    }
+  ]
+}

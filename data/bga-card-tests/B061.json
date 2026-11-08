@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "B061",
+  "cases": [
+    {
+      "id": "B061-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "grain_fields": 1,
+        "vegetable_fields": 1,
+        "empty_fields": 1
+      },
+      "action": {
+        "run_harvest": true
+      },
+      "expected": {
+        "owner_food_delta": 3
+      }
+    },
+    {
+      "id": "B061-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "grain_fields": 1,
+        "vegetable_fields": 1,
+        "empty_fields": 0
+      },
+      "action": {
+        "run_harvest": true
+      },
+      "expected": {
+        "owner_food_delta": 0
+      }
+    }
+  ]
+}

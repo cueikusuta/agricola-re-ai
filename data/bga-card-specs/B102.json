@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "card_id": "B102",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "女性顧問",
+    "name_en": "Consultant"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3155",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": {
+              "op": "custom",
+              "args": [
+                "player_count_table",
+                {
+                  "2": "clay",
+                  "3": "reed",
+                  "4": "sheep"
+                }
+              ]
+            },
+            "amount": {
+              "op": "custom",
+              "args": [
+                "player_count_table",
+                {
+                  "2": 3,
+                  "3": 2,
+                  "4": 2
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B102-normal-two-players",
+      "B102-normal-three-players"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "implemented",
+    "notes": "The wiki gives a separate reward for each player count; the Rust pool only builds the two-player variant."
+  }
+}

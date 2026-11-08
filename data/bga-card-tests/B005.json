@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "B005",
+  "cases": [
+    {
+      "id": "B005-normal",
+      "scope": "effect_only",
+      "setup": {
+        "hand_occupations": 3
+      },
+      "action": {
+        "play": "B005"
+      },
+      "expected": {
+        "stone_delta": 1
+      }
+    },
+    {
+      "id": "B005-boundary-4",
+      "scope": "effect_only",
+      "setup": {
+        "hand_occupations": 4
+      },
+      "action": {
+        "play": "B005"
+      },
+      "expected": {
+        "stone_delta": 1
+      }
+    },
+    {
+      "id": "B005-5",
+      "scope": "effect_only",
+      "setup": {
+        "hand_occupations": 5
+      },
+      "action": {
+        "play": "B005"
+      },
+      "expected": {
+        "reed_delta": 1
+      }
+    },
+    {
+      "id": "B005-7",
+      "scope": "effect_only",
+      "setup": {
+        "hand_occupations": 7
+      },
+      "action": {
+        "play": "B005"
+      },
+      "expected": {
+        "wood_delta": 1
+      }
+    }
+  ]
+}

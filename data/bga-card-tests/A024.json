@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A024",
+  "cases": [
+    {
+      "id": "A024-normal",
+      "scope": "effect_only",
+      "setup": {
+        "bread_oven": true
+      },
+      "action": {
+        "use_space": "cultivation"
+      },
+      "expected": {
+        "bake_bread_granted": true
+      }
+    },
+    {
+      "id": "A024-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "bread_oven": true
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "bake_bread_granted": false
+      }
+    }
+  ]
+}
