@@ -67,10 +67,10 @@
       "optional": false,
       "frequency": "every_use",
       "duration": "instant",
-      "snapshot": "after_event",
+      "snapshot": "before_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Space holds at most 2 food at the moment of use; action arrives afterwards."
+      "notes": "Evaluate the Fishing accumulation count immediately BEFORE collecting its food; the bonus improvement action is executed after the ordinary space action."
     }
   ],
   "post_play": {
@@ -82,11 +82,12 @@
     "test_case_ids": [
       "A095-normal",
       "A095-not-triggered",
-      "A095-boundary"
+      "A095-boundary",
+      "A095-before-after-snapshot"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Each Fishing-space use while the space holds at most 2 food grants a Major-or-Minor Improvement action afterwards."
+    "notes": "If the Fishing pile held at most 2 food before use, grant a major-or-minor improvement afterwards, not after recomputing from the now-empty space."
   }
 }
