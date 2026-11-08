@@ -163,6 +163,15 @@ class M8EvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(EvidenceError, "different Actions run"):
             self.checks(tests, matches, run_url="https://github.com/o/r/actions/runs/999")
 
+    def test_reusable_workflow_exposes_no_invalid_literal_job_output(self):
+        workflow = (
+            Path(__file__).resolve().parent.parent / ".github" / "workflows"
+            / "m8-evidence.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("  workflow_call:", workflow)
+        self.assertNotIn("value: m8-evidence", workflow)
+        self.assertIn("name: m8-evidence", workflow)
+
     def test_trusted_run_requires_real_matching_actions_environment(self):
         from unittest.mock import patch
         from scripts.m8_evidence import validate_trusted_current_run
