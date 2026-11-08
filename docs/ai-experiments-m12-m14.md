@@ -103,7 +103,7 @@ ExIt候補：教師として情報集合を守るE2/E3/E4の探索を用い、�
 - 毎処理単位：同一seed×席の比較、全4席ブロック、評価データの不正混入、報酬の定義一致。
 - 毎コミット：fmt/clippy/test、seed固定回帰、差分レビュー、ブラウザ動作との境界、CIと専用Actions run URL。未測定の結果は書かない。
 
-**進捗更新（2026-11-09）**：G0評価基盤だけは [GitHub Actions Run #42511558662](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42511558662) で正式に`pass`を確認した。G1〜G3、カードあり4人戦、AIの首位率+5pp改善、可変思考予算の厳密な10秒実測は未達のまま。G0の`pass`をAI強化達成と誤解しない。
+**進捗更新（2026-11-09）**：G0評価基盤は [Run #42511558662](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42511558662) で正式に`pass`。PUCT対MCTSの**4人カードなし・固定16シミュレーション**比較も [Run #42515071537](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42515071537) で当該条件の首位クレジット差+5pp暫定基準を満たした（詳細§13）。ただし**G1〜G3、カードあり4人戦、ドラフト、同一最大思考時間・厳密な1手10秒の受入は未達**。G0 PASSと旧MCTS比の強さをモデル学習のG1/G2合格と混同しない。
 
 ## 9. 実装状況：M12データ層（2026-11-07、Task C / #106）
 
@@ -121,7 +121,7 @@ ExIt候補：教師として情報集合を守るE2/E3/E4の探索を用い、�
 - `verified` が使えるのは2人戦のみ（`verified_basic_card_set` の制約）。4人戦カードありは M10 の G1 未達のため、**評価条件として未提供**と明記する。
 - デッキ同一性は `CardSet::content_hash()`（`id`/`kind`/`cost`/`points`/`effects` の秩序非依存ハッシュ）で検証する。seed・配布手札は含めないため、非公開情報の漏洩経路にならない。
 - ドラフト条件（`draft_7_7` / `draft_10_7_simultaneous` / `choose_10_7`）は未提供のまま。#155 の慣行決定と M10 のプール整備が前提。
-- **首位率の比較結果はまだ無い。** 本項は条件分離の実装報告であり、+5pp の達成・未達を判定したものではない。
+- **この節（2026-11-07時点）では首位率比較は未実施だった。** ただし後日の2026-11-09正式比較は下記§13に記録した。カードあり/ドラフトの比較は依然未実施。
 
 
 ## 11. #212：4人カードなし PUCT 対 MCTS の直接比較（事前登録）
@@ -166,3 +166,31 @@ gh workflow run paired-eval.yml --ref main \
 - 8シャードをGitHub-hosted `ubuntu-24.04`で分散し、全実行runとコミットSHAのmeta情報・シャード固有block範囲を確認。Rust側で全試合再演ハッシュを照合し、`scripts/paired_eval_stats.py`が2,000行・全seat/seedの完全性・95%区間/期待順位・score margin・速度を検証する。失敗シャードがあれば集約はFAILし、不完全結果を強さの証拠にしない。
 - PR #213での**32試合pilot**はGitHub-hostedのスモークとしてSUCCESS、PUCT 93.75%・MCTS mirror25.00%、しかし独立seedが4ブロックしかなく4 simulations/depth1の探索的観測である。これを正式な改善主張には用いず、今回の250ブロックの結果を別に評価する。
 - 本正式比較でも両探索の**シミュレーション回数を一致**させたのであり、同時間の10秒条件にはなっていない。時間上限の可変化と対局時計は#167/#92、カード・ドラフト追加は#105/#104で別に扱う。
+
+
+## 13. 2026-11-09 採用方針：現行PUCTを比較基準、Gumbel rootとExItを先行（Issue #218）
+
+**限定モードでの確認済み実績**：[#214](https://github.com/cueikusuta/agricola-re-ai/issues/214)・[Actions #42515071537](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42515071537)、commit `a0cd5301772d1a1de728b51493a66cc3b1afd082`。カードなし4人・追加タイルOFF・16 simulations/depth2、未知seed 965000〜965249、250ブロック×全4席×2arm＝**1,000試合/arm**。PUCT 1席対MCTS3席の首位クレジット87.8%、全MCTS mirror25.0%、差+62.8pp、seedブロックbootstrap95%CI **[+60.6,+64.9]pp**。全シャード・再演/集約SUCCESS。固定探索回数であり**同CPU時間・同10秒制限の証拠ではない**。現行PUCTを増分比較の主力とし、MCTSを履歴参照に残す。
+
+| 優先 | 対象Issue | 比較と成果 | ゲート |
+|---|---|---|---|
+| 1 | [#219](https://github.com/cueikusuta/agricola-re-ai/issues/219) | 現行PUCTのversion/config基準固定、合法候補・prior/leaf・rolloutの小規模アブレーション | cardless検証・未知seed・再演 |
+| 2 | [#220](https://github.com/cueikusuta/agricola-re-ai/issues/220) | Gumbel root Top-k＋sequential halvingを既存prior/valueでpilot、**未学習のGumbel AlphaZero全体ではない** | 少数探索での合法性と時間コスト・現行PUCT同条件比較 |
+| 3 | [#221](https://github.com/cueikusuta/agricola-re-ai/issues/221) | ExIt教師：PUCT rootの訪問分布、観測・合法mask、train/validation/testの再演・秘匿安全なラベル契約 | **G0 PASS**、G1への準備のみ |
+| 4 | [#222](https://github.com/cueikusuta/agricola-re-ai/issues/222) | ExIt学生：軽量線形/小MLPで一様prior・定数価値対照とvalidation比較 | **G1のみを判定**。policy NLL5%以上改善かつ価値MAE改善 |
+| 後段 | [#223](https://github.com/cueikusuta/agricola-re-ai/issues/223) | ISMCTS/情報集合PUCT、カード・ドラフト記憶を利用した秘匿整合サンプラー | M10/M11観測履歴・合法性/再演・G2/G3条件成立後 |
+
+### 13.1 今後の一次比較の統計契約
+
+**旧MCTS対PUCTを毎回再実行するのではなく、現行PUCT対改良版を中心にする。** candidate=改良PUCTまたはGumbel、opponent=既定版PUCT（残り3席）、baseline=既定版PUCT mirror。探索手法・モデルを同名に上書きしてはならない。各armのpolicy ID/version/config、合法候補ID、ルール版・コードSHA、seed block、席、探索回数/深さ、同時間モード、観測スキーマ/デッキハッシュを記録し、違いが意図せず混在したら拒否する。
+
+まず16/32/64 simulations等のpilotで合法性・秘匿・再演・コストを確認し、train/validationで一次候補を選ぶ。正式な勝率評価は**未知のtest seed**、固定の一次比較・全4席・**1,000試合/arm**を初期基準として、1/k首位クレジット差・座席別結果・95%ブロックbootstrap・必要追加試合数を提示する。**同シミュレーション回数比較と同思考時間比較は別実験**で、最終採否は#167の意思決定全体（探索＋詳細）に対する同時間の条件・フォールバックを用いる。カードなしで得た改善をカード/ドラフトへ無検証に外挿しない。
+
+### 13.2 G1から先は条件付き
+
+- **G0（該当カードなし条件）**：PASS [Run #42511558662](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42511558662)。これだけで教師ラベルが有効とは言えない。
+- **G1**：#221で学習入力を合法な公開観測＋自分だけの情報に限定し、探索root訪問数/合法maskを正しく記録。#222の学生がvalidationで一様prior比5%以上のpolicy NLL改善、定数予測より価値MAE改善、違法0/非公開漏洩0/再演一致を示すまでHOLD。失敗時は探索prior/ラベル/特徴を再検討する。
+- **G2**：G1 PASS後に別Issueで、学生単独・既存PUCT探索単独・学生誘導探索を**同時間**かつ未知test seed×全席で比較、首位率+5pp点推定と95%CI下限>0を暫定基準にする。小規模pilotは正式比較にカウントしない。
+- **G3**：M10カード効果の公式照合・M11のドラフト観測履歴と保存・再演が受け入れ済みのモードから、カードあり・7-7・10-7の別評価へ拡張。ISMCTSを検討。カードが実装されたという理由でG2/G3を飛ばさない。
+
+モデル学習・実験の計算資源は原則GitHub-hosted標準CPU、軽量PR CIは60秒目標。大規模学習/GPU/MuZero/PPOを前倒しせず、事前にコスト・有効性を検証する。並行するカードDB PR #215 とカード効果実装には本タスクで変更を加えない。
