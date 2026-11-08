@@ -174,3 +174,45 @@
 3. 他プレイヤーに影響する `step` は `target` を `all_other_players` などにし、所有者以外へ勝手に加算しない。
 4. 数値が式で決まる場合、`snapshot` を `before_effect` にして「効果適用前」を参照することを明示する。
 5. 語彙で表現できない効果は `effects: null` のまま `review.status` を `needs_resolution` とし、`unresolved_fields` に理由を書く。無効果のダミーにしない。
+
+## 2026-11-09追補：Issue #226 A070〜A090の追加語彙
+
+本表はBGA向け第三者Wikiから起こした**データ契約**であり、Rustの効果実装済みを意味しない。
+通常アクションの成果をすべて解決した後で `after_worker_space` を通知する。
+ただし「そのスペースを使ったときの累積数」を条件とするカードは、使用前のイベント値を保持し、`snapshot=after_event` の現在の空スペースを参照してはいけない。
+
+### 新しいtrigger
+| trigger | params/タイミング |
+|---|---|
+| `after_stables_built` | 自分の手番で厩を建て終えたイベント単位、`stables_built_on_own_turn` と併用 |
+| `returning_home_phase` | 収穫のないラウンドも含め、人物を帰宅させるフェイズ |
+| `after_worker_space` | 使用した通常アクションが完了した後。直前のスペースが集積スペースなら**通常取得済み** |
+
+### 新しいpredicate
+| predicate | params・期待値 |
+|---|---|
+| `farmyard_unused_became_used` | `n`：当該イベントにより未使用→使用済みになった農場マス数 |
+| `new_pasture_created` | `min_spaces`：その柵建設で新規成立した牧場の最小セル数 |
+| `resource_at_least` | `good,n`：支払前の所有資源の下限 |
+| `stables_built_on_own_turn` | `min`：自分の手番で新規建設した厩数 |
+| `vegetables_planted` | `min`：その種まきイベントで野菜を植えた畑の個数 |
+| `round_space_has_marker` | `kind`：指定ラウンド上のマーカー識別（使用時に原子的に消去） |
+| `accumulation_at_least` | `space=any_building_resource_space,n`：**通常アクション解決後**も指定資材スペースがn以上保持している |
+
+### 新しい `operation:other` のkind・既存kind拡張
+| kind | params・意味 |
+|---|---|
+| `move_field_good_to_supply` | `good,good_amount,max_source_fields,counts_as_field_phase`。指定畑から一般ストックへ戻す（収穫ではない） |
+| `move_crop_to_empty_field` | `crop_amount,source_field_min_crops,counts_as_sow,counts_as_harvest`。**A071はフリーアクションの受付窓・保存再演が未規定のため`needs_resolution`かつ`effects=null`** |
+| `add_good_to_single_crop_type_fields` | `same_type,amount_per_field,scope`。同種作物だけの畑へ追加 |
+| `stack_goods_on_card` | `mapping,amount_per_use` を追加。アクションスペースと積載資源の対応 |
+| `move_all_goods_on_card_to_supply` | カード上の全資源を一度に所有者へ移す |
+| `take_good_from_accumulation` | `good_type=building_resource,amount`。通常取得後に残り4以上のスペース**1か所**から任意に1個取得。空の使用済み累積スペースから二重取得しない |
+| `place_animals_on_fenced_pasture` | `animal,amount,destination=newly_fenced_pasture`。新規牧場の収容可能性も検証 |
+| `breed_animal` | `animal_types`。支払後に指定家畜種を繁殖。収容/調理/廃棄は既存エンジンの合法性で判断 |
+| `allow_wood_to_stone_renovation` | `cost_unchanged`。石の家への改築経路を拡張する権限。通常の資源費用を省略しない |
+
+### 参照時点・保留
+- `A082` の閾値4以上は通常アクション解決**後**。同じ累積スペースの通常取得品を2回数えない。`A082-normal-action-drains-space` の回帰テストを参照。
+- `A071` の「いつでも」は `passive` だけでは人物を置かない合法な操作として確定できない。フリーアクションAPIで手番境界、連続実行、取消、再演ハッシュを定義するまで実装禁止。
+- `A089` のラウンド14を超えるマーカーは既存の`needs_resolution`のままとし、未知のラウンド15以降を生成しない。
