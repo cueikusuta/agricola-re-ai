@@ -52,7 +52,7 @@ test("Issue #246: BGA-reference tabletop composition works in Chromium",async t=
     assert.match(await page.locator("#nextHarvest").innerText(),/収穫/);
     assert.deepEqual(errors,[],"no uncaught exceptions");
     fs.mkdirSync("artifacts",{recursive:true});
-    await page.locator("#actionPanel").scrollIntoViewIfNeeded();
+    await page.evaluate(()=>window.scrollTo(0,0));
     await page.screenshot({path:"artifacts/bga-tabletop-"+viewport.width+"-viewport.png"});
     if(viewport.width===1280)await page.screenshot({path:"artifacts/bga-tabletop-1280-full.png",fullPage:true});
     const first=page.locator("#actions button[data-space]").first();
