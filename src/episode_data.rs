@@ -161,7 +161,7 @@ impl EpisodeRecord {
             code_sha: meta.code_sha.clone(),
             card_mode: meta.card_mode.clone(),
             config: game.config.clone(),
-            card_set: game.card_set.clone(),
+            card_set: (*game.card_set).clone(),
             ai_versions: meta.ai_versions.clone(),
             draft,
             turns,

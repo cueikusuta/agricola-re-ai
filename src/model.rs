@@ -2,9 +2,28 @@
 use crate::cards::{CardDefinition, CardSet, CardState};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
+
+/// Helper to serialize `Arc<T>` as `T` and deserialize back to `Arc<T>`.
+/// This allows sharing card definitions in memory while keeping save format identical.
+fn serialize_arc<T, S>(arc: &Arc<T>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    T: Serialize,
+    S: Serializer,
+{
+    T::serialize(arc, serializer)
+}
+
+fn deserialize_arc<'de, T, D>(deserializer: D) -> Result<Arc<T>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    T::deserialize(deserializer).map(Arc::new)
+}
 
 pub const FARM_CELLS: usize = 15;
 pub const HARVEST_ROUNDS: [u8; 6] = [4, 7, 9, 11, 13, 14];
@@ -532,8 +551,12 @@ pub struct Game {
     pub hidden_round_deck: Vec<RoundCard>,
     pub rng: RngStreams,
     pub delayed_well: BTreeMap<u8, Vec<usize>>,
-    #[serde(default)]
-    pub card_set: CardSet,
+    #[serde(
+        default,
+        serialize_with = "serialize_arc",
+        deserialize_with = "deserialize_arc"
+    )]
+    pub card_set: Arc<CardSet>,
     #[serde(default)]
     pub cards: CardState,
     pub log: GameLog,
@@ -600,7 +623,7 @@ impl Game {
         }
         card_set.validate(config.players)?;
         let cards = CardState::deal(&card_set, config.seed, config.players);
-        Self::from_card_state(config, card_set, cards, None, None)
+        Self::from_card_state(config, Arc::new(card_set), cards, None, None)
     }
     /// Start a game from explicit, already-drafted hands instead of the random
     /// [`CardState::deal`]. This is the M11 draft-to-game bridge (#104): only
@@ -620,7 +643,7 @@ impl Game {
             return Err("explicit hands must match the player count".into());
         }
         let cards = CardState::from_hands(&card_set, &hands)?;
-        Self::from_card_state(config, card_set, cards, Some(hands), None)
+        Self::from_card_state(config, Arc::new(card_set), cards, Some(hands), None)
     }
     /// Reuse a start player selected and announced *before* drafting. The
     /// round deck keeps its own game seed and independent shuffle stream.
@@ -638,12 +661,18 @@ impl Game {
             return Err("explicit hands must match the player count".into());
         }
         let cards = CardState::from_hands(&card_set, &hands)?;
-        Self::from_card_state(config, card_set, cards, Some(hands), Some(start_player))
+        Self::from_card_state(
+            config,
+            Arc::new(card_set),
+            cards,
+            Some(hands),
+            Some(start_player),
+        )
     }
 
     fn from_card_state(
         config: Config,
-        card_set: CardSet,
+        card_set: Arc<CardSet>,
         cards: CardState,
         initial_hands: Option<Vec<Vec<String>>>,
         initial_start_player_override: Option<usize>,
@@ -701,7 +730,7 @@ impl Game {
             initial_public_state: None,
             round_seed,
             action_seed,
-            card_set: card_set.clone(),
+            card_set: (*card_set).clone(),
             initial_hands: initial_hands.clone(),
             events: vec![],
         };
@@ -741,11 +770,30 @@ impl Game {
             &self.hidden_round_deck,
             &self.rng,
             &self.delayed_well,
-            &self.card_set,
+            &*self.card_set,
             &self.cards,
         ))
         .expect("state serialization");
         format!("{:x}", Sha256::digest(&data))
+    }
+
+    /// Create a lightweight clone for search (MCTS/PUCT).
+    /// This avoids cloning the event log and shares the card definitions via Arc.
+    /// The returned game has `record_events = false` and an empty event log.
+    pub fn search_clone(&self) -> Self {
+        let mut log = self.log.clone();
+        log.events.clear();
+        Self {
+            config: self.config.clone(),
+            public: self.public.clone(),
+            hidden_round_deck: self.hidden_round_deck.clone(),
+            rng: self.rng.clone(),
+            delayed_well: self.delayed_well.clone(),
+            card_set: self.card_set.clone(),
+            cards: self.cards.clone(),
+            log,
+            record_events: false,
+        }
     }
     pub fn save_json(&self) -> Result<String, String> {
         serde_json::to_string_pretty(self).map_err(|e| e.to_string())
@@ -757,7 +805,7 @@ impl Game {
             || result.log.rules_version != RULES_VERSION
             || result.log.engine_version != ENGINE_VERSION
             || result.log.config != result.config
-            || result.log.card_set != result.card_set
+            || result.log.card_set != *result.card_set
         {
             return Err("saved game metadata/version mismatch".into());
         }
@@ -767,14 +815,16 @@ impl Game {
         ) {
             (Some(hands), Some(starter)) => Game::with_cards_and_hands_with_start_player(
                 result.config.clone(),
-                result.card_set.clone(),
+                (*result.card_set).clone(),
                 hands,
                 starter,
             )?,
-            (Some(hands), None) => {
-                Game::with_cards_and_hands(result.config.clone(), result.card_set.clone(), hands)?
-            }
-            (None, None) => Game::with_cards(result.config.clone(), result.card_set.clone())?,
+            (Some(hands), None) => Game::with_cards_and_hands(
+                result.config.clone(),
+                (*result.card_set).clone(),
+                hands,
+            )?,
+            (None, None) => Game::with_cards(result.config.clone(), (*result.card_set).clone())?,
             (None, Some(_)) => return Err("start player override requires draft hands".into()),
         };
         if result.log.start_player != initial.public.start_player
@@ -796,7 +846,7 @@ impl Game {
         // last event hash; otherwise earlier tampering could go unnoticed.
         let replayed = Game::replay_with_setup_and_start_player(
             result.config.clone(),
-            result.card_set.clone(),
+            (*result.card_set).clone(),
             result.log.initial_hands.clone(),
             result.log.initial_start_player_override,
             &result.log.events,

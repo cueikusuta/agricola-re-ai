@@ -498,7 +498,7 @@ impl Game {
     /// `apply`. Human input and AI selections share this validator; it never
     /// modifies `self` and rejects illegal details before any state change.
     pub fn validate_action(&self, action: &Action) -> Result<()> {
-        let mut probe = self.clone();
+        let mut probe = self.search_clone();
         probe.apply_with_plans(action.clone(), None, None, &SimpleHarvestDetails)
     }
 
@@ -830,7 +830,7 @@ impl Game {
     /// cannot disagree with the committed rule engine. No events or state are
     /// added to `self` (only to the discarded clone).
     pub fn validate_free(&self, player: usize, free: &FreeAction) -> Result<()> {
-        let mut probe = self.clone();
+        let mut probe = self.search_clone();
         probe.apply_free(player, free.clone())
     }
 
