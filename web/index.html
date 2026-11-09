@@ -239,6 +239,66 @@ footer{color:#705e41;font-size:12px}
  #cardBrowser .cardIllustration{font-size:25px;min-height:32px}
 }
 
+
+/* #246 Interaction pass — concise visible status, detailed context only on demand */
+.tableHeader{padding-block:9px}.brandSub{display:none}
+.topNav a{display:inline-flex;gap:5px;align-items:center;font-weight:650}
+.actionPanelHeading{gap:6px}
+#notice:empty{display:none}
+#boardSummary{font-size:11px;margin:3px 0 8px;opacity:.9}
+#usedActions{font-size:10px;opacity:.8;gap:3px}
+#usedActions .usedSpace{padding:1px 5px}
+#stats .stat{cursor:help;position:relative;display:flex;align-items:center;justify-content:center;gap:3px;flex-direction:column;font-size:11px;line-height:1.25;min-height:51px}
+#stats .stat::before{content:attr(data-icon);display:block;font-size:21px;line-height:1.2}
+#stats .stat:hover,#stats .stat:focus-within{border-color:#6d8650;background:#f6ebcd}
+.opponentSupply{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:4px 0}
+.opponentResource{display:inline-flex;align-items:center;gap:2px;border:1px solid #d1bd92;border-radius:5px;padding:1px 4px;background:#efe3c1;white-space:nowrap;font-size:11px;color:#433521}
+.opponentResource:hover{background:#fff4d3;border-color:#94784d}
+.resourcePictogram{font-size:14px;line-height:1.2}
+.farmField .cell,.miniFarm .miniCell{cursor:help}
+.farmField .cell:hover{outline:2px solid #fff2af;outline-offset:-3px;z-index:2}
+.farmField .cellLabel{font-size:10px}
+#cardsPanel .cardTile{transition:transform .12s ease,box-shadow .12s ease}
+#cardsPanel .cardTile:hover,#cardsPanel .cardTile:focus-within{transform:translateY(-2px);box-shadow:0 5px 9px #77654b55}
+.compactHelp{position:relative;font-size:13px;max-width:100%}
+.compactHelp summary{display:flex;align-items:center;justify-content:center;width:30px;height:30px;cursor:pointer;list-style:none;border-radius:50%;color:#f7eccd;background:#46603d;border:1px solid #9db78b;font-size:20px;font-weight:700}
+.compactHelp summary::-webkit-details-marker{display:none}
+.compactHelp[open] summary{background:#b58f5b;color:#34281b}
+.compactHelp .helpContent{position:absolute;right:0;top:calc(100% + 6px);z-index:45;width:min(290px,calc(100vw - 32px));padding:10px 12px;background:#fff7e3;border:2px solid #98754c;box-shadow:0 7px 16px #33251655;border-radius:7px;color:#352718;line-height:1.6;font-size:12px}
+.compactHistory summary{cursor:pointer;list-style:none;font-size:12px;font-weight:600;color:#624b32;white-space:nowrap}
+.compactHistory summary::-webkit-details-marker{display:none}
+.compactHistory[open]{width:100%;line-height:1.55}
+#history{padding:4px 0}
+#draftPanel .compactHistory{padding:4px 0}
+#actions .actionTile{overflow:visible;z-index:1;isolation:isolate;cursor:pointer}
+#actions .actionTile:has(.tileInfo:hover),#actions .actionTile.helpOpen,#actions .actionTile:hover,#actions .actionTile:focus-within{z-index:50}
+#actions .actionTile:hover:not(.occupied),#actions .actionTile:focus-within:not(.occupied){border-color:#e4d28d;box-shadow:0 0 0 2px #edd89980,0 5px 12px #263a245c}
+#actions .actionGlyph{right:8px;top:5px;font-size:24px;opacity:.97;filter:drop-shadow(0 1px 1px #41371b55)}
+#actions .actionTile button[data-space]{max-width:calc(100% - 30px);padding:7px 0 0 7px;font-size:13px;min-height:47px;text-align:left;overflow-wrap:anywhere}
+#actions .actionTile .occupiedTitle{max-width:calc(100% - 27px);display:block;padding:8px 0 0 7px}
+#actions .actionTile .tileMeta{font-size:11px;padding:0 40px 6px 6px;line-height:1.1}
+#actions .actionCount{font-size:11px;font-weight:850;padding:3px 4px;max-width:none;white-space:nowrap}
+#actions .actionCount .tokenDot{width:8px;height:8px}
+#actions .tileInfo{display:flex;align-items:center;justify-content:center;position:absolute;right:3px;bottom:3px;width:35px;height:34px;z-index:3;color:#644f33;font-size:18px;border:1px solid #b89c6e;border-radius:6px;background:#fff3d2;line-height:1;cursor:help;user-select:none}
+#actions .tileInfo:hover,#actions .tileInfo:focus-visible,#actions .actionTile.helpOpen .tileInfo{background:#f8d785;border-color:#6e593a;color:#3c2c16;outline-offset:0}
+#actions .tileTooltip{display:none;position:absolute;left:0;bottom:calc(100% + 7px);z-index:60;width:min(258px,calc(100vw - 38px));padding:10px 11px;flex-direction:column;gap:6px;color:#2c2418;background:#fff9e8;border:2px solid #94774c;border-radius:7px;box-shadow:0 7px 18px #27221b8c;text-align:left;cursor:auto;font-size:12px;line-height:1.5;pointer-events:auto}
+#actions .tileTooltip strong{font-size:13px;color:#3b331f}
+#actions .tileTooltip small{color:#6b5d44;font-size:11px;border-top:1px solid #d9c7a2;padding-top:5px}
+#actions .actionTile:nth-child(even) .tileTooltip{left:auto;right:0}
+#actions .actionTile:hover .tileTooltip,#actions .actionTile:focus-within .tileTooltip,#actions .actionTile.helpOpen .tileTooltip{display:flex}
+@media(hover:none){#actions .actionTile:hover:not(.helpOpen):not(:focus-within) .tileTooltip{display:none}}
+@media(prefers-reduced-motion:reduce){#cardsPanel .cardTile{transition:none}}
+@media(max-width:760px){
+ .topNav a{font-size:12px}
+ #actions .actionTile .tileMeta{padding-right:38px}
+ #actions .actionTile button[data-space]{max-width:calc(100% - 31px);font-size:12px}
+ #actions .actionGlyph{font-size:20px}
+ #actions .actionTile .occupiedTitle{font-size:12px}
+ #stats .stat{font-size:10px;min-height:47px}
+ #stats .stat::before{font-size:18px}
+ .compactHelp .helpContent{right:-2px}
+}
+
 </style></head>
 <body><div class="screen">
 <header class="tableHeader">
