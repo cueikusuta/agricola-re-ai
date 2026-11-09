@@ -947,118 +947,7 @@ impl Game {
             return Err("major improvement duplicated or missing".into());
         }
         for (i, player) in p.players.iter().enumerate() {
-            if player.id != i || player.farm.len() != FARM_CELLS {
-                return Err("farm shape/player mismatch".into());
-            }
-            if player.family < 2 || player.family > 5 || player.newborns > player.family {
-                return Err("family limit".into());
-            }
-            if player.occupied_stables() > 4 || player.fences.len() > 15 {
-                return Err("stable/fence limit".into());
-            }
-            if p.work_quota[i] > player.family || p.workers_placed[i] > p.work_quota[i] {
-                return Err("invalid worker count".into());
-            }
-            let mut covered = BTreeSet::new();
-            let mut known_ids = BTreeSet::new();
-            let mut required_fences = BTreeSet::new();
-            for pasture in &player.pastures {
-                if (pasture.quantity == 0) != pasture.animal.is_none() {
-                    return Err("pasture species and quantity inconsistent".into());
-                }
-                if pasture.cells.is_empty() || pasture.cells.iter().any(|&i| i >= FARM_CELLS) {
-                    return Err("pasture cells outside farm".into());
-                }
-                if !known_ids.insert(pasture.id) {
-                    return Err("duplicate pasture ID".into());
-                }
-                let region: BTreeSet<_> = pasture.cells.iter().copied().collect();
-                let mut reached = BTreeSet::new();
-                let mut pending = vec![pasture.cells[0]];
-                while let Some(i) = pending.pop() {
-                    if !reached.insert(i) {
-                        continue;
-                    }
-                    pending.extend(neighbors(i).into_iter().filter(|j| region.contains(j)));
-                }
-                if reached.len() != region.len() {
-                    return Err("pasture is not orthogonally connected".into());
-                }
-                required_fences.extend(pasture_border(&pasture.cells));
-                if pasture.quantity > player.pasture_capacity(pasture) {
-                    return Err("over capacity".into());
-                }
-                if pasture.quantity > 0 && pasture.animal.is_none() {
-                    return Err("missing pasture species".into());
-                }
-                for &cell in &pasture.cells {
-                    if cell >= FARM_CELLS
-                        || !covered.insert(cell)
-                        || player.farm[cell].tile != (Tile::Pasture { id: pasture.id })
-                    {
-                        return Err("pasture cell invalid".into());
-                    }
-                }
-            }
-            // All rooms and all fields must form one orthogonally connected
-            // group; a disconnected serialized farm is not a legal state.
-            for category in [0u8, 1u8] {
-                let tiles = player
-                    .farm
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, cell)| match (category, cell.tile) {
-                        (0, Tile::Room) | (1, Tile::Field { .. }) => Some(index),
-                        _ => None,
-                    })
-                    .collect::<BTreeSet<_>>();
-                if !tiles.is_empty() {
-                    let mut explored = BTreeSet::new();
-                    let mut stack = vec![*tiles.iter().next().expect("nonempty tiles")];
-                    while let Some(index) = stack.pop() {
-                        if explored.insert(index) {
-                            stack.extend(
-                                neighbors(index)
-                                    .into_iter()
-                                    .filter(|neighbor| tiles.contains(neighbor)),
-                            );
-                        }
-                    }
-                    if explored != tiles {
-                        return Err("rooms or fields are not connected".into());
-                    }
-                }
-            }
-            if player.fences != required_fences {
-                return Err("pasture boundaries and placed fences disagree".into());
-            }
-            for (cell_index, cell) in player.farm.iter().enumerate() {
-                if let Tile::Field { crop, remaining } = cell.tile {
-                    match crop {
-                        None if remaining != 0 => {
-                            return Err("empty field carries crops".into());
-                        }
-                        Some(Crop::Grain) if remaining == 0 || remaining > 3 => {
-                            return Err("invalid grain stack".into());
-                        }
-                        Some(Crop::Vegetable) if remaining == 0 || remaining > 2 => {
-                            return Err("invalid vegetable stack".into());
-                        }
-                        _ => (),
-                    }
-                }
-                if matches!(cell.tile, Tile::Pasture { .. }) && !covered.contains(&cell_index) {
-                    return Err("pasture tile orphan".into());
-                }
-                if cell.stable && !matches!(cell.tile, Tile::Empty | Tile::Pasture { .. }) {
-                    return Err("stable placed on room/field".into());
-                }
-                if cell.stable_animal.is_some()
-                    && (!cell.stable || !matches!(cell.tile, Tile::Empty))
-                {
-                    return Err("invalid unfenced stable animal".into());
-                }
-            }
+            validate_player_state(&p.work_quota, &p.workers_placed, i, player)?;
         }
         if !self.config.additional_action_space_enabled
             && p.used.iter().any(|s| s.additional_for(self.config.players))
@@ -1121,6 +1010,128 @@ pub fn round_for_space(s: Space) -> RoundCard {
     }
 }
 
+/// Per-player farm/animal/fence invariants shared by `Game::validate` and the
+/// validation layers (`crate::validation`). Keeping one implementation
+/// prevents the full and incremental validators from drifting apart.
+pub fn validate_player_state(
+    work_quota: &[u8],
+    workers_placed: &[u8],
+    index: usize,
+    player: &Player,
+) -> Result<(), String> {
+    if player.id != index || player.farm.len() != FARM_CELLS {
+        return Err("farm shape/player mismatch".into());
+    }
+    if player.family < 2 || player.family > 5 || player.newborns > player.family {
+        return Err("family limit".into());
+    }
+    if player.occupied_stables() > 4 || player.fences.len() > 15 {
+        return Err("stable/fence limit".into());
+    }
+    if work_quota[index] > player.family || workers_placed[index] > work_quota[index] {
+        return Err("invalid worker count".into());
+    }
+    let mut covered = BTreeSet::new();
+    let mut known_ids = BTreeSet::new();
+    let mut required_fences = BTreeSet::new();
+    for pasture in &player.pastures {
+        if (pasture.quantity == 0) != pasture.animal.is_none() {
+            return Err("pasture species and quantity inconsistent".into());
+        }
+        if pasture.cells.is_empty() || pasture.cells.iter().any(|&i| i >= FARM_CELLS) {
+            return Err("pasture cells outside farm".into());
+        }
+        if !known_ids.insert(pasture.id) {
+            return Err("duplicate pasture ID".into());
+        }
+        let region: BTreeSet<_> = pasture.cells.iter().copied().collect();
+        let mut reached = BTreeSet::new();
+        let mut pending = vec![pasture.cells[0]];
+        while let Some(i) = pending.pop() {
+            if !reached.insert(i) {
+                continue;
+            }
+            pending.extend(neighbors(i).into_iter().filter(|j| region.contains(j)));
+        }
+        if reached.len() != region.len() {
+            return Err("pasture is not orthogonally connected".into());
+        }
+        required_fences.extend(pasture_border(&pasture.cells));
+        if pasture.quantity > player.pasture_capacity(pasture) {
+            return Err("over capacity".into());
+        }
+        if pasture.quantity > 0 && pasture.animal.is_none() {
+            return Err("missing pasture species".into());
+        }
+        for &cell in &pasture.cells {
+            if cell >= FARM_CELLS
+                || !covered.insert(cell)
+                || player.farm[cell].tile != (Tile::Pasture { id: pasture.id })
+            {
+                return Err("pasture cell invalid".into());
+            }
+        }
+    }
+    // All rooms and all fields must form one orthogonally connected
+    // group; a disconnected serialized farm is not a legal state.
+    for category in [0u8, 1u8] {
+        let tiles = player
+            .farm
+            .iter()
+            .enumerate()
+            .filter_map(|(cell_index, cell)| match (category, cell.tile) {
+                (0, Tile::Room) | (1, Tile::Field { .. }) => Some(cell_index),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        if !tiles.is_empty() {
+            let mut explored = BTreeSet::new();
+            let mut stack = vec![*tiles.iter().next().expect("nonempty tiles")];
+            while let Some(index) = stack.pop() {
+                if explored.insert(index) {
+                    stack.extend(
+                        neighbors(index)
+                            .into_iter()
+                            .filter(|neighbor| tiles.contains(neighbor)),
+                    );
+                }
+            }
+            if explored != tiles {
+                return Err("rooms or fields are not connected".into());
+            }
+        }
+    }
+    if player.fences != required_fences {
+        return Err("pasture boundaries and placed fences disagree".into());
+    }
+    for (cell_index, cell) in player.farm.iter().enumerate() {
+        if let Tile::Field { crop, remaining } = cell.tile {
+            match crop {
+                None if remaining != 0 => {
+                    return Err("empty field carries crops".into());
+                }
+                Some(Crop::Grain) if remaining == 0 || remaining > 3 => {
+                    return Err("invalid grain stack".into());
+                }
+                Some(Crop::Vegetable) if remaining == 0 || remaining > 2 => {
+                    return Err("invalid vegetable stack".into());
+                }
+                _ => (),
+            }
+        }
+        if matches!(cell.tile, Tile::Pasture { .. }) && !covered.contains(&cell_index) {
+            return Err("pasture tile orphan".into());
+        }
+        if cell.stable && !matches!(cell.tile, Tile::Empty | Tile::Pasture { .. }) {
+            return Err("stable placed on room/field".into());
+        }
+        if cell.stable_animal.is_some() && (!cell.stable || !matches!(cell.tile, Tile::Empty)) {
+            return Err("invalid unfenced stable animal".into());
+        }
+    }
+    Ok(())
+}
+
 /// orthogonal neighbors in 5 columns x 3 rows, 0-indexed.
 pub fn neighbors(cell: usize) -> Vec<usize> {
     let x = cell % 5;
@@ -1142,7 +1153,7 @@ pub fn neighbors(cell: usize) -> Vec<usize> {
 }
 
 /// Set of existing fence segments around a group of farm cells.
-fn pasture_border(cells: &[usize]) -> BTreeSet<(u8, u8)> {
+pub fn pasture_border(cells: &[usize]) -> BTreeSet<(u8, u8)> {
     let mut result = BTreeSet::new();
     for &cell in cells {
         if cell >= FARM_CELLS {

@@ -149,6 +149,12 @@ impl Episode {
     /// Apply one action for the active player with an explicit harvest policy.
     /// Search code can supply its own feeding/breeding decisions while the
     /// engine still validates the action.
+    ///
+    /// Single validated transition (#255 Phase B): `apply_with_harvest_policy`
+    /// is itself transactional — it only commits after its own validation
+    /// passes, so a separate `validate_action` probe would run the whole
+    /// clone+apply path twice. `require_turn` still guards turn ownership,
+    /// and a rejected action leaves the state completely unchanged.
     pub fn step_with_harvest_policy(
         &mut self,
         player: usize,
@@ -156,7 +162,6 @@ impl Episode {
         harvest: &dyn HarvestDetailPolicy,
     ) -> Result<(), String> {
         self.require_turn(player)?;
-        self.game.validate_action(&action)?;
         self.game.apply_with_harvest_policy(action, harvest)
     }
 
