@@ -17,6 +17,7 @@ pub mod mcts;
 pub mod mcts_puct;
 pub mod model;
 pub mod policy;
+pub mod registry;
 pub mod score;
 pub mod verification;
 pub mod web;

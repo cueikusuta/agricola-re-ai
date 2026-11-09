@@ -2,11 +2,16 @@
 //! This is a deliberately small deterministic effect vocabulary, not a claim that
 //! the full Agricola Revised deck has been implemented.
 use crate::model::{Animal, Crop, Good, House, Player, Space, Tile};
+use crate::registry::{
+    build_default_registry, card_set_from_pool, card_set_from_registry, CardId, CardPool,
+    CardRegistry,
+};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -2166,4 +2171,61 @@ mod card_set_content_hash_tests {
         shuffled.definitions.reverse();
         assert_eq!(first.content_hash(), shuffled.content_hash());
     }
+}
+
+/// Get the default immutable card registry (built once, shared via Arc).
+///
+/// This is the primary entry point for new code. The registry contains all
+/// implemented cards with stable CardId assignments and validated definitions.
+pub fn default_registry() -> Arc<CardRegistry> {
+    build_default_registry().expect("default registry must build")
+}
+
+/// Get a CardPool for the given player count and mode.
+///
+/// - `experimental_mode = false`: Official pool (verified + eligible only, fail-closed)
+/// - `experimental_mode = true`: Experimental pool (all implemented cards)
+pub fn card_pool(players: usize, experimental_mode: bool) -> CardPool {
+    CardPool::new(&default_registry(), players, experimental_mode)
+}
+
+/// Get a legacy CardSet for the given player count and mode (compat adapter).
+///
+/// This builds a CardSet from the pool's eligible cards, suitable for
+/// existing APIs that expect CardSet (saves, observations, legacy engine paths).
+pub fn card_set_for_game(players: usize, experimental_mode: bool) -> CardSet {
+    let registry = default_registry();
+    let pool = card_pool(players, experimental_mode);
+    card_set_from_pool(&registry, &pool)
+}
+
+/// Get a legacy CardSet with ALL implemented cards (for full-catalog observations).
+pub fn card_set_full_catalog() -> CardSet {
+    card_set_from_registry(&default_registry())
+}
+
+/// Look up a card definition by external ID from the default registry.
+pub fn card_definition(external_id: &str) -> Option<CardDefinition> {
+    default_registry()
+        .get_by_external(external_id)
+        .map(|c| c.to_card_definition())
+}
+
+/// Look up a card definition by CardId from the default registry.
+pub fn card_definition_by_id(card_id: CardId) -> Option<CardDefinition> {
+    default_registry()
+        .get(card_id)
+        .map(|c| c.to_card_definition())
+}
+
+/// Convert external ID to CardId using the default registry.
+pub fn external_to_card_id(external_id: &str) -> Option<CardId> {
+    default_registry().card_id(external_id)
+}
+
+/// Convert CardId to external ID using the default registry.
+pub fn card_id_to_external(card_id: CardId) -> Option<String> {
+    default_registry()
+        .external_id(card_id)
+        .map(|s| s.to_string())
 }
