@@ -314,6 +314,10 @@ footer{color:#705e41;font-size:12px}
 .quickActions #quickNew:hover{background:#547c4b}
 @media(max-width:760px){.tableHeader{gap:6px}.quickActions{margin-left:auto}.quickActions button{min-height:34px;padding:5px 8px}}
 
+
+/* Tooltips describe a tile but must NEVER cover the click target of any other action. */
+#actions .tileTooltip{pointer-events:none!important;user-select:none}
+
 </style></head>
 <body><div class="screen">
 <header class="tableHeader">
