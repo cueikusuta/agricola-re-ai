@@ -288,8 +288,7 @@ fn can_build(p: &Player) -> bool {
     (p.supply.reed >= 2
         && p.supply.get(room_material(p)) >= room_build_cost(p)
         && available_room(p))
-        || (p.supply.wood >= 2
-            && (0..FARM_CELLS).any(|i| stable_site_available(p, i)))
+        || (p.supply.wood >= 2 && (0..FARM_CELLS).any(|i| stable_site_available(p, i)))
 }
 fn can_fence(p: &Player) -> bool {
     single_cell_pasture(p).is_some()
@@ -2541,7 +2540,10 @@ mod stable_building_rule_tests {
         };
 
         assert!(game.available_spaces().contains(&Space::FarmExpansion));
-        assert!(game.detail_hints(Space::FarmExpansion).stable_cells.contains(&14));
+        assert!(game
+            .detail_hints(Space::FarmExpansion)
+            .stable_cells
+            .contains(&14));
         game.validate_action(&action).unwrap();
         game.apply(action).unwrap();
         let player = &game.public.players[active];
