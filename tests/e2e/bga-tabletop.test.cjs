@@ -57,18 +57,21 @@ test("Issue #246: BGA-reference tabletop composition works in Chromium",async t=
     assert.ok(await page.locator("#actions .actionTile").count()>0);
     assert.ok(await page.locator("#actions button[data-space]").count()>0);
     assert.match(await page.locator("#nextHarvest").innerText(),/収穫/);
+    assert.match(await page.locator("#actionFeedback").innerText(),/新しい対戦/,"new game gives visible feedback");
     assert.equal(await page.locator("#analysisPanel").isVisible(),false,"analysis is hidden during play");
     assert.equal(await page.locator("#verificationPanel").isVisible(),false,"debug info is hidden during play");
     await page.locator('#uiModeTabs button[data-ui-mode="analysis"]').click();
     assert.equal(await page.locator("#analysisPanel").isVisible(),true,"analysis mode displays server candidate evidence");
     assert.equal(await page.locator("#cardsPanel").isVisible(),false,"hand disappears from analysis sidebar");
     assert.match(await page.locator("#analysisContent").innerText(),/評価順ではありません/);
+    if(viewport.width===1280){fs.mkdirSync("artifacts",{recursive:true});await page.screenshot({path:"artifacts/bga-tabletop-analysis-1280.png"});}
     await page.locator('#uiModeTabs button[data-ui-mode="verification"]').click();
     assert.equal(await page.locator("#verificationPanel").isVisible(),true);
     const verification=await page.locator("#verificationContent").innerText();
     assert.match(verification,/"round"/);
     assert.doesNotMatch(verification,/"hand"|"seed"|"card_definitions"|"state_hash"/,
       "verification must not leak hidden cards, seed or internal-only fields");
+    if(viewport.width===1280)await page.screenshot({path:"artifacts/bga-tabletop-verification-1280.png"});
     await page.locator('#uiModeTabs button[data-ui-mode="play"]').click();
     assert.equal(await page.locator("#cardsPanel").isVisible(),true);
     assert.equal(await page.locator("#verificationPanel").isVisible(),false);
