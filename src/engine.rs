@@ -275,15 +275,20 @@ fn room_build_cost(p: &Player) -> u32 {
         normal
     }
 }
+/// A stable does not occupy a room/field tile. A fenced pasture is still
+/// a legal site (2016 Lookout revised rulebook, p. 8).
+/// This predicate checks the site and stable supply, but not wood payment.
+pub(crate) fn stable_site_available(p: &Player, i: usize) -> bool {
+    i < FARM_CELLS
+        && p.occupied_stables() < 4
+        && !p.farm[i].stable
+        && matches!(p.farm[i].tile, Tile::Empty | Tile::Pasture { .. })
+}
 fn can_build(p: &Player) -> bool {
     (p.supply.reed >= 2
         && p.supply.get(room_material(p)) >= room_build_cost(p)
         && available_room(p))
-        || (p.occupied_stables() < 4
-            && p.supply.wood >= 2
-            && p.farm
-                .iter()
-                .any(|c| matches!(c.tile, Tile::Empty) && !c.stable))
+        || (p.supply.wood >= 2 && (0..FARM_CELLS).any(|i| stable_site_available(p, i)))
 }
 fn can_fence(p: &Player) -> bool {
     single_cell_pasture(p).is_some()
@@ -523,17 +528,14 @@ impl Game {
                     .iter()
                     .any(|&j| matches!(me.farm[j].tile, Tile::Room))
         };
-        let stable_legal = |i: usize| {
-            me.occupied_stables() < 4
-                && !me.farm[i].stable
-                && matches!(me.farm[i].tile, Tile::Empty)
-        };
         if matches!(space, Space::Farmland | Space::Cultivation) {
             hints.plow_cells = (0..FARM_CELLS).filter(|&i| plow_legal(i)).collect();
         }
         if matches!(space, Space::FarmExpansion) {
             hints.room_cells = (0..FARM_CELLS).filter(|&i| room_legal(i)).collect();
-            hints.stable_cells = (0..FARM_CELLS).filter(|&i| stable_legal(i)).collect();
+            hints.stable_cells = (0..FARM_CELLS)
+                .filter(|&i| stable_site_available(me, i))
+                .collect();
         }
         if matches!(space, Space::GrainUtilization | Space::Cultivation) {
             hints.sow_fields = (0..FARM_CELLS)
@@ -1459,11 +1461,7 @@ fn build_room(p: &mut Player, i: usize) -> Result<()> {
     Ok(())
 }
 fn build_stable(p: &mut Player, i: usize) -> Result<()> {
-    if i >= FARM_CELLS
-        || p.occupied_stables() >= 4
-        || p.farm[i].stable
-        || !matches!(p.farm[i].tile, Tile::Empty)
-    {
+    if !stable_site_available(p, i) {
         return Err("stable location illegal".into());
     }
     p.supply.pay(Good::Wood, 2)?;
@@ -2448,13 +2446,110 @@ mod stable_building_rule_tests {
     use super::*;
 
     #[test]
-    fn farm_expansion_cannot_put_stable_on_existing_pasture_tile() {
+    fn farm_expansion_can_build_stable_in_existing_pasture() {
         let mut player = Player::new(0, 0);
         player.supply.wood = 20;
         build_pastures(&mut player, &[vec![14]], None).unwrap();
-        let before = player.clone();
+        player.pastures[0].animal = Some(Animal::Sheep);
+        player.pastures[0].quantity = 2;
+        let pasture_id = player.pastures[0].id;
+        let wood_before = player.supply.wood;
+
+        assert!(stable_site_available(&player, 14));
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 2);
+        build_stable(&mut player, 14).unwrap();
+        assert_eq!(player.supply.wood, wood_before - 2);
+        assert_eq!(player.occupied_stables(), 1);
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 4);
+        assert_eq!(player.animal_count(Animal::Sheep), 2);
+        assert_eq!(player.farm[14].tile, Tile::Pasture { id: pasture_id });
+
+        let after = player.clone();
+        assert!(!stable_site_available(&player, 14));
         assert!(build_stable(&mut player, 14).is_err());
-        assert_eq!(player, before);
+        assert_eq!(player, after);
+    }
+
+    #[test]
+    fn two_pasture_stables_double_capacity_twice_and_survive_split() {
+        let mut player = Player::new(0, 0);
+        player.supply.wood = 20;
+        build_pastures(&mut player, &[vec![13, 14]], None).unwrap();
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 4);
+        build_stable(&mut player, 13).unwrap();
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 8);
+        build_stable(&mut player, 14).unwrap();
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 16);
+        player.pastures[0].animal = Some(Animal::Sheep);
+        player.pastures[0].quantity = 6;
+
+        build_pastures(
+            &mut player,
+            &[vec![13], vec![14]],
+            Some(&[
+                PastureOccupancy {
+                    animal: Some(Animal::Sheep),
+                    quantity: 3,
+                },
+                PastureOccupancy {
+                    animal: Some(Animal::Sheep),
+                    quantity: 3,
+                },
+            ]),
+        )
+        .unwrap();
+
+        assert_eq!(player.animal_count(Animal::Sheep), 6);
+        assert_eq!(player.pastures.len(), 2);
+        for pasture in &player.pastures {
+            assert_eq!(player.pasture_capacity(pasture), 4);
+            assert_eq!(pasture.quantity, 3);
+            assert!(player.farm[pasture.cells[0]].stable);
+        }
+    }
+
+    #[test]
+    fn stable_site_rejects_room_field_and_out_of_bounds() {
+        let mut player = Player::new(0, 0);
+        player.supply.wood = 20;
+        player.farm[14].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        for i in [0, 14, FARM_CELLS] {
+            assert!(!stable_site_available(&player, i));
+            let before = player.clone();
+            assert!(build_stable(&mut player, i).is_err());
+            assert_eq!(player, before);
+        }
+    }
+
+    #[test]
+    fn pasture_stable_is_legal_through_action_validation_and_hints() {
+        let mut game = Game::new(Config::default());
+        let active = game.public.active_player;
+        game.public.players[active].supply.wood = 20;
+        build_pastures(&mut game.public.players[active], &[vec![14]], None).unwrap();
+        game.public.players[active].supply.wood = 2;
+        let action = Action {
+            space: Space::FarmExpansion,
+            detail: Detail::Build {
+                rooms: vec![],
+                stables: vec![14],
+            },
+        };
+
+        assert!(game.available_spaces().contains(&Space::FarmExpansion));
+        assert!(game
+            .detail_hints(Space::FarmExpansion)
+            .stable_cells
+            .contains(&14));
+        game.validate_action(&action).unwrap();
+        game.apply(action).unwrap();
+        let player = &game.public.players[active];
+        assert_eq!(player.supply.wood, 0);
+        assert!(player.farm[14].stable);
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 4);
     }
 
     #[test]
