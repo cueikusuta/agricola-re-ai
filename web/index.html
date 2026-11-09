@@ -334,7 +334,7 @@ function attachFarmPicker(space){
  }
  function draw(){
   tabs.replaceChildren();
-  for(const [id,label] of modes){const b=document.createElement("button");b.type="button";b.textContent=label;b.className=id===purpose?"active":"";b.setAttribute("aria-pressed",String(id===purpose));b.onclick=()=>{purpose=id;draw();};tabs.append(b);}
+  for(const [id,label] of modes){const b=document.createElement("button");b.type="button";b.textContent=label;b.className=id===purpose?"active":"";b.setAttribute("aria-pressed",String(id===purpose));b.dataset.mode=id;b.onclick=()=>{purpose=id;draw();tabs.querySelector(`[data-mode="${id}"]`)?.focus();};tabs.append(b);}
   const selected=selectedMap();grid.replaceChildren();
   for(let n=0;n<pl.farm.length;n++){
    const cell=pl.farm[n],[label,cls]=tileName(cell),b=document.createElement("button");
@@ -359,7 +359,7 @@ function attachFarmPicker(space){
      const assigned=parts("animalPastures").filter(x=>Number(x.split(":")[0])!==pasture.id);
      assigned.push(pasture.id+":"+count);$("animalPastures").value=assigned.join(",");
     }
-    draw();
+    draw();grid.querySelector(`[data-cell="${n}"]`)?.focus();
    };
    grid.append(b);
   }
