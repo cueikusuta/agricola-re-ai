@@ -18,8 +18,11 @@ async function setup(browser, extra = false) {
 async function findUnlockedSpace(page, space) {
   for(let seed=1;seed<=60;seed++){
     await page.locator("#seed").fill(String(seed));
+    const responsePromise=page.waitForResponse(r => new URL(r.url()).pathname==="/api/new"&&r.request().method()==="POST");
     await page.locator("#new").click();
-    await page.waitForFunction(expected => document.querySelector("#turn")?.textContent.includes("ラウンド 1/14"),null);
+    const response=await responsePromise;
+    assert.equal(response.ok(),true,"fresh game setup must succeed");
+    await page.waitForFunction(expected => state&&Number(state.seed)===expected && !document.querySelector("#new").disabled,seed);
     if(await page.locator(`#actions button[data-space="${space}"]`).count()===1)return seed;
   }
   throw new Error(space+" never available across 60 deterministic first-round setups");
