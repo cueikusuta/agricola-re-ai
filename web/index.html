@@ -79,6 +79,125 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
  .buttons button,.tabs button{min-height:44px}
 }
 
+
+/* #246 BGA-reference tabletop skin. All artwork is CSS, no imported BGA assets. */
+:root{--soil:#413221;--ink:#392d20;--parchment:#efe4c8;--grain:#c99e5f;--wood:#7b5a32;--leaf:#385e31;--grass:#59834b;font-family:system-ui,-apple-system,"Noto Sans CJK JP","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:var(--ink);background:#d6c6a2}
+body{background:radial-gradient(ellipse at 48% 7%,#f2e6c3 0,#d5c29c 54%,#bda77f 100%);min-height:100vh}
+.screen{max-width:1650px;gap:12px;padding:12px 18px 24px}
+.screen>.panel{box-shadow:0 2px 7px #59442f28}
+.tableHeader{background:linear-gradient(125deg,#433321,#6f4d2b 45%,#3b3024);color:#fffaed;border:4px solid #795c38;border-radius:9px;padding:11px 18px;box-shadow:0 3px 8px #3b261843}
+.brandLockup{display:flex;align-items:center;gap:12px}.brandLeaf{font-size:30px;color:#dec082}
+.tableHeader h1{font-family:Georgia,serif;font-size:27px;font-weight:750;letter-spacing:.04em;line-height:1.1}
+.brandEn{font-weight:500;font-size:15px;letter-spacing:.2em;color:#dbc391}
+.brandSub{font-size:10px;letter-spacing:.11em;color:#e5d2b4}
+.topNav{display:flex;flex-wrap:wrap;gap:8px}.topNav a{border:1px solid #b69b6c;border-radius:4px;padding:7px 9px;color:#f9ecca;text-decoration:none;font-size:12px;background:#5f442ccc}
+.topNav a:hover,.topNav a:focus-visible{background:#8e6b3b}
+.panel{background:linear-gradient(160deg,#f4ebd4,#e5d7b6);border:1px solid #ad9366;border-radius:9px;color:var(--ink);padding:12px;box-shadow:0 2px 7px #5844261f}
+.panel h2,.panel h3{color:#382b1c}
+.minor{color:#685943}
+button,select,input,textarea{background:#f8f1df;color:#332c21;border:1px solid #a79371;border-radius:5px}
+button:hover{background:#e9d6aa}button.active,.primary{color:#fffaec;background:#59764a;border-color:#2e4f32}
+button:disabled{opacity:.45}
+.statusStrip{background:#e6d6aa;border-left:5px solid #7b8852}
+.statusStrip strong{font-family:Georgia,"Noto Sans CJK JP",serif;font-size:20px}
+.tableHud{background:linear-gradient(90deg,#e3d1a5,#f7edcf);border-left:5px solid #7e6240;padding:10px 13px}
+.workerBadge{background:#447044;border-color:#789b65;color:#fff6df;font-weight:700}
+#turnWorkers,#turnActions,#turnView{color:#49391f}
+.tabletopLayout{display:grid;grid-template-columns:minmax(0,1.13fr) minmax(380px,.87fr);align-items:start;gap:13px}
+.tabletopMain,.tabletopRail{min-width:0;display:grid;gap:13px}
+.sectionEyebrow{font-weight:800;font-size:10px;letter-spacing:.16em;color:#7a6846;margin-bottom:5px}
+.actionTablePanel{background:radial-gradient(ellipse at 60% 35%,#8bad63,#55753e 74%,#3c5732);border:9px solid #9a7440;box-shadow:inset 0 0 0 2px #d0b780,0 5px 15px #45351d55;padding:13px;border-radius:10px;color:#f6f2dc}
+.actionTablePanel .sectionEyebrow,.actionTablePanel h2{color:#f7efd1;text-shadow:0 1px 2px #30452c}
+.actionPanelHeading{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.actionPanelHeading h2{font-family:Georgia,"Noto Sans CJK JP",serif;font-size:22px}
+.roundPill{font-size:12px;font-weight:700;border:1px solid #e8d59d;background:#3e5b34;border-radius:999px;padding:5px 10px;color:#fbf1d6}
+#boardSummary{color:#e6efce;font-size:12px;margin:5px 0 10px}
+#notice{color:#fff0ba;font-size:13px;min-height:18px}
+#actions.actionBoard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:11px}
+.actionGroup{background:#42633370;border:1px solid #c2d09966;box-shadow:inset 0 1px 5px #2b44275a;border-radius:8px;padding:8px}
+.actionGroup h3{font-family:Georgia,"Noto Sans CJK JP",serif;font-size:14px;font-weight:700;margin:0 0 9px;color:#ffefd0;letter-spacing:.04em;padding:0 2px 4px;border-bottom:1px solid #bed09a8a}
+.actionTiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.actionTile{position:relative;min-width:0;min-height:91px;border:2px solid #80643b;border-radius:5px;background:linear-gradient(145deg,#fff4cf 0%,#e4cd9a 75%,#d5b982 100%);box-shadow:1px 2px 0 #2c4427,0 3px 8px #27391e75;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.actionTile::before{content:"";position:absolute;inset:5px;border:1px solid #bda47699;border-radius:2px;pointer-events:none}
+.actionTile button{z-index:1;position:relative;background:transparent;border:none;box-shadow:none;text-align:left;font-family:Georgia,"Noto Sans CJK JP",serif;color:#3f3221;font-size:14px;font-weight:800;line-height:1.4;padding:8px 7px 1px;min-height:40px;max-width:100%;border-radius:0;overflow-wrap:anywhere}
+.actionTile button:hover{background:#fdf4d5cc;color:#244f2a}
+.actionTile .tileMeta{z-index:1;color:#665030;padding:0 8px 8px;font-size:11px;line-height:1.3}
+.actionTile.occupied{filter:saturate(.54);border-color:#756a53;background:linear-gradient(145deg,#ded4af,#beae8f)}
+.actionTile.occupied .tileMeta{font-weight:750;color:#693d2f}
+.actionTile:focus-within{outline:3px solid #ffedaa;outline-offset:2px}
+.actionGlyph{position:absolute;right:6px;top:5px;font-size:18px;opacity:.48;pointer-events:none;line-height:1.1}
+.actionCount{display:inline-flex;align-items:center;gap:5px;padding:2px 6px;border-radius:100px;font-size:11px;font-weight:800;background:#ece0b9;border:1px solid #bca070;color:#46351f;max-width:100%}
+.actionCount .tokenDot{width:11px;height:11px;border-radius:50%;border:2px solid #806745;background:#a87a40}
+.actionCount .tokenDot.clay{background:#bc6738}.actionCount .tokenDot.reed{background:#e5d6a0}
+.actionCount .tokenDot.stone{background:#8d9192}.actionCount .tokenDot.food{background:#d2a642}
+.actionCount .tokenDot.sheep{background:#f7f7ee}.actionCount .tokenDot.boar{background:#68635e}.actionCount .tokenDot.cattle{background:#aa7157}
+.workerOnTile{position:absolute;right:8px;bottom:7px;width:16px;height:16px;border:3px solid #ead9aa;border-radius:50% 50% 5px 5px;background:#765244;box-shadow:0 0 0 1px #513d2d;transform:rotate(-8deg)}
+#usedActions{padding:7px 0 0;color:#f5f0d5;font-size:11px}
+.usedSpace{background:#415d38;border-color:#b8c58e;color:#fbf1dd;padding:2px 6px}
+.farmPanel{padding:12px;background:linear-gradient(150deg,#f1e4bf,#e0cba3)}
+.farmPanel .tabs{margin:8px 0 10px;gap:5px}
+.farmPanel .tabs button{font-size:12px;font-weight:750;padding:5px 7px;min-height:36px}
+.boardArea{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.boardPane{min-width:0}.boardPane h2{margin-bottom:9px;font-size:17px}
+.farmField{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;max-width:100%;padding:7px;border:7px solid #987643;border-radius:8px;background:#47652f;box-shadow:inset 0 0 0 2px #cdb17e,0 3px 5px #443c2369}
+.farmField .cell{position:relative;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;min-width:0;min-height:70px;padding:6px 2px;background:radial-gradient(#8fb76c 2%,#5a913f 85%);border:1px solid #466b2e;border-radius:4px;color:#f5ffdf;font-weight:650;box-shadow:inset 0 0 3px #305328;overflow:hidden}
+.farmField .cell.room{background:linear-gradient(150deg,#8f7044,#5d4529);border:3px ridge #d8b77d;color:#fff0c3}
+.farmField .cell.field-tile{background:repeating-linear-gradient(155deg,#806536,#806536 5px,#a28a54 6px,#a28a54 9px);border:2px solid #b8a072;color:#fff5d7}
+.farmField .cell.pasture{background:linear-gradient(145deg,#719f53,#4b753b);border:3px dashed #d0b580}
+.farmField .cellIndex{position:absolute;top:2px;left:4px;opacity:.6;font-size:10px}
+.farmField .cellIcon{font-size:23px;line-height:1.2;text-shadow:0 1px 1px #253d25}
+.farmField .cellLabel{font-size:10px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}
+.stats h2{font-size:14px;margin:1px 0 7px}.stats{min-width:0}
+.statGrid{grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.stat{padding:7px 2px 5px;background:#eee0b8;border:1px solid #c2ac80;border-radius:4px;font-size:11px;min-width:0;overflow-wrap:anywhere}
+#improvements{font-size:12px;line-height:1.5;margin:7px 0 0}
+.rivalsPanel{background:linear-gradient(145deg,#f2e6ca,#e0d0ad)}
+#opponentBoards{display:grid;gap:7px}
+.opponentCard{display:grid;grid-template-columns:120px minmax(0,1fr);gap:9px;padding:7px;border:1px solid #bba477;border-radius:7px;background:#f8eed2}
+.opponentCard.isActive{border:2px solid #688a55}
+.opponentSelect{width:100%;padding:4px;border:0;background:transparent;font-size:12px;font-weight:800;text-align:left;min-height:30px}
+.opponentMeta{font-size:11px;color:#65583d;line-height:1.55;overflow-wrap:anywhere}
+.opponentSupply{font-size:11px;line-height:1.5;margin-top:3px;color:#4d432f}
+.miniFarm{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;background:#6f8452;border:3px solid #937641;border-radius:4px;padding:3px}
+.miniCell{height:17px;min-width:0;border:1px solid #53733d;border-radius:2px;background:#86ae61;text-align:center;line-height:16px;font-size:11px;color:#fff9e3;overflow:hidden}
+.miniCell.room{background:#816139;border-color:#ccb47d}
+.miniCell.field-tile{background:#a88b4f;border-color:#cdb275}
+.miniCell.pasture{background:#507a40;border:1px dashed #d5c089}
+.cardsPanel{border-top:5px solid #ad8a56;background:linear-gradient(140deg,#f3e6c6,#e9d6b1)}
+.cardShelfHeading{display:flex;align-items:start;justify-content:space-between;flex-wrap:wrap;gap:6px}
+#hand{font-size:12px;max-width:72ch}
+#cardBrowser{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));gap:9px}
+.cardTile{min-height:120px;display:flex;flex-direction:column;border:3px solid #836747;border-radius:5px;background:linear-gradient(160deg,#e5cb8b,#f9edcb 24%,#efe1bd 85%,#dec58c);box-shadow:2px 3px 0 #8b735050,0 3px 8px #74614e33;padding:7px}
+.cardTile summary{display:list-item;font-family:Georgia,"Noto Sans CJK JP",serif;font-size:13px;color:#3f2d1d;min-height:74px;line-height:1.45;cursor:pointer}
+.cardTileBody{border-top:1px solid #bba073;margin-top:6px;padding:7px 2px 1px;font-size:11px;color:#56452c}
+.cardTile[open]{border-color:#4b6e43}
+.operationsPanel{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.operationsPanel h2{margin:0}.operationsPanel .minor{margin:0}
+#history{width:100%;margin:0;color:#63563f}
+#gameSettings,.screen>#draftPanel{background:#e7d9b9}
+#gameSettings::before{content:"対戦オプション";display:block;font-size:15px;font-weight:800;margin-bottom:8px;color:#59422d}
+#draftPanel>h2{font-size:16px}
+footer{color:#705e41;font-size:12px}
+@media(max-width:1090px){
+ .tabletopLayout{grid-template-columns:minmax(0,1fr)}
+ .tabletopRail{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+ .actionTablePanel{border-width:6px}
+}
+@media(max-width:760px){
+ .screen{width:100%;padding:7px;gap:8px}
+ .tableHeader{padding:9px 10px;gap:9px;flex-wrap:wrap}.tableHeader h1{font-size:22px}
+ .topNav{width:100%;justify-content:space-between;gap:5px}.topNav a{font-size:11px;padding:5px}
+ .tabletopRail{grid-template-columns:minmax(0,1fr)}
+ #actions.actionBoard{grid-template-columns:minmax(0,1fr)}
+ .actionTiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .actionGroup{padding:6px}.actionTile{min-height:77px}
+ .actionTile button{font-size:13px}.actionTile .tileMeta{font-size:10px}
+ .farmField .cell{min-height:58px}.farmField .cellIcon{font-size:20px}
+ .statGrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .opponentCard{grid-template-columns:120px minmax(0,1fr)}
+ #cardBrowser{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .cardTile{min-height:105px}
+}
+
 </style></head>
 <body><div class="screen">
 <header class="tableHeader">
