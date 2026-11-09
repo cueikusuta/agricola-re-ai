@@ -119,6 +119,40 @@ on:
         type: number
         default: 0
         required: true
+      baseline_puct_simulations:
+        description: 'Baseline-arm PUCT simulations (freeze all eight baseline-puct inputs together, #219)'
+        type: number
+        default: 32
+        required: true
+      baseline_puct_tree_depth:
+        type: number
+        default: 2
+        required: true
+      baseline_puct_c:
+        type: number
+        default: 1.5
+        required: true
+      baseline_puct_prior_temp:
+        type: number
+        default: 3
+        required: true
+      baseline_puct_value_temp:
+        type: number
+        default: 8
+        required: true
+      baseline_puct_leaf:
+        type: choice
+        options: ['terminal', 'heuristic']
+        default: 'terminal'
+        required: true
+      baseline_puct_root_limit:
+        type: number
+        default: 0
+        required: true
+      baseline_puct_final_prior:
+        type: number
+        default: 0
+        required: true
 
 permissions:
   contents: read
@@ -200,6 +234,25 @@ jobs:
             --cards none --search-mode simulation-capped \
             --output demo-direct/report.json
           python3 -c 'import json; r=json.load(open("demo-direct/report.json")); assert r["comparison_design"]["head_to_head"] is True; assert r["comparison_design"]["mirror_baseline"] is True; assert r["players"]==4 and r["games_per_arm"]==16 and r["total_games"]==32; assert r["search_mode"]=="simulation-capped"; assert len(r["paired_block_bootstrap_95ci"])==2; print("Direct PUCT vs MCTS pilot contract verified; not a strength claim")'
+      - name: PUCT-vs-PUCT ablation smoke with a frozen baseline (#219)
+        run: |
+          set -euo pipefail
+          mkdir -p demo-h2h/shard-0
+          ./target/release/paired_eval \
+            --players 2 --seed-start 64000 --block-start 0 --blocks 1 \
+            --candidate puct --baseline puct --opponent puct \
+            --additional-action-space false \
+            --puct-c 2.5 \
+            --baseline-puct-simulations 32 --baseline-puct-tree-depth 2 \
+            --baseline-puct-c 1.5 --baseline-puct-prior-temp 3 \
+            --baseline-puct-value-temp 8 --baseline-puct-leaf terminal \
+            --baseline-puct-root-limit 0 --baseline-puct-final-prior 0 \
+            --output demo-h2h/shard-0/matches.jsonl
+          python3 scripts/paired_eval_stats.py \
+            --root demo-h2h --players 2 --seed-start 64000 --blocks 1 \
+            --candidate puct --baseline puct --opponent puct \
+            --output demo-h2h/report.json
+          python3 -c 'import json; r=json.load(open("demo-h2h/report.json")); assert r["candidate_puct_config_id"] != r["baseline_puct_config_id"]; assert r["comparison_design"]["head_to_head"] is True; assert r["candidate"] == r["baseline"] == "puct"; print("PUCT-vs-PUCT frozen-baseline smoke verified")'
       - name: Real smoke in the time-budgeted search mode
         shell: bash
         run: |
@@ -226,6 +279,7 @@ jobs:
             demo/
             demo-cards/
             demo-puct-cards/
+            demo-h2h/
             demo-time/
             demo-direct/
           if-no-files-found: warn
@@ -235,11 +289,14 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: [test]
     runs-on: ubuntu-24.04
-    timeout-minutes: 65
+    # 8 shards x up to 32 blocks; a full four-player PUCT-vs-PUCT arm pair
+    # takes roughly 14 s per game on a standard runner, so the widest shard
+    # needs well under two hours including the build.
+    timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
       PLAYERS: ${{ inputs.players }}
       BLOCKS: ${{ inputs.blocks }}
@@ -262,6 +319,14 @@ jobs:
       PUCT_VALUE_TEMP: ${{ inputs.puct_value_temp }}
       PUCT_ROOT_LIMIT: ${{ inputs.puct_root_limit }}
       PUCT_FINAL_PRIOR: ${{ inputs.puct_final_prior }}
+      BASELINE_PUCT_SIMULATIONS: ${{ inputs.baseline_puct_simulations }}
+      BASELINE_PUCT_TREE_DEPTH: ${{ inputs.baseline_puct_tree_depth }}
+      BASELINE_PUCT_C: ${{ inputs.baseline_puct_c }}
+      BASELINE_PUCT_PRIOR_TEMP: ${{ inputs.baseline_puct_prior_temp }}
+      BASELINE_PUCT_VALUE_TEMP: ${{ inputs.baseline_puct_value_temp }}
+      BASELINE_PUCT_LEAF: ${{ inputs.baseline_puct_leaf }}
+      BASELINE_PUCT_ROOT_LIMIT: ${{ inputs.baseline_puct_root_limit }}
+      BASELINE_PUCT_FINAL_PRIOR: ${{ inputs.baseline_puct_final_prior }}
     steps:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
@@ -271,14 +336,19 @@ jobs:
         run: |
           set -euo pipefail
           INDEX=${{ matrix.shard }}
-          test "$BLOCKS" -ge 4
+          # Eight shards: every shard must receive at least one seed block.
+          test "$BLOCKS" -ge 8
           test "$BLOCKS" -le 1000
           test "$SEED_START" -ge 0
-          test "$CANDIDATE" != "$BASELINE"
+          # Same policy names are allowed only for the #219 PUCT-vs-PUCT
+          # ablation; the binary itself fails closed unless the eight
+          # baseline-puct-* flags pin a configuration distinct from the
+          # candidate configuration.
+          if [ "$CANDIDATE" = "$BASELINE" ]; then test "$CANDIDATE" = "puct"; fi
           if [[ "$CARDS" != "none" ]]; then test "$PLAYERS" -eq 2; fi
           if [[ "$SEARCH_MODE" == "time-budgeted" ]]; then test "$DECISION_BUDGET_MS" -gt 0; fi
-          BLOCK_START=$(( BLOCKS * INDEX / 4 ))
-          BLOCK_END=$(( BLOCKS * (INDEX + 1) / 4 ))
+          BLOCK_START=$(( BLOCKS * INDEX / 8 ))
+          BLOCK_END=$(( BLOCKS * (INDEX + 1) / 8 ))
           COUNT=$(( BLOCK_END - BLOCK_START ))
           mkdir -p "results/shard-$INDEX"
           ./target/release/paired_eval \
@@ -300,6 +370,14 @@ jobs:
             --puct-value-temp "$PUCT_VALUE_TEMP" \
             --puct-root-limit "$PUCT_ROOT_LIMIT" \
             --puct-final-prior "$PUCT_FINAL_PRIOR" \
+            --baseline-puct-simulations "$BASELINE_PUCT_SIMULATIONS" \
+            --baseline-puct-tree-depth "$BASELINE_PUCT_TREE_DEPTH" \
+            --baseline-puct-c "$BASELINE_PUCT_C" \
+            --baseline-puct-prior-temp "$BASELINE_PUCT_PRIOR_TEMP" \
+            --baseline-puct-value-temp "$BASELINE_PUCT_VALUE_TEMP" \
+            --baseline-puct-leaf "$BASELINE_PUCT_LEAF" \
+            --baseline-puct-root-limit "$BASELINE_PUCT_ROOT_LIMIT" \
+            --baseline-puct-final-prior "$BASELINE_PUCT_FINAL_PRIOR" \
             --output "results/shard-$INDEX/matches.jsonl"
       - name: Save results and failure artifacts
         if: always()

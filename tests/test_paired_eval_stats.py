@@ -117,6 +117,35 @@ class PairedStatsReportDiagnosticsTests(unittest.TestCase):
         self.assertEqual(report["baseline_solo_first_rate"], 0.0)
         self.assertEqual(report["baseline_first_reach_rate"], 0.0)
 
+    def test_puct_config_ids_are_propagated_when_present(self):
+        """#219: config identities ride along into the aggregated report."""
+        rows = fixture()
+        for row in rows:
+            row["candidate_puct_config_id"] = "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0"
+            row["baseline_puct_config_id"] = "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0"
+        report = run(rows)
+        self.assertEqual(
+            report["candidate_puct_config_id"],
+            "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0",
+        )
+        self.assertEqual(
+            report["baseline_puct_config_id"],
+            "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0",
+        )
+
+    def test_puct_config_id_conflict_is_rejected(self):
+        """A run whose rows disagree on one config identity fails closed."""
+        rows = fixture()
+        rows[0]["candidate_puct_config_id"] = "puct-a"
+        rows[-1]["candidate_puct_config_id"] = "puct-b"
+        with self.assertRaisesRegex(ValueError, "inconsistent candidate_puct_config_id"):
+            run(rows)
+
+    def test_legacy_rows_without_config_ids_stay_valid(self):
+        report = run(fixture())
+        self.assertNotIn("candidate_puct_config_id", report)
+        self.assertNotIn("baseline_puct_config_id", report)
+
     def test_shared_first_is_reported_without_becoming_a_solo_win(self):
         rows = fixture()
         for row in rows:
