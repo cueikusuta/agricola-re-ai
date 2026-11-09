@@ -81,12 +81,38 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 
 </style></head>
 <body><div class="screen">
-<header><h1>アグリコラ <span class="minor">Revised / 手動対戦</span></h1><span class="minor">ローカル専用</span></header>
-<section class="panel" id="turnBar" aria-live="polite">
+<header class="tableHeader">
+  <div class="brandLockup"><span class="brandLeaf" aria-hidden="true">✦</span><div><h1>アグリコラ <span class="brandEn">AGRICOLA</span></h1><span class="brandSub">REVISED EDITION · 人間 vs AI</span></div></div>
+  <nav class="topNav" aria-label="画面内の移動"><a href="#actionPanel">アクション盤</a><a href="#playerFarmPanel">農場</a><a href="#cardsPanel">カード</a><a href="#gameSettings">対戦設定</a></nav>
+</header>
+<section class="panel tableHud" id="turnBar" aria-live="polite">
 <div class="turnInfo"><span id="turnWorkers" class="workerBadge"></span><span id="turnActions" class="minor"></span><span id="turnView" class="minor"></span></div>
 <div id="alert" class="alert" role="alert" hidden></div>
 </section>
-<section class="panel settings">
+<section class="panel status statusStrip"><strong id="turn">読み込み中...</strong><span id="summary" class="minor"></span></section>
+
+
+<main class="tabletopLayout" id="tabletopLayout"><div class="tabletopMain"><section class="panel actionTablePanel" id="actionPanel">
+ <div class="sectionEyebrow">ACTION BOARD · 労働アクション</div><div class="actionPanelHeading"><h2 id="actionTitle">アクションボード</h2><span class="roundPill" id="nextHarvest">次の収穫まで —</span></div>
+ <p id="boardSummary" aria-live="polite"></p><div id="notice"></div>
+ <div class="actions actionBoard" id="actions" aria-label="使用可能なアクションボード"></div>
+ <div class="buttons" id="actionNav"></div><div id="usedActions" aria-label="今ラウンドの使用済みスペース"></div>
+</section></div><aside class="tabletopRail"><section class="panel farmPanel" id="playerFarmPanel">
+  <div class="sectionEyebrow">YOUR FARMYARD · 個人ボード</div>
+  <div class="tabs" id="tabs" role="group" aria-label="表示するプレイヤーの農場"></div>
+  <div class="boardArea">
+    <div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field farmField" aria-label="5×3マスの農場"></div></div>
+    <div class="stats"><h2>ストック・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p></div>
+  </div>
+</section>
+<section class="panel rivalsPanel" id="opponentPanel"><div class="sectionEyebrow">OTHER FARMYARDS · 比較する農場</div><h2>他のプレイヤー</h2><div id="opponentBoards" aria-label="他のプレイヤーの公開農場"></div></section></aside></main>
+<section class="panel cardsPanel" id="cardsPanel">
+ <div class="sectionEyebrow">CARDS · 職業と進歩</div><div class="cardShelfHeading"><h2>カードエリア</h2><p id="hand" class="minor"></p></div>
+ <div id="cardBrowser" aria-label="自分の手札と公開された使用済みカード"></div>
+ <details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details>
+</section>
+<section class="panel operationsPanel"><h2>任意の操作</h2><button id="free">食料変換・動物の配置換え・廃棄</button><p class="minor">ワーカーを使わない操作。エンジンが合法性を判定します。</p><p id="history"></p></section>
+<section class="panel settings" id="gameSettings">
 <label>人数 <select id="players"><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option></select></label>
 <label><input id="extra" type="checkbox">追加アクション</label>
 <label>対戦AI <select id="ai"><option value="eval">評価関数</option><option value="mcts">MCTS</option></select></label>
@@ -98,7 +124,6 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <label>カード <select id="cards"><option value="none">カードなし</option><option value="verified">A/B実装済み（2人戦）</option><option value="json">外部定義JSON</option></select></label>
 <details><summary>外部カード定義JSONを読み込む</summary><textarea id="cardJson" placeholder='{"definitions":[]}'></textarea><p class="minor">空欄ならカードなし。原文や画像は不要です。公式カードを自動収録する機能はありません。</p></details>
 </section>
-<section class="panel status"><strong id="turn">読み込み中...</strong><span id="summary" class="minor"></span></section>
 <section class="panel" id="draftPanel"><h2>ドラフト（M11・テスト用フィクスチャ）</h2>
 <div class="buttons">
 <label>方式 <select id="draftMode"><option value="deal_7">通常7枚配布</option><option value="draft_7_7">7-7ドラフト</option><option value="draft_10_7_simultaneous">10-7同時ドラフト</option><option value="choose_10_7">10-7選択</option></select></label>
@@ -114,10 +139,6 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <p class="minor">受渡方向は両カード種別とも時計回り（1P→2P→3P→4P→1P）です。初回スタートプレイヤーはドラフト前に抽選します。フェーズ順は選択式で、出版社付録にある左回りの変則ルールとは異なるプロジェクト採用ルールです。カードプールで「テスト用フィクスチャ」を選んだ場合、カードは<strong>検証用の架空カード</strong>です。「実装済み公式カードプール」は収録数が限られ、公式照合も継続中です。人間は1Pとして選択し、他席は観測可能情報だけで選ぶCPUです。</p>
 <div id="draftStatus"></div><div id="draftOffered" class="chips"></div><div id="draftActions" class="buttons"></div><div id="draftLog" class="minor"></div>
 </section>
-<section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
-<div class="stats"><h2>資源・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p><p id="hand" class="minor"></p><div id="cardBrowser" aria-label="自分の手札と公開された使用済みカード"></div><details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details><p id="history"></p></div></div></section>
-<section class="panel" id="actionPanel"><h2 id="actionTitle">アクションの詳細を手動指定</h2><p id="boardSummary" aria-live="polite"></p><div id="notice"></div><div class="actions actionBoard" id="actions" aria-label="使用可能なアクションボード"></div><div class="buttons" id="actionNav"></div><div id="usedActions" aria-label="今ラウンドの使用済みスペース"></div></section>
-<section class="panel"><h2>任意の操作</h2><button id="free">食料変換・動物の配置換え・廃棄</button><p class="minor">ワーカーを使わない操作。エンジンが合法性を判定します。</p></section>
 <footer>1Pが人間、残りはCPU。畑は左上から0〜14番です。種まきは1畑につき種1個を使います。無効な指定は適用されず、内容を直して再送信できます。</footer>
 </div>
 <dialog id="editor"><h2 id="editorTitle"></h2><p class="minor" id="editorHint" role="alert"></p>
