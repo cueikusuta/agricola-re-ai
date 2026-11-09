@@ -122,7 +122,11 @@ fn stats_from_batch_us(batch_us: &[f64]) -> Stats {
     sorted.sort_by(|a, b| a.partial_cmp(b).expect("finite times"));
     let n = sorted.len();
     let median = sorted[n / 2];
-    let p95 = sorted[(n as f64 * 0.95) as usize % n];
+    // Nearest-rank percentile: p95 of n samples is the ceil(0.95*n)-th
+    // smallest value. For n=20 that is the 19th (index 18), never the
+    // maximum, so p95 stays below `max` and reflects the distribution tail.
+    let p95_rank = (n as f64 * 0.95).ceil() as usize;
+    let p95 = sorted[p95_rank.clamp(1, n) - 1];
     let min = sorted[0];
     let max = sorted[n - 1];
     let mean = sorted.iter().sum::<f64>() / n as f64;

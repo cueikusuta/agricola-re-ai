@@ -48,6 +48,17 @@ def main() -> int:
         return 1
 
     alloc_scenarios = {s["name"]: s for s in alloc["scenarios"]}
+    timing_names = {s["name"] for s in timing["scenarios"]}
+    missing = timing_names - set(alloc_scenarios)
+    extra = set(alloc_scenarios) - timing_names
+    if missing:
+        print(f"scenarios missing from allocation report: {sorted(missing)}", file=sys.stderr)
+        return 1
+    if extra:
+        # The merge keeps only timing scenarios; extra alloc scenarios would be
+        # silently dropped, so reject instead of losing data.
+        print(f"scenarios extra in allocation report: {sorted(extra)}", file=sys.stderr)
+        return 1
     merged_scenarios = []
     for s in timing["scenarios"]:
         other = alloc_scenarios.get(s["name"])
