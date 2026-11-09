@@ -329,13 +329,10 @@ jobs:
       BASELINE_PUCT_FINAL_PRIOR: ${{ inputs.baseline_puct_final_prior }}
     steps:
       - uses: actions/checkout@v6
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --locked --bin paired_eval
-      - name: Evaluate distinct complete seed blocks
+      - name: Validate dispatch parameters before building
         shell: bash
         run: |
           set -euo pipefail
-          INDEX=${{ matrix.shard }}
           # Eight shards: every shard must receive at least one seed block.
           test "$BLOCKS" -ge 8
           test "$BLOCKS" -le 1000
@@ -347,6 +344,13 @@ jobs:
           if [ "$CANDIDATE" = "$BASELINE" ]; then test "$CANDIDATE" = "puct"; fi
           if [[ "$CARDS" != "none" ]]; then test "$PLAYERS" -eq 2; fi
           if [[ "$SEARCH_MODE" == "time-budgeted" ]]; then test "$DECISION_BUDGET_MS" -gt 0; fi
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --bin paired_eval
+      - name: Evaluate distinct complete seed blocks
+        shell: bash
+        run: |
+          set -euo pipefail
+          INDEX=${{ matrix.shard }}
           BLOCK_START=$(( BLOCKS * INDEX / 8 ))
           BLOCK_END=$(( BLOCKS * (INDEX + 1) / 8 ))
           COUNT=$(( BLOCK_END - BLOCK_START ))

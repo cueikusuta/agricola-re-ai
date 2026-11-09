@@ -536,6 +536,28 @@ fn parse_options_from(args: impl Iterator<Item = String>) -> Result<Options, Str
             "candidate and baseline must be different; a PUCT-vs-PUCT run needs an explicit --baseline-puct-* override".into(),
         );
     }
+    // #219 review P2: in time-budgeted mode the focus stopping rule ignores
+    // per-policy simulation counts, so a PUCT-vs-PUCT run whose two
+    // configurations differ *only* in simulations would measure nothing at
+    // the focus seat. Reject it instead of reporting a silent null result.
+    let baseline_puct_differs_only_in_simulations = !baseline_puct_equals_candidate
+        && baseline_puct_tree_depth == puct_tree_depth
+        && baseline_puct_c == puct_c
+        && baseline_puct_prior_temperature == puct_prior_temperature
+        && baseline_puct_value_temperature == puct_value_temperature
+        && baseline_puct_leaf == puct_leaf
+        && baseline_puct_root_limit == puct_root_limit
+        && baseline_puct_final_prior == puct_final_prior
+        && baseline_puct_simulations != puct_simulations;
+    if search_mode == SearchMode::TimeBudgeted
+        && candidate == Ai::Puct
+        && candidate == baseline
+        && baseline_puct_differs_only_in_simulations
+    {
+        return Err(
+            "a time-budgeted PUCT-vs-PUCT run must differ in more than the simulation count; the focus seat ignores --puct-simulations in that mode".into(),
+        );
+    }
     // A budget of 0 means "no deadline", which is meaningless for a mode whose
     // whole contract is the deadline.
     if search_mode == SearchMode::TimeBudgeted && decision_budget_ms == 0 {
@@ -1564,6 +1586,71 @@ mod tests {
             .chain(["--puct-c".to_string(), "2.5".to_string()])
             .collect::<Vec<_>>();
         assert!(parse_options_from(args.into_iter()).is_ok());
+    }
+
+    /// #219 review P2: in time-budgeted mode a simulations-only configuration
+    /// difference is invisible to the focus seat and would be a null run.
+    #[test]
+    fn time_budgeted_puct_vs_puct_with_simulations_only_difference_is_rejected() {
+        let mut base = vec![
+            "--players",
+            "2",
+            "--seed-start",
+            "1",
+            "--block-start",
+            "0",
+            "--blocks",
+            "1",
+            "--candidate",
+            "puct",
+            "--baseline",
+            "puct",
+            "--opponent",
+            "puct",
+            "--additional-action-space",
+            "false",
+            "--search-mode",
+            "time-budgeted",
+            "--decision-budget-ms",
+            "100",
+            "--output",
+            "out.jsonl",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+        base.extend([
+            "--baseline-puct-simulations".to_string(),
+            "64".to_string(),
+            "--baseline-puct-tree-depth".to_string(),
+            "2".to_string(),
+            "--baseline-puct-c".to_string(),
+            "1.5".to_string(),
+            "--baseline-puct-prior-temp".to_string(),
+            "3".to_string(),
+            "--baseline-puct-value-temp".to_string(),
+            "8".to_string(),
+            "--baseline-puct-leaf".to_string(),
+            "terminal".to_string(),
+            "--baseline-puct-root-limit".to_string(),
+            "0".to_string(),
+            "--baseline-puct-final-prior".to_string(),
+            "0".to_string(),
+        ]);
+        assert!(parse_options_from(base.iter().cloned()).is_err());
+        // The same difference is meaningful in simulation-capped mode.
+        let capped = base
+            .iter()
+            .enumerate()
+            .map(|(i, arg)| {
+                if arg == "time-budgeted" && i > 0 && base[i - 1] == "--search-mode" {
+                    "simulation-capped".to_string()
+                } else {
+                    arg.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        assert!(parse_options_from(capped.into_iter()).is_ok());
     }
 
     #[test]
