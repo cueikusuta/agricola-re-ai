@@ -1,0 +1,4520 @@
+{
+  "alloc_instrumented": false,
+  "alloc_only": false,
+  "engine_version": "0.1.0",
+  "environment": {
+    "cpu_model": ": AMD EPYC 9V74 80-Core Processor",
+    "logical_cores": 4,
+    "rss_kib": "15916 kB"
+  },
+  "fixed_sim_searches": [
+    {
+      "attempted_per_sec": 696.9153633097103,
+      "choice": "Farmland",
+      "choice_is_legal": true,
+      "completed_per_sec": 696.9153633097103,
+      "elapsed_ms": 45,
+      "name": "cardless_2p_off_early_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 694.9508778315449,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 694.9508778315449,
+      "elapsed_ms": 46,
+      "name": "cardless_2p_off_early_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 696.6778806405736,
+      "choice": "Farmland",
+      "choice_is_legal": true,
+      "completed_per_sec": 696.6778806405736,
+      "elapsed_ms": 45,
+      "name": "cardless_2p_off_early_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 693.3194704105225,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 693.3194704105225,
+      "elapsed_ms": 46,
+      "name": "cardless_2p_off_early_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 692.3953269200794,
+      "choice": "Farmland",
+      "choice_is_legal": true,
+      "completed_per_sec": 692.3953269200794,
+      "elapsed_ms": 46,
+      "name": "cardless_2p_off_early_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 693.0353927977337,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 693.0353927977337,
+      "elapsed_ms": 46,
+      "name": "cardless_2p_off_early_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 1310.2542421425997,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 1310.2542421425997,
+      "elapsed_ms": 24,
+      "name": "cardless_2p_off_mid_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 1276.6415645689199,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 1276.6415645689199,
+      "elapsed_ms": 25,
+      "name": "cardless_2p_off_mid_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 1308.4229770032805,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 1308.4229770032805,
+      "elapsed_ms": 24,
+      "name": "cardless_2p_off_mid_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 1272.4324877144657,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 1272.4324877144657,
+      "elapsed_ms": 25,
+      "name": "cardless_2p_off_mid_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 1313.297556371861,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 1313.297556371861,
+      "elapsed_ms": 24,
+      "name": "cardless_2p_off_mid_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 1267.924490024921,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 1267.924490024921,
+      "elapsed_ms": 25,
+      "name": "cardless_2p_off_mid_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 9477.148669511982,
+      "choice": "Fencing",
+      "choice_is_legal": true,
+      "completed_per_sec": 9477.148669511982,
+      "elapsed_ms": 3,
+      "name": "cardless_2p_off_late_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 10231.297667455969,
+      "choice": "MeetingPlace",
+      "choice_is_legal": true,
+      "completed_per_sec": 10231.297667455969,
+      "elapsed_ms": 3,
+      "name": "cardless_2p_off_late_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 9520.09781900509,
+      "choice": "Fencing",
+      "choice_is_legal": true,
+      "completed_per_sec": 9520.09781900509,
+      "elapsed_ms": 3,
+      "name": "cardless_2p_off_late_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 10198.150055579918,
+      "choice": "MeetingPlace",
+      "choice_is_legal": true,
+      "completed_per_sec": 10198.150055579918,
+      "elapsed_ms": 3,
+      "name": "cardless_2p_off_late_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 9478.555065369446,
+      "choice": "Fencing",
+      "choice_is_legal": true,
+      "completed_per_sec": 9478.555065369446,
+      "elapsed_ms": 3,
+      "name": "cardless_2p_off_late_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 10188.944422173818,
+      "choice": "MeetingPlace",
+      "choice_is_legal": true,
+      "completed_per_sec": 10188.944422173818,
+      "elapsed_ms": 3,
+      "name": "cardless_2p_off_late_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 556.3611297670782,
+      "choice": "ResourceMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 556.3611297670782,
+      "elapsed_ms": 57,
+      "name": "cardless_2p_on_early_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 559.4570888545483,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 559.4570888545483,
+      "elapsed_ms": 57,
+      "name": "cardless_2p_on_early_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 557.7284015014258,
+      "choice": "ResourceMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 557.7284015014258,
+      "elapsed_ms": 57,
+      "name": "cardless_2p_on_early_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 559.4408235122768,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 559.4408235122768,
+      "elapsed_ms": 57,
+      "name": "cardless_2p_on_early_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 555.7314696508012,
+      "choice": "ResourceMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 555.7314696508012,
+      "elapsed_ms": 57,
+      "name": "cardless_2p_on_early_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 555.7942189967476,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 555.7942189967476,
+      "elapsed_ms": 57,
+      "name": "cardless_2p_on_early_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 973.3126196186001,
+      "choice": "ResourceMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 973.3126196186001,
+      "elapsed_ms": 32,
+      "name": "cardless_2p_on_mid_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 965.3003774957955,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 965.3003774957955,
+      "elapsed_ms": 33,
+      "name": "cardless_2p_on_mid_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 975.6697538382161,
+      "choice": "ResourceMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 975.6697538382161,
+      "elapsed_ms": 32,
+      "name": "cardless_2p_on_mid_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 963.4288722592368,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 963.4288722592368,
+      "elapsed_ms": 33,
+      "name": "cardless_2p_on_mid_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 967.9034738902594,
+      "choice": "ResourceMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 967.9034738902594,
+      "elapsed_ms": 33,
+      "name": "cardless_2p_on_mid_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 961.1283935679006,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 961.1283935679006,
+      "elapsed_ms": 33,
+      "name": "cardless_2p_on_mid_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 9646.358469532881,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 9646.358469532881,
+      "elapsed_ms": 3,
+      "name": "cardless_2p_on_late_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 8788.914980980238,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 8788.914980980238,
+      "elapsed_ms": 3,
+      "name": "cardless_2p_on_late_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 6428.59697076475,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 6428.59697076475,
+      "elapsed_ms": 4,
+      "name": "cardless_2p_on_late_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 6973.876078144896,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 6973.876078144896,
+      "elapsed_ms": 4,
+      "name": "cardless_2p_on_late_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 6295.487355316913,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 6295.487355316913,
+      "elapsed_ms": 5,
+      "name": "cardless_2p_on_late_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 7801.220988599978,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 7801.220988599978,
+      "elapsed_ms": 4,
+      "name": "cardless_2p_on_late_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 415.6019302371899,
+      "choice": "Forest",
+      "choice_is_legal": true,
+      "completed_per_sec": 415.6019302371899,
+      "elapsed_ms": 76,
+      "name": "cardless_3p_off_early_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 417.2867449895631,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 417.2867449895631,
+      "elapsed_ms": 76,
+      "name": "cardless_3p_off_early_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 418.1077173786773,
+      "choice": "Forest",
+      "choice_is_legal": true,
+      "completed_per_sec": 418.1077173786773,
+      "elapsed_ms": 76,
+      "name": "cardless_3p_off_early_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 417.8614457107619,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 417.8614457107619,
+      "elapsed_ms": 76,
+      "name": "cardless_3p_off_early_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 420.562344424789,
+      "choice": "Forest",
+      "choice_is_legal": true,
+      "completed_per_sec": 420.562344424789,
+      "elapsed_ms": 76,
+      "name": "cardless_3p_off_early_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 416.13671547581885,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 416.13671547581885,
+      "elapsed_ms": 76,
+      "name": "cardless_3p_off_early_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 773.9418425272141,
+      "choice": "WesternQuarry",
+      "choice_is_legal": true,
+      "completed_per_sec": 773.9418425272141,
+      "elapsed_ms": 41,
+      "name": "cardless_3p_off_mid_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 751.254442320116,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 751.254442320116,
+      "elapsed_ms": 42,
+      "name": "cardless_3p_off_mid_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 773.8205668738636,
+      "choice": "WesternQuarry",
+      "choice_is_legal": true,
+      "completed_per_sec": 773.8205668738636,
+      "elapsed_ms": 41,
+      "name": "cardless_3p_off_mid_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 746.9198774845997,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 746.9198774845997,
+      "elapsed_ms": 42,
+      "name": "cardless_3p_off_mid_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 769.0775268360591,
+      "choice": "WesternQuarry",
+      "choice_is_legal": true,
+      "completed_per_sec": 769.0775268360591,
+      "elapsed_ms": 41,
+      "name": "cardless_3p_off_mid_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 753.0662031795208,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 753.0662031795208,
+      "elapsed_ms": 42,
+      "name": "cardless_3p_off_mid_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 5229.43919330671,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 5229.43919330671,
+      "elapsed_ms": 6,
+      "name": "cardless_3p_off_late_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 5609.15315634936,
+      "choice": "MajorImprovement",
+      "choice_is_legal": true,
+      "completed_per_sec": 5609.15315634936,
+      "elapsed_ms": 5,
+      "name": "cardless_3p_off_late_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 5260.554439422989,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 5260.554439422989,
+      "elapsed_ms": 6,
+      "name": "cardless_3p_off_late_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 5664.281237227709,
+      "choice": "MajorImprovement",
+      "choice_is_legal": true,
+      "completed_per_sec": 5664.281237227709,
+      "elapsed_ms": 5,
+      "name": "cardless_3p_off_late_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 5209.938543890557,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 5209.938543890557,
+      "elapsed_ms": 6,
+      "name": "cardless_3p_off_late_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 5616.3407433929015,
+      "choice": "MajorImprovement",
+      "choice_is_legal": true,
+      "completed_per_sec": 5616.3407433929015,
+      "elapsed_ms": 5,
+      "name": "cardless_3p_off_late_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 381.1787239711066,
+      "choice": "DayLaborer",
+      "choice_is_legal": true,
+      "completed_per_sec": 381.1787239711066,
+      "elapsed_ms": 83,
+      "name": "cardless_3p_on_early_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 381.90167029707965,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 381.90167029707965,
+      "elapsed_ms": 83,
+      "name": "cardless_3p_on_early_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 377.51419291152223,
+      "choice": "DayLaborer",
+      "choice_is_legal": true,
+      "completed_per_sec": 377.51419291152223,
+      "elapsed_ms": 84,
+      "name": "cardless_3p_on_early_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 380.49503045547624,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 380.49503045547624,
+      "elapsed_ms": 84,
+      "name": "cardless_3p_on_early_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 375.69342880846096,
+      "choice": "DayLaborer",
+      "choice_is_legal": true,
+      "completed_per_sec": 375.69342880846096,
+      "elapsed_ms": 85,
+      "name": "cardless_3p_on_early_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 377.43521940739817,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 377.43521940739817,
+      "elapsed_ms": 84,
+      "name": "cardless_3p_on_early_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 781.9483317865418,
+      "choice": "WesternQuarry",
+      "choice_is_legal": true,
+      "completed_per_sec": 781.9483317865418,
+      "elapsed_ms": 40,
+      "name": "cardless_3p_on_mid_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 782.5916593973276,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 782.5916593973276,
+      "elapsed_ms": 40,
+      "name": "cardless_3p_on_mid_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 784.1746498096563,
+      "choice": "WesternQuarry",
+      "choice_is_legal": true,
+      "completed_per_sec": 784.1746498096563,
+      "elapsed_ms": 40,
+      "name": "cardless_3p_on_mid_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 780.1662051455326,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 780.1662051455326,
+      "elapsed_ms": 41,
+      "name": "cardless_3p_on_mid_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 779.9540689923483,
+      "choice": "WesternQuarry",
+      "choice_is_legal": true,
+      "completed_per_sec": 779.9540689923483,
+      "elapsed_ms": 41,
+      "name": "cardless_3p_on_mid_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 777.882240880376,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 777.882240880376,
+      "elapsed_ms": 41,
+      "name": "cardless_3p_on_mid_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 5781.918675506979,
+      "choice": "PigMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 5781.918675506979,
+      "elapsed_ms": 5,
+      "name": "cardless_3p_on_late_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 6194.3344681225035,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 6194.3344681225035,
+      "elapsed_ms": 5,
+      "name": "cardless_3p_on_late_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 5590.642661844738,
+      "choice": "PigMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 5590.642661844738,
+      "elapsed_ms": 5,
+      "name": "cardless_3p_on_late_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 6609.03860380755,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 6609.03860380755,
+      "elapsed_ms": 4,
+      "name": "cardless_3p_on_late_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 5881.071862103568,
+      "choice": "PigMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 5881.071862103568,
+      "elapsed_ms": 5,
+      "name": "cardless_3p_on_late_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 6569.738388911267,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 6569.738388911267,
+      "elapsed_ms": 4,
+      "name": "cardless_3p_on_late_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 293.8525585604531,
+      "choice": "Grove",
+      "choice_is_legal": true,
+      "completed_per_sec": 293.8525585604531,
+      "elapsed_ms": 108,
+      "name": "cardless_4p_off_early_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 289.4672833176142,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 289.4672833176142,
+      "elapsed_ms": 110,
+      "name": "cardless_4p_off_early_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 295.1394943155534,
+      "choice": "Grove",
+      "choice_is_legal": true,
+      "completed_per_sec": 295.1394943155534,
+      "elapsed_ms": 108,
+      "name": "cardless_4p_off_early_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 290.14437321067624,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 290.14437321067624,
+      "elapsed_ms": 110,
+      "name": "cardless_4p_off_early_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 299.5717051416437,
+      "choice": "Grove",
+      "choice_is_legal": true,
+      "completed_per_sec": 299.5717051416437,
+      "elapsed_ms": 106,
+      "name": "cardless_4p_off_early_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 291.97580593579875,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 291.97580593579875,
+      "elapsed_ms": 109,
+      "name": "cardless_4p_off_early_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 547.686582998299,
+      "choice": "Grove",
+      "choice_is_legal": true,
+      "completed_per_sec": 547.686582998299,
+      "elapsed_ms": 58,
+      "name": "cardless_4p_off_mid_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 544.9025591621142,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 544.9025591621142,
+      "elapsed_ms": 58,
+      "name": "cardless_4p_off_mid_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 549.4348135771111,
+      "choice": "Grove",
+      "choice_is_legal": true,
+      "completed_per_sec": 549.4348135771111,
+      "elapsed_ms": 58,
+      "name": "cardless_4p_off_mid_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 542.873290914006,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 542.873290914006,
+      "elapsed_ms": 58,
+      "name": "cardless_4p_off_mid_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 548.3643755837403,
+      "choice": "Grove",
+      "choice_is_legal": true,
+      "completed_per_sec": 548.3643755837403,
+      "elapsed_ms": 58,
+      "name": "cardless_4p_off_mid_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 546.3238584614195,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 546.3238584614195,
+      "elapsed_ms": 58,
+      "name": "cardless_4p_off_mid_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4106.952750150321,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 4106.952750150321,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_off_late_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4276.9993267735745,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 4276.9993267735745,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_off_late_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4123.685832871137,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 4123.685832871137,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_off_late_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4282.193328717485,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 4282.193328717485,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_off_late_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4136.10740333497,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 4136.10740333497,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_off_late_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4275.145705649538,
+      "choice": "FamilyGrowthNoRoom",
+      "choice_is_legal": true,
+      "completed_per_sec": 4275.145705649538,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_off_late_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 266.2650701557287,
+      "choice": "TravelingPlayers",
+      "choice_is_legal": true,
+      "completed_per_sec": 266.2650701557287,
+      "elapsed_ms": 120,
+      "name": "cardless_4p_on_early_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 259.90939915720804,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 259.90939915720804,
+      "elapsed_ms": 123,
+      "name": "cardless_4p_on_early_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 261.6278430433414,
+      "choice": "TravelingPlayers",
+      "choice_is_legal": true,
+      "completed_per_sec": 261.6278430433414,
+      "elapsed_ms": 122,
+      "name": "cardless_4p_on_early_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 261.96841165244666,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 261.96841165244666,
+      "elapsed_ms": 122,
+      "name": "cardless_4p_on_early_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 266.52181872123714,
+      "choice": "TravelingPlayers",
+      "choice_is_legal": true,
+      "completed_per_sec": 266.52181872123714,
+      "elapsed_ms": 120,
+      "name": "cardless_4p_on_early_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 262.95418309322275,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 262.95418309322275,
+      "elapsed_ms": 121,
+      "name": "cardless_4p_on_early_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 525.4518878024916,
+      "choice": "ResourceMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 525.4518878024916,
+      "elapsed_ms": 60,
+      "name": "cardless_4p_on_mid_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 519.8946628426248,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 519.8946628426248,
+      "elapsed_ms": 61,
+      "name": "cardless_4p_on_mid_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 525.3057336825347,
+      "choice": "ResourceMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 525.3057336825347,
+      "elapsed_ms": 60,
+      "name": "cardless_4p_on_mid_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 523.2415902240681,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 523.2415902240681,
+      "elapsed_ms": 61,
+      "name": "cardless_4p_on_mid_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 525.8618012179945,
+      "choice": "ResourceMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 525.8618012179945,
+      "elapsed_ms": 60,
+      "name": "cardless_4p_on_mid_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 524.8856401310895,
+      "choice": "FarmExpansion",
+      "choice_is_legal": true,
+      "completed_per_sec": 524.8856401310895,
+      "elapsed_ms": 60,
+      "name": "cardless_4p_on_mid_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 3982.6550394712235,
+      "choice": "TravelingPlayers",
+      "choice_is_legal": true,
+      "completed_per_sec": 3982.6550394712235,
+      "elapsed_ms": 8,
+      "name": "cardless_4p_on_late_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4339.584414274087,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 4339.584414274087,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_on_late_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4047.088379177781,
+      "choice": "TravelingPlayers",
+      "choice_is_legal": true,
+      "completed_per_sec": 4047.088379177781,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_on_late_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4355.110838251319,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 4355.110838251319,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_on_late_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4073.3130151388496,
+      "choice": "TravelingPlayers",
+      "choice_is_legal": true,
+      "completed_per_sec": 4073.3130151388496,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_on_late_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 4356.631098858086,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 4356.631098858086,
+      "elapsed_ms": 7,
+      "name": "cardless_4p_on_late_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 115.05513398875065,
+      "choice": "ClayPit",
+      "choice_is_legal": true,
+      "completed_per_sec": 115.05513398875065,
+      "elapsed_ms": 278,
+      "name": "cards_2p_off_early_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 114.93340053010373,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 114.93340053010373,
+      "elapsed_ms": 278,
+      "name": "cards_2p_off_early_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 115.0609882386204,
+      "choice": "ClayPit",
+      "choice_is_legal": true,
+      "completed_per_sec": 115.0609882386204,
+      "elapsed_ms": 278,
+      "name": "cards_2p_off_early_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 114.64301151427834,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 114.64301151427834,
+      "elapsed_ms": 279,
+      "name": "cards_2p_off_early_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 115.55131315328829,
+      "choice": "ClayPit",
+      "choice_is_legal": true,
+      "completed_per_sec": 115.55131315328829,
+      "elapsed_ms": 276,
+      "name": "cards_2p_off_early_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 114.99286950777345,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 114.99286950777345,
+      "elapsed_ms": 278,
+      "name": "cards_2p_off_early_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 214.76487581664009,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 214.76487581664009,
+      "elapsed_ms": 149,
+      "name": "cards_2p_off_mid_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 224.85714193362247,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 224.85714193362247,
+      "elapsed_ms": 142,
+      "name": "cards_2p_off_mid_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 214.48534987644535,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 214.48534987644535,
+      "elapsed_ms": 149,
+      "name": "cards_2p_off_mid_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 224.37263448138452,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 224.37263448138452,
+      "elapsed_ms": 142,
+      "name": "cards_2p_off_mid_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 213.5105770037272,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 213.5105770037272,
+      "elapsed_ms": 149,
+      "name": "cards_2p_off_mid_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 225.5097026677121,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 225.5097026677121,
+      "elapsed_ms": 141,
+      "name": "cards_2p_off_mid_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 2016.0634898714231,
+      "choice": "PigMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 2016.0634898714231,
+      "elapsed_ms": 15,
+      "name": "cards_2p_off_late_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 2060.761952564222,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 2060.761952564222,
+      "elapsed_ms": 15,
+      "name": "cards_2p_off_late_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 2021.6723273491834,
+      "choice": "PigMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 2021.6723273491834,
+      "elapsed_ms": 15,
+      "name": "cards_2p_off_late_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 2069.212440286247,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 2069.212440286247,
+      "elapsed_ms": 15,
+      "name": "cards_2p_off_late_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 2009.5588434310628,
+      "choice": "PigMarket",
+      "choice_is_legal": true,
+      "completed_per_sec": 2009.5588434310628,
+      "elapsed_ms": 15,
+      "name": "cards_2p_off_late_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 2070.3574756855924,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 2070.3574756855924,
+      "elapsed_ms": 15,
+      "name": "cards_2p_off_late_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 97.49862345654422,
+      "choice": "MeetingPlace",
+      "choice_is_legal": true,
+      "completed_per_sec": 97.49862345654422,
+      "elapsed_ms": 328,
+      "name": "cards_2p_on_early_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 97.79519480315356,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 97.79519480315356,
+      "elapsed_ms": 327,
+      "name": "cards_2p_on_early_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 97.40723640246499,
+      "choice": "MeetingPlace",
+      "choice_is_legal": true,
+      "completed_per_sec": 97.40723640246499,
+      "elapsed_ms": 328,
+      "name": "cards_2p_on_early_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 97.94822676504533,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 97.94822676504533,
+      "elapsed_ms": 326,
+      "name": "cards_2p_on_early_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 97.78678168584246,
+      "choice": "MeetingPlace",
+      "choice_is_legal": true,
+      "completed_per_sec": 97.78678168584246,
+      "elapsed_ms": 327,
+      "name": "cards_2p_on_early_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 97.89474924962069,
+      "choice": "GrainSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 97.89474924962069,
+      "elapsed_ms": 326,
+      "name": "cards_2p_on_early_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 197.45007908215032,
+      "choice": "ReedBank",
+      "choice_is_legal": true,
+      "completed_per_sec": 197.45007908215032,
+      "elapsed_ms": 162,
+      "name": "cards_2p_on_mid_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 193.403623704578,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 193.403623704578,
+      "elapsed_ms": 165,
+      "name": "cards_2p_on_mid_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 197.35719595636075,
+      "choice": "ReedBank",
+      "choice_is_legal": true,
+      "completed_per_sec": 197.35719595636075,
+      "elapsed_ms": 162,
+      "name": "cards_2p_on_mid_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 192.09763977253886,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 192.09763977253886,
+      "elapsed_ms": 166,
+      "name": "cards_2p_on_mid_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 197.01559544669868,
+      "choice": "ReedBank",
+      "choice_is_legal": true,
+      "completed_per_sec": 197.01559544669868,
+      "elapsed_ms": 162,
+      "name": "cards_2p_on_mid_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 191.63411566583684,
+      "choice": "VegetableSeeds",
+      "choice_is_legal": true,
+      "completed_per_sec": 191.63411566583684,
+      "elapsed_ms": 166,
+      "name": "cards_2p_on_mid_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 1901.1618059207287,
+      "choice": "MeetingPlace",
+      "choice_is_legal": true,
+      "completed_per_sec": 1901.1618059207287,
+      "elapsed_ms": 16,
+      "name": "cards_2p_on_late_rep0",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 2059.278387667394,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 2059.278387667394,
+      "elapsed_ms": 15,
+      "name": "cards_2p_on_late_rep0",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 1912.5279064716476,
+      "choice": "MeetingPlace",
+      "choice_is_legal": true,
+      "completed_per_sec": 1912.5279064716476,
+      "elapsed_ms": 16,
+      "name": "cards_2p_on_late_rep1",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 2065.1961781479527,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 2065.1961781479527,
+      "elapsed_ms": 15,
+      "name": "cards_2p_on_late_rep1",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 1912.9721992532714,
+      "choice": "MeetingPlace",
+      "choice_is_legal": true,
+      "completed_per_sec": 1912.9721992532714,
+      "elapsed_ms": 16,
+      "name": "cards_2p_on_late_rep2",
+      "policy": "mcts",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    },
+    {
+      "attempted_per_sec": 2042.6159910661083,
+      "choice": "Fishing",
+      "choice_is_legal": true,
+      "completed_per_sec": 2042.6159910661083,
+      "elapsed_ms": 15,
+      "name": "cards_2p_on_late_rep2",
+      "policy": "puct",
+      "simulations_attempted": 32,
+      "simulations_completed": 32
+    }
+  ],
+  "harness": "perf_baseline",
+  "harness_version": 2,
+  "log_version": 5,
+  "purpose": "#237 Step 0 baseline; measure before any v2 optimization",
+  "quick_mode": false,
+  "rules_version": "agricola-revised-2016-beginner",
+  "scenarios": [
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 22.467766666666666,
+        "mean_us": 16.50006666666667,
+        "median_us": 15.190933333333334,
+        "min_us": 14.780966666666668,
+        "p95_us": 21.746033333333333,
+        "stddev_us": 2.675881014419986
+      },
+      "apply_search": {
+        "max_us": 4.5755,
+        "mean_us": 3.0296433333333335,
+        "median_us": 3.1910666666666665,
+        "min_us": 2.1649000000000003,
+        "p95_us": 4.2620000000000005,
+        "stddev_us": 0.8674541236092352
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008366666666666666,
+        "mean_us": 0.003006666666666667,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003033333333333333,
+        "stddev_us": 0.0012356554715795356
+      },
+      "cardstate_validate": {
+        "max_us": 0.027366666666666664,
+        "mean_us": 0.026489999999999996,
+        "median_us": 0.026366666666666667,
+        "min_us": 0.026366666666666667,
+        "p95_us": 0.026733333333333335,
+        "stddev_us": 0.00024383509910502106
+      },
+      "clone": {
+        "max_us": 0.6179333333333333,
+        "mean_us": 0.5024483333333334,
+        "median_us": 0.4957333333333333,
+        "min_us": 0.4920666666666667,
+        "p95_us": 0.5204333333333334,
+        "stddev_us": 0.027113195793028736
+      },
+      "clone_allocated_bytes": 1550.0,
+      "clone_allocations": 23.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 9,
+      "name": "cardless_2p_off_early",
+      "observation": {
+        "max_us": 0.20463333333333333,
+        "mean_us": 0.19826000000000002,
+        "median_us": 0.1983,
+        "min_us": 0.19593333333333335,
+        "p95_us": 0.20129999999999998,
+        "stddev_us": 0.0019555505050439822
+      },
+      "observation_allocated_bytes": 711.0,
+      "observation_allocations": 10.0,
+      "phase": "early",
+      "players": 2,
+      "position_identity": {
+        "method": "initial",
+        "moves": 0,
+        "seed": 2585066186110667685,
+        "state_hash": "bff71cd590b00c1df0bf2d6c5274c05210044f7673a4cfcea8e34212b4a6ff66"
+      },
+      "round": 1,
+      "sample_game": {
+        "max_us": 10.147733333333333,
+        "mean_us": 9.752143333333333,
+        "median_us": 9.669066666666668,
+        "min_us": 9.592933333333331,
+        "p95_us": 10.108333333333333,
+        "stddev_us": 0.1830117813754684
+      },
+      "sample_game_allocated_bytes": 11519.4,
+      "sample_game_allocations": 83.53333333333333,
+      "save_json_bytes": 14257,
+      "state_hash": {
+        "max_us": 6.158133333333334,
+        "mean_us": 5.844058333333335,
+        "median_us": 5.802300000000001,
+        "min_us": 5.7569,
+        "p95_us": 6.092033333333333,
+        "stddev_us": 0.11729093072593286
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 15.803533333333332,
+        "mean_us": 15.297296666666671,
+        "median_us": 15.315433333333335,
+        "min_us": 15.126866666666668,
+        "p95_us": 15.430966666666666,
+        "stddev_us": 0.1574885614541221
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 43.110800000000005,
+        "mean_us": 41.392256666666675,
+        "median_us": 41.25836666666667,
+        "min_us": 40.386100000000006,
+        "p95_us": 42.821733333333334,
+        "stddev_us": 0.6496667276466541
+      },
+      "apply_search": {
+        "max_us": 26.884,
+        "mean_us": 24.459813333333337,
+        "median_us": 24.134233333333334,
+        "min_us": 23.587766666666667,
+        "p95_us": 26.127566666666667,
+        "stddev_us": 0.8530896535795316
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008033333333333333,
+        "mean_us": 0.0030033333333333344,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003,
+        "stddev_us": 0.0011614598094161026
+      },
+      "cardstate_validate": {
+        "max_us": 0.027033333333333336,
+        "mean_us": 0.026404999999999994,
+        "median_us": 0.026366666666666667,
+        "min_us": 0.026033333333333335,
+        "p95_us": 0.0267,
+        "stddev_us": 0.00020770572131423534
+      },
+      "clone": {
+        "max_us": 24.104200000000002,
+        "mean_us": 21.438731666666666,
+        "median_us": 21.340433333333337,
+        "min_us": 21.015933333333333,
+        "p95_us": 21.46026666666667,
+        "stddev_us": 0.6241524150108605
+      },
+      "clone_allocated_bytes": 82156.0,
+      "clone_allocations": 566.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 13,
+      "name": "cardless_2p_off_mid",
+      "observation": {
+        "max_us": 0.235,
+        "mean_us": 0.22708666666666666,
+        "median_us": 0.22699999999999998,
+        "min_us": 0.223,
+        "p95_us": 0.23399999999999999,
+        "stddev_us": 0.003116326184610473
+      },
+      "observation_allocated_bytes": 718.0,
+      "observation_allocations": 11.0,
+      "phase": "mid",
+      "players": 2,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 28,
+        "seed": 2585170558111580164,
+        "state_hash": "bfd69f7432aea70691dc2649d946af6b78e578d7747f98ed2f10a443d5cc20cc"
+      },
+      "round": 8,
+      "sample_game": {
+        "max_us": 10.785333333333334,
+        "mean_us": 9.874296666666668,
+        "median_us": 9.773200000000001,
+        "min_us": 9.6504,
+        "p95_us": 10.438199999999998,
+        "stddev_us": 0.28110845631377057
+      },
+      "sample_game_allocated_bytes": 12279.4,
+      "sample_game_allocations": 96.53333333333333,
+      "save_json_bytes": 32234,
+      "state_hash": {
+        "max_us": 6.213266666666667,
+        "mean_us": 5.967893333333334,
+        "median_us": 5.921133333333334,
+        "min_us": 5.884766666666667,
+        "p95_us": 6.168833333333334,
+        "stddev_us": 0.10241256303143027
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 62.77706666666667,
+        "mean_us": 59.82881999999999,
+        "median_us": 59.589999999999996,
+        "min_us": 59.082233333333335,
+        "p95_us": 61.56126666666667,
+        "stddev_us": 0.8782924009690626
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 70.62273333333334,
+        "mean_us": 65.77928833333334,
+        "median_us": 65.62700000000001,
+        "min_us": 63.839666666666666,
+        "p95_us": 67.5148,
+        "stddev_us": 1.4422270566066697
+      },
+      "apply_search": {
+        "max_us": 50.791599999999995,
+        "mean_us": 48.009371666666674,
+        "median_us": 47.80179999999999,
+        "min_us": 46.259166666666665,
+        "p95_us": 50.285133333333334,
+        "stddev_us": 1.4367880656084955
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.011333333333333332,
+        "mean_us": 0.0031700000000000005,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003033333333333333,
+        "stddev_us": 0.001877672909629245
+      },
+      "cardstate_validate": {
+        "max_us": 0.027033333333333336,
+        "mean_us": 0.02638833333333333,
+        "median_us": 0.026366666666666667,
+        "min_us": 0.026033333333333335,
+        "p95_us": 0.0267,
+        "stddev_us": 0.00019358460682605962
+      },
+      "clone": {
+        "max_us": 43.701033333333335,
+        "mean_us": 42.793270000000014,
+        "median_us": 42.70786666666667,
+        "min_us": 42.497566666666664,
+        "p95_us": 43.23096666666667,
+        "stddev_us": 0.28245802203356035
+      },
+      "clone_allocated_bytes": 162286.0,
+      "clone_allocations": 1121.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 18,
+      "name": "cardless_2p_off_late",
+      "observation": {
+        "max_us": 0.218,
+        "mean_us": 0.21378333333333335,
+        "median_us": 0.21366666666666664,
+        "min_us": 0.2113,
+        "p95_us": 0.21766666666666667,
+        "stddev_us": 0.001787689383906877
+      },
+      "observation_allocated_bytes": 724.0,
+      "observation_allocations": 11.0,
+      "phase": "late",
+      "players": 2,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 52,
+        "seed": 2585170558111580164,
+        "state_hash": "1a8bdd4e488b932a52756f271c1e69937047cdfaf4a11a3602ef85570ce86e6f"
+      },
+      "round": 14,
+      "sample_game": {
+        "max_us": 11.309533333333333,
+        "mean_us": 10.249816666666664,
+        "median_us": 10.113,
+        "min_us": 10.032266666666665,
+        "p95_us": 10.705266666666667,
+        "stddev_us": 0.31120189293554545
+      },
+      "sample_game_allocated_bytes": 12496.6,
+      "sample_game_allocations": 99.13333333333334,
+      "save_json_bytes": 50335,
+      "state_hash": {
+        "max_us": 6.4506,
+        "mean_us": 6.25651,
+        "median_us": 6.2232666666666665,
+        "min_us": 6.1548333333333325,
+        "p95_us": 6.427233333333334,
+        "stddev_us": 0.09156171755827985
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 117.83496666666666,
+        "mean_us": 108.36361333333335,
+        "median_us": 107.39813333333333,
+        "min_us": 105.60146666666667,
+        "p95_us": 114.13813333333334,
+        "stddev_us": 2.9859552874787347
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 15.773133333333334,
+        "mean_us": 15.413900000000002,
+        "median_us": 15.332166666666668,
+        "min_us": 15.178233333333333,
+        "p95_us": 15.702366666666666,
+        "stddev_us": 0.18321522498598936
+      },
+      "apply_search": {
+        "max_us": 2.6245666666666665,
+        "mean_us": 2.4100866666666665,
+        "median_us": 2.3932333333333333,
+        "min_us": 2.3602,
+        "p95_us": 2.4600000000000004,
+        "stddev_us": 0.055257940002621596
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008033333333333333,
+        "mean_us": 0.0030050000000000007,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003,
+        "stddev_us": 0.0011609993300792402
+      },
+      "cardstate_validate": {
+        "max_us": 0.0277,
+        "mean_us": 0.026404999999999994,
+        "median_us": 0.026366666666666667,
+        "min_us": 0.026033333333333335,
+        "p95_us": 0.0267,
+        "stddev_us": 0.00032969261778544864
+      },
+      "clone": {
+        "max_us": 0.5010666666666667,
+        "mean_us": 0.49153166666666664,
+        "median_us": 0.4914,
+        "min_us": 0.48706666666666665,
+        "p95_us": 0.49406666666666665,
+        "stddev_us": 0.0029109844650144698
+      },
+      "clone_allocated_bytes": 1550.0,
+      "clone_allocations": 23.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 12,
+      "name": "cardless_2p_on_early",
+      "observation": {
+        "max_us": 0.21030000000000001,
+        "mean_us": 0.19978,
+        "median_us": 0.19896666666666668,
+        "min_us": 0.19826666666666665,
+        "p95_us": 0.20163333333333336,
+        "stddev_us": 0.0026212253283955282
+      },
+      "observation_allocated_bytes": 711.0,
+      "observation_allocations": 10.0,
+      "phase": "early",
+      "players": 2,
+      "position_identity": {
+        "method": "initial",
+        "moves": 0,
+        "seed": 2585066186110667685,
+        "state_hash": "e00706695a55cbd2dcfc4fe033df9ee1b0afa9b967d47269068ec583a77dde74"
+      },
+      "round": 1,
+      "sample_game": {
+        "max_us": 10.016933333333332,
+        "mean_us": 9.590406666666667,
+        "median_us": 9.547533333333332,
+        "min_us": 9.446733333333333,
+        "p95_us": 9.943466666666666,
+        "stddev_us": 0.15920825760270363
+      },
+      "sample_game_allocated_bytes": 11671.4,
+      "sample_game_allocations": 87.53333333333333,
+      "save_json_bytes": 14291,
+      "state_hash": {
+        "max_us": 6.013933333333333,
+        "mean_us": 5.715705,
+        "median_us": 5.6681,
+        "min_us": 5.632733333333333,
+        "p95_us": 5.948833333333334,
+        "stddev_us": 0.11531919049846917
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 16.141333333333332,
+        "mean_us": 15.563071666666664,
+        "median_us": 15.551799999999998,
+        "min_us": 15.324133333333332,
+        "p95_us": 15.771466666666667,
+        "stddev_us": 0.19004936472021036
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 39.85196666666666,
+        "mean_us": 38.192258333333335,
+        "median_us": 38.1224,
+        "min_us": 37.622299999999996,
+        "p95_us": 38.72796666666667,
+        "stddev_us": 0.4695732614566119
+      },
+      "apply_search": {
+        "max_us": 25.383766666666666,
+        "mean_us": 24.07201166666667,
+        "median_us": 23.997700000000002,
+        "min_us": 23.482266666666664,
+        "p95_us": 24.4998,
+        "stddev_us": 0.3970838322172455
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.007033333333333333,
+        "mean_us": 0.0029366666666666673,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003,
+        "stddev_us": 0.0009472122840795042
+      },
+      "cardstate_validate": {
+        "max_us": 0.0267,
+        "mean_us": 0.026354999999999996,
+        "median_us": 0.026366666666666667,
+        "min_us": 0.026033333333333335,
+        "p95_us": 0.0264,
+        "stddev_us": 0.00012921773184134652
+      },
+      "clone": {
+        "max_us": 22.708133333333333,
+        "mean_us": 21.64083333333333,
+        "median_us": 21.52433333333333,
+        "min_us": 21.188533333333332,
+        "p95_us": 22.3516,
+        "stddev_us": 0.3871517178919223
+      },
+      "clone_allocated_bytes": 81657.0,
+      "clone_allocations": 566.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 17,
+      "name": "cardless_2p_on_mid",
+      "observation": {
+        "max_us": 0.6990333333333333,
+        "mean_us": 0.27364166666666667,
+        "median_us": 0.24903333333333333,
+        "min_us": 0.24636666666666668,
+        "p95_us": 0.2663666666666667,
+        "stddev_us": 0.09775154552628708
+      },
+      "observation_allocated_bytes": 798.0,
+      "observation_allocations": 14.0,
+      "phase": "mid",
+      "players": 2,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 28,
+        "seed": 2585170558111580164,
+        "state_hash": "7ce09368bb028184a0aab647e2186044ed336398b2a62321fd210cf9976ca2c7"
+      },
+      "round": 8,
+      "sample_game": {
+        "max_us": 11.491066666666665,
+        "mean_us": 10.534769999999998,
+        "median_us": 10.4282,
+        "min_us": 10.267933333333334,
+        "p95_us": 10.996999999999998,
+        "stddev_us": 0.2836691738823779
+      },
+      "sample_game_allocated_bytes": 12823.4,
+      "sample_game_allocations": 110.53333333333333,
+      "save_json_bytes": 32572,
+      "state_hash": {
+        "max_us": 6.6786,
+        "mean_us": 6.129306666666667,
+        "median_us": 6.064366666666667,
+        "min_us": 5.9835666666666665,
+        "p95_us": 6.537733333333334,
+        "stddev_us": 0.19152089082453191
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 65.16193333333334,
+        "mean_us": 61.065981666666666,
+        "median_us": 60.6202,
+        "min_us": 59.98826666666667,
+        "p95_us": 63.77256666666667,
+        "stddev_us": 1.2978717212110937
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 63.423366666666666,
+        "mean_us": 61.974595,
+        "median_us": 62.2476,
+        "min_us": 60.93733333333333,
+        "p95_us": 63.24576666666667,
+        "stddev_us": 0.7782066180416917
+      },
+      "apply_search": {
+        "max_us": 46.51253333333333,
+        "mean_us": 45.25176333333333,
+        "median_us": 45.15486666666666,
+        "min_us": 44.6668,
+        "p95_us": 46.3306,
+        "stddev_us": 0.4807904002669856
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008,
+        "mean_us": 0.0030216666666666677,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003,
+        "stddev_us": 0.001150713546746829
+      },
+      "cardstate_validate": {
+        "max_us": 0.027366666666666664,
+        "mean_us": 0.02643999999999999,
+        "median_us": 0.026366666666666667,
+        "min_us": 0.026366666666666667,
+        "p95_us": 0.0267,
+        "stddev_us": 0.00022449944320643604
+      },
+      "clone": {
+        "max_us": 43.481033333333336,
+        "mean_us": 41.69181833333333,
+        "median_us": 41.667,
+        "min_us": 41.24403333333333,
+        "p95_us": 42.30826666666667,
+        "stddev_us": 0.4822187189872118
+      },
+      "clone_allocated_bytes": 155807.0,
+      "clone_allocations": 1088.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 21,
+      "name": "cardless_2p_on_late",
+      "observation": {
+        "max_us": 0.3144666666666666,
+        "mean_us": 0.3087766666666666,
+        "median_us": 0.3087666666666667,
+        "min_us": 0.3068,
+        "p95_us": 0.30879999999999996,
+        "stddev_us": 0.0014089830848286627
+      },
+      "observation_allocated_bytes": 844.0,
+      "observation_allocations": 15.0,
+      "phase": "late",
+      "players": 2,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 52,
+        "seed": 2585170558111580164,
+        "state_hash": "e755ba56d9f61fee48f47f85d9be56492156eb77ae5d8f864d487ac85e3d5654"
+      },
+      "round": 14,
+      "sample_game": {
+        "max_us": 11.324866666666667,
+        "mean_us": 10.919083333333335,
+        "median_us": 10.8428,
+        "min_us": 10.738666666666665,
+        "p95_us": 11.288800000000002,
+        "stddev_us": 0.19132107495574646
+      },
+      "sample_game_allocated_bytes": 13152.6,
+      "sample_game_allocations": 114.13333333333334,
+      "save_json_bytes": 49943,
+      "state_hash": {
+        "max_us": 6.719666666666667,
+        "mean_us": 6.450948333333332,
+        "median_us": 6.374833333333332,
+        "min_us": 6.3280666666666665,
+        "p95_us": 6.6926000000000005,
+        "stddev_us": 0.1383042059595844
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 109.0142,
+        "mean_us": 105.92496333333334,
+        "median_us": 105.87219999999999,
+        "min_us": 104.26713333333333,
+        "p95_us": 107.90023333333333,
+        "stddev_us": 1.1221043591742164
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 19.9233,
+        "mean_us": 19.574701666666666,
+        "median_us": 19.543733333333332,
+        "min_us": 19.298733333333335,
+        "p95_us": 19.9203,
+        "stddev_us": 0.18924929046542485
+      },
+      "apply_search": {
+        "max_us": 2.8639333333333337,
+        "mean_us": 2.633821666666667,
+        "median_us": 2.6078666666666668,
+        "min_us": 2.5784999999999996,
+        "p95_us": 2.8505666666666665,
+        "stddev_us": 0.07667571343362621
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008033333333333333,
+        "mean_us": 0.0030050000000000007,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003,
+        "stddev_us": 0.0011609993300792402
+      },
+      "cardstate_validate": {
+        "max_us": 0.03773333333333333,
+        "mean_us": 0.03582,
+        "median_us": 0.03573333333333333,
+        "min_us": 0.03536666666666667,
+        "p95_us": 0.036366666666666665,
+        "stddev_us": 0.0004860726968948838
+      },
+      "clone": {
+        "max_us": 0.5938666666666667,
+        "mean_us": 0.57614,
+        "median_us": 0.5752,
+        "min_us": 0.5701666666666667,
+        "p95_us": 0.5798333333333333,
+        "stddev_us": 0.004811220681328645
+      },
+      "clone_allocated_bytes": 2114.0,
+      "clone_allocations": 25.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 12,
+      "name": "cardless_3p_off_early",
+      "observation": {
+        "max_us": 0.24503333333333333,
+        "mean_us": 0.23687166666666667,
+        "median_us": 0.23666666666666666,
+        "min_us": 0.23336666666666667,
+        "p95_us": 0.24036666666666667,
+        "stddev_us": 0.0024823437625670543
+      },
+      "observation_allocated_bytes": 989.0,
+      "observation_allocations": 11.0,
+      "phase": "early",
+      "players": 3,
+      "position_identity": {
+        "method": "initial",
+        "moves": 0,
+        "seed": 2585066186110667685,
+        "state_hash": "d6c4a9968ec76f07a45a7af8413c9740c498302e308312306fc692484a00a449"
+      },
+      "round": 1,
+      "sample_game": {
+        "max_us": 13.2604,
+        "mean_us": 12.164566666666664,
+        "median_us": 12.057933333333333,
+        "min_us": 11.932400000000001,
+        "p95_us": 12.610133333333332,
+        "stddev_us": 0.3030514041471438
+      },
+      "sample_game_allocated_bytes": 21035.8,
+      "sample_game_allocations": 96.4,
+      "save_json_bytes": 19649,
+      "state_hash": {
+        "max_us": 8.324733333333334,
+        "mean_us": 7.743106666666668,
+        "median_us": 7.662733333333334,
+        "min_us": 7.623033333333334,
+        "p95_us": 8.037966666666668,
+        "stddev_us": 0.1813340124374541
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 20.272499999999997,
+        "mean_us": 19.974004999999995,
+        "median_us": 20.0238,
+        "min_us": 19.7497,
+        "p95_us": 20.094566666666665,
+        "stddev_us": 0.13348406990890074
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 54.5552,
+        "mean_us": 52.80989666666667,
+        "median_us": 52.63533333333333,
+        "min_us": 52.18899999999999,
+        "p95_us": 53.54066666666667,
+        "stddev_us": 0.5194836992309452
+      },
+      "apply_search": {
+        "max_us": 36.0827,
+        "mean_us": 35.05766333333334,
+        "median_us": 35.015433333333334,
+        "min_us": 34.490300000000005,
+        "p95_us": 35.880399999999995,
+        "stddev_us": 0.4012029828320478
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.007666666666666666,
+        "mean_us": 0.0029866666666666674,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003033333333333333,
+        "stddev_us": 0.001082148069556308
+      },
+      "cardstate_validate": {
+        "max_us": 0.0374,
+        "mean_us": 0.03580333333333332,
+        "median_us": 0.03573333333333333,
+        "min_us": 0.035699999999999996,
+        "p95_us": 0.03573333333333333,
+        "stddev_us": 0.00036665151483845557
+      },
+      "clone": {
+        "max_us": 36.60246666666667,
+        "mean_us": 33.80822333333334,
+        "median_us": 33.53156666666667,
+        "min_us": 33.062866666666665,
+        "p95_us": 35.673433333333335,
+        "stddev_us": 0.8849380845950008
+      },
+      "clone_allocated_bytes": 123377.0,
+      "clone_allocations": 851.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 17,
+      "name": "cardless_3p_off_mid",
+      "observation": {
+        "max_us": 0.2634,
+        "mean_us": 0.25593333333333335,
+        "median_us": 0.2564,
+        "min_us": 0.2527,
+        "p95_us": 0.2584,
+        "stddev_us": 0.00240150415827711
+      },
+      "observation_allocated_bytes": 996.0,
+      "observation_allocations": 13.0,
+      "phase": "mid",
+      "players": 3,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 42,
+        "seed": 2585170558111580164,
+        "state_hash": "02ecfc91e97115dcff2a795ec0aebbcb391752d714c7a64391eb915e67ba05f1"
+      },
+      "round": 8,
+      "sample_game": {
+        "max_us": 13.024733333333334,
+        "mean_us": 12.513556666666666,
+        "median_us": 12.429200000000002,
+        "min_us": 12.286266666666666,
+        "p95_us": 12.929933333333334,
+        "stddev_us": 0.2286337005148435
+      },
+      "sample_game_allocated_bytes": 21380.0,
+      "sample_game_allocations": 103.66666666666667,
+      "save_json_bytes": 46514,
+      "state_hash": {
+        "max_us": 8.436566666666666,
+        "mean_us": 7.913358333333333,
+        "median_us": 7.843,
+        "min_us": 7.8013,
+        "p95_us": 8.1608,
+        "stddev_us": 0.1593457777131229
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 91.54053333333333,
+        "mean_us": 90.10016666666667,
+        "median_us": 90.04029999999999,
+        "min_us": 88.64656666666666,
+        "p95_us": 91.53886666666668,
+        "stddev_us": 0.7906585603153872
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 97.72606666666667,
+        "mean_us": 96.48354166666667,
+        "median_us": 96.43180000000001,
+        "min_us": 95.28676666666667,
+        "p95_us": 97.54646666666667,
+        "stddev_us": 0.6471674853523025
+      },
+      "apply_search": {
+        "max_us": 76.13096666666667,
+        "mean_us": 73.46102499999999,
+        "median_us": 73.24,
+        "min_us": 72.58333333333333,
+        "p95_us": 74.5573,
+        "stddev_us": 0.7839787309951585
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008,
+        "mean_us": 0.0030050000000000007,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003033333333333333,
+        "stddev_us": 0.0011537992796746659
+      },
+      "cardstate_validate": {
+        "max_us": 0.0374,
+        "mean_us": 0.03581999999999999,
+        "median_us": 0.03573333333333333,
+        "min_us": 0.0354,
+        "p95_us": 0.036366666666666665,
+        "stddev_us": 0.00039670868124831667
+      },
+      "clone": {
+        "max_us": 64.31636666666667,
+        "mean_us": 63.48900000000001,
+        "median_us": 63.40736666666667,
+        "min_us": 63.04046666666667,
+        "p95_us": 64.21056666666667,
+        "stddev_us": 0.3495879660400221
+      },
+      "clone_allocated_bytes": 238776.0,
+      "clone_allocations": 1660.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 24,
+      "name": "cardless_3p_off_late",
+      "observation": {
+        "max_us": 0.35253333333333337,
+        "mean_us": 0.3513066666666666,
+        "median_us": 0.3518666666666667,
+        "min_us": 0.3458333333333333,
+        "p95_us": 0.35253333333333337,
+        "stddev_us": 0.001921243810081847
+      },
+      "observation_allocated_bytes": 1082.0,
+      "observation_allocations": 16.0,
+      "phase": "late",
+      "players": 3,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 78,
+        "seed": 2585170558111580164,
+        "state_hash": "02f72bbf1d7d48ea9f978814bae74df38b7a804f0fbdfcf46692005803de130e"
+      },
+      "round": 14,
+      "sample_game": {
+        "max_us": 14.9596,
+        "mean_us": 13.285903333333334,
+        "median_us": 13.078800000000001,
+        "min_us": 12.955933333333332,
+        "p95_us": 13.988199999999999,
+        "stddev_us": 0.49144047609496355
+      },
+      "sample_game_allocated_bytes": 22013.2,
+      "sample_game_allocations": 115.26666666666667,
+      "save_json_bytes": 73016,
+      "state_hash": {
+        "max_us": 8.535033333333333,
+        "mean_us": 8.256651666666667,
+        "median_us": 8.183499999999999,
+        "min_us": 8.148466666666668,
+        "p95_us": 8.491966666666666,
+        "stddev_us": 0.1264018193764103
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 163.19846666666666,
+        "mean_us": 159.20621333333335,
+        "median_us": 158.90876666666665,
+        "min_us": 156.82666666666668,
+        "p95_us": 163.13273333333333,
+        "stddev_us": 1.5086253142587165
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 20.026799999999998,
+        "mean_us": 19.670766666666665,
+        "median_us": 19.6649,
+        "min_us": 19.405866666666668,
+        "p95_us": 20.0041,
+        "stddev_us": 0.17682496461504282
+      },
+      "apply_search": {
+        "max_us": 2.9333666666666667,
+        "mean_us": 2.717375,
+        "median_us": 2.7143666666666664,
+        "min_us": 2.6426,
+        "p95_us": 2.7691333333333334,
+        "stddev_us": 0.0572294901398455
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008,
+        "mean_us": 0.0030550000000000013,
+        "median_us": 0.0027,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003033333333333333,
+        "stddev_us": 0.001145245000474183
+      },
+      "cardstate_validate": {
+        "max_us": 0.037033333333333335,
+        "mean_us": 0.03575333333333334,
+        "median_us": 0.03573333333333333,
+        "min_us": 0.03536666666666667,
+        "p95_us": 0.03606666666666667,
+        "stddev_us": 0.00034486712417006876
+      },
+      "clone": {
+        "max_us": 0.6122333333333333,
+        "mean_us": 0.6000933333333334,
+        "median_us": 0.5999,
+        "min_us": 0.5905333333333334,
+        "p95_us": 0.6079,
+        "stddev_us": 0.005412296698773596
+      },
+      "clone_allocated_bytes": 2114.0,
+      "clone_allocations": 25.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 13,
+      "name": "cardless_3p_on_early",
+      "observation": {
+        "max_us": 0.24270000000000003,
+        "mean_us": 0.23595333333333332,
+        "median_us": 0.2367,
+        "min_us": 0.23203333333333334,
+        "p95_us": 0.23866666666666667,
+        "stddev_us": 0.0023672863038602765
+      },
+      "observation_allocated_bytes": 989.0,
+      "observation_allocations": 11.0,
+      "phase": "early",
+      "players": 3,
+      "position_identity": {
+        "method": "initial",
+        "moves": 0,
+        "seed": 2585066186110667685,
+        "state_hash": "8c1db02a1ce6b899fe20534b2ff7afb9190b477c3b14ef70c048c4ece6c91a46"
+      },
+      "round": 1,
+      "sample_game": {
+        "max_us": 13.305800000000001,
+        "mean_us": 12.226160000000002,
+        "median_us": 12.077266666666667,
+        "min_us": 11.945066666666666,
+        "p95_us": 12.803066666666666,
+        "stddev_us": 0.3423353881145736
+      },
+      "sample_game_allocated_bytes": 21039.8,
+      "sample_game_allocations": 98.4,
+      "save_json_bytes": 19645,
+      "state_hash": {
+        "max_us": 8.187199999999999,
+        "mean_us": 7.7990716666666655,
+        "median_us": 7.730166666666666,
+        "min_us": 7.657033333333334,
+        "p95_us": 8.087033333333332,
+        "stddev_us": 0.1627153981906238
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 20.596666666666668,
+        "mean_us": 20.240301666666667,
+        "median_us": 20.2785,
+        "min_us": 20.029466666666668,
+        "p95_us": 20.35393333333333,
+        "stddev_us": 0.13194447589590272
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 52.78486666666666,
+        "mean_us": 51.83617333333334,
+        "median_us": 51.86083333333333,
+        "min_us": 51.06763333333333,
+        "p95_us": 52.778866666666666,
+        "stddev_us": 0.4881258538305235
+      },
+      "apply_search": {
+        "max_us": 35.56626666666667,
+        "mean_us": 34.73186333333334,
+        "median_us": 34.62586666666666,
+        "min_us": 34.07236666666667,
+        "p95_us": 35.45776666666667,
+        "stddev_us": 0.41547761256708626
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.007699999999999999,
+        "mean_us": 0.0030233333333333345,
+        "median_us": 0.0027,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003,
+        "stddev_us": 0.001083056374853641
+      },
+      "cardstate_validate": {
+        "max_us": 0.0377,
+        "mean_us": 0.035836666666666656,
+        "median_us": 0.03573333333333333,
+        "min_us": 0.035699999999999996,
+        "p95_us": 0.03606666666666667,
+        "stddev_us": 0.00043434497298294554
+      },
+      "clone": {
+        "max_us": 34.32973333333333,
+        "mean_us": 31.875915,
+        "median_us": 31.567966666666667,
+        "min_us": 31.381700000000002,
+        "p95_us": 34.067366666666665,
+        "stddev_us": 0.7991568215921206
+      },
+      "clone_allocated_bytes": 119425.0,
+      "clone_allocations": 829.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 19,
+      "name": "cardless_3p_on_mid",
+      "observation": {
+        "max_us": 0.26106666666666667,
+        "mean_us": 0.25107499999999994,
+        "median_us": 0.2517,
+        "min_us": 0.24636666666666668,
+        "p95_us": 0.2607333333333334,
+        "stddev_us": 0.0044246390311024906
+      },
+      "observation_allocated_bytes": 996.0,
+      "observation_allocations": 12.0,
+      "phase": "mid",
+      "players": 3,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 42,
+        "seed": 2585170558111580164,
+        "state_hash": "9b756507ba09245c703cf2c07da22e8e990948e887f2e1a9464d33b49a63fc93"
+      },
+      "round": 8,
+      "sample_game": {
+        "max_us": 14.753333333333334,
+        "mean_us": 12.660333333333332,
+        "median_us": 12.353733333333333,
+        "min_us": 12.244200000000001,
+        "p95_us": 13.5682,
+        "stddev_us": 0.624339021152237
+      },
+      "sample_game_allocated_bytes": 21355.0,
+      "sample_game_allocations": 103.66666666666667,
+      "save_json_bytes": 45909,
+      "state_hash": {
+        "max_us": 8.302999999999999,
+        "mean_us": 7.800520000000001,
+        "median_us": 7.7331666666666665,
+        "min_us": 7.6831,
+        "p95_us": 7.9605,
+        "stddev_us": 0.1468409749808727
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 88.53673333333333,
+        "mean_us": 87.60181166666666,
+        "median_us": 87.5663,
+        "min_us": 86.34783333333333,
+        "p95_us": 88.4623,
+        "stddev_us": 0.596211702732343
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 98.71286666666667,
+        "mean_us": 95.39039999999999,
+        "median_us": 95.44736666666668,
+        "min_us": 93.78920000000001,
+        "p95_us": 96.8725,
+        "stddev_us": 1.252895507126502
+      },
+      "apply_search": {
+        "max_us": 74.10926666666666,
+        "mean_us": 70.38459166666665,
+        "median_us": 71.51576666666666,
+        "min_us": 65.86503333333333,
+        "p95_us": 72.6421,
+        "stddev_us": 2.5078794947984546
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008033333333333333,
+        "mean_us": 0.0030050000000000007,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003,
+        "stddev_us": 0.0011609993300792402
+      },
+      "cardstate_validate": {
+        "max_us": 0.0374,
+        "mean_us": 0.03578666666666667,
+        "median_us": 0.03573333333333333,
+        "min_us": 0.03536666666666667,
+        "p95_us": 0.03606666666666667,
+        "stddev_us": 0.0004080304999493168
+      },
+      "clone": {
+        "max_us": 63.82063333333333,
+        "mean_us": 61.826863333333336,
+        "median_us": 61.673433333333335,
+        "min_us": 61.1343,
+        "p95_us": 62.80643333333333,
+        "stddev_us": 0.6262662258620963
+      },
+      "clone_allocated_bytes": 235140.0,
+      "clone_allocations": 1627.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 25,
+      "name": "cardless_3p_on_late",
+      "observation": {
+        "max_us": 0.30910000000000004,
+        "mean_us": 0.29747666666666667,
+        "median_us": 0.2961,
+        "min_us": 0.2937666666666667,
+        "p95_us": 0.3068,
+        "stddev_us": 0.004247955063583214
+      },
+      "observation_allocated_bytes": 1002.0,
+      "observation_allocations": 14.0,
+      "phase": "late",
+      "players": 3,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 78,
+        "seed": 2585170558111580164,
+        "state_hash": "0d49fc7541165c3906d84f049ceb2a3e37158db5eec250bce8810137e39f2ecc"
+      },
+      "round": 14,
+      "sample_game": {
+        "max_us": 13.721733333333333,
+        "mean_us": 12.871480000000002,
+        "median_us": 12.788333333333332,
+        "min_us": 12.656200000000002,
+        "p95_us": 13.211000000000002,
+        "stddev_us": 0.25201918939283624
+      },
+      "sample_game_allocated_bytes": 21721.2,
+      "sample_game_allocations": 110.26666666666667,
+      "save_json_bytes": 71938,
+      "state_hash": {
+        "max_us": 8.5928,
+        "mean_us": 8.118394999999998,
+        "median_us": 8.086666666666666,
+        "min_us": 7.9979,
+        "p95_us": 8.3234,
+        "stddev_us": 0.15137610198699739
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 156.43646666666666,
+        "mean_us": 151.343455,
+        "median_us": 151.2534,
+        "min_us": 149.2918,
+        "p95_us": 152.9833,
+        "stddev_us": 1.436250184344828
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 24.139233333333333,
+        "mean_us": 23.55427833333333,
+        "median_us": 23.516333333333332,
+        "min_us": 23.216866666666665,
+        "p95_us": 24.104533333333332,
+        "stddev_us": 0.2429902147721184
+      },
+      "apply_search": {
+        "max_us": 3.294566666666667,
+        "mean_us": 2.9954066666666668,
+        "median_us": 2.9557333333333333,
+        "min_us": 2.914,
+        "p95_us": 3.2077666666666667,
+        "stddev_us": 0.1036115633829867
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008,
+        "mean_us": 0.003003333333333334,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003033333333333333,
+        "stddev_us": 0.0011542626313895043
+      },
+      "cardstate_validate": {
+        "max_us": 0.047433333333333334,
+        "mean_us": 0.044884999999999994,
+        "median_us": 0.04473333333333333,
+        "min_us": 0.044399999999999995,
+        "p95_us": 0.0454,
+        "stddev_us": 0.0006076800144813063
+      },
+      "clone": {
+        "max_us": 0.6817,
+        "mean_us": 0.6635066666666665,
+        "median_us": 0.6633333333333333,
+        "min_us": 0.6556333333333334,
+        "p95_us": 0.6696666666666666,
+        "stddev_us": 0.0051765883230817595
+      },
+      "clone_allocated_bytes": 2678.0,
+      "clone_allocations": 27.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 14,
+      "name": "cardless_4p_off_early",
+      "observation": {
+        "max_us": 0.2904333333333333,
+        "mean_us": 0.2772799999999999,
+        "median_us": 0.2754333333333333,
+        "min_us": 0.2741,
+        "p95_us": 0.28709999999999997,
+        "stddev_us": 0.004378284798614372
+      },
+      "observation_allocated_bytes": 1267.0,
+      "observation_allocations": 12.0,
+      "phase": "early",
+      "players": 4,
+      "position_identity": {
+        "method": "initial",
+        "moves": 0,
+        "seed": 2585066186110667685,
+        "state_hash": "c8897427eefcb68b4b952654d4adac8c3f9b5d44a609a2086ff61da1ba85ad00"
+      },
+      "round": 1,
+      "sample_game": {
+        "max_us": 17.0654,
+        "mean_us": 14.573746666666668,
+        "median_us": 14.261866666666666,
+        "min_us": 14.143066666666666,
+        "p95_us": 15.501733333333332,
+        "stddev_us": 0.6878697843826742
+      },
+      "sample_game_allocated_bytes": 22207.8,
+      "sample_game_allocations": 105.4,
+      "save_json_bytes": 25063,
+      "state_hash": {
+        "max_us": 9.809266666666666,
+        "mean_us": 9.506546666666663,
+        "median_us": 9.443399999999999,
+        "min_us": 9.353566666666666,
+        "p95_us": 9.687066666666665,
+        "stddev_us": 0.13835485551452265
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 24.756500000000003,
+        "mean_us": 24.003768333333333,
+        "median_us": 23.962333333333333,
+        "min_us": 23.688233333333336,
+        "p95_us": 24.383633333333332,
+        "stddev_us": 0.25615428650956057
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 68.38476666666665,
+        "mean_us": 66.22365333333333,
+        "median_us": 66.16313333333333,
+        "min_us": 65.05546666666666,
+        "p95_us": 67.63163333333333,
+        "stddev_us": 0.7372880849889435
+      },
+      "apply_search": {
+        "max_us": 48.649033333333335,
+        "mean_us": 44.126856666666676,
+        "median_us": 43.69766666666667,
+        "min_us": 43.010000000000005,
+        "p95_us": 46.43576666666667,
+        "stddev_us": 1.3203501438844008
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.007699999999999999,
+        "mean_us": 0.0029900000000000005,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003033333333333333,
+        "stddev_us": 0.0010888883219953172
+      },
+      "cardstate_validate": {
+        "max_us": 0.0464,
+        "mean_us": 0.044766666666666656,
+        "median_us": 0.04473333333333333,
+        "min_us": 0.044399999999999995,
+        "p95_us": 0.04473333333333333,
+        "stddev_us": 0.00039299420408505324
+      },
+      "clone": {
+        "max_us": 43.16556666666666,
+        "mean_us": 41.367205,
+        "median_us": 41.242366666666676,
+        "min_us": 40.902533333333324,
+        "p95_us": 42.624766666666666,
+        "stddev_us": 0.5445011837835309
+      },
+      "clone_allocated_bytes": 155289.0,
+      "clone_allocations": 1065.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 18,
+      "name": "cardless_4p_off_mid",
+      "observation": {
+        "max_us": 0.3428333333333333,
+        "mean_us": 0.33338000000000007,
+        "median_us": 0.3328333333333333,
+        "min_us": 0.3318333333333333,
+        "p95_us": 0.33549999999999996,
+        "stddev_us": 0.0022791665143205328
+      },
+      "observation_allocated_bytes": 1354.0,
+      "observation_allocations": 16.0,
+      "phase": "mid",
+      "players": 4,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 56,
+        "seed": 2585170558111580164,
+        "state_hash": "1225bf304d78a2369c3ab5e23ebc79ffcc23047ad217fe9aaf02decda5399312"
+      },
+      "round": 8,
+      "sample_game": {
+        "max_us": 16.087933333333336,
+        "mean_us": 15.499523333333334,
+        "median_us": 15.414933333333334,
+        "min_us": 15.177933333333334,
+        "p95_us": 15.929666666666668,
+        "stddev_us": 0.26050600016549025
+      },
+      "sample_game_allocated_bytes": 23662.2,
+      "sample_game_allocations": 134.26666666666668,
+      "save_json_bytes": 59789,
+      "state_hash": {
+        "max_us": 10.604766666666668,
+        "mean_us": 10.105254999999998,
+        "median_us": 9.998533333333333,
+        "min_us": 9.918766666666667,
+        "p95_us": 10.517633333333333,
+        "stddev_us": 0.2102106666272884
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 115.18740000000001,
+        "mean_us": 112.97513666666664,
+        "median_us": 112.55416666666666,
+        "min_us": 111.99966666666667,
+        "p95_us": 114.74673333333332,
+        "stddev_us": 0.8984762102149525
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 120.63583333333332,
+        "mean_us": 117.25647166666667,
+        "median_us": 118.12010000000001,
+        "min_us": 114.11546666666668,
+        "p95_us": 120.04026666666665,
+        "stddev_us": 2.016336596467161
+      },
+      "apply_search": {
+        "max_us": 96.06126666666665,
+        "mean_us": 87.68773666666667,
+        "median_us": 87.08156666666667,
+        "min_us": 83.20213333333335,
+        "p95_us": 91.66936666666668,
+        "stddev_us": 2.919938449844067
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008033333333333333,
+        "mean_us": 0.003038333333333334,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003033333333333333,
+        "stddev_us": 0.001156540579102658
+      },
+      "cardstate_validate": {
+        "max_us": 0.04773333333333333,
+        "mean_us": 0.04478333333333332,
+        "median_us": 0.04473333333333333,
+        "min_us": 0.044399999999999995,
+        "p95_us": 0.0454,
+        "stddev_us": 0.0007170541588099654
+      },
+      "clone": {
+        "max_us": 80.8503,
+        "mean_us": 78.67296000000002,
+        "median_us": 78.48043333333334,
+        "min_us": 77.74203333333334,
+        "p95_us": 80.63096666666665,
+        "stddev_us": 0.8618922521986131
+      },
+      "clone_allocated_bytes": 298529.0,
+      "clone_allocations": 2054.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 27,
+      "name": "cardless_4p_off_late",
+      "observation": {
+        "max_us": 0.43496666666666667,
+        "mean_us": 0.42382833333333325,
+        "median_us": 0.4236333333333333,
+        "min_us": 0.4203,
+        "p95_us": 0.42663333333333336,
+        "stddev_us": 0.002933698367438458
+      },
+      "observation_allocated_bytes": 1440.0,
+      "observation_allocations": 21.0,
+      "phase": "late",
+      "players": 4,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 104,
+        "seed": 2585170558111580164,
+        "state_hash": "7561aa1b6a6e610758894f34088b6fe026848e1f64ceea54f124fcade9656b77"
+      },
+      "round": 14,
+      "sample_game": {
+        "max_us": 18.81933333333333,
+        "mean_us": 16.606076666666667,
+        "median_us": 16.223466666666667,
+        "min_us": 16.085933333333333,
+        "p95_us": 18.5082,
+        "stddev_us": 0.7768547801587854
+      },
+      "sample_game_allocated_bytes": 24857.2,
+      "sample_game_allocations": 159.26666666666668,
+      "save_json_bytes": 92887,
+      "state_hash": {
+        "max_us": 10.930933333333334,
+        "mean_us": 10.584701666666666,
+        "median_us": 10.501299999999999,
+        "min_us": 10.416166666666667,
+        "p95_us": 10.907566666666666,
+        "stddev_us": 0.16772367701238716
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 198.93466666666666,
+        "mean_us": 196.57412,
+        "median_us": 197.05153333333334,
+        "min_us": 191.34836666666666,
+        "p95_us": 198.36450000000002,
+        "stddev_us": 1.6727291606632995
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 25.094333333333335,
+        "mean_us": 23.578700000000005,
+        "median_us": 23.53036666666667,
+        "min_us": 23.1451,
+        "p95_us": 24.194333333333336,
+        "stddev_us": 0.4201922934139139
+      },
+      "apply_search": {
+        "max_us": 3.2839000000000005,
+        "mean_us": 3.0507733333333333,
+        "median_us": 3.0215,
+        "min_us": 2.9978,
+        "p95_us": 3.2725333333333335,
+        "stddev_us": 0.08005602524343683
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008033333333333333,
+        "mean_us": 0.003006666666666668,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003,
+        "stddev_us": 0.001160536274506077
+      },
+      "cardstate_validate": {
+        "max_us": 0.047066666666666666,
+        "mean_us": 0.04474833333333332,
+        "median_us": 0.04473333333333333,
+        "min_us": 0.044366666666666665,
+        "p95_us": 0.045066666666666665,
+        "stddev_us": 0.0005635675055690616
+      },
+      "clone": {
+        "max_us": 1.0115,
+        "mean_us": 0.6802283333333332,
+        "median_us": 0.6563,
+        "min_us": 0.6509666666666667,
+        "p95_us": 0.7921999999999999,
+        "stddev_us": 0.08163799379305911
+      },
+      "clone_allocated_bytes": 2678.0,
+      "clone_allocations": 27.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 15,
+      "name": "cardless_4p_on_early",
+      "observation": {
+        "max_us": 0.5074,
+        "mean_us": 0.28372333333333327,
+        "median_us": 0.2710666666666667,
+        "min_us": 0.27040000000000003,
+        "p95_us": 0.2794,
+        "stddev_us": 0.051367446565569776
+      },
+      "observation_allocated_bytes": 1267.0,
+      "observation_allocations": 12.0,
+      "phase": "early",
+      "players": 4,
+      "position_identity": {
+        "method": "initial",
+        "moves": 0,
+        "seed": 2585066186110667685,
+        "state_hash": "8a91bcddde856823ed940edf428a9147d9025a2bac09a2292e914d35a57f1c8b"
+      },
+      "round": 1,
+      "sample_game": {
+        "max_us": 15.221333333333336,
+        "mean_us": 14.433150000000001,
+        "median_us": 14.303266666666667,
+        "min_us": 14.1698,
+        "p95_us": 15.019,
+        "stddev_us": 0.2937667947917571
+      },
+      "sample_game_allocated_bytes": 22211.8,
+      "sample_game_allocations": 107.4,
+      "save_json_bytes": 25059,
+      "state_hash": {
+        "max_us": 10.1628,
+        "mean_us": 9.514970000000002,
+        "median_us": 9.442033333333333,
+        "min_us": 9.3933,
+        "p95_us": 9.688733333333335,
+        "stddev_us": 0.17769361987546003
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 24.2451,
+        "mean_us": 24.04583,
+        "median_us": 24.064166666666665,
+        "min_us": 23.827466666666666,
+        "p95_us": 24.22736666666667,
+        "stddev_us": 0.11402750930270218
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 68.61543333333333,
+        "mean_us": 67.48391333333333,
+        "median_us": 67.50710000000001,
+        "min_us": 66.61043333333333,
+        "p95_us": 68.36706666666667,
+        "stddev_us": 0.49541129449288007
+      },
+      "apply_search": {
+        "max_us": 46.22076666666667,
+        "mean_us": 44.996066666666664,
+        "median_us": 44.8651,
+        "min_us": 44.177733333333336,
+        "p95_us": 45.7631,
+        "stddev_us": 0.47393530383610555
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.007699999999999999,
+        "mean_us": 0.0029900000000000005,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003033333333333333,
+        "stddev_us": 0.0010888883219953172
+      },
+      "cardstate_validate": {
+        "max_us": 0.046733333333333335,
+        "mean_us": 0.04481666666666666,
+        "median_us": 0.04473333333333333,
+        "min_us": 0.044399999999999995,
+        "p95_us": 0.045066666666666665,
+        "stddev_us": 0.00045795438880113696
+      },
+      "clone": {
+        "max_us": 47.08136666666667,
+        "mean_us": 42.86603166666667,
+        "median_us": 42.588366666666666,
+        "min_us": 42.01886666666667,
+        "p95_us": 43.87126666666666,
+        "stddev_us": 1.0936969327050037
+      },
+      "clone_allocated_bytes": 159018.0,
+      "clone_allocations": 1091.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 22,
+      "name": "cardless_4p_on_mid",
+      "observation": {
+        "max_us": 0.31749999999999995,
+        "mean_us": 0.3083949999999999,
+        "median_us": 0.3078,
+        "min_us": 0.3064666666666667,
+        "p95_us": 0.3111333333333334,
+        "stddev_us": 0.0023129172296282147
+      },
+      "observation_allocated_bytes": 1354.0,
+      "observation_allocations": 15.0,
+      "phase": "mid",
+      "players": 4,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 56,
+        "seed": 2585170558111580164,
+        "state_hash": "8b6e7b8c28ad95a92cc59f22ca091149aba34dec973d96f6a0d702e241ca0be2"
+      },
+      "round": 8,
+      "sample_game": {
+        "max_us": 16.121333333333336,
+        "mean_us": 15.546133333333334,
+        "median_us": 15.455666666666668,
+        "min_us": 15.280066666666666,
+        "p95_us": 16.0312,
+        "stddev_us": 0.23542751750804325
+      },
+      "sample_game_allocated_bytes": 23681.2,
+      "sample_game_allocations": 135.26666666666668,
+      "save_json_bytes": 60656,
+      "state_hash": {
+        "max_us": 10.219899999999999,
+        "mean_us": 10.059836666666666,
+        "median_us": 9.992866666666666,
+        "min_us": 9.921433333333333,
+        "p95_us": 10.212533333333335,
+        "stddev_us": 0.11605633397430568
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 116.09506666666667,
+        "mean_us": 114.05064833333333,
+        "median_us": 114.02133333333333,
+        "min_us": 112.85456666666666,
+        "p95_us": 115.57696666666668,
+        "stddev_us": 0.7841318042179591
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 127.6212,
+        "mean_us": 122.97936166666666,
+        "median_us": 122.41546666666666,
+        "min_us": 119.3172,
+        "p95_us": 127.4383,
+        "stddev_us": 2.544894207499378
+      },
+      "apply_search": {
+        "max_us": 98.123,
+        "mean_us": 92.53061,
+        "median_us": 93.02776666666666,
+        "min_us": 89.02579999999999,
+        "p95_us": 95.35653333333333,
+        "stddev_us": 2.2735236517377855
+      },
+      "card_definitions": 0,
+      "cardset_validate": {
+        "max_us": 0.008,
+        "mean_us": 0.0030216666666666673,
+        "median_us": 0.0026666666666666666,
+        "min_us": 0.0026666666666666666,
+        "p95_us": 0.003033333333333333,
+        "stddev_us": 0.0011516787264202152
+      },
+      "cardstate_validate": {
+        "max_us": 0.047066666666666666,
+        "mean_us": 0.04481833333333333,
+        "median_us": 0.04473333333333333,
+        "min_us": 0.044399999999999995,
+        "p95_us": 0.0451,
+        "stddev_us": 0.0005370159318969146
+      },
+      "clone": {
+        "max_us": 86.6062,
+        "mean_us": 84.641835,
+        "median_us": 84.41893333333333,
+        "min_us": 83.7693,
+        "p95_us": 85.37703333333334,
+        "stddev_us": 0.6120359977135521
+      },
+      "clone_allocated_bytes": 313426.0,
+      "clone_allocations": 2173.0,
+      "definition_lookup_mean_us": null,
+      "definition_lookup_worst_us": null,
+      "legal_spaces": 29,
+      "name": "cardless_4p_on_late",
+      "observation": {
+        "max_us": 0.3722333333333333,
+        "mean_us": 0.36325833333333335,
+        "median_us": 0.3628666666666667,
+        "min_us": 0.3562,
+        "p95_us": 0.3675333333333334,
+        "stddev_us": 0.003298852915113907
+      },
+      "observation_allocated_bytes": 1440.0,
+      "observation_allocations": 18.0,
+      "phase": "late",
+      "players": 4,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 104,
+        "seed": 2585170558111580164,
+        "state_hash": "c4b714f641b92ad85d4a5d4155d17ccbaadc30b3244d570d067dae9584c7cadf"
+      },
+      "round": 14,
+      "sample_game": {
+        "max_us": 16.934533333333334,
+        "mean_us": 16.238256666666665,
+        "median_us": 16.0626,
+        "min_us": 15.932400000000001,
+        "p95_us": 16.894466666666666,
+        "stddev_us": 0.3143910263597793
+      },
+      "sample_game_allocated_bytes": 24407.2,
+      "sample_game_allocations": 149.26666666666668,
+      "save_json_bytes": 96156,
+      "state_hash": {
+        "max_us": 10.974666666666668,
+        "mean_us": 10.552120000000002,
+        "median_us": 10.494933333333334,
+        "min_us": 10.382133333333334,
+        "p95_us": 10.803066666666666,
+        "stddev_us": 0.16870250422958574
+      },
+      "uses_cards": false,
+      "validate_action": {
+        "max_us": 205.97913333333332,
+        "mean_us": 203.15068833333336,
+        "median_us": 202.87216666666666,
+        "min_us": 200.732,
+        "p95_us": 205.5982666666667,
+        "stddev_us": 1.41967353548761
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 48.25646666666667,
+        "mean_us": 47.59520333333333,
+        "median_us": 47.64223333333333,
+        "min_us": 47.098733333333335,
+        "p95_us": 47.91263333333333,
+        "stddev_us": 0.27204305437436427
+      },
+      "apply_search": {
+        "max_us": 16.549633333333336,
+        "mean_us": 16.30776666666667,
+        "median_us": 16.342666666666666,
+        "min_us": 16.0245,
+        "p95_us": 16.5079,
+        "stddev_us": 0.14905277141558507
+      },
+      "card_definitions": 30,
+      "cardset_validate": {
+        "max_us": 1.9846333333333335,
+        "mean_us": 1.7247816666666664,
+        "median_us": 1.7142000000000002,
+        "min_us": 1.6945333333333332,
+        "p95_us": 1.7703,
+        "stddev_us": 0.061759622259747286
+      },
+      "cardstate_validate": {
+        "max_us": 4.8882666666666665,
+        "mean_us": 4.702263333333333,
+        "median_us": 4.667633333333334,
+        "min_us": 4.6575999999999995,
+        "p95_us": 4.886933333333333,
+        "stddev_us": 0.0779684436878864
+      },
+      "clone": {
+        "max_us": 6.761066666666667,
+        "mean_us": 6.537808333333333,
+        "median_us": 6.494966666666667,
+        "min_us": 6.4522666666666675,
+        "p95_us": 6.7427,
+        "stddev_us": 0.10161015909128167
+      },
+      "clone_allocated_bytes": 9518.0,
+      "clone_allocations": 206.0,
+      "definition_lookup_mean_us": 0.044566666666666664,
+      "definition_lookup_worst_us": 0.08343333333333333,
+      "legal_spaces": 10,
+      "name": "cards_2p_off_early",
+      "observation": {
+        "max_us": 2.9213333333333336,
+        "mean_us": 2.7099,
+        "median_us": 2.6713,
+        "min_us": 2.6466,
+        "p95_us": 2.908333333333333,
+        "stddev_us": 0.0781959305562352
+      },
+      "observation_allocated_bytes": 4667.0,
+      "observation_allocations": 100.0,
+      "phase": "early",
+      "players": 2,
+      "position_identity": {
+        "method": "initial",
+        "moves": 0,
+        "seed": 2585066186110667685,
+        "state_hash": "2e89a9442acd196b785accf60a1903fb29140e948b17f7a00c44f9a1449843c0"
+      },
+      "round": 1,
+      "sample_game": {
+        "max_us": 48.9996,
+        "mean_us": 46.96328,
+        "median_us": 46.82566666666666,
+        "min_us": 46.12533333333333,
+        "p95_us": 48.23113333333333,
+        "stddev_us": 0.7347191498494893
+      },
+      "sample_game_allocated_bytes": 55388.2,
+      "sample_game_allocations": 448.26666666666665,
+      "save_json_bytes": 41299,
+      "state_hash": {
+        "max_us": 15.823199999999998,
+        "mean_us": 15.26020833333333,
+        "median_us": 15.174266666666666,
+        "min_us": 15.0387,
+        "p95_us": 15.652600000000001,
+        "stddev_us": 0.2095657735188539
+      },
+      "uses_cards": true,
+      "validate_action": {
+        "max_us": 55.34066666666667,
+        "mean_us": 54.33846833333333,
+        "median_us": 54.29476666666667,
+        "min_us": 53.92993333333333,
+        "p95_us": 54.71339999999999,
+        "stddev_us": 0.30352889803388894
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 72.35573333333332,
+        "mean_us": 71.48039166666668,
+        "median_us": 71.43623333333333,
+        "min_us": 70.88133333333333,
+        "p95_us": 72.29963333333333,
+        "stddev_us": 0.42105111907581666
+      },
+      "apply_search": {
+        "max_us": 40.2268,
+        "mean_us": 38.50318166666667,
+        "median_us": 38.46693333333334,
+        "min_us": 37.90636666666667,
+        "p95_us": 39.44316666666667,
+        "stddev_us": 0.5071594696033317
+      },
+      "card_definitions": 30,
+      "cardset_validate": {
+        "max_us": 1.9429,
+        "mean_us": 1.7313433333333337,
+        "median_us": 1.7172333333333334,
+        "min_us": 1.7118666666666666,
+        "p95_us": 1.782,
+        "stddev_us": 0.050627352181295146
+      },
+      "cardstate_validate": {
+        "max_us": 5.419733333333334,
+        "mean_us": 4.953985000000001,
+        "median_us": 4.9069666666666665,
+        "min_us": 4.8949333333333325,
+        "p95_us": 5.1333,
+        "stddev_us": 0.12529323581768775
+      },
+      "clone": {
+        "max_us": 28.997133333333334,
+        "mean_us": 28.04689833333334,
+        "median_us": 27.9843,
+        "min_us": 27.6221,
+        "p95_us": 28.4824,
+        "stddev_us": 0.28757680162098537
+      },
+      "clone_allocated_bytes": 89541.0,
+      "clone_allocations": 748.0,
+      "definition_lookup_mean_us": 0.04510666666666667,
+      "definition_lookup_worst_us": 0.0838,
+      "legal_spaces": 16,
+      "name": "cards_2p_off_mid",
+      "observation": {
+        "max_us": 3.0158333333333336,
+        "mean_us": 2.7208966666666674,
+        "median_us": 2.687333333333333,
+        "min_us": 2.6609666666666665,
+        "p95_us": 2.904333333333333,
+        "stddev_us": 0.0899968838349418
+      },
+      "observation_allocated_bytes": 4702.0,
+      "observation_allocations": 103.0,
+      "phase": "mid",
+      "players": 2,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 28,
+        "seed": 2585170558111580164,
+        "state_hash": "1638500cdc26558ce19e235bcf014188cbcbe69ca67de8ab1a4aa4c018b41827"
+      },
+      "round": 8,
+      "sample_game": {
+        "max_us": 50.092866666666666,
+        "mean_us": 48.036163333333334,
+        "median_us": 47.90793333333333,
+        "min_us": 46.985800000000005,
+        "p95_us": 49.935266666666664,
+        "stddev_us": 0.7845684944180032
+      },
+      "sample_game_allocated_bytes": 56124.0,
+      "sample_game_allocations": 461.0,
+      "save_json_bytes": 59083,
+      "state_hash": {
+        "max_us": 15.843600000000002,
+        "mean_us": 15.331228333333332,
+        "median_us": 15.278733333333332,
+        "min_us": 15.136199999999999,
+        "p95_us": 15.627566666666667,
+        "stddev_us": 0.1900978061931399
+      },
+      "uses_cards": true,
+      "validate_action": {
+        "max_us": 121.30416666666666,
+        "mean_us": 107.29031833333333,
+        "median_us": 106.54353333333333,
+        "min_us": 105.21423333333333,
+        "p95_us": 108.40976666666666,
+        "stddev_us": 3.2949378618904834
+      }
+    },
+    {
+      "additional_action_space_enabled": false,
+      "apply_committed": {
+        "max_us": 96.66663333333332,
+        "mean_us": 94.69710166666667,
+        "median_us": 94.51913333333333,
+        "min_us": 93.39063333333334,
+        "p95_us": 96.21090000000001,
+        "stddev_us": 0.9099184935094744
+      },
+      "apply_search": {
+        "max_us": 61.81256666666666,
+        "mean_us": 60.33844666666666,
+        "median_us": 60.39293333333333,
+        "min_us": 59.3065,
+        "p95_us": 61.05136666666667,
+        "stddev_us": 0.5661820055227612
+      },
+      "card_definitions": 30,
+      "cardset_validate": {
+        "max_us": 2.0359666666666665,
+        "mean_us": 1.7619516666666666,
+        "median_us": 1.7371666666666665,
+        "min_us": 1.7191333333333332,
+        "p95_us": 1.9745666666666668,
+        "stddev_us": 0.08325625133352517
+      },
+      "cardstate_validate": {
+        "max_us": 5.415166666666666,
+        "mean_us": 4.935913333333333,
+        "median_us": 4.883933333333333,
+        "min_us": 4.8746,
+        "p95_us": 5.1464,
+        "stddev_us": 0.13325984366392338
+      },
+      "clone": {
+        "max_us": 50.3172,
+        "mean_us": 49.465806666666666,
+        "median_us": 49.395700000000005,
+        "min_us": 49.06583333333333,
+        "p95_us": 49.951933333333336,
+        "stddev_us": 0.30002097734065963
+      },
+      "clone_allocated_bytes": 168162.0,
+      "clone_allocations": 1287.0,
+      "definition_lookup_mean_us": 0.04510666666666667,
+      "definition_lookup_worst_us": 0.0838,
+      "legal_spaces": 17,
+      "name": "cards_2p_off_late",
+      "observation": {
+        "max_us": 3.0776666666666666,
+        "mean_us": 2.84748,
+        "median_us": 2.8072333333333335,
+        "min_us": 2.7905666666666664,
+        "p95_us": 3.056966666666667,
+        "stddev_us": 0.09176445777702341
+      },
+      "observation_allocated_bytes": 4764.0,
+      "observation_allocations": 106.0,
+      "phase": "late",
+      "players": 2,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 52,
+        "seed": 2585170558111580164,
+        "state_hash": "f547d1271d5df3aa54aef66648ed6d0f0a3815711e150000d08e5c5a741c7220"
+      },
+      "round": 14,
+      "sample_game": {
+        "max_us": 51.77693333333333,
+        "mean_us": 49.03875999999999,
+        "median_us": 48.93626666666667,
+        "min_us": 48.166399999999996,
+        "p95_us": 49.55133333333333,
+        "stddev_us": 0.7203763033304191
+      },
+      "sample_game_allocated_bytes": 55886.2,
+      "sample_game_allocations": 464.6,
+      "save_json_bytes": 76634,
+      "state_hash": {
+        "max_us": 16.7923,
+        "mean_us": 15.70357,
+        "median_us": 15.741299999999999,
+        "min_us": 15.452466666666668,
+        "p95_us": 15.827766666666667,
+        "stddev_us": 0.2838255751337431
+      },
+      "uses_cards": true,
+      "validate_action": {
+        "max_us": 156.58346666666665,
+        "mean_us": 153.51083500000001,
+        "median_us": 153.22666666666666,
+        "min_us": 151.9763,
+        "p95_us": 155.95543333333333,
+        "stddev_us": 1.1185850221236837
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 49.83076666666667,
+        "mean_us": 48.41366333333333,
+        "median_us": 48.306266666666666,
+        "min_us": 47.62083333333333,
+        "p95_us": 49.821733333333334,
+        "stddev_us": 0.6443658960473383
+      },
+      "apply_search": {
+        "max_us": 17.213,
+        "mean_us": 16.635098333333335,
+        "median_us": 16.6324,
+        "min_us": 16.35793333333333,
+        "p95_us": 17.1449,
+        "stddev_us": 0.2348307699114882
+      },
+      "card_definitions": 30,
+      "cardset_validate": {
+        "max_us": 1.9905666666666666,
+        "mean_us": 1.7475116666666666,
+        "median_us": 1.7341666666666666,
+        "min_us": 1.7117666666666667,
+        "p95_us": 1.7805666666666666,
+        "stddev_us": 0.057238223703900665
+      },
+      "cardstate_validate": {
+        "max_us": 4.8712333333333335,
+        "mean_us": 4.66035,
+        "median_us": 4.6389000000000005,
+        "min_us": 4.624866666666667,
+        "p95_us": 4.856566666666667,
+        "stddev_us": 0.06835810404691527
+      },
+      "clone": {
+        "max_us": 7.310866666666667,
+        "mean_us": 6.609933333333333,
+        "median_us": 6.515933333333333,
+        "min_us": 6.4919,
+        "p95_us": 7.095533333333334,
+        "stddev_us": 0.21579962645421288
+      },
+      "clone_allocated_bytes": 9518.0,
+      "clone_allocations": 206.0,
+      "definition_lookup_mean_us": 0.04457333333333333,
+      "definition_lookup_worst_us": 0.08346666666666666,
+      "legal_spaces": 13,
+      "name": "cards_2p_on_early",
+      "observation": {
+        "max_us": 3.063333333333333,
+        "mean_us": 2.6815283333333335,
+        "median_us": 2.6436333333333333,
+        "min_us": 2.6316,
+        "p95_us": 2.8519666666666668,
+        "stddev_us": 0.10142868226547702
+      },
+      "observation_allocated_bytes": 4667.0,
+      "observation_allocations": 100.0,
+      "phase": "early",
+      "players": 2,
+      "position_identity": {
+        "method": "initial",
+        "moves": 0,
+        "seed": 2585066186110667685,
+        "state_hash": "cdaadce21b734901ad1e27d879f30f29939fcad86a7885f6daa7d5890f7d0c90"
+      },
+      "round": 1,
+      "sample_game": {
+        "max_us": 50.167,
+        "mean_us": 47.13869666666667,
+        "median_us": 46.992466666666665,
+        "min_us": 46.196466666666666,
+        "p95_us": 47.79506666666667,
+        "stddev_us": 0.8031417800598961
+      },
+      "sample_game_allocated_bytes": 55540.2,
+      "sample_game_allocations": 452.26666666666665,
+      "save_json_bytes": 41333,
+      "state_hash": {
+        "max_us": 15.525933333333334,
+        "mean_us": 15.205123333333336,
+        "median_us": 15.242133333333332,
+        "min_us": 15.007066666666669,
+        "p95_us": 15.413733333333333,
+        "stddev_us": 0.15578616758592892
+      },
+      "uses_cards": true,
+      "validate_action": {
+        "max_us": 57.025133333333336,
+        "mean_us": 54.93975833333333,
+        "median_us": 54.7087,
+        "min_us": 54.45826666666667,
+        "p95_us": 55.990766666666666,
+        "stddev_us": 0.6006056295176846
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 73.20913333333333,
+        "mean_us": 70.76503166666666,
+        "median_us": 70.40556666666666,
+        "min_us": 69.8343,
+        "p95_us": 72.43186666666666,
+        "stddev_us": 0.9325102677108228
+      },
+      "apply_search": {
+        "max_us": 38.303,
+        "mean_us": 37.86674666666666,
+        "median_us": 37.8529,
+        "min_us": 37.58283333333333,
+        "p95_us": 38.09033333333333,
+        "stddev_us": 0.15884875140277935
+      },
+      "card_definitions": 30,
+      "cardset_validate": {
+        "max_us": 1.9548333333333332,
+        "mean_us": 1.7286800000000002,
+        "median_us": 1.7144666666666668,
+        "min_us": 1.7084333333333332,
+        "p95_us": 1.7678666666666667,
+        "stddev_us": 0.05332547483770457
+      },
+      "cardstate_validate": {
+        "max_us": 5.370733333333334,
+        "mean_us": 4.908038333333334,
+        "median_us": 4.8549,
+        "min_us": 4.846533333333334,
+        "p95_us": 5.2018,
+        "stddev_us": 0.13790965894583154
+      },
+      "clone": {
+        "max_us": 28.315400000000004,
+        "mean_us": 27.651561666666662,
+        "median_us": 27.6176,
+        "min_us": 27.2734,
+        "p95_us": 28.087033333333334,
+        "stddev_us": 0.20916231290953674
+      },
+      "clone_allocated_bytes": 86311.0,
+      "clone_allocations": 733.0,
+      "definition_lookup_mean_us": 0.044594444444444443,
+      "definition_lookup_worst_us": 0.08346666666666666,
+      "legal_spaces": 18,
+      "name": "cards_2p_on_mid",
+      "observation": {
+        "max_us": 3.5397666666666665,
+        "mean_us": 2.7484216666666663,
+        "median_us": 2.635966666666667,
+        "min_us": 2.6279666666666666,
+        "p95_us": 3.218233333333333,
+        "stddev_us": 0.23422168802582446
+      },
+      "observation_allocated_bytes": 4702.0,
+      "observation_allocations": 103.0,
+      "phase": "mid",
+      "players": 2,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 28,
+        "seed": 2585170558111580164,
+        "state_hash": "d7c8cebe7771f83b31e6b1897c5b33569a5c4a7b2de798cb24e516bbe9b684c5"
+      },
+      "round": 8,
+      "sample_game": {
+        "max_us": 50.06413333333333,
+        "mean_us": 47.36276333333335,
+        "median_us": 47.24286666666667,
+        "min_us": 46.54506666666667,
+        "p95_us": 48.06086666666667,
+        "stddev_us": 0.7438752868817008
+      },
+      "sample_game_allocated_bytes": 55173.6,
+      "sample_game_allocations": 452.1333333333333,
+      "save_json_bytes": 58403,
+      "state_hash": {
+        "max_us": 15.522266666666665,
+        "mean_us": 15.177093333333335,
+        "median_us": 15.0939,
+        "min_us": 15.0074,
+        "p95_us": 15.440133333333334,
+        "stddev_us": 0.15872646898219445
+      },
+      "uses_cards": true,
+      "validate_action": {
+        "max_us": 106.42983333333333,
+        "mean_us": 104.63879666666666,
+        "median_us": 104.5758,
+        "min_us": 103.87503333333333,
+        "p95_us": 105.91536666666666,
+        "stddev_us": 0.6375912602129995
+      }
+    },
+    {
+      "additional_action_space_enabled": true,
+      "apply_committed": {
+        "max_us": 98.19109999999999,
+        "mean_us": 95.85860833333331,
+        "median_us": 96.26129999999999,
+        "min_us": 94.02933333333334,
+        "p95_us": 97.09266666666666,
+        "stddev_us": 1.1437282534119617
+      },
+      "apply_search": {
+        "max_us": 62.4546,
+        "mean_us": 61.15350333333333,
+        "median_us": 61.062666666666665,
+        "min_us": 59.605333333333334,
+        "p95_us": 62.4142,
+        "stddev_us": 0.7287564025180916
+      },
+      "card_definitions": 30,
+      "cardset_validate": {
+        "max_us": 2.0249666666666664,
+        "mean_us": 1.7408333333333335,
+        "median_us": 1.7231333333333332,
+        "min_us": 1.7144666666666668,
+        "p95_us": 1.7975666666666668,
+        "stddev_us": 0.06738450860546503
+      },
+      "cardstate_validate": {
+        "max_us": 5.329,
+        "mean_us": 4.946529999999998,
+        "median_us": 4.8716,
+        "min_us": 4.8609,
+        "p95_us": 5.148033333333333,
+        "stddev_us": 0.1260579901385777
+      },
+      "clone": {
+        "max_us": 50.15326666666667,
+        "mean_us": 48.89255666666667,
+        "median_us": 48.711933333333334,
+        "min_us": 48.3016,
+        "p95_us": 49.91923333333333,
+        "stddev_us": 0.5470557429549563
+      },
+      "clone_allocated_bytes": 168314.0,
+      "clone_allocations": 1281.0,
+      "definition_lookup_mean_us": 0.04513999999999999,
+      "definition_lookup_worst_us": 0.0838,
+      "legal_spaces": 22,
+      "name": "cards_2p_on_late",
+      "observation": {
+        "max_us": 3.1067000000000005,
+        "mean_us": 2.84072,
+        "median_us": 2.8059000000000003,
+        "min_us": 2.795533333333333,
+        "p95_us": 3.033266666666667,
+        "stddev_us": 0.08814582576617006
+      },
+      "observation_allocated_bytes": 4844.0,
+      "observation_allocations": 108.0,
+      "phase": "late",
+      "players": 2,
+      "position_identity": {
+        "method": "RandomPolicy",
+        "moves": 52,
+        "seed": 2585170558111580164,
+        "state_hash": "95806c7314bb7d80b5b5c2974e27c3f6a7804e1a2262cc2afeeb326fda47b8d8"
+      },
+      "round": 14,
+      "sample_game": {
+        "max_us": 50.46673333333333,
+        "mean_us": 48.89382,
+        "median_us": 48.8328,
+        "min_us": 48.162333333333336,
+        "p95_us": 50.36066666666667,
+        "stddev_us": 0.6026232377788886
+      },
+      "sample_game_allocated_bytes": 56413.2,
+      "sample_game_allocations": 476.6,
+      "save_json_bytes": 76865,
+      "state_hash": {
+        "max_us": 15.861833333333333,
+        "mean_us": 15.661385000000001,
+        "median_us": 15.727233333333334,
+        "min_us": 15.478533333333335,
+        "p95_us": 15.827066666666667,
+        "stddev_us": 0.13487011219647171
+      },
+      "uses_cards": true,
+      "validate_action": {
+        "max_us": 155.99816666666666,
+        "mean_us": 153.95060499999997,
+        "median_us": 154.07070000000002,
+        "min_us": 151.85943333333333,
+        "p95_us": 155.37883333333332,
+        "stddev_us": 1.0015376154956777
+      }
+    }
+  ],
+  "seed": 2585066186110667685,
+  "ten_second_searches": [
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 711.298745624662,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_off_early",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 7113,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 699.8996557193593,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_off_early",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 6999,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 1319.7967077671126,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_off_mid",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 13198,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 1332.4992723221474,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_off_mid",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 13325,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 10802.8597831136,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_off_late",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 108029,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 11323.5869586249,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_off_late",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 113236,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 568.1987447921529,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_on_early",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 5682,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 563.4987887593535,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_on_early",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 5635,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 1028.1967788651311,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_on_mid",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 10282,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 976.7995096466462,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_on_mid",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 9768,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 11557.257510898486,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_on_late",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 115573,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 11829.069244419965,
+      "elapsed_ms": 10000,
+      "name": "cardless_2p_on_late",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 118291,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 426.69889928751945,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_off_early",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 4267,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 425.39949590159733,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_off_early",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 4254,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 800.2963651339393,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_off_mid",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 8003,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 775.7994481738525,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_off_mid",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 7758,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 5944.666687276817,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_off_late",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 59447,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 6072.0776814712735,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_off_late",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 60721,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 390.99895665838403,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_on_early",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 3910,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 386.8995882614582,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_on_early",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 3869,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 813.7955071163848,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_on_mid",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 8138,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 816.4984374669401,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_on_mid",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 8165,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 7007.366272845392,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_on_late",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 70074,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 7022.1891507177625,
+      "elapsed_ms": 10000,
+      "name": "cardless_3p_on_late",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 70222,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 296.69932999357303,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_off_early",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 2967,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 297.1998453074805,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_off_early",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 2972,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 559.9973796042617,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_off_mid",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 5600,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 547.6984748240571,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_off_mid",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 5477,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 4473.664934966873,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_off_late",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 44737,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 4542.59441351739,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_off_late",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 45426,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 267.09934664828813,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_on_early",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 2671,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 266.89937828458824,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_on_early",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 2669,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 531.9968753163529,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_on_mid",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 5320,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 533.9993500159911,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_on_mid",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 5340,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 4524.173465722623,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_on_late",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 45242,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 4629.490254460065,
+      "elapsed_ms": 10000,
+      "name": "cardless_4p_on_late",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 46295,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 117.99823941906858,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_off_early",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 1180,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 115.5989755156394,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_off_early",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 1156,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 239.9986922231262,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_off_mid",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 2400,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 223.29869314439838,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_off_mid",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 2233,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 2565.4954467586813,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_off_late",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 25655,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 2367.4812592550998,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_off_late",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 23675,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 107.4995629712767,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_on_early",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 1075,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 97.79896098383851,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_on_early",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 978,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 227.096328397401,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_on_mid",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 2271,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 193.69638558670567,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_on_mid",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 1937,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 2317.0729857094743,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_on_late",
+      "overshoot_ms": 0,
+      "policy": "mcts",
+      "simulations_completed": 23171,
+      "timed_out": true,
+      "used_fallback": false
+    },
+    {
+      "budget_ms": 10000,
+      "choice_is_legal": true,
+      "completed_per_sec": 2286.9906178496894,
+      "elapsed_ms": 10000,
+      "name": "cards_2p_on_late",
+      "overshoot_ms": 0,
+      "policy": "puct",
+      "simulations_completed": 22870,
+      "timed_out": true,
+      "used_fallback": false
+    }
+  ],
+  "alloc_report_environment": {
+    "cpu_model": ": AMD EPYC 9V74 80-Core Processor",
+    "logical_cores": 4,
+    "rss_kib": "18416 kB"
+  },
+  "alloc_instrumented_fields_from": {
+    "timing_build": "plain (System allocator)",
+    "allocation_build": "perf-count-alloc (counting allocator) with --alloc-only"
+  }
+}
