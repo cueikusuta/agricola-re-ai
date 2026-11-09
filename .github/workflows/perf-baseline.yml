@@ -46,28 +46,49 @@ jobs:
           cargo --version
           git rev-parse HEAD
 
-      - name: Build release harness
+      - name: Build release harness (timing build, plain allocator)
         run: cargo build --release --bin perf_baseline
 
-      - name: Run baseline (full unless --quick)
+      - name: Build instrumented harness (allocation counting)
+        run: cargo build --release --bin perf_baseline --features perf-count-alloc
+
+      - name: Run timing baseline (plain build)
         env:
           QUICK: ${{ inputs.quick }}
         run: |
           if [ "$QUICK" = "true" ]; then
-            cargo run --release --bin perf_baseline -- --quick > baseline.json
+            ./target/release/perf_baseline --quick > baseline_timing.json
           else
-            cargo run --release --bin perf_baseline > baseline.json
+            ./target/release/perf_baseline > baseline_timing.json
           fi
+
+      - name: Run allocation baseline (instrumented build)
+        env:
+          QUICK: ${{ inputs.quick }}
+        run: |
+          if [ "$QUICK" = "true" ]; then
+            ./target/release/perf_baseline --quick > baseline_alloc.json
+          else
+            ./target/release/perf_baseline > baseline_alloc.json
+          fi
+
+      - name: Merge timing and allocation reports
+        run: python3 scripts/perf_merge.py baseline_timing.json baseline_alloc.json baseline.json
 
       - name: Display summary
         run: python3 scripts/perf_display.py baseline.json
 
-      - name: Upload baseline JSON artifact
+      - name: Upload baseline JSON artifact (90-day retention; long-term
+          archival is an explicit commit to docs/perf/ by the orchestrator
+          after the official run — see docs/perf/README.md)
         uses: actions/upload-artifact@v4
         with:
           name: perf-baseline-${{ github.sha }}
-          path: baseline.json
-          retention-days: 30
+          path: |
+            baseline.json
+            baseline_timing.json
+            baseline_alloc.json
+          retention-days: 90
 
       - name: Write step summary
         run: python3 scripts/perf_summary.py baseline.json
