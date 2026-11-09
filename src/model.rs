@@ -795,6 +795,50 @@ impl Game {
             record_events: false,
         }
     }
+    /// Create a search-only position from pre-sampled components.
+    /// Skips: start player draw, round deck shuffle, Player::new × N,
+    /// start_round(), state_hash (full JSON+SHA256), log CardSet duplication.
+    /// The caller MUST ensure the inputs form a valid game state;
+    /// this constructor does NOT run validate().
+    pub fn search_from_parts(
+        config: Config,
+        public: PublicState,
+        hidden_round_deck: Vec<RoundCard>,
+        rng: RngStreams,
+        delayed_well: BTreeMap<u8, Vec<usize>>,
+        card_set: Arc<CardSet>,
+        cards: CardState,
+    ) -> Self {
+        let start_player = public.start_player;
+        let round_seed = config.seed ^ 0x38DB_3BE3_DF45_3FAF;
+        let action_seed = config.seed ^ 0x6A09_E667_F3BC_C909;
+        let card_set_for_log = (*card_set).clone();
+        Self {
+            config: config.clone(),
+            public,
+            hidden_round_deck,
+            rng,
+            delayed_well,
+            card_set,
+            cards,
+            log: GameLog {
+                log_version: LOG_VERSION,
+                engine_version: ENGINE_VERSION.into(),
+                rules_version: RULES_VERSION.into(),
+                config,
+                start_player,
+                initial_start_player_override: None,
+                initial_state_hash: String::new(),
+                initial_public_state: None,
+                round_seed,
+                action_seed,
+                card_set: card_set_for_log,
+                initial_hands: None,
+                events: Vec::new(),
+            },
+            record_events: false,
+        }
+    }
     pub fn save_json(&self) -> Result<String, String> {
         serde_json::to_string_pretty(self).map_err(|e| e.to_string())
     }

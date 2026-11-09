@@ -3,12 +3,13 @@
 //! each simulation. No Game reference (or hidden RNG) enters SpacePolicy.
 use crate::cards::{CardKind, CardSet, CardState};
 use crate::evaluation::{DetailAwareEvaluationPolicy, WeightedEvaluationPolicy};
-use crate::model::{Config, Game, Observation, RoundCard, Space};
+use crate::model::{Config, Game, Observation, RngStreams, RoundCard, Space};
 use crate::policy::{CardChoiceDetails, DetailPolicy, GreedyPolicy, SpacePolicy};
 use crate::score::standings_with_cards;
-use rand::{seq::SliceRandom, Rng};
+use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use std::time::Instant;
 
 /// Win probability comes first; only empirically equivalent win rates
@@ -135,19 +136,18 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
 /// sampling cost separately from the rollout; policies must not use it to look
 /// at hidden state.
 pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
-    let seed: u64 = rng.gen();
+    // Maintain EXACT RNG consumption order for distribution compatibility:
+    // External rng is consumed as:
+    // 1. gen() for seed (used to derive internal RNG streams)
+    // 2. sample_private_cards (shuffles Occupation pool, then MinorImprovement pool)
+    // 3. shuffle unrevealed round cards for stages 1..6
+    // NO gen_range for start player on external rng (that was done by internal rng)
+    let seed = rng.gen::<u64>();
     let (set, cards) = sample_private_cards(obs, rng)?;
-    let mut game = Game::with_cards(
-        Config {
-            seed,
-            additional_action_space_enabled: obs.public.additional_action_space_enabled,
-            players: obs.public.players.len(),
-        },
-        set,
-    )
-    .ok()?;
-    game.public = obs.public.clone();
-    game.cards = cards;
+    let players = obs.public.players.len();
+
+    // Sample hidden round deck: unrevealed cards per stage, shuffled separately.
+    // This consumes the external rng for 6 shuffles, matching old behavior.
     let mut deck = Vec::new();
     for stage in 1..=6 {
         let mut remaining = RoundCard::ALL
@@ -158,12 +158,40 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
         remaining.shuffle(rng);
         deck.extend(remaining);
     }
-    deck.reverse(); // Game::start_round pops the next card from the end.
-    game.hidden_round_deck = deck;
-    // Search positions are hypothetical: skip state hashing and event logging.
-    game.record_events = false;
-    game.validate().ok()?;
-    Some(game)
+    deck.reverse(); // Game::start_round pops from the end.
+
+    // Internal RNG streams derived from the sampled seed.
+    // The internal round stream draws the start player (matching from_card_state).
+    let round_seed = seed ^ 0x38DB_3BE3_DF45_3FAF;
+    let action_seed = seed ^ 0x6A09_E667_F3BC_C909;
+    let mut rng_streams = RngStreams {
+        round: ChaCha8Rng::seed_from_u64(round_seed),
+        ai: ChaCha8Rng::seed_from_u64(action_seed),
+    };
+    let _start_player = rng_streams.round.gen_range(0..players);
+
+        // Build PublicState directly from observation + sampled start_player.
+        // active_player and start_player are preserved from the observation
+        // (old behavior: game.public = obs.public.clone() overwrote the sampled values).
+        // The internal RNG's start_player draw is still consumed to keep its state
+        // identical to from_card_state.
+        let public = obs.public.clone();
+
+    let config = Config {
+        seed,
+        additional_action_space_enabled: obs.public.additional_action_space_enabled,
+        players,
+    };
+
+    Some(Game::search_from_parts(
+        config,
+        public,
+        deck,
+        rng_streams,
+        BTreeMap::new(), // delayed_well not reconstructable from observation
+        Arc::new(set),
+        cards,
+    ))
 }
 
 /// The guaranteed-legal action used when the search produced nothing usable.
@@ -988,6 +1016,44 @@ mod tests {
         assert!(
             !rollout(&mut sampled, &mut rng, Some(Instant::now())).unwrap(),
             "an elapsed deadline must abort the playout, not finish it"
+        );
+    }
+
+    /// Property test: current `sample_game` output distribution is fixed for a
+    /// given observation and seed. This digest must stay identical after the
+    /// Phase C replacement (SearchPosition direct construction).
+    #[test]
+    fn sample_game_distribution_digest_is_stable() {
+        use crate::cards::verified_basic_card_set;
+        use sha2::{Digest, Sha256};
+        let game = Game::with_cards(
+            Config {
+                seed: 42,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+        let obs = game.observation(game.public.active_player).unwrap();
+        let mut rng = ChaCha8Rng::seed_from_u64(0xCAFE_BABE_DEAD_BEEF);
+        let mut hasher = Sha256::new();
+        for _ in 0..64 {
+            let sampled = sample_game(&obs, &mut rng).expect("sample_game must succeed");
+            // Hash only the hidden partition + round deck; public is identical.
+            let data = serde_json::to_vec(&(
+                &sampled.cards.hands,
+                &sampled.cards.undealt,
+                &sampled.hidden_round_deck,
+            ))
+            .expect("serialize sampled");
+            hasher.update(&data);
+        }
+        let digest = format!("{:x}", hasher.finalize());
+        // This value was recorded from the current implementation.
+        // DO NOT CHANGE unless the implementation is intentionally replaced.
+        assert_eq!(
+            digest, "52e1baa16e91459f5dcbf5e5b060893eceec43070a712607239759382d9942ed",
+            "sample_game distribution changed — update this test only if intentional"
         );
     }
 }
