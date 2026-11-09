@@ -215,6 +215,30 @@ footer{color:#705e41;font-size:12px}
  #draftPool{width:min(100%,270px)!important}
 }
 
+
+/* #246 card polish: a readable face even before expansion, without copyrighted artwork. */
+#cardBrowser{grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr));gap:10px}
+#cardBrowser .cardTile{min-height:205px;max-height:none;padding:0;border-width:3px;overflow:hidden}
+#cardBrowser .cardTile.occupationCard{border-color:#4a6673;background:linear-gradient(160deg,#d3e5e7,#f4eee0 60%,#d5dfdc)}
+#cardBrowser .cardTile.improvementCard{border-color:#906b42;background:linear-gradient(165deg,#f4dfb7,#f9edcf 56%,#e6d6ad)}
+#cardBrowser .cardTile summary{display:flex;flex-direction:column;align-items:stretch;gap:6px;list-style:none;min-height:192px;cursor:pointer;font-family:Georgia,"Noto Sans CJK JP",serif;padding:0;color:#382c1f}
+#cardBrowser .cardTile summary::-webkit-details-marker{display:none}
+#cardBrowser .cardKindBar{display:block;font:700 10px system-ui,"Noto Sans CJK JP",sans-serif;letter-spacing:.03em;line-height:1.3;padding:5px 8px;color:#fff6dc;background:#7c5f38}
+#cardBrowser .occupationCard .cardKindBar{background:#415f6a;color:#f4f9f4}
+#cardBrowser .cardName{font-weight:800;font-size:13px;line-height:1.4;min-height:34px;overflow-wrap:anywhere;padding:0 8px}
+#cardBrowser .cardIllustration{display:flex;align-items:center;justify-content:center;flex:1 0 44px;margin:0 8px;border:2px double #b9a67e;background:radial-gradient(ellipse at 50% 60%,#f2eccd,#c7ae7d);font-size:32px;font-weight:400;color:#8a7049}
+#cardBrowser .occupationCard .cardIllustration{background:radial-gradient(ellipse,#e5e8d6,#a9bcc0);color:#496d71;border-color:#92abb2}
+#cardBrowser .cardExcerpt{font:11px/1.35 system-ui,"Noto Sans CJK JP",sans-serif;color:#534832;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 7px 7px;overflow-wrap:anywhere}
+#cardBrowser .cardTileBody{font-size:12px;line-height:1.55;padding:9px 8px 12px;margin:0;background:#fff7e9}
+#cardBrowser .cardTile[open]{outline:2px solid #527448;outline-offset:1px}
+@media(max-width:760px){
+ #cardBrowser{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ #cardBrowser .cardTile{min-height:168px}
+ #cardBrowser .cardTile summary{min-height:160px}
+ #cardBrowser .cardName{font-size:12px;min-height:32px}
+ #cardBrowser .cardIllustration{font-size:25px;min-height:32px}
+}
+
 </style></head>
 <body><div class="screen">
 <header class="tableHeader">
@@ -323,9 +347,20 @@ function renderCardBrowser(player){
  const own=viewPlayer===0?state.hand:[],played=player.played_cards||[];
  function section(title,ids){
   for(const id of ids){
-   const detail=document.createElement("details");detail.className="cardTile";
-   const summary=document.createElement("summary");summary.textContent=title+"："+cardLabel(id);
-   const body=document.createElement("div");body.className="cardTileBody";body.textContent=cardSummary(id);
+   const definition=state.card_definitions.find(x=>x.id===id);
+   const occupation=definition?.kind==="occupation";
+   const detail=document.createElement("details");detail.className="cardTile "+(occupation?"occupationCard":"improvementCard");
+   const summary=document.createElement("summary");
+   const category=document.createElement("span");category.className="cardKindBar";
+   category.textContent=title+" · "+(occupation?"職業":"小さい進歩");
+   const name=document.createElement("span");name.className="cardName";name.textContent=cardLabel(id);
+   const art=document.createElement("span");art.className="cardIllustration";art.setAttribute("aria-hidden","true");
+   art.textContent=occupation?"♙":"✧";
+   const excerpt=document.createElement("span");excerpt.className="cardExcerpt";
+   const description=cardSummary(id);
+   excerpt.textContent=description==="カード情報なし"?"カード情報なし":description.slice(0,92)+(description.length>92?"…":"");
+   summary.append(category,name,art,excerpt);
+   const body=document.createElement("div");body.className="cardTileBody";body.textContent=description;
    detail.append(summary,body);host.append(detail);
   }
  }
@@ -478,7 +513,7 @@ for(let i=0;i<pl.farm.length;i++)$("farm").append(renderFarmSquare(pl,i,false));
 $("stats").replaceChildren();for(const [good,label] of Object.entries(goods))putStats(label,pl.supply[good]);
 putStats("部屋",pl.farm.filter(c=>c.tile==="Room").length);putStats("柵",pl.fences.length);
 $("improvements").textContent="主要改善: "+(pl.improvements.map(x=>improvements[x]||x).join(" / ")||"なし")+" / 職業・小改善: "+(pl.played_cards||[]).map(cardLabel).join(" / ");
-$("hand").textContent=viewPlayer===0?"手札: "+(state.hand.map(cardLabel).join(" / ")||"なし"):"手札: 非公開";
+$("hand").textContent=viewPlayer===0?"手札: "+state.hand.length+"枚（カードを選ぶと効果を確認できます）":"手札: 非公開";
 renderCardHelp(pl);renderCardBrowser(pl);renderOpponentBoards(shown.players,p,scores);$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
 $("actions").replaceChildren();$("actionNav").replaceChildren();$("usedActions").replaceChildren();$("boardSummary").textContent="";$("free").disabled=busy||!!harvest||p.finished;
 if(p.finished){$("notice").textContent="最終順位: "+scores.rank.map((r,i)=>(i+1)+"P "+r+"位").join("、");return;}
