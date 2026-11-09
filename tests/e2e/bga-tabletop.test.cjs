@@ -10,7 +10,7 @@ test("Issue #246: BGA-reference tabletop composition works in Chromium",async t=
  t.after(()=>browser.close());
  for(const viewport of [{width:1280,height:800},{width:768,height:1024},{width:390,height:844}]){
   await t.test(viewport.width+"px main board, public opponent farms and navigation",async()=>{
-   const page=await browser.newPage({viewport,locale:"ja-JP"});
+   const page=await browser.newPage({viewport,hasTouch:viewport.width===390,locale:"ja-JP"});
    try{
     const errors=[];page.on("pageerror",e=>errors.push(e.message));
     await page.goto(baseUrl);
