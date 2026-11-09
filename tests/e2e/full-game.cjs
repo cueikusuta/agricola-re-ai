@@ -227,7 +227,7 @@ async function verifyRanking(page, players) {
   assert.equal(tabs, players);
   for (let seat = 0; seat < tabs; seat++) {
     assert.match(await page.locator("#tabs button").nth(seat).innerText(),
-      new RegExp("^" + (seat + 1) + "P -?[0-9]+点 残[0-9]+$"),
+      new RegExp("^" + (seat === 0 ? "👤" : "🤖") + (seat + 1) + "P -?[0-9]+点 残[0-9]+$"),
       "seat " + (seat + 1) + " shows a numeric score");
   }
 }
