@@ -36,7 +36,14 @@ test("Issue #246: BGA-reference tabletop composition works in Chromium",async t=
       documentWidth:document.documentElement.scrollWidth,
       cardWidth:document.getElementById("actionPanel").scrollWidth
     }));
-    assert.ok(dimensions.documentWidth<=dimensions.viewport+2,"no page overflow: "+JSON.stringify(dimensions));
+    if(dimensions.documentWidth>dimensions.viewport+2){
+      const offenders=await page.evaluate(()=>[...document.querySelectorAll("body *")].map(el=>{
+        const box=el.getBoundingClientRect();
+        return {tag:el.tagName,id:el.id,className:typeof el.className==="string"?el.className:"",
+          right:Math.round(box.right),width:Math.round(box.width),x:Math.round(box.x)};
+      }).filter(x=>x.right>document.documentElement.clientWidth+2).sort((a,b)=>b.right-a.right).slice(0,22));
+      throw Error("no page overflow: "+JSON.stringify({dimensions,offenders}));
+    }
     assert.equal(await page.locator("#farm .cell").count(),15,"own farm has 5 x 3 squares");
     assert.equal(await page.locator("#opponentBoards .opponentCard").count(),3,"all 3 other farms are visible");
     assert.equal(await page.locator("#opponentBoards .miniCell").count(),45,"each opponent has a 5 x 3 farm");
