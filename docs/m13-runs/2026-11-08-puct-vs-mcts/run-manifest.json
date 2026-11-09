@@ -1,0 +1,382 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-09",
+  "generated_by": "Issue #242 preservation (docs/242-preserve-eval-artifacts)",
+  "purpose": "Preserve expiring GitHub Actions artifacts of the M13 PUCT-vs-MCTS evaluations with checksums, run conditions and independent re-aggregation evidence.",
+  "storage": {
+    "primary": "in-repo docs/m13-runs/2026-11-08-puct-vs-mcts/raw-artifacts/*.zip (public, no private information)",
+    "note": "Extracted layout mirrors gh run download: <run_id>/<artifact_name>/..."
+  },
+  "privacy_audit": "matches.jsonl contains per-game aggregate records only (timings, credits, ranks, config flags, game seed, replay hash). No hands, deck contents, or hidden information are recorded. Seeds are the published fixed evaluation seeds required for replay verification.",
+  "stats_script_note": "Re-aggregation used scripts/paired_eval_stats.py from working tree of this branch. Verified: diff(a0cd530, branch) for that file touches only POLICY_CHOICES enum (removal of unused eval_* variants); aggregation/bootstrap logic is unchanged.",
+  "verification": {
+    "bootstrap_iterations": 10000,
+    "bootstrap_seed": 20261106,
+    "per_run": {
+      "42515071537": {
+        "reaggregated_with": "scripts/paired_eval_stats.py",
+        "differing_fields": []
+      },
+      "42398823247": {
+        "reaggregated_with": "scripts/paired_eval_stats.py",
+        "differing_fields": [
+          "comparison_design",
+          "saturation"
+        ],
+        "note": "Both fields were added to the report schema by #106 (700353d) AFTER runs 42398823247/42406723531 (SHA 1658c05). Re-aggregation adds them; all numeric fields match exactly."
+      },
+      "42406723531": {
+        "reaggregated_with": "scripts/paired_eval_stats.py",
+        "differing_fields": [
+          "comparison_design",
+          "saturation"
+        ],
+        "note": "Same as 42398823247."
+      }
+    },
+    "integrity_checks": "2000/2000 rows per run as configured; arms 1000/1000; seats balanced (formal: 250 blocks x 4 seats per arm); no duplicate (arm,block,seat); all finished=true and replay_verified=true; formal seed range 965000-965249."
+  },
+  "runs": [
+    {
+      "run_id": "42515071537",
+      "workflow_name": "M13 PUCT vs MCTS 4P Formal Direct Evaluation",
+      "run_number": 1,
+      "trigger": "issue_comment",
+      "code_sha": "a0cd5301772d1a1de728b51493a66cc3b1afd082",
+      "run_url": "https://github.com/cueikusuta/agricola-re-ai/actions/runs/42515071537",
+      "title": "正式PUCT対MCTS（4人・カードなし・16sim・simulation-capped）",
+      "classification": "formal",
+      "captured_at": "2026-11-09T13:30Z",
+      "config": {
+        "players": 4,
+        "seed_start": 965000,
+        "seed_blocks": 250,
+        "games_per_arm": 1000,
+        "total_games": 2000,
+        "candidate": "puct",
+        "baseline": "mcts",
+        "opponent": "mcts",
+        "head_to_head": true,
+        "mirror_baseline": true,
+        "search_mode": "simulation-capped",
+        "decision_budget_ms": 0,
+        "puct_simulations": 16,
+        "mcts_simulations": 16,
+        "puct_c": 1.5,
+        "puct_leaf": "terminal",
+        "puct_prior_temperature": 3.0,
+        "puct_value_temperature": 8.0,
+        "puct_root_limit": 0,
+        "puct_final_prior_weight": 0.0,
+        "puct_tree_depth": 2,
+        "mcts_tree_depth": 2,
+        "cards": "none",
+        "card_set_count": 0,
+        "card_set_hash": "6d5642ac5627ca22c092c36bbb0a5ea3554f525b4de33de7fac3f2bcf10056d9",
+        "additional_action_space": false,
+        "time_budget_max_simulations": 100000
+      },
+      "stored_report_summary": {
+        "candidate_first_credit_pct": 87.8,
+        "baseline_first_credit_pct": 25.0,
+        "mean_first_credit_delta_pp": 62.8,
+        "paired_block_bootstrap_95ci_pp": [
+          60.6,
+          64.9
+        ],
+        "total_games": 2000
+      },
+      "artifacts": [
+        {
+          "artifact_id": 13632085288,
+          "name": "shard-3",
+          "zip": "raw-artifacts/run-42515071537-shard-3.zip",
+          "sha256": "0c96c792f9825fabefd3f32b48291ec0d1e779d62ca8937246e08268f93b8441",
+          "size_in_bytes": 32849,
+          "expires_at": "2026-12-08T19:48:00Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13632075312,
+          "name": "shard-2",
+          "zip": "raw-artifacts/run-42515071537-shard-2.zip",
+          "sha256": "a5b6df709c25470a502ebc0733224501a9fc0b320a5a73af42ba6812950bf0b9",
+          "size_in_bytes": 31886,
+          "expires_at": "2026-12-08T19:47:05Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13631880308,
+          "name": "shard-1",
+          "zip": "raw-artifacts/run-42515071537-shard-1.zip",
+          "sha256": "cb400b6d5880029aa836199927798b7ae9d32964fa0967a05e1e119357670703",
+          "size_in_bytes": 31613,
+          "expires_at": "2026-12-08T19:38:44Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13631797144,
+          "name": "m13-direct-formal-report",
+          "zip": "raw-artifacts/run-42515071537-m13-direct-formal-report.zip",
+          "sha256": "be2d8fc1dd31a8fea9f8507c7d8336de1fc8941f20bda18d4b3d094a7583180a",
+          "size_in_bytes": 2776,
+          "expires_at": "2026-12-08T19:48:11Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13631413534,
+          "name": "shard-6",
+          "zip": "raw-artifacts/run-42515071537-shard-6.zip",
+          "sha256": "5bedc18518f42a177cc766118961204a156708bc859f7443db377eea498ae7d8",
+          "size_in_bytes": 32089,
+          "expires_at": "2026-12-08T19:47:41Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13631361750,
+          "name": "shard-4",
+          "zip": "raw-artifacts/run-42515071537-shard-4.zip",
+          "sha256": "2f2f26c6ec407f5ecae492ea2af5be4bfe3a07f49dab210125d9f62811451601",
+          "size_in_bytes": 31510,
+          "expires_at": "2026-12-08T19:42:14Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13631248132,
+          "name": "shard-7",
+          "zip": "raw-artifacts/run-42515071537-shard-7.zip",
+          "sha256": "efaf857557b1d6f3ac965ffe2105543a571c1540b2587bf3c74071ba30ce0b81",
+          "size_in_bytes": 32486,
+          "expires_at": "2026-12-08T19:38:30Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13631119238,
+          "name": "shard-5",
+          "zip": "raw-artifacts/run-42515071537-shard-5.zip",
+          "sha256": "99af28b24a72be0fa21a63d808e1c087da43d6e97920c6c27b9cef0c1984797c",
+          "size_in_bytes": 31411,
+          "expires_at": "2026-12-08T19:42:20Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13630794624,
+          "name": "shard-0",
+          "zip": "raw-artifacts/run-42515071537-shard-0.zip",
+          "sha256": "4665bbdec335bb9168cd93db13374a2be4139c281437063f522bc28fba66a460",
+          "size_in_bytes": 31902,
+          "expires_at": "2026-12-08T19:47:21Z",
+          "expired_at_capture": false
+        }
+      ]
+    },
+    {
+      "run_id": "42398823247",
+      "workflow_name": "Paired AI Evaluation",
+      "run_number": 42,
+      "trigger": "workflow_dispatch",
+      "code_sha": "1658c059b9d10ef9d3c9b2d49898615d0ad89493",
+      "run_url": "https://github.com/cueikusuta/agricola-re-ai/actions/runs/42398823247",
+      "title": "2人 time-budgeted 200ms vs greedy（探索的）",
+      "classification": "exploratory",
+      "captured_at": "2026-11-09T13:30Z",
+      "config": {
+        "players": 2,
+        "seed_start": 900000,
+        "seed_blocks": 500,
+        "games_per_arm": 1000,
+        "total_games": 2000,
+        "candidate": "puct",
+        "baseline": "mcts",
+        "opponent": "greedy",
+        "search_mode": "time-budgeted",
+        "decision_budget_ms": 200,
+        "puct_simulations": 100000,
+        "mcts_simulations": 64,
+        "puct_c": 1.5,
+        "puct_leaf": "terminal",
+        "puct_prior_temperature": 3.0,
+        "puct_value_temperature": 8.0,
+        "puct_root_limit": 0,
+        "puct_final_prior_weight": 0.0,
+        "puct_tree_depth": 2,
+        "mcts_tree_depth": 2,
+        "cards": "none",
+        "card_set_count": 0,
+        "card_set_hash": "6d5642ac5627ca22c092c36bbb0a5ea3554f525b4de33de7fac3f2bcf10056d9",
+        "additional_action_space": false,
+        "time_budget_max_simulations": 100000
+      },
+      "stored_report_summary": {
+        "candidate_first_credit_pct": 100.0,
+        "baseline_first_credit_pct": 99.0,
+        "mean_first_credit_delta_pp": 1.0,
+        "paired_block_bootstrap_95ci_pp": [
+          0.4,
+          1.7000000000000002
+        ],
+        "total_games": 2000
+      },
+      "artifacts": [
+        {
+          "artifact_id": 13586761825,
+          "name": "shard-1",
+          "zip": "raw-artifacts/run-42398823247-shard-1.zip",
+          "sha256": "d9bef99afaa1ae489fa6a309b8013916914d71231fea004cc6ac5defc2a29aee",
+          "size_in_bytes": 69283,
+          "expires_at": "2026-11-14T18:56:46Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13586168929,
+          "name": "shard-3",
+          "zip": "raw-artifacts/run-42398823247-shard-3.zip",
+          "sha256": "ec5960abab96e9c26fa3b2105c69dd6b275ca80ce41acbc440b76b162125857e",
+          "size_in_bytes": 69145,
+          "expires_at": "2026-11-14T18:57:13Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13586108984,
+          "name": "shard-0",
+          "zip": "raw-artifacts/run-42398823247-shard-0.zip",
+          "sha256": "cd66207d1d020fbe63b2e7cd3dde0f28731da09c12834cb6846dde107ba61643",
+          "size_in_bytes": 68852,
+          "expires_at": "2026-11-14T18:56:22Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13585934886,
+          "name": "paired-eval-report",
+          "zip": "raw-artifacts/run-42398823247-paired-eval-report.zip",
+          "sha256": "63f85d68a87b1def4a84d30f4c47d662839db5454535f9caec629db0fece6005",
+          "size_in_bytes": 2420,
+          "expires_at": "2026-11-14T18:57:25Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13585594626,
+          "name": "shard-2",
+          "zip": "raw-artifacts/run-42398823247-shard-2.zip",
+          "sha256": "957fb9f9f14abb3649e14e4c43884295093f603ea3ff79ad5787451ed302faca",
+          "size_in_bytes": 68856,
+          "expires_at": "2026-11-14T18:56:52Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13584626228,
+          "name": "paired-eval-pr-smoke",
+          "zip": "raw-artifacts/run-42398823247-paired-eval-pr-smoke.zip",
+          "sha256": "3a088312404b21c32eaad058148feb2ae9e2f8490f26f0a10c24f3b1f78ab20b",
+          "size_in_bytes": 16246,
+          "expires_at": "2026-11-14T17:57:49Z",
+          "expired_at_capture": false
+        }
+      ]
+    },
+    {
+      "run_id": "42406723531",
+      "workflow_name": "Paired AI Evaluation",
+      "run_number": 44,
+      "trigger": "workflow_dispatch",
+      "code_sha": "1658c059b9d10ef9d3c9b2d49898615d0ad89493",
+      "run_url": "https://github.com/cueikusuta/agricola-re-ai/actions/runs/42406723531",
+      "title": "4人 simulation-capped 32sim vs greedy（探索的）",
+      "classification": "exploratory",
+      "captured_at": "2026-11-09T13:30Z",
+      "config": {
+        "players": 4,
+        "seed_start": 930000,
+        "seed_blocks": 250,
+        "games_per_arm": 1000,
+        "total_games": 2000,
+        "candidate": "puct",
+        "baseline": "mcts",
+        "opponent": "greedy",
+        "search_mode": "simulation-capped",
+        "decision_budget_ms": 0,
+        "puct_simulations": 32,
+        "mcts_simulations": 32,
+        "puct_c": 1.5,
+        "puct_leaf": "terminal",
+        "puct_prior_temperature": 3.0,
+        "puct_value_temperature": 8.0,
+        "puct_root_limit": 0,
+        "puct_final_prior_weight": 0.0,
+        "puct_tree_depth": 2,
+        "mcts_tree_depth": 2,
+        "cards": "none",
+        "card_set_count": 0,
+        "card_set_hash": "6d5642ac5627ca22c092c36bbb0a5ea3554f525b4de33de7fac3f2bcf10056d9",
+        "additional_action_space": false,
+        "time_budget_max_simulations": 100000
+      },
+      "stored_report_summary": {
+        "candidate_first_credit_pct": 96.39999999999999,
+        "baseline_first_credit_pct": 31.3,
+        "mean_first_credit_delta_pp": 65.10000000000001,
+        "paired_block_bootstrap_95ci_pp": [
+          61.95,
+          68.2
+        ],
+        "total_games": 2000
+      },
+      "artifacts": [
+        {
+          "artifact_id": 13589080124,
+          "name": "shard-0",
+          "zip": "raw-artifacts/run-42406723531-shard-0.zip",
+          "sha256": "f018fab26da7fbb72a949727ebac3e5da320d1091ccbf76bc504d0d22ffd83c0",
+          "size_in_bytes": 70396,
+          "expires_at": "2026-11-14T20:06:25Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13588872634,
+          "name": "shard-3",
+          "zip": "raw-artifacts/run-42406723531-shard-3.zip",
+          "sha256": "a5d33fcebf166bfa1b42472a9def6f0f76ffbb0e3e9bc6b7523798fdd3e2174a",
+          "size_in_bytes": 71718,
+          "expires_at": "2026-11-14T20:07:54Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13588284051,
+          "name": "shard-2",
+          "zip": "raw-artifacts/run-42406723531-shard-2.zip",
+          "sha256": "2db17623154ec1447033ec33d61fd4a4c65ac67646c62bd7b213d64b53f97fb8",
+          "size_in_bytes": 70713,
+          "expires_at": "2026-11-14T20:03:06Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13588004358,
+          "name": "paired-eval-report",
+          "zip": "raw-artifacts/run-42406723531-paired-eval-report.zip",
+          "sha256": "904fc635671d35ccc27dfbb3ed0846cf65ab3244f47e1285bf6f6b63cc12e5e6",
+          "size_in_bytes": 2439,
+          "expires_at": "2026-11-14T20:08:08Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13587913777,
+          "name": "shard-1",
+          "zip": "raw-artifacts/run-42406723531-shard-1.zip",
+          "sha256": "8638173089d1e29a29105eb947c8164049f1f58bce1d6a502bec1b0b28b36daa",
+          "size_in_bytes": 70655,
+          "expires_at": "2026-11-14T20:00:05Z",
+          "expired_at_capture": false
+        },
+        {
+          "artifact_id": 13587517350,
+          "name": "paired-eval-pr-smoke",
+          "zip": "raw-artifacts/run-42406723531-paired-eval-pr-smoke.zip",
+          "sha256": "03a9822a9257c90949774b50b66f92799827bdb2d945a0429b4daf02cfa70b61",
+          "size_in_bytes": 16228,
+          "expires_at": "2026-11-14T19:33:13Z",
+          "expired_at_capture": false
+        }
+      ]
+    }
+  ]
+}
