@@ -28,6 +28,18 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 .alert{background:#5a2b2b;border:1px solid #b96a6a;color:#ffe3e3;border-radius:8px;padding:10px 12px;font-size:15px;word-break:break-word}
 .alert[hidden]{display:none}
 #editorFooter{position:sticky;bottom:-18px;background:#1b2a31;padding-top:10px;border-top:1px solid #3a4a53}
+#actions.actionBoard{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));align-items:start;gap:10px}
+.actionGroup{border:1px solid #435965;border-radius:9px;padding:9px;min-width:0}
+.actionGroup h3{margin:0 0 7px;font-size:15px;color:#d9e9ea}
+.actionTiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:7px}
+.actionTile{border:1px solid #4c6370;border-radius:8px;padding:5px;min-width:0;background:#263943}
+.actionTile button{width:100%;text-align:left;min-height:44px;font-weight:600;overflow-wrap:anywhere}
+.actionTile:focus-within{outline:2px solid #9ad4ba;outline-offset:2px}
+.actionTile .tileMeta{font-size:12px;color:#d2dce0;padding:4px;overflow-wrap:anywhere}
+#boardSummary,#usedActions{font-size:13px;color:#d0dbde;margin:6px 0 0}
+#usedActions{display:flex;gap:5px;flex-wrap:wrap}
+.usedSpace{border:1px dashed #60717a;background:#26333a;border-radius:6px;padding:3px 7px}
+
 @media(max-width:700px){.screen{padding:8px}.panel{padding:9px}.cell{min-height:45px;font-size:14px}}
 </style></head>
 <body><div class="screen">
@@ -66,7 +78,7 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 </section>
 <section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
 <div class="stats"><h2>資源・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p><p id="hand" class="minor"></p><details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details><p id="history"></p></div></div></section>
-<section class="panel"><h2 id="actionTitle">アクションの詳細を手動指定</h2><div id="notice"></div><div class="actions" id="actions"></div><div class="buttons" id="actionNav"></div></section>
+<section class="panel" id="actionPanel"><h2 id="actionTitle">アクションの詳細を手動指定</h2><p id="boardSummary" aria-live="polite"></p><div id="notice"></div><div class="actions actionBoard" id="actions" aria-label="使用可能なアクションボード"></div><div class="buttons" id="actionNav"></div><div id="usedActions" aria-label="今ラウンドの使用済みスペース"></div></section>
 <section class="panel"><h2>任意の操作</h2><button id="free">食料変換・動物の配置換え・廃棄</button><p class="minor">ワーカーを使わない操作。エンジンが合法性を判定します。</p></section>
 <footer>1Pが人間、残りはCPU。畑は左上から0〜14番です。種まきは1畑につき種1個を使います。無効な指定は適用されず、内容を直して再送信できます。</footer>
 </div>
@@ -125,6 +137,45 @@ if(key==="Room")return ["部屋","room"];if(key==="Pasture")return ["牧場","pa
 if(key==="Field"){const f=t.Field;return [f.crop==="grain"?"麦畑":f.crop==="vegetable"?"野菜畑":"畑","field-tile"];}
 return [cell.stable?"厩":"空き",""];}
 function putStats(label,value){const d=document.createElement("div");d.className="stat";d.textContent=label+" "+value;$("stats").append(d);}
+// #239: Render only spaces published by the server. Never invent future round spaces.
+const boardGroups=[
+ ["資源・採集",["forest","clay_pit","reed_bank","fishing","western_quarry","eastern_quarry","copse","grove","hollow","traveling_players","resource_market","animal_market"]],
+ ["農場・建築",["farmland","farm_expansion","fencing","grain_utilization","cultivation","farm_redevelopment","house_redevelopment","sheep_market","pig_market","cattle_market"]],
+ ["家族・カード",["meeting_place","lessons","extra_lessons","major_improvement","family_growth_with_room","family_growth_no_room","modest_family_growth"]],
+ ["その他",[]]
+];
+function boardGroup(key){return boardGroups.findIndex(([,list])=>list.includes(key))>=0?boardGroups.findIndex(([,list])=>list.includes(key)):boardGroups.length-1;}
+function tileMeta(key,p){
+ const accum=p.accumulations||{},animalsOnBoard=p.animal_accumulations||{};
+ if(Object.prototype.hasOwnProperty.call(accum,key))return "累積資源 "+accum[key]+"個";
+ if(Object.prototype.hasOwnProperty.call(animalsOnBoard,key))return "累積家畜 "+animalsOnBoard[key]+"頭";
+ return "詳細を選んで確定";
+}
+function renderActionBoard(available,candidate,p){
+ const groups=boardGroups.map(()=>[]);for(const key of available)groups[boardGroup(key)].push(key);
+ $("actions").replaceChildren();$("actionNav").replaceChildren();$("usedActions").replaceChildren();
+ for(let i=0;i<groups.length;i++){
+  if(!groups[i].length)continue;
+  const group=document.createElement("section");group.className="actionGroup";
+  const heading=document.createElement("h3");heading.textContent=boardGroups[i][0];group.append(heading);
+  const tiles=document.createElement("div");tiles.className="actionTiles";
+  for(const key of groups[i]){
+   const tile=document.createElement("div");tile.className="actionTile";tile.dataset.space=key;
+   const b=document.createElement("button");b.type="button";b.dataset.space=key;
+   b.textContent=(names[key]||key)+(candidate.has(key)?"":"（詳細指定）");
+   b.title=candidate.has(key)?"アクションを選び詳細を入力":"詳細を指定すれば選べるアクション";
+   b.disabled=busy;b.onclick=()=>openWork(key);
+   const meta=document.createElement("div");meta.className="tileMeta";meta.textContent=tileMeta(key,p);
+   tile.append(b,meta);tiles.append(tile);
+  }
+  group.append(tiles);$("actions").append(group);
+ }
+ const used=Array.isArray(p.used)?p.used:[];
+ const heading=document.createElement("span");heading.textContent="使用済み: ";$("usedActions").append(heading);
+ for(const key of used){const item=document.createElement("span");item.className="usedSpace";item.textContent=names[key]||key;$("usedActions").append(item);}
+ if(!used.length){const item=document.createElement("span");item.textContent="なし";$("usedActions").append(item);}
+ $("boardSummary").textContent="選択可能 "+available.length+"件 / 使用済み "+used.length+"件（サーバの公開情報）";
+}
 function render(){
 if(!state)return;
 renderDraft();
@@ -141,14 +192,12 @@ putStats("部屋",pl.farm.filter(c=>c.tile==="Room").length);putStats("柵",pl.f
 $("improvements").textContent="主要改善: "+(pl.improvements.map(x=>improvements[x]||x).join(" / ")||"なし")+" / 職業・小改善: "+(pl.played_cards||[]).map(cardLabel).join(" / ");
 $("hand").textContent=viewPlayer===0?"手札: "+(state.hand.map(cardLabel).join(" / ")||"なし"):"手札: 非公開";
 renderCardHelp(pl);$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
-$("actions").replaceChildren();$("actionNav").replaceChildren();$("free").disabled=busy||!!harvest||p.finished;
+$("actions").replaceChildren();$("actionNav").replaceChildren();$("usedActions").replaceChildren();$("boardSummary").textContent="";$("free").disabled=busy||!!harvest||p.finished;
 if(p.finished){$("notice").textContent="最終順位: "+scores.rank.map((r,i)=>(i+1)+"P "+r+"位").join("、");return;}
 if(harvest){$("notice").textContent=harvest.phase==="feeding"?"収穫：給餌順と工房加工を選択":"収穫：繁殖する子の置き場所を選択";const b=document.createElement("button");b.textContent="収穫の詳細を指定";b.onclick=()=>openHarvest();$("actions").append(b);return;}
 $("notice").textContent="1Pの手番です。自動の詳細選択は使用しません。";
 const available=state.available||state.legal||[];const candidate=new Set(state.legal||[]);
-const pages=Math.max(1,Math.ceil(available.length/8));actionPage=Math.min(actionPage,pages-1);
-for(const key of available.slice(actionPage*8,(actionPage+1)*8)){const b=document.createElement("button");b.textContent=(names[key]||key)+(candidate.has(key)?"":"（詳細指定）");b.title=candidate.has(key)?"AI候補にも含まれるスペース":"AI候補外。詳細を明示すれば実行できます";b.disabled=busy;b.onclick=()=>openWork(key);$("actions").append(b);}
-if(pages>1){for(const [label,next,disabled] of [["前へ",actionPage-1,actionPage===0],["次へ",actionPage+1,actionPage===pages-1]]){const b=document.createElement("button");b.textContent=label;b.disabled=busy||disabled;b.onclick=()=>{actionPage=next;render();};$("actionNav").append(b);}}
+renderActionBoard(available,candidate,p);
 }
 function add(label,id,type="text",value="",hint=""){
 const wrap=document.createElement("label");wrap.textContent=label;const el=type==="textarea"?document.createElement("textarea"):document.createElement("input");
