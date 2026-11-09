@@ -100,9 +100,9 @@ on:
         default: 1.5
         required: true
       puct_prior_temp:
-        description: 'Softmax temperature for evaluation priors'
+        description: 'Softmax temperature for evaluation priors (adopted default 6 since #263)'
         type: number
-        default: 3
+        default: 6
         required: true
       puct_value_temp:
         description: 'Softmax temperature for heuristic leaf credit'
@@ -120,9 +120,9 @@ on:
         default: 0
         required: true
       baseline_puct:
-        description: 'Frozen baseline-arm PUCT config: sims,depth,c,priorTemp,valueTemp,leaf,rootLimit,finalPrior (#219). The dispatch API allows 25 inputs, so the eight baseline-puct-* flags travel as one CSV.'
+        description: 'Frozen baseline-arm PUCT config: sims,depth,c,priorTemp,valueTemp,leaf,rootLimit,finalPrior (#219). Default is the adopted standard config since #263 (pt6); pass 32,2,1.5,3,8,terminal,0,0 to reproduce the historical pt3 baseline. The dispatch API allows 25 inputs, so the eight baseline-puct-* flags travel as one CSV.'
         type: string
-        default: '32,2,1.5,3,8,terminal,0,0'
+        default: '32,2,1.5,6,8,terminal,0,0'
         required: true
 
 permissions:

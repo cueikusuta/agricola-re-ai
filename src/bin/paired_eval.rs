@@ -1363,13 +1363,18 @@ mod tests {
     /// #219: two distinct PUCT configurations must never share a name.
     #[test]
     fn puct_config_id_encodes_every_frozen_parameter() {
-        let config = PuctConfig::default();
+        // #263: the shipped default is now the adopted pt6 configuration, so
+        // the baseline ID in this test pins the explicit historical pt3 values
+        // rather than reading them from PuctConfig::default().
+        let mut config = PuctConfig {
+            prior_temperature: 3.0,
+            ..PuctConfig::default()
+        };
         assert_eq!(
             puct_config_id(&config),
             "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0",
-            "the baseline ID freezes the shipped configuration"
+            "the baseline ID freezes the historical configuration"
         );
-        let mut config = config;
         for (name, changed) in [
             ("simulations", {
                 config.simulations = 17;
@@ -1553,6 +1558,8 @@ mod tests {
         assert!(parse_options_from(base.iter().cloned()).is_err());
         // A frozen baseline equal to the candidate default is still "the same
         // configuration": rejected as a meaningless mirror.
+        // Since #263 the candidate default is pt6, so the frozen baseline that
+        // equals the candidate default is pt6 as well.
         let frozen_defaults = [
             "--baseline-puct-simulations",
             "32",
@@ -1561,7 +1568,7 @@ mod tests {
             "--baseline-puct-c",
             "1.5",
             "--baseline-puct-prior-temp",
-            "3",
+            "6",
             "--baseline-puct-value-temp",
             "8",
             "--baseline-puct-leaf",
@@ -1613,6 +1620,11 @@ mod tests {
             "time-budgeted",
             "--decision-budget-ms",
             "100",
+            // Pin the candidate to the same prior temperature as the baseline
+            // so the only configuration difference is the simulation count
+            // (#263 changed the candidate default prior temperature to 6).
+            "--puct-prior-temp",
+            "3",
             "--output",
             "out.jsonl",
         ]
