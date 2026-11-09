@@ -380,30 +380,34 @@ function tileName(cell){const t=cell.tile;const key=typeof t==="string"?t:Object
 if(key==="Room")return ["部屋","room"];if(key==="Pasture")return ["牧場","pasture"];
 if(key==="Field"){const f=t.Field;return [f.crop==="grain"?"麦畑":f.crop==="vegetable"?"野菜畑":"畑","field-tile"];}
 return [cell.stable?"厩":"空き",""];}
-function putStats(label,value){const d=document.createElement("div");d.className="stat";d.textContent=label+" "+value;$("stats").append(d);}
+const resourceIcons={wood:"🪵",clay:"🧱",reed:"🌾",stone:"🪨",food:"🍞",grain:"🌽",vegetable:"🥕",sheep:"🐑",boar:"🐗",cattle:"🐄"};
+const resourceNames={...goods,...animals};
+const iconForLabel=Object.fromEntries(Object.entries(resourceNames).map(([key,label])=>[label,resourceIcons[key]]));
+const spaceIcons={forest:"🌲",clay_pit:"🧱",reed_bank:"🌾",fishing:"🐟",day_laborer:"🧺",grain_seeds:"🌽",farmland:"🚜",farm_expansion:"🏠",meeting_place:"⭐",major_improvement:"🔨",fencing:"🪵",grain_utilization:"🌱",sheep_market:"🐑",family_growth_with_room:"👨‍👩‍👧",house_redevelopment:"🛠️",western_quarry:"⛏️",vegetable_seeds:"🥕",pig_market:"🐗",cattle_market:"🐄",eastern_quarry:"🪨",family_growth_no_room:"👶",cultivation:"🌾",farm_redevelopment:"🪚",copse:"🌳",resource_market:"🛒",animal_market:"🐑",modest_family_growth:"👶",grove:"🌲",hollow:"🧱",traveling_players:"🎭",lessons:"📜",extra_lessons:"📚"};
+function putStats(label,value){const d=document.createElement("div");d.className="stat";d.dataset.icon=iconForLabel[label]||(label==="部屋"?"🏠":"🪵");d.textContent=label+" "+value;d.title=label+"："+value;d.setAttribute("aria-label",label+"："+value);$("stats").append(d);}
 // Farm renderer is shared with public opponent overviews: all values come from public.players.
 function farmDecor(player,index){
  const cell=player.farm[index],[label,cls]=tileName(cell),tile=cell.tile;
  const kind=typeof tile==="string"?tile:Object.keys(tile||{})[0]||"";
  let icon="";let note=label;
- if(kind==="Room")icon="⌂";
+ if(kind==="Room")icon="🏠";
  else if(kind==="Field"){const crop=tile.Field?.crop;icon=crop==="grain"?"🌾":crop==="vegetable"?"🥕":"〰";
   note=label+(tile.Field?.remaining?(" "+tile.Field.remaining):"");
  }else if(kind==="Pasture"){
   const id=tile.Pasture?.id,pasture=(player.pastures||[]).find(x=>x.id===id);
   const animal=pasture?.animal;icon=animal==="sheep"?"🐑":animal==="boar"?"🐗":animal==="cattle"?"🐄":"♧";
   note=animal?(animals[animal]||animal)+" "+pasture.quantity+"頭":"牧場";
- }else if(cell.stable)icon="♜";
- return {label:note,cls,icon};
+ }else if(cell.stable)icon="🏚️";
+ return {label:note,cls,icon:icon||"🌱"};
 }
 function renderFarmSquare(player,index,mini){
  const cell=player.farm[index],info=farmDecor(player,index);
  const d=document.createElement("div");d.className=(mini?"miniCell":"cell")+" "+info.cls;
  d.title="農場マス"+index+" "+info.label+(cell.stable?"・厩あり":"");
  d.setAttribute("aria-label",d.title);
- if(mini){d.textContent=info.icon||"·";return d;}
+ if(mini){d.textContent=info.icon;return d;}
  const indexTag=document.createElement("span");indexTag.className="cellIndex";indexTag.textContent=String(index);
- const icon=document.createElement("span");icon.className="cellIcon";icon.textContent=info.icon||"·";icon.setAttribute("aria-hidden","true");
+ const icon=document.createElement("span");icon.className="cellIcon";icon.textContent=info.icon;icon.setAttribute("aria-hidden","true");
  const label=document.createElement("span");label.className="cellLabel";label.textContent=info.label+(cell.stable&&info.icon!=="♜"?" ▣":"");
  d.append(indexTag,icon,label);return d;
 }
@@ -424,11 +428,17 @@ function renderOpponentBoards(players,p,scores){
   const right=document.createElement("div");right.className="opponentMeta";
   const remaining=Math.max(0,(p.work_quota[person.id]||0)-(p.workers_placed[person.id]||0));
   const score=scores.scores[person.id]?.total??"–";
-  const summary=document.createElement("div");summary.textContent="家族"+person.family+"人 · 残"+remaining+"手 · "+score+"点";
+  const summary=document.createElement("div");summary.textContent="👨‍👩‍👧 "+person.family+"人  ·  ♟ "+remaining+"手  ·  ⭐ "+score+"点";
   const supplies=document.createElement("div");supplies.className="opponentSupply";
-  supplies.textContent=Object.entries(goods).map(([key,name])=>name+":"+(person.supply[key]??0)).join("  ");
+  for(const [key,name] of Object.entries(goods)){
+   const token=document.createElement("span");token.className="opponentResource";
+   token.title=name+"："+(person.supply[key]??0);token.setAttribute("aria-label",token.title);
+   const glyph=document.createElement("span");glyph.className="resourcePictogram";glyph.textContent=resourceIcons[key]||"◆";glyph.setAttribute("aria-hidden","true");
+   const count=document.createElement("span");count.textContent=String(person.supply[key]??0);
+   token.append(glyph,count);supplies.append(token);
+  }
   const played=document.createElement("div");played.className="opponentSupply";
-  played.textContent="公開カード "+(person.played_cards||[]).length+"枚";
+  played.textContent="🃏 "+(person.played_cards||[]).length+"枚";
   right.append(summary,supplies,played);card.append(left,right);host.append(card);
  }
 }
