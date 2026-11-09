@@ -46,26 +46,22 @@ jobs:
           cargo --version
           git rev-parse HEAD
 
-      - name: Build release harness (timing build, plain allocator)
-        run: cargo build --release --bin perf_baseline
-
-      - name: Build instrumented harness (allocation counting)
-        run: cargo build --release --bin perf_baseline --features perf-count-alloc
-
-      - name: Run timing baseline (plain build)
+      - name: Build and run timing baseline (plain allocator)
         env:
           QUICK: ${{ inputs.quick }}
         run: |
+          cargo build --release --bin perf_baseline
           if [ "$QUICK" = "true" ]; then
             ./target/release/perf_baseline --quick > baseline_timing.json
           else
             ./target/release/perf_baseline > baseline_timing.json
           fi
 
-      - name: Run allocation baseline (instrumented build)
+      - name: Build and run allocation baseline (instrumented build)
         env:
           QUICK: ${{ inputs.quick }}
         run: |
+          cargo build --release --bin perf_baseline --features perf-count-alloc
           if [ "$QUICK" = "true" ]; then
             ./target/release/perf_baseline --quick > baseline_alloc.json
           else
