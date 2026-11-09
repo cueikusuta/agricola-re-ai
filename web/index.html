@@ -764,6 +764,75 @@ function renderActionBoard(available,candidate,p){
  if(!used.length){const item=document.createElement("span");item.textContent="なし";$("usedActions").append(item);}
  $("boardSummary").textContent="選択可能 "+available.length+"件 / 使用済み "+used.length+"件";
 }
+// #248 UI modes are presentation-only. No rule/AI computation in browser.
+let uiMode="play";
+document.querySelectorAll("#uiModeTabs button[data-ui-mode]").forEach(button=>{
+  button.onclick=()=>{
+    uiMode=button.dataset.uiMode;
+    renderAuxiliary();
+  };
+});
+function renderAuxiliary(){
+  for(const button of document.querySelectorAll("#uiModeTabs button[data-ui-mode]")){
+    const selected=button.dataset.uiMode===uiMode;
+    button.classList.toggle("selected",selected);
+    button.setAttribute("aria-pressed",String(selected));
+  }
+  const play=uiMode==="play";
+  $("cardsPanel").hidden=!play;
+  document.querySelector(".operationsPanel").hidden=!play;
+  $("analysisPanel").hidden=uiMode!=="analysis";
+  $("verificationPanel").hidden=uiMode!=="verification";
+  if(!state)return;
+  const p=state.public;
+  const harvest=state.harvest;
+  const remaining=Math.max(0,(p.work_quota?.[p.active_player]||0)-(p.workers_placed?.[p.active_player]||0));
+  $("stepGuide").textContent=p.finished?"対戦終了。得点と順位を確認できます。":
+    harvest?"収穫処理を実行してください。中央の「収穫の詳細を指定」から進めます。":
+    p.active_player===0?"あなたの番です（残り"+remaining+"手）。中央の盤面でアクションを選び、必要な配置を指定してください。":
+    (p.active_player+1)+"Pの手番です。盤面の公開情報と農場を確認してください。";
+  const analysis=$("analysisContent");analysis.replaceChildren();
+  if(uiMode==="analysis"){
+    const heading=document.createElement("strong");
+    heading.textContent="現局面のAI候補（評価順ではありません）";analysis.append(heading);
+    const candidates=state.legal||[];
+    const declared=state.available||[];
+    for(const key of candidates){
+      if(!declared.includes(key))continue;
+      const row=document.createElement("div");row.className="analysisItem";
+      const icon=document.createElement("span");icon.textContent=spaceIcons[key]||"◆";icon.setAttribute("aria-hidden","true");
+      const text=document.createElement("span");text.textContent=names[key]||key;
+      row.append(icon,text);analysis.append(row);
+    }
+    if(!candidates.length){
+      const empty=document.createElement("p");empty.textContent=harvest?"収穫中：AI候補はありません":"現在の候補アクションはありません";
+      analysis.append(empty);
+    }
+    const notice=document.createElement("p");notice.className="modeDisclaimer";
+    notice.textContent="探索回数・思考時間・各行動の推定勝率：現行Web APIでは取得できません。表示値を推測していません。";
+    analysis.append(notice);
+  }
+  if(uiMode==="verification"){
+    const publicEvidence={
+      round:p.round,active_player:p.active_player,starting_player:p.start_player,
+      player_count:p.players.length,additional_action_space_enabled:p.additional_action_space_enabled,
+      workers_placed:p.workers_placed,work_quota:p.work_quota,
+      used_action_spaces:p.used,available_action_spaces:state.available||[],
+      candidate_action_spaces:state.legal||[],
+      latest_action_kinds:(state.last_actions||[]).slice(0,8).map(x=>({player:x.player,space:x.space??null,kind:x.kind??null})),
+      source:"公開ゲーム状態とWeb UI応答"
+    };
+    $("verificationContent").textContent=JSON.stringify(publicEvidence,null,2);
+  }
+  const list=$("historyList");list.replaceChildren();
+  for(const event of (state.last_actions||[]).slice(0,12)){
+    const item=document.createElement("li");
+    item.textContent=(event.player===null?"ゲーム":(event.player+1)+"P")+"："+(names[event.space]||event.kind||"操作");
+    list.append(item);
+  }
+  if(!list.children.length){const item=document.createElement("li");item.textContent="履歴はまだありません";list.append(item);}
+}
+
 function render(){
 if(!state)return;
 renderDraft();
@@ -773,6 +842,7 @@ $("summary").textContent=p.players.length+"人戦 / 追加タイル "+(p.additio
 const nextHarvest=[4,7,9,11,13,14].find(round=>round>=p.round)||14;
 $("nextHarvest").textContent=p.finished?"最終収穫終了":(nextHarvest===p.round?"このラウンド終了後に収穫":"次の収穫まで "+(nextHarvest-p.round)+" ラウンド");
 renderTurnBar();
+renderAuxiliary();
 $("tabs").replaceChildren();
 for(const pl of shown.players){const b=document.createElement("button");b.type="button";b.className=viewPlayer===pl.id?"active":"";b.setAttribute("aria-pressed",String(viewPlayer===pl.id));b.textContent=(pl.id+1)+"P "+scores.scores[pl.id].total+"点 残"+Math.max(0,(state.public.work_quota[pl.id]||0)-(state.public.workers_placed[pl.id]||0));b.onclick=()=>{viewPlayer=pl.id;render();};$("tabs").append(b);}
 const pl=shown.players[viewPlayer];$("farmName").textContent=(viewPlayer+1)+"Pの農場（家族"+pl.family+"人）";$("farm").replaceChildren();
