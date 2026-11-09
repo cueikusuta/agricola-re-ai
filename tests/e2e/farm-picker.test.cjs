@@ -97,6 +97,23 @@ test("Issue #240: farm cells feed existing detail inputs without bypassing /api/
     }finally{await page.close();}
   });
 
+  await t.test("closing a farm picker cannot leave stale handlers in free-action dialogs",async()=>{
+    const page=await setup(browser);
+    const errors=[];
+    page.on("pageerror",e=>errors.push(e.message));
+    try{
+      await open(page,"farmland");
+      await page.locator("#farmPicker button[data-cell='2']").click();
+      await page.locator("#cancel").click();
+      await page.locator("#free").click();
+      await page.locator("#freeKind").selectOption("DiscardGood");
+      await page.locator("#good").selectOption("food");
+      await page.locator("#quantity").fill("2");
+      await page.locator("#cancel").click();
+      assert.deepEqual(errors,[],"stale farm-input listeners must not access missing controls");
+    }finally{await page.close();}
+  });
+
   await t.test("animal picker refuses non-pasture cell without committing",async()=>{
     const page=await setup(browser,true);
     try{
