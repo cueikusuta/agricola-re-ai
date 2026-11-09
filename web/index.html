@@ -317,7 +317,7 @@ function attachFarmPicker(space){
   if(purpose==="plow"&&space==="cultivation"&&$("plow").value.trim()!=="")selected.add(Number($("plow").value));
   if(["rooms","stables","animalStable"].includes(purpose)){
    const id=purpose==="animalStable"?"animalStables":purpose;
-   for(const item of parts(id))if(/^\\d+$/.test(item))selected.add(Number(item));
+   for(const item of parts(id))if(/^[0-9]+$/.test(item))selected.add(Number(item));
   }
   if(["grain","vegetable"].includes(purpose)){
    for(const item of parts("plants")){
