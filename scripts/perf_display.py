@@ -6,7 +6,7 @@ import sys
 with open(sys.argv[1]) as f:
     d = json.load(f)
 
-print(f"Harness: {d['harness']} v{d['harness_version']} (alloc_instrumented={d.get('alloc_instrumented')})")
+print(f"Harness: {d['harness']} v{d['harness_version']} (alloc_instrumented={d.get('alloc_instrumented')}, alloc_only={d.get('alloc_only')})")
 print(f"Engine: {d['engine_version']}  Rules: {d['rules_version']}  Log: {d['log_version']}")
 print(f"Seed: {d['seed']}  Quick: {d['quick_mode']}")
 env = d["environment"]
@@ -37,3 +37,6 @@ if d["ten_second_searches"]:
             f"  {s['name']:24s} {s['policy']:4s}  completed={s['simulations_completed']:6d}  "
             f"sims/s={s['completed_per_sec']:8.1f}  fallback={s['used_fallback']}"
         )
+    print()
+    print("NOTE: Early/late sims/s differ due to remaining game length, not engine speed.")
+    print("      Compare only same phase (early/early, mid/mid, late/late) under identical conditions.")

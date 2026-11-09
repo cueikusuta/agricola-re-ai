@@ -233,10 +233,17 @@ fn first_legal_action(game: &Game, use_cards: bool) -> agricola_re_ai::engine::A
 /// comparisons see identical inputs (review P2: mid/late phases, not just
 /// the opening). Uses the guaranteed-legal detail policies, so every move
 /// is legal or the harness fails.
-fn advance_to_round(game: &Game, target_round: u8) -> Game {
+///
+/// Returns the advanced game and a replay record containing the seed, method,
+/// number of moves applied, and the final state_hash for identity verification.
+fn advance_to_round(game: &Game, target_round: u8) -> (Game, Value) {
     let mut g = game.clone();
     if g.public.finished {
-        return g;
+        let state_hash = g.state_hash();
+        return (
+            g,
+            json!({"seed": 0x23E0_5EED_000A_0004u64, "method": "RandomPolicy", "moves": 0, "state_hash": state_hash}),
+        );
     }
     let mut rng = ChaCha8Rng::seed_from_u64(0x23E0_5EED_000A_0004);
     let space_policy = RandomPolicy;
@@ -265,7 +272,16 @@ fn advance_to_round(game: &Game, target_round: u8) -> Game {
         g.apply(action).expect("advance loop apply");
         moves += 1;
     }
-    g
+    let state_hash = g.state_hash();
+    (
+        g,
+        json!({
+            "seed": 0x23E0_5EED_000A_0004u64,
+            "method": "RandomPolicy",
+            "moves": moves,
+            "state_hash": state_hash,
+        }),
+    )
 }
 
 /// Per-operation microbenchmarks for one fixed position.
@@ -275,7 +291,7 @@ fn advance_to_round(game: &Game, target_round: u8) -> Game {
 /// must apply, sample must return a game — a failing operation fails the
 /// whole harness instead of being silently faster (review P1: failure must
 /// not look like a speedup).
-fn scenario_metrics(name: &str, game: &Game, use_cards: bool) -> Value {
+fn scenario_metrics(name: &str, game: &Game, use_cards: bool, advance_info: Value) -> Value {
     let repeats = REPEATS_PER_BATCH;
     let sample_repeats = SAMPLE_REPEATS_PER_BATCH;
     let players = game.config.players;
@@ -423,6 +439,7 @@ fn scenario_metrics(name: &str, game: &Game, use_cards: bool) -> Value {
         "uses_cards": use_cards,
         "card_definitions": game.card_set.definitions.len(),
         "legal_spaces": game.legal_spaces().len(),
+        "position_identity": advance_info,
         "clone": stats_json(&clone_stats),
         "clone_allocations": clone_allocs,
         "clone_allocated_bytes": clone_bytes,
@@ -571,7 +588,9 @@ fn cardless_config(players: usize, additional: bool) -> Config {
 }
 
 fn main() {
-    let quick = std::env::args().any(|arg| arg == "--quick");
+    let args: Vec<String> = std::env::args().collect();
+    let quick = args.iter().any(|a| a == "--quick");
+    let alloc_only = args.iter().any(|a| a == "--alloc-only");
 
     // Fixed scenarios: cardless 2/3/4p × additional space OFF/ON, plus the
     // implemented two-player card pool OFF/ON (review P2: the full feasible
@@ -599,7 +618,7 @@ fn main() {
     };
 
     // Phase positions: early/mid/late per condition (review P2).
-    let mut scenario_entries: Vec<(String, Game, bool)> = Vec::new();
+    let mut scenario_entries: Vec<(String, Game, bool, Value)> = Vec::new();
     for (name, game, use_cards) in [
         ("cardless_2p_off", &cardless_2p_off, false),
         ("cardless_2p_on", &cardless_2p_on, false),
@@ -611,24 +630,35 @@ fn main() {
         ("cards_2p_on", &cards_2p_on, true),
     ] {
         let early = game.clone();
-        let mid = advance_to_round(game, 8);
-        let late = advance_to_round(game, 14);
-        for (suffix, phase_game) in [("_early", early), ("_mid", mid), ("_late", late)] {
+        let (mid, mid_advance) = advance_to_round(game, 8);
+        let (late, late_advance) = advance_to_round(game, 14);
+        for (suffix, phase_game, advance_info) in [
+            (
+                "_early",
+                early,
+                json!({"seed": 0x23E0_0000_0000_0BA5u64, "method": "initial", "moves": 0, "state_hash": game.state_hash()}),
+            ),
+            ("_mid", mid, mid_advance),
+            ("_late", late, late_advance),
+        ] {
             let uses = use_cards && phase_game.card_set.enabled();
-            scenario_entries.push((format!("{name}{suffix}"), phase_game, uses));
+            scenario_entries.push((format!("{name}{suffix}"), phase_game, uses, advance_info));
         }
     }
 
     let scenarios: Vec<Value> = scenario_entries
         .iter()
-        .map(|(name, game, use_cards)| scenario_metrics(name, game, *use_cards))
+        .map(|(name, game, use_cards, advance_info)| {
+            scenario_metrics(name, game, *use_cards, advance_info.clone())
+        })
         .collect();
 
     // Fixed-cap searches: 3 repetitions each for stability (review P2). The
     // completed count stays deterministic per repetition index.
-    let fixed_searches = {
+    // Skipped in --alloc-only mode since these are timing measurements.
+    let fixed_searches = if !alloc_only {
         let mut out = Vec::new();
-        for (name, game, _) in &scenario_entries {
+        for (name, game, _, _) in &scenario_entries {
             for rep in 0..3 {
                 for puct in [false, true] {
                     out.push(fixed_sim_search(
@@ -641,12 +671,14 @@ fn main() {
             }
         }
         out
+    } else {
+        Vec::new()
     };
 
     let ten_second = {
-        if !quick {
+        if !quick && !alloc_only {
             let mut out = Vec::new();
-            for (name, game, _) in &scenario_entries {
+            for (name, game, _, _) in &scenario_entries {
                 out.push(budgeted_search(name, game, false, 10_000));
                 out.push(budgeted_search(name, game, true, 10_000));
             }
@@ -665,6 +697,7 @@ fn main() {
         "log_version": agricola_re_ai::model::LOG_VERSION,
         "seed": 0x23E0_0000_0000_0BA5u64,
         "quick_mode": quick,
+        "alloc_only": alloc_only,
         "alloc_instrumented": INSTRUMENTED,
         "environment": environment(),
         "scenarios": scenarios,

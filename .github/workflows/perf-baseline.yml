@@ -63,9 +63,9 @@ jobs:
         run: |
           cargo build --release --bin perf_baseline --features perf-count-alloc
           if [ "$QUICK" = "true" ]; then
-            ./target/release/perf_baseline --quick > baseline_alloc.json
+            ./target/release/perf_baseline --quick --alloc-only > baseline_alloc.json
           else
-            ./target/release/perf_baseline > baseline_alloc.json
+            ./target/release/perf_baseline --alloc-only > baseline_alloc.json
           fi
 
       - name: Merge timing and allocation reports
