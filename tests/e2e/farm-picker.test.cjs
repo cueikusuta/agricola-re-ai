@@ -65,8 +65,11 @@ test("Issue #240: farm cells feed existing detail inputs without bypassing /api/
       await page.locator("#farmPicker button[data-cell='1']").click();
       assert.equal(await page.locator("#rooms").inputValue(),"1");
       await page.locator("#farmPicker .pickerModes button").getByText("厩").click();
-      await page.locator("#farmPicker button[data-cell='2']").click();
+      await page.locator("#farmPicker button[data-cell='2']").focus();
+      await page.keyboard.press("Enter");
       assert.equal(await page.locator("#stables").inputValue(),"2");
+      assert.equal(await page.locator("#farmPicker button[data-cell='2']").evaluate(e => document.activeElement===e),true,
+        "redrawing the interactive farm grid must restore keyboard focus");
       assert.match(await page.locator("#pickerPreview").innerText(),/未確定/);
       await page.locator("#cancel").click();
       await findUnlockedSpace(page,"grain_utilization");
