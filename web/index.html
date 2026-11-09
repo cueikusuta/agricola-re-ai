@@ -48,7 +48,37 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 .farmPicker .pickerWarning{font-size:12px;color:#f0d7a1}
 
 
-@media(max-width:700px){.screen{padding:8px}.panel{padding:9px}.cell{min-height:45px;font-size:14px}}
+
+:focus-visible{outline:3px solid #ffdf97;outline-offset:2px}
+.panel,.boardPane,.stats{min-width:0}
+#hand,#improvements,#history,.cardEntry,.cardTile{overflow-wrap:anywhere}
+#cardBrowser{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:8px;margin-top:10px}
+.cardTile{border:1px solid #567078;border-radius:8px;padding:8px;background:#263942;min-width:0}
+.cardTile summary{cursor:pointer;font-weight:650;line-height:1.45;list-style-position:inside}
+.cardTile[open]{border-color:#a3d4c5}
+.cardTileBody{font-size:13px;line-height:1.55;padding:9px 3px 1px;color:#e5eceb}
+@media(max-width:700px){
+ .screen{width:100%;max-width:100%;padding:8px;gap:8px}
+ .panel{padding:9px;min-width:0}
+ header{gap:5px;align-items:flex-start}header h1{font-size:18px}
+ .settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .settings label,.settings details{min-width:0;max-width:100%;overflow-wrap:anywhere}
+ .settings select,.settings input,.settings textarea{max-width:100%;min-width:0}
+ .boardArea{display:grid;grid-template-columns:minmax(0,1fr)}
+ .boardPane,.stats{width:100%;min-width:0}
+ .field{grid-template-columns:repeat(5,minmax(0,1fr));max-width:100%;gap:3px}
+ .cell{min-height:48px;font-size:12px;padding:5px 1px}
+ #actions.actionBoard{grid-template-columns:minmax(0,1fr)}
+ .actionTiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .statGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #cardBrowser{grid-template-columns:minmax(0,1fr)}
+ dialog{width:calc(100vw - 14px);max-height:93vh;max-height:93dvh;padding:10px}
+ #editorFooter{bottom:-10px;padding-bottom:6px;flex-wrap:nowrap}
+ #editorFooter button{flex:1;min-width:0}
+ .pickerCells button.cell{min-height:46px;font-size:12px}
+ .buttons button,.tabs button{min-height:44px}
+}
+
 </style></head>
 <body><div class="screen">
 <header><h1>アグリコラ <span class="minor">Revised / 手動対戦</span></h1><span class="minor">ローカル専用</span></header>
@@ -85,7 +115,7 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <div id="draftStatus"></div><div id="draftOffered" class="chips"></div><div id="draftActions" class="buttons"></div><div id="draftLog" class="minor"></div>
 </section>
 <section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
-<div class="stats"><h2>資源・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p><p id="hand" class="minor"></p><details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details><p id="history"></p></div></div></section>
+<div class="stats"><h2>資源・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p><p id="hand" class="minor"></p><div id="cardBrowser" aria-label="自分の手札と公開された使用済みカード"></div><details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details><p id="history"></p></div></div></section>
 <section class="panel" id="actionPanel"><h2 id="actionTitle">アクションの詳細を手動指定</h2><p id="boardSummary" aria-live="polite"></p><div id="notice"></div><div class="actions actionBoard" id="actions" aria-label="使用可能なアクションボード"></div><div class="buttons" id="actionNav"></div><div id="usedActions" aria-label="今ラウンドの使用済みスペース"></div></section>
 <section class="panel"><h2>任意の操作</h2><button id="free">食料変換・動物の配置換え・廃棄</button><p class="minor">ワーカーを使わない操作。エンジンが合法性を判定します。</p></section>
 <footer>1Pが人間、残りはCPU。畑は左上から0〜14番です。種まきは1畑につき種1個を使います。無効な指定は適用されず、内容を直して再送信できます。</footer>
@@ -129,6 +159,20 @@ function renderCardHelp(player){
  const ids=[...(viewPlayer===0?state.hand:[]),...(player.played_cards||[])];
  $("cardHelp").hidden=ids.length===0;
  for(const id of ids){const item=document.createElement("p");item.className="cardEntry";item.textContent=cardLabel(id)+" — "+cardSummary(id);container.append(item);}
+}
+// #241: Native details/summary makes cards expandable without leaking other hands.
+function renderCardBrowser(player){
+ const host=$("cardBrowser");host.replaceChildren();
+ const own=viewPlayer===0?state.hand:[],played=player.played_cards||[];
+ function section(title,ids){
+  for(const id of ids){
+   const detail=document.createElement("details");detail.className="cardTile";
+   const summary=document.createElement("summary");summary.textContent=title+"："+cardLabel(id);
+   const body=document.createElement("div");body.className="cardTileBody";body.textContent=cardSummary(id);
+   detail.append(summary,body);host.append(detail);
+  }
+ }
+ section("手札",own);section("公開された使用済みカード",played);
 }
 const feeds={stored_food:"所持食料",joinery:"製材所",pottery:"製陶所",basketry:"かご製作所",vegetables:"野菜",grain:"麦",sheep:"羊",boar:"猪",cattle:"牛"};
 let state=null,viewPlayer=0,busy=false,actionPage=0,mode=null,selectedSpace=null,feedOrder=Object.keys(feeds);
@@ -192,14 +236,14 @@ $("turn").textContent=p.finished?"対戦終了":harvest?"収穫の詳細を決�
 $("summary").textContent=p.players.length+"人戦 / 追加タイル "+(p.additional_action_space_enabled?"ON":"OFF")+" / "+(state.card_enabled?"カードあり":"カードなし");
 renderTurnBar();
 $("tabs").replaceChildren();
-for(const pl of shown.players){const b=document.createElement("button");b.className=viewPlayer===pl.id?"active":"";b.textContent=(pl.id+1)+"P "+scores.scores[pl.id].total+"点 残"+Math.max(0,(state.public.work_quota[pl.id]||0)-(state.public.workers_placed[pl.id]||0));b.onclick=()=>{viewPlayer=pl.id;render();};$("tabs").append(b);}
+for(const pl of shown.players){const b=document.createElement("button");b.type="button";b.className=viewPlayer===pl.id?"active":"";b.setAttribute("aria-pressed",String(viewPlayer===pl.id));b.textContent=(pl.id+1)+"P "+scores.scores[pl.id].total+"点 残"+Math.max(0,(state.public.work_quota[pl.id]||0)-(state.public.workers_placed[pl.id]||0));b.onclick=()=>{viewPlayer=pl.id;render();};$("tabs").append(b);}
 const pl=shown.players[viewPlayer];$("farmName").textContent=(viewPlayer+1)+"Pの農場（家族"+pl.family+"人）";$("farm").replaceChildren();
 for(let i=0;i<pl.farm.length;i++){const cell=pl.farm[i],[label,cls]=tileName(cell),d=document.createElement("div");d.className="cell "+cls;d.textContent=i+" "+label+(cell.stable?" ▣":"");$("farm").append(d);}
 $("stats").replaceChildren();for(const [good,label] of Object.entries(goods))putStats(label,pl.supply[good]);
 putStats("部屋",pl.farm.filter(c=>c.tile==="Room").length);putStats("柵",pl.fences.length);
 $("improvements").textContent="主要改善: "+(pl.improvements.map(x=>improvements[x]||x).join(" / ")||"なし")+" / 職業・小改善: "+(pl.played_cards||[]).map(cardLabel).join(" / ");
 $("hand").textContent=viewPlayer===0?"手札: "+(state.hand.map(cardLabel).join(" / ")||"なし"):"手札: 非公開";
-renderCardHelp(pl);$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
+renderCardHelp(pl);renderCardBrowser(pl);$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
 $("actions").replaceChildren();$("actionNav").replaceChildren();$("usedActions").replaceChildren();$("boardSummary").textContent="";$("free").disabled=busy||!!harvest||p.finished;
 if(p.finished){$("notice").textContent="最終順位: "+scores.rank.map((r,i)=>(i+1)+"P "+r+"位").join("、");return;}
 if(harvest){$("notice").textContent=harvest.phase==="feeding"?"収穫：給餌順と工房加工を選択":"収穫：繁殖する子の置き場所を選択";const b=document.createElement("button");b.textContent="収穫の詳細を指定";b.onclick=()=>openHarvest();$("actions").append(b);return;}
@@ -267,7 +311,9 @@ case "lessons":case "extra_lessons":return {"PlayOccupation":{card_id:val("occup
 case "meeting_place":case "family_growth_with_room":case "modest_family_growth":return val("minor")?space==="meeting_place"?{"PlayMinor":{card_id:val("minor")}}:{"GrowWithMinor":{card_id:val("minor")}}:"None";
 default:return "None";
 }}
-function openEditor(title,hint,what,space){mode=what;selectedSpace=space;$("fields").replaceChildren();$("editorTitle").textContent=title;$("editorHint").textContent=hint;$("editor").showModal();const first=$("fields").querySelector("input:not([disabled]),select:not([disabled]),textarea:not([disabled])");if(first)first.focus();}
+let editorRestoreFocus=null;
+function openEditor(title,hint,what,space){editorRestoreFocus=document.activeElement;mode=what;selectedSpace=space;$("fields").replaceChildren();$("editorTitle").textContent=title;$("editorHint").textContent=hint;$("editor").showModal();const first=$("fields").querySelector("input:not([disabled]),select:not([disabled]),textarea:not([disabled])");if(first)first.focus();}
+$("editor").addEventListener("close",()=>{const target=editorRestoreFocus&&editorRestoreFocus.isConnected?editorRestoreFocus:$("actions").querySelector("button:not([disabled])")||$("free");if(target&&!target.disabled)target.focus();editorRestoreFocus=null;});
 function appendHint(space,hints){
 const parts=[];if(!(state.legal||[]).includes(space))parts.push("このスペースは現在のAI候補に含まれません。合法な詳細を入力すれば実行できます。");
 if(hints.plow_cells&&hints.plow_cells.length)parts.push("耕せるマス: "+hints.plow_cells.join(","));
