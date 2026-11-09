@@ -85,6 +85,18 @@ test("Issue #246: BGA-reference tabletop composition works in Chromium",async t=
     await page.locator("#editor").waitFor({state:"visible"});
     await page.locator("#cancel").click();
     await page.locator("#editor").waitFor({state:"hidden"});
+    if(viewport.width===1280){
+      await page.locator('#actions button[data-space="forest"]').click();
+      await page.locator("#confirm").click();
+      await page.locator("#editor").waitFor({state:"hidden"});
+      assert.match(await page.locator("#actionFeedback").innerText(),/操作完了/,
+        "successful actual action must give visible feedback");
+      await page.locator("#aiBudget").selectOption("16");
+      const posted=page.waitForRequest(req=>req.url().endsWith("/api/new")&&req.method()==="POST");
+      await page.locator("#new").click();
+      assert.equal((await posted).postDataJSON().budget,16,
+        "the configured MCTS simulation budget must reach the Rust web API");
+    }
    }finally{await page.close();}
   });
  }
