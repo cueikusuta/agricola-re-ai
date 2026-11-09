@@ -12,7 +12,7 @@ SHA-256・実行条件・コードSHA・Run IDを `run-manifest.json` に記録�
 | [#42398823247](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42398823247) | 探索的 | 2人カードなし / PUCT vs MCTS, 共通相手greedy / time-budgeted 200ms | `1658c059b9d10ef9d3c9b2d49898615d0ad89493` | 2026-11-14 |
 | [#42406723531](https://github.com/cueikusuta/agricola-re-ai/actions/runs/42406723531) | 探索的 | 4人カードなし / PUCT vs MCTS, 共通相手greedy / simulation-capped 32sim | `1658c059b9d10ef9d3c9b2d49898615d0ad89493` | 2026-11-14 |
 
-- 保存先: 本リポジトリ `raw-artifacts/*.zip`（21個、合計 約1.0MB）。GitHub リポジトリ自体が恒久保管先であり、
+- 保存先: 本リポジトリ `raw-artifacts/*.zip`（21個、合計 約0.9MB／855,473バイト）。GitHub リポジトリ自体が恒久保管先であり、
   容量・権限の特別な制約は確認されなかった。生成物の作業コピーは `artifacts/`（gitignored）にもある。
 - チェックサム: `raw-artifacts/SHA256SUMS.txt`（Artifact ZIP単位、GitHub REST API `/actions/artifacts/{id}/zip` から取得）。
 - 取得日時: 2026-11-09（全Artifact `expired=false` をAPIで確認済み）。
@@ -26,7 +26,9 @@ AI観測から排除する内部seedの話（AGENTS.md規則7）とは別物で�
 
 ## 3. 独立再集約（元レポートの再転記ではない）
 
-方法: 生JSONL（21個のZIPから展開）を、`scripts/paired_eval_stats.py` に固定条件を渡して再集約した。
+方法: **16個のshard ZIP**（正式8＋旧2件各4）から展開した生JSONLを、`scripts/paired_eval_stats.py`
+に固定条件を渡して再集約した。`paired-eval-pr-smoke` ZIP（2個）のdemo JSONLとreport ZIPは
+再集約には使わない（スモーク用成果物のため）。
 
 - 正式Run #42515071537: `--players 4 --seed-start 965000 --blocks 250 --candidate puct --baseline mcts --opponent mcts`
 - #42398823247: `--players 2 --seed-start 900000 --blocks 500 --candidate puct --baseline mcts --opponent greedy --search-mode time-budgeted`
@@ -46,10 +48,10 @@ AI観測から排除する内部seedの話（AGENTS.md規則7）とは別物で�
 - 探索的2件も数値は完全一致。差分は `comparison_design` と `saturation` の2フィールドのみで、
   これは両Runの後（#106, `700353d`）にレポートスキーマへ追加された項目であり、集計結果の不一致ではない。
 - 完全性検査: 全行 `finished=true` かつ `replay_verified=true`、seed範囲 965000–965249、
-  (arm, block) の組500種が丁度1回ずつ、重複IDなし。
-- 使用スクリプトのSHA対応: 再集約に使用した `scripts/paired_eval_stats.py` と正式Run時点
-  （`a0cd530`）の版の差分は `POLICY_CHOICES` の未使用variant削除のみで、集計・bootstrap・
-  整合性検査ロジックは同一であることを `git diff` で確認した（bootstrapはseed 20261106で決定的）。
+  `(arm, block, seat)` の組2000種が丁度1回ずつ（`(arm, block)` 500種×4席）。
+- 使用スクリプトのSHA対応: 再集約に使用した `scripts/paired_eval_stats.py` は正式Run時点
+  （`a0cd530`）の版と**全く同一**（`git diff a0cd530 <branch> -- scripts/paired_eval_stats.py`
+  は空）であることを確認した。bootstrapはseed 20261106で決定的。
 
 ## 4. ラベル付け（誤用防止）
 

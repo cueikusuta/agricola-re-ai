@@ -8,7 +8,7 @@
     "note": "Extracted layout mirrors gh run download: <run_id>/<artifact_name>/..."
   },
   "privacy_audit": "matches.jsonl contains per-game aggregate records only (timings, credits, ranks, config flags, game seed, replay hash). No hands, deck contents, or hidden information are recorded. Seeds are the published fixed evaluation seeds required for replay verification.",
-  "stats_script_note": "Re-aggregation used scripts/paired_eval_stats.py from working tree of this branch. Verified: diff(a0cd530, branch) for that file touches only POLICY_CHOICES enum (removal of unused eval_* variants); aggregation/bootstrap logic is unchanged.",
+  "stats_script_note": "Re-aggregation used scripts/paired_eval_stats.py, which is byte-identical to the a0cd530 version used by the formal run (git diff a0cd530 -- scripts/paired_eval_stats.py is empty). Bootstrap is deterministic (seed 20261106).",
   "verification": {
     "bootstrap_iterations": 10000,
     "bootstrap_seed": 20261106,
