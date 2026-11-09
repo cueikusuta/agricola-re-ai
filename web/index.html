@@ -198,6 +198,23 @@ footer{color:#705e41;font-size:12px}
  .cardTile{min-height:105px}
 }
 
+
+/* #246 visual review fixes: compact printed spaces and keep the draft form inside phone width. */
+#actions.actionBoard{align-items:start;grid-auto-rows:min-content}
+#actions .actionGroup{align-self:start}
+#actions .actionTiles{align-content:start;grid-auto-rows:min-content}
+#actions .actionTile{height:91px;min-height:91px;max-height:91px}
+#actions .occupiedTitle{font-family:Georgia,"Noto Sans CJK JP",serif;font-size:14px;line-height:1.35;color:#4d4638;z-index:1;position:relative;padding:10px 6px 0}
+#draftPanel .buttons label{min-width:0;max-width:100%;display:inline-flex;align-items:center;flex-wrap:wrap;gap:5px}
+#draftPanel .buttons select{min-width:0;max-width:100%;width:auto}
+#draftPool{width:min(100%,290px)!important}
+@media(max-width:760px){
+ #actions .actionTile{height:84px;min-height:84px;max-height:84px}
+ #draftPanel .buttons label{width:100%}
+ #draftPanel .buttons select{flex:1 1 160px;min-width:0}
+ #draftPool{width:min(100%,270px)!important}
+}
+
 </style></head>
 <body><div class="screen">
 <header class="tableHeader">
