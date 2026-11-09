@@ -305,11 +305,20 @@ footer{color:#705e41;font-size:12px}
 .operationsPanel .recentActions #history{width:100%;min-width:0;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.45}
 #actions .actionTile.helpDismissed .tileTooltip{display:none!important}
 
+
+/* Frequently used actions remain reachable even when full setup controls are below the game. */
+.quickActions{display:flex;align-items:center;gap:5px}
+.quickActions button{display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:5px 9px;background:#705335;border:1px solid #baa071;border-radius:6px;color:#fff0cf;font-size:12px;font-weight:750;white-space:nowrap}
+.quickActions button:hover{background:#987446}
+.quickActions #quickNew{background:#44633b;border-color:#91b17c}
+.quickActions #quickNew:hover{background:#547c4b}
+@media(max-width:760px){.tableHeader{gap:6px}.quickActions{margin-left:auto}.quickActions button{min-height:34px;padding:5px 8px}}
+
 </style></head>
 <body><div class="screen">
 <header class="tableHeader">
   <div class="brandLockup"><span class="brandLeaf" aria-hidden="true">✦</span><div><h1>アグリコラ <span class="brandEn">AGRICOLA</span></h1><span class="brandSub">REVISED · 人間 vs AI</span></div></div>
-  <nav class="topNav" aria-label="画面内の移動"><a href="#actionPanel" title="アクション盤へ"><span aria-hidden="true">🎯</span> 盤面</a><a href="#playerFarmPanel" title="自分と相手の農場へ"><span aria-hidden="true">🏡</span> 農場</a><a href="#cardsPanel" title="カード一覧へ"><span aria-hidden="true">🃏</span> カード</a><a href="#gameSettings" title="対戦設定へ"><span aria-hidden="true">⚙️</span> 設定</a></nav>
+  <nav class="topNav" aria-label="画面内の移動"><a href="#actionPanel" title="アクション盤へ"><span aria-hidden="true">🎯</span> 盤面</a><a href="#playerFarmPanel" title="自分と相手の農場へ"><span aria-hidden="true">🏡</span> 農場</a><a href="#cardsPanel" title="カード一覧へ"><span aria-hidden="true">🃏</span> カード</a><a href="#gameSettings" title="対戦設定へ"><span aria-hidden="true">⚙️</span> 設定</a></nav><div class="quickActions"><button id="quickSave" type="button" title="現在の対戦を保存" aria-label="対戦を保存">💾 <span>保存</span></button><button id="quickNew" type="button" title="設定中の条件で新しい対戦を開始" aria-label="新しい対戦">▶ <span>新規</span></button></div>
 </header>
 <section class="panel tableHud" id="turnBar" aria-live="polite">
 <div class="turnInfo"><span id="turnWorkers" class="workerBadge"></span><span id="turnActions" class="minor"></span><span id="turnView" class="minor"></span></div>
@@ -435,6 +444,12 @@ function renderCardBrowser(player){
 const feeds={stored_food:"所持食料",joinery:"製材所",pottery:"製陶所",basketry:"かご製作所",vegetables:"野菜",grain:"麦",sheep:"羊",boar:"猪",cattle:"牛"};
 let state=null,viewPlayer=0,busy=false,actionPage=0,mode=null,selectedSpace=null,feedOrder=Object.keys(feeds);
 const $=id=>document.getElementById(id);
+$("quickSave").onclick=()=>$("saveGame").click();
+$("quickNew").onclick=()=>{
+ const started=state&&state.public&&!state.public.finished&&(state.public.round>1||(state.public.workers_placed||[]).some(x=>x>0));
+ if(started&&!window.confirm("現在の対戦を終了して、新しい対戦を始めますか？"))return;
+ $("new").click();
+};
 const val=id=>$(id).value;
 const num=id=>Number(val(id));
 const checked=id=>$(id).checked;
