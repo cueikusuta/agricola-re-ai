@@ -510,6 +510,7 @@ footer{font-size:10px;padding:0 4px}
 <label>人数 <select id="players"><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option></select></label>
 <label><input id="extra" type="checkbox">追加アクション</label>
 <label>対戦AI <select id="ai"><option value="eval">評価関数</option><option value="mcts">MCTS</option></select></label>
+<label title="現行Rust Web APIのCPU MCTSシミュレーション回数（1〜256）です。秒数の上限ではありません。">MCTS探索回数 <select id="aiBudget"><option value="8">8（標準）</option><option value="16">16</option><option value="32">32</option><option value="64">64</option><option value="128">128</option><option value="256">256</option></select></label>
 <label>乱数シード <input id="seed" type="number" value="42" min="0" step="1"></label>
 <button id="new">新しい対戦</button>
 <button id="saveGame" title="現在の対戦をファイルに保存します">対戦を保存</button>
@@ -1122,7 +1123,7 @@ $("cancel").onclick=()=>$("editor").close();
 $("free").onclick=openFree;
 $("new").onclick=async()=>{viewPlayer=0;let card_set;const cards=val("cards");
 try{if(cards==="json"){card_set=JSON.parse($("cardJson").value);}}catch(e){$("notice").textContent="カード定義JSONが不正です: "+e.message;return;}
-await request("/api/new",{players:Number($("players").value),extra:$("extra").checked,ai:$("ai").value,seed:Number($("seed").value),budget:8,...(cards==="verified"?{preset:"verified"}:cards==="json"?{card_set}: {})});};
+await request("/api/new",{players:Number($("players").value),extra:$("extra").checked,ai:$("ai").value,seed:Number($("seed").value),budget:Number(val("aiBudget")),...(cards==="verified"?{preset:"verified"}:cards==="json"?{card_set}: {})});};
 // Issue #92: a real save file the player owns. The server returns the full
 // state (including hidden information), so the download is explicit and the
 // warning stays visible next to the controls.
@@ -1202,7 +1203,7 @@ if(d.complete){
     const done=document.createElement("p");done.className="minor";done.textContent="このドラフトの手札でゲームを開始済みです。盤面で操作してください。";offered.append(done);
   }else{
     const start=document.createElement("button");start.id="draftStartGame";start.className="primary";start.textContent="この手札でゲーム開始";
-    start.onclick=async()=>{await request("/api/draft/start-game",{seed:Number(val("seed")),extra:checked("extra"),ai:val("ai"),budget:8});};
+    start.onclick=async()=>{await request("/api/draft/start-game",{seed:Number(val("seed")),extra:checked("extra"),ai:val("ai"),budget:Number(val("aiBudget"))});};
     actions.append(start);
   }
   renderDraftHistory(log,d.history||[],"ドラフト完了");
