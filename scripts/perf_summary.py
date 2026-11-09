@@ -8,7 +8,11 @@ with open(sys.argv[1]) as f:
     d = json.load(f)
 
 sha = os.environ.get("GITHUB_SHA", "unknown")[:12]
-summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+
+if not summary_path:
+    print("GITHUB_STEP_SUMMARY not set; skipping summary write (local run).", file=sys.stderr)
+    sys.exit(0)
 
 with open(summary_path, "a") as out:
     out.write("# Performance Baseline (Step 0, #237)\n")

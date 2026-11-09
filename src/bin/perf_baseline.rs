@@ -70,8 +70,9 @@ fn timed_us(repeats: usize, mut run: impl FnMut()) -> f64 {
 }
 
 /// `(allocations, allocated_bytes)` charged to one call, averaged, uninstrumented
-/// for behaviour: the counting allocator only observes.
+/// for behaviour: the counting allocator only observes. One warmup call first.
 fn allocations(repeats: usize, mut run: impl FnMut()) -> (f64, f64) {
+    run(); // warmup
     let before_calls = ALLOCATIONS.load(Ordering::Relaxed);
     let before_bytes = ALLOCATED_BYTES.load(Ordering::Relaxed);
     for _ in 0..repeats {
@@ -90,6 +91,9 @@ fn first_slash_field(file: &str, key: &str) -> Option<String> {
         .map(|line| line[key.len()..].trim().to_string())
 }
 
+/// Reads `/proc/cpuinfo` and `/proc/self/status` on Linux.
+/// On non-Linux platforms (Windows, macOS) these fields will be `null`.
+/// CI runs on ubuntu-24.04 so the data is available there.
 fn environment() -> Value {
     json!({
         "cpu_model": first_slash_field("/proc/cpuinfo", "model name"),
@@ -159,25 +163,35 @@ fn scenario_metrics(name: &str, game: &Game, use_cards: bool) -> Value {
     // Apply on the search path: `record_events = false`, the state every MCTS
     // simulation actually mutates. The outer clone is not timed; the clone
     // inside `apply_with_plans` is a real cost of `apply` and stays inside.
-    let mut apply_search_us = 0.0f64;
-    for _ in 0..repeats {
-        let mut copy = game.clone();
-        copy.record_events = false;
-        let start = Instant::now();
-        copy.apply(action.clone()).expect("legal search apply");
-        apply_search_us += start.elapsed().as_secs_f64() * 1_000_000.0;
+    // Pre-clone all copies, warmup once, then batch-time to avoid per-iteration
+    // `Instant::now()` overhead contaminating the ~2-3 µs measurement.
+    let mut search_copies: Vec<Game> = (0..repeats).map(|_| game.clone()).collect();
+    // Warmup
+    {
+        let mut w = game.clone();
+        w.record_events = false;
+        let _ = w.apply(action.clone());
     }
-    apply_search_us /= repeats as f64;
+    let start = Instant::now();
+    for copy in &mut search_copies {
+        copy.record_events = false;
+        let _ = copy.apply(action.clone());
+    }
+    let apply_search_us = start.elapsed().as_secs_f64() * 1_000_000.0 / repeats as f64;
+
     // Apply on the committed path: full event logging plus before/after state
     // hashing, i.e. what a recorded human or AI move pays.
-    let mut apply_committed_us = 0.0f64;
-    for _ in 0..repeats {
-        let mut copy = game.clone();
-        let start = Instant::now();
-        copy.apply(action.clone()).expect("legal committed apply");
-        apply_committed_us += start.elapsed().as_secs_f64() * 1_000_000.0;
+    let mut committed_copies: Vec<Game> = (0..repeats).map(|_| game.clone()).collect();
+    // Warmup
+    {
+        let mut w = game.clone();
+        let _ = w.apply(action.clone());
     }
-    apply_committed_us /= repeats as f64;
+    let start = Instant::now();
+    for copy in &mut committed_copies {
+        let _ = copy.apply(action.clone());
+    }
+    let apply_committed_us = start.elapsed().as_secs_f64() * 1_000_000.0 / repeats as f64;
 
     let save_json_bytes = game.save_json().expect("serializable game").len();
 
@@ -185,6 +199,9 @@ fn scenario_metrics(name: &str, game: &Game, use_cards: bool) -> Value {
     let sample_game_us = timed_us(sample_repeats, || {
         let _ = mcts::sample_game(&obs, &mut sample_rng);
     });
+    // Reset RNG to the same seed so allocation measurement uses the exact same
+    // game sequences as the timing measurement.
+    let mut sample_rng = ChaCha8Rng::seed_from_u64(0x23E0_BA5E_0000_0001);
     let (sample_game_allocs, sample_game_bytes) = allocations(sample_repeats, || {
         let _ = mcts::sample_game(&obs, &mut sample_rng);
     });
@@ -270,13 +287,23 @@ fn fixed_sim_search(name: &str, game: &Game, puct: bool, simulations: usize) -> 
     .expect("search decision");
     let elapsed = started.elapsed();
     let elapsed_s = elapsed.as_secs_f64();
+    let completed_per_sec = if elapsed_s > 0.0 {
+        outcome.simulations_completed as f64 / elapsed_s
+    } else {
+        0.0
+    };
+    let attempted_per_sec = if elapsed_s > 0.0 {
+        simulations as f64 / elapsed_s
+    } else {
+        0.0
+    };
     json!({
         "name": name,
         "policy": if puct { "puct" } else { "mcts" },
         "simulations_attempted": simulations,
         "simulations_completed": outcome.simulations_completed,
-        "attempted_per_sec": simulations as f64 / elapsed_s,
-        "completed_per_sec": outcome.simulations_completed as f64 / elapsed_s,
+        "attempted_per_sec": attempted_per_sec,
+        "completed_per_sec": completed_per_sec,
         "elapsed_ms": elapsed.as_millis(),
         "choice": format!("{choice:?}"),
         "choice_is_legal": legal.contains(&choice),
@@ -317,15 +344,21 @@ fn budgeted_search(name: &str, game: &Game, puct: bool, budget_ms: u64) -> Value
         )
     }
     .expect("budgeted decision");
+    let elapsed = started.elapsed();
+    let elapsed_s = elapsed.as_secs_f64();
+    let completed_per_sec = if elapsed_s > 0.0 {
+        outcome.simulations_completed as f64 / elapsed_s
+    } else {
+        0.0
+    };
     json!({
         "name": name,
         "policy": if puct { "puct" } else { "mcts" },
         "budget_ms": budget_ms,
-        "elapsed_ms": started.elapsed().as_millis(),
+        "elapsed_ms": elapsed.as_millis(),
         "overshoot_ms": outcome.overshoot_ms,
         "simulations_completed": outcome.simulations_completed,
-        "completed_per_sec": outcome.simulations_completed as f64
-            / started.elapsed().as_secs_f64(),
+        "completed_per_sec": completed_per_sec,
         "timed_out": outcome.timed_out,
         "used_fallback": outcome.used_fallback,
         "choice_is_legal": legal.contains(&choice),
