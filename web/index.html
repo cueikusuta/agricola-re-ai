@@ -429,7 +429,7 @@ function renderActionBoard(available,candidate,p){
     button.disabled=busy;button.onclick=()=>openWork(key);
     tile.append(button,glyph);tile.onclick=e=>{if(!busy&&e.target!==button)openWork(key);};
    }
-   const meta=document.createElement("div");meta.className="tileMeta",value=tileMeta(key,p);
+   const meta=document.createElement("div"),value=tileMeta(key,p);meta.className="tileMeta";
    if(occupied){meta.textContent="このラウンドで使用済み";tile.setAttribute("aria-label",(names[key]||key)+" 使用済み");}
    else if(value.kind){
     const count=document.createElement("span");count.className="actionCount";
