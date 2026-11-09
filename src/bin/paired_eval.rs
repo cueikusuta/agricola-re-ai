@@ -149,6 +149,17 @@ struct Options {
     puct_leaf: LeafMode,
     puct_root_limit: usize,
     puct_final_prior: f64,
+    /// Configuration of the PUCT used by the **baseline arm's focus seat and
+    /// every opponent PUCT seat** (#219). Unset flags default to the candidate
+    /// PUCT configuration, so every pre-#219 command keeps its behaviour.
+    baseline_puct_simulations: usize,
+    baseline_puct_tree_depth: usize,
+    baseline_puct_c: f64,
+    baseline_puct_prior_temperature: f64,
+    baseline_puct_value_temperature: f64,
+    baseline_puct_leaf: LeafMode,
+    baseline_puct_root_limit: usize,
+    baseline_puct_final_prior: f64,
     output: String,
 }
 
@@ -191,8 +202,12 @@ where
 }
 
 fn parse_options() -> Result<Options, String> {
+    parse_options_from(std::env::args().skip(1))
+}
+
+fn parse_options_from(args: impl Iterator<Item = String>) -> Result<Options, String> {
     let mut values = BTreeMap::new();
-    let mut args = std::env::args().skip(1);
+    let mut args = args;
     while let Some(arg) = args.next() {
         let key = arg
             .strip_prefix("--")
@@ -221,6 +236,14 @@ fn parse_options() -> Result<Options, String> {
             "puct-leaf",
             "puct-root-limit",
             "puct-final-prior",
+            "baseline-puct-simulations",
+            "baseline-puct-tree-depth",
+            "baseline-puct-c",
+            "baseline-puct-prior-temp",
+            "baseline-puct-value-temp",
+            "baseline-puct-leaf",
+            "baseline-puct-root-limit",
+            "baseline-puct-final-prior",
             "output",
         ]
         .contains(&key)
@@ -340,6 +363,92 @@ fn parse_options() -> Result<Options, String> {
         default_puct.final_prior_weight,
         "invalid puct-final-prior",
     )?;
+    // #219: the baseline/opponent PUCT configuration. If no baseline flag is
+    // given the baseline is bit-for-bit the candidate configuration (the
+    // pre-#219 behaviour). Pinning even one flag freezes the baseline
+    // configuration, and because a silent default could silently follow the
+    // candidate variant, freezing requires **all** flags explicitly: a
+    // partially frozen baseline is rejected before any game runs.
+    let baseline_flags_provided = [
+        "baseline-puct-simulations",
+        "baseline-puct-tree-depth",
+        "baseline-puct-c",
+        "baseline-puct-prior-temp",
+        "baseline-puct-value-temp",
+        "baseline-puct-leaf",
+        "baseline-puct-root-limit",
+        "baseline-puct-final-prior",
+    ]
+    .iter()
+    .any(|key| values.contains_key(*key));
+    let require_baseline_value = |key: &str| -> Result<&str, String> {
+        optional_option(&values, key).ok_or_else(|| {
+            format!(
+                "freezing the baseline PUCT configuration requires all eight --baseline-puct-* flags; missing --{key}"
+            )
+        })
+    };
+    let baseline_puct_simulations = if baseline_flags_provided {
+        require_baseline_value("baseline-puct-simulations")?
+            .parse::<usize>()
+            .map_err(|_| "invalid baseline-puct-simulations".to_string())?
+    } else {
+        puct_simulations
+    };
+    let baseline_puct_tree_depth = if baseline_flags_provided {
+        require_baseline_value("baseline-puct-tree-depth")?
+            .parse::<usize>()
+            .map_err(|_| "invalid baseline-puct-tree-depth".to_string())?
+    } else {
+        puct_tree_depth
+    };
+    let baseline_puct_c = if baseline_flags_provided {
+        require_baseline_value("baseline-puct-c")?
+            .parse::<f64>()
+            .map_err(|_| "invalid baseline-puct-c".to_string())?
+    } else {
+        puct_c
+    };
+    let baseline_puct_prior_temperature = if baseline_flags_provided {
+        require_baseline_value("baseline-puct-prior-temp")?
+            .parse::<f64>()
+            .map_err(|_| "invalid baseline-puct-prior-temp".to_string())?
+    } else {
+        puct_prior_temperature
+    };
+    let baseline_puct_value_temperature = if baseline_flags_provided {
+        require_baseline_value("baseline-puct-value-temp")?
+            .parse::<f64>()
+            .map_err(|_| "invalid baseline-puct-value-temp".to_string())?
+    } else {
+        puct_value_temperature
+    };
+    let baseline_puct_leaf = match optional_option(&values, "baseline-puct-leaf") {
+        Some("heuristic") => LeafMode::Heuristic,
+        Some("terminal") => LeafMode::Terminal,
+        Some(_) => return Err("baseline-puct-leaf must be heuristic or terminal".into()),
+        None if baseline_flags_provided => {
+            return Err(
+                "freezing the baseline PUCT configuration requires all eight --baseline-puct-* flags; missing --baseline-puct-leaf"
+                    .into(),
+            )
+        }
+        None => puct_leaf,
+    };
+    let baseline_puct_root_limit = if baseline_flags_provided {
+        require_baseline_value("baseline-puct-root-limit")?
+            .parse::<usize>()
+            .map_err(|_| "invalid baseline-puct-root-limit".to_string())?
+    } else {
+        puct_root_limit
+    };
+    let baseline_puct_final_prior = if baseline_flags_provided {
+        require_baseline_value("baseline-puct-final-prior")?
+            .parse::<f64>()
+            .map_err(|_| "invalid baseline-puct-final-prior".to_string())?
+    } else {
+        puct_final_prior
+    };
     let output = option(&values, "output")?.to_string();
     if !(2..=4).contains(&players) {
         return Err("players must be 2, 3, or 4".into());
@@ -387,8 +496,67 @@ fn parse_options() -> Result<Options, String> {
     if !puct_final_prior.is_finite() || !(0.0..=10.0).contains(&puct_final_prior) {
         return Err("puct-final-prior must be finite and 0..=10".into());
     }
-    if candidate == baseline {
-        return Err("candidate and baseline must be different".into());
+    if baseline_puct_simulations == 0 || baseline_puct_simulations > 100_000 {
+        return Err("baseline-puct-simulations must be 1..=100000".into());
+    }
+    if !(1..=6).contains(&baseline_puct_tree_depth) {
+        return Err("baseline-puct-tree-depth must be 1..=6".into());
+    }
+    if !baseline_puct_c.is_finite() || baseline_puct_c < 0.0 || baseline_puct_c > 100.0 {
+        return Err("baseline-puct-c must be finite and 0..=100".into());
+    }
+    if !baseline_puct_prior_temperature.is_finite() || baseline_puct_prior_temperature <= 0.0 {
+        return Err("baseline-puct-prior-temp must be finite and > 0".into());
+    }
+    if !baseline_puct_value_temperature.is_finite() || baseline_puct_value_temperature <= 0.0 {
+        return Err("baseline-puct-value-temp must be finite and > 0".into());
+    }
+    if baseline_puct_root_limit > 100 {
+        return Err("baseline-puct-root-limit must be 0..=100".into());
+    }
+    if !baseline_puct_final_prior.is_finite() || !(0.0..=10.0).contains(&baseline_puct_final_prior)
+    {
+        return Err("baseline-puct-final-prior must be finite and 0..=10".into());
+    }
+    // Same policy names are only allowed when the two PUCT configurations
+    // provably differ (#219): the whole point of a PUCT-vs-PUCT ablation is a
+    // candidate variant against a frozen baseline configuration, and the
+    // baseline arm stays a mirror control because its focus seat plays the
+    // baseline configuration against baseline opponents.
+    let baseline_puct_equals_candidate = baseline_puct_simulations == puct_simulations
+        && baseline_puct_tree_depth == puct_tree_depth
+        && baseline_puct_c == puct_c
+        && baseline_puct_prior_temperature == puct_prior_temperature
+        && baseline_puct_value_temperature == puct_value_temperature
+        && baseline_puct_leaf == puct_leaf
+        && baseline_puct_root_limit == puct_root_limit
+        && baseline_puct_final_prior == puct_final_prior;
+    if candidate == baseline && (candidate != Ai::Puct || baseline_puct_equals_candidate) {
+        return Err(
+            "candidate and baseline must be different; a PUCT-vs-PUCT run needs an explicit --baseline-puct-* override".into(),
+        );
+    }
+    // #219 review P2: in time-budgeted mode the focus stopping rule ignores
+    // per-policy simulation counts, so a PUCT-vs-PUCT run whose two
+    // configurations differ *only* in simulations would measure nothing at
+    // the focus seat. Reject it instead of reporting a silent null result.
+    let baseline_puct_differs_only_in_simulations = !baseline_puct_equals_candidate
+        && baseline_puct_tree_depth == puct_tree_depth
+        && baseline_puct_c == puct_c
+        && baseline_puct_prior_temperature == puct_prior_temperature
+        && baseline_puct_value_temperature == puct_value_temperature
+        && baseline_puct_leaf == puct_leaf
+        && baseline_puct_root_limit == puct_root_limit
+        && baseline_puct_final_prior == puct_final_prior
+        && baseline_puct_simulations != puct_simulations;
+    if search_mode == SearchMode::TimeBudgeted
+        && candidate == Ai::Puct
+        && candidate == baseline
+        && baseline_puct_differs_only_in_simulations
+    {
+        return Err(
+            "a time-budgeted PUCT-vs-PUCT run must differ in more than the simulation count; the focus seat ignores --puct-simulations in that mode".into(),
+        );
     }
     // A budget of 0 means "no deadline", which is meaningless for a mode whose
     // whole contract is the deadline.
@@ -430,8 +598,38 @@ fn parse_options() -> Result<Options, String> {
         puct_leaf,
         puct_root_limit,
         puct_final_prior,
+        baseline_puct_simulations,
+        baseline_puct_tree_depth,
+        baseline_puct_c,
+        baseline_puct_prior_temperature,
+        baseline_puct_value_temperature,
+        baseline_puct_leaf,
+        baseline_puct_root_limit,
+        baseline_puct_final_prior,
         output,
     })
+}
+
+/// A stable identity for one PUCT configuration (#219). Historical runs all
+/// logged the policy name `puct`, so two very different configurations are
+/// indistinguishable in the archives; every new record carries these IDs so
+/// an ablation never compares two unnamed variants.
+fn puct_config_id(config: &PuctConfig) -> String {
+    let leaf = match config.leaf_mode {
+        LeafMode::Heuristic => "heuristic",
+        LeafMode::Terminal => "terminal",
+    };
+    format!(
+        "puct-s{}-d{}-c{}-pt{}-vt{}-{}-rl{}-fp{}",
+        config.simulations,
+        config.tree_depth,
+        config.c_puct,
+        config.prior_temperature,
+        config.value_temperature,
+        leaf,
+        config.root_candidate_limit,
+        config.final_prior_weight
+    )
 }
 
 /// Per-decision search settings shared by every seat (#164).
@@ -505,7 +703,13 @@ struct SeatSelector<'a> {
     eval_veg_cond: &'a VariantEvaluationPolicy,
     eval_room: &'a VariantEvaluationPolicy,
     mcts: &'a MctsPolicy,
+    /// PUCT configuration of the seat in this slot. The focus seat receives
+    /// the candidate configuration in the candidate arm and the frozen
+    /// baseline configuration in the baseline arm (#219); every opponent PUCT
+    /// seat always receives the frozen baseline configuration.
     puct: &'a PuctPolicy,
+    /// Frozen baseline PUCT configuration used by opponent PUCT seats.
+    puct_baseline: &'a PuctPolicy,
     /// Stopping rule for the focus seat. `None` for heuristic policies and for
     /// the opponent seats, which always run the policy's own deterministic
     /// default.
@@ -632,7 +836,9 @@ impl SeatSelector<'_> {
                 self.eval_veg_cond,
                 self.eval_room,
                 self.mcts,
-                self.puct,
+                // Opponent PUCT seats always play the frozen baseline
+                // configuration, whatever the candidate arm explores (#219).
+                self.puct_baseline,
                 obs,
                 legal,
                 rng,
@@ -725,6 +931,21 @@ fn run(options: &Options) -> Result<(), String> {
             final_prior_weight: options.puct_final_prior,
         },
     };
+    // #219: the frozen baseline configuration. The baseline arm's focus seat
+    // and every opponent PUCT seat play this policy, so a candidate variant is
+    // always compared against a separately pinned PUCT, never against itself.
+    let baseline_puct = PuctPolicy {
+        config: PuctConfig {
+            simulations: options.baseline_puct_simulations,
+            tree_depth: options.baseline_puct_tree_depth,
+            c_puct: options.baseline_puct_c,
+            prior_temperature: options.baseline_puct_prior_temperature,
+            value_temperature: options.baseline_puct_value_temperature,
+            leaf_mode: options.baseline_puct_leaf,
+            root_candidate_limit: options.baseline_puct_root_limit,
+            final_prior_weight: options.baseline_puct_final_prior,
+        },
+    };
     let puct_leaf_name = match options.puct_leaf {
         LeafMode::Heuristic => "heuristic",
         LeafMode::Terminal => "terminal",
@@ -792,6 +1013,23 @@ fn run(options: &Options) -> Result<(), String> {
                 };
                 let mut game = Game::with_cards(config.clone(), card_set.clone())
                     .map_err(|error| format!("seed {seed}: {error}"))?;
+                // The focus seat plays the arm's own PUCT configuration; the
+                // fixed simulation count must therefore follow the same policy
+                // (otherwise the recorded cap would disagree with what ran).
+                let arm_is_candidate = arm_id == "candidate";
+                let focus_puct = if arm_is_candidate {
+                    &puct
+                } else {
+                    &baseline_puct
+                };
+                let focus_settings = SearchSettings {
+                    puct_simulations: if arm_is_candidate {
+                        options.puct_simulations
+                    } else {
+                        options.baseline_puct_simulations
+                    },
+                    ..search_settings
+                };
                 let selector = SeatSelector {
                     focus: seat,
                     focus_ai,
@@ -804,8 +1042,9 @@ fn run(options: &Options) -> Result<(), String> {
                     eval_veg_cond: &eval_veg_cond,
                     eval_room: &eval_room,
                     mcts: &mcts,
-                    puct: &puct,
-                    search: Some(search_settings),
+                    puct: focus_puct,
+                    puct_baseline: &baseline_puct,
+                    search: Some(focus_settings),
                     decision_ns: RefCell::new(Vec::new()),
                     focus_outcomes: RefCell::new(FocusOutcomes::default()),
                 };
@@ -933,6 +1172,26 @@ fn run(options: &Options) -> Result<(), String> {
                     "max_search_elapsed_ms": outcomes.elapsed_ms,
                     "mcts_tree_depth": options.mcts_tree_depth,
                     "puct_leaf": puct_leaf_name,
+                    // Candidate PUCT configuration identifiers (#219) are
+                    // attached to the record below: the json! literal is at
+                    // the macro recursion limit, so these three keys are
+                    // inserted separately. The scalar puct_* fields above
+                    // always describe the candidate configuration, even in
+                    // baseline-arm rows; the baseline arm's focus
+                    // configuration is identified by `focus_puct_config_id`.
+                    "baseline_puct_simulations": options.baseline_puct_simulations,
+                    "baseline_puct_tree_depth": options.baseline_puct_tree_depth,
+                    "baseline_puct_c": options.baseline_puct_c,
+                    "baseline_puct_prior_temperature": options
+                        .baseline_puct_prior_temperature,
+                    "baseline_puct_value_temperature": options
+                        .baseline_puct_value_temperature,
+                    "baseline_puct_leaf": match options.baseline_puct_leaf {
+                        LeafMode::Heuristic => "heuristic",
+                        LeafMode::Terminal => "terminal",
+                    },
+                    "baseline_puct_root_limit": options.baseline_puct_root_limit,
+                    "baseline_puct_final_prior": options.baseline_puct_final_prior,
                     "puct_simulations_config": options.puct_simulations,
                     "puct_tree_depth": options.puct_tree_depth,
                     "puct_c": options.puct_c,
@@ -945,6 +1204,14 @@ fn run(options: &Options) -> Result<(), String> {
                     "replay_hash": hash,
                     "replay_verified": true,
                 });
+                let mut record = record;
+                record["puct_config_id"] = serde_json::json!(puct_config_id(&puct.config));
+                record["candidate_puct_config_id"] =
+                    serde_json::json!(puct_config_id(&puct.config));
+                record["baseline_puct_config_id"] =
+                    serde_json::json!(puct_config_id(&baseline_puct.config));
+                record["focus_puct_config_id"] =
+                    serde_json::json!(puct_config_id(&focus_puct.config));
                 serde_json::to_writer(&mut writer, &record).map_err(|error| error.to_string())?;
                 writer.write_all(b"\n").map_err(|error| error.to_string())?;
             }
@@ -1091,6 +1358,344 @@ mod tests {
         let reversed = settings(SearchMode::SimulationCapped, 9, 2);
         assert_eq!(fixed_count(reversed.rule_for(Ai::Mcts).unwrap()), 9);
         assert_eq!(fixed_count(reversed.rule_for(Ai::Puct).unwrap()), 2);
+    }
+
+    /// #219: two distinct PUCT configurations must never share a name.
+    #[test]
+    fn puct_config_id_encodes_every_frozen_parameter() {
+        let config = PuctConfig::default();
+        assert_eq!(
+            puct_config_id(&config),
+            "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0",
+            "the baseline ID freezes the shipped configuration"
+        );
+        let mut config = config;
+        for (name, changed) in [
+            ("simulations", {
+                config.simulations = 17;
+                puct_config_id(&config)
+            }),
+            ("tree_depth", {
+                config.simulations = PuctConfig::default().simulations;
+                config.tree_depth = 5;
+                puct_config_id(&config)
+            }),
+            ("c_puct", {
+                config.tree_depth = PuctConfig::default().tree_depth;
+                config.c_puct = 0.75;
+                puct_config_id(&config)
+            }),
+            ("prior_temperature", {
+                config.c_puct = PuctConfig::default().c_puct;
+                config.prior_temperature = 1.5;
+                puct_config_id(&config)
+            }),
+            ("value_temperature", {
+                config.prior_temperature = PuctConfig::default().prior_temperature;
+                config.value_temperature = 4.0;
+                puct_config_id(&config)
+            }),
+            ("root_candidate_limit", {
+                config.value_temperature = PuctConfig::default().value_temperature;
+                config.root_candidate_limit = 12;
+                puct_config_id(&config)
+            }),
+            ("final_prior_weight", {
+                config.root_candidate_limit = PuctConfig::default().root_candidate_limit;
+                config.final_prior_weight = 0.5;
+                puct_config_id(&config)
+            }),
+            ("leaf_mode", {
+                config.final_prior_weight = PuctConfig::default().final_prior_weight;
+                config.leaf_mode = LeafMode::Heuristic;
+                puct_config_id(&config)
+            }),
+        ] {
+            assert_ne!(
+                changed, "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0",
+                "changing {name} must rename the config"
+            );
+        }
+        assert!(puct_config_id(&config).contains("-heuristic-rl"));
+    }
+
+    /// #219: unset baseline flags fall back to the candidate configuration,
+    /// so a pre-#219 command still describes the same policy it always did;
+    /// set flags override only the baseline side.
+    #[test]
+    fn baseline_puct_defaults_track_the_candidate_configuration() {
+        let base = [
+            "--players",
+            "2",
+            "--seed-start",
+            "1",
+            "--block-start",
+            "0",
+            "--blocks",
+            "1",
+            "--candidate",
+            "puct",
+            "--baseline",
+            "eval",
+            "--opponent",
+            "greedy",
+            "--additional-action-space",
+            "false",
+            "--output",
+            "out.jsonl",
+        ]
+        .map(String::from);
+        let unset = parse_options_from(base.iter().cloned()).unwrap();
+        assert_eq!(unset.baseline_puct_simulations, unset.puct_simulations);
+        assert_eq!(unset.baseline_puct_tree_depth, unset.puct_tree_depth);
+        assert_eq!(unset.baseline_puct_c, unset.puct_c);
+        assert_eq!(
+            unset.baseline_puct_prior_temperature,
+            unset.puct_prior_temperature
+        );
+        assert_eq!(
+            unset.baseline_puct_value_temperature,
+            unset.puct_value_temperature
+        );
+        assert_eq!(unset.baseline_puct_leaf, unset.puct_leaf);
+        assert_eq!(unset.baseline_puct_root_limit, unset.puct_root_limit);
+        assert_eq!(unset.baseline_puct_final_prior, unset.puct_final_prior);
+
+        let with_overrides = base
+            .iter()
+            .cloned()
+            .chain([
+                "--puct-c".to_string(),
+                "2.5".to_string(),
+                "--baseline-puct-simulations".to_string(),
+                "32".to_string(),
+                "--baseline-puct-tree-depth".to_string(),
+                "2".to_string(),
+                "--baseline-puct-c".to_string(),
+                "1.5".to_string(),
+                "--baseline-puct-prior-temp".to_string(),
+                "3".to_string(),
+                "--baseline-puct-value-temp".to_string(),
+                "8".to_string(),
+                "--baseline-puct-leaf".to_string(),
+                "terminal".to_string(),
+                "--baseline-puct-root-limit".to_string(),
+                "0".to_string(),
+                "--baseline-puct-final-prior".to_string(),
+                "0".to_string(),
+            ])
+            .collect::<Vec<_>>();
+        let overridden = parse_options_from(with_overrides.into_iter()).unwrap();
+        assert_eq!(overridden.puct_c, 2.5);
+        assert_eq!(overridden.baseline_puct_c, 1.5);
+        assert_eq!(overridden.baseline_puct_simulations, 32);
+        assert_eq!(overridden.baseline_puct_prior_temperature, 3.0);
+    }
+
+    #[test]
+    fn partially_frozen_baseline_puct_is_rejected() {
+        let base = [
+            "--players",
+            "2",
+            "--seed-start",
+            "1",
+            "--block-start",
+            "0",
+            "--blocks",
+            "1",
+            "--candidate",
+            "puct",
+            "--baseline",
+            "eval",
+            "--opponent",
+            "greedy",
+            "--additional-action-space",
+            "false",
+            "--output",
+            "out.jsonl",
+        ]
+        .map(String::from);
+        // One flag alone cannot define the frozen configuration: refusing is
+        // cheaper than a baseline that silently inherits a candidate variant.
+        let args = base
+            .iter()
+            .cloned()
+            .chain(["--baseline-puct-c".to_string(), "1.5".to_string()])
+            .collect::<Vec<_>>();
+        assert!(parse_options_from(args.into_iter()).is_err());
+    }
+
+    #[test]
+    fn puct_vs_puct_requires_a_distinct_baseline_configuration() {
+        let base = [
+            "--players",
+            "2",
+            "--seed-start",
+            "1",
+            "--block-start",
+            "0",
+            "--blocks",
+            "1",
+            "--candidate",
+            "puct",
+            "--baseline",
+            "puct",
+            "--opponent",
+            "puct",
+            "--additional-action-space",
+            "false",
+            "--output",
+            "out.jsonl",
+        ]
+        .map(String::from);
+        // Identical configurations would make the baseline arm an exact copy
+        // of the candidate arm: the run must fail closed.
+        assert!(parse_options_from(base.iter().cloned()).is_err());
+        // A frozen baseline equal to the candidate default is still "the same
+        // configuration": rejected as a meaningless mirror.
+        let frozen_defaults = [
+            "--baseline-puct-simulations",
+            "32",
+            "--baseline-puct-tree-depth",
+            "2",
+            "--baseline-puct-c",
+            "1.5",
+            "--baseline-puct-prior-temp",
+            "3",
+            "--baseline-puct-value-temp",
+            "8",
+            "--baseline-puct-leaf",
+            "terminal",
+            "--baseline-puct-root-limit",
+            "0",
+            "--baseline-puct-final-prior",
+            "0",
+        ]
+        .map(String::from);
+        let args = base
+            .iter()
+            .cloned()
+            .chain(frozen_defaults.clone())
+            .collect::<Vec<_>>();
+        assert!(parse_options_from(args.into_iter()).is_err());
+        // A candidate variant against the frozen defaults is accepted.
+        let args = base
+            .iter()
+            .cloned()
+            .chain(frozen_defaults)
+            .chain(["--puct-c".to_string(), "2.5".to_string()])
+            .collect::<Vec<_>>();
+        assert!(parse_options_from(args.into_iter()).is_ok());
+    }
+
+    /// #219 review P2: in time-budgeted mode a simulations-only configuration
+    /// difference is invisible to the focus seat and would be a null run.
+    #[test]
+    fn time_budgeted_puct_vs_puct_with_simulations_only_difference_is_rejected() {
+        let mut base = vec![
+            "--players",
+            "2",
+            "--seed-start",
+            "1",
+            "--block-start",
+            "0",
+            "--blocks",
+            "1",
+            "--candidate",
+            "puct",
+            "--baseline",
+            "puct",
+            "--opponent",
+            "puct",
+            "--additional-action-space",
+            "false",
+            "--search-mode",
+            "time-budgeted",
+            "--decision-budget-ms",
+            "100",
+            "--output",
+            "out.jsonl",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+        base.extend([
+            "--baseline-puct-simulations".to_string(),
+            "64".to_string(),
+            "--baseline-puct-tree-depth".to_string(),
+            "2".to_string(),
+            "--baseline-puct-c".to_string(),
+            "1.5".to_string(),
+            "--baseline-puct-prior-temp".to_string(),
+            "3".to_string(),
+            "--baseline-puct-value-temp".to_string(),
+            "8".to_string(),
+            "--baseline-puct-leaf".to_string(),
+            "terminal".to_string(),
+            "--baseline-puct-root-limit".to_string(),
+            "0".to_string(),
+            "--baseline-puct-final-prior".to_string(),
+            "0".to_string(),
+        ]);
+        assert!(parse_options_from(base.iter().cloned()).is_err());
+        // The same difference is meaningful in simulation-capped mode.
+        let capped = base
+            .iter()
+            .enumerate()
+            .map(|(i, arg)| {
+                if arg == "time-budgeted" && i > 0 && base[i - 1] == "--search-mode" {
+                    "simulation-capped".to_string()
+                } else {
+                    arg.clone()
+                }
+            })
+            .collect::<Vec<_>>();
+        assert!(parse_options_from(capped.into_iter()).is_ok());
+    }
+
+    #[test]
+    fn baseline_puct_overrides_fail_closed_on_invalid_values() {
+        let base = [
+            "--players",
+            "2",
+            "--seed-start",
+            "1",
+            "--block-start",
+            "0",
+            "--blocks",
+            "1",
+            "--candidate",
+            "puct",
+            "--baseline",
+            "eval",
+            "--opponent",
+            "greedy",
+            "--additional-action-space",
+            "false",
+            "--output",
+            "out.jsonl",
+        ]
+        .map(String::from);
+        for (flag, value) in [
+            ("--baseline-puct-simulations", "0"),
+            ("--baseline-puct-tree-depth", "7"),
+            ("--baseline-puct-c", "-1"),
+            ("--baseline-puct-prior-temp", "0"),
+            ("--baseline-puct-value-temp", "abc"),
+            ("--baseline-puct-root-limit", "101"),
+            ("--baseline-puct-final-prior", "11"),
+            ("--baseline-puct-leaf", "rollout"),
+        ] {
+            let args = base
+                .iter()
+                .cloned()
+                .chain([flag.to_string(), value.to_string()])
+                .collect::<Vec<_>>();
+            assert!(
+                parse_options_from(args.into_iter()).is_err(),
+                "{flag} {value} must be rejected"
+            );
+        }
     }
 
     /// Regression for the self-review finding in #167 A: the focus seat used

@@ -40,6 +40,79 @@ def finite_number(value: object) -> bool:
     return type(value) is float and math.isfinite(value)
 
 
+# #219 review P3-1: the config ID must agree with the scalar configuration
+# fields recorded on the same row. The ID is emitted by paired_eval with Rust
+# f64 Display formatting ("3", not "3.0"), so segments are compared numerically.
+PUCT_CONFIG_ID_RE = __import__("re").compile(
+    r"^puct-s(\d+)-d(\d+)-c([^\-]+)-pt([^\-]+)-vt([^\-]+)-(heuristic|terminal)-rl(\d+)-fp([^\-]+)$"
+)
+# Maps config-ID segments to the row's scalar fields (candidate prefix empty).
+PUCT_ID_SEGMENT_KEYS = (
+    ("s", "puct_simulations_config", "baseline_puct_simulations"),
+    ("d", "puct_tree_depth", "baseline_puct_tree_depth"),
+    ("c", "puct_c", "baseline_puct_c"),
+    ("pt", "puct_prior_temperature", "baseline_puct_prior_temperature"),
+    ("vt", "puct_value_temperature", "baseline_puct_value_temperature"),
+    ("leaf", "puct_leaf", "baseline_puct_leaf"),
+    ("rl", "puct_root_limit", "baseline_puct_root_limit"),
+    ("fp", "puct_final_prior_weight", "baseline_puct_final_prior"),
+)
+
+
+def _puct_id_disagrees_with_scalars(config_id: str, row: dict, baseline: bool) -> bool:
+    """True only when both sides are present and provably contradict.
+
+    Legacy rows lack either the ID or the baseline scalars and are skipped:
+    absence must not fabricate a failure, but a recorded contradiction must
+    not slip through."""
+    match = PUCT_CONFIG_ID_RE.match(str(config_id))
+    if match is None:
+        return False
+    for index, (_, candidate_key, baseline_key) in enumerate(PUCT_ID_SEGMENT_KEYS):
+        segment = match.group(index + 1)
+        scalar = row.get(baseline_key if baseline else candidate_key)
+        if scalar is None:
+            continue
+        if segment in ("heuristic", "terminal"):
+            if segment != scalar:
+                return True
+            continue
+        try:
+            number = float(segment)
+        except ValueError:
+            return True
+        if not isinstance(scalar, (int, float)) or isinstance(scalar, bool):
+            return True
+        if float(scalar) != number:
+            return True
+    return False
+
+
+def _distinct_puct_configs_allowed(rows) -> bool:
+    """#219: allow candidate == baseline == puct only when the rows prove the
+    two PUCT configurations differ. Rows written before #219 have no config
+    IDs, so they keep the old fail-closed rejection."""
+    if not rows:
+        return False
+    ids = {
+        (
+            # `candidate_puct_config_id` is the canonical key; early #219 rows
+            # only carried `puct_config_id`, which records the same value.
+            row.get("candidate_puct_config_id") or row.get("puct_config_id"),
+            row.get("baseline_puct_config_id"),
+        )
+        for row in rows
+    }
+    if len(ids) != 1:
+        return False
+    candidate_id, baseline_id = ids.pop()
+    return (
+        candidate_id is not None
+        and baseline_id is not None
+        and candidate_id != baseline_id
+    )
+
+
 def validate_and_report(
     rows: list[dict],
     *,
@@ -57,7 +130,9 @@ def validate_and_report(
 ) -> dict:
     if players not in (2, 3, 4) or blocks < 1 or iterations < 100:
         raise ValueError("invalid experimental settings")
-    if candidate == baseline or any(
+    if candidate == baseline and not _distinct_puct_configs_allowed(rows):
+        raise ValueError("unsupported/identical policy")
+    if any(
         name not in POLICY_CHOICES
         for name in (candidate, baseline, opponent)
     ):
@@ -376,6 +451,26 @@ def validate_and_report(
     if len(card_hashes) != 1:
         raise ValueError("inconsistent card set across game records")
     card_set_count, card_set_hash = next(iter(card_hashes))[1:]
+    # #219: every row carries the two PUCT configuration identities so that an
+    # ablation never compares two unnamed `puct` variants. Rows written before
+    # #219 omit the keys entirely; that stays valid and the report simply has
+    # no config IDs to show.
+    puct_config_ids = {}
+    for key in ("candidate_puct_config_id", "baseline_puct_config_id"):
+        observed = {row.get(key) for row in rows}
+        if len(observed) > 1:
+            raise ValueError(f"inconsistent {key} across game records")
+        value = next(iter(observed))
+        if value is not None:
+            puct_config_ids[key] = value
+            # Cross-check the ID against the scalar configuration fields
+            # recorded on the same rows (#219 review P3-1).
+            baseline_side = key == "baseline_puct_config_id"
+            for row in rows:
+                if _puct_id_disagrees_with_scalars(value, row, baseline_side):
+                    raise ValueError(
+                        f"{key} disagrees with the recorded configuration fields"
+                    )
     values = defaultdict(list)
     deltas = []
     for block in range(first_block, first_block + blocks):
@@ -455,7 +550,20 @@ def validate_and_report(
     # the same fixed field and must not be reported as a direct result.
     candidate_opponents = sorted({g["opponent_policy"] for g in values["candidate"]})
     baseline_opponents = sorted({g["opponent_policy"] for g in values["baseline"]})
-    head_to_head = opponent == baseline and candidate != opponent
+    # A same-name PUCT comparison is head-to-head when the rows prove the two
+    # configurations differ (#219); otherwise equal names mean the mirror is
+    # literally the same policy and the design stays common-opponent.
+    candidate_puct_id = puct_config_ids.get("candidate_puct_config_id")
+    baseline_puct_id = puct_config_ids.get("baseline_puct_config_id")
+    same_name_distinct_puct = (
+        candidate == opponent
+        and candidate_puct_id is not None
+        and baseline_puct_id is not None
+        and candidate_puct_id != baseline_puct_id
+    )
+    head_to_head = opponent == baseline and (
+        candidate != opponent or same_name_distinct_puct
+    )
     # A condition whose better arm already takes almost every first place
     # cannot resolve a +5 pp difference: the interval collapses at the ceiling.
     ceiling_pct = max(
@@ -509,6 +617,7 @@ def validate_and_report(
         "candidate": candidate,
         "baseline": baseline,
         "opponent": opponent,
+        **puct_config_ids,
         "comparison_design": {
             "head_to_head": head_to_head,
             "candidate_opponent_policies": candidate_opponents,
