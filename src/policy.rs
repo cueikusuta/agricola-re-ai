@@ -163,6 +163,21 @@ fn empty_room_target(p: &Player) -> Option<usize> {
                 .any(|&j| matches!(p.farm[j].tile, Tile::Room))
     })
 }
+/// Preserve historical preference for open ground while allowing a fenced
+/// pasture when no unfenced site remains (Lookout revised rules, p. 8).
+fn stable_target(p: &Player) -> Option<usize> {
+    (0..FARM_CELLS)
+        .find(|&i| {
+            matches!(p.farm[i].tile, Tile::Empty)
+                && crate::engine::stable_site_available(p, i)
+        })
+        .or_else(|| {
+            (0..FARM_CELLS).find(|&i| {
+                matches!(p.farm[i].tile, Tile::Pasture { .. })
+                    && crate::engine::stable_site_available(p, i)
+            })
+        })
+}
 fn empty_field_target(p: &Player) -> Option<usize> {
     (0..FARM_CELLS).find(|&i| {
         matches!(p.farm[i].tile, Tile::Empty)
@@ -341,9 +356,7 @@ impl DetailPolicy for SimpleDetails {
                     } else if p.supply.wood >= 2 {
                         Detail::Build {
                             rooms: vec![],
-                            stables: vec![(0..FARM_CELLS).find(|&i| {
-                                matches!(p.farm[i].tile, Tile::Empty) && !p.farm[i].stable
-                            })?],
+                            stables: vec![stable_target(p)?],
                         }
                     } else {
                         return None;
@@ -351,9 +364,7 @@ impl DetailPolicy for SimpleDetails {
                 } else if p.supply.wood >= 2 {
                     Detail::Build {
                         rooms: vec![],
-                        stables: vec![(0..FARM_CELLS).find(|&i| {
-                            matches!(p.farm[i].tile, Tile::Empty) && !p.farm[i].stable
-                        })?],
+                        stables: vec![stable_target(p)?],
                     }
                 } else {
                     return None;
@@ -983,6 +994,33 @@ mod card_choice_tests {
                 .unwrap()
                 .detail,
             Detail::None
+        );
+    }
+
+    #[test]
+    fn simple_details_can_choose_existing_pasture_if_no_open_stable_site() {
+        let game = Game::new(Config::default());
+        let mut obs = game.observation(game.public.active_player).unwrap();
+        let p = &mut obs.public.players[obs.player_id];
+        p.supply.wood = 2;
+        for cell in &mut p.farm {
+            if matches!(cell.tile, Tile::Empty) {
+                cell.tile = Tile::Field {
+                    crop: None,
+                    remaining: 0,
+                };
+            }
+        }
+        // This observation isolates policy target selection. The rule engine
+        // validates real farm topology independently on action application.
+        p.farm[14].tile = Tile::Pasture { id: 0 };
+        let decision = SimpleDetails.produce(&obs, Space::FarmExpansion).unwrap();
+        assert_eq!(
+            decision.detail,
+            Detail::Build {
+                rooms: vec![],
+                stables: vec![14],
+            }
         );
     }
 
