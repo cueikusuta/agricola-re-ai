@@ -23,13 +23,20 @@ test("Issue #246: BGA-reference tabletop composition works in Chromium",async t=
     const farm=await page.locator("#playerFarmPanel").boundingBox();
     const cards=await page.locator("#cardsPanel").boundingBox();
     assert.ok(board&&farm&&cards,"all major regions must be visible");
+    const right=await page.locator(".workstationRight").boundingBox();
+    assert.ok(right,"hand and operation column is present");
     if(viewport.width>=1100){
-     assert.ok(board.x+board.width<=farm.x+4,"action board must be left of personal farm");
-     assert.ok(Math.abs(board.y-farm.y)<8,"action board and farm should share top edge");
-     assert.ok(cards.y>=Math.max(board.y+board.height,farm.y+farm.height)-3,"card shelf follows tabletop");
+     assert.ok(farm.x+farm.width<=board.x+4,"personal farm must be left of the action board");
+     assert.ok(board.x+board.width<=right.x+4,"action board must be left of the hand/actions");
+     assert.ok(Math.abs(board.y-farm.y)<8 && Math.abs(board.y-right.y)<8,
+       "farm, board and hand column should share top edge");
+     assert.ok(cards.x>=right.x-4,"card list belongs to right sidebar");
+    }else if(viewport.width>760){
+     assert.ok(board.y<=farm.y-2,"tablet: board is above the farm and hand");
+     assert.ok(Math.abs(farm.y-right.y)<8,"tablet: farm and hand are side by side");
     }else{
-     assert.ok(board.y<=farm.y,"action board comes before farm on small devices");
-     assert.ok(farm.y<cards.y,"card shelf follows farm on narrow screens");
+     assert.ok(board.y<farm.y,"phone: action board first");
+     assert.ok(farm.y<right.y,"phone: farm before hand/actions");
     }
     const dimensions=await page.evaluate(()=>({
       viewport:document.documentElement.clientWidth,
@@ -50,6 +57,21 @@ test("Issue #246: BGA-reference tabletop composition works in Chromium",async t=
     assert.ok(await page.locator("#actions .actionTile").count()>0);
     assert.ok(await page.locator("#actions button[data-space]").count()>0);
     assert.match(await page.locator("#nextHarvest").innerText(),/収穫/);
+    assert.equal(await page.locator("#analysisPanel").isVisible(),false,"analysis is hidden during play");
+    assert.equal(await page.locator("#verificationPanel").isVisible(),false,"debug info is hidden during play");
+    await page.locator('#uiModeTabs button[data-ui-mode="analysis"]').click();
+    assert.equal(await page.locator("#analysisPanel").isVisible(),true,"analysis mode displays server candidate evidence");
+    assert.equal(await page.locator("#cardsPanel").isVisible(),false,"hand disappears from analysis sidebar");
+    assert.match(await page.locator("#analysisContent").innerText(),/評価順ではありません/);
+    await page.locator('#uiModeTabs button[data-ui-mode="verification"]').click();
+    assert.equal(await page.locator("#verificationPanel").isVisible(),true);
+    const verification=await page.locator("#verificationContent").innerText();
+    assert.match(verification,/"round"/);
+    assert.doesNotMatch(verification,/"hand"|"seed"|"card_definitions"|"state_hash"/,
+      "verification must not leak hidden cards, seed or internal-only fields");
+    await page.locator('#uiModeTabs button[data-ui-mode="play"]').click();
+    assert.equal(await page.locator("#cardsPanel").isVisible(),true);
+    assert.equal(await page.locator("#verificationPanel").isVisible(),false);
     assert.deepEqual(errors,[],"no uncaught exceptions");
     fs.mkdirSync("artifacts",{recursive:true});
     await page.evaluate(()=>window.scrollTo(0,0));
