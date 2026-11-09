@@ -39,6 +39,14 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 #boardSummary,#usedActions{font-size:13px;color:#d0dbde;margin:6px 0 0}
 #usedActions{display:flex;gap:5px;flex-wrap:wrap}
 .usedSpace{border:1px dashed #60717a;background:#26333a;border-radius:6px;padding:3px 7px}
+.farmPicker{padding:10px;border:1px solid #5a7b86;border-radius:9px;background:#24363f;display:grid;gap:9px}
+.farmPicker h3{margin:0}.farmPicker .pickerModes{display:flex;gap:6px;flex-wrap:wrap}
+.farmPicker .pickerCells{max-width:100%;grid-template-columns:repeat(5,minmax(0,1fr))}
+.farmPicker button.cell{font-size:13px;padding:3px;min-width:0;min-height:47px;color:#f0f6f4;border:2px solid transparent;cursor:pointer;overflow-wrap:anywhere}
+.farmPicker button.cell[aria-pressed="true"]{border-color:#ffdb80;background:#655b35;box-shadow:inset 0 0 0 1px #fff1bd}
+.farmPicker .pickerPreview{font-size:13px;background:#182b33;padding:8px;border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.farmPicker .pickerWarning{font-size:12px;color:#f0d7a1}
+
 
 @media(max-width:700px){.screen{padding:8px}.panel{padding:9px}.cell{min-height:45px;font-size:14px}}
 </style></head>
@@ -268,7 +276,102 @@ if(hints.stable_cells&&hints.stable_cells.length)parts.push("厩を建てられ�
 if(hints.sow_fields&&hints.sow_fields.length)parts.push("種をまける畑: "+hints.sow_fields.join(","));
 if(["sheep_market","pig_market","cattle_market","animal_market"].includes(space)){const acc=(state.public.animal_accumulations||{})[space]||0;parts.push("市場の累積家畜: "+acc+"頭（配置・調理・返却の合計で指定）");}
 if(parts.length){const p=document.createElement("p");p.className="minor";p.id="detailHint";p.textContent=parts.join(" / ");$("fields").append(p);}}
-function openWork(space){const hints=(state.detail_hints&&state.detail_hints[space])||{};openEditor(names[space]||space,"各選択は任意ではなく、エンジンにそのまま渡されます。","work",space);appendHint(space,hints);workFields(space,hints);}
+function openWork(space){const hints=(state.detail_hints&&state.detail_hints[space])||{};openEditor(names[space]||space,"各選択は任意ではなく、エンジンにそのまま渡されます。","work",space);appendHint(space,hints);workFields(space,hints);attachFarmPicker(space);}
+function attachFarmPicker(space){
+ // Purely an input aid: the existing Detail payload and server validation remain authoritative.
+ const animalSpaces=["sheep_market","pig_market","cattle_market","animal_market"];
+ const modes=space==="farmland"?[["plow","耕す"]]:
+  space==="farm_expansion"?[["rooms","部屋"],["stables","厩"]]:
+  ["fencing","farm_redevelopment"].includes(space)?[["fence","柵の1グループ"]]:
+  space==="grain_utilization"?[["grain","小麦"],["vegetable","野菜"]]:
+  space==="cultivation"?[["plow","耕す"],["grain","小麦"],["vegetable","野菜"]]:
+  animalSpaces.includes(space)?[["animalPasture","牧場へ"],["animalStable","厩へ"]]:[];
+ if(!modes.length)return;
+ const pl=state.public.players[0],host=document.createElement("section");host.className="farmPicker";host.id="farmPicker";
+ const title=document.createElement("h3");title.textContent="農場15マスから入力する（任意）";host.append(title);
+ const explain=document.createElement("p");explain.className="pickerWarning";explain.textContent="配置はまだ確定しません。最後に「確定」で送信し、合法性はゲーム側が判定します。手入力も使用できます。";host.append(explain);
+ const tabs=document.createElement("div");tabs.className="pickerModes";host.append(tabs);
+ let purpose=modes[0][0];const pendingFence=new Set();
+ const grid=document.createElement("div");grid.className="field pickerCells";host.append(grid);
+ const footer=document.createElement("div");footer.className="buttons";host.append(footer);
+ if(modes.some(m=>m[0]==="fence")){
+  const addGroup=document.createElement("button");addGroup.type="button";addGroup.id="pickerAddPasture";addGroup.textContent="選択マスを牧場グループに追加";
+  addGroup.onclick=()=>{
+   if(!pendingFence.size)return;
+   const field=$("pastures"),next=[...pendingFence].sort((a,b)=>a-b).join(",");
+   field.value=[field.value.trim(),next].filter(Boolean).join(";");pendingFence.clear();draw();
+  };footer.append(addGroup);
+ }
+ if(animalSpaces.includes(space)){
+  const label=document.createElement("label");label.textContent="割り当てる頭数 ";
+  const quantity=document.createElement("input");quantity.id="pickerAnimalCount";quantity.type="number";quantity.min="1";quantity.step="1";quantity.value="1";quantity.style.width="84px";label.append(quantity);footer.append(label);
+ }
+ const clear=document.createElement("button");clear.type="button";clear.id="pickerClear";clear.textContent="マス選択を解除";
+ clear.onclick=()=>{pendingFence.clear();draw();};footer.append(clear);
+ const preview=document.createElement("div");preview.className="pickerPreview";preview.id="pickerPreview";preview.setAttribute("role","status");host.append(preview);
+ function parts(id){return ($(id)?.value||"").split(",").map(x=>x.trim()).filter(Boolean);}
+ function toggleCsv(id,n){const xs=parts(id).map(Number),at=xs.indexOf(n);if(at>=0)xs.splice(at,1);else xs.push(n);$(id).value=xs.sort((a,b)=>a-b).join(",");}
+ function selectedMap(){
+  const selected=new Set();
+  if(purpose==="plow"&&space==="farmland")selected.add(Number($("cell").value));
+  if(purpose==="plow"&&space==="cultivation"&&$("plow").value.trim()!=="")selected.add(Number($("plow").value));
+  if(["rooms","stables","animalStable"].includes(purpose)){
+   const id=purpose==="animalStable"?"animalStables":purpose;
+   for(const item of parts(id))if(/^\\d+$/.test(item))selected.add(Number(item));
+  }
+  if(["grain","vegetable"].includes(purpose)){
+   for(const item of parts("plants")){
+    const [index,crop]=item.split(":");if(Number.isInteger(Number(index))&&
+      (crop==="小麦"||crop==="grain"?purpose==="grain":crop==="野菜"||crop==="vegetable"?purpose==="vegetable":false))selected.add(Number(index));
+   }
+  }
+  if(purpose==="fence")for(const n of pendingFence)selected.add(n);
+  if(purpose==="animalPasture"){
+   const assigned=parts("animalPastures").map(x=>Number(x.split(":")[0]));
+   for(const pasture of pl.pastures||[])if(assigned.includes(pasture.id))for(const n of pasture.cells)selected.add(n);
+  }
+  return selected;
+ }
+ function draw(){
+  tabs.replaceChildren();
+  for(const [id,label] of modes){const b=document.createElement("button");b.type="button";b.textContent=label;b.className=id===purpose?"active":"";b.setAttribute("aria-pressed",String(id===purpose));b.onclick=()=>{purpose=id;draw();};tabs.append(b);}
+  const selected=selectedMap();grid.replaceChildren();
+  for(let n=0;n<pl.farm.length;n++){
+   const cell=pl.farm[n],[label,cls]=tileName(cell),b=document.createElement("button");
+   b.type="button";b.className="cell "+cls;b.dataset.cell=String(n);b.setAttribute("aria-pressed",String(selected.has(n)));
+   b.setAttribute("aria-label","農場マス"+n+" "+label+(selected.has(n)?" 選択中":""));
+   b.textContent=n+" "+label+(cell.stable?" ▣":"");
+   b.onclick=()=>{
+    if(purpose==="plow")$(space==="farmland"?"cell":"plow").value=String(n);
+    else if(purpose==="rooms"||purpose==="stables"||purpose==="animalStable")toggleCsv(purpose==="animalStable"?"animalStables":purpose,n);
+    else if(purpose==="fence"){if(pendingFence.has(n))pendingFence.delete(n);else pendingFence.add(n);}
+    else if(purpose==="grain"||purpose==="vegetable"){
+     const others=parts("plants").filter(x=>Number(x.split(":")[0])!==n);
+     const current=parts("plants").find(x=>Number(x.split(":")[0])===n);
+     const crop=purpose==="grain"?"小麦":"野菜";
+     if(!current||current.split(":")[1]!==crop)others.push(n+":"+crop);
+     $("plants").value=others.join(",");
+    }else if(purpose==="animalPasture"){
+     const pasture=(pl.pastures||[]).find(p=>p.cells.includes(n));
+     if(!pasture){preview.textContent="選択したマスは牧場ではありません。牧場内のマスを選択してください。";return;}
+     const count=Number($("pickerAnimalCount").value);
+     if(!Number.isInteger(count)||count<1){preview.textContent="頭数は1以上の整数で入力してください。";return;}
+     const assigned=parts("animalPastures").filter(x=>Number(x.split(":")[0])!==pasture.id);
+     assigned.push(pasture.id+":"+count);$("animalPastures").value=assigned.join(",");
+    }
+    draw();
+   };
+   grid.append(b);
+  }
+  const ids=["cell","plow","rooms","stables","pastures","plants","animalPastures","animalStables"],values=ids.filter(id=>$(id)).map(id=>id+" = "+($(id).value||"（未入力）"));
+  if(pendingFence.size)values.push("編集中の牧場 = "+[...pendingFence].sort((a,b)=>a-b).join(","));
+  preview.textContent="入力プレビュー（未確定）\n"+values.join("\n");
+ }
+ $("fields").append(host);
+ $("fields").oninput=event=>{if(event.target.closest("#farmPicker"))return;draw();};
+ $("fields").onchange=event=>{if(event.target.closest("#farmPicker"))return;draw();};
+ draw();
+}
 function sourceField(){
 select("動物の場所","sourceType",[["Pet","家"],["Pasture","牧場"],["Stable","厩"]]);add("牧場ID / 厩マス（家なら不要）","sourceIndex","number",0);
 }
