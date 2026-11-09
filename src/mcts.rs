@@ -170,12 +170,12 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     };
     let _start_player = rng_streams.round.gen_range(0..players);
 
-        // Build PublicState directly from observation + sampled start_player.
-        // active_player and start_player are preserved from the observation
-        // (old behavior: game.public = obs.public.clone() overwrote the sampled values).
-        // The internal RNG's start_player draw is still consumed to keep its state
-        // identical to from_card_state.
-        let public = obs.public.clone();
+    // Build PublicState directly from observation + sampled start_player.
+    // active_player and start_player are preserved from the observation
+    // (old behavior: game.public = obs.public.clone() overwrote the sampled values).
+    // The internal RNG's start_player draw is still consumed to keep its state
+    // identical to from_card_state.
+    let public = obs.public.clone();
 
     let config = Config {
         seed,
