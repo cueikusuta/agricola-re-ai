@@ -17,24 +17,26 @@ if not summary_path:
 with open(summary_path, "a") as out:
     out.write("# Performance Baseline (Step 0, #237)\n")
     out.write(f"**SHA:** {sha}\n")
-    out.write(f"**Harness:** perf_baseline v1\n")
+    out.write(f"**Harness:** perf_baseline v{d['harness_version']} (alloc_instrumented={d.get('alloc_instrumented')})\n")
     out.write(f"**Engine:** {d['engine_version']}  **Rules:** {d['rules_version']}  **Log:** {d['log_version']}\n")
     out.write(f"**Seed:** {d['seed']}  **Quick mode:** {d['quick_mode']}\n\n")
 
-    out.write("## Scenarios\n")
-    out.write("| Scenario | Clone (µs) | CardSet validate (µs) | CardState validate (µs) | Observation (µs) | Validate action (µs) | Apply search (µs) | Apply committed (µs) | Sample game (µs) | Save (B) |\n")
+    out.write("## Scenarios (median µs)\n")
+    out.write("| Scenario | Round | Phase | Clone | Observation | Validate action | Apply search | Apply committed | Sample game | Save (B) |\n")
     out.write("|---|---|---|---|---|---|---|---|---|---|\n")
     for s in d["scenarios"]:
         out.write(
-            f"| {s['name']} | {s['clone_us']:.1f} | {s['cardset_validate_us']:.1f} | "
-            f"{s['cardstate_validate_us']:.1f} | {s['observation_us']:.1f} | "
-            f"{s['validate_action_us']:.1f} | {s['apply_search_us']:.1f} | "
-            f"{s['apply_committed_us']:.1f} | {s['sample_game_us']:.1f} | "
+            f"| {s['name']} | {s['round']} | {s['phase']} | "
+            f"{s['clone']['median_us']:.1f} | {s['observation']['median_us']:.1f} | "
+            f"{s['validate_action']['median_us']:.1f} | "
+            f"{s['apply_search']['median_us']:.1f} | "
+            f"{s['apply_committed']['median_us']:.1f} | "
+            f"{s['sample_game']['median_us']:.1f} | "
             f"{s['save_json_bytes']} |\n"
         )
     out.write("\n")
 
-    out.write("## Fixed-sim searches (32 sims)\n")
+    out.write("## Fixed-sim searches (32 sims, 3 reps)\n")
     out.write("| Scenario | Policy | Completed | Sims/s | Elapsed (ms) | Choice |\n")
     out.write("|---|---|---|---|---|---|\n")
     for s in d["fixed_sim_searches"]:
