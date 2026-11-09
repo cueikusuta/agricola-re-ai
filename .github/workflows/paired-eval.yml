@@ -119,39 +119,10 @@ on:
         type: number
         default: 0
         required: true
-      baseline_puct_simulations:
-        description: 'Baseline-arm PUCT simulations (freeze all eight baseline-puct inputs together, #219)'
-        type: number
-        default: 32
-        required: true
-      baseline_puct_tree_depth:
-        type: number
-        default: 2
-        required: true
-      baseline_puct_c:
-        type: number
-        default: 1.5
-        required: true
-      baseline_puct_prior_temp:
-        type: number
-        default: 3
-        required: true
-      baseline_puct_value_temp:
-        type: number
-        default: 8
-        required: true
-      baseline_puct_leaf:
-        type: choice
-        options: ['terminal', 'heuristic']
-        default: 'terminal'
-        required: true
-      baseline_puct_root_limit:
-        type: number
-        default: 0
-        required: true
-      baseline_puct_final_prior:
-        type: number
-        default: 0
+      baseline_puct:
+        description: 'Frozen baseline-arm PUCT config: sims,depth,c,priorTemp,valueTemp,leaf,rootLimit,finalPrior (#219). The dispatch API allows 25 inputs, so the eight baseline-puct-* flags travel as one CSV.'
+        type: string
+        default: '32,2,1.5,3,8,terminal,0,0'
         required: true
 
 permissions:
@@ -319,14 +290,7 @@ jobs:
       PUCT_VALUE_TEMP: ${{ inputs.puct_value_temp }}
       PUCT_ROOT_LIMIT: ${{ inputs.puct_root_limit }}
       PUCT_FINAL_PRIOR: ${{ inputs.puct_final_prior }}
-      BASELINE_PUCT_SIMULATIONS: ${{ inputs.baseline_puct_simulations }}
-      BASELINE_PUCT_TREE_DEPTH: ${{ inputs.baseline_puct_tree_depth }}
-      BASELINE_PUCT_C: ${{ inputs.baseline_puct_c }}
-      BASELINE_PUCT_PRIOR_TEMP: ${{ inputs.baseline_puct_prior_temp }}
-      BASELINE_PUCT_VALUE_TEMP: ${{ inputs.baseline_puct_value_temp }}
-      BASELINE_PUCT_LEAF: ${{ inputs.baseline_puct_leaf }}
-      BASELINE_PUCT_ROOT_LIMIT: ${{ inputs.baseline_puct_root_limit }}
-      BASELINE_PUCT_FINAL_PRIOR: ${{ inputs.baseline_puct_final_prior }}
+      BASELINE_PUCT_SPEC: ${{ inputs.baseline_puct }}
     steps:
       - uses: actions/checkout@v6
       - name: Validate dispatch parameters before building
@@ -344,6 +308,21 @@ jobs:
           if [ "$CANDIDATE" = "$BASELINE" ]; then test "$CANDIDATE" = "puct"; fi
           if [[ "$CARDS" != "none" ]]; then test "$PLAYERS" -eq 2; fi
           if [[ "$SEARCH_MODE" == "time-budgeted" ]]; then test "$DECISION_BUDGET_MS" -gt 0; fi
+          # Split the frozen baseline PUCT configuration (#219) into the eight
+          # --baseline-puct-* flag values, validating the shape up front.
+          IFS=',' read -r -a BASELINE_PUCT_PARTS <<< "$BASELINE_PUCT_SPEC"
+          test "${#BASELINE_PUCT_PARTS[@]}" -eq 8
+          case "${BASELINE_PUCT_PARTS[5]}" in terminal|heuristic) ;; *) echo "baseline_puct leaf must be terminal or heuristic" >&2; exit 1;; esac
+          {
+            echo "BASELINE_PUCT_SIMULATIONS=${BASELINE_PUCT_PARTS[0]}"
+            echo "BASELINE_PUCT_TREE_DEPTH=${BASELINE_PUCT_PARTS[1]}"
+            echo "BASELINE_PUCT_C=${BASELINE_PUCT_PARTS[2]}"
+            echo "BASELINE_PUCT_PRIOR_TEMP=${BASELINE_PUCT_PARTS[3]}"
+            echo "BASELINE_PUCT_VALUE_TEMP=${BASELINE_PUCT_PARTS[4]}"
+            echo "BASELINE_PUCT_LEAF=${BASELINE_PUCT_PARTS[5]}"
+            echo "BASELINE_PUCT_ROOT_LIMIT=${BASELINE_PUCT_PARTS[6]}"
+            echo "BASELINE_PUCT_FINAL_PRIOR=${BASELINE_PUCT_PARTS[7]}"
+          } >> "$GITHUB_ENV"
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked --bin paired_eval
       - name: Evaluate distinct complete seed blocks
