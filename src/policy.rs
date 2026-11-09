@@ -168,8 +168,7 @@ fn empty_room_target(p: &Player) -> Option<usize> {
 fn stable_target(p: &Player) -> Option<usize> {
     (0..FARM_CELLS)
         .find(|&i| {
-            matches!(p.farm[i].tile, Tile::Empty)
-                && crate::engine::stable_site_available(p, i)
+            matches!(p.farm[i].tile, Tile::Empty) && crate::engine::stable_site_available(p, i)
         })
         .or_else(|| {
             (0..FARM_CELLS).find(|&i| {
