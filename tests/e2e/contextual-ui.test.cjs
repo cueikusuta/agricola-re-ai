@@ -50,6 +50,13 @@ test("Issue #246: compact icon-led game board and accessible contextual help",as
     await page.locator("#editor").waitFor({state:"visible"});
     await page.locator("#cancel").click();
     await page.locator("#editor").waitFor({state:"hidden"});
+    assert.ok(await page.locator("#quickNew").isVisible(),"new match remains one click away");
+    assert.ok(await page.locator("#quickSave").isVisible(),"save remains one click away");
+    if(width===1280){
+      const download=page.waitForEvent("download");
+      await page.locator("#quickSave").click();
+      assert.match((await download).suggestedFilename(),/\.json$/);
+    }
     assert.deepEqual(errors,[]);
     const pageWidth=await page.evaluate(()=>document.documentElement.scrollWidth);
     assert.ok(pageWidth<=width+2,"no overflow at "+width+"px, was "+pageWidth);
