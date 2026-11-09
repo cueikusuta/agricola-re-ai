@@ -23,8 +23,8 @@ test("Issue #246: compact icon-led game board and accessible contextual help",as
     assert.ok(await page.locator("#actions .actionGlyph").count()>0,"action tiles contain pictograms");
     assert.equal(await page.locator("#draftPanel .compactHistory").getAttribute("open"),null,
       "draft explanation defaults collapsed");
-    assert.equal(await page.locator(".operationsPanel .compactHistory").getAttribute("open"),null,
-      "history defaults collapsed");
+    assert.ok(await page.locator(".operationsPanel .recentActions #history").count()===1,
+      "recent action history stays available as one compact line");
     const first=page.locator("#actions button[data-space]").first();
     const tile=first.locator("xpath=..");
     const info=tile.locator(".tileInfo");
@@ -41,6 +41,7 @@ test("Issue #246: compact icon-led game board and accessible contextual help",as
     assert.equal(await tile.locator(".tileTooltip").isVisible(),true);
     await page.keyboard.press("Escape");
     assert.equal(await info.getAttribute("aria-expanded"),"false","Escape clears pinned help");
+    assert.equal(await tile.locator(".tileTooltip").isVisible(),false,"Escape closes the tooltip even while info retains focus");
     await info.click();
     assert.equal(await info.getAttribute("aria-expanded"),"true","touch/click info opens tooltip");
     await info.click();
