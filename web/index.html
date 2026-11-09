@@ -312,7 +312,7 @@ case "meeting_place":case "family_growth_with_room":case "modest_family_growth":
 default:return "None";
 }}
 let editorRestoreFocus=null;
-function openEditor(title,hint,what,space){editorRestoreFocus=document.activeElement;mode=what;selectedSpace=space;$("fields").replaceChildren();$("editorTitle").textContent=title;$("editorHint").textContent=hint;$("editor").showModal();const first=$("fields").querySelector("input:not([disabled]),select:not([disabled]),textarea:not([disabled])");if(first)first.focus();}
+function openEditor(title,hint,what,space){editorRestoreFocus=document.activeElement;mode=what;selectedSpace=space;$("fields").oninput=null;$("fields").onchange=null;$("fields").replaceChildren();$("editorTitle").textContent=title;$("editorHint").textContent=hint;$("editor").showModal();const first=$("fields").querySelector("input:not([disabled]),select:not([disabled]),textarea:not([disabled])");if(first)first.focus();}
 $("editor").addEventListener("close",()=>{const target=editorRestoreFocus&&editorRestoreFocus.isConnected?editorRestoreFocus:$("actions").querySelector("button:not([disabled])")||$("free");if(target&&!target.disabled)target.focus();editorRestoreFocus=null;});
 function appendHint(space,hints){
 const parts=[];if(!(state.legal||[]).includes(space))parts.push("このスペースは現在のAI候補に含まれません。合法な詳細を入力すれば実行できます。");
