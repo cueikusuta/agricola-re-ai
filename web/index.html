@@ -242,8 +242,8 @@ footer{color:#705e41;font-size:12px}
 </style></head>
 <body><div class="screen">
 <header class="tableHeader">
-  <div class="brandLockup"><span class="brandLeaf" aria-hidden="true">✦</span><div><h1>アグリコラ <span class="brandEn">AGRICOLA</span></h1><span class="brandSub">REVISED EDITION · 人間 vs AI</span></div></div>
-  <nav class="topNav" aria-label="画面内の移動"><a href="#actionPanel">アクション盤</a><a href="#playerFarmPanel">農場</a><a href="#cardsPanel">カード</a><a href="#gameSettings">対戦設定</a></nav>
+  <div class="brandLockup"><span class="brandLeaf" aria-hidden="true">✦</span><div><h1>アグリコラ <span class="brandEn">AGRICOLA</span></h1><span class="brandSub">REVISED · 人間 vs AI</span></div></div>
+  <nav class="topNav" aria-label="画面内の移動"><a href="#actionPanel" title="アクション盤へ"><span aria-hidden="true">🎯</span> 盤面</a><a href="#playerFarmPanel" title="自分と相手の農場へ"><span aria-hidden="true">🏡</span> 農場</a><a href="#cardsPanel" title="カード一覧へ"><span aria-hidden="true">🃏</span> カード</a><a href="#gameSettings" title="対戦設定へ"><span aria-hidden="true">⚙️</span> 設定</a></nav>
 </header>
 <section class="panel tableHud" id="turnBar" aria-live="polite">
 <div class="turnInfo"><span id="turnWorkers" class="workerBadge"></span><span id="turnActions" class="minor"></span><span id="turnView" class="minor"></span></div>
@@ -253,25 +253,25 @@ footer{color:#705e41;font-size:12px}
 
 
 <main class="tabletopLayout" id="tabletopLayout"><div class="tabletopMain"><section class="panel actionTablePanel" id="actionPanel">
- <div class="sectionEyebrow">ACTION BOARD · 労働アクション</div><div class="actionPanelHeading"><h2 id="actionTitle">アクションボード</h2><span class="roundPill" id="nextHarvest">次の収穫まで —</span></div>
+ <div class="actionPanelHeading"><h2 id="actionTitle">🎯 アクション盤</h2><span class="roundPill" id="nextHarvest">次の収穫まで —</span><details id="boardHelp" class="compactHelp"><summary aria-label="アクションの操作説明" title="操作方法を見る">ⓘ</summary><div class="helpContent">盤面のアクションをクリックしてワーカーを配置。<strong>ⓘ</strong>で詳細を表示できます。使用済みは駒で表示します。</div></details></div>
  <p id="boardSummary" aria-live="polite"></p><div id="notice"></div>
  <div class="actions actionBoard" id="actions" aria-label="使用可能なアクションボード"></div>
  <div class="buttons" id="actionNav"></div><div id="usedActions" aria-label="今ラウンドの使用済みスペース"></div>
 </section></div><aside class="tabletopRail"><section class="panel farmPanel" id="playerFarmPanel">
-  <div class="sectionEyebrow">YOUR FARMYARD · 個人ボード</div>
+  
   <div class="tabs" id="tabs" role="group" aria-label="表示するプレイヤーの農場"></div>
   <div class="boardArea">
     <div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field farmField" aria-label="5×3マスの農場"></div></div>
     <div class="stats"><h2>ストック・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p></div>
   </div>
 </section>
-<section class="panel rivalsPanel" id="opponentPanel"><div class="sectionEyebrow">OTHER FARMYARDS · 比較する農場</div><h2>他のプレイヤー</h2><div id="opponentBoards" aria-label="他のプレイヤーの公開農場"></div></section></aside></main>
+<section class="panel rivalsPanel" id="opponentPanel"><h2>👥 ほかの農場</h2><div id="opponentBoards" aria-label="他のプレイヤーの公開農場"></div></section></aside></main>
 <section class="panel cardsPanel" id="cardsPanel">
- <div class="sectionEyebrow">CARDS · 職業と進歩</div><div class="cardShelfHeading"><h2>カードエリア</h2><p id="hand" class="minor"></p></div>
+ <div class="cardShelfHeading"><h2>🃏 カード</h2><p id="hand" class="minor"></p></div>
  <div id="cardBrowser" aria-label="自分の手札と公開された使用済みカード"></div>
  <details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details>
 </section>
-<section class="panel operationsPanel"><h2>任意の操作</h2><button id="free">食料変換・動物の配置換え・廃棄</button><p class="minor">ワーカーを使わない操作。エンジンが合法性を判定します。</p><p id="history"></p></section>
+<section class="panel operationsPanel"><h2>🧺 任意操作</h2><button id="free" title="調理・食料変換・家畜の移動・廃棄">食料変換・家畜の移動</button><details class="compactHelp"><summary aria-label="任意操作の説明" title="操作説明">ⓘ</summary><div class="helpContent">ワーカーを使わない操作です。ゲーム側が合法性を判定します。</div></details><details class="compactHistory"><summary title="直近の操作を表示">🕓 履歴</summary><p id="history"></p></details></section>
 <section class="panel settings" id="gameSettings">
 <label>人数 <select id="players"><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option></select></label>
 <label><input id="extra" type="checkbox">追加アクション</label>
@@ -296,10 +296,10 @@ footer{color:#705e41;font-size:12px}
 <label>CPUのドラフトAI <select id="draftAi"><option value="random">ランダム</option><option value="card_value">カード価値</option><option value="synergy">シナジー</option></select></label>
 <button id="draftNew">ドラフト開始</button><button id="draftReset">ドラフト解除</button>
 </div>
-<p class="minor">受渡方向は両カード種別とも時計回り（1P→2P→3P→4P→1P）です。初回スタートプレイヤーはドラフト前に抽選します。フェーズ順は選択式で、出版社付録にある左回りの変則ルールとは異なるプロジェクト採用ルールです。カードプールで「テスト用フィクスチャ」を選んだ場合、カードは<strong>検証用の架空カード</strong>です。「実装済み公式カードプール」は収録数が限られ、公式照合も継続中です。人間は1Pとして選択し、他席は観測可能情報だけで選ぶCPUです。</p>
+<details class="compactHistory"><summary>ⓘ ドラフトの説明</summary><p class="minor">受渡方向は時計回りです。開始プレイヤーはドラフト前に抽選。テスト用フィクスチャは架空カードです。実装済みカードは公式照合中で、参加可能人数に制限があります。人間は1P、ほかはCPUです。</p></details>
 <div id="draftStatus"></div><div id="draftOffered" class="chips"></div><div id="draftActions" class="buttons"></div><div id="draftLog" class="minor"></div>
 </section>
-<footer>1Pが人間、残りはCPU。畑は左上から0〜14番です。種まきは1畑につき種1個を使います。無効な指定は適用されず、内容を直して再送信できます。</footer>
+<footer>1Pが人間 · 詳細は各ⓘ・カード・農場マスで確認できます</footer>
 </div>
 <dialog id="editor"><h2 id="editorTitle"></h2><p class="minor" id="editorHint" role="alert"></p>
 <form id="detailForm"><div class="details" id="fields"></div><div class="buttons" id="editorFooter">
