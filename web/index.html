@@ -450,7 +450,12 @@ const boardGroups=[
  ["家族と仕事",["meeting_place","lessons","extra_lessons","modest_family_growth"]],
  ["ラウンドで追加されたアクション",[]]
 ];
-const spaceGlyphs={forest:"♣",clay_pit:"▦",reed_bank:"≋",fishing:"◒",grain_seeds:"♧",day_laborer:"☼",farmland:"▤",farm_expansion:"⌂",meeting_place:"✦",fencing:"⬡",sheep_market:"♧",pig_market:"♧",cattle_market:"♧",major_improvement:"✧",grain_utilization:"✳",family_growth_with_room:"♙",house_redevelopment:"⌂",vegetable_seeds:"✿",cultivation:"▤"};
+const spaceHelp={forest:"木を集める資源スペース",clay_pit:"粘土を集める資源スペース",reed_bank:"葦を集める資源スペース",fishing:"食料を集める資源スペース",grain_seeds:"穀物を得る",vegetable_seeds:"野菜を得る",day_laborer:"労働による食料収入",farmland:"農場の空きマスを畑にする",farm_expansion:"部屋や厩を建築する",meeting_place:"スタートプレイヤーを選ぶ",fencing:"牧場を柵で囲う",grain_utilization:"種まき・パン焼きを行う",sheep_market:"羊を受け取り収容する",pig_market:"猪を受け取り収容する",cattle_market:"牛を受け取り収容する",family_growth_with_room:"居住スペースを確保して家族を増やす",family_growth_no_room:"家族を増やす",major_improvement:"主要改善などを建設する",lessons:"手札の職業を使用する",extra_lessons:"追加の職業アクション",resource_market:"追加資源を得る",animal_market:"家畜市場を利用する",house_redevelopment:"家を改築する",farm_redevelopment:"改築と柵に関するアクション",cultivation:"畑を耕し種まきする"};
+function closeTileHelp(except){
+ for(const tile of document.querySelectorAll("#actions .actionTile.helpOpen")){
+  if(tile===except)continue;tile.classList.remove("helpOpen");tile.querySelector(".tileInfo")?.setAttribute("aria-expanded","false");
+ }
+}
 function boardGroup(key){if(roundSpaces.has(key))return boardGroups.length-1;const i=boardGroups.findIndex(([,list])=>list.includes(key));return i<0?boardGroups.length-2:i;}
 function tileMeta(key,p){
  const accum=p.accumulations||{},animalsOnBoard=p.animal_accumulations||{};
@@ -479,33 +484,50 @@ function renderActionBoard(available,candidate,p){
   for(const key of groups[i]){
    const occupied=usedSet.has(key),tile=document.createElement("div");
    tile.className="actionTile"+(occupied?" occupied":"");tile.dataset.space=key;
-   const glyph=document.createElement("span");glyph.className="actionGlyph";glyph.textContent=spaceGlyphs[key]||"✧";glyph.setAttribute("aria-hidden","true");
+   const glyph=document.createElement("span");glyph.className="actionGlyph";glyph.textContent=spaceIcons[key]||"🎯";glyph.setAttribute("aria-hidden","true");
    if(occupied){
     const name=document.createElement("strong");name.className="occupiedTitle";name.textContent=names[key]||key;
     const worker=document.createElement("span");worker.className="workerOnTile";worker.setAttribute("aria-hidden","true");
     tile.append(name,glyph,worker);
    }else{
     const button=document.createElement("button");button.type="button";button.dataset.space=key;
-    button.textContent=(names[key]||key)+(candidate.has(key)?"":"（詳細指定）");
+    button.textContent=names[key]||key;button.setAttribute("aria-label",(names[key]||key)+"を選択");
     button.title="ワーカーを置く · "+(names[key]||key);
     button.disabled=busy;button.onclick=()=>openWork(key);
-    tile.append(button,glyph);tile.onclick=e=>{if(!busy&&e.target!==button)openWork(key);};
+    tile.append(button,glyph);tile.onclick=e=>{if(!busy&&!e.target.closest("button,.tileInfo,.tileTooltip"))openWork(key);};
    }
    const meta=document.createElement("div"),value=tileMeta(key,p);meta.className="tileMeta";
-   if(occupied){meta.textContent="このラウンドで使用済み";tile.setAttribute("aria-label",(names[key]||key)+" 使用済み");}
+   if(occupied){meta.textContent="使用済み";tile.setAttribute("aria-label",(names[key]||key)+" 使用済み");}
    else if(value.kind){
     const count=document.createElement("span");count.className="actionCount";
     const dot=document.createElement("span");dot.className="tokenDot "+value.kind;dot.setAttribute("aria-hidden","true");
     count.append(dot,document.createTextNode(value.text));meta.append(count);
-   }else meta.textContent=value.text;
-   tile.append(meta);tiles.append(tile);
+   }else meta.textContent=value.kind?value.text:"";
+   tile.append(meta);
+   const tipId="tile-tip-"+key;
+   const help=document.createElement("span");help.className="tileInfo";help.tabIndex=0;
+   help.setAttribute("role","button");help.setAttribute("aria-label",(names[key]||key)+"の説明");
+   help.setAttribute("aria-expanded","false");help.setAttribute("aria-controls",tipId);
+   help.textContent="ⓘ";
+   const tooltip=document.createElement("div");tooltip.className="tileTooltip";tooltip.id=tipId;tooltip.setAttribute("role","tooltip");
+   const heading=document.createElement("strong");heading.textContent=(spaceIcons[key]||"🎯")+" "+(names[key]||key);
+   const description=document.createElement("span");description.textContent=spaceHelp[key]||"アクションを選んで操作の詳細を指定";
+   tooltip.append(heading,description);
+   if(occupied){const status=document.createElement("small");status.textContent="♟ 今ラウンドは使用済み";tooltip.append(status);}
+   else if(value.kind){const qty=document.createElement("small");qty.textContent="現在の"+value.text;tooltip.append(qty);}
+   const toggle=()=>{const open=!tile.classList.contains("helpOpen");closeTileHelp(tile);tile.classList.toggle("helpOpen",open);help.setAttribute("aria-expanded",String(open));};
+   help.onclick=e=>{e.stopPropagation();toggle();};
+   help.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();toggle();}
+      if(e.key==="Escape"){tile.classList.remove("helpOpen");help.setAttribute("aria-expanded","false");e.stopPropagation();}};
+   tooltip.onclick=e=>e.stopPropagation();
+   tile.append(help,tooltip);tiles.append(tile);
   }
   group.append(tiles);$("actions").append(group);
  }
  const heading=document.createElement("span");heading.textContent="今ラウンド使用済み: ";$("usedActions").append(heading);
  for(const key of used){const tag=document.createElement("span");tag.className="usedSpace";tag.textContent=names[key]||key;$("usedActions").append(tag);}
  if(!used.length){const item=document.createElement("span");item.textContent="なし";$("usedActions").append(item);}
- $("boardSummary").textContent="選択可能 "+available.length+"件 / 使用済み "+used.length+"件（公開情報のみ）";
+ $("boardSummary").textContent="選択可能 "+available.length+"件 / 使用済み "+used.length+"件";
 }
 function render(){
 if(!state)return;
@@ -522,13 +544,13 @@ const pl=shown.players[viewPlayer];$("farmName").textContent=(viewPlayer+1)+"P�
 for(let i=0;i<pl.farm.length;i++)$("farm").append(renderFarmSquare(pl,i,false));
 $("stats").replaceChildren();for(const [good,label] of Object.entries(goods))putStats(label,pl.supply[good]);
 putStats("部屋",pl.farm.filter(c=>c.tile==="Room").length);putStats("柵",pl.fences.length);
-$("improvements").textContent="主要改善: "+(pl.improvements.map(x=>improvements[x]||x).join(" / ")||"なし")+" / 職業・小改善: "+(pl.played_cards||[]).map(cardLabel).join(" / ");
+$("improvements").textContent=pl.improvements.length?"🔨 主要改善: "+pl.improvements.map(x=>improvements[x]||x).join(" / "):"";
 $("hand").textContent=viewPlayer===0?"手札: "+state.hand.length+"枚（カードを選ぶと効果を確認できます）":"手札: 非公開";
 renderCardHelp(pl);renderCardBrowser(pl);renderOpponentBoards(shown.players,p,scores);$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
 $("actions").replaceChildren();$("actionNav").replaceChildren();$("usedActions").replaceChildren();$("boardSummary").textContent="";$("free").disabled=busy||!!harvest||p.finished;
 if(p.finished){$("notice").textContent="最終順位: "+scores.rank.map((r,i)=>(i+1)+"P "+r+"位").join("、");return;}
 if(harvest){$("notice").textContent=harvest.phase==="feeding"?"収穫：給餌順と工房加工を選択":"収穫：繁殖する子の置き場所を選択";const b=document.createElement("button");b.textContent="収穫の詳細を指定";b.onclick=()=>openHarvest();$("actions").append(b);return;}
-$("notice").textContent="1Pの手番です。自動の詳細選択は使用しません。";
+$("notice").textContent="";
 const available=state.available||state.legal||[];const candidate=new Set(state.legal||[]);
 renderActionBoard(available,candidate,p);
 }
