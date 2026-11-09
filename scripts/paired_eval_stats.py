@@ -40,6 +40,54 @@ def finite_number(value: object) -> bool:
     return type(value) is float and math.isfinite(value)
 
 
+# #219 review P3-1: the config ID must agree with the scalar configuration
+# fields recorded on the same row. The ID is emitted by paired_eval with Rust
+# f64 Display formatting ("3", not "3.0"), so segments are compared numerically.
+PUCT_CONFIG_ID_RE = __import__("re").compile(
+    r"^puct-s(\d+)-d(\d+)-c([^\-]+)-pt([^\-]+)-vt([^\-]+)-(heuristic|terminal)-rl(\d+)-fp([^\-]+)$"
+)
+# Maps config-ID segments to the row's scalar fields (candidate prefix empty).
+PUCT_ID_SEGMENT_KEYS = (
+    ("s", "puct_simulations_config", "baseline_puct_simulations"),
+    ("d", "puct_tree_depth", "baseline_puct_tree_depth"),
+    ("c", "puct_c", "baseline_puct_c"),
+    ("pt", "puct_prior_temperature", "baseline_puct_prior_temperature"),
+    ("vt", "puct_value_temperature", "baseline_puct_value_temperature"),
+    ("leaf", "puct_leaf", "baseline_puct_leaf"),
+    ("rl", "puct_root_limit", "baseline_puct_root_limit"),
+    ("fp", "puct_final_prior_weight", "baseline_puct_final_prior"),
+)
+
+
+def _puct_id_disagrees_with_scalars(config_id: str, row: dict, baseline: bool) -> bool:
+    """True only when both sides are present and provably contradict.
+
+    Legacy rows lack either the ID or the baseline scalars and are skipped:
+    absence must not fabricate a failure, but a recorded contradiction must
+    not slip through."""
+    match = PUCT_CONFIG_ID_RE.match(str(config_id))
+    if match is None:
+        return False
+    for index, (_, candidate_key, baseline_key) in enumerate(PUCT_ID_SEGMENT_KEYS):
+        segment = match.group(index + 1)
+        scalar = row.get(baseline_key if baseline else candidate_key)
+        if scalar is None:
+            continue
+        if segment in ("heuristic", "terminal"):
+            if segment != scalar:
+                return True
+            continue
+        try:
+            number = float(segment)
+        except ValueError:
+            return True
+        if not isinstance(scalar, (int, float)) or isinstance(scalar, bool):
+            return True
+        if float(scalar) != number:
+            return True
+    return False
+
+
 def _distinct_puct_configs_allowed(rows) -> bool:
     """#219: allow candidate == baseline == puct only when the rows prove the
     two PUCT configurations differ. Rows written before #219 have no config
@@ -415,6 +463,14 @@ def validate_and_report(
         value = next(iter(observed))
         if value is not None:
             puct_config_ids[key] = value
+            # Cross-check the ID against the scalar configuration fields
+            # recorded on the same rows (#219 review P3-1).
+            baseline_side = key == "baseline_puct_config_id"
+            for row in rows:
+                if _puct_id_disagrees_with_scalars(value, row, baseline_side):
+                    raise ValueError(
+                        f"{key} disagrees with the recorded configuration fields"
+                    )
     values = defaultdict(list)
     deltas = []
     for block in range(first_block, first_block + blocks):
