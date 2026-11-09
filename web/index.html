@@ -329,44 +329,121 @@ if(key==="Room")return ["部屋","room"];if(key==="Pasture")return ["牧場","pa
 if(key==="Field"){const f=t.Field;return [f.crop==="grain"?"麦畑":f.crop==="vegetable"?"野菜畑":"畑","field-tile"];}
 return [cell.stable?"厩":"空き",""];}
 function putStats(label,value){const d=document.createElement("div");d.className="stat";d.textContent=label+" "+value;$("stats").append(d);}
-// #239: Render only spaces published by the server. Never invent future round spaces.
+// Farm renderer is shared with public opponent overviews: all values come from public.players.
+function farmDecor(player,index){
+ const cell=player.farm[index],[label,cls]=tileName(cell),tile=cell.tile;
+ const kind=typeof tile==="string"?tile:Object.keys(tile||{})[0]||"";
+ let icon="";let note=label;
+ if(kind==="Room")icon="⌂";
+ else if(kind==="Field"){const crop=tile.Field?.crop;icon=crop==="grain"?"🌾":crop==="vegetable"?"🥕":"〰";
+  note=label+(tile.Field?.remaining?(" "+tile.Field.remaining):"");
+ }else if(kind==="Pasture"){
+  const id=tile.Pasture?.id,pasture=(player.pastures||[]).find(x=>x.id===id);
+  const animal=pasture?.animal;icon=animal==="sheep"?"🐑":animal==="boar"?"🐗":animal==="cattle"?"🐄":"♧";
+  note=animal?(animals[animal]||animal)+" "+pasture.quantity+"頭":"牧場";
+ }else if(cell.stable)icon="♜";
+ return {label:note,cls,icon};
+}
+function renderFarmSquare(player,index,mini){
+ const cell=player.farm[index],info=farmDecor(player,index);
+ const d=document.createElement("div");d.className=(mini?"miniCell":"cell")+" "+info.cls;
+ d.title="農場マス"+index+" "+info.label+(cell.stable?"・厩あり":"");
+ d.setAttribute("aria-label",d.title);
+ if(mini){d.textContent=info.icon||"·";return d;}
+ const indexTag=document.createElement("span");indexTag.className="cellIndex";indexTag.textContent=String(index);
+ const icon=document.createElement("span");icon.className="cellIcon";icon.textContent=info.icon||"·";icon.setAttribute("aria-hidden","true");
+ const label=document.createElement("span");label.className="cellLabel";label.textContent=info.label+(cell.stable&&info.icon!=="♜"?" ▣":"");
+ d.append(indexTag,icon,label);return d;
+}
+function renderOpponentBoards(players,p,scores){
+ const host=$("opponentBoards");host.replaceChildren();
+ for(const person of players){
+  if(person.id===viewPlayer)continue;
+  const card=document.createElement("article");card.className="opponentCard"+(p.active_player===person.id?" isActive":"");
+  card.dataset.player=String(person.id);
+  const left=document.createElement("div");
+  const select=document.createElement("button");select.className="opponentSelect";select.type="button";
+  select.textContent=(person.id+1)+"Pの農場 "+(p.start_player===person.id?"★":"");
+  select.title=(person.id+1)+"Pの農場を大きく表示";select.onclick=()=>{viewPlayer=person.id;render();};
+  const miniature=document.createElement("div");miniature.className="miniFarm";
+  miniature.setAttribute("aria-label",(person.id+1)+"Pの5×3農場");
+  for(let i=0;i<person.farm.length;i++)miniature.append(renderFarmSquare(person,i,true));
+  left.append(select,miniature);
+  const right=document.createElement("div");right.className="opponentMeta";
+  const remaining=Math.max(0,(p.work_quota[person.id]||0)-(p.workers_placed[person.id]||0));
+  const score=scores.scores[person.id]?.total??"–";
+  const summary=document.createElement("div");summary.textContent="家族"+person.family+"人 · 残"+remaining+"手 · "+score+"点";
+  const supplies=document.createElement("div");supplies.className="opponentSupply";
+  supplies.textContent=Object.entries(goods).map(([key,name])=>name+":"+(person.supply[key]??0)).join("  ");
+  const played=document.createElement("div");played.className="opponentSupply";
+  played.textContent="公開カード "+(person.played_cards||[]).length+"枚";
+  right.append(summary,supplies,played);card.append(left,right);host.append(card);
+ }
+}
+// #246: Use only published, unlocked/used action spaces; future round cards are never invented.
+const roundSpaces=new Set(["major_improvement","fencing","grain_utilization","sheep_market","family_growth_with_room","house_redevelopment","western_quarry","vegetable_seeds","pig_market","cattle_market","eastern_quarry","family_growth_no_room","cultivation","farm_redevelopment"]);
 const boardGroups=[
- ["資源・採集",["forest","clay_pit","reed_bank","fishing","western_quarry","eastern_quarry","copse","grove","hollow","traveling_players","resource_market","animal_market"]],
- ["農場・建築",["farmland","farm_expansion","fencing","grain_utilization","cultivation","farm_redevelopment","house_redevelopment","sheep_market","pig_market","cattle_market"]],
- ["家族・カード",["meeting_place","lessons","extra_lessons","major_improvement","family_growth_with_room","family_growth_no_room","modest_family_growth"]],
- ["その他",[]]
+ ["採集と資源",["forest","clay_pit","reed_bank","fishing","copse","grove","hollow","traveling_players","resource_market","animal_market"]],
+ ["畑と家づくり",["farmland","farm_expansion","grain_seeds","day_laborer"]],
+ ["家族と仕事",["meeting_place","lessons","extra_lessons","modest_family_growth"]],
+ ["ラウンドで追加されたアクション",[]]
 ];
-function boardGroup(key){return boardGroups.findIndex(([,list])=>list.includes(key))>=0?boardGroups.findIndex(([,list])=>list.includes(key)):boardGroups.length-1;}
+const spaceGlyphs={forest:"♣",clay_pit:"▦",reed_bank:"≋",fishing:"◒",grain_seeds:"♧",day_laborer:"☼",farmland:"▤",farm_expansion:"⌂",meeting_place:"✦",fencing:"⬡",sheep_market:"♧",pig_market:"♧",cattle_market:"♧",major_improvement:"✧",grain_utilization:"✳",family_growth_with_room:"♙",house_redevelopment:"⌂",vegetable_seeds:"✿",cultivation:"▤"};
+function boardGroup(key){if(roundSpaces.has(key))return boardGroups.length-1;const i=boardGroups.findIndex(([,list])=>list.includes(key));return i<0?boardGroups.length-2:i;}
 function tileMeta(key,p){
  const accum=p.accumulations||{},animalsOnBoard=p.animal_accumulations||{};
- if(Object.prototype.hasOwnProperty.call(accum,key))return "累積資源 "+accum[key]+"個";
- if(Object.prototype.hasOwnProperty.call(animalsOnBoard,key))return "累積家畜 "+animalsOnBoard[key]+"頭";
- return "詳細を選んで確定";
+ if(Object.prototype.hasOwnProperty.call(accum,key)){
+  const material=(["clay_pit","hollow"].includes(key)?"clay":["reed_bank"].includes(key)?"reed":["fishing","meeting_place","traveling_players"].includes(key)?"food":["western_quarry","eastern_quarry"].includes(key)?"stone":"wood");
+  return {text:"累積 "+accum[key]+" 個",kind:material,count:accum[key]};
+ }
+ if(Object.prototype.hasOwnProperty.call(animalsOnBoard,key)){
+  const kind=key==="sheep_market"?"sheep":key==="pig_market"?"boar":"cattle";
+  return {text:"累積 "+animalsOnBoard[key]+" 頭",kind,count:animalsOnBoard[key]};
+ }
+ return {text:"選んで詳細を指定",kind:null,count:null};
 }
 function renderActionBoard(available,candidate,p){
- const groups=boardGroups.map(()=>[]);for(const key of available)groups[boardGroup(key)].push(key);
+ const used=Array.isArray(p.used)?p.used:[];
+ const usedSet=new Set(used);
+ const unique=[...new Set([...available,...used])];
+ const groups=boardGroups.map(()=>[]);
+ for(const key of unique)groups[boardGroup(key)].push(key);
  $("actions").replaceChildren();$("actionNav").replaceChildren();$("usedActions").replaceChildren();
  for(let i=0;i<groups.length;i++){
   if(!groups[i].length)continue;
-  const group=document.createElement("section");group.className="actionGroup";
+  const group=document.createElement("section");group.className="actionGroup";group.dataset.group=String(i);
   const heading=document.createElement("h3");heading.textContent=boardGroups[i][0];group.append(heading);
   const tiles=document.createElement("div");tiles.className="actionTiles";
   for(const key of groups[i]){
-   const tile=document.createElement("div");tile.className="actionTile";tile.dataset.space=key;
-   const b=document.createElement("button");b.type="button";b.dataset.space=key;
-   b.textContent=(names[key]||key)+(candidate.has(key)?"":"（詳細指定）");
-   b.title=candidate.has(key)?"アクションを選び詳細を入力":"詳細を指定すれば選べるアクション";
-   b.disabled=busy;b.onclick=()=>openWork(key);
-   const meta=document.createElement("div");meta.className="tileMeta";meta.textContent=tileMeta(key,p);
-   tile.append(b,meta);tiles.append(tile);
+   const occupied=usedSet.has(key),tile=document.createElement("div");
+   tile.className="actionTile"+(occupied?" occupied":"");tile.dataset.space=key;
+   const glyph=document.createElement("span");glyph.className="actionGlyph";glyph.textContent=spaceGlyphs[key]||"✧";glyph.setAttribute("aria-hidden","true");
+   if(occupied){
+    const name=document.createElement("strong");name.className="occupiedTitle";name.textContent=names[key]||key;
+    const worker=document.createElement("span");worker.className="workerOnTile";worker.setAttribute("aria-hidden","true");
+    tile.append(name,glyph,worker);
+   }else{
+    const button=document.createElement("button");button.type="button";button.dataset.space=key;
+    button.textContent=(names[key]||key)+(candidate.has(key)?"":"（詳細指定）");
+    button.title="ワーカーを置く · "+(names[key]||key);
+    button.disabled=busy;button.onclick=()=>openWork(key);
+    tile.append(button,glyph);tile.onclick=e=>{if(!busy&&e.target!==button)openWork(key);};
+   }
+   const meta=document.createElement("div");meta.className="tileMeta",value=tileMeta(key,p);
+   if(occupied){meta.textContent="このラウンドで使用済み";tile.setAttribute("aria-label",(names[key]||key)+" 使用済み");}
+   else if(value.kind){
+    const count=document.createElement("span");count.className="actionCount";
+    const dot=document.createElement("span");dot.className="tokenDot "+value.kind;dot.setAttribute("aria-hidden","true");
+    count.append(dot,document.createTextNode(value.text));meta.append(count);
+   }else meta.textContent=value.text;
+   tile.append(meta);tiles.append(tile);
   }
   group.append(tiles);$("actions").append(group);
  }
- const used=Array.isArray(p.used)?p.used:[];
- const heading=document.createElement("span");heading.textContent="使用済み: ";$("usedActions").append(heading);
- for(const key of used){const item=document.createElement("span");item.className="usedSpace";item.textContent=names[key]||key;$("usedActions").append(item);}
+ const heading=document.createElement("span");heading.textContent="今ラウンド使用済み: ";$("usedActions").append(heading);
+ for(const key of used){const tag=document.createElement("span");tag.className="usedSpace";tag.textContent=names[key]||key;$("usedActions").append(tag);}
  if(!used.length){const item=document.createElement("span");item.textContent="なし";$("usedActions").append(item);}
- $("boardSummary").textContent="選択可能 "+available.length+"件 / 使用済み "+used.length+"件（サーバの公開情報）";
+ $("boardSummary").textContent="選択可能 "+available.length+"件 / 使用済み "+used.length+"件（公開情報のみ）";
 }
 function render(){
 if(!state)return;
@@ -374,16 +451,18 @@ renderDraft();
 const p=state.public,scores=state.standings,harvest=state.harvest,shown=harvest?harvest.preview:p;
 $("turn").textContent=p.finished?"対戦終了":harvest?"収穫の詳細を決めてください":"ラウンド "+p.round+"/14・"+(p.active_player+1)+"Pの手番";
 $("summary").textContent=p.players.length+"人戦 / 追加タイル "+(p.additional_action_space_enabled?"ON":"OFF")+" / "+(state.card_enabled?"カードあり":"カードなし");
+const nextHarvest=[4,7,9,11,13,14].find(round=>round>=p.round)||14;
+$("nextHarvest").textContent=p.finished?"最終収穫終了":(nextHarvest===p.round?"このラウンド終了後に収穫":"次の収穫まで "+(nextHarvest-p.round)+" ラウンド");
 renderTurnBar();
 $("tabs").replaceChildren();
 for(const pl of shown.players){const b=document.createElement("button");b.type="button";b.className=viewPlayer===pl.id?"active":"";b.setAttribute("aria-pressed",String(viewPlayer===pl.id));b.textContent=(pl.id+1)+"P "+scores.scores[pl.id].total+"点 残"+Math.max(0,(state.public.work_quota[pl.id]||0)-(state.public.workers_placed[pl.id]||0));b.onclick=()=>{viewPlayer=pl.id;render();};$("tabs").append(b);}
 const pl=shown.players[viewPlayer];$("farmName").textContent=(viewPlayer+1)+"Pの農場（家族"+pl.family+"人）";$("farm").replaceChildren();
-for(let i=0;i<pl.farm.length;i++){const cell=pl.farm[i],[label,cls]=tileName(cell),d=document.createElement("div");d.className="cell "+cls;d.textContent=i+" "+label+(cell.stable?" ▣":"");$("farm").append(d);}
+for(let i=0;i<pl.farm.length;i++)$("farm").append(renderFarmSquare(pl,i,false));
 $("stats").replaceChildren();for(const [good,label] of Object.entries(goods))putStats(label,pl.supply[good]);
 putStats("部屋",pl.farm.filter(c=>c.tile==="Room").length);putStats("柵",pl.fences.length);
 $("improvements").textContent="主要改善: "+(pl.improvements.map(x=>improvements[x]||x).join(" / ")||"なし")+" / 職業・小改善: "+(pl.played_cards||[]).map(cardLabel).join(" / ");
 $("hand").textContent=viewPlayer===0?"手札: "+(state.hand.map(cardLabel).join(" / ")||"なし"):"手札: 非公開";
-renderCardHelp(pl);renderCardBrowser(pl);$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
+renderCardHelp(pl);renderCardBrowser(pl);renderOpponentBoards(shown.players,p,scores);$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
 $("actions").replaceChildren();$("actionNav").replaceChildren();$("usedActions").replaceChildren();$("boardSummary").textContent="";$("free").disabled=busy||!!harvest||p.finished;
 if(p.finished){$("notice").textContent="最終順位: "+scores.rank.map((r,i)=>(i+1)+"P "+r+"位").join("、");return;}
 if(harvest){$("notice").textContent=harvest.phase==="feeding"?"収穫：給餌順と工房加工を選択":"収穫：繁殖する子の置き場所を選択";const b=document.createElement("button");b.textContent="収穫の詳細を指定";b.onclick=()=>openHarvest();$("actions").append(b);return;}
