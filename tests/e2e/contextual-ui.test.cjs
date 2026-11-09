@@ -2,6 +2,7 @@
 const {test}=require("node:test");
 const assert=require("node:assert/strict");
 const {chromium}=require("playwright-core");
+const fs=require("node:fs");
 const baseUrl=process.env.AGRICOLA_WEB_URL||"http://127.0.0.1:8787/";
 
 test("Issue #246: compact icon-led game board and accessible contextual help",async t=>{
@@ -34,6 +35,12 @@ test("Issue #246: compact icon-led game board and accessible contextual help",as
     if(width===1280){
       await first.hover();
       assert.equal(await tile.locator(".tileTooltip").isVisible(),true,"hover shows action description");
+      const tipBox=await tile.locator(".tileTooltip").boundingBox();
+      const hitTooltip=await page.evaluate(({x,y})=>Boolean(document.elementFromPoint(x,y)?.closest(".tileTooltip")),
+        {x:tipBox.x+tipBox.width/2,y:tipBox.y+tipBox.height/2});
+      assert.equal(hitTooltip,false,"tooltip cannot intercept pointer events over an adjacent action");
+      fs.mkdirSync("artifacts",{recursive:true});
+      await page.screenshot({path:"artifacts/bga-tabletop-hover-1280.png"});
     }
     await info.focus();
     await page.keyboard.press("Enter");
@@ -44,6 +51,10 @@ test("Issue #246: compact icon-led game board and accessible contextual help",as
     assert.equal(await tile.locator(".tileTooltip").isVisible(),false,"Escape closes the tooltip even while info retains focus");
     await info.click();
     assert.equal(await info.getAttribute("aria-expanded"),"true","touch/click info opens tooltip");
+    if(width===390){
+      fs.mkdirSync("artifacts",{recursive:true});
+      await page.screenshot({path:"artifacts/bga-tabletop-info-390.png"});
+    }
     await info.click();
     assert.equal(await info.getAttribute("aria-expanded"),"false","second tap closes tooltip");
     await first.click();
