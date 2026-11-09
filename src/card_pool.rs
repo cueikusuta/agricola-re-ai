@@ -20,11 +20,12 @@ use crate::cards::{
     verified_scoring_cards, verified_simple_occupations, verified_worker_bonus_cards,
     CardDefinition, CardKind, CardSet,
 };
-use serde::Serialize;
+use crate::registry::{CardPool, CardRegistry};
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 /// Official cross-check state, mirroring the `#115` ledger values.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ReviewStatus {
     /// No official check has been performed.
@@ -60,7 +61,7 @@ impl ReviewStatus {
 }
 
 /// Player-count eligibility, mirroring the `#115` ledger values.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Eligibility {
     Yes,
@@ -88,7 +89,7 @@ impl Eligibility {
 }
 
 /// Review metadata for one card id. Effect data stays in `CardDefinition`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CardReview {
     pub card_id: String,
     pub review_status: ReviewStatus,
@@ -237,6 +238,7 @@ pub struct PoolGateReport {
 }
 
 /// Machine-readable G1/G2 summary for one player count.
+/// LEGACY: Works with CardSet + Vec<CardReview>.
 pub fn pool_gate_report(set: &CardSet, registry: &[CardReview], players: usize) -> PoolGateReport {
     let occupations = usable_occupations(set, registry, players);
     let minors = usable_minor_improvements(set, registry, players);
@@ -254,6 +256,46 @@ pub fn pool_gate_report(set: &CardSet, registry: &[CardReview], players: usize) 
         registry_verified,
         registry_not_verified: registry.len() - registry_verified,
     }
+}
+
+// ===== NEW API: CardRegistry + CardPool =====
+
+/// Build a PoolGateReport from the new CardRegistry and CardPool (official mode).
+pub fn pool_gate_report_new(registry: &CardRegistry, pool: &CardPool) -> PoolGateReport {
+    let occupations = pool.occupation_count(registry);
+    let minors = pool.minor_improvement_count(registry);
+    let registry_verified = registry
+        .iter()
+        .filter(|c| c.review.review_status == ReviewStatus::Verified)
+        .count();
+    PoolGateReport {
+        players: pool.players(),
+        verified_occupations: occupations,
+        verified_minor_improvements: minors,
+        g1_met: occupations >= G1_MIN_PER_KIND && minors >= G1_MIN_PER_KIND,
+        g2_met: occupations >= G2_TARGET_PER_KIND && minors >= G2_TARGET_PER_KIND,
+        registry_entries: registry.len(),
+        registry_verified,
+        registry_not_verified: registry.len() - registry_verified,
+    }
+}
+
+/// Get the official pool as CardIds (new API).
+pub fn official_pool_card_ids(
+    registry: &CardRegistry,
+    players: usize,
+) -> Vec<crate::registry::CardId> {
+    let pool = CardPool::new(registry, players, false);
+    pool.eligible().to_vec()
+}
+
+/// Get the experimental pool as CardIds (new API).
+pub fn experimental_pool_card_ids(
+    registry: &CardRegistry,
+    players: usize,
+) -> Vec<crate::registry::CardId> {
+    let pool = CardPool::new(registry, players, true);
+    pool.eligible().to_vec()
 }
 
 #[cfg(test)]
@@ -518,5 +560,42 @@ mod tests {
         assert_eq!(report.verified_minor_improvements, G1_MIN_PER_KIND - 1);
         assert!(!report.g1_met);
         assert!(!report.g2_met);
+    }
+
+    // ===== NEW API TESTS =====
+
+    #[test]
+    fn new_api_pool_gate_report_matches_legacy() {
+        let registry = crate::registry::build_default_registry().unwrap();
+        let pool = crate::registry::CardPool::new(&registry, 2, false);
+        let report_new = pool_gate_report_new(&registry, &pool);
+
+        // Also test with legacy
+        let set = registry.to_card_set();
+        let legacy_registry = builtin_review_registry();
+        let report_legacy = pool_gate_report(&set, &legacy_registry, 2);
+
+        // Both should show 0 verified since all are unverified
+        assert_eq!(
+            report_new.verified_occupations,
+            report_legacy.verified_occupations
+        );
+        assert_eq!(
+            report_new.verified_minor_improvements,
+            report_legacy.verified_minor_improvements
+        );
+    }
+
+    #[test]
+    fn official_pool_card_ids_subset_of_experimental() {
+        let registry = crate::registry::build_default_registry().unwrap();
+        let official = official_pool_card_ids(&registry, 2);
+        let experimental = experimental_pool_card_ids(&registry, 2);
+        for id in &official {
+            assert!(
+                experimental.contains(id),
+                "official id {id:?} missing from experimental"
+            );
+        }
     }
 }
