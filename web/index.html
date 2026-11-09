@@ -267,7 +267,7 @@ case "lessons":case "extra_lessons":return {"PlayOccupation":{card_id:val("occup
 case "meeting_place":case "family_growth_with_room":case "modest_family_growth":return val("minor")?space==="meeting_place"?{"PlayMinor":{card_id:val("minor")}}:{"GrowWithMinor":{card_id:val("minor")}}:"None";
 default:return "None";
 }}
-function openEditor(title,hint,what,space){mode=what;selectedSpace=space;$("fields").replaceChildren();$("editorTitle").textContent=title;$("editorHint").textContent=hint;$("editor").showModal();const first=$("fields").querySelector("input:not([disabled]),select:not([disabled]),textarea:not([disabled])");if(first)first.focus();}
+function openEditor(title,hint,what,space){mode=what;selectedSpace=space;$("fields").oninput=null;$("fields").onchange=null;$("fields").replaceChildren();$("editorTitle").textContent=title;$("editorHint").textContent=hint;$("editor").showModal();const first=$("fields").querySelector("input:not([disabled]),select:not([disabled]),textarea:not([disabled])");if(first)first.focus();}
 function appendHint(space,hints){
 const parts=[];if(!(state.legal||[]).includes(space))parts.push("このスペースは現在のAI候補に含まれません。合法な詳細を入力すれば実行できます。");
 if(hints.plow_cells&&hints.plow_cells.length)parts.push("耕せるマス: "+hints.plow_cells.join(","));
