@@ -299,6 +299,12 @@ footer{color:#705e41;font-size:12px}
  .compactHelp .helpContent{right:-2px}
 }
 
+
+/* History stays readable to human users and existing browser contracts, but uses one compact line. */
+.operationsPanel .recentActions{display:flex;align-items:center;gap:5px;max-width:100%;width:100%;min-width:0;color:#766246;font-size:11px;margin-top:2px}
+.operationsPanel .recentActions #history{width:100%;min-width:0;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.45}
+#actions .actionTile.helpDismissed .tileTooltip{display:none!important}
+
 </style></head>
 <body><div class="screen">
 <header class="tableHeader">
@@ -331,7 +337,7 @@ footer{color:#705e41;font-size:12px}
  <div id="cardBrowser" aria-label="自分の手札と公開された使用済みカード"></div>
  <details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details>
 </section>
-<section class="panel operationsPanel"><h2>🧺 任意操作</h2><button id="free" title="調理・食料変換・家畜の移動・廃棄">食料変換・家畜の移動</button><details class="compactHelp"><summary aria-label="任意操作の説明" title="操作説明">ⓘ</summary><div class="helpContent">ワーカーを使わない操作です。ゲーム側が合法性を判定します。</div></details><details class="compactHistory"><summary title="直近の操作を表示">🕓 履歴</summary><p id="history"></p></details></section>
+<section class="panel operationsPanel"><h2>🧺 任意操作</h2><button id="free" title="調理・食料変換・家畜の移動・廃棄">食料変換・家畜の移動</button><details class="compactHelp"><summary aria-label="任意操作の説明" title="操作説明">ⓘ</summary><div class="helpContent">ワーカーを使わない操作です。ゲーム側が合法性を判定します。</div></details><div class="recentActions" title="直近の操作"><span aria-hidden="true">🕓</span><p id="history" aria-label="直近の操作履歴"></p></div></section>
 <section class="panel settings" id="gameSettings">
 <label>人数 <select id="players"><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option></select></label>
 <label><input id="extra" type="checkbox">追加アクション</label>
@@ -575,10 +581,11 @@ function renderActionBoard(available,candidate,p){
    tooltip.append(heading,description);
    if(occupied){const status=document.createElement("small");status.textContent="♟ 今ラウンドは使用済み";tooltip.append(status);}
    else if(value.kind){const qty=document.createElement("small");qty.textContent="現在の"+value.text;tooltip.append(qty);}
-   const toggle=()=>{const open=!tile.classList.contains("helpOpen");closeTileHelp(tile);tile.classList.toggle("helpOpen",open);help.setAttribute("aria-expanded",String(open));};
+   const toggle=()=>{const open=!tile.classList.contains("helpOpen");closeTileHelp(tile);tile.classList.remove("helpDismissed");tile.classList.toggle("helpOpen",open);help.setAttribute("aria-expanded",String(open));};
    help.onclick=e=>{e.stopPropagation();toggle();};
+   help.onblur=()=>tile.classList.remove("helpDismissed");
    help.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();toggle();}
-      if(e.key==="Escape"){tile.classList.remove("helpOpen");help.setAttribute("aria-expanded","false");e.stopPropagation();}};
+      if(e.key==="Escape"){tile.classList.remove("helpOpen");tile.classList.add("helpDismissed");help.setAttribute("aria-expanded","false");e.stopPropagation();}};
    tooltip.onclick=e=>e.stopPropagation();
    tile.append(help,tooltip);tiles.append(tile);
   }
