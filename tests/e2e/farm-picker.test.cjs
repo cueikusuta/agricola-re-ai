@@ -15,6 +15,15 @@ async function setup(browser, extra = false) {
   await page.waitForFunction(() => document.querySelector("#turn")?.textContent.includes("ラウンド 1/14"));
   return page;
 }
+async function findUnlockedSpace(page, space) {
+  for(let seed=1;seed<=60;seed++){
+    await page.locator("#seed").fill(String(seed));
+    await page.locator("#new").click();
+    await page.waitForFunction(expected => document.querySelector("#turn")?.textContent.includes("ラウンド 1/14"),null);
+    if(await page.locator(`#actions button[data-space="${space}"]`).count()===1)return seed;
+  }
+  throw new Error(space+" never available across 60 deterministic first-round setups");
+}
 async function open(page, space) {
   const button=page.locator(`#actions button[data-space="${space}"]`);
   assert.equal(await button.count(),1,space+" should be a reachable space");
@@ -57,6 +66,7 @@ test("Issue #240: farm cells feed existing detail inputs without bypassing /api/
       assert.equal(await page.locator("#stables").inputValue(),"2");
       assert.match(await page.locator("#pickerPreview").innerText(),/未確定/);
       await page.locator("#cancel").click();
+      await findUnlockedSpace(page,"grain_utilization");
       await open(page,"grain_utilization");
       await page.locator("#farmPicker button[data-cell='3']").click();
       assert.equal(await page.locator("#plants").inputValue(),"3:小麦");
@@ -71,6 +81,7 @@ test("Issue #240: farm cells feed existing detail inputs without bypassing /api/
   await t.test("fence selection is grouped but does not mutate the game before submit",async()=>{
     const page=await setup(browser);
     try{
+      await findUnlockedSpace(page,"fencing");
       await open(page,"fencing");
       const before=await page.locator("#farm").innerText();
       await page.locator("#farmPicker button[data-cell='2']").click();
