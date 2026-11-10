@@ -183,6 +183,17 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     };
     let _start_player = rng_streams.round.gen_range(0..players);
 
+    // Mirror from_card_state's internal rng.round consumption so the sampled
+    // position's internal stream state matches the old with_cards path EXACTLY.
+    for stage in 1..=6 {
+        let mut all_stage: Vec<_> = RoundCard::ALL
+            .iter()
+            .copied()
+            .filter(|c| c.stage() == stage)
+            .collect();
+        all_stage.shuffle(&mut rng_streams.round);
+    }
+
     // Build PublicState directly from observation + sampled start_player.
     // active_player and start_player are preserved from the observation
     // (old behavior: game.public = obs.public.clone() overwrote the sampled values).
