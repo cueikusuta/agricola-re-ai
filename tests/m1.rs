@@ -784,3 +784,53 @@ fn sample_game_accepts_valid_observation() {
     let sampled = sample_game(&obs, &mut rng).expect("valid observation must produce Some(Game)");
     sampled.validate().unwrap();
 }
+
+#[test]
+fn illegal_free_action_rejected_atomically() {
+    use agricola_re_ai::engine::FreeAction;
+    use agricola_re_ai::model::{Config, Game};
+    use agricola_re_ai::validation::validate_free_action_or_full;
+
+    let mut game = Game::new(Config {
+        players: 2,
+        seed: 7,
+        additional_action_space_enabled: false,
+    });
+    let snapshot = game.save_json().unwrap();
+    let hash_before = game.state_hash();
+
+    // Illegal free action: DiscardGood with quantity player doesn't have
+    let illegal = FreeAction::DiscardGood {
+        good: Good::Food,
+        quantity: 999,
+    };
+    let result = game.apply_free(0, illegal);
+    assert!(result.is_err(), "illegal free action must be rejected");
+
+    // State must be unchanged (atomic)
+    let hash_after = game.state_hash();
+    assert_eq!(
+        hash_before, hash_after,
+        "state_hash must not change after rejected action"
+    );
+    assert_eq!(
+        game.save_json().unwrap(),
+        snapshot,
+        "full JSON must be identical"
+    );
+
+    // Legal free action (conversion) should be accepted and change state
+    let mut game2 = Game::new(Config {
+        players: 2,
+        seed: 7,
+        additional_action_space_enabled: false,
+    });
+    // Give player 1 grain to convert
+    game2.public.players[0].supply.grain = 5;
+    let legal = FreeAction::ConvertCrop {
+        good: Good::Grain,
+        quantity: 2,
+    };
+    assert!(game2.apply_free(0, legal).is_ok());
+    assert_ne!(game2.state_hash(), hash_before, "legal free action must change state");
+}

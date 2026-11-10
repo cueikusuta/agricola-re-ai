@@ -770,7 +770,7 @@ impl Game {
             None
         };
         next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
-        next.validate()?;
+        crate::validation::validate_incremental_or_full(&next, self)?;
         if record {
             let after = next.state_hash();
             next.log.events.push(Event {
@@ -846,7 +846,7 @@ impl Game {
             String::new()
         };
         next.execute_free(player, &free)?;
-        next.validate()?;
+        crate::validation::validate_free_action_or_full(&next, self)?;
         if record {
             let after = next.state_hash();
             next.log.events.push(Event {

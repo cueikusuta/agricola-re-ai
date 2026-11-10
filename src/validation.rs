@@ -238,6 +238,199 @@ pub fn validate_incremental_or_full(post: &Game, pre: &Game) -> Result<(), Strin
     }
 }
 
+/// Fast incremental validation for one free action (not a work move).
+///
+/// `pre` is the committed state before the action; `post` is the state the
+/// action produced. Both must describe the same game (same config, player
+/// count, round, revealed spaces and hidden deck).
+///
+/// Free actions do NOT place a worker or add a used space. They can change:
+/// - Actor's supply (conversions, discards, cooking, baking)
+/// - Actor's farm (fence building, plowing, sowing - but these are work moves usually)
+/// - Actor's played_cards, improvements (for card effects)
+/// - Actor's animals/pastures (rearrangement during breeding)
+/// - Accumulations (taking from them)
+///
+/// Free actions must NOT change:
+/// - Non-actor state (supply, cards, farm, fences, house, family, newborns, improvements)
+/// - Round, revealed, hidden_round_deck, work_quota, start_player (except meeting place but that's a work move)
+/// - Used spaces, workers_placed
+/// - Major improvement multiset
+/// - Accumulations can only decrease
+pub fn validate_free_action(post: &Game, pre: &Game) -> Verdict {
+    // 1. Identity of the game itself.
+    if post.config != pre.config {
+        return Verdict::Fail("config mutated".into());
+    }
+    if post.public.players.len() != pre.public.players.len() {
+        return Verdict::Fail("player count changed".into());
+    }
+    if post.public.additional_action_space_enabled != pre.public.additional_action_space_enabled {
+        return Verdict::Fail("setting mutated".into());
+    }
+    // 2. Free actions don't advance round.
+    if post.public.round != pre.public.round || post.public.finished != pre.public.finished {
+        return Verdict::Unsure;
+    }
+    // 3. Revealed spaces and hidden deck are frozen.
+    if post.public.revealed != pre.public.revealed {
+        return Verdict::Fail("revealed changed mid-round".into());
+    }
+    if post.hidden_round_deck != pre.hidden_round_deck {
+        return Verdict::Fail("hidden_round_deck changed mid-round".into());
+    }
+    // 4. Start player and work quota unchanged.
+    if post.public.start_player != pre.public.start_player {
+        return Verdict::Unsure;
+    }
+    if post.public.work_quota != pre.public.work_quota {
+        return Verdict::Fail("work_quota changed mid-round".into());
+    }
+    // 5. Workers placed MUST NOT change (free actions don't place workers).
+    let n = pre.public.players.len();
+    for i in 0..n {
+        if post.public.workers_placed[i] != pre.public.workers_placed[i] {
+            return Verdict::Fail("workers_placed changed in free action".into());
+        }
+    }
+    // 6. Used spaces MUST NOT change (free actions don't use spaces).
+    if post.public.used != pre.public.used {
+        return Verdict::Fail("used changed in free action".into());
+    }
+    // 7. Major improvements: the union across market + player tables must keep
+    //    every physical major improvement in exactly one location.
+    {
+        let count_items = |market: &[crate::model::Improvement],
+                           players: &[crate::model::Player]|
+         -> std::collections::BTreeMap<crate::model::Improvement, u32> {
+            let mut counts = std::collections::BTreeMap::new();
+            for item in market
+                .iter()
+                .copied()
+                .chain(players.iter().flat_map(|p| p.improvements.iter().copied()))
+            {
+                *counts.entry(item).or_insert(0u32) += 1;
+            }
+            counts
+        };
+        let post_counts = count_items(&post.public.improvement_market, &post.public.players);
+        let pre_counts = count_items(&pre.public.improvement_market, &pre.public.players);
+        if post_counts != pre_counts {
+            return Verdict::Fail("major improvement duplicated or missing".into());
+        }
+        let pre_tables: std::collections::BTreeSet<_> = pre
+            .public
+            .players
+            .iter()
+            .flat_map(|p| p.improvements.iter().copied())
+            .collect();
+        for item in &post.public.improvement_market {
+            let in_pre_market = pre.public.improvement_market.contains(item);
+            let exchangeable = matches!(
+                item,
+                crate::model::Improvement::Fireplace2 | crate::model::Improvement::Fireplace3
+            ) && pre_tables.contains(item);
+            if !in_pre_market && !exchangeable {
+                return Verdict::Fail("improvement appeared in market from nowhere".into());
+            }
+        }
+    }
+    // 8. Non-actors cannot change in a free action: verify the
+    //    cheap subset and decline (Unsure) if anything looks different.
+    //    The actor gets full shared per-player check for farm invariants.
+    for (i, player) in post.public.players.iter().enumerate() {
+        if i != pre.public.active_player {
+            if player.farm.len() != crate::model::FARM_CELLS
+                || player.occupied_stables() > 4
+                || player.fences.len() > 15
+                || player.family < 2
+                || player.family > 5
+                || player.newborns > player.family
+            {
+                return Verdict::Unsure;
+            }
+            let pre_p = &pre.public.players[i];
+            if player.supply != pre_p.supply
+                || player.played_cards != pre_p.played_cards
+                || player.card_points != pre_p.card_points
+                || player.improvements != pre_p.improvements
+                || player.farm != pre_p.farm
+                || player.fences != pre_p.fences
+                || player.house != pre_p.house
+                || player.family != pre_p.family
+                || player.newborns != pre_p.newborns
+            {
+                return Verdict::Unsure;
+            }
+            continue;
+        }
+        // Actor: validate farm invariants (shared with full validator)
+        if crate::model::validate_player_state(
+            &post.public.work_quota,
+            &post.public.workers_placed,
+            i,
+            player,
+        )
+        .is_err()
+        {
+            return Verdict::Fail("actor farm invariants violated".into());
+        }
+    }
+    // 9. Tile-kind aggregate for the actor: free actions can add tiles (plow/sow)
+    //    but never demolish them.
+    let count_tiles = |p: &crate::model::Player| {
+        let mut rooms = 0usize;
+        let mut fields = 0usize;
+        let mut pastures = 0usize;
+        for cell in &p.farm {
+            match cell.tile {
+                crate::model::Tile::Room => rooms += 1,
+                crate::model::Tile::Field { .. } => fields += 1,
+                crate::model::Tile::Pasture { .. } => pastures += 1,
+                crate::model::Tile::Empty => {}
+            }
+        }
+        (rooms, fields, pastures)
+    };
+    let actor = pre.public.active_player;
+    let (pre_rooms, pre_fields, pre_pastures) = count_tiles(&pre.public.players[actor]);
+    let (post_rooms, post_fields, post_pastures) = count_tiles(&post.public.players[actor]);
+    if post_rooms < pre_rooms || post_fields < pre_fields || post_pastures < pre_pastures {
+        return Verdict::Fail("actor demolished tiles in a free action".into());
+    }
+    // 10. `accumulations` may only decrease (the free action takes from them);
+    //     unseen growth or unknown keys decline to the full validator.
+    for (space, post_n) in &post.public.accumulations {
+        match pre.public.accumulations.get(space) {
+            Some(pre_n) if post_n <= pre_n => {}
+            _ => return Verdict::Unsure,
+        }
+    }
+    if post.public.accumulations.len() > pre.public.accumulations.len() {
+        return Verdict::Unsure;
+    }
+    // 11. Animal accumulations same rule.
+    for (space, post_n) in &post.public.animal_accumulations {
+        match pre.public.animal_accumulations.get(space) {
+            Some(pre_n) if post_n <= pre_n => {}
+            _ => return Verdict::Unsure,
+        }
+    }
+    if post.public.animal_accumulations.len() > pre.public.animal_accumulations.len() {
+        return Verdict::Unsure;
+    }
+    Verdict::Pass
+}
+
+/// Incremental free-action validation with automatic fallback to full validation.
+pub fn validate_free_action_or_full(post: &Game, pre: &Game) -> Result<(), String> {
+    match validate_free_action(post, pre) {
+        Verdict::Pass => Ok(()),
+        Verdict::Fail(e) => Err(e),
+        Verdict::Unsure => validate_full(post),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
