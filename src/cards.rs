@@ -473,9 +473,9 @@ fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String>
 }
 
 /// Execute one prevalidated card play; the containing Game transaction provides rollback.
-/// This function validates the play, pays costs, and applies on-play effects (Before phase).
-/// The caller is responsible for moving the card from hand to played via `move_card`
-/// and for dispatching the Replace/Before phases via the event dispatcher.
+/// This function validates the play, pays costs, applies on-play effects (Before phase),
+/// moves the card from hand to played, and updates card_points.
+/// This is the canonical public API used by evaluation, policy, and unit tests.
 pub fn play(
     set: &CardSet,
     hand: &mut Vec<String>,
@@ -494,19 +494,45 @@ pub fn play(
     for (good, amount) in card_costs(card, player, extra_food) {
         player.supply.pay(good, amount)?;
     }
-    // On-play effects (Before phase) are now applied by the event dispatcher.
-    // This function only validates and pays costs.
-    // The card_points update happens after the card is moved to played.
+    // Apply on-play (Before phase) effects
+    apply_on_play_effects(set, player, id)?;
+    // Move card from hand to played via the single canonical implementation
+    crate::card_zones::hand_to_played(hand, player, id).map_err(|e| e.to_string())?;
+    // Update card points
+    let next_points = player
+        .card_points
+        .checked_add(card.points)
+        .ok_or("card points overflow")?;
+    player.card_points = next_points;
+    Ok(())
+}
+
+/// Internal: validate and pay costs only (no effects, no move, no points).
+/// Used by the engine path which then routes through card_zones and dispatch_play.
+pub(crate) fn play_validate_pay(
+    set: &CardSet,
+    hand: &mut [String],
+    player: &mut Player,
+    id: &str,
+    kind: CardKind,
+    extra_food: u32,
+) -> Result<(), String> {
+    let card = set.definition(id).ok_or("unknown card")?;
+    if card.kind != kind || !hand.iter().any(|x| x == id) {
+        return Err("card is not in the player's hand or is the wrong kind".into());
+    }
+    if !can_play(set, card, player, extra_food) {
+        return Err("cannot pay card costs or prerequisites are unmet".into());
+    }
+    for (good, amount) in card_costs(card, player, extra_food) {
+        player.supply.pay(good, amount)?;
+    }
     Ok(())
 }
 
 /// Apply on-play (Before phase) effects for a card that has been moved to played.
 /// Called by the event dispatcher after the card is in the played zone.
-pub fn apply_on_play_effects(
-    set: &CardSet,
-    player: &mut Player,
-    id: &str,
-) -> Result<(), String> {
+pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Result<(), String> {
     let card = set.definition(id).ok_or("unknown card")?;
     for effect in &card.effects {
         match effect {
@@ -553,7 +579,10 @@ pub fn apply_on_play_effects(
 /// Update card_points after a card is successfully played.
 /// Called after move_card and effect dispatch.
 pub fn update_card_points_on_play(player: &mut Player, points: i32) -> Result<(), String> {
-    let next_points = player.card_points.checked_add(points).ok_or("card points overflow")?;
+    let next_points = player
+        .card_points
+        .checked_add(points)
+        .ok_or("card points overflow")?;
     player.card_points = next_points;
     Ok(())
 }

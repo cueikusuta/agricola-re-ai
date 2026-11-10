@@ -344,10 +344,10 @@ pub fn sample_game_with_set(
         obs.well_food_schedule.clone(), // public mirror for determinization
         Arc::clone(set),
         cards,
-        None, // pending
-        64,   // event_budget
+        None,            // pending
+        64,              // event_budget
         BTreeMap::new(), // card_uses
-        0,    // next_decision_id
+        0,               // next_decision_id
     ))
 }
 

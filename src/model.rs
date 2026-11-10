@@ -800,21 +800,47 @@ impl Game {
     }
     pub fn state_hash(&self) -> String {
         // Event log is intentionally omitted; this is the full game state, including hidden cards and RNG.
+        // LOG_VERSION=5 compatibility: the hash tuple MUST stay identical to the
+        // v5 format (7 fields, tests/fixtures/v5/*). New bookkeeping fields
+        // (well_food_schedule, pending, event_budget, card_uses, next_decision_id)
+        // are serialized into saves via serde defaults, but are deliberately
+        // EXCLUDED from the hash so legacy v5 fixtures keep verifying.
+        // well_food_schedule mirrors delayed_well (Finding A) and pending
+        // decisions are excluded from the hash; their integrity is enforced by
+        // PendingDecision::state_hash_before checks in the resume path instead.
         let data = serde_json::to_vec(&(
             &self.config,
             &self.public,
             &self.hidden_round_deck,
             &self.rng,
             &self.delayed_well,
-            &self.well_food_schedule,
             &*self.card_set,
             &self.cards,
-            &self.pending,
-            &self.event_budget,
-            &self.card_uses,
-            &self.next_decision_id,
         ))
         .expect("state serialization");
+        format!("{:x}", Sha256::digest(&data))
+    }
+
+    /// Full integrity hash covering the whole `Game`, including the Step 3
+    /// bookkeeping fields (`well_food_schedule`, `pending`, `event_budget`,
+    /// `card_uses`, `next_decision_id`) that `state_hash` deliberately omits for
+    /// LOG_VERSION=5 compatibility.
+    ///
+    /// Use this for save/restore/resume integrity checks on NEW saves:
+    /// `state_hash` keeps the v5 replay contract, while `integrity_hash` proves
+    /// that an interrupted PendingDecision survives a save/load round-trip
+    /// byte-for-byte (Issue #266 acceptance: "PendingDecision save/restore/resume
+    /// with a consistent state hash").
+    pub fn integrity_hash(&self) -> String {
+        let data = serde_json::to_vec(&(
+            self.state_hash(),
+            &self.well_food_schedule,
+            &self.pending,
+            self.event_budget,
+            &self.card_uses,
+            self.next_decision_id,
+        ))
+        .expect("integrity serialization");
         format!("{:x}", Sha256::digest(&data))
     }
 
@@ -858,6 +884,7 @@ impl Game {
     /// start_round(), state_hash (full JSON+SHA256), log CardSet duplication.
     /// The caller MUST ensure the inputs form a valid game state;
     /// this constructor does NOT run validate().
+    #[allow(clippy::too_many_arguments)] // pre-sampled parts mirror the Game field list
     pub fn search_from_parts(
         config: Config,
         public: PublicState,
@@ -1137,7 +1164,9 @@ impl Game {
         // Verify state hash integrity
         if pending.state_hash_before != self.state_hash() {
             self.pending = Some(pending); // Restore on failure
-            return Err("state hash mismatch: game state changed since decision was created".into());
+            return Err(
+                "state hash mismatch: game state changed since decision was created".into(),
+            );
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&decision)?;
@@ -1152,7 +1181,10 @@ impl Game {
         resolution: PendingResolution,
     ) -> Result<(), String> {
         match (pending.kind, resolution) {
-            (PendingKind::ChooseGain { source_card, .. }, PendingResolution::ChooseGain { chosen }) => {
+            (
+                PendingKind::ChooseGain { source_card, .. },
+                PendingResolution::ChooseGain { chosen },
+            ) => {
                 let player = &mut self.public.players[pending.player];
                 let next = player
                     .supply
@@ -1175,7 +1207,10 @@ impl Game {
                 }
                 Ok(())
             }
-            (PendingKind::ChoosePayment { card_id, .. }, PendingResolution::ChoosePayment { chosen }) => {
+            (
+                PendingKind::ChoosePayment { card_id, .. },
+                PendingResolution::ChoosePayment { chosen },
+            ) => {
                 let player = &mut self.public.players[pending.player];
                 for (good, amount) in &chosen.cost {
                     player.supply.pay(*good, *amount)?;
@@ -1194,7 +1229,10 @@ impl Game {
                 }
                 Ok(())
             }
-            (PendingKind::DelayedWellRelief { round, recipients }, PendingResolution::DelayedWellRelief { confirmed }) => {
+            (
+                PendingKind::DelayedWellRelief { round, recipients },
+                PendingResolution::DelayedWellRelief { confirmed },
+            ) => {
                 if confirmed {
                     for id in recipients {
                         self.public.players[id].supply.food += 1;

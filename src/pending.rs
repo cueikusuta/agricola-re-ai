@@ -120,9 +120,10 @@ impl PendingDecision {
                     Err("chosen payment option not in available options".into())
                 }
             }
-            (PendingKind::DelayedWellRelief { .. }, PendingResolution::DelayedWellRelief { .. }) => {
-                Ok(())
-            }
+            (
+                PendingKind::DelayedWellRelief { .. },
+                PendingResolution::DelayedWellRelief { .. },
+            ) => Ok(()),
             (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => Ok(()),
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
@@ -151,7 +152,7 @@ pub trait PendingExt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Good, Config, Game};
+    use crate::model::{Config, Game, Good};
 
     #[test]
     fn pending_decision_serialize_roundtrip() {
@@ -161,8 +162,14 @@ mod tests {
             PendingKind::ChooseGain {
                 source_card: "TEST".into(),
                 options: vec![
-                    GainOption { good: Good::Food, amount: 1 },
-                    GainOption { good: Good::Wood, amount: 2 },
+                    GainOption {
+                        good: Good::Food,
+                        amount: 1,
+                    },
+                    GainOption {
+                        good: Good::Wood,
+                        amount: 2,
+                    },
                 ],
             },
             "abc123".into(),
@@ -182,8 +189,14 @@ mod tests {
             PendingKind::ChooseGain {
                 source_card: "TEST".into(),
                 options: vec![
-                    GainOption { good: Good::Food, amount: 1 },
-                    GainOption { good: Good::Wood, amount: 2 },
+                    GainOption {
+                        good: Good::Food,
+                        amount: 1,
+                    },
+                    GainOption {
+                        good: Good::Wood,
+                        amount: 2,
+                    },
                 ],
             },
             "hash".into(),
@@ -192,13 +205,19 @@ mod tests {
 
         assert!(decision
             .validate_resolution(&PendingResolution::ChooseGain {
-                chosen: GainOption { good: Good::Food, amount: 1 }
+                chosen: GainOption {
+                    good: Good::Food,
+                    amount: 1
+                }
             })
             .is_ok());
 
         assert!(decision
             .validate_resolution(&PendingResolution::ChooseGain {
-                chosen: GainOption { good: Good::Stone, amount: 1 }
+                chosen: GainOption {
+                    good: Good::Stone,
+                    amount: 1
+                }
             })
             .is_err());
     }
@@ -214,5 +233,216 @@ mod tests {
 
         assert_eq!(opt1, opt2);
         assert_ne!(opt1, opt3);
+    }
+
+    /// End-to-end PendingDecision lifecycle: create -> save -> load -> resume,
+    /// with `integrity_hash` stable across the round-trip and the pending
+    /// decision still resolvable afterwards.
+    #[test]
+    fn pending_decision_survives_save_restore_and_resumes() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 11,
+            additional_action_space_enabled: false,
+        });
+        let decision = PendingDecision::new(
+            game.next_decision_id,
+            0,
+            PendingKind::ChooseGain {
+                source_card: "A001".into(),
+                options: vec![
+                    GainOption {
+                        good: Good::Food,
+                        amount: 2,
+                    },
+                    GainOption {
+                        good: Good::Wood,
+                        amount: 1,
+                    },
+                ],
+            },
+            game.state_hash(),
+            serde_json::json!({ "space": "Forest" }),
+        );
+        game.next_decision_id += 1;
+        game.pending = Some(decision.clone());
+        assert!(game.has_pending());
+
+        let integrity = game.integrity_hash();
+        let saved = game.save_json().unwrap();
+
+        let mut restored = Game::load_json(&saved).unwrap();
+        assert_eq!(
+            restored.integrity_hash(),
+            integrity,
+            "integrity hash must survive save/load"
+        );
+        assert_eq!(
+            restored.pending(),
+            Some(&decision),
+            "pending decision must survive save/load"
+        );
+        assert_eq!(
+            restored.next_decision_id, 1,
+            "decision counter must survive save/load"
+        );
+        assert!(restored.has_pending());
+
+        // Resume: the stored state_hash_before still matches, so the choice applies.
+        let food_before = restored.public.players[0].supply.food;
+        restored
+            .resolve_pending(PendingResolution::ChooseGain {
+                chosen: GainOption {
+                    good: Good::Food,
+                    amount: 2,
+                },
+            })
+            .unwrap();
+        assert_eq!(restored.public.players[0].supply.food, food_before + 2);
+        assert!(!restored.has_pending(), "decision cleared after resolution");
+    }
+
+    /// A mismatch between the recorded `state_hash_before` and the current
+    /// state must refuse the resolution and keep the decision pending.
+    #[test]
+    fn pending_decision_rejects_a_changed_state_and_stays_pending() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 12,
+            additional_action_space_enabled: false,
+        });
+        game.pending = Some(PendingDecision::new(
+            game.next_decision_id,
+            0,
+            PendingKind::ChooseGain {
+                source_card: "A001".into(),
+                options: vec![GainOption {
+                    good: Good::Food,
+                    amount: 1,
+                }],
+            },
+            game.state_hash(),
+            serde_json::json!({}),
+        ));
+        // Mutate the game after the decision was created.
+        game.public.players[0].supply.wood += 1;
+
+        let err = game
+            .resolve_pending(PendingResolution::ChooseGain {
+                chosen: GainOption {
+                    good: Good::Food,
+                    amount: 1,
+                },
+            })
+            .unwrap_err();
+        assert!(err.contains("state hash mismatch"), "got: {err}");
+        assert!(
+            game.has_pending(),
+            "decision must stay pending after a rejected resume"
+        );
+    }
+
+    /// Only one pending decision can be outstanding: resolving without one is
+    /// an explicit error rather than a silent no-op.
+    #[test]
+    fn resolving_without_a_pending_decision_is_an_error() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 13,
+            additional_action_space_enabled: false,
+        });
+        assert!(!game.has_pending());
+        let err = game
+            .resolve_pending(PendingResolution::ChooseGain {
+                chosen: GainOption {
+                    good: Good::Food,
+                    amount: 1,
+                },
+            })
+            .unwrap_err();
+        assert!(err.contains("no pending decision"), "got: {err}");
+    }
+
+    /// Per-card use limits and the event budget are both enforced (Issue #266
+    /// acceptance: "use limits and unbounded-chain guards proven by tests").
+    #[test]
+    fn card_use_limit_and_event_budget_are_enforced() {
+        use crate::card_events::dispatch_start_round;
+        use crate::cards::CardSet;
+        // Build a two-card chain where the same card fires repeatedly.
+        let set = CardSet {
+            definitions: vec![crate::cards::CardDefinition {
+                id: "LOOP".into(),
+                kind: crate::cards::CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![crate::cards::CardEffect::StartRoundGain {
+                    good: Good::Food,
+                    amount: 1,
+                    house: None,
+                    rooms: None,
+                }],
+            }],
+        };
+        let mut players = vec![crate::model::Player::new(0, 0)];
+        for _ in 0..5 {
+            players[0].played_cards.push("LOOP".into());
+        }
+        let mut cards = crate::cards::CardState::default();
+        let mut market = vec![];
+        let mut well = std::collections::BTreeMap::new();
+        let mut uses = std::collections::BTreeMap::new();
+        let mut pending = None;
+        let mut budget = 64u32;
+
+        // Budget generous: all five instances resolve and each is counted.
+        dispatch_start_round(
+            &set,
+            &mut players,
+            &mut cards,
+            &mut market,
+            &mut well,
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(players[0].supply.food, 5);
+        assert_eq!(
+            uses.get("LOOP"),
+            Some(&5),
+            "each resolution must be counted"
+        );
+        assert_eq!(budget, 59, "one budget unit per resolved effect");
+
+        // Now a budget of 2 must stop the chain mid-way with an explicit error.
+        let mut players2 = vec![crate::model::Player::new(0, 0)];
+        for _ in 0..5 {
+            players2[0].played_cards.push("LOOP".into());
+        }
+        let mut uses2 = std::collections::BTreeMap::new();
+        let mut budget2 = 2u32;
+        let mut pending2 = None;
+        let err = dispatch_start_round(
+            &set,
+            &mut players2,
+            &mut cards,
+            &mut market,
+            &mut well,
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut budget2,
+            &mut uses2,
+            &mut pending2,
+        )
+        .unwrap_err();
+        assert!(err.contains("budget exhausted"), "got: {err}");
+        assert_eq!(budget2, 0, "the budget is fully consumed before the error");
+        assert_eq!(
+            players2[0].supply.food, 2,
+            "only the affordable prefix of the chain resolved"
+        );
     }
 }

@@ -10,10 +10,9 @@
 //! Each resolution site carries a comment citing the 2016 Lookout rulebook.
 //! Source: docs/bga-card-specification.md and existing repo citations.
 
-use crate::cards::{CardDefinition, CardEffect, CardSet};
-use crate::card_zones::CardMoveCtx;
+use crate::cards::{CardEffect, CardSet};
 use crate::model::{Animal, Crop, Good, House, Player, Space};
-use crate::pending::{PendingDecision, PendingKind, PendingResolution};
+use crate::pending::PendingDecision;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -96,7 +95,11 @@ fn consume_budget(budget: &mut u32) -> Result<(), String> {
 }
 
 /// Check and increment per-card use count. Returns Err if limit exceeded.
-fn check_card_use(card_uses: &mut BTreeMap<String, u32>, card_id: &str, limit: u32) -> Result<(), String> {
+fn check_card_use(
+    card_uses: &mut BTreeMap<String, u32>,
+    card_id: &str,
+    limit: u32,
+) -> Result<(), String> {
     let count = card_uses.entry(card_id.to_string()).or_insert(0);
     if *count >= limit {
         return Err(format!("card {card_id} use limit ({limit}) exceeded"));
@@ -153,9 +156,11 @@ pub fn resolve_phase(
                     amount,
                 } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
-                CardEffect::AfterWorkerGain { space, good, amount } => {
-                    handle_after_worker_gain(ctx, player, space, good, *amount, trigger_data)?
-                }
+                CardEffect::AfterWorkerGain {
+                    space,
+                    good,
+                    amount,
+                } => handle_after_worker_gain(ctx, player, space, good, *amount, trigger_data)?,
                 CardEffect::AfterWorkerGainIfUsed {
                     space,
                     required_space,
@@ -202,6 +207,101 @@ pub fn resolve_phase(
     Ok(())
 }
 
+/// Execute all effects of a given phase for ONLY the specified card (newly played).
+/// This is used by dispatch_play to avoid re-firing already-played cards' effects.
+fn resolve_phase_for_card(
+    ctx: &mut DispatchContext<'_>,
+    player: usize,
+    phase: TriggerPhase,
+    trigger_data: &PhaseTriggerData,
+    card_id: &str,
+) -> Result<(), String> {
+    let Some(card) = ctx.card_set.definition(card_id) else {
+        return Ok(()); // Card not found, nothing to do
+    };
+
+    for effect in &card.effects {
+        if effect_phase(effect) != phase {
+            continue;
+        }
+
+        // Consume event budget
+        consume_budget(ctx.event_budget)?;
+
+        // Check per-card use limit (default: no limit, but track for future)
+        check_card_use(ctx.card_uses, card_id, u32::MAX)?;
+
+        // Dispatch to handler
+        let result = match effect {
+            CardEffect::Prerequisite { rule } => {
+                handle_prerequisite(ctx, player, card_id, rule, trigger_data)?
+            }
+            CardEffect::OnPlayGain { good, amount } => {
+                handle_on_play_gain(ctx, player, good, *amount)?
+            }
+            CardEffect::OnPlayGainPerStored {
+                stored,
+                divisor,
+                good,
+                amount,
+            } => handle_on_play_gain_per_stored(ctx, player, stored, *divisor, good, *amount)?,
+            CardEffect::OnPlayGainIfHouse {
+                house,
+                rooms,
+                good,
+                amount,
+            } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
+            CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
+            CardEffect::AfterWorkerGain {
+                space,
+                good,
+                amount,
+            } => handle_after_worker_gain(ctx, player, space, good, *amount, trigger_data)?,
+            CardEffect::AfterWorkerGainIfUsed {
+                space,
+                required_space,
+                good,
+                amount,
+            } => handle_after_worker_gain_if_used(
+                ctx,
+                player,
+                space,
+                required_space,
+                good,
+                *amount,
+                trigger_data,
+            )?,
+            CardEffect::StartRoundGain {
+                good,
+                amount,
+                house,
+                rooms,
+            } => handle_start_round_gain(ctx, player, good, *amount, house, rooms)?,
+            CardEffect::AfterClayConstructionGain { good, amount } => {
+                handle_after_clay_construction_gain(ctx, player, good, *amount, trigger_data)?
+            }
+            CardEffect::AfterHarvestBakeGain { amount } => {
+                handle_after_harvest_bake_gain(ctx, player, *amount, trigger_data)?
+            }
+            CardEffect::HarvestFieldGain { rule, good, amount } => {
+                handle_harvest_field_gain(ctx, player, rule, good, *amount, trigger_data)?
+            }
+            CardEffect::EndGameBonus { .. } => {
+                // Scoring is handled separately in evaluation; no runtime effect.
+                EffectResult::Resolved
+            }
+        };
+
+        // Handle pending interrupt
+        if let EffectResult::Pending(pending) = result {
+            *ctx.pending = Some(pending);
+            return Err("pending decision".into()); // Signal to caller to pause
+        }
+    }
+
+    Ok(())
+}
+
 /// Data passed to phase handlers for context-dependent effects.
 #[derive(Debug, Clone)]
 pub struct PhaseTriggerData {
@@ -217,8 +317,7 @@ pub struct PhaseTriggerData {
     pub used_spaces: std::collections::BTreeSet<Space>,
 }
 
-/// --- Effect Handlers (legacy implementations renamed with _legacy suffix) ---
-
+// --- Effect Handlers (each phase handler cites the official timing rule) ---
 fn handle_prerequisite(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
@@ -281,19 +380,23 @@ fn handle_prerequisite(
 
 fn handle_on_play_gain(
     ctx: &mut DispatchContext<'_>,
-    player: usize,
+    _player: usize,
     good: &Good,
     amount: u32,
 ) -> Result<EffectResult, String> {
     let p = &mut ctx.player;
-    let next = p.supply.get(*good).checked_add(amount).ok_or("resource overflow")?;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(amount)
+        .ok_or("resource overflow")?;
     p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
 }
 
 fn handle_on_play_gain_per_stored(
     ctx: &mut DispatchContext<'_>,
-    player: usize,
+    _player: usize,
     stored: &Good,
     divisor: u32,
     good: &Good,
@@ -303,14 +406,18 @@ fn handle_on_play_gain_per_stored(
     let bonus = (p.supply.get(*stored) / divisor)
         .checked_mul(amount)
         .ok_or("on-play bonus overflow")?;
-    let next = p.supply.get(*good).checked_add(bonus).ok_or("resource overflow")?;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(bonus)
+        .ok_or("resource overflow")?;
     p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
 }
 
 fn handle_on_play_gain_if_house(
     ctx: &mut DispatchContext<'_>,
-    player: usize,
+    _player: usize,
     house: &House,
     rooms: u8,
     good: &Good,
@@ -318,7 +425,11 @@ fn handle_on_play_gain_if_house(
 ) -> Result<EffectResult, String> {
     let p = &mut ctx.player;
     if p.house == *house && p.rooms() == usize::from(rooms) {
-        let next = p.supply.get(*good).checked_add(amount).ok_or("resource overflow")?;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
         p.supply.set(*good, next);
     }
     Ok(EffectResult::Resolved)
@@ -326,16 +437,14 @@ fn handle_on_play_gain_if_house(
 
 fn handle_passive(
     ctx: &mut DispatchContext<'_>,
-    player: usize,
+    _player: usize,
     rule: &crate::cards::PassiveRule,
 ) -> Result<EffectResult, String> {
     let p = &mut ctx.player;
     match rule {
         crate::cards::PassiveRule::PastureCapacity(n) => p.pasture_capacity_bonus += n,
         crate::cards::PassiveRule::FenceWoodDiscount(n) => p.free_fence_wood += n,
-        crate::cards::PassiveRule::ImprovementWoodDiscount(n) => {
-            p.improvement_wood_discount += n
-        }
+        crate::cards::PassiveRule::ImprovementWoodDiscount(n) => p.improvement_wood_discount += n,
         crate::cards::PassiveRule::WoodenRoomCost(n) => p.wooden_room_cost = Some(*n),
         crate::cards::PassiveRule::RoomCost(n) => p.room_material_cost = Some(*n),
         crate::cards::PassiveRule::MajorStoneDiscountByRooms => {
@@ -349,7 +458,7 @@ fn handle_passive(
 
 fn handle_after_worker_gain(
     ctx: &mut DispatchContext<'_>,
-    player: usize,
+    _player: usize,
     space: &Space,
     good: &Good,
     amount: u32,
@@ -357,7 +466,11 @@ fn handle_after_worker_gain(
 ) -> Result<EffectResult, String> {
     if trigger.space == Some(*space) {
         let p = &mut ctx.player;
-        let next = p.supply.get(*good).checked_add(amount).ok_or("resource overflow")?;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
         p.supply.set(*good, next);
     }
     Ok(EffectResult::Resolved)
@@ -365,7 +478,7 @@ fn handle_after_worker_gain(
 
 fn handle_after_worker_gain_if_used(
     ctx: &mut DispatchContext<'_>,
-    player: usize,
+    _player: usize,
     space: &Space,
     required_space: &Space,
     good: &Good,
@@ -374,7 +487,11 @@ fn handle_after_worker_gain_if_used(
 ) -> Result<EffectResult, String> {
     if trigger.space == Some(*space) && trigger.used_spaces.contains(required_space) {
         let p = &mut ctx.player;
-        let next = p.supply.get(*good).checked_add(amount).ok_or("resource overflow")?;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
         p.supply.set(*good, next);
     }
     Ok(EffectResult::Resolved)
@@ -382,7 +499,7 @@ fn handle_after_worker_gain_if_used(
 
 fn handle_start_round_gain(
     ctx: &mut DispatchContext<'_>,
-    player: usize,
+    _player: usize,
     good: &Good,
     amount: u32,
     house: &Option<House>,
@@ -392,7 +509,11 @@ fn handle_start_round_gain(
     let house_ok = house.is_none_or(|h| p.house == h);
     let rooms_ok = rooms.is_none_or(|r| p.rooms() == usize::from(r));
     if house_ok && rooms_ok {
-        let next = p.supply.get(*good).checked_add(amount).ok_or("resource overflow")?;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
         p.supply.set(*good, next);
     }
     Ok(EffectResult::Resolved)
@@ -413,7 +534,11 @@ fn handle_after_clay_construction_gain(
         || (prev.house == House::Clay && current.house == House::Stone);
     if qualifies && trigger.improvement.is_some() {
         let p = &mut ctx.player;
-        let next = p.supply.get(*good).checked_add(amount).ok_or("resource overflow")?;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
         p.supply.set(*good, next);
     }
     Ok(EffectResult::Resolved)
@@ -421,13 +546,17 @@ fn handle_after_clay_construction_gain(
 
 fn handle_after_harvest_bake_gain(
     ctx: &mut DispatchContext<'_>,
-    player: usize,
+    _player: usize,
     amount: u32,
     trigger: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
     if trigger.baked {
         let p = &mut ctx.player;
-        let next = p.supply.get(Good::Food).checked_add(amount).ok_or("resource overflow")?;
+        let next = p
+            .supply
+            .get(Good::Food)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
         p.supply.set(Good::Food, next);
     }
     Ok(EffectResult::Resolved)
@@ -435,7 +564,7 @@ fn handle_after_harvest_bake_gain(
 
 fn handle_harvest_field_gain(
     ctx: &mut DispatchContext<'_>,
-    player: usize,
+    _player: usize,
     rule: &crate::cards::HarvestFieldRule,
     good: &Good,
     amount: u32,
@@ -464,20 +593,28 @@ fn handle_harvest_field_gain(
             u32::from(has(Some(Crop::Grain)) && has(Some(Crop::Vegetable)) && has(None))
         }
     };
-    let gain = multiplier.checked_mul(amount).ok_or("harvest bonus overflow")?;
-    let next = p.supply.get(*good).checked_add(gain).ok_or("resource overflow")?;
+    let gain = multiplier
+        .checked_mul(amount)
+        .ok_or("harvest bonus overflow")?;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(gain)
+        .ok_or("resource overflow")?;
     p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
 }
 
-/// --- Public Dispatcher Entry Points ---
-
+// --- Public Dispatcher Entry Points ---
 /// Dispatch all phases for a card play action.
 /// Returns Ok(()) if fully resolved, Err("pending decision") if interrupted.
+/// Only the newly played card's Replace/Before effects are resolved (prerequisites gate the play,
+/// on-play gains/passives apply once). Already-played cards' effects are NOT re-fired.
+#[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_play(
     card_set: &CardSet,
     player: usize,
-    card_id: &str,
+    new_card_id: &str,
     cards: &mut crate::cards::CardState,
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
@@ -501,7 +638,6 @@ pub fn dispatch_play(
         pending,
     };
 
-    // Phase 1: Replace (prerequisites)
     let trigger = PhaseTriggerData {
         space: None,
         improvement: None,
@@ -509,20 +645,35 @@ pub fn dispatch_play(
         previous_player: None,
         used_spaces: std::collections::BTreeSet::new(),
     };
-    resolve_phase(&mut ctx, player, TriggerPhase::Replace, &trigger)?;
 
-    // Phase 2: Before (on-play gains, passives)
-    resolve_phase(&mut ctx, player, TriggerPhase::Before, &trigger)?;
+    // Phase 1: Replace (prerequisites) - ONLY for the new card
+    resolve_phase_for_card(
+        &mut ctx,
+        player,
+        TriggerPhase::Replace,
+        &trigger,
+        new_card_id,
+    )?;
+
+    // Phase 2: Before (on-play gains, passives) - ONLY for the new card
+    resolve_phase_for_card(
+        &mut ctx,
+        player,
+        TriggerPhase::Before,
+        &trigger,
+        new_card_id,
+    )?;
 
     // Phase 3: Core action (card is moved to played zone — handled by caller via move_card)
 
     // Phase 4: After (no play-time after effects currently)
-    resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+    // NOTE: After phase is a no-op for OnPlay cards; no need to resolve for new card
 
     Ok(())
 }
 
 /// Dispatch AfterWorker phase for a completed worker action.
+#[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_after_worker(
     card_set: &CardSet,
     player: usize,
@@ -565,6 +716,7 @@ pub fn dispatch_after_worker(
 }
 
 /// Dispatch StartRound phase for all players at round start.
+#[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_start_round(
     card_set: &CardSet,
     players: &mut [Player],
@@ -577,10 +729,10 @@ pub fn dispatch_start_round(
     card_uses: &mut BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<(), String> {
-    for player in 0..players.len() {
+    for (player, p_ref) in players.iter_mut().enumerate() {
         let mut ctx = DispatchContext {
             card_set,
-            player: &mut players[player],
+            player: p_ref,
             cards,
             improvement_market,
             delayed_well,
@@ -610,6 +762,7 @@ pub fn dispatch_start_round(
 }
 
 /// Dispatch AfterClayConstruction phase when a major improvement is purchased.
+#[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_after_clay_construction(
     card_set: &CardSet,
     player: usize,
@@ -652,6 +805,7 @@ pub fn dispatch_after_clay_construction(
 }
 
 /// Dispatch HarvestField phase during harvest.
+#[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_harvest_field(
     card_set: &CardSet,
     player: usize,
@@ -692,6 +846,7 @@ pub fn dispatch_harvest_field(
 }
 
 /// Dispatch AfterHarvestBake phase when baking occurs.
+#[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_after_harvest_bake(
     card_set: &CardSet,
     player: usize,
@@ -735,17 +890,20 @@ pub fn dispatch_after_harvest_bake(
 /// These are the original implementations from cards.rs, renamed with _legacy suffix.
 pub mod legacy {
     use super::*;
-    use crate::cards::{CardSet, CardState};
+    use crate::cards::CardSet;
     use crate::model::Player;
 
     /// Legacy on-play gains and passives (called during cards::play).
+    /// `kind`/`extra_food` are accepted to mirror the legacy `cards::play`
+    /// signature used by the equivalence tests; the legacy effect loop never
+    /// read them (cost payment happened before it in cards::play).
     pub fn apply_on_play_effects_legacy(
         set: &CardSet,
         hand: &mut Vec<String>,
         player: &mut Player,
         id: &str,
-        kind: crate::cards::CardKind,
-        extra_food: u32,
+        _kind: crate::cards::CardKind,
+        _extra_food: u32,
     ) -> Result<(), String> {
         // This mirrors the original cards::play effect loop (Before phase effects)
         let card = set.definition(id).ok_or("unknown card")?;
@@ -789,12 +947,16 @@ pub mod legacy {
                     player.supply.set(*good, next);
                 }
                 CardEffect::Passive { rule } => match rule {
-                    crate::cards::PassiveRule::PastureCapacity(n) => player.pasture_capacity_bonus += n,
+                    crate::cards::PassiveRule::PastureCapacity(n) => {
+                        player.pasture_capacity_bonus += n
+                    }
                     crate::cards::PassiveRule::FenceWoodDiscount(n) => player.free_fence_wood += n,
                     crate::cards::PassiveRule::ImprovementWoodDiscount(n) => {
                         player.improvement_wood_discount += n
                     }
-                    crate::cards::PassiveRule::WoodenRoomCost(n) => player.wooden_room_cost = Some(*n),
+                    crate::cards::PassiveRule::WoodenRoomCost(n) => {
+                        player.wooden_room_cost = Some(*n)
+                    }
                     crate::cards::PassiveRule::RoomCost(n) => player.room_material_cost = Some(*n),
                     crate::cards::PassiveRule::MajorStoneDiscountByRooms => {
                         player.major_stone_discount_by_rooms = true
@@ -905,8 +1067,10 @@ pub mod legacy {
         previous: &Player,
         current: &mut Player,
     ) -> Result<(), String> {
-        let qualifies = (previous.house == crate::model::House::Clay && current.rooms() > previous.rooms())
-            || (previous.house == crate::model::House::Clay && current.house == crate::model::House::Stone);
+        let qualifies = (previous.house == crate::model::House::Clay
+            && current.rooms() > previous.rooms())
+            || (previous.house == crate::model::House::Clay
+                && current.house == crate::model::House::Stone);
         if !qualifies {
             return Ok(());
         }
@@ -937,7 +1101,9 @@ pub mod legacy {
                             sheep_per,
                             cattle_per,
                         } => (player.animal_count(crate::model::Animal::Sheep) / *sheep_per)
-                            .checked_add(player.animal_count(crate::model::Animal::Cattle) / *cattle_per)
+                            .checked_add(
+                                player.animal_count(crate::model::Animal::Cattle) / *cattle_per,
+                            )
                             .ok_or("harvest animal bonus overflow")?,
                         crate::cards::HarvestFieldRule::MixedFields => {
                             let has = |crop: Option<crate::model::Crop>| {
@@ -958,7 +1124,9 @@ pub mod legacy {
                             )
                         }
                     };
-                    let gain = multiplier.checked_mul(*amount).ok_or("harvest bonus overflow")?;
+                    let gain = multiplier
+                        .checked_mul(*amount)
+                        .ok_or("harvest bonus overflow")?;
                     let next = player
                         .supply
                         .get(*good)
@@ -985,15 +1153,8 @@ pub mod legacy {
             .map(|effect| match effect {
                 CardEffect::EndGameBonus { rule } => match rule {
                     crate::cards::ScoreBonusRule::PastureArea => {
-                        let squares = player
-                            .pastures
-                            .iter()
-                            .map(|p| p.cells.len())
-                            .sum::<usize>();
-                        [6, 7, 8, 10]
-                            .iter()
-                            .filter(|&&n| squares >= n)
-                            .count() as i32
+                        let squares = player.pastures.iter().map(|p| p.cells.len()).sum::<usize>();
+                        [6, 7, 8, 10].iter().filter(|&&n| squares >= n).count() as i32
                     }
                     crate::cards::ScoreBonusRule::HouseMaterial => match player.house {
                         crate::model::House::Wood => 3,
@@ -1004,10 +1165,10 @@ pub mod legacy {
                         .farm
                         .iter()
                         .filter(|cell| {
-                            cell.stable
-                                && !matches!(cell.tile, crate::model::Tile::Pasture { .. })
+                            cell.stable && !matches!(cell.tile, crate::model::Tile::Pasture { .. })
                         })
-                        .count() as i32,
+                        .count()
+                        as i32,
                     crate::cards::ScoreBonusRule::ImprovementCount => {
                         let minor = player
                             .played_cards
@@ -1039,7 +1200,8 @@ pub mod legacy {
                                     .saturating_sub(pasture.quantity)
                                     >= 3
                         })
-                        .count() as i32,
+                        .count()
+                        as i32,
                     crate::cards::ScoreBonusRule::LaterOccupations => {
                         let tutor = player.played_cards.iter().position(|id| {
                             definition(id).is_some_and(|card| {
@@ -1179,7 +1341,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(players[0].supply.food, 1 + 3); // 3 starting food + 1 from card
+        // Player::new(0, 0) starts with 0 food; the card grants +1.
+        assert_eq!(players[0].supply.food, 1);
     }
 
     #[test]
@@ -1190,16 +1353,20 @@ mod tests {
                 kind: CardKind::Occupation,
                 cost: vec![],
                 points: 0,
-                effects: vec![CardEffect::OnPlayGain {
+                effects: vec![CardEffect::StartRoundGain {
                     good: Good::Food,
                     amount: 1,
+                    house: None,
+                    rooms: None,
                 }],
             }],
         };
         let mut players = vec![Player::new(0, 0)];
-        // 64 cards would exceed budget
-        for i in 0..70 {
-            players[0].played_cards.push(format!("CHAIN{i}"));
+        // 70 instances of the SAME chain card: resolve_phase looks up every
+        // played card by definition, so each instance must exist in the set
+        // to consume one budget unit. 70 > 64 budget → exhaustive guard fires.
+        for _ in 0..70 {
+            players[0].played_cards.push(set.definitions[0].id.clone());
         }
         let mut cards = crate::cards::CardState::default();
         let mut improvement_market = vec![];
@@ -1222,5 +1389,359 @@ mod tests {
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("budget exhausted"));
+    }
+
+    // Equivalence differential tests: the legacy hooks path (cards.rs public
+    // fns, the pre-Step3 implementation) and the new phase dispatcher must
+    // produce identical state transitions, including multi-card chains where
+    // several played cards fire on the same trigger (Issue #266 acceptance:
+    // equivalence of the old CardEffect/hooks path and the new path, incl. chains).
+    fn equivalence_pool() -> CardSet {
+        let chain = |id: &str, effects: Vec<CardEffect>| CardDefinition {
+            id: id.into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects,
+        };
+        CardSet {
+            definitions: vec![
+                // chain of three cards firing on the same worker trigger
+                chain(
+                    "C1",
+                    vec![CardEffect::AfterWorkerGain {
+                        space: Space::Forest,
+                        good: Good::Wood,
+                        amount: 1,
+                    }],
+                ),
+                chain(
+                    "C2",
+                    vec![CardEffect::AfterWorkerGain {
+                        space: Space::Forest,
+                        good: Good::Clay,
+                        amount: 2,
+                    }],
+                ),
+                chain(
+                    "C3",
+                    vec![CardEffect::AfterWorkerGainIfUsed {
+                        space: Space::Forest,
+                        required_space: Space::Lessons,
+                        good: Good::Reed,
+                        amount: 1,
+                    }],
+                ),
+                chain("C4", vec![CardEffect::AfterHarvestBakeGain { amount: 3 }]),
+                chain(
+                    "C5",
+                    vec![CardEffect::HarvestFieldGain {
+                        rule: crate::cards::HarvestFieldRule::Animals {
+                            sheep_per: 2,
+                            cattle_per: 1,
+                        },
+                        good: Good::Food,
+                        amount: 1,
+                    }],
+                ),
+                chain(
+                    "C6",
+                    vec![CardEffect::StartRoundGain {
+                        good: Good::Food,
+                        amount: 1,
+                        house: None,
+                        rooms: None,
+                    }],
+                ),
+                chain(
+                    "C7",
+                    vec![CardEffect::AfterClayConstructionGain {
+                        good: Good::Food,
+                        amount: 2,
+                    }],
+                ),
+                // minor with an on-play gain for the play-path equivalence
+                CardDefinition {
+                    id: "M1".into(),
+                    kind: CardKind::MinorImprovement,
+                    cost: vec![],
+                    points: 1,
+                    effects: vec![CardEffect::OnPlayGain {
+                        good: Good::Grain,
+                        amount: 2,
+                    }],
+                },
+            ],
+        }
+    }
+
+    fn ctx_parts() -> (
+        Vec<Player>,
+        crate::cards::CardState,
+        u32,
+        BTreeMap<String, u32>,
+    ) {
+        (
+            vec![Player::new(0, 0)],
+            crate::cards::CardState::default(),
+            64,
+            BTreeMap::new(),
+        )
+    }
+
+    #[test]
+    fn equivalence_after_worker_chain_matches_legacy_path() {
+        let set = equivalence_pool();
+        for space in [Space::Forest, Space::Lessons, Space::DayLaborer] {
+            // legacy path: the production pair after_worker + after_worker_if_used
+            let mut legacy = [Player::new(0, 0)];
+            legacy[0].played_cards = vec!["C1".into(), "C2".into(), "C3".into()];
+            crate::cards::after_worker(&set, &mut legacy[0], space).unwrap();
+            let mut legacy_used = std::collections::BTreeSet::new();
+            legacy_used.insert(Space::Lessons);
+            crate::cards::after_worker_if_used(&set, &mut legacy[0], space, &legacy_used).unwrap();
+            // new dispatcher path
+            let (mut players, mut cards, mut budget, mut uses) = ctx_parts();
+            players[0].played_cards = vec!["C1".into(), "C2".into(), "C3".into()];
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut used = std::collections::BTreeSet::new();
+            used.insert(Space::Lessons);
+            let mut pending = None;
+            dispatch_after_worker(
+                &set,
+                0,
+                space,
+                &mut cards,
+                &mut players,
+                &mut market,
+                &mut well,
+                1,
+                &used,
+                &mut budget,
+                &mut uses,
+                &mut pending,
+            )
+            .unwrap();
+            assert_eq!(
+                legacy[0].supply.wood, players[0].supply.wood,
+                "wood mismatch on {space:?}"
+            );
+            assert_eq!(
+                legacy[0].supply.clay, players[0].supply.clay,
+                "clay mismatch on {space:?}"
+            );
+            assert_eq!(
+                legacy[0].supply.reed, players[0].supply.reed,
+                "reed mismatch on {space:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn equivalence_start_round_matches_legacy_path() {
+        let set = equivalence_pool();
+        let mut legacy = [Player::new(0, 0)];
+        legacy[0].played_cards = vec!["C1".into(), "C4".into(), "C6".into(), "C6".into()];
+        crate::cards::start_round_rewards(&set, &mut legacy[0]).unwrap();
+
+        let (mut players, mut cards, mut budget, mut uses) = ctx_parts();
+        players[0].played_cards = legacy[0].played_cards.clone();
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_start_round(
+            &set,
+            &mut players,
+            &mut cards,
+            &mut market,
+            &mut well,
+            2,
+            &std::collections::BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(legacy[0].supply.food, players[0].supply.food);
+    }
+
+    #[test]
+    fn equivalence_harvest_and_bake_matches_legacy_path() {
+        let set = equivalence_pool();
+        // HarvestField chain C5 with no animals: multiplier 0 on both paths.
+        let mut legacy = [Player::new(0, 0)];
+        legacy[0].played_cards = vec!["C5".into()];
+        crate::cards::harvest_field_rewards(&set, &mut legacy[0]).unwrap();
+
+        let (mut players, mut cards, mut budget, mut uses) = ctx_parts();
+        players[0].played_cards = vec!["C5".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut cards,
+            &mut players,
+            &mut market,
+            &mut well,
+            8,
+            &std::collections::BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            legacy[0].supply.food, players[0].supply.food,
+            "harvest field gain must match legacy"
+        );
+
+        // bake chain: two C4 instances fire together
+        let mut legacy2 = [Player::new(0, 0)];
+        legacy2[0].played_cards = vec!["C1".into(), "C4".into(), "C4".into()];
+        crate::cards::after_harvest_baking(&set, &mut legacy2[0], 5, true).unwrap();
+
+        let (mut players2, mut cards2, mut budget2, mut uses2) = ctx_parts();
+        players2[0].played_cards = legacy2[0].played_cards.clone();
+        let mut market2 = vec![];
+        let mut well2 = BTreeMap::new();
+        let mut pending2 = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut cards2,
+            &mut players2,
+            &mut market2,
+            &mut well2,
+            5,
+            &std::collections::BTreeSet::new(),
+            &mut budget2,
+            &mut uses2,
+            &mut pending2,
+        )
+        .unwrap();
+        assert_eq!(
+            legacy2[0].supply.food, players2[0].supply.food,
+            "bake bonus must match legacy"
+        );
+    }
+
+    #[test]
+    fn equivalence_after_clay_construction_matches_legacy_path() {
+        let set = equivalence_pool();
+        // previous clay house, current renovates to stone -> qualifies
+        let mut previous = Player::new(0, 0);
+        previous.house = crate::model::House::Clay;
+
+        let mut legacy = [Player::new(0, 0)];
+        legacy[0].played_cards = vec!["C1".into(), "C7".into(), "C7".into()];
+        legacy[0].house = crate::model::House::Stone;
+        crate::cards::after_clay_construction(&set, &previous, &mut legacy[0]).unwrap();
+
+        let (mut players, mut cards, mut budget, mut uses) = ctx_parts();
+        players[0].played_cards = legacy[0].played_cards.clone();
+        players[0].house = crate::model::House::Stone;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &previous,
+            crate::model::Improvement::ClayOven,
+            &mut cards,
+            &mut players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(legacy[0].supply.food, players[0].supply.food);
+    }
+
+    #[test]
+    fn equivalence_play_path_matches_legacy_cards_play() {
+        // cards::play (still the legacy single-call API for direct callers)
+        // vs the engine path: play_validate_pay + play_from_hand +
+        // dispatch_play + update_card_points_on_play. Identical state.
+        let set = equivalence_pool();
+        let mut legacy_hand = vec!["M1".to_string()];
+        let mut legacy = [Player::new(0, 0)];
+        crate::cards::play(
+            &set,
+            &mut legacy_hand,
+            &mut legacy[0],
+            "M1",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+
+        // engine path
+        let mut cards2 = crate::cards::CardState {
+            hands: vec![vec!["M1".to_string()]],
+            undealt: vec![],
+        };
+        let mut players2 = vec![Player::new(0, 0)];
+        let mut market = vec![];
+        let mut ctx = crate::card_zones::CardMoveCtx {
+            cards: &mut cards2,
+            players: &mut players2,
+            improvement_market: &mut market,
+        };
+        crate::cards::play_validate_pay(
+            &set,
+            &mut ctx.cards.hands[0],
+            &mut ctx.players[0],
+            "M1",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        crate::card_zones::play_from_hand(&mut ctx, 0, "M1").unwrap();
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let mut pending = None;
+        let mut well = BTreeMap::new();
+        dispatch_play(
+            &set,
+            0,
+            "M1",
+            ctx.cards,
+            ctx.players,
+            ctx.improvement_market,
+            &mut well,
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &mut pending,
+        )
+        .unwrap();
+        let card = set.definition("M1").unwrap();
+        crate::cards::update_card_points_on_play(&mut ctx.players[0], card.points).unwrap();
+        // end of ctx borrows: copy the results out
+        let new_hand = ctx.cards.hands[0].clone();
+        let new_played = ctx.players[0].played_cards.clone();
+        let new_grain = ctx.players[0].supply.grain;
+        let new_points = ctx.players[0].card_points;
+
+        assert_eq!(
+            legacy[0].supply.grain, new_grain,
+            "on-play grain gain must match"
+        );
+        assert_eq!(legacy_hand, new_hand);
+        assert_eq!(
+            legacy[0].played_cards, new_played,
+            "zone move must match legacy retain+push"
+        );
+        assert_eq!(legacy[0].card_points, new_points);
+        let _ = players2.pop();
     }
 }

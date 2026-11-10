@@ -9,11 +9,13 @@
 //! preserve `LOG_VERSION=5` save format.
 
 use crate::cards::{CardSet, CardState};
-use crate::model::{Good, Improvement, Player};
+use crate::model::{Improvement, Player};
 use std::collections::BTreeMap;
 
 /// Logical zone a card can occupy. No hidden state; purely a classification.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum CardZone {
     /// Cards not yet dealt to any player (initial pool remainder).
@@ -32,9 +34,9 @@ impl CardZone {
     /// Returns the player index if the zone is player-specific, else `None`.
     pub fn player(&self) -> Option<usize> {
         match self {
-            CardZone::Hand { player } | CardZone::Played { player } | CardZone::Discard { player } => {
-                Some(*player)
-            }
+            CardZone::Hand { player }
+            | CardZone::Played { player }
+            | CardZone::Discard { player } => Some(*player),
             CardZone::Undealt | CardZone::ImprovementMarket => None,
         }
     }
@@ -64,7 +66,9 @@ impl std::fmt::Display for CardZoneError {
             CardZoneError::CardNotFound(id) => write!(f, "card not found: {id}"),
             CardZoneError::CardNotInZone(id, zone) => write!(f, "card {id} not in zone {zone:?}"),
             CardZoneError::InvalidMove(msg) => write!(f, "invalid move: {msg}"),
-            CardZoneError::DuplicateInPlayed(id) => write!(f, "duplicate card in played_cards: {id}"),
+            CardZoneError::DuplicateInPlayed(id) => {
+                write!(f, "duplicate card in played_cards: {id}")
+            }
             CardZoneError::PrerequisiteFailed(msg) => write!(f, "prerequisite failed: {msg}"),
         }
     }
@@ -96,7 +100,27 @@ pub fn move_card(
     to: CardZone,
 ) -> Result<(), CardZoneError> {
     if from == to {
-        return Err(CardZoneError::InvalidMove("from and to zones are identical".into()));
+        return Err(CardZoneError::InvalidMove(
+            "from and to zones are identical".into(),
+        ));
+    }
+
+    // The hand -> played transfer has exactly one implementation (hand_to_played);
+    // every other pair goes through the generic remove/add pair below.
+    if let (
+        CardZone::Hand {
+            player: from_player,
+        },
+        CardZone::Played { player: to_player },
+    ) = (from, to)
+    {
+        if from_player != to_player {
+            return Err(CardZoneError::InvalidMove(
+                "hand -> played moves must stay within one player".into(),
+            ));
+        }
+        let hand = &mut ctx.cards.hands[from_player];
+        return hand_to_played(hand, &mut ctx.players[from_player], id);
     }
 
     // Remove from source zone
@@ -178,11 +202,7 @@ fn remove_from_zone(
 }
 
 /// Add `id` to `zone`.
-fn add_to_zone(
-    ctx: &mut CardMoveCtx<'_>,
-    id: &str,
-    zone: CardZone,
-) -> Result<(), CardZoneError> {
+fn add_to_zone(ctx: &mut CardMoveCtx<'_>, id: &str, zone: CardZone) -> Result<(), CardZoneError> {
     match zone {
         CardZone::Undealt => {
             ctx.cards.undealt.push(id.to_string());
@@ -211,11 +231,9 @@ fn add_to_zone(
             played.push(id.to_string());
             Ok(())
         }
-        CardZone::ImprovementMarket => {
-            Err(CardZoneError::InvalidMove(
-                "ImprovementMarket zone is for major improvements, not card IDs".into(),
-            ))
-        }
+        CardZone::ImprovementMarket => Err(CardZoneError::InvalidMove(
+            "ImprovementMarket zone is for major improvements, not card IDs".into(),
+        )),
         CardZone::Discard { player } => {
             if player >= ctx.players.len() {
                 return Err(CardZoneError::InvalidMove(format!(
@@ -276,11 +294,41 @@ pub fn validate_card_partition(
         }
         for (id, count) in played_seen {
             if count > 1 {
-                return Err(format!("player {} has duplicate played card: {}", player.id, id));
+                return Err(format!(
+                    "player {} has duplicate played card: {}",
+                    player.id, id
+                ));
             }
         }
     }
 
+    Ok(())
+}
+
+/// Single canonical implementation of the hand -> played transfer.
+///
+/// This is the one place that mutates a hand and a played area for a play.
+/// `move_card` (through `remove_from_zone`/`add_to_zone`) and `cards::play`
+/// (which only holds a `&mut Vec<String>` hand plus a `&mut Player`) both
+/// delegate here, so there is exactly one code path that can move a card from
+/// a hand to a played area (Issue #266: "card movement has a single source of
+/// truth, ad-hoc Vec mutations removed").
+pub fn hand_to_played(
+    hand: &mut Vec<String>,
+    player: &mut Player,
+    id: &str,
+) -> Result<(), CardZoneError> {
+    let Some(pos) = hand.iter().position(|x| x == id) else {
+        return Err(CardZoneError::CardNotInZone(
+            id.to_string(),
+            CardZone::Hand { player: player.id },
+        ));
+    };
+    if player.played_cards.iter().any(|x| x == id) {
+        return Err(CardZoneError::DuplicateInPlayed(id.to_string()));
+    }
+    hand.remove(pos);
+    player.played_cards.push(id.to_string());
     Ok(())
 }
 
@@ -291,7 +339,12 @@ pub fn play_from_hand(
     player: usize,
     id: &str,
 ) -> Result<(), CardZoneError> {
-    move_card(ctx, id, CardZone::Hand { player }, CardZone::Played { player })
+    move_card(
+        ctx,
+        id,
+        CardZone::Hand { player },
+        CardZone::Played { player },
+    )
 }
 
 /// Convenience: deal initial hands from undealt to each player's hand.
@@ -312,7 +365,7 @@ pub fn deal_initial_hands(
 mod tests {
     use super::*;
     use crate::cards::{CardDefinition, CardKind, CardSet};
-    use crate::model::{Good, Player};
+    use crate::model::Player;
 
     fn test_setup() -> (CardSet, CardState, Vec<Player>) {
         let set = CardSet {
@@ -344,25 +397,27 @@ mod tests {
     #[test]
     fn move_card_hand_to_played() {
         let (set, mut cards, mut players) = test_setup();
+        let mut market = vec![];
         let mut ctx = CardMoveCtx {
             cards: &mut cards,
             players: &mut players,
-            improvement_market: &mut vec![],
+            improvement_market: &mut market,
         };
         play_from_hand(&mut ctx, 0, "A001").unwrap();
         assert!(ctx.cards.hands[0].is_empty());
         assert_eq!(ctx.players[0].played_cards, vec!["A001"]);
-        validate_card_partition(&set, &ctx.cards, &ctx.players).unwrap();
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
     }
 
     #[test]
     fn move_card_rejects_duplicate_in_played() {
-        let (set, mut cards, mut players) = test_setup();
+        let (_set, mut cards, mut players) = test_setup();
         players[0].played_cards.push("A001".into());
+        let mut market = vec![];
         let mut ctx = CardMoveCtx {
             cards: &mut cards,
             players: &mut players,
-            improvement_market: &mut vec![],
+            improvement_market: &mut market,
         };
         let err = play_from_hand(&mut ctx, 0, "A001").unwrap_err();
         assert!(matches!(err, CardZoneError::DuplicateInPlayed(_)));
@@ -384,7 +439,7 @@ mod tests {
 
     #[test]
     fn validate_card_partition_detects_duplicate() {
-        let (set, mut cards, mut players) = test_setup();
+        let (set, mut cards, players) = test_setup();
         cards.undealt.push("A001".into()); // duplicate
         let err = validate_card_partition(&set, &cards, &players).unwrap_err();
         assert!(err.contains("duplicate"));
@@ -415,15 +470,90 @@ mod tests {
             undealt: vec!["A001".into(), "A002".into()],
         };
         let mut players = vec![Player::new(0, 0), Player::new(1, 0)];
+        let mut market = vec![];
         let mut ctx = CardMoveCtx {
             cards: &mut cards,
             players: &mut players,
-            improvement_market: &mut vec![],
+            improvement_market: &mut market,
         };
         deal_initial_hands(&mut ctx, &[vec!["A001".into()], vec!["A002".into()]]).unwrap();
         assert_eq!(ctx.cards.hands[0], vec!["A001"]);
         assert_eq!(ctx.cards.hands[1], vec!["A002"]);
         assert!(ctx.cards.undealt.is_empty());
-        validate_card_partition(&set, &ctx.cards, &ctx.players).unwrap();
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
+    }
+
+    #[test]
+    fn hand_to_played_is_the_single_hand_to_played_implementation() {
+        // Both entry points must produce the same post-state.
+        let (set, cards, players) = test_setup();
+
+        let mut via_move_cards = cards.clone();
+        let mut via_move_players = players.clone();
+        let mut market = vec![];
+        {
+            let mut ctx = CardMoveCtx {
+                cards: &mut via_move_cards,
+                players: &mut via_move_players,
+                improvement_market: &mut market,
+            };
+            move_card(
+                &mut ctx,
+                "A001",
+                CardZone::Hand { player: 0 },
+                CardZone::Played { player: 0 },
+            )
+            .unwrap();
+        }
+
+        let mut via_direct_cards = cards;
+        let mut via_direct_players = players;
+        hand_to_played(
+            &mut via_direct_cards.hands[0],
+            &mut via_direct_players[0],
+            "A001",
+        )
+        .unwrap();
+
+        assert_eq!(via_move_cards.hands, via_direct_cards.hands);
+        assert_eq!(
+            via_move_players[0].played_cards,
+            via_direct_players[0].played_cards
+        );
+        assert_eq!(via_move_players[0].played_cards, vec!["A001"]);
+        validate_card_partition(&set, &via_move_cards, &via_move_players).unwrap();
+    }
+
+    #[test]
+    fn hand_to_played_rejects_a_card_not_in_hand_and_a_duplicate() {
+        let (_set, mut cards, mut players) = test_setup();
+        let err = hand_to_played(&mut cards.hands[0], &mut players[0], "A002").unwrap_err();
+        assert!(matches!(
+            err,
+            CardZoneError::CardNotInZone(_, CardZone::Hand { .. })
+        ));
+
+        players[0].played_cards.push("A001".into());
+        let err = hand_to_played(&mut cards.hands[0], &mut players[0], "A001").unwrap_err();
+        assert!(matches!(err, CardZoneError::DuplicateInPlayed(_)));
+    }
+
+    #[test]
+    fn hand_to_played_cross_player_is_rejected() {
+        let (_set, mut cards, mut players) = test_setup();
+        let mut market = vec![];
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        let err = move_card(
+            &mut ctx,
+            "A001",
+            CardZone::Hand { player: 0 },
+            CardZone::Played { player: 1 },
+        )
+        .unwrap_err();
+        assert!(matches!(err, CardZoneError::InvalidMove(_)));
     }
 }
