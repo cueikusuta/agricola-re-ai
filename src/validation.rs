@@ -312,7 +312,80 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
             return Verdict::Unsure;
         }
     }
-    // 13. post.card_set: Arc pointer equality required.
+    // 12b. Actor card consistency: card_points delta must equal points of newly played cards.
+    // Free actions don't play cards (engine.rs execute_free has no cards::play calls), so this
+    // applies only to work moves. If played_cards changes, the points delta must match exactly.
+    {
+        let pre_actor = &pre.public.players[actor];
+        let post_actor = &post.public.players[actor];
+        let played_delta: i32 = post_actor.card_points - pre_actor.card_points;
+        // Compute multiset difference of played_cards.
+        let pre_played: std::collections::BTreeMap<_, _> =
+            pre_actor
+                .played_cards
+                .iter()
+                .fold(std::collections::BTreeMap::new(), |mut acc, id| {
+                    *acc.entry(id.clone()).or_insert(0usize) += 1;
+                    acc
+                });
+        let post_played: std::collections::BTreeMap<_, _> = post_actor.played_cards.iter().fold(
+            std::collections::BTreeMap::new(),
+            |mut acc, id| {
+                *acc.entry(id.clone()).or_insert(0usize) += 1;
+                acc
+            },
+        );
+        // Cards cannot be removed from played_cards in a work move (engine has no such path).
+        for (id, pre_count) in &pre_played {
+            let post_count = post_played.get(id).copied().unwrap_or(0);
+            if *pre_count > post_count {
+                return Verdict::Fail("actor played_cards lost cards in work move".into());
+            }
+        }
+        // Newly added played cards.
+        let mut played_added = std::collections::BTreeMap::new();
+        for (id, post_count) in &post_played {
+            let pre_count = pre_played.get(id).copied().unwrap_or(0);
+            if *post_count > pre_count {
+                played_added.insert(id.clone(), post_count - pre_count);
+            }
+        }
+        if !played_added.is_empty() {
+            // Sum points of newly played cards.
+            let set = &post.card_set;
+            let mut expected_points_delta = 0i32;
+            for (id, count) in &played_added {
+                if let Some(card) = set.definition(id) {
+                    expected_points_delta = match expected_points_delta
+                        .checked_add(card.points * (*count as i32))
+                    {
+                        Some(v) => v,
+                        None => {
+                            return Verdict::Fail("card points delta overflow".into());
+                        }
+                    };
+                } else {
+                    // Unknown card ID in played_cards — full validator will reject.
+                    return Verdict::Fail("actor played_cards contains unknown card ID".into());
+                }
+            }
+            // card_set disabled => no cards can be played (hands empty, played_cards empty).
+            if !set.enabled() {
+                if played_delta != 0 || !played_added.is_empty() {
+                    return Verdict::Fail(
+                        "card_points/played_cards changed while card_set disabled".into(),
+                    );
+                }
+            } else if played_delta != expected_points_delta {
+                return Verdict::Fail(
+                    "actor card_points inconsistent with played_cards delta".into(),
+                );
+            }
+        } else if played_delta != 0 {
+            // No played_cards change but card_points changed — invalid.
+            return Verdict::Fail("actor card_points changed without played_cards delta".into());
+        }
+    }
     //     Engine has no path that swaps card_set mid-game (grep-confirmed).
     //     Different valid card_set -> Unsure (full accepts, incremental cannot prove).
     if !std::sync::Arc::ptr_eq(&post.card_set, &pre.card_set) {
@@ -558,6 +631,29 @@ pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
                 removed.insert(id.clone(), pre_count - post_count);
             }
         }
+        // Review P1-A/2 counterexample: if actor hand changed in free action, that's a
+        // definite violation (execute_free never touches hands). Fail instead of Unsure.
+        if !removed.is_empty() {
+            return Verdict::Fail("actor hand changed in free action".into());
+        }
+        // Actor played_cards must not change in free action (no cards::play calls in execute_free).
+        let pre_played: std::collections::BTreeSet<_> = pre.public.players[actor]
+            .played_cards
+            .iter()
+            .cloned()
+            .collect();
+        let post_played: std::collections::BTreeSet<_> = post.public.players[actor]
+            .played_cards
+            .iter()
+            .cloned()
+            .collect();
+        if pre_played != post_played {
+            return Verdict::Fail("actor played_cards changed in free action".into());
+        }
+        // Actor card_points must not change in free action.
+        if pre.public.players[actor].card_points != post.public.players[actor].card_points {
+            return Verdict::Fail("actor card_points changed in free action".into());
+        }
         // Non-actor hands: any difference -> Unsure.
         for i in 0..n {
             if i == actor {
@@ -595,7 +691,7 @@ pub fn validate_free_action_or_full(post: &Game, pre: &Game, actor: usize) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::engine::{Action, Detail};
+    use crate::engine::{Action, Detail, FreeAction};
     use crate::model::{Config, Game, Space};
     use crate::policy::{CardChoiceDetails, DetailPolicy, RandomPolicy, SpacePolicy};
     use rand::SeedableRng;
@@ -1102,6 +1198,227 @@ mod tests {
     fn untampered_mid_round_still_passes() {
         let (pre, post) = mid_round_pair();
         assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+    }
+
+    /// Review P1-A/2 counterexample 1 (issuecomment-6769764161): actor card_points
+    /// tampered in a mid-round work move (cards enabled or disabled) must not Pass.
+    /// incremental must reject (Fail), or_full must reject, and full must reject.
+    #[test]
+    fn tampered_actor_card_points_declines_and_full_rejects() {
+        // Cards-enabled variant (uses mid_round_pair which uses cardless game, so we need a card game).
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 7,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        // Drive to a mid-round state.
+        let mut rng = ChaCha8Rng::seed_from_u64(0xBEEF);
+        let mut game = game;
+        for _ in 0..6 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            game.apply(action).unwrap();
+        }
+        let pre = game.clone();
+        let actor = pre.public.active_player;
+        let mut post = pre.clone();
+        // Tamper: increment actor card_points by 1.
+        post.public.players[actor].card_points += 1;
+        let verdict = validate_incremental(&post, &pre);
+        assert_ne!(
+            verdict,
+            Verdict::Pass,
+            "tampered card_points must not Pass (got {verdict:?})"
+        );
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+        assert!(validate_full(&post).is_err());
+    }
+
+    /// Review P1-A/2 counterexample 1 variant: card_set disabled but actor card_points changed.
+    #[test]
+    fn tampered_actor_card_points_cardless_declines() {
+        let (pre, mut post) = mid_round_pair();
+        let actor = pre.public.active_player;
+        post.public.players[actor].card_points += 1;
+        let verdict = validate_incremental(&post, &pre);
+        assert_ne!(
+            verdict,
+            Verdict::Pass,
+            "tampered card_points (cardless) must not Pass (got {verdict:?})"
+        );
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+        assert!(validate_full(&post).is_err());
+    }
+
+    /// Review P1-A/2 counterexample 2 (issuecomment-6769764161): free action with
+    /// actor hand card removed must not Pass.
+    #[test]
+    fn tampered_free_action_hand_removal_declines() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 11,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        // Drive to a state where free actions are available (e.g., after some moves).
+        let mut rng = ChaCha8Rng::seed_from_u64(0xFEED);
+        let mut game = game;
+        for _ in 0..8 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            game.apply(action).unwrap();
+        }
+        let pre = game.clone();
+        let actor = pre.public.active_player;
+        // Apply a free action (DiscardGood is always legal if actor has food).
+        // Use the engine's free action execution via Game::apply_free.
+        let mut post = pre.clone();
+        // Ensure actor has food to discard.
+        post.public.players[actor].supply.food = 3;
+        post.apply_free(
+            actor,
+            FreeAction::DiscardGood {
+                good: crate::model::Good::Food,
+                quantity: 1,
+            },
+        )
+        .expect("free action must apply");
+        // Now tamper: remove a card from actor's hand.
+        assert!(
+            !post.cards.hands[actor].is_empty(),
+            "setup: actor must have cards"
+        );
+        post.cards.hands[actor].pop();
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert_ne!(
+            verdict,
+            Verdict::Pass,
+            "tampered free action hand must not Pass (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+        assert!(validate_full(&post).is_err());
+    }
+
+    /// Review P1-A/2 counterexample 2 variant: free action with actor card_points tampered.
+    #[test]
+    fn tampered_free_action_actor_card_points_declines() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 13,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xCAFE);
+        let mut game = game;
+        for _ in 0..8 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            game.apply(action).unwrap();
+        }
+        let pre = game.clone();
+        let actor = pre.public.active_player;
+        let mut post = pre.clone();
+        post.public.players[actor].supply.food = 3;
+        post.apply_free(
+            actor,
+            FreeAction::DiscardGood {
+                good: crate::model::Good::Food,
+                quantity: 1,
+            },
+        )
+        .expect("free action must apply");
+        // Tamper: increment actor card_points.
+        post.public.players[actor].card_points += 1;
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert_ne!(
+            verdict,
+            Verdict::Pass,
+            "tampered free action card_points must not Pass (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+        assert!(validate_full(&post).is_err());
+    }
+
+    /// Normal card play regression: a legal work move that plays a card (Occupation/Minor
+    /// on Lessons space) must still Pass incremental validation.
+    #[test]
+    fn legal_card_play_passes_incremental() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 17,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xBABA);
+        let mut game = game;
+        // Drive until we hit a Lessons/ExtraLessons space or similar.
+        for _ in 0..20 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            let pre = game.clone();
+            game.apply(action).unwrap();
+            let post = game.clone();
+            // If this was a card play (actor played_cards grew), verify incremental passes.
+            if post.public.players[id].played_cards.len()
+                > pre.public.players[id].played_cards.len()
+            {
+                let verdict = validate_incremental(&post, &pre);
+                assert_eq!(
+                    verdict,
+                    Verdict::Pass,
+                    "legal card play must Pass incremental (got {verdict:?})"
+                );
+                validate_incremental_or_full(&post, &pre).unwrap();
+                assert_eq!(validate_full(&post), Ok(()));
+                return; // Found at least one card play, test passes.
+            }
+        }
+        panic!("no card play observed in 20 moves — test setup may need adjustment");
     }
 
     /// A plain mid-round (pre, post) pair: same round, quota not exhausted.
