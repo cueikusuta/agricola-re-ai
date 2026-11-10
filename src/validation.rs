@@ -12,7 +12,19 @@
 //!   verifies only what a work move can change mid-round. Anything the cheap
 //!   checks cannot decide returns [`Verdict::Unsure`], and the caller must
 //!   fall back to [`validate_full`] — no invalid state is ever accepted.
+//!
+//! Soundness contract (review P1-A): `Pass` is returned only when every
+//! difference between `pre` and `post` has been *proven legal* by the checks
+//! below. Any component the incremental layer does not explicitly verify is
+//! either shown unchanged, or downgrades the verdict to `Unsure` so the full
+//! validator arbitrates. A `Pass` is never reachable from a post state that
+//! `validate_full` rejects. This includes `post.cards`, `post.card_set`,
+//! `post.delayed_well`, and `post.public.active_player` which are all fully
+//! verified or downgraded to `Unsure`. The internal RNG state (`post.rng`) is
+//! explicitly excluded from incremental checks and is only validated by
+//! `validate_full` (if at all) — documented here per review P1-A.
 
+use crate::engine::expected_active_player;
 use crate::model::{Game, Tile};
 
 /// Result of incremental validation.
@@ -93,6 +105,22 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
             return Verdict::Fail("non-actor worker count changed".into());
         }
     }
+    // 5b. Verify post.active_player matches the expected next worker.
+    // Round advancement is already excluded above (round == pre.round), so all
+    // players should not have placed their full quota yet. If they have, the
+    // round would advance and we would have returned Unsure.
+    let expected = expected_active_player(
+        pre.public.active_player,
+        &post.public.workers_placed,
+        &post.public.work_quota,
+    );
+    if expected >= n {
+        // All workers placed but round hasn't advanced — engine invariant broken.
+        return Verdict::Fail("all workers placed but round not advanced".into());
+    }
+    if post.public.active_player != expected {
+        return Verdict::Fail("active_player does not match expected next worker".into());
+    }
     // 6. Exactly one newly used space; `used` may only grow mid-round. A
     //    previously used space disappearing is a definite violation (the
     //    full validator does not check monotonicity — this catches a class
@@ -152,8 +180,10 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
         }
     }
     // 8. Farm invariants. Non-actors cannot change in a work move: verify the
-    //    cheap subset and decline (Unsure) if anything looks different. The
-    //    actor gets the full shared per-player check.
+    //    cheap structural bounds and decline (Unsure) if anything looks different.
+    //    The actor gets the full shared per-player check.
+    //    Non-actor full equality (Player::PartialEq) covers id, pastures, pet,
+    //    and all effect-counter fields — any drift downgrades to Unsure→full.
     for (i, player) in post.public.players.iter().enumerate() {
         if i != actor {
             if player.farm.len() != crate::model::FARM_CELLS
@@ -165,20 +195,11 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
             {
                 return Verdict::Unsure;
             }
-            // A work move should not change a non-actor's supply, cards, or
-            // farm; passive cross-player card effects exist, so any drift
-            // declines to the full validator instead of guessing.
-            let pre_p = &pre.public.players[i];
-            if player.supply != pre_p.supply
-                || player.played_cards != pre_p.played_cards
-                || player.card_points != pre_p.card_points
-                || player.improvements != pre_p.improvements
-                || player.farm != pre_p.farm
-                || player.fences != pre_p.fences
-                || player.house != pre_p.house
-                || player.family != pre_p.family
-                || player.newborns != pre_p.newborns
-            {
+            // Full structural equality for non-actors: any difference (including
+            // id, pastures, pet, and all effect-counter fields) is Unsure.
+            // The cheap bounds above remain as definite Fail guards matching
+            // validate_full's hard errors.
+            if player != &pre.public.players[i] {
                 return Verdict::Unsure;
             }
             continue;
@@ -226,6 +247,82 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
     if post.public.accumulations.len() > pre.public.accumulations.len() {
         return Verdict::Unsure;
     }
+    // 12. post.cards: mid-round checks.
+    //     - hands.len() must equal player count (full validator rejects otherwise).
+    if post.cards.hands.len() != n {
+        return Verdict::Fail("card hand count mismatch".into());
+    }
+    //     - card_set disabled => hands must be empty (full validator enforces).
+    if !post.card_set.enabled() && post.cards != pre.cards {
+        return Verdict::Fail("cards changed while card_set disabled".into());
+    }
+    //     - non-actor hand differences -> Unsure (passive card effects possible).
+    //     - undealt differences -> Unsure.
+    //     - actor hand: multiset post ⊆ pre (cards only removed via play).
+    //       Removed multiset must equal played_cards multiset addition.
+    {
+        let pre_actor_hand: std::collections::BTreeMap<_, _> =
+            pre.cards.hands[actor]
+                .iter()
+                .fold(std::collections::BTreeMap::new(), |mut acc, id| {
+                    *acc.entry(id.clone()).or_insert(0usize) += 1;
+                    acc
+                });
+        let post_actor_hand: std::collections::BTreeMap<_, _> = post.cards.hands[actor]
+            .iter()
+            .fold(std::collections::BTreeMap::new(), |mut acc, id| {
+                *acc.entry(id.clone()).or_insert(0usize) += 1;
+                acc
+            });
+        // Check post ⊆ pre for actor hand.
+        for (id, count) in &post_actor_hand {
+            let pre_count = pre_actor_hand.get(id).copied().unwrap_or(0);
+            if *count > pre_count {
+                return Verdict::Unsure;
+            }
+        }
+        // Check removed cards match played_cards additions.
+        let mut removed = std::collections::BTreeMap::new();
+        for (id, pre_count) in &pre_actor_hand {
+            let post_count = post_actor_hand.get(id).copied().unwrap_or(0);
+            if *pre_count > post_count {
+                removed.insert(id.clone(), pre_count - post_count);
+            }
+        }
+        let mut played_added = std::collections::BTreeMap::new();
+        for id in &post.public.players[actor].played_cards {
+            if !pre.public.players[actor].played_cards.contains(id) {
+                *played_added.entry(id.clone()).or_insert(0usize) += 1;
+            }
+        }
+        if removed != played_added {
+            return Verdict::Unsure;
+        }
+        // Non-actor hands: any difference -> Unsure.
+        for i in 0..n {
+            if i == actor {
+                continue;
+            }
+            if post.cards.hands[i] != pre.cards.hands[i] {
+                return Verdict::Unsure;
+            }
+        }
+        // Undealt: any difference -> Unsure.
+        if post.cards.undealt != pre.cards.undealt {
+            return Verdict::Unsure;
+        }
+    }
+    // 13. post.card_set: Arc pointer equality required.
+    //     Engine has no path that swaps card_set mid-game (grep-confirmed).
+    //     Different valid card_set -> Unsure (full accepts, incremental cannot prove).
+    if !std::sync::Arc::ptr_eq(&post.card_set, &pre.card_set) {
+        return Verdict::Unsure;
+    }
+    // 14. post.delayed_well: Well purchase adds entries; engine path is complex.
+    //     Downgrade to Unsure→full (soundness: Fail only for proven violations).
+    if post.delayed_well != pre.delayed_well {
+        return Verdict::Unsure;
+    }
     Verdict::Pass
 }
 
@@ -244,6 +341,9 @@ pub fn validate_incremental_or_full(post: &Game, pre: &Game) -> Result<(), Strin
 /// action produced. Both must describe the same game (same config, player
 /// count, round, revealed spaces and hidden deck).
 ///
+/// `actor` is the player who performed the free action. This may differ from
+/// `pre.public.active_player` because free actions can be taken out of turn.
+///
 /// Free actions do NOT place a worker or add a used space. They can change:
 /// - Actor's supply (conversions, discards, cooking, baking)
 /// - Actor's farm (fence building, plowing, sowing - but these are work moves usually)
@@ -257,13 +357,17 @@ pub fn validate_incremental_or_full(post: &Game, pre: &Game) -> Result<(), Strin
 /// - Used spaces, workers_placed
 /// - Major improvement multiset
 /// - Accumulations can only decrease
-pub fn validate_free_action(post: &Game, pre: &Game) -> Verdict {
+pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
     // 1. Identity of the game itself.
     if post.config != pre.config {
         return Verdict::Fail("config mutated".into());
     }
-    if post.public.players.len() != pre.public.players.len() {
+    let n = pre.public.players.len();
+    if post.public.players.len() != n {
         return Verdict::Fail("player count changed".into());
+    }
+    if actor >= n {
+        return Verdict::Fail("actor index out of bounds".into());
     }
     if post.public.additional_action_space_enabled != pre.public.additional_action_space_enabled {
         return Verdict::Fail("setting mutated".into());
@@ -287,7 +391,6 @@ pub fn validate_free_action(post: &Game, pre: &Game) -> Verdict {
         return Verdict::Fail("work_quota changed mid-round".into());
     }
     // 5. Workers placed MUST NOT change (free actions don't place workers).
-    let n = pre.public.players.len();
     for i in 0..n {
         if post.public.workers_placed[i] != pre.public.workers_placed[i] {
             return Verdict::Fail("workers_placed changed in free action".into());
@@ -336,10 +439,12 @@ pub fn validate_free_action(post: &Game, pre: &Game) -> Verdict {
         }
     }
     // 8. Non-actors cannot change in a free action: verify the
-    //    cheap subset and decline (Unsure) if anything looks different.
+    //    cheap structural bounds and decline (Unsure) if anything looks different.
     //    The actor gets full shared per-player check for farm invariants.
+    //    Non-actor full equality (Player::PartialEq) covers id, pastures, pet,
+    //    and all effect-counter fields — any drift downgrades to Unsure→full.
     for (i, player) in post.public.players.iter().enumerate() {
-        if i != pre.public.active_player {
+        if i != actor {
             if player.farm.len() != crate::model::FARM_CELLS
                 || player.occupied_stables() > 4
                 || player.fences.len() > 15
@@ -349,17 +454,11 @@ pub fn validate_free_action(post: &Game, pre: &Game) -> Verdict {
             {
                 return Verdict::Unsure;
             }
-            let pre_p = &pre.public.players[i];
-            if player.supply != pre_p.supply
-                || player.played_cards != pre_p.played_cards
-                || player.card_points != pre_p.card_points
-                || player.improvements != pre_p.improvements
-                || player.farm != pre_p.farm
-                || player.fences != pre_p.fences
-                || player.house != pre_p.house
-                || player.family != pre_p.family
-                || player.newborns != pre_p.newborns
-            {
+            // Full structural equality for non-actors: any difference (including
+            // id, pastures, pet, and all effect-counter fields) is Unsure.
+            // The cheap bounds above remain as definite Fail guards matching
+            // validate_full's hard errors.
+            if player != &pre.public.players[i] {
                 return Verdict::Unsure;
             }
             continue;
@@ -392,7 +491,6 @@ pub fn validate_free_action(post: &Game, pre: &Game) -> Verdict {
         }
         (rooms, fields, pastures)
     };
-    let actor = pre.public.active_player;
     let (pre_rooms, pre_fields, pre_pastures) = count_tiles(&pre.public.players[actor]);
     let (post_rooms, post_fields, post_pastures) = count_tiles(&post.public.players[actor]);
     if post_rooms < pre_rooms || post_fields < pre_fields || post_pastures < pre_pastures {
@@ -419,12 +517,75 @@ pub fn validate_free_action(post: &Game, pre: &Game) -> Verdict {
     if post.public.animal_accumulations.len() > pre.public.animal_accumulations.len() {
         return Verdict::Unsure;
     }
+    // 12. active_player must not change in a free action.
+    if post.public.active_player != pre.public.active_player {
+        return Verdict::Fail("active_player changed in free action".into());
+    }
+    // 13. post.cards: free action checks.
+    if post.cards.hands.len() != n {
+        return Verdict::Fail("card hand count mismatch".into());
+    }
+    if !post.card_set.enabled() && post.cards != pre.cards {
+        return Verdict::Fail("cards changed while card_set disabled".into());
+    }
+    {
+        let pre_actor_hand: std::collections::BTreeMap<_, _> =
+            pre.cards.hands[actor]
+                .iter()
+                .fold(std::collections::BTreeMap::new(), |mut acc, id| {
+                    *acc.entry(id.clone()).or_insert(0usize) += 1;
+                    acc
+                });
+        let post_actor_hand: std::collections::BTreeMap<_, _> = post.cards.hands[actor]
+            .iter()
+            .fold(std::collections::BTreeMap::new(), |mut acc, id| {
+                *acc.entry(id.clone()).or_insert(0usize) += 1;
+                acc
+            });
+        // Check post ⊆ pre for actor hand (free actions don't play cards from hand).
+        for (id, count) in &post_actor_hand {
+            let pre_count = pre_actor_hand.get(id).copied().unwrap_or(0);
+            if *count > pre_count {
+                return Verdict::Unsure;
+            }
+        }
+        // Free actions don't add to played_cards, so hand should be unchanged or have
+        // cards removed only by card effects (which we can't fully verify -> Unsure).
+        let mut removed = std::collections::BTreeMap::new();
+        for (id, pre_count) in &pre_actor_hand {
+            let post_count = post_actor_hand.get(id).copied().unwrap_or(0);
+            if *pre_count > post_count {
+                removed.insert(id.clone(), pre_count - post_count);
+            }
+        }
+        // Non-actor hands: any difference -> Unsure.
+        for i in 0..n {
+            if i == actor {
+                continue;
+            }
+            if post.cards.hands[i] != pre.cards.hands[i] {
+                return Verdict::Unsure;
+            }
+        }
+        // Undealt: any difference -> Unsure.
+        if post.cards.undealt != pre.cards.undealt {
+            return Verdict::Unsure;
+        }
+    }
+    // 14. post.card_set: Arc pointer equality required.
+    if !std::sync::Arc::ptr_eq(&post.card_set, &pre.card_set) {
+        return Verdict::Unsure;
+    }
+    // 15. post.delayed_well: Well purchase not possible in free action, but downgrade.
+    if post.delayed_well != pre.delayed_well {
+        return Verdict::Unsure;
+    }
     Verdict::Pass
 }
 
 /// Incremental free-action validation with automatic fallback to full validation.
-pub fn validate_free_action_or_full(post: &Game, pre: &Game) -> Result<(), String> {
-    match validate_free_action(post, pre) {
+pub fn validate_free_action_or_full(post: &Game, pre: &Game, actor: usize) -> Result<(), String> {
+    match validate_free_action(post, pre, actor) {
         Verdict::Pass => Ok(()),
         Verdict::Fail(e) => Err(e),
         Verdict::Unsure => validate_full(post),

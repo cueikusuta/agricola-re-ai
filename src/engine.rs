@@ -846,7 +846,7 @@ impl Game {
             String::new()
         };
         next.execute_free(player, &free)?;
-        crate::validation::validate_free_action_or_full(&next, self)?;
+        crate::validation::validate_free_action_or_full(&next, self, player)?;
         if record {
             let after = next.state_hash();
             next.log.events.push(Event {
@@ -951,19 +951,44 @@ impl Game {
         }
         Ok(())
     }
+}
+
+/// Compute the expected next active player given the current state.
+/// This is the single implementation shared by `next_worker_or_round`
+/// and the validation layer (`validate_incremental`/`validate_free_action`).
+/// Returns the index of the next player who has not placed all their workers,
+/// or `n` (player count) if all players have placed their quota (round should advance).
+pub fn expected_active_player(
+    start_player: usize,
+    workers_placed: &[u8],
+    work_quota: &[u8],
+) -> usize {
+    let n = workers_placed.len();
+    let mut next = start_player;
+    for _ in 0..n {
+        next = (next + 1) % n;
+        if workers_placed[next] < work_quota[next] {
+            return next;
+        }
+    }
+    n // all players have placed their quota
+}
+
+impl Game {
     fn next_worker_or_round(
         &mut self,
         feeding: Option<&[FeedingPlan]>,
         breeding: Option<&[BreedingPlan]>,
     ) -> Result<()> {
         let n = self.public.players.len();
-        let mut next = self.public.active_player;
-        for _ in 0..n {
-            next = (next + 1) % n;
-            if self.public.workers_placed[next] < self.public.work_quota[next] {
-                self.public.active_player = next;
-                return Ok(());
-            }
+        let next = expected_active_player(
+            self.public.active_player,
+            &self.public.workers_placed,
+            &self.public.work_quota,
+        );
+        if next < n {
+            self.public.active_player = next;
+            return Ok(());
         }
         if HARVEST_ROUNDS.contains(&self.public.round) {
             self.harvest(
