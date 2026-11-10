@@ -357,26 +357,81 @@ fn affordable(p: &Player, i: Improvement) -> bool {
 impl Game {
     /// Apply post-placement card rewards identically in committed moves and
     /// harvest previews, before the space becomes occupied.
+    ///
+    /// All three triggers go through the phase dispatcher rather than the legacy
+    /// `cards::*` hooks, so the event budget and per-card use limits apply on
+    /// the production path too. The legacy functions stay for the equivalence
+    /// tests: #266 requires staged migration, so the old path is kept as the
+    /// differential reference rather than deleted.
     fn apply_post_work_card_effects(
         &mut self,
         player: usize,
         action: &Action,
         previous: &Player,
     ) -> Result<()> {
-        let current = &mut self.public.players[player];
-        crate::cards::after_harvest_baking(
+        // No cards means no card effects; skip the dispatch entirely so the
+        // cardless hot path keeps its Step 2 cost.
+        if !self.card_set.enabled() {
+            return Ok(());
+        }
+        // Bake trigger: only when this action actually baked bread, matching
+        // cards::after_harvest_baking's own gate (round >= 2, harvest round).
+        if is_bake_bread_detail(&action.detail) {
+            crate::card_events::dispatch_after_harvest_bake(
+                &self.card_set,
+                player,
+                &mut self.cards,
+                &mut self.public.players,
+                &mut self.public.improvement_market,
+                &mut self.delayed_well,
+                self.public.round,
+                &self.public.used,
+                &mut self.event_budget,
+                &mut self.card_uses,
+                &self.card_use_limits,
+                &mut self.pending,
+            )?;
+        }
+        // Clay-construction trigger: `previous` is the pre-action player, so a
+        // longer improvements list means this action bought one.
+        let bought = if previous.improvements.len() < self.public.players[player].improvements.len()
+        {
+            self.public.players[player].improvements.last().copied()
+        } else {
+            None
+        };
+        crate::card_events::dispatch_after_clay_construction(
             &self.card_set,
-            current,
+            player,
+            previous,
+            bought,
+            &mut self.cards,
+            &mut self.public.players,
+            &mut self.public.improvement_market,
+            &mut self.delayed_well,
             self.public.round,
-            is_bake_bread_detail(&action.detail),
-        )?;
-        crate::cards::after_clay_construction(&self.card_set, previous, current)?;
-        crate::cards::after_worker(&self.card_set, current, action.space)?;
-        crate::cards::after_worker_if_used(
-            &self.card_set,
-            current,
-            action.space,
             &self.public.used,
+            &mut self.event_budget,
+            &mut self.card_uses,
+            &self.card_use_limits,
+            &mut self.pending,
+        )?;
+        // Worker trigger: AfterWorkerGain and AfterWorkerGainIfUsed, in the
+        // active player's played_cards order.
+        crate::card_events::dispatch_after_worker(
+            &self.card_set,
+            player,
+            action.space,
+            &mut self.cards,
+            &mut self.public.players,
+            &mut self.public.improvement_market,
+            &mut self.delayed_well,
+            self.public.round,
+            &self.public.used,
+            &mut self.event_budget,
+            &mut self.card_uses,
+            &self.card_use_limits,
+            &mut self.pending,
         )?;
         Ok(())
     }

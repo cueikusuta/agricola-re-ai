@@ -47,6 +47,7 @@ fn play_to_end(state: &mut DraftState) {
 
 fn fixture_card_set(pool: &DraftPool) -> CardSet {
     let definition = |id: &String, kind: DefKind| CardDefinition {
+        use_limit: None,
         id: id.clone(),
         kind,
         cost: vec![],

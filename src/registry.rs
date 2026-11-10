@@ -106,6 +106,7 @@ impl RegisteredCard {
     /// Convert to the legacy CardDefinition for compat adapter.
     pub fn to_card_definition(&self) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: self.external_id.clone(),
             kind: self.kind,
             cost: self.cost.clone(),

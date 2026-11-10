@@ -372,6 +372,7 @@ mod tests {
         // Build a two-card chain where the same card fires repeatedly.
         let set = CardSet {
             definitions: vec![crate::cards::CardDefinition {
+                use_limit: None,
                 id: "LOOP".into(),
                 kind: crate::cards::CardKind::Occupation,
                 cost: vec![],
@@ -549,6 +550,121 @@ mod tests {
         assert_eq!(
             game.event_budget, DEFAULT_EVENT_BUDGET,
             "a new action must start from the full budget, not a depleted one"
+        );
+    }
+
+    /// The production engine path must enforce the same guards as the
+    /// dispatcher: a card's declared per-round use limit is honoured by a real
+    /// CommittedAction, not just by a direct dispatcher call.
+    #[test]
+    fn a_real_card_use_limit_is_enforced_through_the_engine() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        // Occupation whose effects fire on every worker placement, limited to
+        // one resolution per round.
+        let card = |id: &str| CardDefinition {
+            id: id.into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterWorkerGain {
+                space: crate::model::Space::DayLaborer,
+                good: Good::Wood,
+                amount: 1,
+            }],
+            use_limit: Some(1),
+        };
+        let set = CardSet {
+            definitions: vec![card("LIMITED"), card("USER")],
+        };
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 31,
+            additional_action_space_enabled: false,
+        });
+        // Install the probe set directly: the deck-shape validation applies to
+        // real pools, while this test isolates the use-limit guard.
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = set
+            .definitions
+            .iter()
+            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+            .collect();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec![], vec![]],
+            undealt: vec![],
+        };
+        // Both cards are played in front of the ACTIVE player, so both would
+        // fire on DayLaborer and the second one must hit its limit.
+        let active = game.public.active_player;
+        // The same id twice: two resolutions of ONE limited card. This isolates
+        // the limit from card-count effects.
+        game.public.players[active].played_cards =
+            vec!["LIMITED".to_string(), "LIMITED".to_string()];
+
+        // The engine reads the limit from card data.
+        assert_eq!(game.card_use_limits.get("LIMITED"), Some(&1));
+
+        // A legal DayLaborer action must fail: the second resolution hits the
+        // limit, which the engine reports rather than silently over-granting.
+        let action = crate::engine::Action {
+            space: crate::model::Space::DayLaborer,
+            detail: crate::engine::Detail::None,
+        };
+        let err = game.apply(action).unwrap_err();
+        assert!(
+            err.contains("use limit"),
+            "the production path must enforce the declared limit, got: {err}"
+        );
+    }
+
+    /// A card without a declared limit resolves freely, so limits are opt-in
+    /// data and do not change existing card behaviour.
+    #[test]
+    fn cards_without_a_declared_limit_are_unlimited() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                id: "FREE".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::AfterWorkerGain {
+                    space: crate::model::Space::DayLaborer,
+                    good: Good::Wood,
+                    amount: 1,
+                }],
+                use_limit: None,
+            }],
+        };
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 32,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = set
+            .definitions
+            .iter()
+            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+            .collect();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec![], vec![]],
+            undealt: vec![],
+        };
+        assert!(
+            game.card_use_limits.is_empty(),
+            "no limit declared means no entry"
+        );
+        let active = game.public.active_player;
+        game.public.players[active].played_cards.push("FREE".into());
+        game.apply(crate::engine::Action {
+            space: crate::model::Space::DayLaborer,
+            detail: crate::engine::Detail::None,
+        })
+        .unwrap();
+        assert_eq!(
+            game.public.players[active].supply.wood, 1,
+            "an unlimited card resolves normally"
         );
     }
 }

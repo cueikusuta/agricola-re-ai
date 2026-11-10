@@ -96,9 +96,32 @@ impl Game {
     /// Only an internal preview copy is used to query policies at the
     /// beginning of the harvest. The real field phase happens in harvest().
     pub(crate) fn harvest_fields(&mut self) {
-        for p in &mut self.public.players {
-            crate::cards::harvest_field_rewards(&self.card_set, p)
+        // Cardless games have no harvest effects at all, so skip the dispatch
+        // entirely: this is the hot path for the cardless baseline.
+        let carded = self.card_set.enabled();
+        for p in 0..self.public.players.len() {
+            // Route the harvest trigger through the dispatcher so the event
+            // budget and per-card use limits apply (the field phase is one
+            // effect chain across all players).
+            if carded {
+                self.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
+                crate::card_events::dispatch_harvest_field(
+                    &self.card_set,
+                    p,
+                    &mut self.cards,
+                    &mut self.public.players,
+                    &mut self.public.improvement_market,
+                    &mut self.delayed_well,
+                    self.public.round,
+                    &self.public.used,
+                    &mut self.event_budget,
+                    &mut self.card_uses,
+                    &self.card_use_limits,
+                    &mut self.pending,
+                )
                 .expect("validated card field-phase reward");
+            }
+            let p = &mut self.public.players[p];
             for cell in &mut p.farm {
                 if let Tile::Field {
                     crop: Some(kind),

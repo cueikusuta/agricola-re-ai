@@ -161,6 +161,13 @@ pub struct CardDefinition {
     pub cost: Vec<(Good, u32)>,
     pub points: i32,
     pub effects: Vec<CardEffect>,
+    /// Maximum times this card's effects may resolve per round, for cards
+    /// printed with a per-round use limit. `None` = no limit (the default), and
+    /// it is skipped when serializing, so existing card sets and saved games
+    /// keep their exact bytes and `content_hash` is unchanged unless a limit is
+    /// actually declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_limit: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -628,6 +635,7 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
         rule: ScoreBonusRule,
     ) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.to_owned(),
             kind,
             cost,
@@ -863,6 +871,7 @@ mod verified_scoring_card_tests {
             definitions: verified_scoring_cards(3),
         };
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "test_minor".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![],
@@ -912,6 +921,7 @@ mod verified_scoring_card_tests {
             definitions: verified_scoring_cards(2),
         };
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "before_occ".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -919,6 +929,7 @@ mod verified_scoring_card_tests {
             effects: vec![],
         });
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "after_occ".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -942,6 +953,7 @@ mod card_prerequisite_tests {
 
     fn prerequisite_card(rule: CardRequirement) -> (CardSet, CardDefinition) {
         let card = CardDefinition {
+            use_limit: None,
             id: "check".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Wood, 1)],
@@ -961,6 +973,7 @@ mod card_prerequisite_tests {
         let (mut set, card) = prerequisite_card(CardRequirement::MinimumOccupations(2));
         set.definitions
             .extend(["one", "two"].into_iter().map(|id| CardDefinition {
+                use_limit: None,
                 id: id.into(),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -1023,6 +1036,7 @@ mod card_prerequisite_tests {
     fn player_count_requirement_rejected_by_card_set() {
         let mut cards = verified_scoring_cards(3);
         cards.push(CardDefinition {
+            use_limit: None,
             id: "extra".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![],
@@ -1055,6 +1069,7 @@ pub fn verified_minor_worker_cards(players: usize) -> Vec<CardDefinition> {
         effects: Vec<CardEffect>,
     ) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.to_string(),
             kind,
             cost,
@@ -1147,6 +1162,7 @@ mod verified_minor_worker_tests {
             definitions: verified_minor_worker_cards(2),
         };
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "test_occ".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1183,6 +1199,7 @@ mod verified_minor_worker_tests {
         };
         for i in 1..=3 {
             set.definitions.push(CardDefinition {
+                use_limit: None,
                 id: format!("occ{i}"),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -1211,6 +1228,7 @@ mod verified_minor_worker_tests {
 pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
     vec![
         CardDefinition {
+            use_limit: None,
             id: "A005".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Food, 1)],
@@ -1223,6 +1241,7 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "A125".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1305,6 +1324,7 @@ mod verified_immediate_resource_tests {
 pub fn verified_worker_bonus_cards(players: usize) -> Vec<CardDefinition> {
     fn occupation(id: &str, effects: Vec<CardEffect>) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1525,6 +1545,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
     let occupation = CardKind::Occupation;
     vec![
         CardDefinition {
+            use_limit: None,
             id: "B050".into(),
             kind: minor,
             cost: vec![(Good::Wood, 1)],
@@ -1544,6 +1565,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             ],
         },
         CardDefinition {
+            use_limit: None,
             id: "B057".into(),
             kind: minor,
             cost: vec![(Good::Clay, 1), (Good::Wood, 1)],
@@ -1556,6 +1578,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "B061".into(),
             kind: minor,
             cost: vec![],
@@ -1567,6 +1590,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "B062".into(),
             kind: minor,
             cost: vec![(Good::Wood, 1)],
@@ -1579,6 +1603,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "B118".into(),
             kind: occupation,
             cost: vec![],
@@ -1687,6 +1712,7 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
         effect: PassiveRule,
     ) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.into(),
             kind,
             cost,
@@ -1702,6 +1728,7 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
             PassiveRule::PastureCapacity(2),
         ),
         CardDefinition {
+            use_limit: None,
             id: "A075".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Stone, 2)],
@@ -1777,6 +1804,7 @@ mod passive_cards_tests {
             definitions: verified_passive_cards(),
         };
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "sample".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Wood, 1)],
@@ -1827,6 +1855,7 @@ mod passive_cards_tests {
         };
         for i in 0..4 {
             set.definitions.push(CardDefinition {
+                use_limit: None,
                 id: format!("occ{i}"),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -1869,6 +1898,7 @@ pub fn after_clay_construction(
 pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
     let mut result = vec![
         CardDefinition {
+            use_limit: None,
             id: "A110".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1879,6 +1909,7 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "B107".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1893,6 +1924,7 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
     ];
     if players == 2 {
         result.push(CardDefinition {
+            use_limit: None,
             id: "B102".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -2010,6 +2042,7 @@ mod simple_occupation_tests {
 pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
     vec![
         CardDefinition {
+            use_limit: None,
             id: "B010".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Wood, 3), (Good::Food, 3)],
@@ -2019,6 +2052,7 @@ pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "A063".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Wood, 2), (Good::Stone, 2)],
@@ -2032,6 +2066,7 @@ pub fn verified_multiplayer_passive_cards(players: usize) -> Vec<CardDefinition>
         return vec![];
     }
     vec![CardDefinition {
+        use_limit: None,
         id: "A143".into(),
         kind: CardKind::Occupation,
         cost: vec![],
@@ -2160,6 +2195,7 @@ mod card_set_content_hash_tests {
 
     fn card(id: &str, kind: CardKind, points: i32) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.into(),
             kind,
             cost: Vec::new(),

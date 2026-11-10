@@ -797,9 +797,17 @@ impl Game {
             pending: None,
             event_budget: default_event_budget(),
             card_uses: BTreeMap::new(),
-            card_use_limits: BTreeMap::new(),
+            card_use_limits: Default::default(),
             next_decision_id: 0,
         };
+        // Per-card use limits are card data (`CardDefinition::use_limit`), so
+        // the engine reads them from the set instead of a hard-coded table.
+        result.card_use_limits = result
+            .card_set
+            .definitions
+            .iter()
+            .filter_map(|card| card.use_limit.map(|limit| (card.id.clone(), limit)))
+            .collect();
         result.start_round();
         result.log.initial_state_hash = result.state_hash();
         result.log.initial_public_state = Some(result.public.clone());
@@ -1083,9 +1091,26 @@ impl Game {
                 self.public.players[id].supply.food += 1
             }
         }
-        for player in &mut self.public.players {
-            crate::cards::start_round_rewards(&self.card_set, player)
-                .expect("validated card round reward");
+        // Round-start triggers go through the phase dispatcher so the event
+        // budget and per-card use limits apply here too. The budget is reset
+        // for a new round: a round boundary is not part of one action's chain.
+        if self.card_set.enabled() {
+            self.event_budget = default_event_budget();
+            // dispatch_start_round already walks every player, so one call covers them all.
+            crate::card_events::dispatch_start_round(
+                &self.card_set,
+                &mut self.public.players,
+                &mut self.cards,
+                &mut self.public.improvement_market,
+                &mut self.delayed_well,
+                self.public.round,
+                &self.public.used,
+                &mut self.event_budget,
+                &mut self.card_uses,
+                &self.card_use_limits,
+                &mut self.pending,
+            )
+            .expect("validated card round reward");
         }
     }
     pub fn validate(&self) -> Result<(), String> {

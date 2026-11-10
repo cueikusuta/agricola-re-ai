@@ -7,6 +7,7 @@ fn set(players: usize) -> CardSet {
     let mut definitions = vec![];
     for i in 0..7 * players {
         definitions.push(CardDefinition {
+            use_limit: None,
             id: format!("occ_{i}"),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -18,6 +19,7 @@ fn set(players: usize) -> CardSet {
             }],
         });
         definitions.push(CardDefinition {
+            use_limit: None,
             id: format!("minor_{i}"),
             kind: CardKind::MinorImprovement,
             cost: vec![],

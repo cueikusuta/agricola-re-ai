@@ -835,7 +835,10 @@ pub fn dispatch_after_clay_construction(
     card_set: &CardSet,
     player: usize,
     previous: &Player,
-    improvement: crate::model::Improvement,
+    // The improvement bought in this action, if any. `None` still dispatches
+    // (so the budget/limits apply), but the clay-construction handler cannot
+    // fire because it requires `trigger.improvement.is_some()`.
+    improvement: Option<crate::model::Improvement>,
     cards: &mut crate::cards::CardState,
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
@@ -863,7 +866,7 @@ pub fn dispatch_after_clay_construction(
 
     let trigger = PhaseTriggerData {
         space: None,
-        improvement: Some(improvement),
+        improvement,
         baked: false,
         previous_player: Some(previous.clone()),
         used_spaces: used_spaces.clone(),
@@ -1329,6 +1332,7 @@ mod tests {
         let set = CardSet {
             definitions: vec![
                 CardDefinition {
+                    use_limit: None,
                     id: "TEST_OCC".into(),
                     kind: CardKind::Occupation,
                     cost: vec![],
@@ -1340,6 +1344,7 @@ mod tests {
                     }],
                 },
                 CardDefinition {
+                    use_limit: None,
                     id: "TEST_MINOR".into(),
                     kind: CardKind::MinorImprovement,
                     cost: vec![],
@@ -1394,6 +1399,7 @@ mod tests {
     fn dispatch_start_round_triggers_gain() {
         let set = CardSet {
             definitions: vec![CardDefinition {
+                use_limit: None,
                 id: "SR_GAIN".into(),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -1439,6 +1445,7 @@ mod tests {
     fn event_budget_exhausted() {
         let set = CardSet {
             definitions: vec![CardDefinition {
+                use_limit: None,
                 id: "CHAIN".into(),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -1490,6 +1497,7 @@ mod tests {
     // equivalence of the old CardEffect/hooks path and the new path, incl. chains).
     fn equivalence_pool() -> CardSet {
         let chain = |id: &str, effects: Vec<CardEffect>| CardDefinition {
+            use_limit: None,
             id: id.into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1554,6 +1562,7 @@ mod tests {
                 ),
                 // minor with an on-play gain for the play-path equivalence
                 CardDefinition {
+                    use_limit: None,
                     id: "M1".into(),
                     kind: CardKind::MinorImprovement,
                     cost: vec![],
@@ -1754,7 +1763,7 @@ mod tests {
             &set,
             0,
             &previous,
-            crate::model::Improvement::ClayOven,
+            Some(crate::model::Improvement::ClayOven),
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -1854,6 +1863,7 @@ mod tests {
     #[test]
     fn interrupt_phase_pauses_the_chain_with_a_pending_decision() {
         let probe = |id: &str| CardDefinition {
+            use_limit: None,
             id: id.into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1917,6 +1927,7 @@ mod tests {
     fn declared_per_card_use_limit_is_enforced() {
         let set = CardSet {
             definitions: vec![CardDefinition {
+                use_limit: None,
                 id: "ONCE".into(),
                 kind: CardKind::Occupation,
                 cost: vec![],

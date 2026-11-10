@@ -371,6 +371,7 @@ mod tests {
         let set = CardSet {
             definitions: vec![
                 CardDefinition {
+                    use_limit: None,
                     id: "A001".into(),
                     kind: CardKind::Occupation,
                     cost: vec![],
@@ -378,6 +379,7 @@ mod tests {
                     effects: vec![],
                 },
                 CardDefinition {
+                    use_limit: None,
                     id: "A002".into(),
                     kind: CardKind::MinorImprovement,
                     cost: vec![],
@@ -427,6 +429,7 @@ mod tests {
     fn validate_card_partition_detects_missing() {
         let (mut set, cards, players) = test_setup();
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "A003".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -450,6 +453,7 @@ mod tests {
         let set = CardSet {
             definitions: vec![
                 CardDefinition {
+                    use_limit: None,
                     id: "A001".into(),
                     kind: CardKind::Occupation,
                     cost: vec![],
@@ -457,6 +461,7 @@ mod tests {
                     effects: vec![],
                 },
                 CardDefinition {
+                    use_limit: None,
                     id: "A002".into(),
                     kind: CardKind::MinorImprovement,
                     cost: vec![],
