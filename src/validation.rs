@@ -526,4 +526,143 @@ mod tests {
         // The fallback wrapper therefore accepts via the full path.
         assert_eq!(validate_incremental_or_full(&post, &pre), Ok(()));
     }
+
+    #[cfg(feature = "perf-count-alloc")]
+        #[test]
+        fn search_clone_allocs_do_not_scale_with_log_size() {
+            use crate::model::{Config, Game, Event};
+            use crate::counting::allocation_count;
+
+            // Warmup: run once to initialize allocator internals
+            let mut warmup_game = Game::new(Config {
+                players: 2,
+                seed: 999,
+                additional_action_space_enabled: false,
+            });
+            for i in 0..10 {
+                warmup_game.log.events.push(Event {
+                    player: Some(i % 2),
+                    kind: "test".into(),
+                    payload: serde_json::json!({}),
+                    before: "{}".into(),
+                    after: "{}".into(),
+                });
+            }
+            let _ = warmup_game.search_clone();
+
+            // Test with large log (500 events)
+            let mut game_large = Game::new(Config {
+                players: 2,
+                seed: 1,
+                additional_action_space_enabled: false,
+            });
+            for i in 0..500 {
+                game_large.log.events.push(Event {
+                    player: Some(i % 2),
+                    kind: "test".into(),
+                    payload: serde_json::json!({}),
+                    before: "{}".into(),
+                    after: "{}".into(),
+                });
+            }
+            assert_eq!(game_large.log.events.len(), 500);
+
+            // Measure allocations for search_clone with large log (run 3x, take median)
+            let mut large_allocs = Vec::new();
+            for _ in 0..3 {
+                let before = allocation_count();
+                let _probe = game_large.search_clone();
+                large_allocs.push(allocation_count() - before);
+            }
+            large_allocs.sort();
+            let median_large = large_allocs[1];
+
+            // Test with small log (5 events)
+            let mut game_small = Game::new(Config {
+                players: 2,
+                seed: 2,
+                additional_action_space_enabled: false,
+            });
+            for i in 0..5 {
+                game_small.log.events.push(Event {
+                    player: Some(i % 2),
+                    kind: "test".into(),
+                    payload: serde_json::json!({}),
+                    before: "{}".into(),
+                    after: "{}".into(),
+                });
+            }
+            assert_eq!(game_small.log.events.len(), 5);
+
+            // Measure allocations for search_clone with small log (run 3x, take median)
+            let mut small_allocs = Vec::new();
+            for _ in 0..3 {
+                let before = allocation_count();
+                let _probe = game_small.search_clone();
+                small_allocs.push(allocation_count() - before);
+            }
+            small_allocs.sort();
+            let median_small = small_allocs[1];
+
+            // Allocations should not scale with log size (O(1) wrt log size).
+            // Median allocations should be equal (or very close).
+            let diff = (median_large as i64 - median_small as i64).abs();
+            assert!(
+                diff <= 10,
+                "search_clone allocations must not scale with log size: large={median_large} small={median_small} diff={diff} (raw: large={large_allocs:?} small={small_allocs:?})"
+            );
+        }
+
+    #[cfg(feature = "perf-count-alloc")]
+    #[test]
+    fn search_from_parts_log_card_set_shares_arc() {
+        use crate::cards::verified_basic_card_set;
+        use crate::model::{Config, Game};
+        use std::sync::Arc;
+
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 1,
+                additional_action_space_enabled: false,
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+
+        // search_from_parts shares the card_set Arc with the log
+        assert!(
+            Arc::ptr_eq(&game.log.card_set, &game.card_set),
+            "log.card_set and game.card_set must be the same Arc"
+        );
+    }
+
+    #[cfg(feature = "perf-count-alloc")]
+    #[test]
+    fn search_clone_log_card_set_shares_arc() {
+        use crate::cards::verified_basic_card_set;
+        use crate::model::{Config, Game};
+        use std::sync::Arc;
+
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 1,
+                additional_action_space_enabled: false,
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+
+        let clone = game.search_clone();
+        // search_clone shares the card_set Arc with the original log
+        assert!(
+            Arc::ptr_eq(&clone.log.card_set, &game.log.card_set),
+            "cloned log.card_set and original log.card_set must be the same Arc"
+        );
+        assert!(
+            Arc::ptr_eq(&clone.card_set, &game.card_set),
+            "cloned game.card_set and original game.card_set must be the same Arc"
+        );
+    }
 }

@@ -594,8 +594,12 @@ pub struct GameLog {
     pub initial_public_state: Option<PublicState>,
     pub round_seed: u64,
     pub action_seed: u64,
-    #[serde(default)]
-    pub card_set: CardSet,
+    #[serde(
+        default,
+        serialize_with = "serialize_arc",
+        deserialize_with = "deserialize_arc"
+    )]
+    pub card_set: Arc<CardSet>,
     /// Explicit starting hands for a draft-seeded game (#104). `None` means the
     /// engine dealt from `config.seed`. Stored so save/load and replay rebuild
     /// the exact initial card state instead of re-dealing randomly.
@@ -730,7 +734,7 @@ impl Game {
             initial_public_state: None,
             round_seed,
             action_seed,
-            card_set: (*card_set).clone(),
+            card_set: card_set.clone(),
             initial_hands: initial_hands.clone(),
             events: vec![],
         };
@@ -781,8 +785,6 @@ impl Game {
     /// This avoids cloning the event log and shares the card definitions via Arc.
     /// The returned game has `record_events = false` and an empty event log.
     pub fn search_clone(&self) -> Self {
-        let mut log = self.log.clone();
-        log.events.clear();
         Self {
             config: self.config.clone(),
             public: self.public.clone(),
@@ -791,7 +793,21 @@ impl Game {
             delayed_well: self.delayed_well.clone(),
             card_set: self.card_set.clone(),
             cards: self.cards.clone(),
-            log,
+            log: GameLog {
+                log_version: self.log.log_version,
+                engine_version: self.log.engine_version.clone(),
+                rules_version: self.log.rules_version.clone(),
+                config: self.log.config.clone(),
+                start_player: self.log.start_player,
+                initial_start_player_override: self.log.initial_start_player_override,
+                initial_state_hash: self.log.initial_state_hash.clone(),
+                initial_public_state: self.log.initial_public_state.clone(),
+                round_seed: self.log.round_seed,
+                action_seed: self.log.action_seed,
+                card_set: self.log.card_set.clone(), // Arc shared
+                initial_hands: self.log.initial_hands.clone(),
+                events: Vec::new(),
+            },
             record_events: false,
         }
     }
@@ -812,14 +828,13 @@ impl Game {
         let start_player = public.start_player;
         let round_seed = config.seed ^ 0x38DB_3BE3_DF45_3FAF;
         let action_seed = config.seed ^ 0x6A09_E667_F3BC_C909;
-        let card_set_for_log = (*card_set).clone();
         Self {
             config: config.clone(),
             public,
             hidden_round_deck,
             rng,
             delayed_well,
-            card_set,
+            card_set: card_set.clone(),
             cards,
             log: GameLog {
                 log_version: LOG_VERSION,
@@ -832,7 +847,7 @@ impl Game {
                 initial_public_state: None,
                 round_seed,
                 action_seed,
-                card_set: card_set_for_log,
+                card_set: card_set.clone(), // Arc shared
                 initial_hands: None,
                 events: Vec::new(),
             },
@@ -849,7 +864,7 @@ impl Game {
             || result.log.rules_version != RULES_VERSION
             || result.log.engine_version != ENGINE_VERSION
             || result.log.config != result.config
-            || result.log.card_set != *result.card_set
+            || *result.log.card_set != *result.card_set
         {
             return Err("saved game metadata/version mismatch".into());
         }
