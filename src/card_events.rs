@@ -37,6 +37,11 @@ pub enum TriggerPhase {
 /// Mapping from CardEffect variant to its TriggerPhase.
 fn effect_phase(effect: &CardEffect) -> TriggerPhase {
     match effect {
+        #[cfg(test)]
+        // The probe models an effect whose resolution needs a player choice,
+        // which is exactly the Interrupt phase (2016 Lookout p.8: the active
+        // player resolves their own effects in the order they choose).
+        CardEffect::PendingProbe { .. } => TriggerPhase::Interrupt,
         // Prerequisite blocks play — Replace phase (can prevent the play)
         CardEffect::Prerequisite { .. } => TriggerPhase::Replace,
         // On-play gains are instantaneous at play time — Before phase
@@ -71,6 +76,8 @@ pub struct DispatchContext<'a> {
     pub used_spaces: &'a std::collections::BTreeSet<Space>,
     pub event_budget: &'a mut u32,
     pub card_uses: &'a mut BTreeMap<String, u32>,
+    /// Declared per-card limits. Absent card = no per-period limit.
+    pub card_use_limits: &'a BTreeMap<String, u32>,
     pub pending: &'a mut Option<PendingDecision>,
 }
 
@@ -131,12 +138,22 @@ pub fn resolve_phase(
             // Consume event budget
             consume_budget(ctx.event_budget)?;
 
-            // Check per-card use limit (default: no limit, but track for future)
-            // Currently all effects have no hard limit; the ledger is for extensibility.
-            check_card_use(ctx.card_uses, &card_id, u32::MAX)?;
+            // Per-card use limit for the current period. A card without a
+            // declared limit is unlimited (u32::MAX); the ledger still counts
+            // every resolution so limits can be introduced as data.
+            let limit = ctx
+                .card_use_limits
+                .get(&card_id)
+                .copied()
+                .unwrap_or(u32::MAX);
+            check_card_use(ctx.card_uses, &card_id, limit)?;
 
             // Dispatch to handler
             let result = match effect {
+                #[cfg(test)]
+                CardEffect::PendingProbe { options } => {
+                    handle_pending_probe(ctx, player, &card_id, options.clone())?
+                }
                 CardEffect::Prerequisite { rule } => {
                     handle_prerequisite(ctx, player, &card_id, rule, trigger_data)?
                 }
@@ -228,11 +245,20 @@ fn resolve_phase_for_card(
         // Consume event budget
         consume_budget(ctx.event_budget)?;
 
-        // Check per-card use limit (default: no limit, but track for future)
-        check_card_use(ctx.card_uses, card_id, u32::MAX)?;
+        // Same per-card limit rule as resolve_phase.
+        let limit = ctx
+            .card_use_limits
+            .get(card_id)
+            .copied()
+            .unwrap_or(u32::MAX);
+        check_card_use(ctx.card_uses, card_id, limit)?;
 
         // Dispatch to handler
         let result = match effect {
+            #[cfg(test)]
+            CardEffect::PendingProbe { options } => {
+                handle_pending_probe(ctx, player, card_id, options.clone())?
+            }
             CardEffect::Prerequisite { rule } => {
                 handle_prerequisite(ctx, player, card_id, rule, trigger_data)?
             }
@@ -318,6 +344,36 @@ pub struct PhaseTriggerData {
 }
 
 // --- Effect Handlers (each phase handler cites the official timing rule) ---
+/// Test-only handler for the Interrupt branch: it produces a PendingDecision
+/// instead of resolving immediately, so the pause/resume contract is covered.
+#[cfg(test)]
+fn handle_pending_probe(
+    _ctx: &mut DispatchContext<'_>,
+    player: usize,
+    card_id: &str,
+    options: Vec<(Good, u32)>,
+) -> Result<EffectResult, String> {
+    let kind = crate::pending::PendingKind::ChooseGain {
+        source_card: card_id.to_string(),
+        options: options
+            .into_iter()
+            .map(|(good, amount)| crate::pending::GainOption { good, amount })
+            .collect(),
+    };
+    // Handlers describe WHAT has to be decided; the engine stamps the decision
+    // id and the pre-decision state hash when it actually pauses (it is the
+    // only layer that knows them). Leaving them blank here keeps the handler
+    // free of game-level bookkeeping.
+    let decision = PendingDecision::new(
+        0,
+        player,
+        kind,
+        String::new(),
+        serde_json::json!({ "card": card_id }),
+    );
+    Ok(EffectResult::Pending(decision))
+}
+
 fn handle_prerequisite(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
@@ -623,6 +679,7 @@ pub fn dispatch_play(
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<(), String> {
     let mut ctx = DispatchContext {
@@ -635,6 +692,7 @@ pub fn dispatch_play(
         used_spaces,
         event_budget,
         card_uses,
+        card_use_limits,
         pending,
     };
 
@@ -686,6 +744,7 @@ pub fn dispatch_after_worker(
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<(), String> {
     let mut ctx = DispatchContext {
@@ -698,6 +757,7 @@ pub fn dispatch_after_worker(
         used_spaces,
         event_budget,
         card_uses,
+        card_use_limits,
         pending,
     };
 
@@ -711,6 +771,10 @@ pub fn dispatch_after_worker(
 
     // AfterWorkerGain and AfterWorkerGainIfUsed are After phase
     resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+    // Interrupts pause the chain after the passive phase has resolved
+    // (2016 Lookout p.8: the active player resolves their effects in the
+    // order they choose; a choice-requiring effect stops the chain).
+    resolve_phase(&mut ctx, player, TriggerPhase::Interrupt, &trigger)?;
 
     Ok(())
 }
@@ -727,6 +791,7 @@ pub fn dispatch_start_round(
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<(), String> {
     for (player, p_ref) in players.iter_mut().enumerate() {
@@ -740,6 +805,7 @@ pub fn dispatch_start_round(
             used_spaces,
             event_budget,
             card_uses,
+            card_use_limits,
             pending,
         };
 
@@ -752,6 +818,8 @@ pub fn dispatch_start_round(
         };
 
         resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+        // Then the interrupt phase for this player.
+        resolve_phase(&mut ctx, player, TriggerPhase::Interrupt, &trigger)?;
 
         // Check for pending interrupt
         if pending.is_some() {
@@ -776,6 +844,7 @@ pub fn dispatch_after_clay_construction(
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<(), String> {
     let mut ctx = DispatchContext {
@@ -788,6 +857,7 @@ pub fn dispatch_after_clay_construction(
         used_spaces,
         event_budget,
         card_uses,
+        card_use_limits,
         pending,
     };
 
@@ -800,6 +870,10 @@ pub fn dispatch_after_clay_construction(
     };
 
     resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+    // Interrupts pause the chain after the passive phase has resolved
+    // (2016 Lookout p.8: the active player resolves their effects in the
+    // order they choose; a choice-requiring effect stops the chain).
+    resolve_phase(&mut ctx, player, TriggerPhase::Interrupt, &trigger)?;
 
     Ok(())
 }
@@ -817,6 +891,7 @@ pub fn dispatch_harvest_field(
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<(), String> {
     let mut ctx = DispatchContext {
@@ -829,6 +904,7 @@ pub fn dispatch_harvest_field(
         used_spaces,
         event_budget,
         card_uses,
+        card_use_limits,
         pending,
     };
 
@@ -841,6 +917,10 @@ pub fn dispatch_harvest_field(
     };
 
     resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+    // Interrupts pause the chain after the passive phase has resolved
+    // (2016 Lookout p.8: the active player resolves their effects in the
+    // order they choose; a choice-requiring effect stops the chain).
+    resolve_phase(&mut ctx, player, TriggerPhase::Interrupt, &trigger)?;
 
     Ok(())
 }
@@ -858,6 +938,7 @@ pub fn dispatch_after_harvest_bake(
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<(), String> {
     let mut ctx = DispatchContext {
@@ -870,6 +951,7 @@ pub fn dispatch_after_harvest_bake(
         used_spaces,
         event_budget,
         card_uses,
+        card_use_limits,
         pending,
     };
 
@@ -882,6 +964,10 @@ pub fn dispatch_after_harvest_bake(
     };
 
     resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+    // Interrupts pause the chain after the passive phase has resolved
+    // (2016 Lookout p.8: the active player resolves their effects in the
+    // order they choose; a choice-requiring effect stops the chain).
+    resolve_phase(&mut ctx, player, TriggerPhase::Interrupt, &trigger)?;
 
     Ok(())
 }
@@ -1281,6 +1367,7 @@ mod tests {
         let mut delayed_well = std::collections::BTreeMap::new();
         let mut event_budget = 64;
         let mut card_uses = std::collections::BTreeMap::new();
+        let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
 
         dispatch_after_worker(
@@ -1295,6 +1382,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut event_budget,
             &mut card_uses,
+            &card_use_limits,
             &mut pending,
         )
         .unwrap();
@@ -1325,6 +1413,7 @@ mod tests {
         let mut delayed_well = std::collections::BTreeMap::new();
         let mut event_budget = 64;
         let mut card_uses = std::collections::BTreeMap::new();
+        let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
 
         dispatch_start_round(
@@ -1337,6 +1426,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut event_budget,
             &mut card_uses,
+            &card_use_limits,
             &mut pending,
         )
         .unwrap();
@@ -1373,6 +1463,7 @@ mod tests {
         let mut delayed_well = std::collections::BTreeMap::new();
         let mut event_budget = 64;
         let mut card_uses = std::collections::BTreeMap::new();
+        let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
 
         let result = dispatch_start_round(
@@ -1385,6 +1476,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut event_budget,
             &mut card_uses,
+            &card_use_limits,
             &mut pending,
         );
         assert!(result.is_err());
@@ -1475,18 +1567,25 @@ mod tests {
         }
     }
 
-    fn ctx_parts() -> (
-        Vec<Player>,
-        crate::cards::CardState,
-        u32,
-        BTreeMap<String, u32>,
-    ) {
-        (
-            vec![Player::new(0, 0)],
-            crate::cards::CardState::default(),
-            64,
-            BTreeMap::new(),
-        )
+    /// All the pieces the dispatchers need, so each test stays a one-liner.
+    struct Ctx {
+        players: Vec<Player>,
+        cards: crate::cards::CardState,
+        budget: u32,
+        uses: BTreeMap<String, u32>,
+        limits: BTreeMap<String, u32>,
+    }
+
+    impl Ctx {
+        fn new() -> Self {
+            Self {
+                players: vec![Player::new(0, 0)],
+                cards: crate::cards::CardState::default(),
+                budget: 64,
+                uses: BTreeMap::new(),
+                limits: BTreeMap::new(),
+            }
+        }
     }
 
     #[test]
@@ -1500,9 +1599,10 @@ mod tests {
             let mut legacy_used = std::collections::BTreeSet::new();
             legacy_used.insert(Space::Lessons);
             crate::cards::after_worker_if_used(&set, &mut legacy[0], space, &legacy_used).unwrap();
+
             // new dispatcher path
-            let (mut players, mut cards, mut budget, mut uses) = ctx_parts();
-            players[0].played_cards = vec!["C1".into(), "C2".into(), "C3".into()];
+            let mut c = Ctx::new();
+            c.players[0].played_cards = vec!["C1".into(), "C2".into(), "C3".into()];
             let mut market = vec![];
             let mut well = BTreeMap::new();
             let mut used = std::collections::BTreeSet::new();
@@ -1512,27 +1612,28 @@ mod tests {
                 &set,
                 0,
                 space,
-                &mut cards,
-                &mut players,
+                &mut c.cards,
+                &mut c.players,
                 &mut market,
                 &mut well,
                 1,
                 &used,
-                &mut budget,
-                &mut uses,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
                 &mut pending,
             )
             .unwrap();
             assert_eq!(
-                legacy[0].supply.wood, players[0].supply.wood,
+                legacy[0].supply.wood, c.players[0].supply.wood,
                 "wood mismatch on {space:?}"
             );
             assert_eq!(
-                legacy[0].supply.clay, players[0].supply.clay,
+                legacy[0].supply.clay, c.players[0].supply.clay,
                 "clay mismatch on {space:?}"
             );
             assert_eq!(
-                legacy[0].supply.reed, players[0].supply.reed,
+                legacy[0].supply.reed, c.players[0].supply.reed,
                 "reed mismatch on {space:?}"
             );
         }
@@ -1545,25 +1646,26 @@ mod tests {
         legacy[0].played_cards = vec!["C1".into(), "C4".into(), "C6".into(), "C6".into()];
         crate::cards::start_round_rewards(&set, &mut legacy[0]).unwrap();
 
-        let (mut players, mut cards, mut budget, mut uses) = ctx_parts();
-        players[0].played_cards = legacy[0].played_cards.clone();
+        let mut c = Ctx::new();
+        c.players[0].played_cards = legacy[0].played_cards.clone();
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut pending = None;
         dispatch_start_round(
             &set,
-            &mut players,
-            &mut cards,
+            &mut c.players,
+            &mut c.cards,
             &mut market,
             &mut well,
             2,
             &std::collections::BTreeSet::new(),
-            &mut budget,
-            &mut uses,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
             &mut pending,
         )
         .unwrap();
-        assert_eq!(legacy[0].supply.food, players[0].supply.food);
+        assert_eq!(legacy[0].supply.food, c.players[0].supply.food);
     }
 
     #[test]
@@ -1574,27 +1676,28 @@ mod tests {
         legacy[0].played_cards = vec!["C5".into()];
         crate::cards::harvest_field_rewards(&set, &mut legacy[0]).unwrap();
 
-        let (mut players, mut cards, mut budget, mut uses) = ctx_parts();
-        players[0].played_cards = vec!["C5".into()];
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C5".into()];
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut pending = None;
         dispatch_harvest_field(
             &set,
             0,
-            &mut cards,
-            &mut players,
+            &mut c.cards,
+            &mut c.players,
             &mut market,
             &mut well,
             8,
             &std::collections::BTreeSet::new(),
-            &mut budget,
-            &mut uses,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
             &mut pending,
         )
         .unwrap();
         assert_eq!(
-            legacy[0].supply.food, players[0].supply.food,
+            legacy[0].supply.food, c.players[0].supply.food,
             "harvest field gain must match legacy"
         );
 
@@ -1603,27 +1706,28 @@ mod tests {
         legacy2[0].played_cards = vec!["C1".into(), "C4".into(), "C4".into()];
         crate::cards::after_harvest_baking(&set, &mut legacy2[0], 5, true).unwrap();
 
-        let (mut players2, mut cards2, mut budget2, mut uses2) = ctx_parts();
-        players2[0].played_cards = legacy2[0].played_cards.clone();
+        let mut c2 = Ctx::new();
+        c2.players[0].played_cards = legacy2[0].played_cards.clone();
         let mut market2 = vec![];
         let mut well2 = BTreeMap::new();
         let mut pending2 = None;
         dispatch_after_harvest_bake(
             &set,
             0,
-            &mut cards2,
-            &mut players2,
+            &mut c2.cards,
+            &mut c2.players,
             &mut market2,
             &mut well2,
             5,
             &std::collections::BTreeSet::new(),
-            &mut budget2,
-            &mut uses2,
+            &mut c2.budget,
+            &mut c2.uses,
+            &c2.limits,
             &mut pending2,
         )
         .unwrap();
         assert_eq!(
-            legacy2[0].supply.food, players2[0].supply.food,
+            legacy2[0].supply.food, c2.players[0].supply.food,
             "bake bonus must match legacy"
         );
     }
@@ -1640,9 +1744,9 @@ mod tests {
         legacy[0].house = crate::model::House::Stone;
         crate::cards::after_clay_construction(&set, &previous, &mut legacy[0]).unwrap();
 
-        let (mut players, mut cards, mut budget, mut uses) = ctx_parts();
-        players[0].played_cards = legacy[0].played_cards.clone();
-        players[0].house = crate::model::House::Stone;
+        let mut c = Ctx::new();
+        c.players[0].played_cards = legacy[0].played_cards.clone();
+        c.players[0].house = crate::model::House::Stone;
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut pending = None;
@@ -1651,18 +1755,19 @@ mod tests {
             0,
             &previous,
             crate::model::Improvement::ClayOven,
-            &mut cards,
-            &mut players,
+            &mut c.cards,
+            &mut c.players,
             &mut market,
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
-            &mut budget,
-            &mut uses,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
             &mut pending,
         )
         .unwrap();
-        assert_eq!(legacy[0].supply.food, players[0].supply.food);
+        assert_eq!(legacy[0].supply.food, c.players[0].supply.food);
     }
 
     #[test]
@@ -1684,64 +1789,178 @@ mod tests {
         .unwrap();
 
         // engine path
-        let mut cards2 = crate::cards::CardState {
+        let mut cards = crate::cards::CardState {
             hands: vec![vec!["M1".to_string()]],
             undealt: vec![],
         };
-        let mut players2 = vec![Player::new(0, 0)];
+        let mut players = vec![Player::new(0, 0)];
         let mut market = vec![];
-        let mut ctx = crate::card_zones::CardMoveCtx {
-            cards: &mut cards2,
-            players: &mut players2,
-            improvement_market: &mut market,
-        };
-        crate::cards::play_validate_pay(
-            &set,
-            &mut ctx.cards.hands[0],
-            &mut ctx.players[0],
-            "M1",
-            CardKind::MinorImprovement,
-            0,
-        )
-        .unwrap();
-        crate::card_zones::play_from_hand(&mut ctx, 0, "M1").unwrap();
-        let mut budget = 64u32;
-        let mut uses = BTreeMap::new();
-        let mut pending = None;
         let mut well = BTreeMap::new();
-        dispatch_play(
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        {
+            let mut ctx = crate::card_zones::CardMoveCtx {
+                cards: &mut cards,
+                players: &mut players,
+                improvement_market: &mut market,
+            };
+            crate::cards::play_validate_pay(
+                &set,
+                &mut ctx.cards.hands[0],
+                &mut ctx.players[0],
+                "M1",
+                CardKind::MinorImprovement,
+                0,
+            )
+            .unwrap();
+            crate::card_zones::play_from_hand(&mut ctx, 0, "M1").unwrap();
+            dispatch_play(
+                &set,
+                0,
+                "M1",
+                ctx.cards,
+                ctx.players,
+                ctx.improvement_market,
+                &mut well,
+                1,
+                &std::collections::BTreeSet::new(),
+                &mut budget,
+                &mut uses,
+                &limits,
+                &mut pending,
+            )
+            .unwrap();
+            let card = set.definition("M1").unwrap();
+            crate::cards::update_card_points_on_play(&mut ctx.players[0], card.points).unwrap();
+        }
+
+        assert_eq!(
+            legacy[0].supply.grain, players[0].supply.grain,
+            "on-play grain gain must match"
+        );
+        assert_eq!(legacy_hand, cards.hands[0]);
+        assert_eq!(
+            legacy[0].played_cards, players[0].played_cards,
+            "zone move must match legacy retain+push"
+        );
+        assert_eq!(legacy[0].card_points, players[0].card_points);
+    }
+
+    /// The Interrupt phase must be reachable: a handler that needs a decision
+    /// sets a PendingDecision and pauses the chain. Two decision-requiring
+    /// cards are in play, so the pause must stop the SECOND one from firing.
+    #[test]
+    fn interrupt_phase_pauses_the_chain_with_a_pending_decision() {
+        let probe = |id: &str| CardDefinition {
+            id: id.into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::PendingProbe {
+                options: vec![(Good::Food, 2), (Good::Wood, 1)],
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![probe("CHOICE_A"), probe("CHOICE_B")],
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["CHOICE_A".into(), "CHOICE_B".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        let err = dispatch_start_round(
             &set,
-            0,
-            "M1",
-            ctx.cards,
-            ctx.players,
-            ctx.improvement_market,
+            &mut c.players,
+            &mut c.cards,
+            &mut market,
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
-            &mut budget,
-            &mut uses,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
             &mut pending,
         )
-        .unwrap();
-        let card = set.definition("M1").unwrap();
-        crate::cards::update_card_points_on_play(&mut ctx.players[0], card.points).unwrap();
-        // end of ctx borrows: copy the results out
-        let new_hand = ctx.cards.hands[0].clone();
-        let new_played = ctx.players[0].played_cards.clone();
-        let new_grain = ctx.players[0].supply.grain;
-        let new_points = ctx.players[0].card_points;
+        .unwrap_err();
 
+        assert_eq!(err, "pending decision", "the chain must pause");
+        let decision = pending.expect("a PendingDecision must be recorded");
+        assert_eq!(decision.player, 0);
+        match &decision.kind {
+            crate::pending::PendingKind::ChooseGain {
+                source_card,
+                options,
+            } => {
+                assert_eq!(
+                    source_card, "CHOICE_A",
+                    "the first decision-requiring card must pause the chain"
+                );
+                assert_eq!(options.len(), 2);
+            }
+            other => panic!("unexpected pending kind: {other:?}"),
+        }
+        // Exactly one budget unit consumed: the second card never resolved.
+        assert_eq!(c.budget, 63, "the chain stopped after the first decision");
         assert_eq!(
-            legacy[0].supply.grain, new_grain,
-            "on-play grain gain must match"
+            c.uses.get("CHOICE_B"),
+            None,
+            "the second decision-requiring card must not resolve"
         );
-        assert_eq!(legacy_hand, new_hand);
+    }
+
+    /// An effect whose per-period limit is reached must be refused, and the
+    /// ledger must not exceed the limit. This is the real (non-vacuous) proof
+    /// for the "use limits" acceptance criterion: the limit comes from data.
+    #[test]
+    fn declared_per_card_use_limit_is_enforced() {
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                id: "ONCE".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::StartRoundGain {
+                    good: Good::Food,
+                    amount: 1,
+                    house: None,
+                    rooms: None,
+                }],
+            }],
+        };
+        // Two copies of the same card in play, limit 1 per period.
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["ONCE".into(), "ONCE".into()];
+        c.limits.insert("ONCE".into(), 1);
+
+        let err = dispatch_start_round(
+            &set,
+            &mut c.players,
+            &mut c.cards,
+            &mut vec![],
+            &mut BTreeMap::new(),
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending_none(),
+        )
+        .unwrap_err();
+        assert!(err.contains("use limit"), "got: {err}");
         assert_eq!(
-            legacy[0].played_cards, new_played,
-            "zone move must match legacy retain+push"
+            c.uses.get("ONCE"),
+            Some(&1),
+            "the ledger stops at the limit"
         );
-        assert_eq!(legacy[0].card_points, new_points);
-        let _ = players2.pop();
+        assert_eq!(
+            c.players[0].supply.food, 1,
+            "exactly one resolution happened before the limit fired"
+        );
+    }
+
+    fn pending_none() -> Option<PendingDecision> {
+        None
     }
 }

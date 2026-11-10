@@ -392,6 +392,7 @@ mod tests {
         let mut market = vec![];
         let mut well = std::collections::BTreeMap::new();
         let mut uses = std::collections::BTreeMap::new();
+        let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
         let mut budget = 64u32;
 
@@ -406,6 +407,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut budget,
             &mut uses,
+            &card_use_limits,
             &mut pending,
         )
         .unwrap();
@@ -435,6 +437,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut budget2,
             &mut uses2,
+            &card_use_limits,
             &mut pending2,
         )
         .unwrap_err();
@@ -443,6 +446,109 @@ mod tests {
         assert_eq!(
             players2[0].supply.food, 2,
             "only the affordable prefix of the chain resolved"
+        );
+    }
+
+    /// A save whose Step 3 bookkeeping (here: the pending decision) was edited
+    /// after the fact must be rejected on load. This is the defence the
+    /// `integrity_hash` stamping in `save_json`/`load_json` provides.
+    #[test]
+    fn a_tampered_pending_decision_is_rejected_on_load() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 21,
+            additional_action_space_enabled: false,
+        });
+        game.pending = Some(PendingDecision::new(
+            0,
+            0,
+            PendingKind::ChooseGain {
+                source_card: "A001".into(),
+                options: vec![GainOption {
+                    good: Good::Food,
+                    amount: 1,
+                }],
+            },
+            game.state_hash(),
+            serde_json::json!({}),
+        ));
+        let saved = game.save_json().unwrap();
+        assert!(
+            Game::load_json(&saved).is_ok(),
+            "the untampered save must load"
+        );
+
+        // Tamper: change the pending decision's options (a bigger gain).
+        let tampered = saved.replace("\"amount\": 1", "\"amount\": 99");
+        assert_ne!(tampered, saved, "the tamper must actually change the file");
+        let err = Game::load_json(&tampered).unwrap_err();
+        assert!(
+            err.contains("integrity"),
+            "tampering must be caught by the integrity stamp, got: {err}"
+        );
+    }
+
+    /// A legacy (pre-Step3) save has no integrity stamp and no pending
+    /// decision; it must still load, while one that somehow carries a pending
+    /// decision is refused.
+    #[test]
+    fn a_legacy_save_without_a_stamp_still_loads() {
+        let game = Game::new(Config {
+            players: 2,
+            seed: 22,
+            additional_action_space_enabled: false,
+        });
+        let mut value: serde_json::Value =
+            serde_json::from_str(&game.save_json().unwrap()).unwrap();
+        // Drop the stamp to emulate a pre-Step3 save.
+        value["log"]
+            .as_object_mut()
+            .unwrap()
+            .remove("integrity_hash");
+        let legacy = serde_json::to_string(&value).unwrap();
+        assert!(
+            Game::load_json(&legacy).is_ok(),
+            "a legacy save without the stamp must keep loading"
+        );
+
+        // Same file, but with a pending decision injected: refuse it.
+        value["pending"] = serde_json::json!({
+            "id": 0,
+            "player": 0,
+            "kind": {"kind": "custom", "source_card": "A001", "payload": null},
+            "state_hash_before": "",
+            "context": null
+        });
+        let forged = serde_json::to_string(&value).unwrap();
+        let err = Game::load_json(&forged).unwrap_err();
+        assert!(
+            err.contains("legacy save must not carry a pending decision"),
+            "got: {err}"
+        );
+    }
+
+    /// The event budget bounds one action's chain and is replenished for the
+    /// next action, so it cannot starve a long game.
+    #[test]
+    fn the_event_budget_is_replenished_per_action() {
+        use crate::model::DEFAULT_EVENT_BUDGET;
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 23,
+            additional_action_space_enabled: false,
+        });
+        // Simulate a chain that consumed the whole budget in a previous action.
+        game.event_budget = 0;
+        let obs = game.observation(game.public.active_player).unwrap();
+        let legal = game.legal_spaces();
+        use crate::policy::DetailPolicy;
+        let action = crate::policy::SimpleDetails
+            .produce(&obs, legal[0])
+            .expect("a detail for the first legal space");
+        game.apply(action).unwrap();
+        assert_eq!(
+            game.event_budget, DEFAULT_EVENT_BUDGET,
+            "a new action must start from the full budget, not a depleted one"
         );
     }
 }

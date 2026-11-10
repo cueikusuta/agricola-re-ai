@@ -347,6 +347,7 @@ pub fn sample_game_with_set(
         None,            // pending
         64,              // event_budget
         BTreeMap::new(), // card_uses
+        BTreeMap::new(), // card_use_limits
         0,               // next_decision_id
     ))
 }

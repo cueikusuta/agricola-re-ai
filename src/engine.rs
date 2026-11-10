@@ -723,6 +723,9 @@ impl Game {
         } else {
             String::new()
         };
+        // The event budget guards against unbounded effect chains WITHIN one
+        // action, so each action starts from the full budget again.
+        next.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         next.execute_work(player, &action)?;
         next.apply_post_work_card_effects(player, &action, &self.public.players[player])?;
         next.public.used.insert(action.space);
@@ -849,6 +852,8 @@ impl Game {
         } else {
             String::new()
         };
+        // Same per-action budget reset as apply_with_plans.
+        next.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         next.execute_free(player, &free)?;
         crate::validation::validate_free_action_or_full(&next, self, player)?;
         if record {
@@ -1066,6 +1071,7 @@ impl Game {
                             &self.public.used,
                             &mut self.event_budget,
                             &mut self.card_uses,
+                            &self.card_use_limits,
                             &mut self.pending,
                         )?;
                         // Update card points
@@ -1133,6 +1139,7 @@ impl Game {
                     &self.public.used,
                     &mut self.event_budget,
                     &mut self.card_uses,
+                    &self.card_use_limits,
                     &mut self.pending,
                 )?;
                 // Update card points
@@ -1235,6 +1242,7 @@ impl Game {
                             &self.public.used,
                             &mut self.event_budget,
                             &mut self.card_uses,
+                            &self.card_use_limits,
                             &mut self.pending,
                         )?;
                         // Update card points
@@ -1323,6 +1331,7 @@ impl Game {
                         &self.public.used,
                         &mut self.event_budget,
                         &mut self.card_uses,
+                        &self.card_use_limits,
                         &mut self.pending,
                     )?;
                     // Update card points

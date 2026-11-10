@@ -535,6 +535,9 @@ fn card_priority(
             | CardEffect::OnPlayGainPerStored { .. }
             | CardEffect::OnPlayGainIfHouse { .. }
             | CardEffect::Prerequisite { .. } => 0,
+            #[cfg(test)]
+            // Test-only probe; never part of a real evaluated pool.
+            CardEffect::PendingProbe { .. } => 0,
             CardEffect::AfterWorkerGain { good, amount, .. }
             | CardEffect::StartRoundGain { good, amount, .. } => {
                 card_good_value(*good) * i64::from(*amount) * horizon

@@ -576,19 +576,31 @@ pub struct Game {
     #[serde(default)]
     pub pending: Option<PendingDecision>,
     /// Event chain budget: max effect resolutions per action (default 64).
+    /// Replenished at the start of every committed action, so it bounds a
+    /// single effect chain (loop guard) rather than the whole game.
     #[serde(default = "default_event_budget")]
     pub event_budget: u32,
     /// Per-card use tracking for effects with limits (e.g., once per round).
-    /// Key: card ID, Value: use count this period.
-    #[serde(default)]
+    /// Key: card ID, Value: use count in the current period. Cleared at each
+    /// round boundary, matching the "once per round" period used by the cards.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub card_uses: BTreeMap<String, u32>,
+    /// Declared per-card use limits (card ID -> max resolutions per period).
+    /// A card absent from this map has no per-period limit. Kept in `Game` so
+    /// the limit is data, not a magic constant at the call site: an empty map
+    /// is skipped when serializing, so existing v5 saves stay byte-identical.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub card_use_limits: BTreeMap<String, u32>,
     /// Next decision ID for PendingDecision.
     #[serde(default)]
     pub next_decision_id: u64,
 }
 
-fn default_event_budget() -> u32 {
-    64
+/// Maximum effect resolutions inside one action's effect chain (loop guard).
+pub const DEFAULT_EVENT_BUDGET: u32 = 64;
+
+pub fn default_event_budget() -> u32 {
+    DEFAULT_EVENT_BUDGET
 }
 
 fn record_events_by_default() -> bool {
@@ -629,6 +641,12 @@ pub struct GameLog {
     #[serde(default)]
     pub initial_hands: Option<Vec<Vec<String>>>,
     pub events: Vec<Event>,
+    /// Step 3 bookkeeping integrity, stamped when the save is written and
+    /// verified on load. Absent in pre-Step3 (v5) saves, which is why it is
+    /// optional: old saves keep loading, new saves cannot have their
+    /// PendingDecision / use ledger / event budget silently tampered with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub integrity_hash: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Observation {
@@ -763,6 +781,7 @@ impl Game {
             card_set: card_set.clone(),
             initial_hands: initial_hands.clone(),
             events: vec![],
+            integrity_hash: None,
         };
         let mut result = Self {
             config,
@@ -778,6 +797,7 @@ impl Game {
             pending: None,
             event_budget: default_event_budget(),
             card_uses: BTreeMap::new(),
+            card_use_limits: BTreeMap::new(),
             next_decision_id: 0,
         };
         result.start_round();
@@ -838,6 +858,7 @@ impl Game {
             &self.pending,
             self.event_budget,
             &self.card_uses,
+            &self.card_use_limits,
             self.next_decision_id,
         ))
         .expect("integrity serialization");
@@ -871,11 +892,13 @@ impl Game {
                 card_set: self.log.card_set.clone(), // Arc shared
                 initial_hands: self.log.initial_hands.clone(),
                 events: Vec::new(),
+                integrity_hash: None,
             },
             record_events: false,
             pending: self.pending.clone(),
             event_budget: self.event_budget,
             card_uses: self.card_uses.clone(),
+            card_use_limits: self.card_use_limits.clone(),
             next_decision_id: self.next_decision_id,
         }
     }
@@ -897,6 +920,7 @@ impl Game {
         pending: Option<PendingDecision>,
         event_budget: u32,
         card_uses: BTreeMap<String, u32>,
+        card_use_limits: BTreeMap<String, u32>,
         next_decision_id: u64,
     ) -> Self {
         let start_player = public.start_player;
@@ -925,16 +949,23 @@ impl Game {
                 card_set: card_set.clone(), // Arc shared
                 initial_hands: None,
                 events: Vec::new(),
+                integrity_hash: None,
             },
             record_events: false,
             pending,
             event_budget,
             card_uses,
+            card_use_limits,
             next_decision_id,
         }
     }
     pub fn save_json(&self) -> Result<String, String> {
-        serde_json::to_string_pretty(self).map_err(|e| e.to_string())
+        // Stamp the Step 3 bookkeeping integrity into the log before writing,
+        // so load_json can reject a tampered PendingDecision / use ledger /
+        // event budget even though state_hash() predates those fields.
+        let mut stamped = self.clone();
+        stamped.log.integrity_hash = Some(self.integrity_hash());
+        serde_json::to_string_pretty(&stamped).map_err(|e| e.to_string())
     }
     pub fn load_json(text: &str) -> Result<Self, String> {
         let result: Self = serde_json::from_str(text).map_err(|e| e.to_string())?;
@@ -992,6 +1023,19 @@ impl Game {
         if replayed.state_hash() != result.state_hash() {
             return Err("saved game differs from logged action replay".into());
         }
+        // Step 3 bookkeeping is outside state_hash (LOG_VERSION=5 keeps that
+        // tuple fixed), so verify it against the hash stamped at save time.
+        // Absent for pre-Step3 saves, which therefore keep loading unchanged.
+        if let Some(expected) = result.log.integrity_hash.clone() {
+            let actual = result.integrity_hash();
+            if actual != expected {
+                return Err("saved game bookkeeping integrity mismatch".into());
+            }
+        } else if result.pending.is_some() {
+            // A legacy save can never carry a pending decision; if one shows up
+            // the file was tampered with.
+            return Err("legacy save must not carry a pending decision".into());
+        }
         Ok(result)
     }
     pub fn start_round(&mut self) {
@@ -999,6 +1043,9 @@ impl Game {
         let card = self.hidden_round_deck.pop().expect("14 rounds only");
         self.public.revealed.push(card);
         self.public.used.clear();
+        // Per-card use limits use the round as their period, so the ledger is
+        // cleared when a new round opens.
+        self.card_uses.clear();
         self.public.start_player = self.public.start_player.min(self.public.players.len() - 1);
         self.public.active_player = self.public.start_player;
         self.public.workers_placed = vec![0; self.public.players.len()];

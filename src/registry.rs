@@ -278,6 +278,8 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
                 | crate::cards::CardEffect::EndGameBonus { .. } => continue,
+                #[cfg(test)]
+                crate::cards::CardEffect::PendingProbe { .. } => continue,
             };
             self.event_index
                 .by_kind
@@ -346,6 +348,8 @@ impl CardRegistryBuilder {
                         crate::cards::CardEffect::EndGameBonus { .. }
                         | crate::cards::CardEffect::Prerequisite { .. }
                         | crate::cards::CardEffect::Passive { .. } => 1,
+                        #[cfg(test)]
+                        crate::cards::CardEffect::PendingProbe { .. } => 1,
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
                         | crate::cards::CardEffect::OnPlayGainIfHouse { amount, .. }
                         | crate::cards::CardEffect::StartRoundGain { amount, .. }

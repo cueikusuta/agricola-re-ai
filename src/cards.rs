@@ -22,6 +22,15 @@ pub enum CardKind {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CardEffect {
+    /// Test-only probe: an effect whose resolution requires a player decision.
+    /// Compiled only in the crate's own test build, so the production card pool
+    /// and `CardSet::content_hash` are unaffected. It exists so the dispatcher's
+    /// Interrupt branch (handler -> `EffectResult::Pending` -> `PendingDecision`
+    /// -> pause) is exercised end to end instead of being an untested path.
+    #[cfg(test)]
+    PendingProbe {
+        options: Vec<(Good, u32)>,
+    },
     OnPlayGain {
         good: Good,
         amount: u32,
@@ -84,6 +93,8 @@ impl CardEffect {
     /// engine actually implements, never a guessed printed effect.
     pub fn public_tag(&self) -> &'static str {
         match self {
+            #[cfg(test)]
+            CardEffect::PendingProbe { .. } => "pending_probe",
             CardEffect::OnPlayGain { .. } => "on_play_gain",
             CardEffect::AfterWorkerGain { .. } => "after_worker_gain",
             CardEffect::EndGameBonus { .. } => "end_game_bonus",
@@ -224,6 +235,8 @@ impl CardSet {
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
                         | CardEffect::Passive { .. } => 1,
+                        #[cfg(test)]
+                        CardEffect::PendingProbe { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
                         | CardEffect::OnPlayGainIfHouse { amount, .. }
                         | CardEffect::StartRoundGain { amount, .. }
