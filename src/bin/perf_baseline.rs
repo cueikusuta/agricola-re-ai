@@ -46,47 +46,13 @@ use serde_json::{json, Value};
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
-// The counting allocator is compiled only behind `perf-count-alloc`, so the
-// timing build pays no counting overhead at all (review P1).
+// The counting allocator lives in the library (`agricola_re_ai::counting`,
+// behind `perf-count-alloc`): one `#[global_allocator]` per process, and a
+// binary-local allocator would collide with the library's when the feature is
+// enabled. Timing builds (feature off) link a stub module that reports zeros
+// and pay no counting overhead at all (review P1).
 #[cfg(feature = "perf-count-alloc")]
-mod counting {
-    use std::alloc::{GlobalAlloc, Layout, System};
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    /// Counts heap allocations/bytes. Only used in the dedicated allocation
-    /// run; timing runs use the plain build and the `System` allocator.
-    struct CountingAllocator;
-
-    static ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
-    static ALLOCATED_BYTES: AtomicU64 = AtomicU64::new(0);
-
-    unsafe impl GlobalAlloc for CountingAllocator {
-        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-            ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-            ALLOCATED_BYTES.fetch_add(layout.size() as u64, Ordering::Relaxed);
-            unsafe { System.alloc(layout) }
-        }
-        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-            unsafe { System.dealloc(ptr, layout) }
-        }
-        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-            ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-            ALLOCATED_BYTES.fetch_add(new_size as u64, Ordering::Relaxed);
-            unsafe { System.realloc(ptr, layout, new_size) }
-        }
-    }
-
-    #[global_allocator]
-    static GLOBAL: CountingAllocator = CountingAllocator;
-
-    pub fn allocation_count() -> u64 {
-        ALLOCATIONS.load(Ordering::Relaxed)
-    }
-    pub fn allocated_byte_count() -> u64 {
-        ALLOCATED_BYTES.load(Ordering::Relaxed)
-    }
-    pub const INSTRUMENTED: bool = true;
-}
+use agricola_re_ai::counting::{allocated_byte_count, allocation_count, INSTRUMENTED};
 
 #[cfg(not(feature = "perf-count-alloc"))]
 mod counting {
@@ -99,6 +65,7 @@ mod counting {
     pub const INSTRUMENTED: bool = false;
 }
 
+#[cfg(not(feature = "perf-count-alloc"))]
 use counting::{allocated_byte_count, allocation_count, INSTRUMENTED};
 
 /// Microbenchmark statistics over several batches (review P2: stability).

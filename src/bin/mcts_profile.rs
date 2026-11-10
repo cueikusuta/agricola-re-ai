@@ -10,9 +10,23 @@
 //!   generation, `apply`, one rollout, and one whole decision for both MCTS and
 //!   PUCT, plus heap allocations per component.
 //!
-//! Allocation counting installs a counting global allocator in this binary
-//! only, so allocation numbers must be read from `counted` runs and not mixed
-//! with the timing numbers of the uninstrumented runs.
+//! Allocation counting is provided by the library's `perf-count-alloc`
+//! feature module (`agricola_re_ai::counting`), so this binary no longer
+//! installs its own `#[global_allocator]` (two global allocators in one
+//! process fail to compile). Allocation numbers must be read from runs
+//! built with `--features perf-count-alloc` and not mixed with the timing
+//! numbers of the uninstrumented runs.
+#[cfg(feature = "perf-count-alloc")]
+use agricola_re_ai::counting::{total_allocated_byte_count, total_allocation_count};
+
+#[cfg(not(feature = "perf-count-alloc"))]
+fn total_allocation_count() -> u64 {
+    0
+}
+#[cfg(not(feature = "perf-count-alloc"))]
+fn total_allocated_byte_count() -> u64 {
+    0
+}
 use agricola_re_ai::mcts::{self, MctsPolicy, SearchLimit, SearchMode};
 use agricola_re_ai::mcts_puct::{PuctConfig, PuctPolicy};
 use agricola_re_ai::model::{Config, Game, Observation, Space};
@@ -20,35 +34,7 @@ use agricola_re_ai::policy::{CardChoiceDetails, DetailPolicy, SimpleDetails, Spa
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use serde_json::{json, Value};
-use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
-
-/// Counts heap allocations/bytes so the profiler can report them. It wraps the
-/// system allocator and never changes allocation behaviour.
-struct CountingAllocator;
-
-static ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
-static ALLOCATED_BYTES: AtomicU64 = AtomicU64::new(0);
-
-unsafe impl GlobalAlloc for CountingAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-        ALLOCATED_BYTES.fetch_add(layout.size() as u64, Ordering::Relaxed);
-        unsafe { System.alloc(layout) }
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(ptr, layout) }
-    }
-    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-        ALLOCATED_BYTES.fetch_add(new_size as u64, Ordering::Relaxed);
-        unsafe { System.realloc(ptr, layout, new_size) }
-    }
-}
-
-#[global_allocator]
-static GLOBAL: CountingAllocator = CountingAllocator;
 
 fn timed_us(repeats: usize, mut run: impl FnMut()) -> f64 {
     let start = Instant::now();
@@ -59,14 +45,16 @@ fn timed_us(repeats: usize, mut run: impl FnMut()) -> f64 {
 }
 
 /// `(allocations, bytes)` charged to one call, averaged over `repeats`.
+/// Reads the library's process-wide counters (`perf-count-alloc` build);
+/// the plain build reports zeros.
 fn allocations(repeats: usize, mut run: impl FnMut()) -> (f64, f64) {
-    let before_allocations = ALLOCATIONS.load(Ordering::Relaxed);
-    let before_bytes = ALLOCATED_BYTES.load(Ordering::Relaxed);
+    let before_allocations = total_allocation_count();
+    let before_bytes = total_allocated_byte_count();
     for _ in 0..repeats {
         run();
     }
-    let allocations = ALLOCATIONS.load(Ordering::Relaxed) - before_allocations;
-    let bytes = ALLOCATED_BYTES.load(Ordering::Relaxed) - before_bytes;
+    let allocations = total_allocation_count() - before_allocations;
+    let bytes = total_allocated_byte_count() - before_bytes;
     (
         allocations as f64 / repeats as f64,
         bytes as f64 / repeats as f64,
