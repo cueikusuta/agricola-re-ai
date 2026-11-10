@@ -289,10 +289,35 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
                 removed.insert(id.clone(), pre_count - post_count);
             }
         }
+        // Compute played_added as exact per-ID multiset count delta (post - pre where positive).
+        // This catches duplicate pushes of already-played IDs which the old membership check missed.
+        let pre_played: std::collections::BTreeMap<_, _> = pre.public.players[actor]
+            .played_cards
+            .iter()
+            .fold(std::collections::BTreeMap::new(), |mut acc, id| {
+                *acc.entry(id.clone()).or_insert(0usize) += 1;
+                acc
+            });
+        let post_played: std::collections::BTreeMap<_, _> = post.public.players[actor]
+            .played_cards
+            .iter()
+            .fold(std::collections::BTreeMap::new(), |mut acc, id| {
+                *acc.entry(id.clone()).or_insert(0usize) += 1;
+                acc
+            });
         let mut played_added = std::collections::BTreeMap::new();
-        for id in &post.public.players[actor].played_cards {
-            if !pre.public.players[actor].played_cards.contains(id) {
-                *played_added.entry(id.clone()).or_insert(0usize) += 1;
+        for (id, post_count) in &post_played {
+            let pre_count = pre_played.get(id).copied().unwrap_or(0);
+            if *post_count > pre_count {
+                played_added.insert(id.clone(), post_count - pre_count);
+            }
+        }
+        // Explicit duplicate guard: any ID occurring more than once in post.played_cards is tampering.
+        // Real engine cannot produce duplicates (cards::play removes from hand by value, then pushes once),
+        // and full validation rejects duplicate IDs globally (Err "card missing, duplicate or unknown").
+        for count in post_played.values() {
+            if *count > 1 {
+                return Verdict::Fail("actor played_cards contains duplicate card ID".into());
             }
         }
         if removed != played_added {
@@ -636,17 +661,8 @@ pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
             return Verdict::Fail("actor hand changed in free action".into());
         }
         // Actor played_cards must not change in free action (no cards::play calls in execute_free).
-        let pre_played: std::collections::BTreeSet<_> = pre.public.players[actor]
-            .played_cards
-            .iter()
-            .cloned()
-            .collect();
-        let post_played: std::collections::BTreeSet<_> = post.public.players[actor]
-            .played_cards
-            .iter()
-            .cloned()
-            .collect();
-        if pre_played != post_played {
+        // Use exact Vec equality (sequence + multiplicity) — any change including duplicate pushes is a violation.
+        if post.public.players[actor].played_cards != pre.public.players[actor].played_cards {
             return Verdict::Fail("actor played_cards changed in free action".into());
         }
         // Actor card_points must not change in free action.
@@ -1202,9 +1218,12 @@ mod tests {
     /// Review P1-A/2 counterexample 1 (issuecomment-6769764161): actor card_points
     /// tampered in a mid-round work move (cards enabled or disabled) must not Pass.
     /// incremental must reject (Fail), or_full must reject, and full must reject.
+    // P2 fix: exercise the 12b consistency path on a genuine transition by applying
+    // one legal action first, then tampering post's actor.card_points.
     #[test]
     fn tampered_actor_card_points_declines_and_full_rejects() {
-        // Cards-enabled variant (uses mid_round_pair which uses cardless game, so we need a card game).
+        // Cards-enabled variant: drive to a mid-round state, apply ONE legal action,
+        // then tamper card_points on the resulting post state.
         let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
         let game = Game::with_cards(
             Config {
@@ -1232,8 +1251,20 @@ mod tests {
         }
         let pre = game.clone();
         let actor = pre.public.active_player;
-        let mut post = pre.clone();
-        // Tamper: increment actor card_points by 1.
+        // Apply ONE real work move to get a genuine pre/post pair.
+        let id = game.public.active_player;
+        let obs = game.observation(id).unwrap();
+        let legal = game.legal_spaces();
+        let space = RandomPolicy
+            .select(&obs, &legal, &mut rng)
+            .expect("legal space");
+        let action = CardChoiceDetails
+            .produce(&obs, space)
+            .expect("legal detail");
+        game.apply(action).unwrap();
+        let post = game.clone();
+        // Tamper: increment actor card_points by 1 on the real post state.
+        let mut post = post;
         post.public.players[actor].card_points += 1;
         let verdict = validate_incremental(&post, &pre);
         assert_ne!(
@@ -1418,6 +1449,245 @@ mod tests {
             }
         }
         panic!("no card play observed in 20 moves — test setup may need adjustment");
+    }
+
+    /// 4th review P1 (issuecomment-6772921046): duplicate played-card ID in
+    /// validate_incremental (work-path, 0-point card) must not Pass.
+    /// Drive a real transition where actor has played cards, then tamper by
+    /// pushing a duplicate of a 0-point played card. The explicit duplicate
+    /// guard in section 12 must catch this with a definite Fail.
+    #[test]
+    fn duplicate_played_card_zero_point_declines_incremental() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 19,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xDEAD);
+        let mut game = game;
+        let mut found = false;
+        let mut pre = Game::new(Config::default());
+        let mut post = Game::new(Config::default());
+        let mut actor = 0;
+        // Drive up to 50 moves to find a transition where actor has at least one played card.
+        for _ in 0..50 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            let pre_candidate = game.clone();
+            game.apply(action).unwrap();
+            let post_candidate = game.clone();
+            let mover = pre_candidate.public.active_player;
+            if !post_candidate.public.players[mover].played_cards.is_empty()
+                && validate_incremental(&post_candidate, &pre_candidate) == Verdict::Pass
+            {
+                pre = pre_candidate;
+                post = post_candidate;
+                actor = mover;
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "could not find a played-card transition in 50 moves");
+        // Find a 0-point card in actor's played_cards to duplicate.
+        let zero_point_id = post.public.players[actor]
+            .played_cards
+            .iter()
+            .find(|id| {
+                post.card_set
+                    .definition(id)
+                    .map(|c| c.points == 0)
+                    .unwrap_or(false)
+            })
+            .cloned();
+        let Some(zero_point_id) = zero_point_id else {
+            panic!("no 0-point card in actor's played_cards — test needs different seed");
+        };
+        // Tamper: push a duplicate of the 0-point played card.
+        post.public.players[actor].played_cards.push(zero_point_id);
+        // The duplicate guard must produce a definite Fail.
+        let verdict = validate_incremental(&post, &pre);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "duplicate 0-point card must be definite Fail (got {verdict:?})"
+        );
+        // Full validation must also reject.
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+        assert!(validate_full(&post).is_err());
+    }
+
+    /// 4th review P1 (issuecomment-6772921046): duplicate played-card ID in
+    /// validate_incremental (work-path, non-zero-point card) must not Pass.
+    /// Duplicate a non-zero-point card AND bump card_points by its points so
+    /// the points check alone would pass — the duplicate guard must still catch it.
+    #[test]
+    fn duplicate_played_card_nonzero_point_declines_incremental() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 23,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xBEEF);
+        let mut game = game;
+        let mut found = false;
+        let mut pre = Game::new(Config::default());
+        let mut post = Game::new(Config::default());
+        let mut actor = 0;
+        // Drive up to 50 moves to find a transition where actor has a non-zero-point played card.
+        for _ in 0..50 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            let pre_candidate = game.clone();
+            game.apply(action).unwrap();
+            let post_candidate = game.clone();
+            let mover = pre_candidate.public.active_player;
+            if !post_candidate.public.players[mover].played_cards.is_empty()
+                && validate_incremental(&post_candidate, &pre_candidate) == Verdict::Pass
+            {
+                // Check if actor has a non-zero-point played card.
+                let has_nonzero = post_candidate.public.players[mover]
+                    .played_cards
+                    .iter()
+                    .any(|id| {
+                        post_candidate
+                            .card_set
+                            .definition(id)
+                            .map(|c| c.points != 0)
+                            .unwrap_or(false)
+                    });
+                if has_nonzero {
+                    pre = pre_candidate;
+                    post = post_candidate;
+                    actor = mover;
+                    found = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            found,
+            "could not find a non-zero-point played-card transition in 50 moves"
+        );
+        // Find a non-zero-point card in actor's played_cards to duplicate.
+        let nonzero_id = post.public.players[actor]
+            .played_cards
+            .iter()
+            .find(|id| {
+                post.card_set
+                    .definition(id)
+                    .map(|c| c.points != 0)
+                    .unwrap_or(false)
+            })
+            .cloned();
+        let Some(nonzero_id) = nonzero_id else {
+            panic!("no non-zero-point card in actor's played_cards — test needs different seed");
+        };
+        let card_points = post.card_set.definition(&nonzero_id).unwrap().points;
+        // Tamper: push a duplicate of the non-zero-point played card AND bump card_points.
+        post.public.players[actor]
+            .played_cards
+            .push(nonzero_id.clone());
+        post.public.players[actor].card_points += card_points;
+        // The duplicate guard must produce a definite Fail (points check would pass alone).
+        let verdict = validate_incremental(&post, &pre);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "duplicate non-zero-point card must be definite Fail (got {verdict:?})"
+        );
+        // Full validation must also reject.
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+        assert!(validate_full(&post).is_err());
+    }
+
+    /// 4th review P1 (issuecomment-6772921046): duplicate played-card ID in
+    /// validate_free_action must not Pass.
+    /// Drive a real free action transition, then tamper by pushing a duplicate
+    /// of an existing played card. The exact Vec equality check must catch this.
+    #[test]
+    fn duplicate_played_card_declines_free_action() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 29,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xFEED);
+        let mut game = game;
+        // Drive up to 30 moves, then apply a free action, looking for a state
+        // where the actor has at least one played card.
+        for _ in 0..30 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            game.apply(action).unwrap();
+        }
+        // Now apply a free action on the current state.
+        let mut pre = game.clone();
+        let actor = pre.public.active_player;
+        // Ensure actor has food for DiscardGood.
+        if pre.public.players[actor].supply.food < 3 {
+            pre.public.players[actor].supply.food = 3;
+        }
+        let mut post = pre.clone();
+        post.apply_free(
+            actor,
+            FreeAction::DiscardGood {
+                good: crate::model::Good::Food,
+                quantity: 1,
+            },
+        )
+        .expect("free action must apply");
+        // Verify this is a legitimate free action transition.
+        assert_eq!(validate_free_action(&post, &pre, actor), Verdict::Pass);
+        // Check actor has played cards to duplicate.
+        if post.public.players[actor].played_cards.is_empty() {
+            panic!("actor has no played cards after free action — test needs different seed");
+        }
+        // Tamper: push a duplicate of an existing played card.
+        let existing_id = post.public.players[actor].played_cards[0].clone();
+        post.public.players[actor].played_cards.push(existing_id);
+        // The exact Vec equality check must produce a definite Fail.
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "duplicate played card in free action must be definite Fail (got {verdict:?})"
+        );
+        // Full validation must also reject.
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+        assert!(validate_full(&post).is_err());
     }
 
     /// A plain mid-round (pre, post) pair: same round, quota not exhausted.
