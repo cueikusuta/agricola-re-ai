@@ -38,6 +38,13 @@ pub fn validate_full(game: &Game) -> Result<(), String> {
 /// count, round, revealed spaces and hidden deck). If `post` advanced to a
 /// new round (last placement, harvest, round reveal), the cheap checks
 /// cannot decide and return [`Verdict::Unsure`].
+///
+/// Soundness contract (review P1-2): `Pass` is returned only when every
+/// difference between `pre` and `post` has been *proven legal* by the checks
+/// below. Any component the incremental layer does not explicitly verify is
+/// either shown unchanged, or downgrades the verdict to `Unsure` so the full
+/// validator arbitrates. A `Pass` is never reachable from a post state that
+/// `validate_full` rejects.
 pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
     // 1. Identity of the game itself.
     if post.config != pre.config {
@@ -86,17 +93,64 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
             return Verdict::Fail("non-actor worker count changed".into());
         }
     }
-    // 6. Exactly one newly used space (difference is non-empty because the
-    //    actor placed a worker; a work move always consumes one space).
+    // 6. Exactly one newly used space; `used` may only grow mid-round. A
+    //    previously used space disappearing is a definite violation (the
+    //    full validator does not check monotonicity — this catches a class
+    //    it would otherwise miss, e.g. tampering that shrinks `used`).
+    let removed_used: Vec<_> = pre.public.used.difference(&post.public.used).collect();
+    if !removed_used.is_empty() {
+        return Verdict::Fail("a used space disappeared mid-round".into());
+    }
     let added: Vec<_> = post.public.used.difference(&pre.public.used).collect();
     if added.len() != 1 {
         return Verdict::Fail("a work move must add exactly one used space".into());
     }
-    // 7. Supply non-negativity: `Supply` fields are `u32` and all
-    //    deductions go through the checked `Supply::pay`, so a negative
-    //    value cannot be represented. No runtime check needed here; the
-    //    full validator relies on the same unsigned types.
-
+    // 7. Major improvements: the union across market + player tables must keep
+    //    every physical major improvement in exactly one location (the same
+    //    invariant `validate_full` enforces). A work move may move an item
+    //    from market to the actor's table, or return an exchanged Fireplace
+    //    to the market — but never duplicate or lose an item. Comparing the
+    //    per-item multisets is O(market+tables), far cheaper than full
+    //    validation, and shares the full validator's semantics.
+    {
+        let count_items = |market: &[crate::model::Improvement],
+                           players: &[crate::model::Player]|
+         -> std::collections::BTreeMap<crate::model::Improvement, u32> {
+            let mut counts = std::collections::BTreeMap::new();
+            for item in market
+                .iter()
+                .copied()
+                .chain(players.iter().flat_map(|p| p.improvements.iter().copied()))
+            {
+                *counts.entry(item).or_insert(0u32) += 1;
+            }
+            counts
+        };
+        let post_counts = count_items(&post.public.improvement_market, &post.public.players);
+        let pre_counts = count_items(&pre.public.improvement_market, &pre.public.players);
+        if post_counts != pre_counts {
+            return Verdict::Fail("major improvement duplicated or missing".into());
+        }
+        // The market may only contain items that were already in the
+        // pre-market, or a Fireplace returned via a hearth exchange from a
+        // pre-round table. A market is not provably legal mid-round.
+        let pre_tables: std::collections::BTreeSet<_> = pre
+            .public
+            .players
+            .iter()
+            .flat_map(|p| p.improvements.iter().copied())
+            .collect();
+        for item in &post.public.improvement_market {
+            let in_pre_market = pre.public.improvement_market.contains(item);
+            let exchangeable = matches!(
+                item,
+                crate::model::Improvement::Fireplace2 | crate::model::Improvement::Fireplace3
+            ) && pre_tables.contains(item);
+            if !in_pre_market && !exchangeable {
+                return Verdict::Fail("improvement appeared in market from nowhere".into());
+            }
+        }
+    }
     // 8. Farm invariants. Non-actors cannot change in a work move: verify the
     //    cheap subset and decline (Unsure) if anything looks different. The
     //    actor gets the full shared per-player check.
@@ -108,6 +162,22 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
                 || player.family < 2
                 || player.family > 5
                 || player.newborns > player.family
+            {
+                return Verdict::Unsure;
+            }
+            // A work move should not change a non-actor's supply, cards, or
+            // farm; passive cross-player card effects exist, so any drift
+            // declines to the full validator instead of guessing.
+            let pre_p = &pre.public.players[i];
+            if player.supply != pre_p.supply
+                || player.played_cards != pre_p.played_cards
+                || player.card_points != pre_p.card_points
+                || player.improvements != pre_p.improvements
+                || player.farm != pre_p.farm
+                || player.fences != pre_p.fences
+                || player.house != pre_p.house
+                || player.family != pre_p.family
+                || player.newborns != pre_p.newborns
             {
                 return Verdict::Unsure;
             }
@@ -144,6 +214,17 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
     let (post_rooms, post_fields, post_pastures) = count_tiles(&post.public.players[actor]);
     if post_rooms < pre_rooms || post_fields < pre_fields || post_pastures < pre_pastures {
         return Verdict::Fail("actor demolished tiles in a work move".into());
+    }
+    // 11. `accumulations` may only decrease (the placed space pays out);
+    //     unseen growth or unknown keys decline to the full validator.
+    for (space, post_n) in &post.public.accumulations {
+        match pre.public.accumulations.get(space) {
+            Some(pre_n) if post_n <= pre_n => {}
+            _ => return Verdict::Unsure,
+        }
+    }
+    if post.public.accumulations.len() > pre.public.accumulations.len() {
+        return Verdict::Unsure;
     }
     Verdict::Pass
 }
@@ -376,5 +457,73 @@ mod tests {
         restored.public.improvement_market.push(imp);
         restored.public.improvement_market.sort();
         assert_eq!(validate_full(&restored), Ok(()));
+    }
+
+    /// Review P1-2 regression: a major improvement outright REMOVED (the
+    /// counter-example from the review: `improvement_market.pop()` without
+    /// re-adding it anywhere) must never reach `Pass`, because
+    /// `validate_full` rejects it ("major improvement duplicated or missing").
+    /// The per-item multiset check makes this a definite `Fail`.
+    #[test]
+    fn removed_major_improvement_is_never_pass() {
+        let (pre, mut post) = transitions(2, 47, 6)
+            .into_iter()
+            .next()
+            .expect("at least one transition");
+        assert!(
+            !post.public.improvement_market.is_empty(),
+            "setup: market must be non-empty"
+        );
+        post.public.improvement_market.pop();
+        let verdict = validate_incremental(&post, &pre);
+        assert!(
+            matches!(verdict, Verdict::Fail(_) | Verdict::Unsure),
+            "vanished major improvement must not Pass (got {verdict:?})"
+        );
+        assert!(validate_full(&post).is_err());
+        // And the fallback wrapper must reject it too.
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// Review P1-2 regression: removing an already-used space from `used`
+    /// (monotonicity is a hard mid-round law; the full validator's
+    /// available-space check does not cover every removal).
+    #[test]
+    fn removed_used_space_is_a_definite_fail() {
+        let pairs = transitions(3, 53, 8);
+        // Use a transition where pre already has used spaces (not the first move).
+        let (pre, mut post) = pairs
+            .into_iter()
+            .nth(2)
+            .expect("need at least 3 transitions");
+        let any_pre_used = *pre.public.used.iter().next().expect("used spaces exist");
+        assert!(post.public.used.remove(&any_pre_used));
+        let verdict = validate_incremental(&post, &pre);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "removing a used space must be a definite Fail (got {verdict:?})"
+        );
+    }
+
+    /// Review P1-2 regression: a non-actor's supply changing cannot `Pass`.
+    #[test]
+    fn non_actor_supply_drift_declines() {
+        let (pre, mut post) = transitions(2, 59, 6)
+            .into_iter()
+            .next()
+            .expect("at least one transition");
+        let actor = pre.public.active_player;
+        let other = (actor + 1) % pre.public.players.len();
+        post.public.players[other].supply.food += 10;
+        let verdict = validate_incremental(&post, &pre);
+        assert!(
+            matches!(verdict, Verdict::Unsure),
+            "non-actor supply drift must be Unsure (got {verdict:?})"
+        );
+        // The full validator doesn't check supply reachability, only structural
+        // invariants. This is correct — both validators accept, no disagreement.
+        assert_eq!(validate_full(&post), Ok(()));
+        // The fallback wrapper therefore accepts via the full path.
+        assert_eq!(validate_incremental_or_full(&post, &pre), Ok(()));
     }
 }
