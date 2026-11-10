@@ -1019,4 +1019,100 @@ mod tests {
             "cloned game.card_set and original game.card_set must be the same Arc"
         );
     }
+
+    /// Review re-review P1-A counterexample reproduction (issuecomment-6766412202):
+    /// a valid mid-round transition whose non-actor `Player.id` is tampered must
+    /// never yield `Pass`, and `validate_incremental_or_full` must reject what
+    /// `validate_full` rejects.
+    #[test]
+    fn tampered_non_actor_id_declines_and_full_rejects() {
+        let (pre, mut post) = mid_round_pair();
+        let non_actor = 1 - pre.public.active_player;
+        post.public.players[non_actor].id = 999;
+        let verdict = validate_incremental(&post, &pre);
+        assert_ne!(verdict, Verdict::Pass, "tampered id must not Pass");
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+        assert_eq!(
+            validate_full(&post).unwrap_err(),
+            "farm shape/player mismatch"
+        );
+    }
+
+    /// P1-A: post.active_player tampered to an out-of-range value fails fast.
+    #[test]
+    fn tampered_active_player_out_of_range_fails() {
+        let (pre, mut post) = mid_round_pair();
+        post.public.active_player = 999;
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// P1-A: post.active_player set back to the player who just moved (rotation
+    /// says the other player is next) is a definite Fail.
+    #[test]
+    fn tampered_active_player_regression_fails() {
+        let (pre, mut post) = mid_round_pair();
+        post.public.active_player = pre.public.active_player;
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+    }
+
+    /// P1-A: non-actor `pet` (uncompared in the old field list) drifts -> Unsure,
+    /// so the full validator arbitrates.
+    #[test]
+    fn tampered_non_actor_pet_declines() {
+        let (pre, mut post) = mid_round_pair();
+        let non_actor = 1 - pre.public.active_player;
+        post.public.players[non_actor].pet = Some(crate::model::Animal::Sheep);
+        let verdict = validate_incremental(&post, &pre);
+        assert_ne!(verdict, Verdict::Pass);
+        if matches!(verdict, Verdict::Unsure) {
+            // The full validator accepts this particular drift (pet is not
+            // cross-checked there); the contract only requires incremental to
+            // never Pass when it cannot prove the delta.
+            validate_incremental_or_full(&post, &pre).unwrap();
+        }
+    }
+
+    /// P1-A: swapping `post.card_set` for a different (even valid) Arc is not
+    /// provable -> Unsure, never Pass.
+    #[test]
+    fn tampered_card_set_swap_declines() {
+        let (pre, mut post) = mid_round_pair();
+        post.card_set = std::sync::Arc::new(crate::cards::CardSet::default());
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+    }
+
+    /// P1-A: mutating `post.delayed_well` (hidden ledger) is not proved -> Unsure.
+    #[test]
+    fn tampered_delayed_well_declines() {
+        let (pre, mut post) = mid_round_pair();
+        post.delayed_well.insert(5, vec![pre.public.active_player]);
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+    }
+
+    /// P1-A: an untampered mid-round pair still passes — the soundness fixes
+    /// must not degrade the legitimate fast path.
+    #[test]
+    fn untampered_mid_round_still_passes() {
+        let (pre, post) = mid_round_pair();
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+    }
+
+    /// A plain mid-round (pre, post) pair: same round, quota not exhausted.
+    fn mid_round_pair() -> (Game, Game) {
+        transitions(2, 7, 24)
+            .into_iter()
+            .find(|(pre, post)| {
+                post.public.round == pre.public.round
+                    && post.public.start_player == pre.public.start_player
+                    && post.public.workers_placed != post.public.work_quota
+            })
+            .expect("no plain mid-round move sampled")
+    }
 }

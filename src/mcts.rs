@@ -1261,4 +1261,62 @@ mod tests {
             "sample_game_with_set distribution differs from wrapper — implementation diverged"
         );
     }
+
+    /// Review P1-B: `sample_game_with_set` must not copy card definitions per
+    /// sample, so its allocations must NOT scale with the size of the
+    /// definition bodies (the old path cloned `obs.card_definitions` on every
+    /// call). Two observations with the same card count but a 100x larger
+    /// effect payload must cost the same number of allocations.
+    #[cfg(feature = "perf-count-alloc")]
+    #[test]
+    fn sample_game_with_set_allocs_do_not_scale_with_definition_body() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::counting::allocation_count;
+        use crate::model::{Config, Game, Good};
+
+        fn make_obs(effect_pad: usize) -> crate::model::Observation {
+            let mut definitions = Vec::new();
+            for i in 0..40 {
+                let effects: Vec<CardEffect> = (0..effect_pad)
+                    .map(|j| CardEffect::OnPlayGain {
+                        good: Good::Food,
+                        amount: j as u32 % 7 + 1,
+                    })
+                    .collect();
+                definitions.push(CardDefinition {
+                    id: format!("card-{i:03}"),
+                    kind: if i % 2 == 0 {
+                        CardKind::Occupation
+                    } else {
+                        CardKind::MinorImprovement
+                    },
+                    cost: vec![],
+                    points: i % 8 - 2,
+                    effects,
+                });
+            }
+            let game = Game::with_cards(Config::default(), CardSet { definitions }).unwrap();
+            game.observation(0).unwrap()
+        }
+
+        let measure = |obs: &crate::model::Observation| -> u64 {
+            let set = search_card_set(obs).expect("set");
+            let lookup = CardLookup::from_card_set(&set).expect("lookup");
+            let mut rng = ChaCha8Rng::seed_from_u64(0xABCD);
+            let before = allocation_count();
+            for _ in 0..20 {
+                let sampled = sample_game_with_set(obs, &set, Some(&lookup), &mut rng).unwrap();
+                std::hint::black_box(&sampled);
+            }
+            (allocation_count() - before) / 20
+        };
+
+        let small = measure(&make_obs(2));
+        let large = measure(&make_obs(200));
+        assert!(
+            (large as i64 - small as i64).abs() <= 4,
+            "sample_game_with_set allocations must not scale with definition \
+             body size: small(2 effects/def)={small} large(200 effects/def)={large}"
+        );
+    }
 }
