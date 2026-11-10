@@ -1,0 +1,2168 @@
+{
+  "config": {
+    "seed": 7,
+    "additional_action_space_enabled": false,
+    "players": 2
+  },
+  "public": {
+    "round": 4,
+    "active_player": 1,
+    "start_player": 1,
+    "used": [],
+    "revealed": [
+      "major_improvement",
+      "fencing",
+      "grain_utilization",
+      "sheep_market"
+    ],
+    "accumulations": {
+      "forest": 3,
+      "clay_pit": 4,
+      "reed_bank": 1,
+      "fishing": 1
+    },
+    "animal_accumulations": {
+      "sheep_market": 1
+    },
+    "players": [
+      {
+        "id": 0,
+        "family": 2,
+        "newborns": 0,
+        "house": "wood",
+        "supply": {
+          "wood": 9,
+          "clay": 0,
+          "reed": 1,
+          "stone": 0,
+          "food": 5,
+          "grain": 0,
+          "vegetable": 0
+        },
+        "farm": [
+          {
+            "tile": "Room",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Room",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          }
+        ],
+        "pastures": [],
+        "pet": null,
+        "fences": [],
+        "improvements": [],
+        "played_cards": [],
+        "card_points": 0,
+        "pasture_capacity_bonus": 0,
+        "free_fence_wood": 0,
+        "improvement_wood_discount": 0,
+        "wooden_room_cost": null,
+        "room_material_cost": null,
+        "major_stone_discount_by_rooms": false,
+        "stone_cost_discount": 0,
+        "extra_housing": 0,
+        "begging": 0
+      },
+      {
+        "id": 1,
+        "family": 2,
+        "newborns": 0,
+        "house": "wood",
+        "supply": {
+          "wood": 0,
+          "clay": 0,
+          "reed": 2,
+          "stone": 0,
+          "food": 7,
+          "grain": 0,
+          "vegetable": 0
+        },
+        "farm": [
+          {
+            "tile": "Room",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Room",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          },
+          {
+            "tile": "Empty",
+            "stable": false,
+            "stable_animal": null
+          }
+        ],
+        "pastures": [],
+        "pet": null,
+        "fences": [],
+        "improvements": [],
+        "played_cards": [
+          "A119"
+        ],
+        "card_points": 0,
+        "pasture_capacity_bonus": 0,
+        "free_fence_wood": 0,
+        "improvement_wood_discount": 0,
+        "wooden_room_cost": null,
+        "room_material_cost": null,
+        "major_stone_discount_by_rooms": false,
+        "stone_cost_discount": 0,
+        "extra_housing": 0,
+        "begging": 0
+      }
+    ],
+    "improvement_market": [
+      "fireplace2",
+      "fireplace3",
+      "hearth4",
+      "hearth5",
+      "clay_oven",
+      "stone_oven",
+      "well",
+      "joinery",
+      "pottery",
+      "basketry"
+    ],
+    "work_quota": [
+      2,
+      2
+    ],
+    "workers_placed": [
+      0,
+      0
+    ],
+    "additional_action_space_enabled": false,
+    "finished": false
+  },
+  "hidden_round_deck": [
+    "farm_redevelopment",
+    "family_growth_no_room",
+    "cultivation",
+    "cattle_market",
+    "eastern_quarry",
+    "vegetable_seeds",
+    "pig_market",
+    "western_quarry",
+    "family_growth_with_room",
+    "house_redevelopment"
+  ],
+  "rng": {
+    "round": {
+      "seed": [
+        97,
+        133,
+        251,
+        137,
+        251,
+        136,
+        109,
+        147,
+        9,
+        130,
+        153,
+        48,
+        30,
+        129,
+        87,
+        170,
+        130,
+        81,
+        0,
+        134,
+        216,
+        187,
+        22,
+        125,
+        91,
+        32,
+        189,
+        36,
+        173,
+        154,
+        41,
+        128
+      ],
+      "stream": 0,
+      "word_pos": 16
+    },
+    "ai": {
+      "seed": [
+        166,
+        115,
+        138,
+        236,
+        75,
+        41,
+        168,
+        67,
+        239,
+        10,
+        187,
+        9,
+        215,
+        92,
+        122,
+        92,
+        159,
+        119,
+        183,
+        202,
+        134,
+        157,
+        103,
+        74,
+        229,
+        235,
+        48,
+        60,
+        232,
+        213,
+        243,
+        139
+      ],
+      "stream": 0,
+      "word_pos": 0
+    }
+  },
+  "delayed_well": {},
+  "card_set": {
+    "definitions": [
+      {
+        "id": "A032",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "wood",
+            2
+          ]
+        ],
+        "points": 0,
+        "effects": [
+          {
+            "EndGameBonus": {
+              "rule": "pasture_area"
+            }
+          }
+        ]
+      },
+      {
+        "id": "A038",
+        "kind": "minor_improvement",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "EndGameBonus": {
+              "rule": "house_material"
+            }
+          },
+          {
+            "Prerequisite": {
+              "rule": {
+                "minimum_animals": {
+                  "animal": "sheep",
+                  "number": 5
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "A098",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "EndGameBonus": {
+              "rule": "unfenced_stables"
+            }
+          }
+        ]
+      },
+      {
+        "id": "B098",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "EndGameBonus": {
+              "rule": "spare_pasture_capacity"
+            }
+          }
+        ]
+      },
+      {
+        "id": "B099",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "EndGameBonus": {
+              "rule": "later_occupations"
+            }
+          }
+        ]
+      },
+      {
+        "id": "A067",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "wood",
+            1
+          ]
+        ],
+        "points": 0,
+        "effects": [
+          {
+            "AfterWorkerGain": {
+              "space": "grain_seeds",
+              "good": "grain",
+              "amount": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "A078",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "wood",
+            2
+          ]
+        ],
+        "points": 1,
+        "effects": [
+          {
+            "Prerequisite": {
+              "rule": {
+                "minimum_occupations": 1
+              }
+            }
+          },
+          {
+            "AfterWorkerGain": {
+              "space": "fishing",
+              "good": "food",
+              "amount": 1
+            }
+          },
+          {
+            "AfterWorkerGain": {
+              "space": "fishing",
+              "good": "reed",
+              "amount": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "A080",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "wood",
+            1
+          ]
+        ],
+        "points": 0,
+        "effects": [
+          {
+            "AfterWorkerGain": {
+              "space": "western_quarry",
+              "good": "stone",
+              "amount": 1
+            }
+          },
+          {
+            "AfterWorkerGain": {
+              "space": "eastern_quarry",
+              "good": "stone",
+              "amount": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "B077",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "food",
+            1
+          ]
+        ],
+        "points": 1,
+        "effects": [
+          {
+            "Prerequisite": {
+              "rule": {
+                "minimum_occupations": 3
+              }
+            }
+          },
+          {
+            "AfterWorkerGain": {
+              "space": "day_laborer",
+              "good": "clay",
+              "amount": 3
+            }
+          }
+        ]
+      },
+      {
+        "id": "B121",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "AfterWorkerGain": {
+              "space": "forest",
+              "good": "clay",
+              "amount": 1
+            }
+          },
+          {
+            "AfterWorkerGain": {
+              "space": "reed_bank",
+              "good": "clay",
+              "amount": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "A005",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "food",
+            1
+          ]
+        ],
+        "points": 0,
+        "effects": [
+          {
+            "OnPlayGainPerStored": {
+              "stored": "clay",
+              "divisor": 2,
+              "good": "clay",
+              "amount": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "A125",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "OnPlayGainIfHouse": {
+              "house": "clay",
+              "rooms": 2,
+              "good": "clay",
+              "amount": 3
+            }
+          },
+          {
+            "OnPlayGainIfHouse": {
+              "house": "clay",
+              "rooms": 2,
+              "good": "reed",
+              "amount": 2
+            }
+          },
+          {
+            "OnPlayGainIfHouse": {
+              "house": "clay",
+              "rooms": 2,
+              "good": "stone",
+              "amount": 2
+            }
+          }
+        ]
+      },
+      {
+        "id": "A116",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "AfterWorkerGain": {
+              "space": "forest",
+              "good": "wood",
+              "amount": 1
+            }
+          },
+          {
+            "AfterWorkerGain": {
+              "space": "copse",
+              "good": "wood",
+              "amount": 1
+            }
+          },
+          {
+            "AfterWorkerGain": {
+              "space": "grove",
+              "good": "wood",
+              "amount": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "A119",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "AfterWorkerGain": {
+              "space": "farmland",
+              "good": "wood",
+              "amount": 1
+            }
+          },
+          {
+            "AfterWorkerGain": {
+              "space": "grain_seeds",
+              "good": "wood",
+              "amount": 1
+            }
+          },
+          {
+            "AfterWorkerGain": {
+              "space": "grain_utilization",
+              "good": "wood",
+              "amount": 1
+            }
+          },
+          {
+            "AfterWorkerGain": {
+              "space": "cultivation",
+              "good": "wood",
+              "amount": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "B050",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "wood",
+            1
+          ]
+        ],
+        "points": 0,
+        "effects": [
+          {
+            "Prerequisite": {
+              "rule": {
+                "maximum_occupations": 3
+              }
+            }
+          },
+          {
+            "HarvestFieldGain": {
+              "rule": {
+                "animals": {
+                  "sheep_per": 3,
+                  "cattle_per": 2
+                }
+              },
+              "good": "food",
+              "amount": 1
+            }
+          }
+        ]
+      },
+      {
+        "id": "B057",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "clay",
+            1
+          ],
+          [
+            "wood",
+            1
+          ]
+        ],
+        "points": 0,
+        "effects": [
+          {
+            "StartRoundGain": {
+              "good": "food",
+              "amount": 1,
+              "house": "wood",
+              "rooms": null
+            }
+          }
+        ]
+      },
+      {
+        "id": "B061",
+        "kind": "minor_improvement",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "HarvestFieldGain": {
+              "rule": "mixed_fields",
+              "good": "food",
+              "amount": 3
+            }
+          }
+        ]
+      },
+      {
+        "id": "B062",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "wood",
+            1
+          ]
+        ],
+        "points": 0,
+        "effects": [
+          {
+            "AfterWorkerGainIfUsed": {
+              "space": "grain_seeds",
+              "required_space": "farmland",
+              "good": "food",
+              "amount": 3
+            }
+          }
+        ]
+      },
+      {
+        "id": "B118",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "StartRoundGain": {
+              "good": "wood",
+              "amount": 1,
+              "house": null,
+              "rooms": 2
+            }
+          }
+        ]
+      },
+      {
+        "id": "A012",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "clay",
+            1
+          ]
+        ],
+        "points": 0,
+        "effects": [
+          {
+            "Passive": {
+              "rule": {
+                "pasture_capacity": 2
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "A075",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "stone",
+            2
+          ]
+        ],
+        "points": 2,
+        "effects": [
+          {
+            "Prerequisite": {
+              "rule": {
+                "maximum_occupations": 3
+              }
+            }
+          },
+          {
+            "Passive": {
+              "rule": {
+                "improvement_wood_discount": 1
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "B013",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "stone",
+            1
+          ],
+          [
+            "wood",
+            1
+          ]
+        ],
+        "points": 0,
+        "effects": [
+          {
+            "Passive": {
+              "rule": {
+                "wooden_room_cost": 2
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "A088",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "Passive": {
+              "rule": {
+                "fence_wood_discount": 3
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "B095",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "Passive": {
+              "rule": "major_stone_discount_by_rooms"
+            }
+          }
+        ]
+      },
+      {
+        "id": "B126",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "Passive": {
+              "rule": {
+                "room_cost": 3
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "A110",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "AfterClayConstructionGain": {
+              "good": "food",
+              "amount": 3
+            }
+          }
+        ]
+      },
+      {
+        "id": "B107",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "StartRoundGain": {
+              "good": "food",
+              "amount": 3,
+              "house": "stone",
+              "rooms": null
+            }
+          }
+        ]
+      },
+      {
+        "id": "B102",
+        "kind": "occupation",
+        "cost": [],
+        "points": 0,
+        "effects": [
+          {
+            "OnPlayGain": {
+              "good": "clay",
+              "amount": 3
+            }
+          }
+        ]
+      },
+      {
+        "id": "B010",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "wood",
+            3
+          ],
+          [
+            "food",
+            3
+          ]
+        ],
+        "points": 0,
+        "effects": [
+          {
+            "Passive": {
+              "rule": {
+                "housing_space": 1
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "A063",
+        "kind": "minor_improvement",
+        "cost": [
+          [
+            "wood",
+            2
+          ],
+          [
+            "stone",
+            2
+          ]
+        ],
+        "points": 2,
+        "effects": [
+          {
+            "AfterHarvestBakeGain": {
+              "amount": 3
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "cards": {
+    "hands": [
+      [
+        "A116",
+        "B126",
+        "B095",
+        "A110",
+        "A098",
+        "B118",
+        "B121",
+        "A012",
+        "A038",
+        "B013",
+        "A063",
+        "A075",
+        "A032",
+        "A078"
+      ],
+      [
+        "A088",
+        "B099",
+        "A125",
+        "B107",
+        "B098",
+        "B102",
+        "B050",
+        "B062",
+        "B077",
+        "A005",
+        "B010",
+        "A067",
+        "A080"
+      ]
+    ],
+    "undealt": [
+      "B061",
+      "B057"
+    ]
+  },
+  "log": {
+    "log_version": 5,
+    "engine_version": "0.1.0",
+    "rules_version": "agricola-revised-2016-beginner",
+    "config": {
+      "seed": 7,
+      "additional_action_space_enabled": false,
+      "players": 2
+    },
+    "start_player": 0,
+    "initial_start_player_override": null,
+    "initial_state_hash": "c4b896ea7078f65c9c2740a359c4311a654788da5d87abd31d2dce95f7385344",
+    "initial_public_state": {
+      "round": 1,
+      "active_player": 0,
+      "start_player": 0,
+      "used": [],
+      "revealed": [
+        "major_improvement"
+      ],
+      "accumulations": {
+        "forest": 3,
+        "clay_pit": 1,
+        "reed_bank": 1,
+        "fishing": 1
+      },
+      "animal_accumulations": {},
+      "players": [
+        {
+          "id": 0,
+          "family": 2,
+          "newborns": 0,
+          "house": "wood",
+          "supply": {
+            "wood": 0,
+            "clay": 0,
+            "reed": 0,
+            "stone": 0,
+            "food": 2,
+            "grain": 0,
+            "vegetable": 0
+          },
+          "farm": [
+            {
+              "tile": "Room",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Room",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            }
+          ],
+          "pastures": [],
+          "pet": null,
+          "fences": [],
+          "improvements": [],
+          "played_cards": [],
+          "card_points": 0,
+          "pasture_capacity_bonus": 0,
+          "free_fence_wood": 0,
+          "improvement_wood_discount": 0,
+          "wooden_room_cost": null,
+          "room_material_cost": null,
+          "major_stone_discount_by_rooms": false,
+          "stone_cost_discount": 0,
+          "extra_housing": 0,
+          "begging": 0
+        },
+        {
+          "id": 1,
+          "family": 2,
+          "newborns": 0,
+          "house": "wood",
+          "supply": {
+            "wood": 0,
+            "clay": 0,
+            "reed": 0,
+            "stone": 0,
+            "food": 3,
+            "grain": 0,
+            "vegetable": 0
+          },
+          "farm": [
+            {
+              "tile": "Room",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Room",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            },
+            {
+              "tile": "Empty",
+              "stable": false,
+              "stable_animal": null
+            }
+          ],
+          "pastures": [],
+          "pet": null,
+          "fences": [],
+          "improvements": [],
+          "played_cards": [],
+          "card_points": 0,
+          "pasture_capacity_bonus": 0,
+          "free_fence_wood": 0,
+          "improvement_wood_discount": 0,
+          "wooden_room_cost": null,
+          "room_material_cost": null,
+          "major_stone_discount_by_rooms": false,
+          "stone_cost_discount": 0,
+          "extra_housing": 0,
+          "begging": 0
+        }
+      ],
+      "improvement_market": [
+        "fireplace2",
+        "fireplace3",
+        "hearth4",
+        "hearth5",
+        "clay_oven",
+        "stone_oven",
+        "well",
+        "joinery",
+        "pottery",
+        "basketry"
+      ],
+      "work_quota": [
+        2,
+        2
+      ],
+      "workers_placed": [
+        0,
+        0
+      ],
+      "additional_action_space_enabled": false,
+      "finished": false
+    },
+    "round_seed": 4096934135913070504,
+    "action_seed": 7640891576956012814,
+    "card_set": {
+      "definitions": [
+        {
+          "id": "A032",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "wood",
+              2
+            ]
+          ],
+          "points": 0,
+          "effects": [
+            {
+              "EndGameBonus": {
+                "rule": "pasture_area"
+              }
+            }
+          ]
+        },
+        {
+          "id": "A038",
+          "kind": "minor_improvement",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "EndGameBonus": {
+                "rule": "house_material"
+              }
+            },
+            {
+              "Prerequisite": {
+                "rule": {
+                  "minimum_animals": {
+                    "animal": "sheep",
+                    "number": 5
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "A098",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "EndGameBonus": {
+                "rule": "unfenced_stables"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B098",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "EndGameBonus": {
+                "rule": "spare_pasture_capacity"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B099",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "EndGameBonus": {
+                "rule": "later_occupations"
+              }
+            }
+          ]
+        },
+        {
+          "id": "A067",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "wood",
+              1
+            ]
+          ],
+          "points": 0,
+          "effects": [
+            {
+              "AfterWorkerGain": {
+                "space": "grain_seeds",
+                "good": "grain",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "A078",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "wood",
+              2
+            ]
+          ],
+          "points": 1,
+          "effects": [
+            {
+              "Prerequisite": {
+                "rule": {
+                  "minimum_occupations": 1
+                }
+              }
+            },
+            {
+              "AfterWorkerGain": {
+                "space": "fishing",
+                "good": "food",
+                "amount": 1
+              }
+            },
+            {
+              "AfterWorkerGain": {
+                "space": "fishing",
+                "good": "reed",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "A080",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "wood",
+              1
+            ]
+          ],
+          "points": 0,
+          "effects": [
+            {
+              "AfterWorkerGain": {
+                "space": "western_quarry",
+                "good": "stone",
+                "amount": 1
+              }
+            },
+            {
+              "AfterWorkerGain": {
+                "space": "eastern_quarry",
+                "good": "stone",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "B077",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "food",
+              1
+            ]
+          ],
+          "points": 1,
+          "effects": [
+            {
+              "Prerequisite": {
+                "rule": {
+                  "minimum_occupations": 3
+                }
+              }
+            },
+            {
+              "AfterWorkerGain": {
+                "space": "day_laborer",
+                "good": "clay",
+                "amount": 3
+              }
+            }
+          ]
+        },
+        {
+          "id": "B121",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "AfterWorkerGain": {
+                "space": "forest",
+                "good": "clay",
+                "amount": 1
+              }
+            },
+            {
+              "AfterWorkerGain": {
+                "space": "reed_bank",
+                "good": "clay",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "A005",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "food",
+              1
+            ]
+          ],
+          "points": 0,
+          "effects": [
+            {
+              "OnPlayGainPerStored": {
+                "stored": "clay",
+                "divisor": 2,
+                "good": "clay",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "A125",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "OnPlayGainIfHouse": {
+                "house": "clay",
+                "rooms": 2,
+                "good": "clay",
+                "amount": 3
+              }
+            },
+            {
+              "OnPlayGainIfHouse": {
+                "house": "clay",
+                "rooms": 2,
+                "good": "reed",
+                "amount": 2
+              }
+            },
+            {
+              "OnPlayGainIfHouse": {
+                "house": "clay",
+                "rooms": 2,
+                "good": "stone",
+                "amount": 2
+              }
+            }
+          ]
+        },
+        {
+          "id": "A116",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "AfterWorkerGain": {
+                "space": "forest",
+                "good": "wood",
+                "amount": 1
+              }
+            },
+            {
+              "AfterWorkerGain": {
+                "space": "copse",
+                "good": "wood",
+                "amount": 1
+              }
+            },
+            {
+              "AfterWorkerGain": {
+                "space": "grove",
+                "good": "wood",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "A119",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "AfterWorkerGain": {
+                "space": "farmland",
+                "good": "wood",
+                "amount": 1
+              }
+            },
+            {
+              "AfterWorkerGain": {
+                "space": "grain_seeds",
+                "good": "wood",
+                "amount": 1
+              }
+            },
+            {
+              "AfterWorkerGain": {
+                "space": "grain_utilization",
+                "good": "wood",
+                "amount": 1
+              }
+            },
+            {
+              "AfterWorkerGain": {
+                "space": "cultivation",
+                "good": "wood",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "B050",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "wood",
+              1
+            ]
+          ],
+          "points": 0,
+          "effects": [
+            {
+              "Prerequisite": {
+                "rule": {
+                  "maximum_occupations": 3
+                }
+              }
+            },
+            {
+              "HarvestFieldGain": {
+                "rule": {
+                  "animals": {
+                    "sheep_per": 3,
+                    "cattle_per": 2
+                  }
+                },
+                "good": "food",
+                "amount": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "B057",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "clay",
+              1
+            ],
+            [
+              "wood",
+              1
+            ]
+          ],
+          "points": 0,
+          "effects": [
+            {
+              "StartRoundGain": {
+                "good": "food",
+                "amount": 1,
+                "house": "wood",
+                "rooms": null
+              }
+            }
+          ]
+        },
+        {
+          "id": "B061",
+          "kind": "minor_improvement",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "HarvestFieldGain": {
+                "rule": "mixed_fields",
+                "good": "food",
+                "amount": 3
+              }
+            }
+          ]
+        },
+        {
+          "id": "B062",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "wood",
+              1
+            ]
+          ],
+          "points": 0,
+          "effects": [
+            {
+              "AfterWorkerGainIfUsed": {
+                "space": "grain_seeds",
+                "required_space": "farmland",
+                "good": "food",
+                "amount": 3
+              }
+            }
+          ]
+        },
+        {
+          "id": "B118",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "StartRoundGain": {
+                "good": "wood",
+                "amount": 1,
+                "house": null,
+                "rooms": 2
+              }
+            }
+          ]
+        },
+        {
+          "id": "A012",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "clay",
+              1
+            ]
+          ],
+          "points": 0,
+          "effects": [
+            {
+              "Passive": {
+                "rule": {
+                  "pasture_capacity": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "A075",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "stone",
+              2
+            ]
+          ],
+          "points": 2,
+          "effects": [
+            {
+              "Prerequisite": {
+                "rule": {
+                  "maximum_occupations": 3
+                }
+              }
+            },
+            {
+              "Passive": {
+                "rule": {
+                  "improvement_wood_discount": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "B013",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "stone",
+              1
+            ],
+            [
+              "wood",
+              1
+            ]
+          ],
+          "points": 0,
+          "effects": [
+            {
+              "Passive": {
+                "rule": {
+                  "wooden_room_cost": 2
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "A088",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "Passive": {
+                "rule": {
+                  "fence_wood_discount": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "B095",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "Passive": {
+                "rule": "major_stone_discount_by_rooms"
+              }
+            }
+          ]
+        },
+        {
+          "id": "B126",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "Passive": {
+                "rule": {
+                  "room_cost": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "A110",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "AfterClayConstructionGain": {
+                "good": "food",
+                "amount": 3
+              }
+            }
+          ]
+        },
+        {
+          "id": "B107",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "StartRoundGain": {
+                "good": "food",
+                "amount": 3,
+                "house": "stone",
+                "rooms": null
+              }
+            }
+          ]
+        },
+        {
+          "id": "B102",
+          "kind": "occupation",
+          "cost": [],
+          "points": 0,
+          "effects": [
+            {
+              "OnPlayGain": {
+                "good": "clay",
+                "amount": 3
+              }
+            }
+          ]
+        },
+        {
+          "id": "B010",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "wood",
+              3
+            ],
+            [
+              "food",
+              3
+            ]
+          ],
+          "points": 0,
+          "effects": [
+            {
+              "Passive": {
+                "rule": {
+                  "housing_space": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "A063",
+          "kind": "minor_improvement",
+          "cost": [
+            [
+              "wood",
+              2
+            ],
+            [
+              "stone",
+              2
+            ]
+          ],
+          "points": 2,
+          "effects": [
+            {
+              "AfterHarvestBakeGain": {
+                "amount": 3
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "initial_hands": null,
+    "events": [
+      {
+        "player": 0,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "day_laborer"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 0
+          }
+        },
+        "before": "c4b896ea7078f65c9c2740a359c4311a654788da5d87abd31d2dce95f7385344",
+        "after": "012876116f86e2efc44dc379e61d1d201a30b7809e0167989675ade1065759f2"
+      },
+      {
+        "player": 1,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "fishing"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 1
+          }
+        },
+        "before": "012876116f86e2efc44dc379e61d1d201a30b7809e0167989675ade1065759f2",
+        "after": "a8d604e0621cac5b20b72e911f56107ec7d37b44b8bcc2f7b7b2a977675bbe81"
+      },
+      {
+        "player": 0,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "forest"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 0
+          }
+        },
+        "before": "a8d604e0621cac5b20b72e911f56107ec7d37b44b8bcc2f7b7b2a977675bbe81",
+        "after": "5197ac0fde97a1f0f6956f7b6f28ff2625f980b3e16555f620babbaed609f479"
+      },
+      {
+        "player": 1,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "meeting_place"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 1
+          }
+        },
+        "before": "5197ac0fde97a1f0f6956f7b6f28ff2625f980b3e16555f620babbaed609f479",
+        "after": "8c243e0f29c523b74f9dec5d918241c4fbc09c8b366b565d71e21b53ab19d497"
+      },
+      {
+        "player": 1,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "reed_bank"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 1
+          }
+        },
+        "before": "8c243e0f29c523b74f9dec5d918241c4fbc09c8b366b565d71e21b53ab19d497",
+        "after": "c65cf672b494fd4b2668a1c584cf245b7341c0216c98e8339b563b323f0e1433"
+      },
+      {
+        "player": 0,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "forest"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 0
+          }
+        },
+        "before": "c65cf672b494fd4b2668a1c584cf245b7341c0216c98e8339b563b323f0e1433",
+        "after": "099bd66712e3d528fa78243e0e8d9fcab97cdc04a25c84bb9ffa1e6d24e0d209"
+      },
+      {
+        "player": 1,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": {
+                "PlayOccupation": {
+                  "card_id": "A119"
+                }
+              },
+              "space": "lessons"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 1
+          }
+        },
+        "before": "099bd66712e3d528fa78243e0e8d9fcab97cdc04a25c84bb9ffa1e6d24e0d209",
+        "after": "0a76b45da16c9095fa1fe27b8935edf9993b3aaed25a2080f209682bde726aa7"
+      },
+      {
+        "player": 0,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "fishing"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 0
+          }
+        },
+        "before": "0a76b45da16c9095fa1fe27b8935edf9993b3aaed25a2080f209682bde726aa7",
+        "after": "8de8ff77992ff83bb1c01b30f8c94858e56f2292a54fb72ab7ad6a2c25ccb8a5"
+      },
+      {
+        "player": 1,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "day_laborer"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 1
+          }
+        },
+        "before": "8de8ff77992ff83bb1c01b30f8c94858e56f2292a54fb72ab7ad6a2c25ccb8a5",
+        "after": "21d001f4aa3db9d8955d0c1085fecb232bc69528a7a7878d15a26a46d729a116"
+      },
+      {
+        "player": 0,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "reed_bank"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 0
+          }
+        },
+        "before": "21d001f4aa3db9d8955d0c1085fecb232bc69528a7a7878d15a26a46d729a116",
+        "after": "3ff0608e20329f9da9a5e25d7843e52816943e68f23c711c4c4579156eb968d7"
+      },
+      {
+        "player": 1,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "fishing"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 1
+          }
+        },
+        "before": "3ff0608e20329f9da9a5e25d7843e52816943e68f23c711c4c4579156eb968d7",
+        "after": "e40782459e501126153d7b2639e674cfaef661e0ce3bf1eb3d21fa835ddc37c2"
+      },
+      {
+        "player": 0,
+        "kind": "work",
+        "payload": {
+          "Work": {
+            "action": {
+              "detail": "None",
+              "space": "forest"
+            },
+            "breeding_plans": null,
+            "harvest_plans": null,
+            "player": 0
+          }
+        },
+        "before": "e40782459e501126153d7b2639e674cfaef661e0ce3bf1eb3d21fa835ddc37c2",
+        "after": "b0e9e8ddb6cf1165a9ee9abc63cf54b0b3e8fa1997d195772b363111fcc055ac"
+      }
+    ]
+  }
+}

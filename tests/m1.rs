@@ -788,10 +788,9 @@ fn sample_game_accepts_valid_observation() {
 #[test]
 fn illegal_free_action_rejected_atomically() {
     use agricola_re_ai::engine::FreeAction;
-    use agricola_re_ai::model::{Config, Game};
-    use agricola_re_ai::validation::validate_free_action_or_full;
+    use agricola_re_ai::model::{Game, Good};
 
-    let mut game = Game::new(Config {
+    let mut game = Game::new(agricola_re_ai::model::Config {
         players: 2,
         seed: 7,
         additional_action_space_enabled: false,
@@ -832,5 +831,71 @@ fn illegal_free_action_rejected_atomically() {
         quantity: 2,
     };
     assert!(game2.apply_free(0, legal).is_ok());
-    assert_ne!(game2.state_hash(), hash_before, "legal free action must change state");
+    assert_ne!(
+        game2.state_hash(),
+        hash_before,
+        "legal free action must change state"
+    );
+}
+
+#[test]
+fn legacy_v5_fixture_loads_and_replays() {
+    use agricola_re_ai::model::Game;
+    use agricola_re_ai::policy::{CardChoiceDetails, DetailPolicy, RandomPolicy, SpacePolicy};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    // Load cardless fixture
+    let cardless_json = include_str!("fixtures/v5/cardless_2p_seed7_r3.json");
+    let mut cardless_game = Game::load_json(cardless_json).unwrap();
+    cardless_game.validate().unwrap();
+    let cardless_hash = cardless_game.state_hash();
+
+    // Load cards fixture
+    let cards_json = include_str!("fixtures/v5/cards_2p_seed7_r3.json");
+    let mut cards_game = Game::load_json(cards_json).unwrap();
+    cards_game.validate().unwrap();
+    let cards_hash = cards_game.state_hash();
+
+    // Continue both games for a few moves to verify they can be replayed
+    let mut rng = ChaCha8Rng::seed_from_u64(0xDEAD);
+    for _ in 0..5 {
+        if cardless_game.public.finished {
+            break;
+        }
+        let id = cardless_game.public.active_player;
+        let obs = cardless_game.observation(id).unwrap();
+        let legal = cardless_game.legal_spaces();
+        if legal.is_empty() {
+            break;
+        }
+        let space = RandomPolicy.select(&obs, &legal, &mut rng).expect("legal");
+        let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+        cardless_game.apply(action).unwrap();
+    }
+    assert_ne!(cardless_game.state_hash(), cardless_hash); // hash changes after moves
+
+    let mut rng = ChaCha8Rng::seed_from_u64(0xDEAD);
+    for _ in 0..5 {
+        if cards_game.public.finished {
+            break;
+        }
+        let id = cards_game.public.active_player;
+        let obs = cards_game.observation(id).unwrap();
+        let legal = cards_game.legal_spaces();
+        if legal.is_empty() {
+            break;
+        }
+        let space = RandomPolicy.select(&obs, &legal, &mut rng).expect("legal");
+        let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+        cards_game.apply(action).unwrap();
+    }
+    assert_ne!(cards_game.state_hash(), cards_hash); // hash changes after moves
+
+    // Save and reload to verify round-trip
+    let cardless_reloaded = Game::load_json(&cardless_game.save_json().unwrap()).unwrap();
+    assert_eq!(cardless_reloaded.state_hash(), cardless_game.state_hash());
+
+    let cards_reloaded = Game::load_json(&cards_game.save_json().unwrap()).unwrap();
+    assert_eq!(cards_reloaded.state_hash(), cards_game.state_hash());
 }
