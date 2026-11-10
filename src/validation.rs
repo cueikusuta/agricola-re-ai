@@ -356,14 +356,13 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
             let mut expected_points_delta = 0i32;
             for (id, count) in &played_added {
                 if let Some(card) = set.definition(id) {
-                    expected_points_delta = match expected_points_delta
-                        .checked_add(card.points * (*count as i32))
-                    {
-                        Some(v) => v,
-                        None => {
-                            return Verdict::Fail("card points delta overflow".into());
-                        }
-                    };
+                    expected_points_delta =
+                        match expected_points_delta.checked_add(card.points * (*count as i32)) {
+                            Some(v) => v,
+                            None => {
+                                return Verdict::Fail("card points delta overflow".into());
+                            }
+                        };
                 } else {
                     // Unknown card ID in played_cards — full validator will reject.
                     return Verdict::Fail("actor played_cards contains unknown card ID".into());
