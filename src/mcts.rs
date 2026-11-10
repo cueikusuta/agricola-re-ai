@@ -1292,6 +1292,7 @@ mod tests {
                     })
                     .collect();
                 definitions.push(CardDefinition {
+                    use_limit: None,
                     id: format!("card-{i:03}"),
                     kind: if i % 2 == 0 {
                         CardKind::Occupation
