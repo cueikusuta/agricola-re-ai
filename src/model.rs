@@ -1045,6 +1045,126 @@ impl Game {
         Ok(())
     }
 }
+
+/// Lightweight public-state structure validation for `sample_game` and
+/// other direct-construction paths. It checks only the public structural
+/// invariants that can be verified without the private `card_set`, `cards`,
+/// `hidden_round_deck`, or `rng`. This is a subset of `Game::validate`
+/// designed to catch tampered `Observation` inputs fast.
+///
+/// Checks:
+/// - `round` in 1..=14, `revealed.len() == round`
+/// - `active_player < players`, `start_player < players`
+/// - `players.len() == players`, `workers_placed.len() == players`, `work_quota.len() == players`
+/// - Major improvements: market + all player tables multiset equals `Improvement::ALL`
+/// - `used` spaces subset of `regular_for(players) ∪ revealed ∪ extra_for(players)` (+ Lessons/ExtraLessons if cards enabled)
+/// - At most one mutually-exclusive additional space used
+/// - `additional_action_space_enabled == additional`
+/// - Revealed cards are in stage order (each stage count ≤ `RoundCard::ALL` for that stage)
+pub fn validate_search_public(
+    public: &PublicState,
+    players: usize,
+    additional: bool,
+    cards_enabled: bool,
+) -> Result<(), String> {
+    if !(2..=4).contains(&players) || public.players.len() != players {
+        return Err("player count mismatch".into());
+    }
+    if public.round < 1 || public.round > 14 {
+        return Err("invalid round".into());
+    }
+    if public.revealed.len() != public.round as usize {
+        return Err("round/revealed count mismatch".into());
+    }
+    if public.active_player >= players || public.start_player >= players {
+        return Err("invalid active/start player".into());
+    }
+    if public.work_quota.len() != players || public.workers_placed.len() != players {
+        return Err("worker array mismatch".into());
+    }
+    if public.additional_action_space_enabled != additional {
+        return Err("additional_action_space_enabled mismatch".into());
+    }
+
+    // Major improvements: market + all player tables multiset equals Improvement::ALL
+    let cards = public
+        .improvement_market
+        .iter()
+        .copied()
+        .chain(
+            public
+                .players
+                .iter()
+                .flat_map(|player| player.improvements.iter().copied()),
+        )
+        .collect::<Vec<_>>();
+    if cards.len() != Improvement::ALL.len()
+        || cards.iter().copied().collect::<BTreeSet<_>>() != Improvement::ALL.into_iter().collect()
+    {
+        return Err("major improvement duplicated or missing".into());
+    }
+
+    // Used spaces must be from the available set
+    let mut available: BTreeSet<_> = Space::regular_for(players).into_iter().collect();
+    if cards_enabled {
+        available.insert(Space::Lessons);
+        if players >= 3 {
+            available.insert(Space::ExtraLessons);
+        }
+    }
+    available.extend(public.revealed.iter().copied().map(Space::from));
+    if additional {
+        available.extend(Space::extra_for(players));
+    }
+    if !public.used.is_subset(&available) {
+        return Err("a non-revealed action space was used".into());
+    }
+    // Mutually-exclusive additional spaces: at most one
+    if public
+        .used
+        .iter()
+        .filter(|s| s.additional_for(players))
+        .count()
+        > 1
+    {
+        return Err("multiple mutually-exclusive additional spaces used".into());
+    }
+
+    // Revealed cards stage order: each stage count ≤ RoundCard::ALL for that stage
+    for stage in 1..=6 {
+        let revealed_in_stage = public
+            .revealed
+            .iter()
+            .filter(|c| c.stage() == stage)
+            .count();
+        let all_in_stage = RoundCard::ALL.iter().filter(|c| c.stage() == stage).count();
+        if revealed_in_stage > all_in_stage {
+            return Err(format!("too many revealed cards for stage {stage}"));
+        }
+    }
+
+    // Player farm invariants (shared with full validate)
+    for (i, player) in public.players.iter().enumerate() {
+        validate_player_state(&public.work_quota, &public.workers_placed, i, player)?;
+    }
+
+    // Finished game checks
+    if public.finished && (public.round != 14 || public.workers_placed != public.work_quota) {
+        return Err("game ended before all workers were placed".into());
+    }
+    if public.used.len()
+        != public
+            .workers_placed
+            .iter()
+            .map(|&n| usize::from(n))
+            .sum::<usize>()
+    {
+        return Err("worker placements do not match used spaces".into());
+    }
+
+    Ok(())
+}
+
 pub fn round_for_space(s: Space) -> RoundCard {
     match s {
         Space::SheepMarket => RoundCard::SheepMarket,

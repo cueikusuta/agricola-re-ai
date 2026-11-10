@@ -685,3 +685,102 @@ fn v5_save_compatibility_load_and_continue() {
         }
     }
 }
+
+#[test]
+fn sample_game_rejects_invalid_round() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    use agricola_re_ai::mcts::sample_game;
+    use agricola_re_ai::model::{Config, Game};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let game = Game::with_cards(
+        Config {
+            seed: 7,
+            ..Config::default()
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+    let mut obs = game.observation(0).unwrap();
+
+    // Tamper: set round to 99 (invalid)
+    obs.public.round = 99;
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    assert!(sample_game(&obs, &mut rng).is_none());
+}
+
+#[test]
+fn sample_game_rejects_missing_revealed() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    use agricola_re_ai::mcts::sample_game;
+    use agricola_re_ai::model::{Config, Game};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let game = Game::with_cards(
+        Config {
+            seed: 7,
+            ..Config::default()
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+    let mut obs = game.observation(0).unwrap();
+
+    // Tamper: remove one revealed card but keep round the same
+    obs.public.revealed.pop();
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    assert!(sample_game(&obs, &mut rng).is_none());
+}
+
+#[test]
+fn sample_game_rejects_tampered_market() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    use agricola_re_ai::mcts::sample_game;
+    use agricola_re_ai::model::{Config, Game};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let game = Game::with_cards(
+        Config {
+            seed: 7,
+            ..Config::default()
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+    let mut obs = game.observation(0).unwrap();
+
+    // Tamper: remove one major improvement from market
+    assert!(!obs.public.improvement_market.is_empty());
+    obs.public.improvement_market.pop();
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    assert!(sample_game(&obs, &mut rng).is_none());
+}
+
+#[test]
+fn sample_game_accepts_valid_observation() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    use agricola_re_ai::mcts::sample_game;
+    use agricola_re_ai::model::{Config, Game};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let game = Game::with_cards(
+        Config {
+            seed: 7,
+            ..Config::default()
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+    let obs = game.observation(0).unwrap();
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let sampled = sample_game(&obs, &mut rng).expect("valid observation must produce Some(Game)");
+    sampled.validate().unwrap();
+}

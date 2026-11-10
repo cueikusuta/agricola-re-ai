@@ -131,7 +131,6 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
 }
 
 /// Build a hypothetical position from public information only.
-///
 /// Public so the profiler (`src/bin/mcts_profile.rs`) can measure the
 /// sampling cost separately from the rollout; policies must not use it to look
 /// at hidden state.
@@ -159,6 +158,20 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
         deck.extend(remaining);
     }
     deck.reverse(); // Game::start_round pops from the end.
+
+    // Validate public structure before constructing the game (fail-closed).
+    // This catches tampered Observations that would otherwise produce Some(Game).
+    crate::model::validate_search_public(
+        &obs.public,
+        players,
+        obs.public.additional_action_space_enabled,
+        !obs.card_definitions.is_empty(),
+    )
+    .ok()?;
+    // Deck + revealed must total 14 cards (round deck integrity).
+    if obs.public.revealed.len() + deck.len() != 14 {
+        return None;
+    }
 
     // Internal RNG streams derived from the sampled seed.
     // The internal round stream draws the start player (matching from_card_state).
