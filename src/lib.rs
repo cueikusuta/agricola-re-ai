@@ -27,27 +27,47 @@ pub mod web;
 #[cfg(feature = "perf-count-alloc")]
 pub mod counting {
     use std::alloc::{GlobalAlloc, Layout, System};
+    use std::cell::Cell;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     /// Counts heap allocations/bytes. Only used in the dedicated allocation
     /// run; timing runs use the plain build and the `System` allocator.
+    ///
+    /// The counters are thread-local: `cargo test` runs test threads in
+    /// parallel, and a process-global counter would make any measured window
+    /// depend on which unrelated tests happen to allocate concurrently. The
+    /// counting allocator itself stays process-wide (one `#[global_allocator]`),
+    /// but each thread tallies only its own allocations, so a test that
+    /// measures `allocation_count()` before/after a call measures that call
+    /// alone regardless of parallel siblings.
     struct CountingAllocator;
 
-    static ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
-    static ALLOCATED_BYTES: AtomicU64 = AtomicU64::new(0);
+    thread_local! {
+        static ALLOCATIONS: Cell<u64> = const { Cell::new(0) };
+        static ALLOCATED_BYTES: Cell<u64> = const { Cell::new(0) };
+    }
+
+    // Process-wide totals for `perf_baseline`, which is single-threaded per
+    // measurement but reads the counters from the main thread.
+    static TOTAL_ALLOCATIONS: AtomicU64 = AtomicU64::new(0);
+    static TOTAL_ALLOCATED_BYTES: AtomicU64 = AtomicU64::new(0);
 
     unsafe impl GlobalAlloc for CountingAllocator {
         unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-            ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-            ALLOCATED_BYTES.fetch_add(layout.size() as u64, Ordering::Relaxed);
+            ALLOCATIONS.with(|c| c.set(c.get() + 1));
+            ALLOCATED_BYTES.with(|c| c.set(c.get() + layout.size() as u64));
+            TOTAL_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+            TOTAL_ALLOCATED_BYTES.fetch_add(layout.size() as u64, Ordering::Relaxed);
             unsafe { System.alloc(layout) }
         }
         unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
             unsafe { System.dealloc(ptr, layout) }
         }
         unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-            ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-            ALLOCATED_BYTES.fetch_add(new_size as u64, Ordering::Relaxed);
+            ALLOCATIONS.with(|c| c.set(c.get() + 1));
+            ALLOCATED_BYTES.with(|c| c.set(c.get() + new_size as u64));
+            TOTAL_ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+            TOTAL_ALLOCATED_BYTES.fetch_add(new_size as u64, Ordering::Relaxed);
             unsafe { System.realloc(ptr, layout, new_size) }
         }
     }
@@ -55,11 +75,21 @@ pub mod counting {
     #[global_allocator]
     static GLOBAL: CountingAllocator = CountingAllocator;
 
+    /// Allocations made by the calling thread since thread start.
     pub fn allocation_count() -> u64 {
-        ALLOCATIONS.load(Ordering::Relaxed)
+        ALLOCATIONS.with(|c| c.get())
     }
+    /// Bytes allocated by the calling thread since thread start.
     pub fn allocated_byte_count() -> u64 {
-        ALLOCATED_BYTES.load(Ordering::Relaxed)
+        ALLOCATED_BYTES.with(|c| c.get())
+    }
+    /// Process-wide allocation total (all threads).
+    pub fn total_allocation_count() -> u64 {
+        TOTAL_ALLOCATIONS.load(Ordering::Relaxed)
+    }
+    /// Process-wide allocated-byte total (all threads).
+    pub fn total_allocated_byte_count() -> u64 {
+        TOTAL_ALLOCATED_BYTES.load(Ordering::Relaxed)
     }
     pub const INSTRUMENTED: bool = true;
 }
