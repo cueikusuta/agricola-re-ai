@@ -301,6 +301,7 @@ impl PuctPolicy {
             timed_out,
             elapsed_ms: elapsed.as_millis().min(u128::from(u64::MAX)) as u64,
             overshoot_ms: budget
+                .filter(|b| !b.is_zero())
                 .map(|budget| elapsed.saturating_sub(budget).as_millis() as u64)
                 .unwrap_or(0),
             mode,

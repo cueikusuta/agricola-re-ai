@@ -50,10 +50,11 @@ impl Node {
     }
 }
 
-/// O(1) card definition lookup for sampling. Built once per decision from a
+/// O(log n) card definition lookup for sampling. Built once per decision from a
 /// validated `CardSet`, then reused across all simulations in that decision.
-/// Maps card id -> (kind, points) for the checks that `CardState::validate`
-/// performs (partition coverage, hand size, card_points consistency).
+/// Maps card id -> (kind, points) for the checks that `CardState::validate` /// performs (partition coverage, hand size, card_points consistency).
+/// Uses `BTreeMap` for deterministic iteration order; lookup is O(log n) where n
+/// is the number of card definitions.
 #[derive(Clone, Debug)]
 pub struct CardLookup {
     kind: BTreeMap<String, CardKind>,
@@ -1266,12 +1267,13 @@ mod tests {
     /// sample, so its allocations must NOT scale with the size of the
     /// definition bodies (the old path cloned `obs.card_definitions` on every
     /// call). Two observations with the same card count but a 100x larger
-    /// effect payload must cost the same number of allocations.
+    /// effect payload must cost the same number of allocations AND the same
+    /// number of allocated bytes.
     #[cfg(feature = "perf-count-alloc")]
     #[test]
     fn sample_game_with_set_allocs_do_not_scale_with_definition_body() {
         use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
-        use crate::counting::allocation_count;
+        use crate::counting::{allocated_byte_count, allocation_count};
         use crate::model::{Config, Game, Good};
 
         fn make_obs(effect_pad: usize) -> crate::model::Observation {
@@ -1299,24 +1301,30 @@ mod tests {
             game.observation(0).unwrap()
         }
 
-        let measure = |obs: &crate::model::Observation| -> u64 {
+        let measure = |obs: &crate::model::Observation| -> (u64, u64) {
             let set = search_card_set(obs).expect("set");
             let lookup = CardLookup::from_card_set(&set).expect("lookup");
             let mut rng = ChaCha8Rng::seed_from_u64(0xABCD);
-            let before = allocation_count();
+            let before_allocs = allocation_count();
+            let before_bytes = allocated_byte_count();
             for _ in 0..20 {
                 let sampled = sample_game_with_set(obs, &set, Some(&lookup), &mut rng).unwrap();
                 std::hint::black_box(&sampled);
             }
-            (allocation_count() - before) / 20
+            let allocs = (allocation_count() - before_allocs) / 20;
+            let bytes = (allocated_byte_count() - before_bytes) / 20;
+            (allocs, bytes)
         };
 
-        let small = measure(&make_obs(2));
-        let large = measure(&make_obs(200));
+        let (small_allocs, small_bytes) = measure(&make_obs(2));
+        let (large_allocs, large_bytes) = measure(&make_obs(200));
         assert!(
-            (large as i64 - small as i64).abs() <= 4,
-            "sample_game_with_set allocations must not scale with definition \
-             body size: small(2 effects/def)={small} large(200 effects/def)={large}"
+            (large_allocs as i64 - small_allocs as i64).abs() <= 4,
+            "sample_game_with_set allocations must not scale with definition body size: small(2 effects/def)={small_allocs} large(200 effects/def)={large_allocs}"
+        );
+        assert!(
+            (large_bytes as i64 - small_bytes as i64).abs() <= 4096,
+            "sample_game_with_set allocated bytes must not scale with definition body size: small(2 effects/def)={small_bytes} large(200 effects/def)={large_bytes}"
         );
     }
 }
