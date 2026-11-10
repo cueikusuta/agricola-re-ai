@@ -1,5 +1,6 @@
 //! Public model types and private game state. No card text is bundled.
 use crate::cards::{CardDefinition, CardSet, CardState};
+use crate::pending::{PendingDecision, PendingKind, PendingResolution};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -551,6 +552,10 @@ pub struct Game {
     pub hidden_round_deck: Vec<RoundCard>,
     pub rng: RngStreams,
     pub delayed_well: BTreeMap<u8, Vec<usize>>,
+    /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
+    /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
+    #[serde(default)]
+    pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
     #[serde(
         default,
         serialize_with = "serialize_arc",
@@ -566,6 +571,24 @@ pub struct Game {
     /// always keep a complete, hash-checked event log.
     #[serde(skip, default = "record_events_by_default")]
     pub record_events: bool,
+    /// Pending decision awaiting player resolution (Interrupt phase).
+    /// Included in state_hash for save/restore/resume integrity.
+    #[serde(default)]
+    pub pending: Option<PendingDecision>,
+    /// Event chain budget: max effect resolutions per action (default 64).
+    #[serde(default = "default_event_budget")]
+    pub event_budget: u32,
+    /// Per-card use tracking for effects with limits (e.g., once per round).
+    /// Key: card ID, Value: use count this period.
+    #[serde(default)]
+    pub card_uses: BTreeMap<String, u32>,
+    /// Next decision ID for PendingDecision.
+    #[serde(default)]
+    pub next_decision_id: u64,
+}
+
+fn default_event_budget() -> u32 {
+    64
 }
 
 fn record_events_by_default() -> bool {
@@ -616,6 +639,9 @@ pub struct Observation {
     pub hand_counts: Vec<usize>,
     /// The implemented card vocabulary is public; its randomized locations are not.
     pub card_definitions: Vec<CardDefinition>,
+    /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
+    /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
+    pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
 }
 impl Game {
     pub fn new(config: Config) -> Self {
@@ -744,10 +770,15 @@ impl Game {
             hidden_round_deck: deck,
             rng,
             delayed_well: BTreeMap::new(),
+            well_food_schedule: BTreeMap::new(),
             card_set,
             cards,
             log,
             record_events: true,
+            pending: None,
+            event_budget: default_event_budget(),
+            card_uses: BTreeMap::new(),
+            next_decision_id: 0,
         };
         result.start_round();
         result.log.initial_state_hash = result.state_hash();
@@ -764,6 +795,7 @@ impl Game {
             hand: self.cards.hands[player_id].clone(),
             hand_counts: self.cards.hands.iter().map(Vec::len).collect(),
             card_definitions: self.card_set.definitions.clone(),
+            well_food_schedule: self.well_food_schedule.clone(),
         })
     }
     pub fn state_hash(&self) -> String {
@@ -774,8 +806,13 @@ impl Game {
             &self.hidden_round_deck,
             &self.rng,
             &self.delayed_well,
+            &self.well_food_schedule,
             &*self.card_set,
             &self.cards,
+            &self.pending,
+            &self.event_budget,
+            &self.card_uses,
+            &self.next_decision_id,
         ))
         .expect("state serialization");
         format!("{:x}", Sha256::digest(&data))
@@ -791,6 +828,7 @@ impl Game {
             hidden_round_deck: self.hidden_round_deck.clone(),
             rng: self.rng.clone(),
             delayed_well: self.delayed_well.clone(),
+            well_food_schedule: self.well_food_schedule.clone(),
             card_set: self.card_set.clone(),
             cards: self.cards.clone(),
             log: GameLog {
@@ -809,6 +847,10 @@ impl Game {
                 events: Vec::new(),
             },
             record_events: false,
+            pending: self.pending.clone(),
+            event_budget: self.event_budget,
+            card_uses: self.card_uses.clone(),
+            next_decision_id: self.next_decision_id,
         }
     }
     /// Create a search-only position from pre-sampled components.
@@ -822,8 +864,13 @@ impl Game {
         hidden_round_deck: Vec<RoundCard>,
         rng: RngStreams,
         delayed_well: BTreeMap<u8, Vec<usize>>,
+        well_food_schedule: BTreeMap<u8, Vec<usize>>,
         card_set: Arc<CardSet>,
         cards: CardState,
+        pending: Option<PendingDecision>,
+        event_budget: u32,
+        card_uses: BTreeMap<String, u32>,
+        next_decision_id: u64,
     ) -> Self {
         let start_player = public.start_player;
         let round_seed = config.seed ^ 0x38DB_3BE3_DF45_3FAF;
@@ -834,6 +881,7 @@ impl Game {
             hidden_round_deck,
             rng,
             delayed_well,
+            well_food_schedule,
             card_set: card_set.clone(),
             cards,
             log: GameLog {
@@ -852,6 +900,10 @@ impl Game {
                 events: Vec::new(),
             },
             record_events: false,
+            pending,
+            event_budget,
+            card_uses,
+            next_decision_id,
         }
     }
     pub fn save_json(&self) -> Result<String, String> {
@@ -1058,6 +1110,127 @@ impl Game {
             return Err("round deck contains duplicate or missing cards".into());
         }
         Ok(())
+    }
+
+    /// Returns true if there is a pending decision awaiting resolution.
+    pub fn has_pending(&self) -> bool {
+        self.pending.is_some()
+    }
+
+    /// Get a reference to the pending decision.
+    pub fn pending(&self) -> Option<&PendingDecision> {
+        self.pending.as_ref()
+    }
+
+    /// Get a mutable reference to the pending decision.
+    pub fn pending_mut(&mut self) -> Option<&mut PendingDecision> {
+        self.pending.as_mut()
+    }
+
+    /// Resolve the pending decision.
+    /// The state_hash_before must match the current game state hash,
+    /// otherwise returns Err (prevents replay attacks on suspended games).
+    pub fn resolve_pending(&mut self, decision: PendingResolution) -> Result<(), String> {
+        let Some(pending) = self.pending.take() else {
+            return Err("no pending decision".into());
+        };
+        // Verify state hash integrity
+        if pending.state_hash_before != self.state_hash() {
+            self.pending = Some(pending); // Restore on failure
+            return Err("state hash mismatch: game state changed since decision was created".into());
+        }
+        // Validate resolution matches pending kind
+        pending.validate_resolution(&decision)?;
+        // Apply the resolution
+        self.apply_pending_resolution(pending, decision)
+    }
+
+    /// Internal: apply a validated pending resolution.
+    fn apply_pending_resolution(
+        &mut self,
+        pending: PendingDecision,
+        resolution: PendingResolution,
+    ) -> Result<(), String> {
+        match (pending.kind, resolution) {
+            (PendingKind::ChooseGain { source_card, .. }, PendingResolution::ChooseGain { chosen }) => {
+                let player = &mut self.public.players[pending.player];
+                let next = player
+                    .supply
+                    .get(chosen.good)
+                    .checked_add(chosen.amount)
+                    .ok_or("resource overflow")?;
+                player.supply.set(chosen.good, next);
+                // Log the choice if recording events
+                if self.record_events {
+                    self.log.events.push(crate::model::Event {
+                        player: Some(pending.player),
+                        kind: "pending_resolution".into(),
+                        payload: serde_json::json!({
+                            "source_card": source_card,
+                            "chosen_gain": chosen,
+                        }),
+                        before: pending.state_hash_before,
+                        after: self.state_hash(),
+                    });
+                }
+                Ok(())
+            }
+            (PendingKind::ChoosePayment { card_id, .. }, PendingResolution::ChoosePayment { chosen }) => {
+                let player = &mut self.public.players[pending.player];
+                for (good, amount) in &chosen.cost {
+                    player.supply.pay(*good, *amount)?;
+                }
+                if self.record_events {
+                    self.log.events.push(crate::model::Event {
+                        player: Some(pending.player),
+                        kind: "pending_resolution".into(),
+                        payload: serde_json::json!({
+                            "card_id": card_id,
+                            "chosen_payment": chosen,
+                        }),
+                        before: pending.state_hash_before,
+                        after: self.state_hash(),
+                    });
+                }
+                Ok(())
+            }
+            (PendingKind::DelayedWellRelief { round, recipients }, PendingResolution::DelayedWellRelief { confirmed }) => {
+                if confirmed {
+                    for id in recipients {
+                        self.public.players[id].supply.food += 1;
+                    }
+                }
+                if self.record_events {
+                    self.log.events.push(crate::model::Event {
+                        player: None,
+                        kind: "pending_resolution".into(),
+                        payload: serde_json::json!({
+                            "delayed_well_relief": { "round": round, "confirmed": confirmed },
+                        }),
+                        before: pending.state_hash_before,
+                        after: self.state_hash(),
+                    });
+                }
+                Ok(())
+            }
+            (PendingKind::Custom { source_card, .. }, PendingResolution::Custom { payload }) => {
+                // Extensible: custom effects handle their own payload
+                if self.record_events {
+                    self.log.events.push(crate::model::Event {
+                        player: Some(pending.player),
+                        kind: "pending_resolution".into(),
+                        payload: serde_json::json!({
+                            "source_card": source_card,
+                            "custom_payload": payload,
+                        }),
+                        before: pending.state_hash_before,
+                        after: self.state_hash(),
+                    });
+                }
+                Ok(())
+            }
+            _ => Err("resolution kind does not match pending decision kind".into()),
+        }
     }
 }
 

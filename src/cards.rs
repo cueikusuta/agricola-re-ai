@@ -473,6 +473,9 @@ fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String>
 }
 
 /// Execute one prevalidated card play; the containing Game transaction provides rollback.
+/// This function validates the play, pays costs, and applies on-play effects (Before phase).
+/// The caller is responsible for moving the card from hand to played via `move_card`
+/// and for dispatching the Replace/Before phases via the event dispatcher.
 pub fn play(
     set: &CardSet,
     hand: &mut Vec<String>,
@@ -491,10 +494,20 @@ pub fn play(
     for (good, amount) in card_costs(card, player, extra_food) {
         player.supply.pay(good, amount)?;
     }
-    let next_points = player
-        .card_points
-        .checked_add(card.points)
-        .ok_or("card points overflow")?;
+    // On-play effects (Before phase) are now applied by the event dispatcher.
+    // This function only validates and pays costs.
+    // The card_points update happens after the card is moved to played.
+    Ok(())
+}
+
+/// Apply on-play (Before phase) effects for a card that has been moved to played.
+/// Called by the event dispatcher after the card is in the played zone.
+pub fn apply_on_play_effects(
+    set: &CardSet,
+    player: &mut Player,
+    id: &str,
+) -> Result<(), String> {
+    let card = set.definition(id).ok_or("unknown card")?;
     for effect in &card.effects {
         match effect {
             CardEffect::OnPlayGain { good, amount } => {
@@ -534,8 +547,13 @@ pub fn play(
             _ => {}
         }
     }
-    hand.retain(|x| x != id);
-    player.played_cards.push(id.to_string());
+    Ok(())
+}
+
+/// Update card_points after a card is successfully played.
+/// Called after move_card and effect dispatch.
+pub fn update_card_points_on_play(player: &mut Player, points: i32) -> Result<(), String> {
+    let next_points = player.card_points.checked_add(points).ok_or("card points overflow")?;
     player.card_points = next_points;
     Ok(())
 }
