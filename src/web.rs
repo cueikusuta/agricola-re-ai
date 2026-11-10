@@ -1295,7 +1295,7 @@ mod tests {
         );
         let replay = Game::replay_with_cards(
             session.game.config.clone(),
-            session.game.card_set.clone(),
+            (*session.game.card_set).clone(),
             &session.game.log.events,
         )
         .unwrap();
@@ -1741,7 +1741,7 @@ mod tests {
         );
         let replay = Game::replay_with_cards(
             restarted.game.config.clone(),
-            restarted.game.card_set.clone(),
+            (*restarted.game.card_set).clone(),
             &restarted.game.log.events,
         )
         .unwrap();

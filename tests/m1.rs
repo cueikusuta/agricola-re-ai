@@ -330,3 +330,572 @@ fn action_log_metadata_and_replay_information() {
     .unwrap();
     assert_eq!(replay.state_hash(), g.state_hash());
 }
+
+/// ===== Phase C / Issue #255 新規テスト =====
+
+#[test]
+fn incremental_vs_full_validation_agree_on_legal_actions() {
+    use agricola_re_ai::model::{Config, Game};
+    use agricola_re_ai::policy::{CardChoiceDetails, DetailPolicy, RandomPolicy, SpacePolicy};
+    use agricola_re_ai::validation::{validate_full, validate_incremental, Verdict};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    for players in [2, 3, 4] {
+        for seed in 0..20 {
+            let mut game = Game::new(Config {
+                players,
+                seed,
+                additional_action_space_enabled: false,
+            });
+            let mut rng = ChaCha8Rng::seed_from_u64(seed ^ 0xDEAD_BEEF);
+            for _ in 0..20 {
+                if game.public.finished {
+                    break;
+                }
+                let id = game.public.active_player;
+                let obs = game.observation(id).unwrap();
+                let legal = game.legal_spaces();
+                if legal.is_empty() {
+                    break;
+                }
+                let space = RandomPolicy.select(&obs, &legal, &mut rng).expect("legal");
+                let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+                let pre = game.clone();
+                game.apply(action).unwrap();
+                let post = game.clone();
+
+                let full = validate_full(&post);
+                let inc = validate_incremental(&post, &pre);
+                assert!(
+                    full.is_ok(),
+                    "full validation failed after legal action: seed={seed} players={players} action={space:?}"
+                );
+                match inc {
+                    Verdict::Pass => {}
+                    Verdict::Unsure => {
+                        assert!(validate_full(&post).is_ok());
+                    }
+                    Verdict::Fail(msg) => {
+                        panic!("incremental rejected legal action: {msg} (seed={seed} players={players} action={space:?})");
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn incremental_validation_rejects_illegal_actions() {
+    use agricola_re_ai::model::{Config, Game};
+    use agricola_re_ai::validation::{validate_incremental, Verdict};
+
+    for players in [2, 3, 4] {
+        let game = Game::new(Config {
+            players,
+            seed: 7,
+            additional_action_space_enabled: false,
+        });
+        let pre = game.clone();
+
+        let mut post = pre.clone();
+        let space = post.legal_spaces()[0];
+        post.public.used.insert(space);
+        post.public.used.insert(space);
+        let verdict = validate_incremental(&post, &pre);
+        assert!(matches!(verdict, Verdict::Fail(_) | Verdict::Unsure));
+
+        let mut post2 = pre.clone();
+        post2.public.round = 99;
+        let verdict2 = validate_incremental(&post2, &pre);
+        assert!(matches!(verdict2, Verdict::Fail(_) | Verdict::Unsure));
+
+        let mut post3 = pre.clone();
+        post3.public.work_quota[0] = 99;
+        let verdict3 = validate_incremental(&post3, &pre);
+        assert!(matches!(verdict3, Verdict::Fail(_) | Verdict::Unsure));
+    }
+}
+
+#[test]
+fn legal_action_state_hash_matches_between_apply_paths() {
+    use agricola_re_ai::model::{Config, Game};
+    use agricola_re_ai::policy::{CardChoiceDetails, DetailPolicy, RandomPolicy, SpacePolicy};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    for players in [2, 3, 4] {
+        for seed in 0..10 {
+            let mut game = Game::new(Config {
+                players,
+                seed,
+                additional_action_space_enabled: false,
+            });
+            let mut rng = ChaCha8Rng::seed_from_u64(seed ^ 0xFEED_FACE);
+            for _ in 0..30 {
+                if game.public.finished {
+                    break;
+                }
+                let id = game.public.active_player;
+                let obs = game.observation(id).unwrap();
+                let legal = game.legal_spaces();
+                if legal.is_empty() {
+                    break;
+                }
+                let space = RandomPolicy.select(&obs, &legal, &mut rng).expect("legal");
+                let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+                let hash_before = game.state_hash();
+                game.apply(action).unwrap();
+                let hash_after = game.state_hash();
+                assert_ne!(hash_before, hash_after, "state must change after action");
+            }
+            game.validate().unwrap();
+        }
+    }
+}
+
+#[test]
+fn illegal_action_leaves_state_unchanged_bytewise() {
+    use agricola_re_ai::engine::{Action, Detail};
+    use agricola_re_ai::model::{Config, Game, Space};
+
+    for players in [2, 3, 4] {
+        let mut game = Game::new(Config {
+            players,
+            seed: 42,
+            additional_action_space_enabled: false,
+        });
+        let snapshot = game.save_json().unwrap();
+        let hash_before = game.state_hash();
+
+        let illegal = Action {
+            space: Space::Farmland,
+            detail: Detail::Plow { cell: 0 },
+        };
+        assert!(game.apply(illegal).is_err());
+
+        let hash_after = game.state_hash();
+        assert_eq!(
+            hash_before, hash_after,
+            "state_hash must not change after rejected action"
+        );
+        assert_eq!(
+            game.save_json().unwrap(),
+            snapshot,
+            "full JSON must be identical"
+        );
+    }
+}
+
+#[test]
+fn search_position_noninterference_with_hidden_cards() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    use agricola_re_ai::mcts::sample_game;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let game = Game::with_cards(
+        Config {
+            seed: 40,
+            ..Config::default()
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+
+    let observed = game.observation(0).unwrap();
+    let mut changed_hidden = game.clone();
+
+    if let Some(idx) = changed_hidden.cards.hands[1].iter().position(|id| {
+        changed_hidden
+            .card_set
+            .definition(id)
+            .is_some_and(|c| c.kind == agricola_re_ai::cards::CardKind::MinorImprovement)
+    }) {
+        let replacement = changed_hidden.cards.undealt[0].clone();
+        let old = std::mem::replace(&mut changed_hidden.cards.hands[1][idx], replacement);
+        changed_hidden.cards.undealt[0] = old;
+        changed_hidden.validate().unwrap();
+    }
+
+    assert_eq!(
+        changed_hidden.observation(0).unwrap(),
+        observed,
+        "observation must not change when hidden opponent hand changes"
+    );
+
+    let mut first_rng = ChaCha8Rng::seed_from_u64(99);
+    let mut second_rng = ChaCha8Rng::seed_from_u64(99);
+    for _ in 0..5 {
+        let first = sample_game(&observed, &mut first_rng).unwrap();
+        let second = sample_game(&changed_hidden.observation(0).unwrap(), &mut second_rng).unwrap();
+        first.validate().unwrap();
+        second.validate().unwrap();
+        assert_eq!(first.public, observed.public);
+        assert_eq!(first.cards.hands[0], observed.hand);
+        assert_eq!(first.cards, second.cards);
+        assert_eq!(first.hidden_round_deck, second.hidden_round_deck);
+    }
+    assert_ne!(game.cards, changed_hidden.cards);
+}
+
+#[test]
+fn fixed_seed_sample_game_reproducibility() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    use agricola_re_ai::mcts::sample_game;
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let game = Game::with_cards(
+        Config {
+            seed: 7,
+            ..Config::default()
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+    let obs = game.observation(0).unwrap();
+
+    let mut rng_a = ChaCha8Rng::seed_from_u64(0x1234_5678);
+    let mut rng_b = ChaCha8Rng::seed_from_u64(0x1234_5678);
+
+    for _ in 0..16 {
+        let a = sample_game(&obs, &mut rng_a).unwrap();
+        let b = sample_game(&obs, &mut rng_b).unwrap();
+        assert_eq!(a.cards.hands, b.cards.hands);
+        assert_eq!(a.cards.undealt, b.cards.undealt);
+        assert_eq!(a.hidden_round_deck, b.hidden_round_deck);
+        assert_eq!(a.public, b.public);
+    }
+}
+
+#[test]
+fn search_clone_allocation_independent_of_registry_and_log_size() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+
+    use agricola_re_ai::model::{Config, Game};
+    use agricola_re_ai::policy::{CardChoiceDetails, DetailPolicy, RandomPolicy, SpacePolicy};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+    use std::sync::Arc;
+
+    // Use a verified card set to ensure validity
+    let card_set = verified_basic_card_set(2).unwrap();
+    let mut game = Game::with_cards(
+        Config {
+            players: 2,
+            seed: 1,
+            additional_action_space_enabled: false,
+        },
+        card_set,
+    )
+    .unwrap();
+
+    let mut rng = ChaCha8Rng::seed_from_u64(1);
+    for _ in 0..20 {
+        if game.public.finished {
+            break;
+        }
+        let id = game.public.active_player;
+        let obs = game.observation(id).unwrap();
+        let legal = game.legal_spaces();
+        if legal.is_empty() {
+            break;
+        }
+        let space = RandomPolicy.select(&obs, &legal, &mut rng).expect("legal");
+        let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+        game.apply(action).unwrap();
+    }
+
+    assert!(game.log.events.len() > 10, "should have accumulated events");
+
+    let probe = game.search_clone();
+    assert_eq!(
+        probe.log.events.len(),
+        0,
+        "search clone must have empty event log"
+    );
+    assert!(!probe.record_events);
+    assert!(Arc::ptr_eq(&probe.card_set, &game.card_set));
+    assert_eq!(probe.state_hash(), game.state_hash());
+    probe.validate().unwrap();
+}
+
+#[test]
+fn v5_save_compatibility_load_and_continue() {
+    use agricola_re_ai::model::{Config, Game};
+    use agricola_re_ai::policy::{CardChoiceDetails, DetailPolicy, RandomPolicy, SpacePolicy};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    for players in [2, 3, 4] {
+        for seed in [0, 1, 2, 5, 10] {
+            let mut original = Game::new(Config {
+                players,
+                seed,
+                additional_action_space_enabled: false,
+            });
+            let mut rng = ChaCha8Rng::seed_from_u64(seed ^ 0xBEEF);
+            for _ in 0..5 {
+                let id = original.public.active_player;
+                let obs = original.observation(id).unwrap();
+                let legal = original.legal_spaces();
+                if legal.is_empty() {
+                    break;
+                }
+                let space = RandomPolicy.select(&obs, &legal, &mut rng).expect("legal");
+                let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+                original.apply(action).unwrap();
+            }
+            let mid_hash = original.state_hash();
+            let json = original.save_json().unwrap();
+
+            let mut loaded = Game::load_json(&json).unwrap();
+            assert_eq!(
+                loaded.state_hash(),
+                mid_hash,
+                "loaded state_hash must match"
+            );
+            loaded.validate().unwrap();
+
+            let mut rng1 = ChaCha8Rng::seed_from_u64(0xDEAD);
+            let mut _rng2 = ChaCha8Rng::seed_from_u64(0xDEAD);
+            for _ in 0..10 {
+                if original.public.finished || loaded.public.finished {
+                    break;
+                }
+                let id1 = original.public.active_player;
+                let id2 = loaded.public.active_player;
+                assert_eq!(id1, id2);
+                let obs1 = original.observation(id1).unwrap();
+                let obs2 = loaded.observation(id2).unwrap();
+                assert_eq!(obs1, obs2);
+                let legal1 = original.legal_spaces();
+                let legal2 = loaded.legal_spaces();
+                assert_eq!(legal1, legal2);
+                let space = RandomPolicy
+                    .select(&obs1, &legal1, &mut rng1)
+                    .expect("legal");
+                let action1 = CardChoiceDetails.produce(&obs1, space).expect("detail");
+                let action2 = CardChoiceDetails.produce(&obs2, space).expect("detail");
+                original.apply(action1).unwrap();
+                loaded.apply(action2).unwrap();
+                assert_eq!(original.state_hash(), loaded.state_hash());
+            }
+        }
+    }
+}
+
+#[test]
+fn sample_game_rejects_invalid_round() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    use agricola_re_ai::mcts::sample_game;
+    use agricola_re_ai::model::{Config, Game};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let game = Game::with_cards(
+        Config {
+            seed: 7,
+            ..Config::default()
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+    let mut obs = game.observation(0).unwrap();
+
+    // Tamper: set round to 99 (invalid)
+    obs.public.round = 99;
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    assert!(sample_game(&obs, &mut rng).is_none());
+}
+
+#[test]
+fn sample_game_rejects_missing_revealed() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    use agricola_re_ai::mcts::sample_game;
+    use agricola_re_ai::model::{Config, Game};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let game = Game::with_cards(
+        Config {
+            seed: 7,
+            ..Config::default()
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+    let mut obs = game.observation(0).unwrap();
+
+    // Tamper: remove one revealed card but keep round the same
+    obs.public.revealed.pop();
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    assert!(sample_game(&obs, &mut rng).is_none());
+}
+
+#[test]
+fn sample_game_rejects_tampered_market() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    use agricola_re_ai::mcts::sample_game;
+    use agricola_re_ai::model::{Config, Game};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let game = Game::with_cards(
+        Config {
+            seed: 7,
+            ..Config::default()
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+    let mut obs = game.observation(0).unwrap();
+
+    // Tamper: remove one major improvement from market
+    assert!(!obs.public.improvement_market.is_empty());
+    obs.public.improvement_market.pop();
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    assert!(sample_game(&obs, &mut rng).is_none());
+}
+
+#[test]
+fn sample_game_accepts_valid_observation() {
+    use agricola_re_ai::cards::verified_basic_card_set;
+    use agricola_re_ai::mcts::sample_game;
+    use agricola_re_ai::model::{Config, Game};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    let game = Game::with_cards(
+        Config {
+            seed: 7,
+            ..Config::default()
+        },
+        verified_basic_card_set(2).unwrap(),
+    )
+    .unwrap();
+    let obs = game.observation(0).unwrap();
+
+    let mut rng = ChaCha8Rng::seed_from_u64(42);
+    let sampled = sample_game(&obs, &mut rng).expect("valid observation must produce Some(Game)");
+    sampled.validate().unwrap();
+}
+
+#[test]
+fn illegal_free_action_rejected_atomically() {
+    use agricola_re_ai::engine::FreeAction;
+    use agricola_re_ai::model::{Game, Good};
+
+    let mut game = Game::new(agricola_re_ai::model::Config {
+        players: 2,
+        seed: 7,
+        additional_action_space_enabled: false,
+    });
+    let snapshot = game.save_json().unwrap();
+    let hash_before = game.state_hash();
+
+    // Illegal free action: DiscardGood with quantity player doesn't have
+    let illegal = FreeAction::DiscardGood {
+        good: Good::Food,
+        quantity: 999,
+    };
+    let result = game.apply_free(0, illegal);
+    assert!(result.is_err(), "illegal free action must be rejected");
+
+    // State must be unchanged (atomic)
+    let hash_after = game.state_hash();
+    assert_eq!(
+        hash_before, hash_after,
+        "state_hash must not change after rejected action"
+    );
+    assert_eq!(
+        game.save_json().unwrap(),
+        snapshot,
+        "full JSON must be identical"
+    );
+
+    // Legal free action (conversion) should be accepted and change state
+    let mut game2 = Game::new(Config {
+        players: 2,
+        seed: 7,
+        additional_action_space_enabled: false,
+    });
+    // Give player 1 grain to convert
+    game2.public.players[0].supply.grain = 5;
+    let legal = FreeAction::ConvertCrop {
+        good: Good::Grain,
+        quantity: 2,
+    };
+    assert!(game2.apply_free(0, legal).is_ok());
+    assert_ne!(
+        game2.state_hash(),
+        hash_before,
+        "legal free action must change state"
+    );
+}
+
+#[test]
+fn legacy_v5_fixture_loads_and_replays() {
+    use agricola_re_ai::model::Game;
+    use agricola_re_ai::policy::{CardChoiceDetails, DetailPolicy, RandomPolicy, SpacePolicy};
+    use rand::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
+
+    // Load cardless fixture
+    let cardless_json = include_str!("fixtures/v5/cardless_2p_seed7_r3.json");
+    let mut cardless_game = Game::load_json(cardless_json).unwrap();
+    cardless_game.validate().unwrap();
+    let cardless_hash = cardless_game.state_hash();
+
+    // Load cards fixture
+    let cards_json = include_str!("fixtures/v5/cards_2p_seed7_r3.json");
+    let mut cards_game = Game::load_json(cards_json).unwrap();
+    cards_game.validate().unwrap();
+    let cards_hash = cards_game.state_hash();
+
+    // Continue both games for a few moves to verify they can be replayed
+    let mut rng = ChaCha8Rng::seed_from_u64(0xDEAD);
+    for _ in 0..5 {
+        if cardless_game.public.finished {
+            break;
+        }
+        let id = cardless_game.public.active_player;
+        let obs = cardless_game.observation(id).unwrap();
+        let legal = cardless_game.legal_spaces();
+        if legal.is_empty() {
+            break;
+        }
+        let space = RandomPolicy.select(&obs, &legal, &mut rng).expect("legal");
+        let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+        cardless_game.apply(action).unwrap();
+    }
+    assert_ne!(cardless_game.state_hash(), cardless_hash); // hash changes after moves
+
+    let mut rng = ChaCha8Rng::seed_from_u64(0xDEAD);
+    for _ in 0..5 {
+        if cards_game.public.finished {
+            break;
+        }
+        let id = cards_game.public.active_player;
+        let obs = cards_game.observation(id).unwrap();
+        let legal = cards_game.legal_spaces();
+        if legal.is_empty() {
+            break;
+        }
+        let space = RandomPolicy.select(&obs, &legal, &mut rng).expect("legal");
+        let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+        cards_game.apply(action).unwrap();
+    }
+    assert_ne!(cards_game.state_hash(), cards_hash); // hash changes after moves
+
+    // Save and reload to verify round-trip
+    let cardless_reloaded = Game::load_json(&cardless_game.save_json().unwrap()).unwrap();
+    assert_eq!(cardless_reloaded.state_hash(), cardless_game.state_hash());
+
+    let cards_reloaded = Game::load_json(&cards_game.save_json().unwrap()).unwrap();
+    assert_eq!(cards_reloaded.state_hash(), cards_game.state_hash());
+}

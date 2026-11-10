@@ -19,12 +19,16 @@
 //! simulation samples hidden information from [`Observation`] only, through the
 //! same `sample_game` helper the baseline uses.
 use crate::evaluation::{action_value_with_details, evaluate_player, WeightedEvaluationPolicy};
-use crate::mcts::{rollout, sample_game, MctsOutcome, SearchLimit, SearchMode};
+use crate::mcts::{
+    rollout, sample_game_with_set, search_card_set, CardLookup, MctsOutcome, SearchLimit,
+    SearchMode,
+};
 use crate::model::{Game, Observation, Space};
 use crate::policy::{weight, DetailPolicy, SimpleDetails, SpacePolicy};
 use crate::score::standings_with_cards;
 use rand_chacha::ChaCha8Rng;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 /// How the value of a depth-limited leaf is estimated.
@@ -297,6 +301,7 @@ impl PuctPolicy {
             timed_out,
             elapsed_ms: elapsed.as_millis().min(u128::from(u64::MAX)) as u64,
             overshoot_ms: budget
+                .filter(|b| !b.is_zero())
                 .map(|budget| elapsed.saturating_sub(budget).as_millis() as u64)
                 .unwrap_or(0),
             mode,
@@ -349,6 +354,19 @@ impl PuctPolicy {
         let mut nodes = vec![Node::new(players, 1.0)];
         let mut simulations_completed = 0usize;
         let mut timed_out = false;
+
+        // Hoist CardSet creation and validation outside the simulation loop (P1-B).
+        let set = match search_card_set(obs) {
+            Some(set) => Arc::clone(&set),
+            None => {
+                let space = fallback(obs, legal, rng)
+                    .filter(|space| legal.contains(space))
+                    .or_else(|| legal.first().copied())?;
+                return Some((space, outcome(0, true, false, started.elapsed())));
+            }
+        };
+        let lookup = CardLookup::from_card_set(&set);
+
         for _ in 0..max_simulations {
             if let Some(limit) = deadline {
                 if Instant::now() >= limit {
@@ -356,7 +374,7 @@ impl PuctPolicy {
                     break;
                 }
             }
-            let Some(mut game) = sample_game(obs, rng) else {
+            let Some(mut game) = sample_game_with_set(obs, &set, lookup.as_ref(), rng) else {
                 continue;
             };
             let mut path = vec![0usize];

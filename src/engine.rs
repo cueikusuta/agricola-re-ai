@@ -503,7 +503,7 @@ impl Game {
     /// `apply`. Human input and AI selections share this validator; it never
     /// modifies `self` and rejects illegal details before any state change.
     pub fn validate_action(&self, action: &Action) -> Result<()> {
-        let mut probe = self.clone();
+        let mut probe = self.search_clone();
         probe.apply_with_plans(action.clone(), None, None, &SimpleHarvestDetails)
     }
 
@@ -772,7 +772,7 @@ impl Game {
             None
         };
         next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
-        next.validate()?;
+        crate::validation::validate_incremental_or_full(&next, self)?;
         if record {
             let after = next.state_hash();
             next.log.events.push(Event {
@@ -832,7 +832,7 @@ impl Game {
     /// cannot disagree with the committed rule engine. No events or state are
     /// added to `self` (only to the discarded clone).
     pub fn validate_free(&self, player: usize, free: &FreeAction) -> Result<()> {
-        let mut probe = self.clone();
+        let mut probe = self.search_clone();
         probe.apply_free(player, free.clone())
     }
 
@@ -848,7 +848,7 @@ impl Game {
             String::new()
         };
         next.execute_free(player, &free)?;
-        next.validate()?;
+        crate::validation::validate_free_action_or_full(&next, self, player)?;
         if record {
             let after = next.state_hash();
             next.log.events.push(Event {
@@ -953,19 +953,44 @@ impl Game {
         }
         Ok(())
     }
+}
+
+/// Compute the expected next active player given the current state.
+/// This is the single implementation shared by `next_worker_or_round`
+/// and the validation layer (`validate_incremental`/`validate_free_action`).
+/// Returns the index of the next player who has not placed all their workers,
+/// or `n` (player count) if all players have placed their quota (round should advance).
+pub fn expected_active_player(
+    start_player: usize,
+    workers_placed: &[u8],
+    work_quota: &[u8],
+) -> usize {
+    let n = workers_placed.len();
+    let mut next = start_player;
+    for _ in 0..n {
+        next = (next + 1) % n;
+        if workers_placed[next] < work_quota[next] {
+            return next;
+        }
+    }
+    n // all players have placed their quota
+}
+
+impl Game {
     fn next_worker_or_round(
         &mut self,
         feeding: Option<&[FeedingPlan]>,
         breeding: Option<&[BreedingPlan]>,
     ) -> Result<()> {
         let n = self.public.players.len();
-        let mut next = self.public.active_player;
-        for _ in 0..n {
-            next = (next + 1) % n;
-            if self.public.workers_placed[next] < self.public.work_quota[next] {
-                self.public.active_player = next;
-                return Ok(());
-            }
+        let next = expected_active_player(
+            self.public.active_player,
+            &self.public.workers_placed,
+            &self.public.work_quota,
+        );
+        if next < n {
+            self.public.active_player = next;
+            return Ok(());
         }
         if HARVEST_ROUNDS.contains(&self.public.round) {
             self.harvest(

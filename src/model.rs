@@ -2,9 +2,28 @@
 use crate::cards::{CardDefinition, CardSet, CardState};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
+
+/// Helper to serialize `Arc<T>` as `T` and deserialize back to `Arc<T>`.
+/// This allows sharing card definitions in memory while keeping save format identical.
+fn serialize_arc<T, S>(arc: &Arc<T>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    T: Serialize,
+    S: Serializer,
+{
+    T::serialize(arc, serializer)
+}
+
+fn deserialize_arc<'de, T, D>(deserializer: D) -> Result<Arc<T>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    T::deserialize(deserializer).map(Arc::new)
+}
 
 pub const FARM_CELLS: usize = 15;
 pub const HARVEST_ROUNDS: [u8; 6] = [4, 7, 9, 11, 13, 14];
@@ -532,8 +551,12 @@ pub struct Game {
     pub hidden_round_deck: Vec<RoundCard>,
     pub rng: RngStreams,
     pub delayed_well: BTreeMap<u8, Vec<usize>>,
-    #[serde(default)]
-    pub card_set: CardSet,
+    #[serde(
+        default,
+        serialize_with = "serialize_arc",
+        deserialize_with = "deserialize_arc"
+    )]
+    pub card_set: Arc<CardSet>,
     #[serde(default)]
     pub cards: CardState,
     pub log: GameLog,
@@ -571,8 +594,12 @@ pub struct GameLog {
     pub initial_public_state: Option<PublicState>,
     pub round_seed: u64,
     pub action_seed: u64,
-    #[serde(default)]
-    pub card_set: CardSet,
+    #[serde(
+        default,
+        serialize_with = "serialize_arc",
+        deserialize_with = "deserialize_arc"
+    )]
+    pub card_set: Arc<CardSet>,
     /// Explicit starting hands for a draft-seeded game (#104). `None` means the
     /// engine dealt from `config.seed`. Stored so save/load and replay rebuild
     /// the exact initial card state instead of re-dealing randomly.
@@ -600,7 +627,7 @@ impl Game {
         }
         card_set.validate(config.players)?;
         let cards = CardState::deal(&card_set, config.seed, config.players);
-        Self::from_card_state(config, card_set, cards, None, None)
+        Self::from_card_state(config, Arc::new(card_set), cards, None, None)
     }
     /// Start a game from explicit, already-drafted hands instead of the random
     /// [`CardState::deal`]. This is the M11 draft-to-game bridge (#104): only
@@ -620,7 +647,7 @@ impl Game {
             return Err("explicit hands must match the player count".into());
         }
         let cards = CardState::from_hands(&card_set, &hands)?;
-        Self::from_card_state(config, card_set, cards, Some(hands), None)
+        Self::from_card_state(config, Arc::new(card_set), cards, Some(hands), None)
     }
     /// Reuse a start player selected and announced *before* drafting. The
     /// round deck keeps its own game seed and independent shuffle stream.
@@ -638,12 +665,18 @@ impl Game {
             return Err("explicit hands must match the player count".into());
         }
         let cards = CardState::from_hands(&card_set, &hands)?;
-        Self::from_card_state(config, card_set, cards, Some(hands), Some(start_player))
+        Self::from_card_state(
+            config,
+            Arc::new(card_set),
+            cards,
+            Some(hands),
+            Some(start_player),
+        )
     }
 
     fn from_card_state(
         config: Config,
-        card_set: CardSet,
+        card_set: Arc<CardSet>,
         cards: CardState,
         initial_hands: Option<Vec<Vec<String>>>,
         initial_start_player_override: Option<usize>,
@@ -741,11 +774,85 @@ impl Game {
             &self.hidden_round_deck,
             &self.rng,
             &self.delayed_well,
-            &self.card_set,
+            &*self.card_set,
             &self.cards,
         ))
         .expect("state serialization");
         format!("{:x}", Sha256::digest(&data))
+    }
+
+    /// Create a lightweight clone for search (MCTS/PUCT).
+    /// This avoids cloning the event log and shares the card definitions via Arc.
+    /// The returned game has `record_events = false` and an empty event log.
+    pub fn search_clone(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            public: self.public.clone(),
+            hidden_round_deck: self.hidden_round_deck.clone(),
+            rng: self.rng.clone(),
+            delayed_well: self.delayed_well.clone(),
+            card_set: self.card_set.clone(),
+            cards: self.cards.clone(),
+            log: GameLog {
+                log_version: self.log.log_version,
+                engine_version: self.log.engine_version.clone(),
+                rules_version: self.log.rules_version.clone(),
+                config: self.log.config.clone(),
+                start_player: self.log.start_player,
+                initial_start_player_override: self.log.initial_start_player_override,
+                initial_state_hash: self.log.initial_state_hash.clone(),
+                initial_public_state: self.log.initial_public_state.clone(),
+                round_seed: self.log.round_seed,
+                action_seed: self.log.action_seed,
+                card_set: self.log.card_set.clone(), // Arc shared
+                initial_hands: self.log.initial_hands.clone(),
+                events: Vec::new(),
+            },
+            record_events: false,
+        }
+    }
+    /// Create a search-only position from pre-sampled components.
+    /// Skips: start player draw, round deck shuffle, Player::new × N,
+    /// start_round(), state_hash (full JSON+SHA256), log CardSet duplication.
+    /// The caller MUST ensure the inputs form a valid game state;
+    /// this constructor does NOT run validate().
+    pub fn search_from_parts(
+        config: Config,
+        public: PublicState,
+        hidden_round_deck: Vec<RoundCard>,
+        rng: RngStreams,
+        delayed_well: BTreeMap<u8, Vec<usize>>,
+        card_set: Arc<CardSet>,
+        cards: CardState,
+    ) -> Self {
+        let start_player = public.start_player;
+        let round_seed = config.seed ^ 0x38DB_3BE3_DF45_3FAF;
+        let action_seed = config.seed ^ 0x6A09_E667_F3BC_C909;
+        Self {
+            config: config.clone(),
+            public,
+            hidden_round_deck,
+            rng,
+            delayed_well,
+            card_set: card_set.clone(),
+            cards,
+            log: GameLog {
+                log_version: LOG_VERSION,
+                engine_version: ENGINE_VERSION.into(),
+                rules_version: RULES_VERSION.into(),
+                config,
+                start_player,
+                initial_start_player_override: None,
+                initial_state_hash: String::new(),
+                initial_public_state: None,
+                round_seed,
+                action_seed,
+                card_set: card_set.clone(), // Arc shared
+                initial_hands: None,
+                events: Vec::new(),
+            },
+            record_events: false,
+        }
     }
     pub fn save_json(&self) -> Result<String, String> {
         serde_json::to_string_pretty(self).map_err(|e| e.to_string())
@@ -757,7 +864,7 @@ impl Game {
             || result.log.rules_version != RULES_VERSION
             || result.log.engine_version != ENGINE_VERSION
             || result.log.config != result.config
-            || result.log.card_set != result.card_set
+            || *result.log.card_set != *result.card_set
         {
             return Err("saved game metadata/version mismatch".into());
         }
@@ -767,14 +874,16 @@ impl Game {
         ) {
             (Some(hands), Some(starter)) => Game::with_cards_and_hands_with_start_player(
                 result.config.clone(),
-                result.card_set.clone(),
+                (*result.card_set).clone(),
                 hands,
                 starter,
             )?,
-            (Some(hands), None) => {
-                Game::with_cards_and_hands(result.config.clone(), result.card_set.clone(), hands)?
-            }
-            (None, None) => Game::with_cards(result.config.clone(), result.card_set.clone())?,
+            (Some(hands), None) => Game::with_cards_and_hands(
+                result.config.clone(),
+                (*result.card_set).clone(),
+                hands,
+            )?,
+            (None, None) => Game::with_cards(result.config.clone(), (*result.card_set).clone())?,
             (None, Some(_)) => return Err("start player override requires draft hands".into()),
         };
         if result.log.start_player != initial.public.start_player
@@ -796,7 +905,7 @@ impl Game {
         // last event hash; otherwise earlier tampering could go unnoticed.
         let replayed = Game::replay_with_setup_and_start_player(
             result.config.clone(),
-            result.card_set.clone(),
+            (*result.card_set).clone(),
             result.log.initial_hands.clone(),
             result.log.initial_start_player_override,
             &result.log.events,
@@ -897,118 +1006,7 @@ impl Game {
             return Err("major improvement duplicated or missing".into());
         }
         for (i, player) in p.players.iter().enumerate() {
-            if player.id != i || player.farm.len() != FARM_CELLS {
-                return Err("farm shape/player mismatch".into());
-            }
-            if player.family < 2 || player.family > 5 || player.newborns > player.family {
-                return Err("family limit".into());
-            }
-            if player.occupied_stables() > 4 || player.fences.len() > 15 {
-                return Err("stable/fence limit".into());
-            }
-            if p.work_quota[i] > player.family || p.workers_placed[i] > p.work_quota[i] {
-                return Err("invalid worker count".into());
-            }
-            let mut covered = BTreeSet::new();
-            let mut known_ids = BTreeSet::new();
-            let mut required_fences = BTreeSet::new();
-            for pasture in &player.pastures {
-                if (pasture.quantity == 0) != pasture.animal.is_none() {
-                    return Err("pasture species and quantity inconsistent".into());
-                }
-                if pasture.cells.is_empty() || pasture.cells.iter().any(|&i| i >= FARM_CELLS) {
-                    return Err("pasture cells outside farm".into());
-                }
-                if !known_ids.insert(pasture.id) {
-                    return Err("duplicate pasture ID".into());
-                }
-                let region: BTreeSet<_> = pasture.cells.iter().copied().collect();
-                let mut reached = BTreeSet::new();
-                let mut pending = vec![pasture.cells[0]];
-                while let Some(i) = pending.pop() {
-                    if !reached.insert(i) {
-                        continue;
-                    }
-                    pending.extend(neighbors(i).into_iter().filter(|j| region.contains(j)));
-                }
-                if reached.len() != region.len() {
-                    return Err("pasture is not orthogonally connected".into());
-                }
-                required_fences.extend(pasture_border(&pasture.cells));
-                if pasture.quantity > player.pasture_capacity(pasture) {
-                    return Err("over capacity".into());
-                }
-                if pasture.quantity > 0 && pasture.animal.is_none() {
-                    return Err("missing pasture species".into());
-                }
-                for &cell in &pasture.cells {
-                    if cell >= FARM_CELLS
-                        || !covered.insert(cell)
-                        || player.farm[cell].tile != (Tile::Pasture { id: pasture.id })
-                    {
-                        return Err("pasture cell invalid".into());
-                    }
-                }
-            }
-            // All rooms and all fields must form one orthogonally connected
-            // group; a disconnected serialized farm is not a legal state.
-            for category in [0u8, 1u8] {
-                let tiles = player
-                    .farm
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, cell)| match (category, cell.tile) {
-                        (0, Tile::Room) | (1, Tile::Field { .. }) => Some(index),
-                        _ => None,
-                    })
-                    .collect::<BTreeSet<_>>();
-                if !tiles.is_empty() {
-                    let mut explored = BTreeSet::new();
-                    let mut stack = vec![*tiles.iter().next().expect("nonempty tiles")];
-                    while let Some(index) = stack.pop() {
-                        if explored.insert(index) {
-                            stack.extend(
-                                neighbors(index)
-                                    .into_iter()
-                                    .filter(|neighbor| tiles.contains(neighbor)),
-                            );
-                        }
-                    }
-                    if explored != tiles {
-                        return Err("rooms or fields are not connected".into());
-                    }
-                }
-            }
-            if player.fences != required_fences {
-                return Err("pasture boundaries and placed fences disagree".into());
-            }
-            for (cell_index, cell) in player.farm.iter().enumerate() {
-                if let Tile::Field { crop, remaining } = cell.tile {
-                    match crop {
-                        None if remaining != 0 => {
-                            return Err("empty field carries crops".into());
-                        }
-                        Some(Crop::Grain) if remaining == 0 || remaining > 3 => {
-                            return Err("invalid grain stack".into());
-                        }
-                        Some(Crop::Vegetable) if remaining == 0 || remaining > 2 => {
-                            return Err("invalid vegetable stack".into());
-                        }
-                        _ => (),
-                    }
-                }
-                if matches!(cell.tile, Tile::Pasture { .. }) && !covered.contains(&cell_index) {
-                    return Err("pasture tile orphan".into());
-                }
-                if cell.stable && !matches!(cell.tile, Tile::Empty | Tile::Pasture { .. }) {
-                    return Err("stable placed on room/field".into());
-                }
-                if cell.stable_animal.is_some()
-                    && (!cell.stable || !matches!(cell.tile, Tile::Empty))
-                {
-                    return Err("invalid unfenced stable animal".into());
-                }
-            }
+            validate_player_state(&p.work_quota, &p.workers_placed, i, player)?;
         }
         if !self.config.additional_action_space_enabled
             && p.used.iter().any(|s| s.additional_for(self.config.players))
@@ -1062,6 +1060,126 @@ impl Game {
         Ok(())
     }
 }
+
+/// Lightweight public-state structure validation for `sample_game` and
+/// other direct-construction paths. It checks only the public structural
+/// invariants that can be verified without the private `card_set`, `cards`,
+/// `hidden_round_deck`, or `rng`. This is a subset of `Game::validate`
+/// designed to catch tampered `Observation` inputs fast.
+///
+/// Checks:
+/// - `round` in 1..=14, `revealed.len() == round`
+/// - `active_player < players`, `start_player < players`
+/// - `players.len() == players`, `workers_placed.len() == players`, `work_quota.len() == players`
+/// - Major improvements: market + all player tables multiset equals `Improvement::ALL`
+/// - `used` spaces subset of `regular_for(players) ∪ revealed ∪ extra_for(players)` (+ Lessons/ExtraLessons if cards enabled)
+/// - At most one mutually-exclusive additional space used
+/// - `additional_action_space_enabled == additional`
+/// - Revealed cards are in stage order (each stage count ≤ `RoundCard::ALL` for that stage)
+pub fn validate_search_public(
+    public: &PublicState,
+    players: usize,
+    additional: bool,
+    cards_enabled: bool,
+) -> Result<(), String> {
+    if !(2..=4).contains(&players) || public.players.len() != players {
+        return Err("player count mismatch".into());
+    }
+    if public.round < 1 || public.round > 14 {
+        return Err("invalid round".into());
+    }
+    if public.revealed.len() != public.round as usize {
+        return Err("round/revealed count mismatch".into());
+    }
+    if public.active_player >= players || public.start_player >= players {
+        return Err("invalid active/start player".into());
+    }
+    if public.work_quota.len() != players || public.workers_placed.len() != players {
+        return Err("worker array mismatch".into());
+    }
+    if public.additional_action_space_enabled != additional {
+        return Err("additional_action_space_enabled mismatch".into());
+    }
+
+    // Major improvements: market + all player tables multiset equals Improvement::ALL
+    let cards = public
+        .improvement_market
+        .iter()
+        .copied()
+        .chain(
+            public
+                .players
+                .iter()
+                .flat_map(|player| player.improvements.iter().copied()),
+        )
+        .collect::<Vec<_>>();
+    if cards.len() != Improvement::ALL.len()
+        || cards.iter().copied().collect::<BTreeSet<_>>() != Improvement::ALL.into_iter().collect()
+    {
+        return Err("major improvement duplicated or missing".into());
+    }
+
+    // Used spaces must be from the available set
+    let mut available: BTreeSet<_> = Space::regular_for(players).into_iter().collect();
+    if cards_enabled {
+        available.insert(Space::Lessons);
+        if players >= 3 {
+            available.insert(Space::ExtraLessons);
+        }
+    }
+    available.extend(public.revealed.iter().copied().map(Space::from));
+    if additional {
+        available.extend(Space::extra_for(players));
+    }
+    if !public.used.is_subset(&available) {
+        return Err("a non-revealed action space was used".into());
+    }
+    // Mutually-exclusive additional spaces: at most one
+    if public
+        .used
+        .iter()
+        .filter(|s| s.additional_for(players))
+        .count()
+        > 1
+    {
+        return Err("multiple mutually-exclusive additional spaces used".into());
+    }
+
+    // Revealed cards stage order: each stage count ≤ RoundCard::ALL for that stage
+    for stage in 1..=6 {
+        let revealed_in_stage = public
+            .revealed
+            .iter()
+            .filter(|c| c.stage() == stage)
+            .count();
+        let all_in_stage = RoundCard::ALL.iter().filter(|c| c.stage() == stage).count();
+        if revealed_in_stage > all_in_stage {
+            return Err(format!("too many revealed cards for stage {stage}"));
+        }
+    }
+
+    // Player farm invariants (shared with full validate)
+    for (i, player) in public.players.iter().enumerate() {
+        validate_player_state(&public.work_quota, &public.workers_placed, i, player)?;
+    }
+
+    // Finished game checks
+    if public.finished && (public.round != 14 || public.workers_placed != public.work_quota) {
+        return Err("game ended before all workers were placed".into());
+    }
+    if public.used.len()
+        != public
+            .workers_placed
+            .iter()
+            .map(|&n| usize::from(n))
+            .sum::<usize>()
+    {
+        return Err("worker placements do not match used spaces".into());
+    }
+
+    Ok(())
+}
+
 pub fn round_for_space(s: Space) -> RoundCard {
     match s {
         Space::SheepMarket => RoundCard::SheepMarket,
@@ -1069,6 +1187,128 @@ pub fn round_for_space(s: Space) -> RoundCard {
         Space::CattleMarket => RoundCard::CattleMarket,
         _ => panic!("not an animal accumulation round space"),
     }
+}
+
+/// Per-player farm/animal/fence invariants shared by `Game::validate` and the
+/// validation layers (`crate::validation`). Keeping one implementation
+/// prevents the full and incremental validators from drifting apart.
+pub fn validate_player_state(
+    work_quota: &[u8],
+    workers_placed: &[u8],
+    index: usize,
+    player: &Player,
+) -> Result<(), String> {
+    if player.id != index || player.farm.len() != FARM_CELLS {
+        return Err("farm shape/player mismatch".into());
+    }
+    if player.family < 2 || player.family > 5 || player.newborns > player.family {
+        return Err("family limit".into());
+    }
+    if player.occupied_stables() > 4 || player.fences.len() > 15 {
+        return Err("stable/fence limit".into());
+    }
+    if work_quota[index] > player.family || workers_placed[index] > work_quota[index] {
+        return Err("invalid worker count".into());
+    }
+    let mut covered = BTreeSet::new();
+    let mut known_ids = BTreeSet::new();
+    let mut required_fences = BTreeSet::new();
+    for pasture in &player.pastures {
+        if (pasture.quantity == 0) != pasture.animal.is_none() {
+            return Err("pasture species and quantity inconsistent".into());
+        }
+        if pasture.cells.is_empty() || pasture.cells.iter().any(|&i| i >= FARM_CELLS) {
+            return Err("pasture cells outside farm".into());
+        }
+        if !known_ids.insert(pasture.id) {
+            return Err("duplicate pasture ID".into());
+        }
+        let region: BTreeSet<_> = pasture.cells.iter().copied().collect();
+        let mut reached = BTreeSet::new();
+        let mut pending = vec![pasture.cells[0]];
+        while let Some(i) = pending.pop() {
+            if !reached.insert(i) {
+                continue;
+            }
+            pending.extend(neighbors(i).into_iter().filter(|j| region.contains(j)));
+        }
+        if reached.len() != region.len() {
+            return Err("pasture is not orthogonally connected".into());
+        }
+        required_fences.extend(pasture_border(&pasture.cells));
+        if pasture.quantity > player.pasture_capacity(pasture) {
+            return Err("over capacity".into());
+        }
+        if pasture.quantity > 0 && pasture.animal.is_none() {
+            return Err("missing pasture species".into());
+        }
+        for &cell in &pasture.cells {
+            if cell >= FARM_CELLS
+                || !covered.insert(cell)
+                || player.farm[cell].tile != (Tile::Pasture { id: pasture.id })
+            {
+                return Err("pasture cell invalid".into());
+            }
+        }
+    }
+    // All rooms and all fields must form one orthogonally connected
+    // group; a disconnected serialized farm is not a legal state.
+    for category in [0u8, 1u8] {
+        let tiles = player
+            .farm
+            .iter()
+            .enumerate()
+            .filter_map(|(cell_index, cell)| match (category, cell.tile) {
+                (0, Tile::Room) | (1, Tile::Field { .. }) => Some(cell_index),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        if !tiles.is_empty() {
+            let mut explored = BTreeSet::new();
+            let mut stack = vec![*tiles.iter().next().expect("nonempty tiles")];
+            while let Some(index) = stack.pop() {
+                if explored.insert(index) {
+                    stack.extend(
+                        neighbors(index)
+                            .into_iter()
+                            .filter(|neighbor| tiles.contains(neighbor)),
+                    );
+                }
+            }
+            if explored != tiles {
+                return Err("rooms or fields are not connected".into());
+            }
+        }
+    }
+    if player.fences != required_fences {
+        return Err("pasture boundaries and placed fences disagree".into());
+    }
+    for (cell_index, cell) in player.farm.iter().enumerate() {
+        if let Tile::Field { crop, remaining } = cell.tile {
+            match crop {
+                None if remaining != 0 => {
+                    return Err("empty field carries crops".into());
+                }
+                Some(Crop::Grain) if remaining == 0 || remaining > 3 => {
+                    return Err("invalid grain stack".into());
+                }
+                Some(Crop::Vegetable) if remaining == 0 || remaining > 2 => {
+                    return Err("invalid vegetable stack".into());
+                }
+                _ => (),
+            }
+        }
+        if matches!(cell.tile, Tile::Pasture { .. }) && !covered.contains(&cell_index) {
+            return Err("pasture tile orphan".into());
+        }
+        if cell.stable && !matches!(cell.tile, Tile::Empty | Tile::Pasture { .. }) {
+            return Err("stable placed on room/field".into());
+        }
+        if cell.stable_animal.is_some() && (!cell.stable || !matches!(cell.tile, Tile::Empty)) {
+            return Err("invalid unfenced stable animal".into());
+        }
+    }
+    Ok(())
 }
 
 /// orthogonal neighbors in 5 columns x 3 rows, 0-indexed.
@@ -1092,7 +1332,7 @@ pub fn neighbors(cell: usize) -> Vec<usize> {
 }
 
 /// Set of existing fence segments around a group of farm cells.
-fn pasture_border(cells: &[usize]) -> BTreeSet<(u8, u8)> {
+pub fn pasture_border(cells: &[usize]) -> BTreeSet<(u8, u8)> {
     let mut result = BTreeSet::new();
     for &cell in cells {
         if cell >= FARM_CELLS {
