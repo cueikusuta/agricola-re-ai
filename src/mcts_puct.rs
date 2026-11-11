@@ -63,14 +63,22 @@ pub struct PuctConfig {
 
 impl Default for PuctConfig {
     fn default() -> Self {
-        // Defaults match the configuration measured in
-        // docs/m8-3-mcts-improvement-2026-11-06.md: PUCT priors + terminal
-        // rollouts, which beat the evaluation policy on the development seeds.
+        // Since #263 the shipped default is the adopted configuration
+        // `puct-s32-d2-c1.5-pt6-vt8-terminal-rl0-fp0` from the pre-registered
+        // formal evaluation Run 42654611147 (#219): four-player cardless,
+        // 32 simulations per decision, unknown seeds 985000-985249,
+        // 1,000 games per arm, +8.05 pp first-credit, 95% CI [+5.2, +11.0].
+        // That comparison used a fixed simulation count and says nothing about
+        // equal wall-clock time; carded, draft, and two-player strength are
+        // not established here. The historical configuration
+        // `puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0` (docs/m8-3-
+        // mcts-improvement-2026-11-06.md) stays reproducible by passing
+        // `--puct-prior-temp 3` explicitly.
         Self {
             simulations: 32,
             tree_depth: 2,
             c_puct: 1.5,
-            prior_temperature: 3.0,
+            prior_temperature: 6.0,
             value_temperature: 8.0,
             leaf_mode: LeafMode::Terminal,
             root_candidate_limit: 0,
@@ -539,6 +547,23 @@ mod tests {
             seed: 4242,
             additional_action_space_enabled: false,
         })
+    }
+
+    /// #263: the shipped default is the adopted configuration from the
+    /// pre-registered formal evaluation Run 42654611147 (#219). Every field is
+    /// enumerated so a future accidental change fails here instead of silently
+    /// shifting the standard PUCT.
+    #[test]
+    fn shipped_default_is_the_adopted_pt6_configuration() {
+        let config = PuctConfig::default();
+        assert_eq!(config.simulations, 32);
+        assert_eq!(config.tree_depth, 2);
+        assert_eq!(config.c_puct, 1.5);
+        assert_eq!(config.prior_temperature, 6.0);
+        assert_eq!(config.value_temperature, 8.0);
+        assert_eq!(config.leaf_mode, LeafMode::Terminal);
+        assert_eq!(config.root_candidate_limit, 0);
+        assert_eq!(config.final_prior_weight, 0.0);
     }
 
     #[test]
