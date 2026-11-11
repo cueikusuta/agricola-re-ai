@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "card_id": "A099",
+  "cases": [
+    {
+      "id": "A099-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures_covering": [
+          4,
+          2
+        ]
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "bonus_points": 4
+      }
+    },
+    {
+      "id": "A099-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures_covering": [
+          2
+        ]
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "bonus_points": 0
+      }
+    },
+    {
+      "id": "A099-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures_covering": [
+          3
+        ]
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "bonus_points": 2
+      },
+      "notes": "Exactly 3 farmyard spaces qualifies a pasture."
+    }
+  ]
+}

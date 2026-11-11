@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "card_id": "A094",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "怠惰な種まき",
+    "name_en": "Lazy Sowman"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3331",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "sow_action_declined",
+      "conditions": [
+        {
+          "predicate": "sow_unconditional",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "amount": 1,
+            "destination": "any_action_space",
+            "allow_occupied": true,
+            "kind": "place_unplaced_person"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Declining an own-turn unconditional sow; the placed person resolves that space."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "decline_scope_of_card_granted_sow",
+      "same_turn_decline_window"
+    ],
+    "test_case_ids": [
+      "A094-normal",
+      "A094-not-triggered",
+      "A094-boundary"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Declining an own-turn unconditional Sow grants one placement of a still-unplaced person on any action space, even occupied. Unresolved: scope of card-granted sow and the decline window."
+  }
+}

@@ -216,3 +216,41 @@
 - `A082` の閾値4以上は通常アクション解決**後**。同じ累積スペースの通常取得品を2回数えない。`A082-normal-action-drains-space` の回帰テストを参照。
 - `A071` の「いつでも」は `passive` だけでは人物を置かない合法な操作として確定できない。フリーアクションAPIで手番境界、連続実行、取消、再演ハッシュを定義するまで実装禁止。
 - `A089` のラウンド14を超えるマーカーは既存の`needs_resolution`のままとし、未知のラウンド15以降を生成しない。
+
+## 2026-11-09追補：Issue #226 A091〜A114の追加語彙
+
+この節はカード仕様JSONの新規語彙を定義する。**本節の存在はRustエンジンでの実装完了を意味しない**。各カードの `review.status=needs_resolution` は、他の記述に優先する実装停止ゲートである。
+
+### 発動イベント
+| trigger | 意味・参照時点 |
+|---|---|
+| `after_family_growth` | 家族増員後。A092は同ラウンドの別人物行動・食料支払い窓が未確定なので実行ゲート停止 |
+| `sow_action_declined` | 制約なし種まき権限を辞退したイベント。A094は辞退できる権限源/タイミング未確定 |
+| `stone_accumulation_space_revealed` | ラウンド準備中に石の累積スペースを新規公開 |
+| `after_field_gained` | 同一イベントで獲得・耕作した畑が確定した時点 |
+
+### 述語
+| predicate | パラメータ・評価 |
+|---|---|
+| `accumulation_at_most` | `space,n`（`good`だけではスペースを同定できない）。**使用前**の累積個数で評価する。A095 `Fishing` は2以下 |
+| `accumulation_exactly` | `n`。**使用前**の指定した資材累積スペースの個数を用いる（A107） |
+| `own_placement_index_this_round` | `index`。自分の1/2/3番目の人物かを行動開始時に記録 |
+| `persons_returned_from_accumulation_at_least` | 累積スペースで働いた人物の帰宅数閾値 |
+| `improvement_played_from_hand` | `via_major_or_minor_action`。自身の手札から該当進歩を使用したイベント |
+| `round_space_has_placed_good` | `good`：カード/所有者ごとに分離されたラウンドマーカー集合の有無。単純なboolを取得数量と混同しない |
+
+### 特殊操作kind・数量
+| kind/式 | params・安全な意味 |
+|---|---|
+| `allow_family_member_to_act` | 増員人物ID、ラウンド、合法な配置窓、食料支払・新生児状態を一貫して記録（A092は未解決のため実行不可） |
+| `place_unplaced_person` | `amount,destination,allow_occupied`。既存手番キューに対し未配置人物を一度だけ合法配置 |
+| `gain_good_by_food_tier` | `tiers,amount,mode`。A103の閾値対応が未確定のため`effects=null`で実行不可 |
+| `add_good_to_matching_fields` | `field_match,placement`で対象畑と既存品物の下位置を指定 |
+| `take_all_goods_from_round_space` | `good,source=this_card_round_markers,consume_markers=true,amount=all`。同一ラウンドに重なったマーカーを**カード所有者ごと**に数えて全量取得・原子的に除去（A111） |
+| `custom(["count",source])` | source: `pastures_at_least_3_spaces`, `cooking_improvements`, `wood_accumulation_spaces_with_exactly_2`, `wood_accumulation_spaces_with_at_least_3`, `fields_gained_this_event`, `fields_harvested_last_grain`, `fields_harvested_last_vegetable` |
+| `grant_action` | action: `minor_improvement` / `major_or_minor_improvement`。手札/市場を合法なものに限定 |
+
+### 時点・保存の契約
+- `A095` および `A107`: `trigger=after_worker_space` の効果でも `snapshot=before_event` とし、**通常アクションで取り除く前の累積数**を判定。発動時の資源/食料は通常アクション完了後に増減。未公開・未来情報を参照しない。
+- `A111`: `after_room_construction` で各イベント1回だけ置く。複数イベントが同じラウンドに重なれば各マーカーを別々に記録し、`round_start` で**自分のカードが置いた全個数**を得る。他カード由来マーカーは保持する。
+- `A092` と `A103`: 不明点を推測実装しない。両者とも`review.status=needs_resolution`かつ`effects=null`でフェイルクローズ。定義された語彙は将来の設計候補である。

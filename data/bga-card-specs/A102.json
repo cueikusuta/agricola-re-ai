@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "card_id": "A102",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "小売人",
+    "name_en": "Grocer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3323",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "goods": [
+              "vegetable",
+              "reed",
+              "clay",
+              "vegetable",
+              "stone",
+              "reed",
+              "grain",
+              "wood"
+            ],
+            "kind": "stack_goods_on_card"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Bottom-to-top pile following the card diagram."
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "resource_at_least",
+          "params": {
+            "good": "food",
+            "n": 1
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "take_top_good_from_card"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Needs at least 1 good left on the pile; paid to the supply."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A102-normal",
+      "A102-order",
+      "A102-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Piles 8 goods bottom-to-top (diagram list) on the card; any time the owner may pay 1 food to buy the top good."
+  }
+}

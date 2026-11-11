@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "card_id": "A113",
+  "cases": [
+    {
+      "id": "A113-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "fields": [
+          {
+            "crop": "grain",
+            "amount": 3
+          }
+        ]
+      },
+      "action": {
+        "use_space": "lessons"
+      },
+      "expected": {
+        "field0_vegetable_amount": 1,
+        "vegetable_below_grain": true
+      }
+    },
+    {
+      "id": "A113-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "fields": [
+          {
+            "crop": "grain",
+            "amount": 2
+          },
+          {
+            "crop": "grain",
+            "amount": 3,
+            "has_vegetable": true
+          }
+        ]
+      },
+      "action": {
+        "use_space": "lessons"
+      },
+      "expected": {
+        "vegetables_placed": 0,
+        "field0_vegetable_amount": 0,
+        "field1_vegetable_amount": 0
+      },
+      "notes": "Fields under 3 grain or already holding a vegetable are skipped."
+    },
+    {
+      "id": "A113-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {
+        "use_space": "day_laborer"
+      },
+      "expected": {
+        "vegetables_placed": 0
+      }
+    }
+  ]
+}

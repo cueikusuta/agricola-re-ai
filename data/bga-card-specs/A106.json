@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "card_id": "A106",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "液肥散布人",
+    "name_en": "Slurry Spreader"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3319",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_field_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "multiply",
+                  "args": [
+                    {
+                      "op": "custom",
+                      "args": [
+                        "count",
+                        "fields_harvested_last_grain"
+                      ]
+                    },
+                    2
+                  ]
+                },
+                {
+                  "op": "custom",
+                  "args": [
+                    "count",
+                    "fields_harvested_last_vegetable"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_harvest",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Counts fields whose last grain / last vegetable was taken in this field phase."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A106-normal",
+      "A106-vegetable",
+      "A106-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Each harvest field phase: 2 food per own field emptied of its last grain plus 1 food per field emptied of its last vegetable."
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "card_id": "A113",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "異端教師",
+    "name_en": "Heresy Teacher"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3312",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "lessons"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "good": "vegetable",
+            "per_field": 1,
+            "field_match": {
+              "crop": "grain",
+              "min_amount": 3,
+              "no_vegetable": true
+            },
+            "placement": "below_existing_good",
+            "kind": "add_good_to_matching_fields"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Fires from Lessons-space uses; playing this card itself resolves no Lessons space."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A113-normal",
+      "A113-boundary",
+      "A113-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Each Lessons-space use adds 1 vegetable below the grain stack of each own field holding at least 3 grain and no vegetable."
+  }
+}

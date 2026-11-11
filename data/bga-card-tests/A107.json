@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "card_id": "A107",
+  "cases": [
+    {
+      "id": "A107-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "own_people_used_this_round": 0,
+        "space_holds_before_use": 5,
+        "space_holds_after_use": 0
+      },
+      "action": {
+        "use_space": {
+          "space": "forest",
+          "own_position": 1
+        }
+      },
+      "expected": {
+        "owner_food_delta": 1
+      }
+    },
+    {
+      "id": "A107-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "own_people_used_this_round": 1,
+        "space_holds_before_use": 5,
+        "space_holds_after_use": 0
+      },
+      "action": {
+        "use_space": {
+          "space": "forest",
+          "own_position": 2
+        }
+      },
+      "expected": {
+        "owner_food_delta": 0
+      },
+      "notes": "The 2nd-person tier needs the space at exactly 4."
+    },
+    {
+      "id": "A107-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "own_people_used_this_round": 2,
+        "space_holds_before_use": 4,
+        "space_holds_after_use": 0
+      },
+      "action": {
+        "use_space": {
+          "space": "forest",
+          "own_position": 3
+        }
+      },
+      "expected": {
+        "owner_food_delta": 0
+      },
+      "notes": "The 3rd-person tier needs the space at exactly 3."
+    },
+    {
+      "id": "A107-food-space",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "own_people_used_this_round": 0,
+        "space_holds_before_use": 5,
+        "space_holds_after_use": 0
+      },
+      "action": {
+        "use_space": {
+          "space": "fishing",
+          "own_position": 1
+        }
+      },
+      "expected": {
+        "owner_food_delta": 0
+      },
+      "notes": "Food accumulation spaces do not qualify."
+    },
+    {
+      "id": "A107-second-worker-correct",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "own_people_used_this_round": 1,
+        "space_holds_before_use": 4,
+        "space_holds_after_use": 0
+      },
+      "action": {
+        "use_space": {
+          "space": "forest",
+          "own_position": 2
+        }
+      },
+      "expected": {
+        "owner_food_delta": 1
+      },
+      "notes": "Second worker at a 4-resource pile qualifies; pile is empty after the normal action."
+    }
+  ]
+}

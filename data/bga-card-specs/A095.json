@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "card_id": "A095",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "釣り師",
+    "name_en": "Angler"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3330",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "fishing"
+          }
+        },
+        {
+          "predicate": "accumulation_at_most",
+          "params": {
+            "good": "food",
+            "n": 2
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "major_or_minor_improvement"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Evaluate the Fishing accumulation count immediately BEFORE collecting its food; the bonus improvement action is executed after the ordinary space action."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A095-normal",
+      "A095-not-triggered",
+      "A095-boundary",
+      "A095-before-after-snapshot"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "If the Fishing pile held at most 2 food before use, grant a major-or-minor improvement afterwards, not after recomputing from the now-empty space."
+  }
+}

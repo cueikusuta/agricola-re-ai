@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "card_id": "A101",
+  "cases": [
+    {
+      "id": "A101-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "improvements": {
+          "cooking": 1,
+          "oven": 1
+        }
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "bonus_points": 1
+      },
+      "notes": "Only cooking (pot icon) improvements count; oven-only ones do not."
+    },
+    {
+      "id": "A101-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "improvements": {
+          "cooking": 0,
+          "oven": 2
+        }
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "bonus_points": 0
+      }
+    },
+    {
+      "id": "A101-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "improvements": {
+          "cooking": 2
+        }
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "bonus_points": 2
+      }
+    }
+  ]
+}
