@@ -42,46 +42,24 @@
     "prerequisites": [],
     "printed_points": 0
   },
-  "effects": [
-    {
-      "trigger": "passive",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "other",
-          "target": "owner",
-          "params": {
-            "crop_amount": 1,
-            "source_field_min_crops": 2,
-            "counts_as_sow": false,
-            "counts_as_harvest": false,
-            "kind": "move_crop_to_empty_field"
-          }
-        }
-      ],
-      "optional": true,
-      "frequency": "always",
-      "duration": "permanent",
-      "snapshot": "live_state",
-      "order": 0,
-      "decision_owner": "owner",
-      "notes": "Anytime standing ability; each use moves 1 crop."
-    }
-  ],
+  "effects": null,
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "anytime_free_action_window_and_deterministic_replay"
+    ],
     "test_case_ids": [
       "A071-normal",
       "A071-boundary",
-      "A071-not-triggered"
+      "A071-not-triggered",
+      "A071-free-action-contract-pending"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "At any time, move1 crop from an own field holding at least 2 crops to an empty field; not sow/harvest."
+    "notes": "Moving a crop at any time is described by BGA, but a passive modifier alone does not define the decision API, allowed windows or replay. Marked unresolved until legal free-action contract is specified; do not treat as implemented."
   }
 }

@@ -46,18 +46,43 @@
       "setup": {
         "card_played": true,
         "accumulation_counts": {
+          "reed_bank": 5,
+          "forest": 4
+        }
+      },
+      "action": {
+        "use_space": "reed_bank",
+        "normal_collect_all": 5,
+        "choose_bonus_from": "forest"
+      },
+      "expected": {
+        "take_1_from_accumulation": "forest",
+        "owner_reed_delta": 5,
+        "owner_wood_delta": 1,
+        "reed_bank_count_after": 0,
+        "forest_count_after": 3
+      },
+      "notes": "The used Reed Bank is empty after its normal action; the bonus must come from a different 4+ material space."
+    },
+    {
+      "id": "A082-normal-action-drains-space",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_counts": {
           "reed_bank": 5
         }
       },
       "action": {
-        "use_space": "reed_bank"
+        "use_space": "reed_bank",
+        "normal_collect_all": 5
       },
       "expected": {
-        "take_1_from_accumulation": "reed_bank",
-        "owner_reed_delta": 2,
-        "reed_bank_count_after": 3
+        "owner_reed_delta": 5,
+        "reed_bank_count_after": 0,
+        "take_1_from_accumulation": null
       },
-      "notes": "The just-used accumulation space still counts for the >=4 requirement."
+      "notes": "Do not count the five collected reeds a second time for a post-action 4+ threshold."
     }
   ]
 }
