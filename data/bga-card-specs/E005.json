@@ -73,11 +73,12 @@
     "unresolved_fields": [],
     "test_case_ids": [
       "E005-normal",
-      "E005-same-type"
+      "E005-same-type",
+      "E005-insufficient-types"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Take 2 different building resources from accumulation spaces; pass left."
+    "notes": "Take exactly 1 each of 2 different building resources from accumulation spaces; pass left."
   }
 }

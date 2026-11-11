@@ -52,8 +52,15 @@
                 "kind": "exchange",
                 "give": [
                   {
-                    "good": "wood",
-                    "amount": 2
+                    "resource_group": "building_resources",
+                    "allowed_goods": [
+                      "wood",
+                      "clay",
+                      "reed",
+                      "stone"
+                    ],
+                    "total_count": 2,
+                    "allow_mixed": true
                   }
                 ],
                 "receive": [
@@ -67,8 +74,15 @@
                 "kind": "exchange",
                 "give": [
                   {
-                    "good": "clay",
-                    "amount": 3
+                    "resource_group": "building_resources",
+                    "allowed_goods": [
+                      "wood",
+                      "clay",
+                      "reed",
+                      "stone"
+                    ],
+                    "total_count": 3,
+                    "allow_mixed": true
                   }
                 ],
                 "receive": [
@@ -82,8 +96,15 @@
                 "kind": "exchange",
                 "give": [
                   {
-                    "good": "stone",
-                    "amount": 4
+                    "resource_group": "building_resources",
+                    "allowed_goods": [
+                      "wood",
+                      "clay",
+                      "reed",
+                      "stone"
+                    ],
+                    "total_count": 4,
+                    "allow_mixed": true
                   }
                 ],
                 "receive": [
@@ -94,7 +115,8 @@
                 ]
               }
             ],
-            "max_uses": 2
+            "max_uses": 2,
+            "allow_repeat_option": true
           }
         }
       ],
@@ -104,7 +126,7 @@
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "owner",
-      "notes": "up to two exchanges; each option may be taken at most once"
+      "notes": "At most two independent exchanges; mixed building resources are legal and the same option can be repeated."
     }
   ],
   "post_play": {
@@ -114,12 +136,15 @@
     "status": "bga_checked",
     "unresolved_fields": [],
     "test_case_ids": [
-      "E009-normal",
-      "E009-declined"
+      "E009-mixed-2",
+      "E009-double-same-option",
+      "E009-mixed-3-4",
+      "E009-declined",
+      "E009-third-exchange-rejected"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Up to twice: exchange 2/3/4 building resources for 1 sheep/wild boar/cattle; pass left."
+    "notes": "Up to twice: spend any combination of 2/3/4 building resources for 1 sheep/wild boar/cattle respectively; pass left."
   }
 }

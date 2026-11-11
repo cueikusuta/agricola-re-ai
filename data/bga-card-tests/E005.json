@@ -17,8 +17,10 @@
         ]
       },
       "expected": {
-        "wood_delta": 2,
-        "clay_delta": 1
+        "wood_delta": 1,
+        "clay_delta": 1,
+        "forest_wood_after": 1,
+        "clay_pit_clay_after": 0
       }
     },
     {
@@ -33,6 +35,24 @@
         "take": [
           "wood",
           "wood"
+        ]
+      },
+      "expected": {
+        "play_rejected": true
+      }
+    },
+    {
+      "id": "E005-insufficient-types",
+      "scope": "effect_only",
+      "setup": {
+        "forest_wood": 2,
+        "clay_pit_clay": 0
+      },
+      "action": {
+        "play": "E005",
+        "take": [
+          "wood",
+          "clay"
         ]
       },
       "expected": {

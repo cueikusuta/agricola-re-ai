@@ -3,18 +3,92 @@
   "card_id": "E009",
   "cases": [
     {
-      "id": "E009-normal",
+      "id": "E009-mixed-2",
       "scope": "effect_only",
       "setup": {
-        "wood": 2
+        "wood": 1,
+        "reed": 1
       },
       "action": {
         "play": "E009",
-        "choose": 0
+        "exchanges": [
+          {
+            "option": 0,
+            "give": {
+              "wood": 1,
+              "reed": 1
+            }
+          }
+        ]
+      },
+      "expected": {
+        "wood_delta": -1,
+        "reed_delta": -1,
+        "sheep_delta": 1
+      }
+    },
+    {
+      "id": "E009-double-same-option",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4
+      },
+      "action": {
+        "play": "E009",
+        "exchanges": [
+          {
+            "option": 0,
+            "give": {
+              "wood": 2
+            }
+          },
+          {
+            "option": 0,
+            "give": {
+              "wood": 2
+            }
+          }
+        ]
+      },
+      "expected": {
+        "wood_delta": -4,
+        "sheep_delta": 2
+      }
+    },
+    {
+      "id": "E009-mixed-3-4",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 2,
+        "clay": 3,
+        "stone": 2
+      },
+      "action": {
+        "play": "E009",
+        "exchanges": [
+          {
+            "option": 1,
+            "give": {
+              "wood": 1,
+              "clay": 2
+            }
+          },
+          {
+            "option": 2,
+            "give": {
+              "wood": 1,
+              "clay": 1,
+              "stone": 2
+            }
+          }
+        ]
       },
       "expected": {
         "wood_delta": -2,
-        "sheep_delta": 1
+        "clay_delta": -3,
+        "stone_delta": -2,
+        "wild_boar_delta": 1,
+        "cattle_delta": 1
       }
     },
     {
@@ -25,11 +99,44 @@
       },
       "action": {
         "play": "E009",
-        "choose": null
+        "exchanges": []
       },
       "expected": {
         "wood_delta": 0,
         "sheep_delta": 0
+      }
+    },
+    {
+      "id": "E009-third-exchange-rejected",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 6
+      },
+      "action": {
+        "play": "E009",
+        "exchanges": [
+          {
+            "option": 0,
+            "give": {
+              "wood": 2
+            }
+          },
+          {
+            "option": 0,
+            "give": {
+              "wood": 2
+            }
+          },
+          {
+            "option": 0,
+            "give": {
+              "wood": 2
+            }
+          }
+        ]
+      },
+      "expected": {
+        "play_rejected": true
       }
     }
   ]
