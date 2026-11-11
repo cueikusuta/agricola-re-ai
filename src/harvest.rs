@@ -99,12 +99,15 @@ impl Game {
         // Cardless games have no harvest effects at all, so skip the dispatch
         // entirely: this is the hot path for the cardless baseline.
         let carded = self.card_set.enabled();
+        // The field phase is one effect chain across all players, so the budget
+        // is reset once here rather than per player.
+        if carded {
+            self.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
+        }
         for p in 0..self.public.players.len() {
             // Route the harvest trigger through the dispatcher so the event
-            // budget and per-card use limits apply (the field phase is one
-            // effect chain across all players).
+            // budget and per-card use limits apply.
             if carded {
-                self.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
                 crate::card_events::dispatch_harvest_field(
                     &self.card_set,
                     p,

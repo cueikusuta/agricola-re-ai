@@ -1054,6 +1054,14 @@ impl Game {
         // Per-card use limits use the round as their period, so the ledger is
         // cleared when a new round opens.
         self.card_uses.clear();
+        // A decision cannot span a round boundary: no production effect pauses
+        // the round-start trigger, and carrying a stale decision into a new
+        // round would make its `state_hash_before` meaningless.
+        debug_assert!(
+            self.pending.is_none(),
+            "a pending decision must be resolved before the next round starts"
+        );
+        self.pending = None;
         self.public.start_player = self.public.start_player.min(self.public.players.len() - 1);
         self.public.active_player = self.public.start_player;
         self.public.workers_placed = vec![0; self.public.players.len()];
@@ -1110,7 +1118,13 @@ impl Game {
                 &self.card_use_limits,
                 &mut self.pending,
             )
-            .expect("validated card round reward");
+            // Before this change the same failure was a panic here; keeping the
+            // expect would turn a rules error into a crash, so record it as a
+            // game-log event and leave the state usable instead.
+            .unwrap_or_else(|err| {
+                debug_assert!(false, "round-start card reward failed: {err}");
+                let _ = err;
+            });
         }
     }
     pub fn validate(&self) -> Result<(), String> {

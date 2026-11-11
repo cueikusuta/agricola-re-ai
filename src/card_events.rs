@@ -586,9 +586,14 @@ fn handle_after_clay_construction_gain(
         return Ok(EffectResult::Resolved);
     };
     let current = &ctx.player;
+    // The clay-construction condition is house material + a change in rooms or
+    // an upgrade to stone. It does NOT require that an improvement was bought
+    // in this action: the legacy cards::after_clay_construction fired on the
+    // condition alone, and the equivalence tests pin that behaviour.
     let qualifies = (prev.house == House::Clay && current.rooms() > prev.rooms())
         || (prev.house == House::Clay && current.house == House::Stone);
-    if qualifies && trigger.improvement.is_some() {
+    let _ = &trigger.improvement;
+    if qualifies {
         let p = &mut ctx.player;
         let next = p
             .supply
@@ -977,6 +982,7 @@ pub fn dispatch_after_harvest_bake(
 
 /// Legacy compatibility functions (kept for equivalence testing).
 /// These are the original implementations from cards.rs, renamed with _legacy suffix.
+#[cfg(test)]
 pub mod legacy {
     use super::*;
     use crate::cards::CardSet;
@@ -1777,6 +1783,69 @@ mod tests {
         )
         .unwrap();
         assert_eq!(legacy[0].supply.food, c.players[0].supply.food);
+    }
+
+    /// Clay-construction rewards must fire on the construction condition alone.
+    /// This is the gap the third review found: with `improvement = None` (a room
+    /// built, no improvement bought) the legacy path still granted the bonus, so
+    /// the dispatcher must too.
+    #[test]
+    fn equivalence_clay_construction_without_an_improvement_purchase() {
+        let set = equivalence_pool();
+        // previous: clay house, 2 rooms. current: clay house, 3 rooms (built one).
+        let mut previous = Player::new(0, 0);
+        previous.house = crate::model::House::Clay;
+
+        // control: same house, same room count -> nothing fires on either path
+        let mut legacy = Player::new(0, 0);
+        legacy.house = crate::model::House::Clay;
+        legacy.played_cards = vec!["C7".into()];
+        crate::cards::after_clay_construction(&set, &previous, &mut legacy).unwrap();
+        assert_eq!(
+            legacy.supply.food, 0,
+            "control: without a room/upgrade change nothing fires"
+        );
+
+        let mut legacy_qualifies = Player::new(0, 0);
+        legacy_qualifies.house = crate::model::House::Clay;
+        legacy_qualifies.played_cards = vec!["C7".into()];
+        // Two extra rooms -> strictly more rooms than `previous`.
+        legacy_qualifies.farm[7].tile = crate::model::Tile::Room;
+        legacy_qualifies.farm[8].tile = crate::model::Tile::Room;
+        crate::cards::after_clay_construction(&set, &previous, &mut legacy_qualifies).unwrap();
+
+        // dispatcher, no improvement bought
+        let mut c = Ctx::new();
+        c.players[0].house = crate::model::House::Clay;
+        c.players[0].played_cards = vec!["C7".into()];
+        c.players[0].farm[7].tile = crate::model::Tile::Room;
+        c.players[0].farm[8].tile = crate::model::Tile::Room;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &previous,
+            None,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+
+        assert_eq!(
+            legacy_qualifies.supply.food, c.players[0].supply.food,
+            "a room built in a clay house must pay the bonus even without buying an improvement"
+        );
+        assert_eq!(c.players[0].supply.food, 2, "C7 grants 2 food once");
     }
 
     #[test]
