@@ -1842,6 +1842,169 @@ mod tests {
         }
     }
 
+    /// Exhaustive worker-trigger equivalence: every round, every space, with a
+    /// chain of gain cards plus a conditional one. The used-spaces set is varied
+    /// so `AfterWorkerGainIfUsed` is exercised both ways.
+    #[test]
+    fn equivalence_worker_triggers_exhaustively_match_legacy() {
+        let set = equivalence_pool();
+        let spaces = [
+            Space::Forest,
+            Space::ClayPit,
+            Space::ReedBank,
+            Space::Fishing,
+            Space::Lessons,
+            Space::DayLaborer,
+            Space::Farmland,
+            Space::Fencing,
+            Space::GrainSeeds,
+            Space::CattleMarket,
+        ];
+        for space in spaces {
+            for lessons_used in [false, true] {
+                let mut legacy = [Player::new(0, 0)];
+                legacy[0].played_cards = vec!["C1".into(), "C2".into(), "C3".into()];
+                let mut used = std::collections::BTreeSet::new();
+                if lessons_used {
+                    used.insert(Space::Lessons);
+                }
+                crate::cards::after_worker(&set, &mut legacy[0], space).unwrap();
+                crate::cards::after_worker_if_used(&set, &mut legacy[0], space, &used).unwrap();
+
+                let mut c = Ctx::new();
+                c.players[0].played_cards = vec!["C1".into(), "C2".into(), "C3".into()];
+                let mut market = vec![];
+                let mut well = BTreeMap::new();
+                let mut pending = None;
+                dispatch_after_worker(
+                    &set,
+                    0,
+                    space,
+                    &mut c.cards,
+                    &mut c.players,
+                    &mut market,
+                    &mut well,
+                    1,
+                    &used,
+                    &mut c.budget,
+                    &mut c.uses,
+                    &c.limits,
+                    &mut pending,
+                )
+                .unwrap();
+
+                for good in [Good::Wood, Good::Clay, Good::Reed, Good::Food] {
+                    assert_eq!(
+                        legacy[0].supply.get(good),
+                        c.players[0].supply.get(good),
+                        "{space:?} lessons_used={lessons_used}: {good:?} diverged"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Exhaustive start-round equivalence across every round number, including
+    /// round 1 and the rounds that follow a harvest.
+    #[test]
+    fn equivalence_start_round_exhaustively_matches_legacy() {
+        let set = equivalence_pool();
+        for round in 1u8..=14 {
+            let chain = vec!["C6".to_string(), "C1".to_string(), "C6".to_string()];
+            let mut legacy = [Player::new(0, 0)];
+            legacy[0].played_cards = chain.clone();
+            crate::cards::start_round_rewards(&set, &mut legacy[0]).unwrap();
+
+            let mut c = Ctx::new();
+            c.players[0].played_cards = chain;
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            dispatch_start_round(
+                &set,
+                &mut c.players,
+                &mut c.cards,
+                &mut market,
+                &mut well,
+                round,
+                &std::collections::BTreeSet::new(),
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+            )
+            .unwrap();
+            assert_eq!(
+                legacy[0].supply.food, c.players[0].supply.food,
+                "round {round}: StartRoundGain total diverged"
+            );
+            assert_eq!(legacy[0].supply.wood, c.players[0].supply.wood);
+        }
+    }
+
+    /// Harvest-field equivalence with real animal counts, so the Animals
+    /// multiplier is compared on non-degenerate inputs (C5: sheep_per 2,
+    /// cattle_per 1).
+    #[test]
+    fn equivalence_harvest_field_multipliers_match_legacy() {
+        let set = equivalence_pool();
+        for (sheep, cattle) in [(0, 0), (1, 0), (2, 0), (0, 1), (4, 2), (7, 3)] {
+            let pasture =
+                |animal: crate::model::Animal, quantity: u32, id: u8| crate::model::Pasture {
+                    id,
+                    cells: vec![1],
+                    animal: Some(animal),
+                    quantity,
+                };
+
+            let mut legacy = [Player::new(0, 0)];
+            legacy[0].played_cards = vec!["C5".into()];
+            if sheep > 0 {
+                legacy[0]
+                    .pastures
+                    .push(pasture(crate::model::Animal::Sheep, sheep, 0));
+            }
+            if cattle > 0 {
+                legacy[0]
+                    .pastures
+                    .push(pasture(crate::model::Animal::Cattle, cattle, 1));
+            }
+            crate::cards::harvest_field_rewards(&set, &mut legacy[0]).unwrap();
+
+            let mut c = Ctx::new();
+            c.players[0].played_cards = vec!["C5".into()];
+            c.players[0].pastures = legacy[0].pastures.clone();
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            dispatch_harvest_field(
+                &set,
+                0,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                8,
+                &std::collections::BTreeSet::new(),
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+            )
+            .unwrap();
+            assert_eq!(
+                legacy[0].supply.food, c.players[0].supply.food,
+                "sheep={sheep} cattle={cattle}: harvest multiplier diverged"
+            );
+            // Expected: (sheep / 2 + cattle / 1) * 1 food.
+            assert_eq!(
+                c.players[0].supply.food,
+                sheep / 2 + cattle,
+                "sheep={sheep} cattle={cattle}: wrong expected multiplier"
+            );
+        }
+    }
+
     /// Clay-construction rewards must fire on the construction condition alone.
     /// This is the gap the third review found: with `improvement = None` (a room
     /// built, no improvement bought) the legacy path still granted the bonus, so
