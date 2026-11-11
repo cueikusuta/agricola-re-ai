@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "card_id": "A089",
+  "cases": [
+    {
+      "id": "A089-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "play_round": 2
+      },
+      "action": {
+        "play_occupation": "A089"
+      },
+      "expected": {
+        "marker_rounds": [
+          5,
+          8,
+          11
+        ],
+        "free_stable_round_starts": [
+          5,
+          8,
+          11
+        ]
+      }
+    },
+    {
+      "id": "A089-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "play_round": 2,
+        "round_before_marker": 4
+      },
+      "action": {
+        "attempt_free_stable_at_round_start": 4
+      },
+      "expected": {
+        "free_stable_allowed": false
+      },
+      "notes": "Before the first marked round no free stable placement is possible."
+    },
+    {
+      "id": "A089-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "play_round": 6
+      },
+      "action": {
+        "play_occupation": "A089"
+      },
+      "expected": {
+        "marker_rounds": [
+          9,
+          12
+        ],
+        "raw_computed_rounds": [
+          9,
+          12,
+          15
+        ],
+        "round_15": "needs_resolution"
+      },
+      "notes": "Rounds computed beyond 14 (play round + 9) are not covered by known texts."
+    }
+  ]
+}

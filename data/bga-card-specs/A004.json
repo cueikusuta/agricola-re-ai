@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "card_id": "A004",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "幅木",
+    "name_en": "Baseboards"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3421",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": null,
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": "2 飯/1 小麦"
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "rooms_exceed_people",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": {
+              "op": "per",
+              "args": [
+                {
+                  "op": "count",
+                  "args": [
+                    "room"
+                  ]
+                },
+                1
+              ]
+            }
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: the wiki shows only alternative costs (2 food / 1 grain); the base resource cost is not stated"
+    ],
+    "test_case_ids": [
+      "A004-normal",
+      "A004-no-bonus"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Gain 1 wood per room; if rooms exceed people, gain 1 extra wood; pass left."
+  }
+}

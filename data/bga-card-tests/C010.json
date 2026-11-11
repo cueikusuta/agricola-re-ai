@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "C010",
+  "cases": [
+    {
+      "id": "C010-normal",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 4
+      },
+      "action": {
+        "play": "C010"
+      },
+      "expected": {
+        "housing_capacity": 5
+      }
+    },
+    {
+      "id": "C010-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 3
+      },
+      "action": {
+        "play": "C010"
+      },
+      "expected": {
+        "housing_capacity": 4
+      }
+    }
+  ]
+}

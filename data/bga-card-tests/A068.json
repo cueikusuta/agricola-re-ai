@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "A068",
+  "cases": [
+    {
+      "id": "A068-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4,
+        "fences_built": 4
+      },
+      "action": {
+        "build_fences": 4
+      },
+      "expected": {
+        "vegetable_delta": 1
+      }
+    },
+    {
+      "id": "A068-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "fences_built": 5
+      },
+      "action": {
+        "build_fences": 5
+      },
+      "expected": {
+        "vegetable_delta": 1
+      }
+    },
+    {
+      "id": "A068-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "fences_built": 4
+      },
+      "action": {
+        "build_fences": 4
+      },
+      "expected": {
+        "vegetable_delta": 0
+      }
+    }
+  ]
+}

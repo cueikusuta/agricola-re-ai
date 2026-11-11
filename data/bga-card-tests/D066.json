@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "D066",
+  "cases": [
+    {
+      "id": "D066-normal",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 1,
+        "grain": 0
+      },
+      "action": {
+        "bake_bread": 1,
+        "exchange": true
+      },
+      "expected": {
+        "clay_delta": -1,
+        "grain_delta": 1
+      }
+    },
+    {
+      "id": "D066-declined",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 1
+      },
+      "action": {
+        "bake_bread": 1,
+        "exchange": false
+      },
+      "expected": {
+        "clay_delta": 0,
+        "grain_delta": 0
+      }
+    },
+    {
+      "id": "D066-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 1
+      },
+      "action": {
+        "use_space": "forest",
+        "exchange": true
+      },
+      "expected": {
+        "clay_delta": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "B001",
+  "cases": [
+    {
+      "id": "B001-normal",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0
+      },
+      "action": {
+        "play": "B001",
+        "renovate": true
+      },
+      "expected": {
+        "clay_delta": 5,
+        "renovation_granted": true,
+        "post_play": "left_neighbor_hand"
+      }
+    },
+    {
+      "id": "B001-no-renovate",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0
+      },
+      "action": {
+        "play": "B001",
+        "renovate": false
+      },
+      "expected": {
+        "clay_delta": 5,
+        "renovation_granted": false
+      }
+    }
+  ]
+}

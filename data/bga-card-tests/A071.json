@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "card_id": "A071",
+  "cases": [
+    {
+      "id": "A071-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "fields": [
+          {
+            "crop": "grain",
+            "amount": 2
+          },
+          {
+            "crop": "vegetable",
+            "amount": 0
+          }
+        ]
+      },
+      "action": {
+        "move_crop": {
+          "from_field": 0,
+          "to_field": 1,
+          "good": "grain"
+        }
+      },
+      "expected": {
+        "field0_grain_delta": -1,
+        "field1_grain_delta": 1,
+        "saved_replay_delta": {},
+        "counts_as_sow": false,
+        "counts_as_harvest": false
+      }
+    },
+    {
+      "id": "A071-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "fields": [
+          {
+            "crop": "grain",
+            "amount": 1
+          },
+          {
+            "crop": "vegetable",
+            "amount": 0
+          }
+        ]
+      },
+      "action": {
+        "move_crop": {
+          "from_field": 0,
+          "to_field": 1,
+          "good": "grain"
+        }
+      },
+      "expected": {
+        "move_allowed": false
+      },
+      "notes": "Source field with only 1 crop cannot supply a crop."
+    },
+    {
+      "id": "A071-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "fields": [
+          {
+            "crop": "grain",
+            "amount": 2
+          }
+        ]
+      },
+      "action": {
+        "move_crop_to": "no_empty_field"
+      },
+      "expected": {
+        "move_allowed": false
+      },
+      "notes": "No empty field available: there is nothing to move."
+    },
+    {
+      "id": "A071-free-action-contract-pending",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "window": "between_worker_placements"
+      },
+      "action": {
+        "move_crop": {
+          "from_field": 0,
+          "to_field": 1,
+          "good": "grain"
+        }
+      },
+      "expected": {
+        "review_status": "needs_resolution",
+        "automatic_effect_execution_allowed": false
+      },
+      "notes": "Block execution until the anytime free-action API and reproducible event window are specified."
+    }
+  ]
+}

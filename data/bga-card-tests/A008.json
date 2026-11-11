@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "A008",
+  "cases": [
+    {
+      "id": "A008-normal",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 0,
+        "vegetable": 0
+      },
+      "action": {
+        "play": "A008"
+      },
+      "expected": {
+        "grain_delta": 1,
+        "vegetable_delta": 1
+      }
+    },
+    {
+      "id": "A008-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 1,
+        "improvements_played": 2
+      },
+      "action": {
+        "play": "A008"
+      },
+      "expected": {
+        "play_rejected": true
+      }
+    }
+  ]
+}

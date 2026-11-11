@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A124",
+  "cases": [
+    {
+      "id": "A124-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "use_space": "farmland"
+      },
+      "expected": {
+        "stone_delta": 1
+      }
+    },
+    {
+      "id": "A124-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "round": 8
+      },
+      "action": {
+        "use_space": "farmland"
+      },
+      "expected": {
+        "stone_delta": 0
+      }
+    }
+  ]
+}

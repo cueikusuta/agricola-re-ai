@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A035",
+  "cases": [
+    {
+      "id": "A035-normal",
+      "scope": "effect_only",
+      "setup": {
+        "newborns_on_fishing": 2
+      },
+      "action": {
+        "run_round": true
+      },
+      "expected": {
+        "points_delta": 4
+      }
+    },
+    {
+      "id": "A035-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "newborns_on_fishing": 0
+      },
+      "action": {
+        "run_round": true
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    }
+  ]
+}

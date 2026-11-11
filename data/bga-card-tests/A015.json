@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "A015",
+  "cases": [
+    {
+      "id": "A015-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 7
+      },
+      "action": {
+        "use_space": "forest",
+        "build": 1
+      },
+      "expected": {
+        "stables_delta": 1,
+        "wood_delta": -1
+      }
+    },
+    {
+      "id": "A015-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 6
+      },
+      "action": {
+        "use_space": "forest",
+        "build": 1
+      },
+      "expected": {
+        "stables_delta": 0
+      }
+    }
+  ]
+}

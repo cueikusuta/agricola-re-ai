@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A044",
+  "cases": [
+    {
+      "id": "A044-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4
+      },
+      "action": {
+        "play": "A044"
+      },
+      "expected": {
+        "rounds_with_food": 3
+      }
+    },
+    {
+      "id": "A044-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 13
+      },
+      "action": {
+        "play": "A044"
+      },
+      "expected": {
+        "rounds_with_food": 2
+      }
+    }
+  ]
+}

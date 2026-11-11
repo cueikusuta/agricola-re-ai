@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "A100",
+  "cases": [
+    {
+      "id": "A100-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "persons_returned_from_accumulation": 3,
+        "owner_food": 1
+      },
+      "action": {
+        "buy_bonus_point": true
+      },
+      "expected": {
+        "owner_food_delta": -1,
+        "bonus_points": 1
+      }
+    },
+    {
+      "id": "A100-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "persons_returned_from_accumulation": 2,
+        "owner_food": 1
+      },
+      "action": {
+        "buy_bonus_point": true
+      },
+      "expected": {
+        "owner_food_delta": 0,
+        "bonus_points": 0
+      }
+    },
+    {
+      "id": "A100-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "persons_returned_from_accumulation": 3,
+        "owner_food": 0
+      },
+      "action": {
+        "buy_bonus_point": true
+      },
+      "expected": {
+        "bonus_points": 0
+      },
+      "notes": "Without 1 food the bonus point cannot be bought."
+    }
+  ]
+}

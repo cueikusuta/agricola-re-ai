@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "B088",
+  "cases": [
+    {
+      "id": "B088-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "rooms": 2
+      },
+      "action": {
+        "play": "B088"
+      },
+      "expected": {
+        "house": "clay",
+        "building_resources_spent": 0,
+        "build_fences_granted": true
+      }
+    },
+    {
+      "id": "B088-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "rooms": 3
+      },
+      "action": {
+        "play": "B088"
+      },
+      "expected": {
+        "house": "wood",
+        "build_fences_granted": false
+      }
+    }
+  ]
+}

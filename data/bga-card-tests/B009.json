@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "B009",
+  "cases": [
+    {
+      "id": "B009-normal",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0
+      },
+      "action": {
+        "play": "B009",
+        "choose": "gain_reed"
+      },
+      "expected": {
+        "reed_delta": 1
+      }
+    },
+    {
+      "id": "B009-exchange",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 1
+      },
+      "action": {
+        "play": "B009",
+        "choose": "exchange_cattle"
+      },
+      "expected": {
+        "reed_delta": -1,
+        "cattle_delta": 1
+      }
+    }
+  ]
+}

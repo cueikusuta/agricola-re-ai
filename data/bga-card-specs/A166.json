@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "card_id": "A166",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "草干し",
+    "name_en": "Haydryer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3259",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_end",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "table",
+              "args": [
+                "animal_price",
+                {
+                  "sheep": 4,
+                  "wild_boar": 4,
+                  "cattle": 4
+                }
+              ]
+            }
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": {
+              "op": "table",
+              "args": [
+                "market_animal",
+                {
+                  "sheep": "sheep",
+                  "pig": "wild_boar",
+                  "cattle": "cattle"
+                }
+              ]
+            },
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "food cost is capped by the number of animals already owned (minimum 0)"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A166-normal",
+      "A166-free"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "At harvest end: may buy 1 animal for 4 food minus the number already owned (minimum 0)."
+  }
+}

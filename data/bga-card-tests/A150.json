@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A150",
+  "cases": [
+    {
+      "id": "A150-normal",
+      "scope": "effect_only",
+      "setup": {
+        "other_player_uses": "farmland"
+      },
+      "action": {
+        "choose": "fencing"
+      },
+      "expected": {
+        "action_granted": "fencing"
+      }
+    },
+    {
+      "id": "A150-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "owner_uses": "farmland"
+      },
+      "action": {
+        "choose": "fencing"
+      },
+      "expected": {
+        "action_granted": null
+      }
+    }
+  ]
+}

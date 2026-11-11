@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "card_id": "A142",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "紐編み",
+    "name_en": "Cordmaker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3283",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "reed_bank"
+          }
+        },
+        {
+          "predicate": "any_player",
+          "params": {}
+        },
+        {
+          "predicate": "reed_taken_at_least",
+          "params": {
+            "n": 2
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "gain",
+                "good": "grain",
+                "amount": 1
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "food",
+                    "amount": 2
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "vegetable",
+                    "amount": 1
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "After any player takes 2+ reed from the Reed Bank: gain 1 grain, or pay 2 food for 1 vegetable."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A142-normal",
+      "A142-buy",
+      "A142-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Reed Bank trigger with a two-option choice; official verification remains separate."
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "B004",
+  "cases": [
+    {
+      "id": "B004-normal",
+      "scope": "effect_only",
+      "setup": {
+        "people_on_accumulation_spaces": 2
+      },
+      "action": {
+        "play": "B004"
+      },
+      "expected": {
+        "wood_delta": 2
+      }
+    },
+    {
+      "id": "B004-zero",
+      "scope": "effect_only",
+      "setup": {
+        "people_on_accumulation_spaces": 0
+      },
+      "action": {
+        "play": "B004"
+      },
+      "expected": {
+        "wood_delta": 0
+      }
+    }
+  ]
+}

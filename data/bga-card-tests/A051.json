@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A051",
+  "cases": [
+    {
+      "id": "A051-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "A051-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

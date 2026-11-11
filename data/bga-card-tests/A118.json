@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "A118",
+  "cases": [
+    {
+      "id": "A118-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0,
+        "food": 2
+      },
+      "action": {
+        "run_harvest": true,
+        "buy": 2
+      },
+      "expected": {
+        "wood_delta": 3,
+        "food_delta": -2
+      }
+    },
+    {
+      "id": "A118-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0,
+        "food": 3
+      },
+      "action": {
+        "run_harvest": true,
+        "buy": 3
+      },
+      "expected": {
+        "wood_delta": 3,
+        "food_delta": -2
+      }
+    }
+  ]
+}

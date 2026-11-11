@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "A084",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "穀物飼料",
+    "name_en": "Silage"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3341",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "at_least_fields",
+        "params": {
+          "n": 2
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "returning_home_phase",
+      "conditions": [
+        {
+          "predicate": "round_has_no_harvest",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1,
+            "allow_from_field": true
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "animal_types": 1,
+            "kind": "breed_animal"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_round",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Exactly one animal type breeds; the paid grain may be taken straight from an own field."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A084-normal",
+      "A084-from-field",
+      "A084-not-triggered",
+      "A084-boundary"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "In each returning-home phase of a harvest-free round, pay exactly 1 grain to breed exactly one animal type."
+  }
+}

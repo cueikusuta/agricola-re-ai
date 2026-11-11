@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "E045",
+  "cases": [
+    {
+      "id": "E045-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "E045"
+      },
+      "expected": {
+        "even_rounds_marked": 5
+      }
+    },
+    {
+      "id": "E045-last",
+      "scope": "effect_only",
+      "setup": {
+        "round": 14
+      },
+      "action": {
+        "play": "E045"
+      },
+      "expected": {
+        "even_rounds_marked": 1
+      }
+    }
+  ]
+}

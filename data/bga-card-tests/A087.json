@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "card_id": "A087",
+  "cases": [
+    {
+      "id": "A087-normal",
+      "scope": "legal_play",
+      "setup": {
+        "card_played": true,
+        "house": "wood",
+        "owner_reed": 1,
+        "owner_stone": 3
+      },
+      "action": {
+        "renovate": {
+          "from": "wood",
+          "to": "stone"
+        }
+      },
+      "expected": {
+        "house_after": "stone",
+        "owner_reed_delta": -1,
+        "owner_stone_delta": -3,
+        "clay_house_required": false
+      }
+    },
+    {
+      "id": "A087-not-triggered",
+      "scope": "legal_play",
+      "setup": {
+        "card_played": false,
+        "house": "wood",
+        "owner_reed": 1,
+        "owner_stone": 3
+      },
+      "action": {
+        "renovate": {
+          "from": "wood",
+          "to": "stone"
+        }
+      },
+      "expected": {
+        "move_allowed": false
+      },
+      "notes": "Without the occupation the wood-to-stone renovation stays illegal."
+    },
+    {
+      "id": "A087-boundary",
+      "scope": "legal_play",
+      "setup": {
+        "card_played": true,
+        "house": "wood",
+        "owner_reed": 1,
+        "owner_stone": 2
+      },
+      "action": {
+        "renovate": {
+          "from": "wood",
+          "to": "stone"
+        }
+      },
+      "expected": {
+        "move_allowed": false
+      },
+      "notes": "The normal stone renovation cost is still required."
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "card_id": "E005",
+  "cases": [
+    {
+      "id": "E005-normal",
+      "scope": "effect_only",
+      "setup": {
+        "forest_wood": 2,
+        "clay_pit_clay": 1
+      },
+      "action": {
+        "play": "E005",
+        "take": [
+          "wood",
+          "clay"
+        ]
+      },
+      "expected": {
+        "wood_delta": 1,
+        "clay_delta": 1,
+        "forest_wood_after": 1,
+        "clay_pit_clay_after": 0
+      }
+    },
+    {
+      "id": "E005-same-type",
+      "scope": "effect_only",
+      "setup": {
+        "forest_wood": 2,
+        "clay_pit_clay": 1
+      },
+      "action": {
+        "play": "E005",
+        "take": [
+          "wood",
+          "wood"
+        ]
+      },
+      "expected": {
+        "play_rejected": true
+      }
+    },
+    {
+      "id": "E005-insufficient-types",
+      "scope": "effect_only",
+      "setup": {
+        "forest_wood": 2,
+        "clay_pit_clay": 0
+      },
+      "action": {
+        "play": "E005",
+        "take": [
+          "wood",
+          "clay"
+        ]
+      },
+      "expected": {
+        "play_rejected": true
+      }
+    }
+  ]
+}

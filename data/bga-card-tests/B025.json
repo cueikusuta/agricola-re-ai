@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "B025",
+  "cases": [
+    {
+      "id": "B025-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "B025"
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "B025-occupation",
+      "scope": "effect_only",
+      "setup": {
+        "bread_oven": true
+      },
+      "action": {
+        "play_occupation": "A086"
+      },
+      "expected": {
+        "bake_bread_granted": true
+      }
+    }
+  ]
+}

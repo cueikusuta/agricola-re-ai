@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "card_id": "B077",
+  "cases": [
+    {
+      "id": "B077-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_used": "day_laborer"
+      },
+      "action": {
+        "use_space": "day_laborer"
+      },
+      "expected": {
+        "owner_clay_delta": 3
+      }
+    },
+    {
+      "id": "B077-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_used": "fishing"
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "owner_clay_delta": 0
+      }
+    }
+  ]
+}

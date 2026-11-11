@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "A097",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "新入生",
+    "name_en": "Freshman"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3328",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "before_bake_bread",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "instead_of": "bake_bread",
+            "max_per_turn": 1,
+            "max_per_harvest": 1,
+            "kind": "play_occupation_without_cost"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Covers board-space and card-granted Bake Bread actions; the action is skipped when replaced."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "per_turn_and_per_harvest_limits_absent_in_en_list",
+      "replaced_bake_bread_sources_scope"
+    ],
+    "test_case_ids": [
+      "A097-normal",
+      "A097-not-triggered",
+      "A097-boundary"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Each obtained Bake Bread action may be replaced by playing one occupation without cost. Japanese text caps it per turn and per harvest; the English list row omits that cap."
+  }
+}

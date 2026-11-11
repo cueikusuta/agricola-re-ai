@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "E026",
+  "cases": [
+    {
+      "id": "E026-round7",
+      "scope": "effect_only",
+      "setup": {
+        "round": 7
+      },
+      "action": {
+        "end_work_phase": true
+      },
+      "expected": {
+        "sow_granted": true
+      }
+    },
+    {
+      "id": "E026-round8",
+      "scope": "effect_only",
+      "setup": {
+        "round": 8
+      },
+      "action": {
+        "end_work_phase": true
+      },
+      "expected": {
+        "sow_granted": false
+      }
+    }
+  ]
+}

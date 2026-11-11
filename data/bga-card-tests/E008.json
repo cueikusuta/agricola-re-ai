@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "card_id": "E008",
+  "cases": [
+    {
+      "id": "E008-normal",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 0
+      },
+      "action": {
+        "play": "E008"
+      },
+      "expected": {
+        "vegetable_delta": 1
+      }
+    }
+  ]
+}

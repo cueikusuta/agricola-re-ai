@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "card_id": "D062",
+  "cases": [
+    {
+      "id": "D062-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "D062"
+      },
+      "expected": {
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "D062-exchange-2",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2
+      },
+      "action": {
+        "run_harvest": true,
+        "exchange": 2
+      },
+      "expected": {
+        "grain_delta": -2,
+        "food_delta": 3
+      }
+    },
+    {
+      "id": "D062-exchange-3",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 3
+      },
+      "action": {
+        "run_harvest": true,
+        "exchange": 3
+      },
+      "expected": {
+        "grain_delta": -3,
+        "food_delta": 6
+      }
+    },
+    {
+      "id": "D062-exchange-4",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 4
+      },
+      "action": {
+        "run_harvest": true,
+        "exchange": 4
+      },
+      "expected": {
+        "grain_delta": -4,
+        "food_delta": 9
+      }
+    },
+    {
+      "id": "D062-not-enough",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 1
+      },
+      "action": {
+        "run_harvest": true,
+        "exchange": 2
+      },
+      "expected": {
+        "grain_delta": 0,
+        "food_delta": 0
+      }
+    }
+  ]
+}

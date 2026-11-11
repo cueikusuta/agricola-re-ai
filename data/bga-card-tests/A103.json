@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "card_id": "A103",
+  "cases": [
+    {
+      "id": "A103-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_type": "food_accumulation"
+      },
+      "action": {
+        "take_food": 1
+      },
+      "expected": {
+        "bonus_good": "vegetable"
+      }
+    },
+    {
+      "id": "A103-boundary-two",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_type": "food_accumulation"
+      },
+      "action": {
+        "take_food": 2
+      },
+      "expected": {
+        "bonus_good": "grain"
+      },
+      "notes": "Tier 2 taken positionally; the cumulative reading would differ."
+    },
+    {
+      "id": "A103-boundary-three",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_type": "food_accumulation"
+      },
+      "action": {
+        "take_food": 4
+      },
+      "expected": {
+        "bonus_good": "reed"
+      },
+      "notes": "Tier three-or-more read positionally; unresolved against the other reading."
+    },
+    {
+      "id": "A103-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_type": "wood_accumulation"
+      },
+      "action": {
+        "take_food": 1
+      },
+      "expected": {
+        "bonus_good": null
+      }
+    },
+    {
+      "id": "A103-tier-contract-pending",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "food_taken_from_accumulation": 3
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "review_status": "needs_resolution",
+        "automatic_effect_execution_allowed": false
+      },
+      "notes": "Conflicting BGA prose is not a safe executable mapping for the tiered reward."
+    }
+  ]
+}

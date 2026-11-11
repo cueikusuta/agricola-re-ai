@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A046",
+  "cases": [
+    {
+      "id": "A046-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 6
+      },
+      "action": {
+        "use_space": "sheep_market"
+      },
+      "expected": {
+        "rounds_with_food": 2
+      }
+    },
+    {
+      "id": "A046-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 14
+      },
+      "action": {
+        "use_space": "sheep_market"
+      },
+      "expected": {
+        "rounds_with_food": 1
+      }
+    }
+  ]
+}

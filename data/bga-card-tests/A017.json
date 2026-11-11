@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "A017",
+  "cases": [
+    {
+      "id": "A017-normal",
+      "scope": "effect_only",
+      "setup": {
+        "animals_pending": 2,
+        "capacity": 2
+      },
+      "action": {
+        "accommodate_accumulation_animals": true
+      },
+      "expected": {
+        "fields_delta": 1
+      }
+    },
+    {
+      "id": "A017-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "animals_pending": 2,
+        "capacity": 1
+      },
+      "action": {
+        "accommodate_accumulation_animals": false
+      },
+      "expected": {
+        "fields_delta": 0
+      }
+    },
+    {
+      "id": "A017-once",
+      "scope": "effect_only",
+      "setup": {
+        "already_used": true,
+        "animals_pending": 2,
+        "capacity": 2
+      },
+      "action": {
+        "accommodate_accumulation_animals": true
+      },
+      "expected": {
+        "fields_delta": 0
+      }
+    }
+  ]
+}

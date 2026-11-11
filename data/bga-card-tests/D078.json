@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "D078",
+  "cases": [
+    {
+      "id": "D078-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "D078"
+      },
+      "expected": {
+        "rounds_with_reed": 3,
+        "reed_per_space": 1
+      }
+    },
+    {
+      "id": "D078-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 13
+      },
+      "action": {
+        "play": "D078"
+      },
+      "expected": {
+        "rounds_with_reed": 2
+      }
+    }
+  ]
+}

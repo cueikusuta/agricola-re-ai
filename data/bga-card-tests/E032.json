@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "E032",
+  "cases": [
+    {
+      "id": "E032-normal",
+      "scope": "effect_only",
+      "setup": {
+        "columns_with_room": 3
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 3
+      }
+    },
+    {
+      "id": "E032-zero",
+      "scope": "effect_only",
+      "setup": {
+        "columns_with_room": 0
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    }
+  ]
+}

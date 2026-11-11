@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "A148",
+  "cases": [
+    {
+      "id": "A148-normal",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 3,
+        "capacity_full": true
+      },
+      "action": {
+        "play": "A148"
+      },
+      "expected": {
+        "animals_on_card": 3
+      }
+    },
+    {
+      "id": "A148-harvest",
+      "scope": "effect_only",
+      "setup": {
+        "animals_on_card": 3
+      },
+      "action": {
+        "run_harvest": true
+      },
+      "expected": {
+        "animals_on_card": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "A135",
+  "cases": [
+    {
+      "id": "A135-normal",
+      "scope": "effect_only",
+      "setup": {
+        "remaining_rounds": 6
+      },
+      "action": {
+        "play": "A135"
+      },
+      "expected": {
+        "wood_delta": 3
+      }
+    },
+    {
+      "id": "A135-score",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 3,
+        "wild_boar": 3,
+        "cattle": 3
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 3
+      }
+    },
+    {
+      "id": "A135-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 2,
+        "wild_boar": 3,
+        "cattle": 3
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 1
+      }
+    }
+  ]
+}

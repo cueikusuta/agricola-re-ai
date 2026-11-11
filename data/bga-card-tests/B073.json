@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "B073",
+  "cases": [
+    {
+      "id": "B073-normal",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 3
+      },
+      "action": {
+        "play": "B073"
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "B073-4",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 4
+      },
+      "action": {
+        "play": "B073"
+      },
+      "expected": {
+        "grain_delta": 1
+      }
+    },
+    {
+      "id": "B073-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 6
+      },
+      "action": {
+        "play": "B073"
+      },
+      "expected": {
+        "food_delta": 0,
+        "grain_delta": 0,
+        "vegetable_delta": 0
+      }
+    }
+  ]
+}

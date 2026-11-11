@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "card_id": "E022",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ゲストルーム",
+    "name_en": "Guest Room"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2731",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 4
+      },
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_food_on_card",
+            "any_amount": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    },
+    {
+      "trigger": "round_end",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1,
+            "source": "card"
+          }
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "place_person"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.1.timing: the card is usable once per round at any time, which the trigger vocabulary cannot express; modeled as a round-end action"
+    ],
+    "test_case_ids": [
+      "E022-normal",
+      "E022-use",
+      "E022-empty"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Place any amount of food on the card; once per round discard 1 food from it to place a person."
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "B006",
+  "cases": [
+    {
+      "id": "B006-normal",
+      "scope": "effect_only",
+      "setup": {
+        "people": 3
+      },
+      "action": {
+        "play": "B006"
+      },
+      "expected": {
+        "stone_delta": 3
+      }
+    },
+    {
+      "id": "B006-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "people": 2
+      },
+      "action": {
+        "play": "B006"
+      },
+      "expected": {
+        "stone_delta": 2
+      }
+    }
+  ]
+}

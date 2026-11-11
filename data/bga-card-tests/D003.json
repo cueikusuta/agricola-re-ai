@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "D003",
+  "cases": [
+    {
+      "id": "D003-normal",
+      "scope": "effect_only",
+      "setup": {
+        "empty_fields": 1,
+        "grain": 1
+      },
+      "action": {
+        "play": "D003",
+        "sow": 1
+      },
+      "expected": {
+        "sown_fields": 1,
+        "grain_delta": -1
+      }
+    },
+    {
+      "id": "D003-no-field",
+      "scope": "effect_only",
+      "setup": {
+        "empty_fields": 0,
+        "grain": 1
+      },
+      "action": {
+        "play": "D003",
+        "sow": 1
+      },
+      "expected": {
+        "sown_fields": 0,
+        "grain_delta": 0
+      }
+    }
+  ]
+}

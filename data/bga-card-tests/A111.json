@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "card_id": "A111",
+  "cases": [
+    {
+      "id": "A111-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "round": 4
+      },
+      "action": {
+        "build_rooms": 1
+      },
+      "expected": {
+        "food_on_round_spaces": [
+          5,
+          6,
+          7,
+          8
+        ],
+        "food_per_space": 1
+      }
+    },
+    {
+      "id": "A111-collect",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "round": 4,
+        "food_on_round_spaces": [
+          5,
+          6,
+          7,
+          8
+        ]
+      },
+      "action": {
+        "advance_to_round_start": 5
+      },
+      "expected": {
+        "owner_food_delta": 1,
+        "food_on_round_spaces_after": [
+          6,
+          7,
+          8
+        ]
+      }
+    },
+    {
+      "id": "A111-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "round": 4
+      },
+      "action": {
+        "build_rooms": 2
+      },
+      "expected": {
+        "food_on_round_spaces": [
+          5,
+          6,
+          7,
+          8
+        ],
+        "food_per_space": 1,
+        "placements_per_event": 1
+      },
+      "notes": "One event with 2 rooms still places a single batch."
+    },
+    {
+      "id": "A111-overlapping-events",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "round": 6,
+        "food_round_markers_by_card": {
+          "A111": 2,
+          "other_card": 1
+        }
+      },
+      "action": {
+        "advance_to_round_start": 6
+      },
+      "expected": {
+        "owner_food_delta": 2,
+        "food_round_markers_by_card_after": {
+          "A111": 0,
+          "other_card": 1
+        }
+      },
+      "notes": "Only this card's two stacked food markers are collected and removed; other cards' markers remain."
+    }
+  ]
+}

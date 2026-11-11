@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "A040",
+  "cases": [
+    {
+      "id": "A040-normal",
+      "scope": "effect_only",
+      "setup": {
+        "unused_farmyard_spaces": 4
+      },
+      "action": {
+        "play": "A040"
+      },
+      "expected": {
+        "spaces_with_clay": 4
+      }
+    },
+    {
+      "id": "A040-take",
+      "scope": "effect_only",
+      "setup": {
+        "spaces_with_clay": 2
+      },
+      "action": {
+        "use_farmyard_space": true
+      },
+      "expected": {
+        "clay_delta": 1,
+        "food_delta": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "A138",
+  "cases": [
+    {
+      "id": "A138-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1,
+        "people": 3
+      },
+      "action": {
+        "use_space": "fishing",
+        "pay": true
+      },
+      "expected": {
+        "wood_delta": -1,
+        "food_delta": 3,
+        "reed_delta": 1
+      }
+    },
+    {
+      "id": "A138-declined",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1,
+        "people": 3
+      },
+      "action": {
+        "use_space": "fishing",
+        "pay": false
+      },
+      "expected": {
+        "wood_delta": 0
+      }
+    }
+  ]
+}

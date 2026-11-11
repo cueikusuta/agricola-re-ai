@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "A057",
+  "cases": [
+    {
+      "id": "A057-normal",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 3,
+        "cattle": 2
+      },
+      "action": {
+        "play": "A057"
+      },
+      "expected": {
+        "food_delta": 6
+      }
+    },
+    {
+      "id": "A057-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 1,
+        "cattle": 1
+      },
+      "action": {
+        "play": "A057"
+      },
+      "expected": {
+        "food_delta": 4
+      }
+    },
+    {
+      "id": "A057-zero",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 0,
+        "cattle": 0
+      },
+      "action": {
+        "play": "A057"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

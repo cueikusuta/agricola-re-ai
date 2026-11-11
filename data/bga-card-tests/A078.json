@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "A078",
+  "cases": [
+    {
+      "id": "A078-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_used": "fishing"
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "owner_food_delta": 1,
+        "owner_reed_delta": 1
+      }
+    },
+    {
+      "id": "A078-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "space_used": "day_laborer"
+      },
+      "action": {
+        "use_space": "day_laborer"
+      },
+      "expected": {
+        "owner_food_delta": 0,
+        "owner_reed_delta": 0
+      }
+    }
+  ]
+}

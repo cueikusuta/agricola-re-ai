@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "E028",
+  "cases": [
+    {
+      "id": "E028-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4
+      },
+      "action": {
+        "play": "E028"
+      },
+      "expected": {
+        "marked_round": 7
+      }
+    },
+    {
+      "id": "E028-round",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 7,
+        "marker": true
+      },
+      "action": {
+        "start_round": 7
+      },
+      "expected": {
+        "free_occupation_granted": true
+      }
+    },
+    {
+      "id": "E028-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 7,
+        "marker": false
+      },
+      "action": {
+        "start_round": 7
+      },
+      "expected": {
+        "free_occupation_granted": false
+      }
+    }
+  ]
+}

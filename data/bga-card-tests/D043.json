@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "card_id": "D043",
+  "cases": [
+    {
+      "id": "D043-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4
+      },
+      "action": {
+        "play": "D043"
+      },
+      "expected": {
+        "round_space_food": [
+          0,
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "id": "D043-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 12
+      },
+      "action": {
+        "play": "D043"
+      },
+      "expected": {
+        "round_space_food": [
+          0,
+          1
+        ]
+      }
+    }
+  ]
+}

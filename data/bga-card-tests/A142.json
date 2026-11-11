@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "A142",
+  "cases": [
+    {
+      "id": "A142-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "reed_taken": 2,
+        "food": 0
+      },
+      "action": {
+        "use_space": "reed_bank",
+        "choose": "gain_grain"
+      },
+      "expected": {
+        "grain_delta": 1,
+        "food_delta": 0,
+        "vegetable_delta": 0
+      }
+    },
+    {
+      "id": "A142-buy",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "reed_taken": 3,
+        "food": 2
+      },
+      "action": {
+        "use_space": "reed_bank",
+        "choose": "buy_vegetable"
+      },
+      "expected": {
+        "grain_delta": 0,
+        "food_delta": -2,
+        "vegetable_delta": 1
+      }
+    },
+    {
+      "id": "A142-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "reed_taken": 1,
+        "food": 2
+      },
+      "action": {
+        "use_space": "reed_bank",
+        "choose": "gain_grain"
+      },
+      "expected": {
+        "grain_delta": 0,
+        "vegetable_delta": 0
+      }
+    }
+  ]
+}

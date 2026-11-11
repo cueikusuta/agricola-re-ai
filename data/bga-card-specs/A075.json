@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "A075",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "木挽水車",
+    "name_en": "Lumber Mill"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3350",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "stone",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "at_most_occupations",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
+    "printed_points": 2
+  },
+  "effects": [
+    {
+      "trigger": "when_buying",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1,
+            "scope": "improvements"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A075-normal",
+      "A075-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "implemented",
+    "notes": "BGA wiki content structured; official verification remains separate."
+  }
+}

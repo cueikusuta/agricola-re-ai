@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "card_id": "A167",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "種畜買い付け人",
+    "name_en": "Breeder Buyer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3258",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_stable_construction",
+      "conditions": [
+        {
+          "predicate": "stables_at_least",
+          "params": {
+            "n": 1
+          }
+        },
+        {
+          "predicate": "house_is",
+          "params": {
+            "house": [
+              "wood",
+              "clay",
+              "stone"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": {
+              "op": "table",
+              "args": [
+                "house",
+                {
+                  "wood": "sheep",
+                  "clay": "wild_boar",
+                  "stone": "cattle"
+                }
+              ]
+            },
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A167-wood",
+      "A167-stone",
+      "A167-no-material"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Building a stable while owning at least 1 of the house material: 1 sheep/boar/cattle."
+  }
+}

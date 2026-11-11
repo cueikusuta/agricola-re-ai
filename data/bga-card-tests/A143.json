@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "A143",
+  "cases": [
+    {
+      "id": "A143-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "stone_cost": 2
+      },
+      "action": {
+        "buy_improvement": "stone_2"
+      },
+      "expected": {
+        "owner_stone_delta": -1
+      }
+    },
+    {
+      "id": "A143-minimum-zero",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "stone_cost": 0
+      },
+      "action": {
+        "buy_improvement": "stone_0"
+      },
+      "expected": {
+        "owner_stone_delta": 0,
+        "note": "a discount never makes a cost negative"
+      }
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "A022",
+  "cases": [
+    {
+      "id": "A022-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4,
+        "fences_in_supply": 2
+      },
+      "action": {
+        "play": "A022"
+      },
+      "expected": {
+        "marked_round": 6,
+        "extra_person_round": 6
+      }
+    },
+    {
+      "id": "A022-round",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 6,
+        "marker": true
+      },
+      "action": {
+        "start_round": 6
+      },
+      "expected": {
+        "extra_person_granted": true
+      }
+    }
+  ]
+}

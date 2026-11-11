@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "A011",
+  "cases": [
+    {
+      "id": "A011-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wild_boar": 0
+      },
+      "action": {
+        "play": "A011"
+      },
+      "expected": {
+        "wild_boar_delta": 1
+      }
+    },
+    {
+      "id": "A011-capacity",
+      "scope": "effect_only",
+      "setup": {
+        "unplanted_fields": 2,
+        "wild_boar": 1
+      },
+      "action": {
+        "play": "A011"
+      },
+      "expected": {
+        "boar_capacity": 2
+      }
+    }
+  ]
+}

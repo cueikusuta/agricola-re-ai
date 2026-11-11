@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "card_id": "A133",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "ほら吹き",
+    "name_en": "Braggart"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3292",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "end_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": {
+              "op": "custom",
+              "args": [
+                "threshold_table",
+                "improvement_count",
+                {
+                  "threshold": 5,
+                  "points": 2
+                },
+                {
+                  "threshold": 6,
+                  "points": 3
+                },
+                {
+                  "threshold": 7,
+                  "points": 4
+                },
+                {
+                  "threshold": 8,
+                  "points": 5
+                },
+                {
+                  "threshold": 9,
+                  "points": 7
+                },
+                {
+                  "threshold": 10,
+                  "points": 9
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "end_of_game",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A133-boundary-4",
+      "A133-boundary-9"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "implemented",
+    "notes": "The wiki lists the card as strongly banned; the ban is metadata, not an effect."
+  }
+}

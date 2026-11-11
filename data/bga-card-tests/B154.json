@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "card_id": "B154",
+  "cases": [
+    {
+      "id": "B154-normal",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 6
+      },
+      "action": {
+        "acquire_sheep": 1
+      },
+      "expected": {
+        "points_delta": 3,
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "B154-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 7
+      },
+      "action": {
+        "acquire_sheep": 0
+      },
+      "expected": {
+        "points_delta": 3,
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "B154-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 5
+      },
+      "action": {
+        "acquire_sheep": 1
+      },
+      "expected": {
+        "points_delta": 0,
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "B154-once",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 7,
+        "already_scored": true
+      },
+      "action": {
+        "acquire_sheep": 1
+      },
+      "expected": {
+        "points_delta": 0,
+        "food_delta": 0
+      }
+    }
+  ]
+}

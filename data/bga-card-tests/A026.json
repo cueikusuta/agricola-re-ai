@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A026",
+  "cases": [
+    {
+      "id": "A026-normal",
+      "scope": "effect_only",
+      "setup": {
+        "space_occupied_by_other": true
+      },
+      "action": {
+        "use_space": "wish_for_children"
+      },
+      "expected": {
+        "action_allowed": true
+      }
+    },
+    {
+      "id": "A026-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "space_occupied_by_other": true
+      },
+      "action": {
+        "use_space": "farmland"
+      },
+      "expected": {
+        "action_allowed": false
+      }
+    }
+  ]
+}

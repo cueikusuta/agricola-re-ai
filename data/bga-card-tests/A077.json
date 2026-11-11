@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "A077",
+  "cases": [
+    {
+      "id": "A077-normal",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0
+      },
+      "action": {
+        "play": "A077"
+      },
+      "expected": {
+        "clay_delta": 1
+      }
+    },
+    {
+      "id": "A077-other-player",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0
+      },
+      "action": {
+        "other_player_uses": "pig_market"
+      },
+      "expected": {
+        "clay_delta": 2
+      }
+    },
+    {
+      "id": "A077-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0
+      },
+      "action": {
+        "other_player_uses": "forest"
+      },
+      "expected": {
+        "clay_delta": 0
+      }
+    }
+  ]
+}

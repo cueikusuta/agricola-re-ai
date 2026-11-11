@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "card_id": "C011",
+  "cases": [
+    {
+      "id": "C011-normal",
+      "scope": "effect_only",
+      "setup": {
+        "occupations": 1
+      },
+      "action": {
+        "play": "C011"
+      },
+      "expected": {
+        "per_type_capacity": 1
+      }
+    }
+  ]
+}

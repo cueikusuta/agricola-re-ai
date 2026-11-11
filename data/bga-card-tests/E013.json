@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "E013",
+  "cases": [
+    {
+      "id": "E013-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house": "clay",
+        "stone": 2,
+        "people": 0
+      },
+      "action": {
+        "play": "E013",
+        "renovate": true
+      },
+      "expected": {
+        "house": "stone",
+        "person_placed": 0
+      }
+    },
+    {
+      "id": "E013-wrong-house",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood"
+      },
+      "action": {
+        "renovate": true
+      },
+      "expected": {
+        "renovation_allowed": false
+      }
+    }
+  ]
+}

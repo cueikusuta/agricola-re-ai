@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "A058",
+  "cases": [
+    {
+      "id": "A058-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 8,
+        "vegetable_fields": 1
+      },
+      "action": {
+        "use_card": true
+      },
+      "expected": {
+        "food_delta": 3,
+        "points_delta": 1,
+        "vegetable_delta": -1
+      }
+    },
+    {
+      "id": "A058-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "round": 9
+      },
+      "action": {
+        "use_card": true
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

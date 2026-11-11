@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "A054",
+  "cases": [
+    {
+      "id": "A054-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "A054"
+      },
+      "expected": {
+        "food_delta": 5
+      }
+    },
+    {
+      "id": "A054-pay",
+      "scope": "effect_only",
+      "setup": {
+        "food": 3
+      },
+      "action": {
+        "end_round": "no_harvest"
+      },
+      "expected": {
+        "food_delta": -1,
+        "begging_markers": 0
+      }
+    },
+    {
+      "id": "A054-cannot-pay",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "end_round": "no_harvest"
+      },
+      "expected": {
+        "food_delta": 0,
+        "begging_markers": 1
+      }
+    }
+  ]
+}

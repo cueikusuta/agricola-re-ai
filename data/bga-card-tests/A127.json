@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "A127",
+  "cases": [
+    {
+      "id": "A127-normal",
+      "scope": "effect_only",
+      "setup": {
+        "family": 2,
+        "rooms": 2
+      },
+      "action": {
+        "play": "A127"
+      },
+      "expected": {
+        "housing_capacity": 3
+      }
+    },
+    {
+      "id": "A127-expiry",
+      "scope": "effect_only",
+      "setup": {
+        "round": 9,
+        "no_other_housing": true
+      },
+      "action": {
+        "run_round": true
+      },
+      "expected": {
+        "person_removed": true
+      }
+    },
+    {
+      "id": "A127-kept",
+      "scope": "effect_only",
+      "setup": {
+        "round": 9,
+        "no_other_housing": false
+      },
+      "action": {
+        "run_round": true
+      },
+      "expected": {
+        "person_removed": false
+      }
+    }
+  ]
+}

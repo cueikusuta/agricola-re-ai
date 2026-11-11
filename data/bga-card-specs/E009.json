@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "card_id": "E009",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "物々交換所",
+    "name_en": "Bartering Hut"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2744",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "resource_group": "building_resources",
+                    "allowed_goods": [
+                      "wood",
+                      "clay",
+                      "reed",
+                      "stone"
+                    ],
+                    "total_count": 2,
+                    "allow_mixed": true
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "sheep",
+                    "amount": 1
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "resource_group": "building_resources",
+                    "allowed_goods": [
+                      "wood",
+                      "clay",
+                      "reed",
+                      "stone"
+                    ],
+                    "total_count": 3,
+                    "allow_mixed": true
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "wild_boar",
+                    "amount": 1
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "resource_group": "building_resources",
+                    "allowed_goods": [
+                      "wood",
+                      "clay",
+                      "reed",
+                      "stone"
+                    ],
+                    "total_count": 4,
+                    "allow_mixed": true
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "cattle",
+                    "amount": 1
+                  }
+                ]
+              }
+            ],
+            "max_uses": 2,
+            "allow_repeat_option": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "At most two independent exchanges; mixed building resources are legal and the same option can be repeated."
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E009-mixed-2",
+      "E009-double-same-option",
+      "E009-mixed-3-4",
+      "E009-declined",
+      "E009-third-exchange-rejected"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Up to twice: spend any combination of 2/3/4 building resources for 1 sheep/wild boar/cattle respectively; pass left."
+  }
+}

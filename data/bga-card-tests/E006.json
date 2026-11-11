@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "E006",
+  "cases": [
+    {
+      "id": "E006-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4,
+        "clay": 3,
+        "reed": 5,
+        "stone": 0
+      },
+      "action": {
+        "play": "E006"
+      },
+      "expected": {
+        "wood_delta": 1,
+        "clay_delta": 0,
+        "reed_delta": 1,
+        "stone_delta": 0
+      }
+    },
+    {
+      "id": "E006-zero",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0,
+        "clay": 0,
+        "reed": 0,
+        "stone": 0
+      },
+      "action": {
+        "play": "E006"
+      },
+      "expected": {
+        "wood_delta": 0,
+        "reed_delta": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "card_id": "A073",
+  "cases": [
+    {
+      "id": "A073-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "farmyard_unused_spaces": 5
+      },
+      "action": {
+        "action": "build_fences",
+        "fenced_spaces": 3
+      },
+      "expected": {
+        "sow_action_granted": true,
+        "farmyard_used_delta": 3
+      }
+    },
+    {
+      "id": "A073-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "farmyard_unused_spaces": 5
+      },
+      "action": {
+        "action": "build_fences",
+        "fenced_spaces": 1
+      },
+      "expected": {
+        "sow_action_granted": false,
+        "farmyard_used_delta": 1
+      }
+    },
+    {
+      "id": "A073-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "farmyard_unused_spaces": 5
+      },
+      "action": {
+        "action": "build_rooms",
+        "rooms_built": 2,
+        "family_members_placed": 1
+      },
+      "expected": {
+        "sow_action_granted": true,
+        "sow_action_granted_count": 1
+      },
+      "notes": "Any one action that converts at least 2 unused farmyard spaces grants exactly one Sow."
+    }
+  ]
+}

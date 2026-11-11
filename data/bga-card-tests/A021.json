@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "A021",
+  "cases": [
+    {
+      "id": "A021-normal",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 3,
+        "people": 2
+      },
+      "action": {
+        "build_rooms": 1
+      },
+      "expected": {
+        "family_growth_granted": true,
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "A021-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 2,
+        "people": 2
+      },
+      "action": {
+        "build_rooms": 1
+      },
+      "expected": {
+        "family_growth_granted": false,
+        "food_delta": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "E042",
+  "cases": [
+    {
+      "id": "E042-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "E042"
+      },
+      "expected": {
+        "round_space_goods": [
+          "cattle",
+          "grain",
+          "cattle"
+        ]
+      }
+    },
+    {
+      "id": "E042-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 13
+      },
+      "action": {
+        "play": "E042"
+      },
+      "expected": {
+        "round_space_goods": [
+          "cattle"
+        ]
+      }
+    }
+  ]
+}

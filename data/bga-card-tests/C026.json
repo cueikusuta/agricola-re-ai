@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "C026",
+  "cases": [
+    {
+      "id": "C026-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "C026"
+      },
+      "expected": {
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "C026-bake",
+      "scope": "effect_only",
+      "setup": {
+        "bread_oven": true
+      },
+      "action": {
+        "use_space": "farmland"
+      },
+      "expected": {
+        "bake_bread_granted": true
+      }
+    },
+    {
+      "id": "C026-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "bread_oven": true
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "bake_bread_granted": false
+      }
+    }
+  ]
+}

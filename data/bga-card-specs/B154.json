@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "card_id": "B154",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "羊持ち",
+    "name_en": "Sheep Keeper"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3103",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "animal_count_less",
+        "params": {
+          "animal": "sheep",
+          "n": 7
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_animal_acquisition",
+      "conditions": [
+        {
+          "predicate": "animal_count_at_least",
+          "params": {
+            "animal": "sheep",
+            "n": 7
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": 3
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B154-normal",
+      "B154-boundary",
+      "B154-not-triggered",
+      "B154-once"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Playable only with fewer than 7 sheep; once at 7 sheep gain 3 points and 2 food."
+  }
+}

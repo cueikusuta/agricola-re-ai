@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "card_id": "A029",
+  "cases": [
+    {
+      "id": "A029-normal",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2
+      },
+      "action": {
+        "decline_round_bonus": false
+      },
+      "expected": {
+        "grain_delta": -1,
+        "points_delta": 1,
+        "other_players_food_delta": 1
+      }
+    },
+    {
+      "id": "A029-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 0
+      },
+      "action": {
+        "decline_round_bonus": false
+      },
+      "expected": {
+        "grain_delta": 0,
+        "points_delta": 0,
+        "other_players_food_delta": 0
+      }
+    },
+    {
+      "id": "A029-declined",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2
+      },
+      "action": {
+        "decline_round_bonus": true
+      },
+      "expected": {
+        "grain_delta": 0,
+        "points_delta": 0
+      }
+    }
+  ]
+}
