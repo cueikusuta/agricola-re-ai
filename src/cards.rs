@@ -2,11 +2,16 @@
 //! This is a deliberately small deterministic effect vocabulary, not a claim that
 //! the full Agricola Revised deck has been implemented.
 use crate::model::{Animal, Crop, Good, House, Player, Space, Tile};
+use crate::registry::{
+    build_default_registry, card_set_from_pool, card_set_from_registry, CardId, CardPool,
+    CardRegistry,
+};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -17,6 +22,15 @@ pub enum CardKind {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CardEffect {
+    /// Test-only probe: an effect whose resolution requires a player decision.
+    /// Compiled only in the crate's own test build, so the production card pool
+    /// and `CardSet::content_hash` are unaffected. It exists so the dispatcher's
+    /// Interrupt branch (handler -> `EffectResult::Pending` -> `PendingDecision`
+    /// -> pause) is exercised end to end instead of being an untested path.
+    #[cfg(test)]
+    PendingProbe {
+        options: Vec<(Good, u32)>,
+    },
     OnPlayGain {
         good: Good,
         amount: u32,
@@ -79,6 +93,8 @@ impl CardEffect {
     /// engine actually implements, never a guessed printed effect.
     pub fn public_tag(&self) -> &'static str {
         match self {
+            #[cfg(test)]
+            CardEffect::PendingProbe { .. } => "pending_probe",
             CardEffect::OnPlayGain { .. } => "on_play_gain",
             CardEffect::AfterWorkerGain { .. } => "after_worker_gain",
             CardEffect::EndGameBonus { .. } => "end_game_bonus",
@@ -145,6 +161,13 @@ pub struct CardDefinition {
     pub cost: Vec<(Good, u32)>,
     pub points: i32,
     pub effects: Vec<CardEffect>,
+    /// Maximum times this card's effects may resolve per round, for cards
+    /// printed with a per-round use limit. `None` = no limit (the default), and
+    /// it is skipped when serializing, so existing card sets and saved games
+    /// keep their exact bytes and `content_hash` is unchanged unless a limit is
+    /// actually declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_limit: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -219,6 +242,8 @@ impl CardSet {
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
                         | CardEffect::Passive { .. } => 1,
+                        #[cfg(test)]
+                        CardEffect::PendingProbe { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
                         | CardEffect::OnPlayGainIfHouse { amount, .. }
                         | CardEffect::StartRoundGain { amount, .. }
@@ -468,6 +493,9 @@ fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String>
 }
 
 /// Execute one prevalidated card play; the containing Game transaction provides rollback.
+/// This function validates the play, pays costs, applies on-play effects (Before phase),
+/// moves the card from hand to played, and updates card_points.
+/// This is the canonical public API used by evaluation, policy, and unit tests.
 pub fn play(
     set: &CardSet,
     hand: &mut Vec<String>,
@@ -486,10 +514,46 @@ pub fn play(
     for (good, amount) in card_costs(card, player, extra_food) {
         player.supply.pay(good, amount)?;
     }
+    // Apply on-play (Before phase) effects
+    apply_on_play_effects(set, player, id)?;
+    // Move card from hand to played via the single canonical implementation
+    crate::card_zones::hand_to_played(hand, player, id).map_err(|e| e.to_string())?;
+    // Update card points
     let next_points = player
         .card_points
         .checked_add(card.points)
         .ok_or("card points overflow")?;
+    player.card_points = next_points;
+    Ok(())
+}
+
+/// Internal: validate and pay costs only (no effects, no move, no points).
+/// Used by the engine path which then routes through card_zones and dispatch_play.
+pub(crate) fn play_validate_pay(
+    set: &CardSet,
+    hand: &mut [String],
+    player: &mut Player,
+    id: &str,
+    kind: CardKind,
+    extra_food: u32,
+) -> Result<(), String> {
+    let card = set.definition(id).ok_or("unknown card")?;
+    if card.kind != kind || !hand.iter().any(|x| x == id) {
+        return Err("card is not in the player's hand or is the wrong kind".into());
+    }
+    if !can_play(set, card, player, extra_food) {
+        return Err("cannot pay card costs or prerequisites are unmet".into());
+    }
+    for (good, amount) in card_costs(card, player, extra_food) {
+        player.supply.pay(good, amount)?;
+    }
+    Ok(())
+}
+
+/// Apply on-play (Before phase) effects for a card that has been moved to played.
+/// Called by the event dispatcher after the card is in the played zone.
+pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Result<(), String> {
+    let card = set.definition(id).ok_or("unknown card")?;
     for effect in &card.effects {
         match effect {
             CardEffect::OnPlayGain { good, amount } => {
@@ -529,8 +593,16 @@ pub fn play(
             _ => {}
         }
     }
-    hand.retain(|x| x != id);
-    player.played_cards.push(id.to_string());
+    Ok(())
+}
+
+/// Update card_points after a card is successfully played.
+/// Called after move_card and effect dispatch.
+pub fn update_card_points_on_play(player: &mut Player, points: i32) -> Result<(), String> {
+    let next_points = player
+        .card_points
+        .checked_add(points)
+        .ok_or("card points overflow")?;
     player.card_points = next_points;
     Ok(())
 }
@@ -563,6 +635,7 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
         rule: ScoreBonusRule,
     ) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.to_owned(),
             kind,
             cost,
@@ -798,6 +871,7 @@ mod verified_scoring_card_tests {
             definitions: verified_scoring_cards(3),
         };
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "test_minor".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![],
@@ -847,6 +921,7 @@ mod verified_scoring_card_tests {
             definitions: verified_scoring_cards(2),
         };
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "before_occ".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -854,6 +929,7 @@ mod verified_scoring_card_tests {
             effects: vec![],
         });
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "after_occ".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -877,6 +953,7 @@ mod card_prerequisite_tests {
 
     fn prerequisite_card(rule: CardRequirement) -> (CardSet, CardDefinition) {
         let card = CardDefinition {
+            use_limit: None,
             id: "check".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Wood, 1)],
@@ -896,6 +973,7 @@ mod card_prerequisite_tests {
         let (mut set, card) = prerequisite_card(CardRequirement::MinimumOccupations(2));
         set.definitions
             .extend(["one", "two"].into_iter().map(|id| CardDefinition {
+                use_limit: None,
                 id: id.into(),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -958,6 +1036,7 @@ mod card_prerequisite_tests {
     fn player_count_requirement_rejected_by_card_set() {
         let mut cards = verified_scoring_cards(3);
         cards.push(CardDefinition {
+            use_limit: None,
             id: "extra".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![],
@@ -990,6 +1069,7 @@ pub fn verified_minor_worker_cards(players: usize) -> Vec<CardDefinition> {
         effects: Vec<CardEffect>,
     ) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.to_string(),
             kind,
             cost,
@@ -1082,6 +1162,7 @@ mod verified_minor_worker_tests {
             definitions: verified_minor_worker_cards(2),
         };
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "test_occ".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1118,6 +1199,7 @@ mod verified_minor_worker_tests {
         };
         for i in 1..=3 {
             set.definitions.push(CardDefinition {
+                use_limit: None,
                 id: format!("occ{i}"),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -1146,6 +1228,7 @@ mod verified_minor_worker_tests {
 pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
     vec![
         CardDefinition {
+            use_limit: None,
             id: "A005".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Food, 1)],
@@ -1158,6 +1241,7 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "A125".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1240,6 +1324,7 @@ mod verified_immediate_resource_tests {
 pub fn verified_worker_bonus_cards(players: usize) -> Vec<CardDefinition> {
     fn occupation(id: &str, effects: Vec<CardEffect>) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1460,6 +1545,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
     let occupation = CardKind::Occupation;
     vec![
         CardDefinition {
+            use_limit: None,
             id: "B050".into(),
             kind: minor,
             cost: vec![(Good::Wood, 1)],
@@ -1479,6 +1565,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             ],
         },
         CardDefinition {
+            use_limit: None,
             id: "B057".into(),
             kind: minor,
             cost: vec![(Good::Clay, 1), (Good::Wood, 1)],
@@ -1491,6 +1578,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "B061".into(),
             kind: minor,
             cost: vec![],
@@ -1502,6 +1590,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "B062".into(),
             kind: minor,
             cost: vec![(Good::Wood, 1)],
@@ -1514,6 +1603,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "B118".into(),
             kind: occupation,
             cost: vec![],
@@ -1622,6 +1712,7 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
         effect: PassiveRule,
     ) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.into(),
             kind,
             cost,
@@ -1637,6 +1728,7 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
             PassiveRule::PastureCapacity(2),
         ),
         CardDefinition {
+            use_limit: None,
             id: "A075".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Stone, 2)],
@@ -1712,6 +1804,7 @@ mod passive_cards_tests {
             definitions: verified_passive_cards(),
         };
         set.definitions.push(CardDefinition {
+            use_limit: None,
             id: "sample".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Wood, 1)],
@@ -1762,6 +1855,7 @@ mod passive_cards_tests {
         };
         for i in 0..4 {
             set.definitions.push(CardDefinition {
+                use_limit: None,
                 id: format!("occ{i}"),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -1804,6 +1898,7 @@ pub fn after_clay_construction(
 pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
     let mut result = vec![
         CardDefinition {
+            use_limit: None,
             id: "A110".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1814,6 +1909,7 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "B107".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1828,6 +1924,7 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
     ];
     if players == 2 {
         result.push(CardDefinition {
+            use_limit: None,
             id: "B102".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -1945,6 +2042,7 @@ mod simple_occupation_tests {
 pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
     vec![
         CardDefinition {
+            use_limit: None,
             id: "B010".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Wood, 3), (Good::Food, 3)],
@@ -1954,6 +2052,7 @@ pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
             }],
         },
         CardDefinition {
+            use_limit: None,
             id: "A063".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Wood, 2), (Good::Stone, 2)],
@@ -1967,6 +2066,7 @@ pub fn verified_multiplayer_passive_cards(players: usize) -> Vec<CardDefinition>
         return vec![];
     }
     vec![CardDefinition {
+        use_limit: None,
         id: "A143".into(),
         kind: CardKind::Occupation,
         cost: vec![],
@@ -2095,6 +2195,7 @@ mod card_set_content_hash_tests {
 
     fn card(id: &str, kind: CardKind, points: i32) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.into(),
             kind,
             cost: Vec::new(),
@@ -2166,4 +2267,61 @@ mod card_set_content_hash_tests {
         shuffled.definitions.reverse();
         assert_eq!(first.content_hash(), shuffled.content_hash());
     }
+}
+
+/// Get the default immutable card registry (built once, shared via Arc).
+///
+/// This is the primary entry point for new code. The registry contains all
+/// implemented cards with stable CardId assignments and validated definitions.
+pub fn default_registry() -> Arc<CardRegistry> {
+    build_default_registry().expect("default registry must build")
+}
+
+/// Get a CardPool for the given player count and mode.
+///
+/// - `experimental_mode = false`: Official pool (verified + eligible only, fail-closed)
+/// - `experimental_mode = true`: Experimental pool (all implemented cards)
+pub fn card_pool(players: usize, experimental_mode: bool) -> CardPool {
+    CardPool::new(&default_registry(), players, experimental_mode)
+}
+
+/// Get a legacy CardSet for the given player count and mode (compat adapter).
+///
+/// This builds a CardSet from the pool's eligible cards, suitable for
+/// existing APIs that expect CardSet (saves, observations, legacy engine paths).
+pub fn card_set_for_game(players: usize, experimental_mode: bool) -> CardSet {
+    let registry = default_registry();
+    let pool = card_pool(players, experimental_mode);
+    card_set_from_pool(&registry, &pool)
+}
+
+/// Get a legacy CardSet with ALL implemented cards (for full-catalog observations).
+pub fn card_set_full_catalog() -> CardSet {
+    card_set_from_registry(&default_registry())
+}
+
+/// Look up a card definition by external ID from the default registry.
+pub fn card_definition(external_id: &str) -> Option<CardDefinition> {
+    default_registry()
+        .get_by_external(external_id)
+        .map(|c| c.to_card_definition())
+}
+
+/// Look up a card definition by CardId from the default registry.
+pub fn card_definition_by_id(card_id: CardId) -> Option<CardDefinition> {
+    default_registry()
+        .get(card_id)
+        .map(|c| c.to_card_definition())
+}
+
+/// Convert external ID to CardId using the default registry.
+pub fn external_to_card_id(external_id: &str) -> Option<CardId> {
+    default_registry().card_id(external_id)
+}
+
+/// Convert CardId to external ID using the default registry.
+pub fn card_id_to_external(card_id: CardId) -> Option<String> {
+    default_registry()
+        .external_id(card_id)
+        .map(|s| s.to_string())
 }

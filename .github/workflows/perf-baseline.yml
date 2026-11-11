@@ -1,0 +1,90 @@
+name: Step 0 Performance Baseline (#236)
+
+# Explicit experiment only: no automatic trigger on push or PR.
+# The authoritative baseline is produced by an authorized maintainer or agent
+# via workflow_dispatch. AGENTS.md rule 13: large measurement jobs never
+# auto-run on main push.
+on:
+  workflow_dispatch:
+    inputs:
+      quick:
+        description: "Run in quick mode (skip 10s budgets)"
+        type: boolean
+        default: false
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-baseline-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  baseline:
+    name: Perf baseline (ubuntu-24.04 standard CPU)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Restore Cargo cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: perf-baseline
+          save-if: ${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Print environment
+        run: |
+          echo "=== Host environment ==="
+          lscpu | grep -E 'Model name|CPU\(s\)|Thread|Core'
+          echo "Memory: $(free -h | grep Mem: | awk '{print $2}')"
+          rustc --version
+          cargo --version
+          git rev-parse HEAD
+
+      - name: Build and run timing baseline (plain allocator)
+        env:
+          QUICK: ${{ inputs.quick }}
+        run: |
+          cargo build --release --bin perf_baseline
+          if [ "$QUICK" = "true" ]; then
+            ./target/release/perf_baseline --quick > baseline_timing.json
+          else
+            ./target/release/perf_baseline > baseline_timing.json
+          fi
+
+      - name: Build and run allocation baseline (instrumented build)
+        env:
+          QUICK: ${{ inputs.quick }}
+        run: |
+          cargo build --release --bin perf_baseline --features perf-count-alloc
+          if [ "$QUICK" = "true" ]; then
+            ./target/release/perf_baseline --quick --alloc-only > baseline_alloc.json
+          else
+            ./target/release/perf_baseline --alloc-only > baseline_alloc.json
+          fi
+
+      - name: Merge timing and allocation reports
+        run: python3 scripts/perf_merge.py baseline_timing.json baseline_alloc.json baseline.json
+
+      - name: Display summary
+        run: python3 scripts/perf_display.py baseline.json
+
+      - name: Upload baseline JSON artifact (90-day retention; long-term
+          archival is an explicit commit to docs/perf/ by the orchestrator
+          after the official run — see docs/perf/README.md)
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-baseline-${{ github.sha }}
+          path: |
+            baseline.json
+            baseline_timing.json
+            baseline_alloc.json
+          retention-days: 90
+
+      - name: Write step summary
+        run: python3 scripts/perf_summary.py baseline.json

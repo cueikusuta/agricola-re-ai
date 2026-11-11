@@ -117,6 +117,93 @@ class PairedStatsReportDiagnosticsTests(unittest.TestCase):
         self.assertEqual(report["baseline_solo_first_rate"], 0.0)
         self.assertEqual(report["baseline_first_reach_rate"], 0.0)
 
+    def test_puct_config_ids_are_propagated_when_present(self):
+        """#219: config identities ride along into the aggregated report."""
+        rows = fixture()
+        for row in rows:
+            row["candidate_puct_config_id"] = "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0"
+            row["baseline_puct_config_id"] = "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0"
+        report = run(rows)
+        self.assertEqual(
+            report["candidate_puct_config_id"],
+            "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0",
+        )
+        self.assertEqual(
+            report["baseline_puct_config_id"],
+            "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0",
+        )
+
+    def test_puct_config_id_conflict_is_rejected(self):
+        """A run whose rows disagree on one config identity fails closed."""
+        rows = fixture()
+        rows[0]["candidate_puct_config_id"] = "puct-a"
+        rows[-1]["candidate_puct_config_id"] = "puct-b"
+        with self.assertRaisesRegex(ValueError, "inconsistent candidate_puct_config_id"):
+            run(rows)
+
+    def test_legacy_rows_without_config_ids_stay_valid(self):
+        report = run(fixture())
+        self.assertNotIn("candidate_puct_config_id", report)
+        self.assertNotIn("baseline_puct_config_id", report)
+
+    def test_puct_config_id_must_agree_with_recorded_scalars(self):
+        """#219 review P3-1: scalar fields and the config ID must agree."""
+        rows = fixture()
+        config_id = "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0"
+        scalars = {
+            "puct_simulations_config": 32,
+            "puct_tree_depth": 2,
+            "puct_c": 1.5,
+            "puct_prior_temperature": 3.0,
+            "puct_value_temperature": 8.0,
+            "puct_leaf": "terminal",
+            "puct_root_limit": 0,
+            "puct_final_prior_weight": 0.0,
+        }
+        for row in rows:
+            row.update(scalars)
+            row["candidate_puct_config_id"] = config_id
+        report = run(rows)
+        self.assertEqual(report["candidate_puct_config_id"], config_id)
+        # One contradictory scalar fails the whole aggregation.
+        broken = fixture()
+        for row in broken:
+            row.update(scalars)
+            row["candidate_puct_config_id"] = config_id
+        broken[0]["puct_c"] = 2.0
+        with self.assertRaisesRegex(
+            ValueError, "candidate_puct_config_id disagrees"
+        ):
+            run(broken)
+
+    def test_baseline_puct_id_must_agree_with_baseline_scalars(self):
+        rows = fixture()
+        config_id = "puct-s16-d2-c1.5-pt3-vt8-terminal-rl0-fp0"
+        scalars = {
+            "baseline_puct_simulations": 16,
+            "baseline_puct_tree_depth": 2,
+            "baseline_puct_c": 1.5,
+            "baseline_puct_prior_temperature": 3.0,
+            "baseline_puct_value_temperature": 8.0,
+            "baseline_puct_leaf": "terminal",
+            "baseline_puct_root_limit": 0,
+            "baseline_puct_final_prior": 0.0,
+        }
+        for row in rows:
+            row.update(scalars)
+            row["baseline_puct_config_id"] = config_id
+        report = run(rows)
+        self.assertEqual(report["baseline_puct_config_id"], config_id)
+        broken = fixture()
+        for row in broken:
+            row.update(scalars)
+            row["baseline_puct_config_id"] = config_id
+        broken[0]["baseline_puct_simulations"] = 32
+        with self.assertRaisesRegex(
+            ValueError, "baseline_puct_config_id disagrees"
+        ):
+            run(broken)
+
     def test_shared_first_is_reported_without_becoming_a_solo_win(self):
         rows = fixture()
         for row in rows:

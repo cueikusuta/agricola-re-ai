@@ -19,12 +19,16 @@
 //! simulation samples hidden information from [`Observation`] only, through the
 //! same `sample_game` helper the baseline uses.
 use crate::evaluation::{action_value_with_details, evaluate_player, WeightedEvaluationPolicy};
-use crate::mcts::{rollout, sample_game, MctsOutcome, SearchLimit, SearchMode};
+use crate::mcts::{
+    rollout, sample_game_with_set, search_card_set, CardLookup, MctsOutcome, SearchLimit,
+    SearchMode,
+};
 use crate::model::{Game, Observation, Space};
 use crate::policy::{weight, DetailPolicy, SimpleDetails, SpacePolicy};
 use crate::score::standings_with_cards;
 use rand_chacha::ChaCha8Rng;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::Instant;
 
 /// How the value of a depth-limited leaf is estimated.
@@ -59,14 +63,22 @@ pub struct PuctConfig {
 
 impl Default for PuctConfig {
     fn default() -> Self {
-        // Defaults match the configuration measured in
-        // docs/m8-3-mcts-improvement-2026-11-06.md: PUCT priors + terminal
-        // rollouts, which beat the evaluation policy on the development seeds.
+        // Since #263 the shipped default is the adopted configuration
+        // `puct-s32-d2-c1.5-pt6-vt8-terminal-rl0-fp0` from the pre-registered
+        // formal evaluation Run 42654611147 (#219): four-player cardless,
+        // 32 simulations per decision, unknown seeds 985000-985249,
+        // 1,000 games per arm, +8.05 pp first-credit, 95% CI [+5.2, +11.0].
+        // That comparison used a fixed simulation count and says nothing about
+        // equal wall-clock time; carded, draft, and two-player strength are
+        // not established here. The historical configuration
+        // `puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0` (docs/m8-3-
+        // mcts-improvement-2026-11-06.md) stays reproducible by passing
+        // `--puct-prior-temp 3` explicitly.
         Self {
             simulations: 32,
             tree_depth: 2,
             c_puct: 1.5,
-            prior_temperature: 3.0,
+            prior_temperature: 6.0,
             value_temperature: 8.0,
             leaf_mode: LeafMode::Terminal,
             root_candidate_limit: 0,
@@ -297,6 +309,7 @@ impl PuctPolicy {
             timed_out,
             elapsed_ms: elapsed.as_millis().min(u128::from(u64::MAX)) as u64,
             overshoot_ms: budget
+                .filter(|b| !b.is_zero())
                 .map(|budget| elapsed.saturating_sub(budget).as_millis() as u64)
                 .unwrap_or(0),
             mode,
@@ -349,6 +362,19 @@ impl PuctPolicy {
         let mut nodes = vec![Node::new(players, 1.0)];
         let mut simulations_completed = 0usize;
         let mut timed_out = false;
+
+        // Hoist CardSet creation and validation outside the simulation loop (P1-B).
+        let set = match search_card_set(obs) {
+            Some(set) => Arc::clone(&set),
+            None => {
+                let space = fallback(obs, legal, rng)
+                    .filter(|space| legal.contains(space))
+                    .or_else(|| legal.first().copied())?;
+                return Some((space, outcome(0, true, false, started.elapsed())));
+            }
+        };
+        let lookup = CardLookup::from_card_set(&set);
+
         for _ in 0..max_simulations {
             if let Some(limit) = deadline {
                 if Instant::now() >= limit {
@@ -356,7 +382,7 @@ impl PuctPolicy {
                     break;
                 }
             }
-            let Some(mut game) = sample_game(obs, rng) else {
+            let Some(mut game) = sample_game_with_set(obs, &set, lookup.as_ref(), rng) else {
                 continue;
             };
             let mut path = vec![0usize];
@@ -521,6 +547,23 @@ mod tests {
             seed: 4242,
             additional_action_space_enabled: false,
         })
+    }
+
+    /// #263: the shipped default is the adopted configuration from the
+    /// pre-registered formal evaluation Run 42654611147 (#219). Every field is
+    /// enumerated so a future accidental change fails here instead of silently
+    /// shifting the standard PUCT.
+    #[test]
+    fn shipped_default_is_the_adopted_pt6_configuration() {
+        let config = PuctConfig::default();
+        assert_eq!(config.simulations, 32);
+        assert_eq!(config.tree_depth, 2);
+        assert_eq!(config.c_puct, 1.5);
+        assert_eq!(config.prior_temperature, 6.0);
+        assert_eq!(config.value_temperature, 8.0);
+        assert_eq!(config.leaf_mode, LeafMode::Terminal);
+        assert_eq!(config.root_candidate_limit, 0);
+        assert_eq!(config.final_prior_weight, 0.0);
     }
 
     #[test]

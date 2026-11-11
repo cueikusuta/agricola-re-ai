@@ -795,6 +795,7 @@ fn fixture_pool(mode: DraftMode, players: usize) -> DraftPool {
 /// function and must not be treated as reviewed cards.
 fn fixture_card_set(pool: &DraftPool) -> CardSet {
     let definition = |id: &String, kind: crate::cards::CardKind| CardDefinition {
+        use_limit: None,
         id: id.clone(),
         kind,
         cost: vec![],
@@ -1295,7 +1296,7 @@ mod tests {
         );
         let replay = Game::replay_with_cards(
             session.game.config.clone(),
-            session.game.card_set.clone(),
+            (*session.game.card_set).clone(),
             &session.game.log.events,
         )
         .unwrap();
@@ -1741,7 +1742,7 @@ mod tests {
         );
         let replay = Game::replay_with_cards(
             restarted.game.config.clone(),
-            restarted.game.card_set.clone(),
+            (*restarted.game.card_set).clone(),
             &restarted.game.log.events,
         )
         .unwrap();

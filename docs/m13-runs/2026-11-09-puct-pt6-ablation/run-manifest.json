@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "purpose": "Pre-registered formal PUCT-vs-PUCT ablation (Issue #219): candidate prior_temp=6 vs frozen current PUCT baseline.",
+  "run_id": "42654611147",
+  "run_url": "https://github.com/cueikusuta/agricola-re-ai/actions/runs/42654611147",
+  "code_sha": "85672c6",
+  "branch": "m13/219-puct-ablation-baseline",
+  "classification": "formal",
+  "conditions": {
+    "players": 4,
+    "cards": "none",
+    "additional_action_space": false,
+    "candidate": "puct",
+    "candidate_puct_config_id": "puct-s32-d2-c1.5-pt6-vt8-terminal-rl0-fp0",
+    "baseline": "puct",
+    "baseline_puct_config_id": "puct-s32-d2-c1.5-pt3-vt8-terminal-rl0-fp0",
+    "opponent": "puct",
+    "opponent_note": "all non-focus PUCT seats use the frozen baseline configuration",
+    "search_mode": "simulation-capped",
+    "decision_budget_ms": 0,
+    "puct_simulations": 32,
+    "puct_tree_depth": 2,
+    "puct_prior_temp": 6,
+    "seed_start": 985000,
+    "seed_blocks": 250,
+    "games_per_arm": 1000,
+    "total_games": 2000,
+    "seed_registry_note": "985000-985249 unused by any previous evaluation (M8-3 held-out band 980000-980249 was deliberately not reused)."
+  },
+  "pre_registered_adoption_criteria": {
+    "point_estimate": "+5 pp or more over the frozen current PUCT",
+    "ci_lower_bound_above_zero": true,
+    "one_primary_comparison": "prior_temp 3 -> 6, no other factor"
+  },
+  "results": {
+    "candidate_first_credit_pct": 33.050000000000004,
+    "baseline_first_credit_pct": 25.0,
+    "mean_first_credit_delta_pp": 8.05,
+    "paired_block_bootstrap_95ci_pp": [
+      5.2,
+      11.0
+    ],
+    "bootstrap_iterations": 10000,
+    "bootstrap_seed": 20261106,
+    "candidate_expected_rank": 2.311,
+    "candidate_score_margin": 0.7496666666666666,
+    "candidate_max_focus_decision_ms": 158.721001,
+    "baseline_max_focus_decision_ms": 153.986734,
+    "maximum_focus_p95_decision_ms": 156.065781,
+    "simulations_per_decision_equal": true,
+    "verdict": "ADOPTED per pre-registered criteria (point 8.05pp >= 5pp, CI lower 5.2 > 0)"
+  },
+  "verification": {
+    "local_reaggregation": "scripts/paired_eval_stats.py re-run on the 8 downloaded shards reproduced the Actions report with zero differing fields",
+    "integrity": "2000 rows; (arm,block,seat) unique x2000; 1000 rows per arm; all finished=true and replay_verified=true; seeds 985000-985249"
+  },
+  "artifacts": {
+    "shard-0.matches.jsonl.gz": {
+      "sha256": "6d4eb7b982345546658d3485ba178a3ee0a58cbfa990f33a14b6756e83feb79a",
+      "bytes": 33584
+    },
+    "shard-1.matches.jsonl.gz": {
+      "sha256": "b1f159737b31546add87a533013d582244686920effaa2155536eebe5404bf13",
+      "bytes": 33456
+    },
+    "shard-2.matches.jsonl.gz": {
+      "sha256": "b78a89928649cf2384aaa9bfff36cfff1554171c3e33fa293b9f3093c2dc48c9",
+      "bytes": 33005
+    },
+    "shard-3.matches.jsonl.gz": {
+      "sha256": "1d8a8032c59628f6ade1c608986066e852bcf969689626359f82b6bc7c17dc44",
+      "bytes": 34333
+    },
+    "shard-4.matches.jsonl.gz": {
+      "sha256": "30e555b95d7fb0295826ccb8242216fab76a1c9bebec078eff8870705fd69934",
+      "bytes": 33145
+    },
+    "shard-5.matches.jsonl.gz": {
+      "sha256": "df59afbfb8f797cb6adac42496090ae07287487d3faa1d9a9e7b964354085cc2",
+      "bytes": 33067
+    },
+    "shard-6.matches.jsonl.gz": {
+      "sha256": "be58c79ddffb676831987fb14d8ceea6740127bb14d5d58f1ba37f7ca8838ccb",
+      "bytes": 33377
+    },
+    "shard-7.matches.jsonl.gz": {
+      "sha256": "4ac4e381cefa0c0c187d866f172b80f1ccaea141ef29661b23ea37eca199e541",
+      "bytes": 34268
+    }
+  },
+  "limitations": "cardless 4p only; cards/draft not evaluated; equal simulation count (32), not equal wall clock; result must not be conflated with the +62.8pp historic PUCT-vs-MCTS(16sim) figure",
+  "actions_artifact_expiry": "2026-11-16 (7-day retention); raw shards preserved in this directory as .jsonl.gz"
+}

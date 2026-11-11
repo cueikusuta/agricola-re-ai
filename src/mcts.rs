@@ -3,12 +3,13 @@
 //! each simulation. No Game reference (or hidden RNG) enters SpacePolicy.
 use crate::cards::{CardKind, CardSet, CardState};
 use crate::evaluation::{DetailAwareEvaluationPolicy, WeightedEvaluationPolicy};
-use crate::model::{Config, Game, Observation, RoundCard, Space};
+use crate::model::{Config, Game, Observation, RngStreams, RoundCard, Space};
 use crate::policy::{CardChoiceDetails, DetailPolicy, GreedyPolicy, SpacePolicy};
 use crate::score::standings_with_cards;
-use rand::{seq::SliceRandom, Rng};
+use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use std::time::Instant;
 
 /// Win probability comes first; only empirically equivalent win rates
@@ -49,14 +50,50 @@ impl Node {
     }
 }
 
-/// Creates a plausible full state from *only* public information.
-/// The remaining round cards are sampled independently within each stage.
-/// This is a rollout approximation: past Well purchase times are not part
-/// of Observation, so pending Well rewards cannot be reconstructed.
-/// Rebuild the hidden card partition from the observing player's information.
-/// Unknown cards are shuffled separately by kind; opponent cards are never copied
-/// from the real Game, even when the caller has a reference to that Game.
-fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(CardSet, CardState)> {
+/// O(log n) card definition lookup for sampling. Built once per decision from a
+/// validated `CardSet`, then reused across all simulations in that decision.
+/// Maps card id -> (kind, points) for the checks that `CardState::validate` /// performs (partition coverage, hand size, card_points consistency).
+/// Uses `BTreeMap` for deterministic iteration order; lookup is O(log n) where n
+/// is the number of card definitions.
+#[derive(Clone, Debug)]
+pub struct CardLookup {
+    kind: BTreeMap<String, CardKind>,
+    points: BTreeMap<String, i32>,
+}
+
+impl CardLookup {
+    /// Build a lookup from a validated CardSet. Returns `None` if the set is
+    /// not enabled (cardless game), in which case no lookup is needed because
+    /// `sample_private_cards_with_set` handles the disabled case directly.
+    pub fn from_card_set(set: &CardSet) -> Option<Self> {
+        if !set.enabled() {
+            return None;
+        }
+        let mut kind = BTreeMap::new();
+        let mut points = BTreeMap::new();
+        for def in &set.definitions {
+            kind.insert(def.id.clone(), def.kind);
+            points.insert(def.id.clone(), def.points);
+        }
+        Some(Self { kind, points })
+    }
+
+    #[inline]
+    pub fn kind(&self, id: &str) -> Option<CardKind> {
+        self.kind.get(id).copied()
+    }
+
+    #[inline]
+    pub fn points(&self, id: &str) -> Option<i32> {
+        self.points.get(id).copied()
+    }
+}
+
+/// Hoist the per-decision CardSet creation and validation. Returns `Some(Arc<CardSet>)`
+/// if the observation's card definitions form a valid card set for the player count,
+/// `None` otherwise. This replaces the per-simulation `obs.card_definitions.clone()`
+/// + `set.validate(players)` in the old `sample_private_cards`.
+pub fn search_card_set(obs: &Observation) -> Option<Arc<CardSet>> {
     let players = obs.public.players.len();
     if obs.player_id >= players || obs.hand_counts.len() != players {
         return None;
@@ -65,17 +102,76 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
         definitions: obs.card_definitions.clone(),
     };
     set.validate(players).ok()?;
+    Some(Arc::new(set))
+}
+
+/// Fast partition validation using a pre-built `CardLookup` instead of
+/// `set.definition(id)` linear search. This is the same checks as
+/// `CardState::validate` but O(number of cards) instead of
+/// O(number of cards × number of definitions).
+fn validate_partition(
+    cards: &CardState,
+    lookup: &CardLookup,
+    players: &[crate::model::Player],
+    definitions_len: usize,
+) -> Result<(), String> {
+    if cards.hands.len() != players.len() {
+        return Err("card hand count mismatch".into());
+    }
+    let mut all = BTreeSet::new();
+    for id in cards
+        .undealt
+        .iter()
+        .chain(cards.hands.iter().flat_map(|hand| hand.iter()))
+        .chain(players.iter().flat_map(|player| player.played_cards.iter()))
+    {
+        if lookup.kind(id).is_none() || !all.insert(id.as_str()) {
+            return Err("card missing, duplicate or unknown".into());
+        }
+    }
+    if all.len() != definitions_len {
+        return Err("card partition does not match card set".into());
+    }
+    for (hand, player) in cards.hands.iter().zip(players) {
+        let own = hand.iter().chain(player.played_cards.iter());
+        for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
+            let count = own
+                .clone()
+                .filter(|id| lookup.kind(id) == Some(kind))
+                .count();
+            if count != 7 {
+                return Err("player has incorrect original card allocation".into());
+            }
+        }
+        let points: i32 = player
+            .played_cards
+            .iter()
+            .filter_map(|id| lookup.points(id))
+            .sum();
+        if points != player.card_points {
+            return Err("card score mismatch".into());
+        }
+    }
+    Ok(())
+}
+
+/// Internal: sample private cards given a pre-validated CardSet and optional CardLookup.
+/// This is the per-simulation fast path — no clone, no full set validation.
+fn sample_private_cards_with_set(
+    obs: &Observation,
+    set: &CardSet,
+    lookup: Option<&CardLookup>,
+    rng: &mut ChaCha8Rng,
+) -> Option<CardState> {
+    let players = obs.public.players.len();
     if !set.enabled() {
         if obs.hand_counts.iter().any(|&n| n != 0) || !obs.hand.is_empty() {
             return None;
         }
-        return Some((
-            set,
-            CardState {
-                hands: vec![Vec::new(); players],
-                undealt: Vec::new(),
-            },
-        ));
+        return Some(CardState {
+            hands: vec![Vec::new(); players],
+            undealt: Vec::new(),
+        });
     }
 
     // All public played cards and only the observer's own hand are known.
@@ -87,7 +183,13 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
         .flat_map(|p| p.played_cards.iter())
         .chain(obs.hand.iter())
     {
-        if set.definition(id).is_none() || !known.insert(id.clone()) {
+        if lookup
+            .as_ref()
+            .map(|l| l.kind(id))
+            .unwrap_or(None)
+            .is_none()
+            || !known.insert(id.clone())
+        {
             return None;
         }
     }
@@ -109,7 +211,7 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
             let played = player
                 .played_cards
                 .iter()
-                .filter(|id| set.definition(id).is_some_and(|c| c.kind == kind))
+                .filter(|id| lookup.as_ref().map(|l| l.kind(id)) == Some(Some(kind)))
                 .count();
             let required = 7usize.checked_sub(played)?;
             if pool.len() < required {
@@ -125,29 +227,54 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
         return None;
     }
     let cards = CardState { hands, undealt };
-    cards.validate(&set, &obs.public.players).ok()?;
-    Some((set, cards))
+    validate_partition(
+        &cards,
+        lookup.expect("enabled set has lookup"),
+        &obs.public.players,
+        set.definitions.len(),
+    )
+    .ok()?;
+    Some(cards)
 }
 
 /// Build a hypothetical position from public information only.
-///
 /// Public so the profiler (`src/bin/mcts_profile.rs`) can measure the
 /// sampling cost separately from the rollout; policies must not use it to look
 /// at hidden state.
+///
+/// This is the slow path (wrapper) that maintains the exact external RNG
+/// consumption order for distribution compatibility. It calls
+/// `search_card_set` internally and delegates to `sample_game_with_set`.
 pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
-    let seed: u64 = rng.gen();
-    let (set, cards) = sample_private_cards(obs, rng)?;
-    let mut game = Game::with_cards(
-        Config {
-            seed,
-            additional_action_space_enabled: obs.public.additional_action_space_enabled,
-            players: obs.public.players.len(),
-        },
-        set,
-    )
-    .ok()?;
-    game.public = obs.public.clone();
-    game.cards = cards;
+    let set = search_card_set(obs)?;
+    let lookup = CardLookup::from_card_set(&set);
+    sample_game_with_set(obs, &set, lookup.as_ref(), rng)
+}
+
+/// Fast per-simulation sampling path using a pre-validated `CardSet` and
+/// optional `CardLookup`. External RNG consumption order is identical to `sample_game`:
+/// 1. gen() for seed (used to derive internal RNG streams)
+/// 2. sample_private_cards_with_set (shuffles Occupation pool, then MinorImprovement pool)
+/// 3. shuffle unrevealed round cards for stages 1..6
+/// 4. NO gen_range for start player on external rng (that was done by internal rng)
+pub fn sample_game_with_set(
+    obs: &Observation,
+    set: &Arc<CardSet>,
+    lookup: Option<&CardLookup>,
+    rng: &mut ChaCha8Rng,
+) -> Option<Game> {
+    // Maintain EXACT RNG consumption order for distribution compatibility:
+    // External rng is consumed as:
+    // 1. gen() for seed (used to derive internal RNG streams)
+    // 2. sample_private_cards (shuffles Occupation pool, then MinorImprovement pool)
+    // 3. shuffle unrevealed round cards for stages 1..6
+    // NO gen_range for start player on external rng (that was done by internal rng)
+    let seed = rng.gen::<u64>();
+    let cards = sample_private_cards_with_set(obs, set, lookup, rng)?;
+    let players = obs.public.players.len();
+
+    // Sample hidden round deck: unrevealed cards per stage, shuffled separately.
+    // This consumes the external rng for 6 shuffles, matching old behavior.
     let mut deck = Vec::new();
     for stage in 1..=6 {
         let mut remaining = RoundCard::ALL
@@ -158,12 +285,71 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
         remaining.shuffle(rng);
         deck.extend(remaining);
     }
-    deck.reverse(); // Game::start_round pops the next card from the end.
-    game.hidden_round_deck = deck;
-    // Search positions are hypothetical: skip state hashing and event logging.
-    game.record_events = false;
-    game.validate().ok()?;
-    Some(game)
+    deck.reverse(); // Game::start_round pops from the end.
+
+    // Validate public structure before constructing the game (fail-closed).
+    // This catches tampered Observations that would otherwise produce Some(Game).
+    crate::model::validate_search_public(
+        &obs.public,
+        players,
+        obs.public.additional_action_space_enabled,
+        !obs.card_definitions.is_empty(),
+    )
+    .ok()?;
+    // Deck + revealed must total 14 cards (round deck integrity).
+    if obs.public.revealed.len() + deck.len() != 14 {
+        return None;
+    }
+
+    // Internal RNG streams derived from the sampled seed.
+    // The internal round stream draws the start player (matching from_card_state).
+    let round_seed = seed ^ 0x38DB_3BE3_DF45_3FAF;
+    let action_seed = seed ^ 0x6A09_E667_F3BC_C909;
+    let mut rng_streams = RngStreams {
+        round: ChaCha8Rng::seed_from_u64(round_seed),
+        ai: ChaCha8Rng::seed_from_u64(action_seed),
+    };
+    let _start_player = rng_streams.round.gen_range(0..players);
+
+    // Mirror from_card_state's internal rng.round consumption so the sampled
+    // position's internal stream state matches the old with_cards path EXACTLY.
+    for stage in 1..=6 {
+        let mut all_stage: Vec<_> = RoundCard::ALL
+            .iter()
+            .copied()
+            .filter(|c| c.stage() == stage)
+            .collect();
+        all_stage.shuffle(&mut rng_streams.round);
+    }
+
+    // Build PublicState directly from observation + sampled start_player.
+    // active_player and start_player are preserved from the observation
+    // (old behavior: game.public = obs.public.clone() overwrote the sampled values).
+    // The internal RNG's start_player draw is still consumed to keep its state
+    // identical to from_card_state.
+    let public = obs.public.clone();
+
+    let config = Config {
+        seed,
+        additional_action_space_enabled: obs.public.additional_action_space_enabled,
+        players,
+    };
+
+    Some(Game::search_from_parts(
+        config,
+        public,
+        deck,
+        rng_streams,
+        BTreeMap::new(), // delayed_well not reconstructable from observation
+        obs.well_food_schedule.clone(), // public mirror for determinization
+        Arc::clone(set),
+        cards,
+        None,            // pending
+        64,              // event_budget
+        BTreeMap::new(), // card_uses
+        BTreeMap::new(), // card_use_limits
+        0,               // next_decision_id
+    ))
 }
 
 /// The guaranteed-legal action used when the search produced nothing usable.
@@ -410,6 +596,20 @@ impl MctsPolicy {
         let detail_policy = CardChoiceDetails;
         let mut simulations_completed = 0usize;
         let mut timed_out = false;
+
+        // Hoist CardSet creation and validation outside the simulation loop (P1-B).
+        // If the observation is invalid, we skip all simulations (same as old behavior:
+        // sample_game would return None for every simulation, so we'd complete 0 sims).
+        let set = match search_card_set(obs) {
+            Some(set) => Arc::clone(&set),
+            None => {
+                // Invalid observation: no simulations possible, fall back immediately.
+                let fallback = fallback_space(obs, legal, rng)?;
+                return Some((fallback, outcome(0, true, false, started.elapsed())));
+            }
+        };
+        let lookup = CardLookup::from_card_set(&set);
+
         for _ in 0..max_simulations {
             if let Some(limit) = deadline {
                 if Instant::now() >= limit {
@@ -417,7 +617,7 @@ impl MctsPolicy {
                     break;
                 }
             }
-            let Some(mut game) = sample_game(obs, rng) else {
+            let Some(mut game) = sample_game_with_set(obs, &set, lookup.as_ref(), rng) else {
                 continue;
             };
             let mut path = vec![0usize];
@@ -988,6 +1188,150 @@ mod tests {
         assert!(
             !rollout(&mut sampled, &mut rng, Some(Instant::now())).unwrap(),
             "an elapsed deadline must abort the playout, not finish it"
+        );
+    }
+
+    /// Property test: current `sample_game` output distribution is fixed for a
+    /// given observation and seed. This digest must stay identical after the
+    /// Phase C replacement (SearchPosition direct construction).
+    #[test]
+    fn sample_game_distribution_digest_is_stable() {
+        use crate::cards::verified_basic_card_set;
+        use sha2::{Digest, Sha256};
+        let game = Game::with_cards(
+            Config {
+                seed: 42,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+        let obs = game.observation(game.public.active_player).unwrap();
+        let mut rng = ChaCha8Rng::seed_from_u64(0xCAFE_BABE_DEAD_BEEF);
+        let mut hasher = Sha256::new();
+        for _ in 0..64 {
+            let sampled = sample_game(&obs, &mut rng).expect("sample_game must succeed");
+            // Hash only the hidden partition + round deck; public is identical.
+            let data = serde_json::to_vec(&(
+                &sampled.cards.hands,
+                &sampled.cards.undealt,
+                &sampled.hidden_round_deck,
+            ))
+            .expect("serialize sampled");
+            hasher.update(&data);
+        }
+        let digest = format!("{:x}", hasher.finalize());
+        // This value was recorded from the current implementation.
+        // DO NOT CHANGE unless the implementation is intentionally replaced.
+        assert_eq!(
+            digest, "52e1baa16e91459f5dcbf5e5b060893eceec43070a712607239759382d9942ed",
+            "sample_game distribution changed — update this test only if intentional"
+        );
+    }
+
+    /// Property test: `sample_game_with_set` produces the same distribution as the
+    /// wrapper `sample_game`. This ensures the hoisted path maintains exact RNG
+    /// consumption order and output equivalence.
+    #[test]
+    fn sample_game_with_set_distribution_digest_is_stable() {
+        use crate::cards::verified_basic_card_set;
+        use sha2::{Digest, Sha256};
+        let game = Game::with_cards(
+            Config {
+                seed: 42,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+        let obs = game.observation(game.public.active_player).unwrap();
+        let set = search_card_set(&obs).expect("search_card_set must succeed");
+        let lookup = CardLookup::from_card_set(&set).expect("CardLookup must succeed");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xCAFE_BABE_DEAD_BEEF);
+        let mut hasher = Sha256::new();
+        for _ in 0..64 {
+            let sampled = sample_game_with_set(&obs, &set, Some(&lookup), &mut rng)
+                .expect("sample_game_with_set must succeed");
+            // Hash only the hidden partition + round deck; public is identical.
+            let data = serde_json::to_vec(&(
+                &sampled.cards.hands,
+                &sampled.cards.undealt,
+                &sampled.hidden_round_deck,
+            ))
+            .expect("serialize sampled");
+            hasher.update(&data);
+        }
+        let digest = format!("{:x}", hasher.finalize());
+        // This must match the wrapper's digest exactly.
+        assert_eq!(
+            digest, "52e1baa16e91459f5dcbf5e5b060893eceec43070a712607239759382d9942ed",
+            "sample_game_with_set distribution differs from wrapper — implementation diverged"
+        );
+    }
+
+    /// Review P1-B: `sample_game_with_set` must not copy card definitions per
+    /// sample, so its allocations must NOT scale with the size of the
+    /// definition bodies (the old path cloned `obs.card_definitions` on every
+    /// call). Two observations with the same card count but a 100x larger
+    /// effect payload must cost the same number of allocations AND the same
+    /// number of allocated bytes.
+    #[cfg(feature = "perf-count-alloc")]
+    #[test]
+    fn sample_game_with_set_allocs_do_not_scale_with_definition_body() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::counting::{allocated_byte_count, allocation_count};
+        use crate::model::{Config, Game, Good};
+
+        fn make_obs(effect_pad: usize) -> crate::model::Observation {
+            let mut definitions = Vec::new();
+            for i in 0..40 {
+                let effects: Vec<CardEffect> = (0..effect_pad)
+                    .map(|j| CardEffect::OnPlayGain {
+                        good: Good::Food,
+                        amount: j as u32 % 7 + 1,
+                    })
+                    .collect();
+                definitions.push(CardDefinition {
+                    use_limit: None,
+                    id: format!("card-{i:03}"),
+                    kind: if i % 2 == 0 {
+                        CardKind::Occupation
+                    } else {
+                        CardKind::MinorImprovement
+                    },
+                    cost: vec![],
+                    points: i % 8 - 2,
+                    effects,
+                });
+            }
+            let game = Game::with_cards(Config::default(), CardSet { definitions }).unwrap();
+            game.observation(0).unwrap()
+        }
+
+        let measure = |obs: &crate::model::Observation| -> (u64, u64) {
+            let set = search_card_set(obs).expect("set");
+            let lookup = CardLookup::from_card_set(&set).expect("lookup");
+            let mut rng = ChaCha8Rng::seed_from_u64(0xABCD);
+            let before_allocs = allocation_count();
+            let before_bytes = allocated_byte_count();
+            for _ in 0..20 {
+                let sampled = sample_game_with_set(obs, &set, Some(&lookup), &mut rng).unwrap();
+                std::hint::black_box(&sampled);
+            }
+            let allocs = (allocation_count() - before_allocs) / 20;
+            let bytes = (allocated_byte_count() - before_bytes) / 20;
+            (allocs, bytes)
+        };
+
+        let (small_allocs, small_bytes) = measure(&make_obs(2));
+        let (large_allocs, large_bytes) = measure(&make_obs(200));
+        assert!(
+            (large_allocs as i64 - small_allocs as i64).abs() <= 4,
+            "sample_game_with_set allocations must not scale with definition body size: small(2 effects/def)={small_allocs} large(200 effects/def)={large_allocs}"
+        );
+        assert!(
+            (large_bytes as i64 - small_bytes as i64).abs() <= 4096,
+            "sample_game_with_set allocated bytes must not scale with definition body size: small(2 effects/def)={small_bytes} large(200 effects/def)={large_bytes}"
         );
     }
 }

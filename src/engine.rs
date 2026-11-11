@@ -1,5 +1,7 @@
 //! Transactional rule application. Detail policies live outside this module.
 use crate::breeding::BreedingPlan;
+use crate::card_events::dispatch_play;
+use crate::card_zones::{play_from_hand, CardMoveCtx};
 use crate::harvest::{FeedingPlan, HarvestDetailPolicy, SimpleHarvestDetails};
 use crate::model::*;
 use serde::{Deserialize, Serialize};
@@ -275,15 +277,20 @@ fn room_build_cost(p: &Player) -> u32 {
         normal
     }
 }
+/// A stable does not occupy a room/field tile. A fenced pasture is still
+/// a legal site (2016 Lookout revised rulebook, p. 8).
+/// This predicate checks the site and stable supply, but not wood payment.
+pub(crate) fn stable_site_available(p: &Player, i: usize) -> bool {
+    i < FARM_CELLS
+        && p.occupied_stables() < 4
+        && !p.farm[i].stable
+        && matches!(p.farm[i].tile, Tile::Empty | Tile::Pasture { .. })
+}
 fn can_build(p: &Player) -> bool {
     (p.supply.reed >= 2
         && p.supply.get(room_material(p)) >= room_build_cost(p)
         && available_room(p))
-        || (p.occupied_stables() < 4
-            && p.supply.wood >= 2
-            && p.farm
-                .iter()
-                .any(|c| matches!(c.tile, Tile::Empty) && !c.stable))
+        || (p.supply.wood >= 2 && (0..FARM_CELLS).any(|i| stable_site_available(p, i)))
 }
 fn can_fence(p: &Player) -> bool {
     single_cell_pasture(p).is_some()
@@ -350,26 +357,81 @@ fn affordable(p: &Player, i: Improvement) -> bool {
 impl Game {
     /// Apply post-placement card rewards identically in committed moves and
     /// harvest previews, before the space becomes occupied.
+    ///
+    /// All three triggers go through the phase dispatcher rather than the legacy
+    /// `cards::*` hooks, so the event budget and per-card use limits apply on
+    /// the production path too. The legacy functions stay for the equivalence
+    /// tests: #266 requires staged migration, so the old path is kept as the
+    /// differential reference rather than deleted.
     fn apply_post_work_card_effects(
         &mut self,
         player: usize,
         action: &Action,
         previous: &Player,
     ) -> Result<()> {
-        let current = &mut self.public.players[player];
-        crate::cards::after_harvest_baking(
+        // No cards means no card effects; skip the dispatch entirely so the
+        // cardless hot path keeps its Step 2 cost.
+        if !self.card_set.enabled() {
+            return Ok(());
+        }
+        // Bake trigger: only when this action actually baked bread, matching
+        // cards::after_harvest_baking's own gate (round >= 2, harvest round).
+        if is_bake_bread_detail(&action.detail) {
+            crate::card_events::dispatch_after_harvest_bake(
+                &self.card_set,
+                player,
+                &mut self.cards,
+                &mut self.public.players,
+                &mut self.public.improvement_market,
+                &mut self.delayed_well,
+                self.public.round,
+                &self.public.used,
+                &mut self.event_budget,
+                &mut self.card_uses,
+                &self.card_use_limits,
+                &mut self.pending,
+            )?;
+        }
+        // Clay-construction trigger: `previous` is the pre-action player, so a
+        // longer improvements list means this action bought one.
+        let bought = if previous.improvements.len() < self.public.players[player].improvements.len()
+        {
+            self.public.players[player].improvements.last().copied()
+        } else {
+            None
+        };
+        crate::card_events::dispatch_after_clay_construction(
             &self.card_set,
-            current,
+            player,
+            previous,
+            bought,
+            &mut self.cards,
+            &mut self.public.players,
+            &mut self.public.improvement_market,
+            &mut self.delayed_well,
             self.public.round,
-            is_bake_bread_detail(&action.detail),
-        )?;
-        crate::cards::after_clay_construction(&self.card_set, previous, current)?;
-        crate::cards::after_worker(&self.card_set, current, action.space)?;
-        crate::cards::after_worker_if_used(
-            &self.card_set,
-            current,
-            action.space,
             &self.public.used,
+            &mut self.event_budget,
+            &mut self.card_uses,
+            &self.card_use_limits,
+            &mut self.pending,
+        )?;
+        // Worker trigger: AfterWorkerGain and AfterWorkerGainIfUsed, in the
+        // active player's played_cards order.
+        crate::card_events::dispatch_after_worker(
+            &self.card_set,
+            player,
+            action.space,
+            &mut self.cards,
+            &mut self.public.players,
+            &mut self.public.improvement_market,
+            &mut self.delayed_well,
+            self.public.round,
+            &self.public.used,
+            &mut self.event_budget,
+            &mut self.card_uses,
+            &self.card_use_limits,
+            &mut self.pending,
         )?;
         Ok(())
     }
@@ -498,7 +560,7 @@ impl Game {
     /// `apply`. Human input and AI selections share this validator; it never
     /// modifies `self` and rejects illegal details before any state change.
     pub fn validate_action(&self, action: &Action) -> Result<()> {
-        let mut probe = self.clone();
+        let mut probe = self.search_clone();
         probe.apply_with_plans(action.clone(), None, None, &SimpleHarvestDetails)
     }
 
@@ -523,17 +585,14 @@ impl Game {
                     .iter()
                     .any(|&j| matches!(me.farm[j].tile, Tile::Room))
         };
-        let stable_legal = |i: usize| {
-            me.occupied_stables() < 4
-                && !me.farm[i].stable
-                && matches!(me.farm[i].tile, Tile::Empty)
-        };
         if matches!(space, Space::Farmland | Space::Cultivation) {
             hints.plow_cells = (0..FARM_CELLS).filter(|&i| plow_legal(i)).collect();
         }
         if matches!(space, Space::FarmExpansion) {
             hints.room_cells = (0..FARM_CELLS).filter(|&i| room_legal(i)).collect();
-            hints.stable_cells = (0..FARM_CELLS).filter(|&i| stable_legal(i)).collect();
+            hints.stable_cells = (0..FARM_CELLS)
+                .filter(|&i| stable_site_available(me, i))
+                .collect();
         }
         if matches!(space, Space::GrainUtilization | Space::Cultivation) {
             hints.sow_fields = (0..FARM_CELLS)
@@ -719,6 +778,9 @@ impl Game {
         } else {
             String::new()
         };
+        // The event budget guards against unbounded effect chains WITHIN one
+        // action, so each action starts from the full budget again.
+        next.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         next.execute_work(player, &action)?;
         next.apply_post_work_card_effects(player, &action, &self.public.players[player])?;
         next.public.used.insert(action.space);
@@ -770,7 +832,7 @@ impl Game {
             None
         };
         next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
-        next.validate()?;
+        crate::validation::validate_incremental_or_full(&next, self)?;
         if record {
             let after = next.state_hash();
             next.log.events.push(Event {
@@ -830,7 +892,7 @@ impl Game {
     /// cannot disagree with the committed rule engine. No events or state are
     /// added to `self` (only to the discarded clone).
     pub fn validate_free(&self, player: usize, free: &FreeAction) -> Result<()> {
-        let mut probe = self.clone();
+        let mut probe = self.search_clone();
         probe.apply_free(player, free.clone())
     }
 
@@ -845,8 +907,10 @@ impl Game {
         } else {
             String::new()
         };
+        // Same per-action budget reset as apply_with_plans.
+        next.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         next.execute_free(player, &free)?;
-        next.validate()?;
+        crate::validation::validate_free_action_or_full(&next, self, player)?;
         if record {
             let after = next.state_hash();
             next.log.events.push(Event {
@@ -951,19 +1015,44 @@ impl Game {
         }
         Ok(())
     }
+}
+
+/// Compute the expected next active player given the current state.
+/// This is the single implementation shared by `next_worker_or_round`
+/// and the validation layer (`validate_incremental`/`validate_free_action`).
+/// Returns the index of the next player who has not placed all their workers,
+/// or `n` (player count) if all players have placed their quota (round should advance).
+pub fn expected_active_player(
+    start_player: usize,
+    workers_placed: &[u8],
+    work_quota: &[u8],
+) -> usize {
+    let n = workers_placed.len();
+    let mut next = start_player;
+    for _ in 0..n {
+        next = (next + 1) % n;
+        if workers_placed[next] < work_quota[next] {
+            return next;
+        }
+    }
+    n // all players have placed their quota
+}
+
+impl Game {
     fn next_worker_or_round(
         &mut self,
         feeding: Option<&[FeedingPlan]>,
         breeding: Option<&[BreedingPlan]>,
     ) -> Result<()> {
         let n = self.public.players.len();
-        let mut next = self.public.active_player;
-        for _ in 0..n {
-            next = (next + 1) % n;
-            if self.public.workers_placed[next] < self.public.work_quota[next] {
-                self.public.active_player = next;
-                return Ok(());
-            }
+        let next = expected_active_player(
+            self.public.active_player,
+            &self.public.workers_placed,
+            &self.public.work_quota,
+        );
+        if next < n {
+            self.public.active_player = next;
+            return Ok(());
         }
         if HARVEST_ROUNDS.contains(&self.public.round) {
             self.harvest(
@@ -1001,53 +1090,119 @@ impl Game {
                 p.supply.gain(kind, n);
             }
             Space::MeetingPlace => {
+                // Handle card play first (before borrowing p for the rest).
+                // PlayMinor is valid even when the card set is disabled: the
+                // legacy main-branch semantics accept the detail and rely on
+                // cards::play to reject plays when no set exists.
                 match detail {
                     Detail::None => {}
                     Detail::PlayMinor { card_id } if self.card_set.enabled() => {
-                        crate::cards::play(
+                        // Validate and pay costs
+                        crate::cards::play_validate_pay(
                             &self.card_set,
                             &mut self.cards.hands[id],
-                            p,
+                            &mut self.public.players[id],
                             card_id,
                             crate::cards::CardKind::MinorImprovement,
                             0,
                         )?;
+                        // Canonical zone move: hand -> played (2016 Lookout p.6)
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        play_from_hand(&mut ctx, id, card_id)?;
+                        // Dispatch Replace/Before phases for the new card only
+                        dispatch_play(
+                            &self.card_set,
+                            id,
+                            card_id,
+                            &mut self.cards,
+                            &mut self.public.players,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            self.public.round,
+                            &self.public.used,
+                            &mut self.event_budget,
+                            &mut self.card_uses,
+                            &self.card_use_limits,
+                            &mut self.pending,
+                        )?;
+                        // Update card points
+                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                        crate::cards::update_card_points_on_play(
+                            &mut self.public.players[id],
+                            card.points,
+                        )?;
                     }
                     _ => return Err("invalid starting-player details".into()),
                 }
+                // Now handle the rest of the action
                 let n = self.public.accumulations.remove(&space).unwrap_or(0);
-                p.supply.food += n;
+                self.public.players[id].supply.food += n;
                 self.public.start_player = id;
             }
             Space::Lessons | Space::ExtraLessons => {
-                if let Detail::PlayOccupation { card_id } = detail {
-                    let count = p
-                        .played_cards
-                        .iter()
-                        .filter(|id| {
-                            self.card_set
-                                .definition(id)
-                                .is_some_and(|c| c.kind == crate::cards::CardKind::Occupation)
-                        })
-                        .count();
-                    let fee = if space == Space::Lessons {
-                        u32::from(count > 0)
-                    } else if self.config.players == 3 || count >= 2 {
-                        2
-                    } else {
-                        1
-                    };
-                    crate::cards::play(
-                        &self.card_set,
-                        &mut self.cards.hands[id],
-                        p,
-                        card_id,
-                        crate::cards::CardKind::Occupation,
-                        fee,
-                    )?;
-                } else {
+                // Occupation play: Lessons requires an occupation selection.
+                // (2016 Lookout p.8: multiple card effects → active player's
+                // chosen order; here the play IS the selection.)
+                let Detail::PlayOccupation { card_id } = detail else {
                     return Err("occupation selection required".into());
-                }
+                };
+                let count = self.public.players[id]
+                    .played_cards
+                    .iter()
+                    .filter(|pid| {
+                        self.card_set
+                            .definition(pid)
+                            .is_some_and(|c| c.kind == crate::cards::CardKind::Occupation)
+                    })
+                    .count();
+                let fee = if space == Space::Lessons {
+                    u32::from(count > 0)
+                } else if self.config.players == 3 || count >= 2 {
+                    2
+                } else {
+                    1
+                };
+                crate::cards::play_validate_pay(
+                    &self.card_set,
+                    &mut self.cards.hands[id],
+                    &mut self.public.players[id],
+                    card_id,
+                    crate::cards::CardKind::Occupation,
+                    fee,
+                )?;
+                // Canonical zone move: hand -> played (2016 Lookout p.6)
+                let mut ctx = CardMoveCtx {
+                    cards: &mut self.cards,
+                    players: &mut self.public.players,
+                    improvement_market: &mut self.public.improvement_market,
+                };
+                play_from_hand(&mut ctx, id, card_id)?;
+                // Dispatch Replace/Before phases for the new card only
+                dispatch_play(
+                    &self.card_set,
+                    id,
+                    card_id,
+                    &mut self.cards,
+                    &mut self.public.players,
+                    &mut self.public.improvement_market,
+                    &mut self.delayed_well,
+                    self.public.round,
+                    &self.public.used,
+                    &mut self.event_budget,
+                    &mut self.card_uses,
+                    &self.card_use_limits,
+                    &mut self.pending,
+                )?;
+                // Update card points
+                let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                crate::cards::update_card_points_on_play(
+                    &mut self.public.players[id],
+                    card.points,
+                )?;
             }
             Space::DayLaborer => {
                 require_none(detail)?;
@@ -1105,22 +1260,59 @@ impl Game {
                 _ => return Err("pasture details required".into()),
             },
             Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth => {
+                // Round gate for ModestFamilyGrowth must be checked BEFORE any card play
+                // (legacy semantics: gate error before paying costs)
                 if space == Space::ModestFamilyGrowth && self.public.round < 5 {
                     return Err("modest family growth is only available from round 5".into());
                 }
-                match detail {
-                    Detail::None => grow(p, true)?,
-                    Detail::GrowWithMinor { card_id } if self.card_set.enabled() => {
-                        grow(p, true)?;
-                        crate::cards::play(
+                // Handle card play first (before borrowing p for the rest)
+                if let Detail::GrowWithMinor { card_id } = detail {
+                    if self.card_set.enabled() {
+                        // Validate and pay costs (use internal fn; cards::play does full legacy for direct callers)
+                        crate::cards::play_validate_pay(
                             &self.card_set,
                             &mut self.cards.hands[id],
-                            p,
+                            &mut self.public.players[id],
                             card_id,
                             crate::cards::CardKind::MinorImprovement,
                             0,
                         )?;
+                        // Move card from hand to played
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        play_from_hand(&mut ctx, id, card_id)?;
+                        // Dispatch Replace/Before phases
+                        dispatch_play(
+                            &self.card_set,
+                            id,
+                            card_id,
+                            &mut self.cards,
+                            &mut self.public.players,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            self.public.round,
+                            &self.public.used,
+                            &mut self.event_budget,
+                            &mut self.card_uses,
+                            &self.card_use_limits,
+                            &mut self.pending,
+                        )?;
+                        // Update card points
+                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                        crate::cards::update_card_points_on_play(
+                            &mut self.public.players[id],
+                            card.points,
+                        )?;
                     }
+                }
+                // Now handle the rest of the action
+                let p = &mut self.public.players[id];
+                match detail {
+                    Detail::None => grow(p, true)?,
+                    Detail::GrowWithMinor { .. } => {} // Already handled above
                     _ => return Err("invalid growth details".into()),
                 }
             }
@@ -1163,62 +1355,105 @@ impl Game {
                 }
             }
             Space::MajorImprovement => match detail {
+                // Handle card play first (before borrowing p for the rest)
                 Detail::PlayMinor { card_id } if self.card_set.enabled() => {
-                    crate::cards::play(
+                    // Validate and pay costs (use internal fn; cards::play does full legacy for direct callers)
+                    crate::cards::play_validate_pay(
                         &self.card_set,
                         &mut self.cards.hands[id],
-                        p,
+                        &mut self.public.players[id],
                         card_id,
                         crate::cards::CardKind::MinorImprovement,
                         0,
+                    )?;
+                    // Move card from hand to played
+                    let mut ctx = CardMoveCtx {
+                        cards: &mut self.cards,
+                        players: &mut self.public.players,
+                        improvement_market: &mut self.public.improvement_market,
+                    };
+                    play_from_hand(&mut ctx, id, card_id)?;
+                    // Dispatch Replace/Before phases
+                    dispatch_play(
+                        &self.card_set,
+                        id,
+                        card_id,
+                        &mut self.cards,
+                        &mut self.public.players,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        self.public.round,
+                        &self.public.used,
+                        &mut self.event_budget,
+                        &mut self.card_uses,
+                        &self.card_use_limits,
+                        &mut self.pending,
+                    )?;
+                    // Update card points
+                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                    crate::cards::update_card_points_on_play(
+                        &mut self.public.players[id],
+                        card.points,
                     )?;
                 }
                 Detail::Buy {
                     improvement,
                     instant_bake,
-                } => buy_improvement(
-                    p,
-                    &mut self.public.improvement_market,
-                    &mut self.delayed_well,
-                    self.public.round,
-                    *improvement,
-                    PurchaseArgs {
-                        instant_bake: *instant_bake,
-                        allocation: None,
-                        mode: PurchaseMode::Auto,
-                    },
-                )?,
+                } => {
+                    let p = &mut self.public.players[id];
+                    buy_improvement(
+                        p,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        &mut self.well_food_schedule,
+                        self.public.round,
+                        *improvement,
+                        PurchaseArgs {
+                            instant_bake: *instant_bake,
+                            allocation: None,
+                            mode: PurchaseMode::Auto,
+                        },
+                    )?;
+                }
                 Detail::BuyDetailed {
                     improvement,
                     instant_baking,
-                } => buy_improvement(
-                    p,
-                    &mut self.public.improvement_market,
-                    &mut self.delayed_well,
-                    self.public.round,
-                    *improvement,
-                    PurchaseArgs {
-                        instant_bake: 0,
-                        allocation: Some(instant_baking),
-                        mode: PurchaseMode::Auto,
-                    },
-                )?,
+                } => {
+                    let p = &mut self.public.players[id];
+                    buy_improvement(
+                        p,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        &mut self.well_food_schedule,
+                        self.public.round,
+                        *improvement,
+                        PurchaseArgs {
+                            instant_bake: 0,
+                            allocation: Some(instant_baking),
+                            mode: PurchaseMode::Auto,
+                        },
+                    )?;
+                }
                 Detail::BuyWithMode {
                     improvement,
                     instant_baking,
                     mode,
-                } => buy_improvement(
-                    p,
-                    &mut self.public.improvement_market,
-                    &mut self.delayed_well,
-                    self.public.round,
-                    *improvement,
-                    PurchaseArgs {
-                        instant_bake: 0,
-                        allocation: Some(instant_baking),
-                        mode: *mode,
-                    },
-                )?,
+                } => {
+                    let p = &mut self.public.players[id];
+                    buy_improvement(
+                        p,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        &mut self.well_food_schedule,
+                        self.public.round,
+                        *improvement,
+                        PurchaseArgs {
+                            instant_bake: 0,
+                            allocation: Some(instant_baking),
+                            mode: *mode,
+                        },
+                    )?;
+                }
                 _ => return Err("improvement required".into()),
             },
             Space::HouseRedevelopment => match detail {
@@ -1236,6 +1471,7 @@ impl Game {
                             p,
                             &mut self.public.improvement_market,
                             &mut self.delayed_well,
+                            &mut self.well_food_schedule,
                             self.public.round,
                             *i,
                             PurchaseArgs {
@@ -1264,6 +1500,7 @@ impl Game {
                             p,
                             &mut self.public.improvement_market,
                             &mut self.delayed_well,
+                            &mut self.well_food_schedule,
                             self.public.round,
                             *improvement,
                             PurchaseArgs {
@@ -1459,11 +1696,7 @@ fn build_room(p: &mut Player, i: usize) -> Result<()> {
     Ok(())
 }
 fn build_stable(p: &mut Player, i: usize) -> Result<()> {
-    if i >= FARM_CELLS
-        || p.occupied_stables() >= 4
-        || p.farm[i].stable
-        || !matches!(p.farm[i].tile, Tile::Empty)
-    {
+    if !stable_site_available(p, i) {
         return Err("stable location illegal".into());
     }
     p.supply.pay(Good::Wood, 2)?;
@@ -1594,7 +1827,8 @@ struct PurchaseArgs<'a> {
 fn buy_improvement(
     p: &mut Player,
     market: &mut Vec<Improvement>,
-    well: &mut BTreeMap<u8, Vec<usize>>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     item: Improvement,
     options: PurchaseArgs<'_>,
@@ -1644,7 +1878,8 @@ fn buy_improvement(
     p.improvements.push(item);
     if item == Improvement::Well {
         for r in round + 1..=14u8.min(round.saturating_add(5)) {
-            well.entry(r).or_default().push(p.id)
+            delayed_well.entry(r).or_default().push(p.id);
+            well_food_schedule.entry(r).or_default().push(p.id);
         }
     }
     if (instant_bake > 0 || allocation.is_some_and(|a| !a.is_empty()))
@@ -2448,13 +2683,110 @@ mod stable_building_rule_tests {
     use super::*;
 
     #[test]
-    fn farm_expansion_cannot_put_stable_on_existing_pasture_tile() {
+    fn farm_expansion_can_build_stable_in_existing_pasture() {
         let mut player = Player::new(0, 0);
         player.supply.wood = 20;
         build_pastures(&mut player, &[vec![14]], None).unwrap();
-        let before = player.clone();
+        player.pastures[0].animal = Some(Animal::Sheep);
+        player.pastures[0].quantity = 2;
+        let pasture_id = player.pastures[0].id;
+        let wood_before = player.supply.wood;
+
+        assert!(stable_site_available(&player, 14));
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 2);
+        build_stable(&mut player, 14).unwrap();
+        assert_eq!(player.supply.wood, wood_before - 2);
+        assert_eq!(player.occupied_stables(), 1);
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 4);
+        assert_eq!(player.animal_count(Animal::Sheep), 2);
+        assert_eq!(player.farm[14].tile, Tile::Pasture { id: pasture_id });
+
+        let after = player.clone();
+        assert!(!stable_site_available(&player, 14));
         assert!(build_stable(&mut player, 14).is_err());
-        assert_eq!(player, before);
+        assert_eq!(player, after);
+    }
+
+    #[test]
+    fn two_pasture_stables_double_capacity_twice_and_survive_split() {
+        let mut player = Player::new(0, 0);
+        player.supply.wood = 20;
+        build_pastures(&mut player, &[vec![13, 14]], None).unwrap();
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 4);
+        build_stable(&mut player, 13).unwrap();
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 8);
+        build_stable(&mut player, 14).unwrap();
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 16);
+        player.pastures[0].animal = Some(Animal::Sheep);
+        player.pastures[0].quantity = 6;
+
+        build_pastures(
+            &mut player,
+            &[vec![13], vec![14]],
+            Some(&[
+                PastureOccupancy {
+                    animal: Some(Animal::Sheep),
+                    quantity: 3,
+                },
+                PastureOccupancy {
+                    animal: Some(Animal::Sheep),
+                    quantity: 3,
+                },
+            ]),
+        )
+        .unwrap();
+
+        assert_eq!(player.animal_count(Animal::Sheep), 6);
+        assert_eq!(player.pastures.len(), 2);
+        for pasture in &player.pastures {
+            assert_eq!(player.pasture_capacity(pasture), 4);
+            assert_eq!(pasture.quantity, 3);
+            assert!(player.farm[pasture.cells[0]].stable);
+        }
+    }
+
+    #[test]
+    fn stable_site_rejects_room_field_and_out_of_bounds() {
+        let mut player = Player::new(0, 0);
+        player.supply.wood = 20;
+        player.farm[14].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        for i in [0, 14, FARM_CELLS] {
+            assert!(!stable_site_available(&player, i));
+            let before = player.clone();
+            assert!(build_stable(&mut player, i).is_err());
+            assert_eq!(player, before);
+        }
+    }
+
+    #[test]
+    fn pasture_stable_is_legal_through_action_validation_and_hints() {
+        let mut game = Game::new(Config::default());
+        let active = game.public.active_player;
+        game.public.players[active].supply.wood = 20;
+        build_pastures(&mut game.public.players[active], &[vec![14]], None).unwrap();
+        game.public.players[active].supply.wood = 2;
+        let action = Action {
+            space: Space::FarmExpansion,
+            detail: Detail::Build {
+                rooms: vec![],
+                stables: vec![14],
+            },
+        };
+
+        assert!(game.available_spaces().contains(&Space::FarmExpansion));
+        assert!(game
+            .detail_hints(Space::FarmExpansion)
+            .stable_cells
+            .contains(&14));
+        game.validate_action(&action).unwrap();
+        game.apply(action).unwrap();
+        let player = &game.public.players[active];
+        assert_eq!(player.supply.wood, 0);
+        assert!(player.farm[14].stable);
+        assert_eq!(player.pasture_capacity(&player.pastures[0]), 4);
     }
 
     #[test]

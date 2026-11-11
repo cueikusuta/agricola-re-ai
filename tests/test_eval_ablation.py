@@ -413,7 +413,8 @@ class AblationPuctParameterTests(unittest.TestCase):
         by_arm = {row["arm"]: row for row in report["arms"]}
         self.assertEqual(
             by_arm["warm"]["changed_search_parameters"],
-            {"puct_prior_temp": {"control": 3.0, "arm": 1.0}},
+            # #263: the shipped PUCT default prior temperature is now 6.0.
+            {"puct_prior_temp": {"control": 6.0, "arm": 1.0}},
         )
         self.assertAlmostEqual(
             by_arm["warm"]["search_parameters"]["puct_prior_temp"], 1.0)

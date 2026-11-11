@@ -10,6 +10,7 @@ fn test_cards() -> CardSet {
     let mut definitions = Vec::new();
     for number in 0..14 {
         definitions.push(CardDefinition {
+            use_limit: None,
             id: format!("occupation-{number}"),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -17,6 +18,7 @@ fn test_cards() -> CardSet {
             effects: vec![],
         });
         definitions.push(CardDefinition {
+            use_limit: None,
             id: format!("minor-{number}"),
             kind: CardKind::MinorImprovement,
             cost: vec![],

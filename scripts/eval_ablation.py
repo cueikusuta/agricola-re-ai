@@ -48,7 +48,8 @@ SEARCH_PARAMETERS = {
     "puct_simulations": ("--puct-simulations", 32, "simulations"),
     "puct_tree_depth": ("--puct-tree-depth", 2, "tree_depth"),
     "puct_c": ("--puct-c", 1.5, "non_negative"),
-    "puct_prior_temp": ("--puct-prior-temp", 3.0, "positive"),
+    # Matches PuctConfig::default() since #263 (adopted pt6 from Run 42654611147).
+    "puct_prior_temp": ("--puct-prior-temp", 6.0, "positive"),
     "puct_value_temp": ("--puct-value-temp", 8.0, "positive"),
     "puct_leaf": ("--puct-leaf", "terminal", "leaf"),
     "puct_root_limit": ("--puct-root-limit", 0, "root_limit"),
