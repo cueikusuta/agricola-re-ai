@@ -5,6 +5,7 @@ fn sample_set(players: usize) -> CardSet {
     let mut definitions = Vec::new();
     for index in 0..7 * players {
         definitions.push(CardDefinition {
+            use_limit: None,
             id: format!("occ_{index}"),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -16,6 +17,7 @@ fn sample_set(players: usize) -> CardSet {
             }],
         });
         definitions.push(CardDefinition {
+            use_limit: None,
             id: format!("minor_{index}"),
             kind: CardKind::MinorImprovement,
             cost: vec![],

@@ -98,14 +98,20 @@ pub struct RegisteredCard {
     pub cost: Vec<(crate::model::Good, u32)>,
     pub points: i32,
     pub effects: Vec<crate::cards::CardEffect>,
+    /// Maximum number of times this card can be played/used. `None` means
+    /// unlimited. Preserved losslessly through `to_card_definition`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_limit: Option<u32>,
     /// Review metadata (official verification status, player-count eligibility)
     pub review: CardReview,
 }
 
 impl RegisteredCard {
     /// Convert to the legacy CardDefinition for compat adapter.
+    /// Preserves `use_limit` so registry -> CardSet conversion is lossless.
     pub fn to_card_definition(&self) -> CardDefinition {
         CardDefinition {
+            use_limit: self.use_limit,
             id: self.external_id.clone(),
             kind: self.kind,
             cost: self.cost.clone(),
@@ -212,6 +218,7 @@ impl CardRegistryBuilder {
     ///
     /// The external_id must be in the canonical A001–E168 list.
     /// Returns error if duplicate external_id or invalid ID.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_card(
         mut self,
         external_id: String,
@@ -219,6 +226,7 @@ impl CardRegistryBuilder {
         cost: Vec<(crate::model::Good, u32)>,
         points: i32,
         effects: Vec<crate::cards::CardEffect>,
+        use_limit: Option<u32>,
         review: CardReview,
     ) -> Result<Self, RegistryBuildError> {
         // Validate external ID is known
@@ -253,6 +261,7 @@ impl CardRegistryBuilder {
             cost,
             points,
             effects,
+            use_limit,
             review,
         };
 
@@ -673,6 +682,7 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
                     card.cost,
                     card.points,
                     card.effects,
+                    card.use_limit,
                     review,
                 )?;
             }
@@ -780,6 +790,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review,
             )
             .unwrap()
@@ -803,6 +814,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review,
             )
             .unwrap_err();
@@ -819,6 +831,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review.clone(),
             )
             .unwrap()
@@ -828,6 +841,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review,
             )
             .unwrap_err();
@@ -844,6 +858,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review.clone(),
             )
             .unwrap()
@@ -856,6 +871,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review,
             )
             .unwrap()
@@ -875,6 +891,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review1,
             )
             .unwrap()
@@ -887,6 +904,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review2,
             )
             .unwrap()
@@ -909,6 +927,7 @@ mod tests {
                     good: crate::model::Good::Wood,
                     amount: 1,
                 }],
+                None,
                 review,
             )
             .unwrap()
@@ -938,6 +957,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review_verified,
             )
             .unwrap()
@@ -947,6 +967,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review_unverified,
             )
             .unwrap()
@@ -971,6 +992,7 @@ mod tests {
                 vec![],
                 0,
                 vec![],
+                None,
                 review,
             )
             .unwrap()
@@ -1023,5 +1045,52 @@ mod tests {
         assert_eq!(ids.iter().position(|x| x == "A001").unwrap(), 0);
         // E168 is always 844
         assert_eq!(ids.iter().position(|x| x == "E168").unwrap(), 843);
+    }
+
+    #[test]
+    fn use_limit_preserved_through_registry_to_card_set_round_trip() {
+        let review = CardReview::unverified("A001");
+        let registry = CardRegistryBuilder::new()
+            .add_card(
+                "A001".into(),
+                CardKind::Occupation,
+                vec![],
+                0,
+                vec![],
+                Some(3),
+                review.clone(),
+            )
+            .unwrap()
+            .add_card(
+                "A002".into(),
+                CardKind::MinorImprovement,
+                vec![],
+                0,
+                vec![],
+                None,
+                review,
+            )
+            .unwrap()
+            .freeze()
+            .unwrap();
+
+        let set = card_set_from_registry(&registry);
+
+        let a001 = set.definition("A001").unwrap();
+        assert_eq!(a001.use_limit, Some(3));
+        let a002 = set.definition("A002").unwrap();
+        assert_eq!(a002.use_limit, None);
+
+        // Round-trip equivalence: RegisteredCard -> CardDefinition -> CardSet
+        // preserves use_limit losslessly.
+        for card in registry.iter() {
+            let def = card.to_card_definition();
+            let found = set.definition(&card.external_id).unwrap();
+            assert_eq!(
+                def.use_limit, found.use_limit,
+                "use_limit mismatch for {}",
+                card.external_id
+            );
+        }
     }
 }

@@ -895,6 +895,7 @@ mod card_choice_tests {
         let mut obs = game.observation(game.public.active_player).unwrap();
         for (id, food) in [("weak", 1), ("strong", 3)] {
             obs.card_definitions.push(CardDefinition {
+                use_limit: None,
                 id: id.into(),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -928,6 +929,7 @@ mod card_choice_tests {
         let mut obs = game.observation(game.public.active_player).unwrap();
         obs.card_definitions = vec![
             CardDefinition {
+                use_limit: None,
                 id: "bait".into(),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -940,6 +942,7 @@ mod card_choice_tests {
                 }],
             },
             CardDefinition {
+                use_limit: None,
                 id: "house_bait".into(),
                 kind: CardKind::Occupation,
                 cost: vec![],
@@ -952,6 +955,7 @@ mod card_choice_tests {
                 }],
             },
             CardDefinition {
+                use_limit: None,
                 id: "sure_food".into(),
                 kind: CardKind::Occupation,
                 cost: vec![],

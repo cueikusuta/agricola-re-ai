@@ -901,6 +901,7 @@ mod projection_tests {
 
         let mut obs = observed(|_| {});
         obs.card_definitions.push(CardDefinition {
+            use_limit: None,
             id: "sample_occ".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -969,6 +970,7 @@ mod projection_tests {
         use crate::cards::{CardDefinition, CardEffect, CardKind, ScoreBonusRule};
         let mut obs = observed(|_| {});
         obs.card_definitions.push(CardDefinition {
+            use_limit: None,
             id: "bonus".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -988,6 +990,7 @@ mod projection_tests {
         use crate::cards::{CardDefinition, CardEffect, CardKind};
         let mut obs = observed(|p| p.played_cards.push("conditional".into()));
         obs.card_definitions.push(CardDefinition {
+            use_limit: None,
             id: "conditional".into(),
             kind: CardKind::Occupation,
             cost: vec![],

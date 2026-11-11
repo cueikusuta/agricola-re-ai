@@ -8,7 +8,7 @@
 //!
 //! Design notes:
 //! - Metadata lives beside `CardDefinition` instead of inside it, so the card
-//!   effect engine and every existing `CardDefinition { .. }` literal stay
+//!   effect engine and every existing `CardDefinition { use_limit: None, .. }` literal stay
 //!   untouched.
 //! - Every implemented card defaults to `unverified`. Nothing is promoted to
 //!   `verified` here; that requires an official source recorded by `#115`.
@@ -305,6 +305,7 @@ mod tests {
 
     fn def(id: &str, kind: CardKind) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.to_owned(),
             kind,
             cost: vec![],
