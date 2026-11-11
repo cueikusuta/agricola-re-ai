@@ -1244,29 +1244,42 @@ impl Game {
     /// The state_hash_before must match the current game state hash,
     /// otherwise returns Err (prevents replay attacks on suspended games).
     pub fn resolve_pending(&mut self, decision: PendingResolution) -> Result<(), String> {
-        let Some(pending) = self.pending.take() else {
+        // Validate BEFORE touching the stored decision. Taking it first (the
+        // previous behaviour) meant any rejected selection destroyed the
+        // decision, so an invalid click could silently drop a pause. Every
+        // fallible check now runs against `&self.pending` and leaves both the
+        // decision and the game state byte-for-byte unchanged on rejection.
+        let Some(pending) = self.pending.as_ref() else {
             return Err("no pending decision".into());
         };
         // Verify state hash integrity
         if pending.state_hash_before != self.state_hash() {
-            self.pending = Some(pending); // Restore on failure
             return Err(
                 "state hash mismatch: game state changed since decision was created".into(),
             );
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&decision)?;
-        // Apply the resolution
-        self.apply_pending_resolution(pending, decision)
+        // Only now remove the decision. The steps below are individually
+        // atomic (see `apply_pending_resolution`); if one still fails the
+        // decision is put back so it stays resolvable.
+        let pending = self.pending.take().expect("checked above");
+        match self.apply_pending_resolution(&pending, decision) {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                self.pending = Some(pending);
+                Err(err)
+            }
+        }
     }
 
     /// Internal: apply a validated pending resolution.
     fn apply_pending_resolution(
         &mut self,
-        pending: PendingDecision,
+        pending: &PendingDecision,
         resolution: PendingResolution,
     ) -> Result<(), String> {
-        match (pending.kind, resolution) {
+        match (&pending.kind, resolution) {
             (
                 PendingKind::ChooseGain { source_card, .. },
                 PendingResolution::ChooseGain { chosen },
@@ -1287,7 +1300,7 @@ impl Game {
                             "source_card": source_card,
                             "chosen_gain": chosen,
                         }),
-                        before: pending.state_hash_before,
+                        before: pending.state_hash_before.clone(),
                         after: self.state_hash(),
                     });
                 }
@@ -1298,9 +1311,14 @@ impl Game {
                 PendingResolution::ChoosePayment { chosen },
             ) => {
                 let player = &mut self.public.players[pending.player];
+                // Atomic payment: a multi-good cost is paid against a copy and
+                // only committed once every good succeeded, so a shortage on
+                // the second good cannot leave the first one deducted.
+                let mut paid = player.supply.clone();
                 for (good, amount) in &chosen.cost {
-                    player.supply.pay(*good, *amount)?;
+                    paid.pay(*good, *amount)?;
                 }
+                player.supply = paid;
                 if self.record_events {
                     self.log.events.push(crate::model::Event {
                         player: Some(pending.player),
@@ -1309,7 +1327,7 @@ impl Game {
                             "card_id": card_id,
                             "chosen_payment": chosen,
                         }),
-                        before: pending.state_hash_before,
+                        before: pending.state_hash_before.clone(),
                         after: self.state_hash(),
                     });
                 }
@@ -1321,7 +1339,7 @@ impl Game {
             ) => {
                 if confirmed {
                     for id in recipients {
-                        self.public.players[id].supply.food += 1;
+                        self.public.players[*id].supply.food += 1;
                     }
                 }
                 if self.record_events {
@@ -1331,7 +1349,7 @@ impl Game {
                         payload: serde_json::json!({
                             "delayed_well_relief": { "round": round, "confirmed": confirmed },
                         }),
-                        before: pending.state_hash_before,
+                        before: pending.state_hash_before.clone(),
                         after: self.state_hash(),
                     });
                 }
@@ -1347,7 +1365,7 @@ impl Game {
                             "source_card": source_card,
                             "custom_payload": payload,
                         }),
-                        before: pending.state_hash_before,
+                        before: pending.state_hash_before.clone(),
                         after: self.state_hash(),
                     });
                 }

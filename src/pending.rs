@@ -363,6 +363,181 @@ mod tests {
         assert!(err.contains("no pending decision"), "got: {err}");
     }
 
+    /// Minimum reproduction for P1-B (Issue #268): the previous
+    /// `resolve_pending` called `take()` before validating, so a selection that
+    /// was not one of the offered options destroyed the decision and left the
+    /// game unresolvable. The decision, the state hash and the supply must all
+    /// be untouched by the rejected attempt.
+    #[test]
+    fn an_invalid_selection_leaves_the_decision_and_the_state_unchanged() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 41,
+            additional_action_space_enabled: false,
+        });
+        let options = vec![
+            GainOption {
+                good: Good::Food,
+                amount: 1,
+            },
+            GainOption {
+                good: Good::Wood,
+                amount: 2,
+            },
+        ];
+        let decision = PendingDecision::new(
+            game.next_decision_id,
+            0,
+            PendingKind::ChooseGain {
+                source_card: "A001".into(),
+                options,
+            },
+            game.state_hash(),
+            serde_json::json!({}),
+        );
+        game.pending = Some(decision.clone());
+
+        let hash_before = game.state_hash();
+        let integrity_before = game.integrity_hash();
+        let supply_before = game.public.players[0].supply.clone();
+
+        // Stone is not offered.
+        let err = game
+            .resolve_pending(PendingResolution::ChooseGain {
+                chosen: GainOption {
+                    good: Good::Stone,
+                    amount: 1,
+                },
+            })
+            .unwrap_err();
+        assert!(
+            err.contains("not in available options"),
+            "the selection must be rejected as unavailable, got: {err}"
+        );
+        assert_eq!(
+            game.pending(),
+            Some(&decision),
+            "a rejected selection must not consume the decision"
+        );
+        assert_eq!(game.state_hash(), hash_before, "state must be unchanged");
+        assert_eq!(
+            game.integrity_hash(),
+            integrity_before,
+            "no bookkeeping may change either"
+        );
+        assert_eq!(
+            game.public.players[0].supply, supply_before,
+            "no resource may be granted"
+        );
+
+        // The decision is still usable: a legal option now succeeds.
+        game.resolve_pending(PendingResolution::ChooseGain {
+            chosen: GainOption {
+                good: Good::Wood,
+                amount: 2,
+            },
+        })
+        .expect("a legal selection must still resolve after a rejected attempt");
+        assert_eq!(game.public.players[0].supply.wood, supply_before.wood + 2);
+        assert!(!game.has_pending());
+    }
+
+    /// Same defect, different branch: a resolution of the wrong kind used to be
+    /// an error raised *after* the decision had already been taken.
+    #[test]
+    fn a_resolution_of_the_wrong_kind_keeps_the_decision_pending() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 42,
+            additional_action_space_enabled: false,
+        });
+        let decision = PendingDecision::new(
+            game.next_decision_id,
+            0,
+            PendingKind::ChooseGain {
+                source_card: "A001".into(),
+                options: vec![GainOption {
+                    good: Good::Food,
+                    amount: 1,
+                }],
+            },
+            game.state_hash(),
+            serde_json::json!({}),
+        );
+        game.pending = Some(decision.clone());
+        let mut cost = BTreeMap::new();
+        cost.insert(Good::Wood, 1);
+
+        let err = game
+            .resolve_pending(PendingResolution::ChoosePayment {
+                chosen: PaymentOption { cost },
+            })
+            .unwrap_err();
+        assert!(err.contains("does not match"), "got: {err}");
+        assert_eq!(
+            game.pending(),
+            Some(&decision),
+            "a kind mismatch must not consume the decision"
+        );
+    }
+
+    /// Minimum reproduction for the ChoosePayment atomicity requirement
+    /// (Issue #268): `Food` sorts before `Wood`, so the old sequential loop
+    /// deducted the affordable food and only then failed on the wood.
+    #[test]
+    fn a_failed_multi_good_payment_leaves_no_partial_deduction() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 43,
+            additional_action_space_enabled: false,
+        });
+        game.public.players[0].supply.food = 1;
+        game.public.players[0].supply.wood = 1;
+
+        let mut cost = BTreeMap::new();
+        cost.insert(Good::Food, 1);
+        cost.insert(Good::Wood, 5);
+        let offered = PaymentOption { cost };
+        let decision = PendingDecision::new(
+            game.next_decision_id,
+            0,
+            PendingKind::ChoosePayment {
+                card_id: "A002".into(),
+                options: vec![offered.clone()],
+            },
+            game.state_hash(),
+            serde_json::json!({}),
+        );
+        game.pending = Some(decision.clone());
+
+        // The offered option is legal as a *choice*, but unaffordable.
+        let err = game
+            .resolve_pending(PendingResolution::ChoosePayment {
+                chosen: offered.clone(),
+            })
+            .unwrap_err();
+        assert!(err.contains("insufficient"), "got: {err}");
+        assert_eq!(
+            game.public.players[0].supply.food, 1,
+            "the affordable prefix of the cost must not be deducted"
+        );
+        assert_eq!(game.public.players[0].supply.wood, 1);
+        assert_eq!(
+            game.pending(),
+            Some(&decision),
+            "a failed payment must not consume the decision"
+        );
+
+        // Once affordable, the same choice deducts the whole cost exactly once.
+        game.public.players[0].supply.wood = 5;
+        let hash_after_topup = game.state_hash();
+        game.pending.as_mut().unwrap().state_hash_before = hash_after_topup;
+        game.resolve_pending(PendingResolution::ChoosePayment { chosen: offered })
+            .expect("an affordable payment resolves");
+        assert_eq!(game.public.players[0].supply.food, 0);
+        assert_eq!(game.public.players[0].supply.wood, 0);
+    }
+
     /// Per-card use limits and the event budget are both enforced (Issue #266
     /// acceptance: "use limits and unbounded-chain guards proven by tests").
     #[test]
