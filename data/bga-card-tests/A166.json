@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "A166",
+  "cases": [
+    {
+      "id": "A166-normal",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 2,
+        "food": 4
+      },
+      "action": {
+        "run_harvest": true,
+        "buy": "sheep"
+      },
+      "expected": {
+        "food_delta": -2,
+        "sheep_delta": 1
+      }
+    },
+    {
+      "id": "A166-free",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 4,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "buy": "sheep"
+      },
+      "expected": {
+        "food_delta": 0,
+        "sheep_delta": 1
+      }
+    }
+  ]
+}

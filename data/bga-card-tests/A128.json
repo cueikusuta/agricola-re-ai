@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A128",
+  "cases": [
+    {
+      "id": "A128-normal",
+      "scope": "effect_only",
+      "setup": {
+        "other_player_uses": "reed_bank"
+      },
+      "action": {
+        "build_room": true
+      },
+      "expected": {
+        "clay_discount": 1
+      }
+    },
+    {
+      "id": "A128-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "owner_uses": "reed_bank"
+      },
+      "action": {
+        "build_room": true
+      },
+      "expected": {
+        "clay_discount": 0
+      }
+    }
+  ]
+}

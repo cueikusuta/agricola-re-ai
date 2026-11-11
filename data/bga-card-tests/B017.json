@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "B017",
+  "cases": [
+    {
+      "id": "B017-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 2
+      },
+      "action": {
+        "use_space": "forest",
+        "use_card": true
+      },
+      "expected": {
+        "wood_delta": -2,
+        "fields_delta": 1,
+        "space_wood_delta": 2
+      }
+    },
+    {
+      "id": "B017-declined",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 2
+      },
+      "action": {
+        "use_space": "forest",
+        "use_card": false
+      },
+      "expected": {
+        "wood_delta": 0
+      }
+    }
+  ]
+}

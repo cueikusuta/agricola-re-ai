@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "A136",
+  "cases": [
+    {
+      "id": "A136-normal",
+      "scope": "effect_only",
+      "setup": {
+        "remaining_rounds": 9
+      },
+      "action": {
+        "play": "A136"
+      },
+      "expected": {
+        "wood_delta": 4
+      }
+    },
+    {
+      "id": "A136-score",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 3,
+        "clay": 3,
+        "reed": 3,
+        "stone": 3
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 5
+      }
+    }
+  ]
+}

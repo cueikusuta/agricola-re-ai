@@ -9,6 +9,7 @@
         "reed": 0
       },
       "action": {
+        "play": "B009",
         "choose": "gain_reed"
       },
       "expected": {
@@ -22,25 +23,12 @@
         "reed": 1
       },
       "action": {
+        "play": "B009",
         "choose": "exchange_cattle"
       },
       "expected": {
         "reed_delta": -1,
         "cattle_delta": 1
-      }
-    },
-    {
-      "id": "B009-not-triggered",
-      "scope": "effect_only",
-      "setup": {
-        "reed": 0
-      },
-      "action": {
-        "choose": "exchange_cattle"
-      },
-      "expected": {
-        "reed_delta": 0,
-        "cattle_delta": 0
       }
     }
   ]

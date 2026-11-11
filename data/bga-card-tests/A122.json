@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "card_id": "A122",
+  "cases": [
+    {
+      "id": "A122-normal",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0,
+        "wood": 0
+      },
+      "action": {
+        "use_space": "grain_utilization"
+      },
+      "expected": {
+        "clay_delta": 2,
+        "wood_delta": 1
+      }
+    },
+    {
+      "id": "A122-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 0
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "clay_delta": 0
+      }
+    }
+  ]
+}

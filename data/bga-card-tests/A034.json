@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "A034",
+  "cases": [
+    {
+      "id": "A034-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1,
+        "fences_in_supply": 1
+      },
+      "action": {
+        "build_fences": 1,
+        "exchange": true
+      },
+      "expected": {
+        "wood_delta": -1,
+        "food_delta": 2,
+        "points_delta": 1
+      }
+    },
+    {
+      "id": "A034-declined",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1
+      },
+      "action": {
+        "build_fences": 1,
+        "exchange": false
+      },
+      "expected": {
+        "wood_delta": 0
+      }
+    }
+  ]
+}

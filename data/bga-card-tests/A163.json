@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A163",
+  "cases": [
+    {
+      "id": "A163-first",
+      "scope": "effect_only",
+      "setup": {
+        "person_number": 1
+      },
+      "action": {
+        "use_space": "traveling_players"
+      },
+      "expected": {
+        "clay_delta": 1
+      }
+    },
+    {
+      "id": "A163-fifth",
+      "scope": "effect_only",
+      "setup": {
+        "person_number": 5
+      },
+      "action": {
+        "use_space": "traveling_players"
+      },
+      "expected": {
+        "stone_delta": 1
+      }
+    }
+  ]
+}

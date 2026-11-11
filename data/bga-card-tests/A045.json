@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A045",
+  "cases": [
+    {
+      "id": "A045-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood"
+      },
+      "action": {
+        "renovate_to": "clay"
+      },
+      "expected": {
+        "rounds_with_food": 6
+      }
+    },
+    {
+      "id": "A045-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood"
+      },
+      "action": {
+        "renovate_to": "wood"
+      },
+      "expected": {
+        "rounds_with_food": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "B021",
+  "cases": [
+    {
+      "id": "B021-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 4,
+        "wood": 0
+      },
+      "action": {
+        "play": "B021"
+      },
+      "expected": {
+        "food_on_card": 4
+      }
+    },
+    {
+      "id": "B021-gain",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 4,
+        "wood": 1
+      },
+      "action": {
+        "gain_wood": 1
+      },
+      "expected": {
+        "food_on_card": 3,
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "B021-family",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 0
+      },
+      "action": {
+        "gain_wood": 1
+      },
+      "expected": {
+        "family_growth_granted": true
+      }
+    }
+  ]
+}

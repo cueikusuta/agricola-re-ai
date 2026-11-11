@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "A010",
+  "cases": [
+    {
+      "id": "A010-normal",
+      "scope": "effect_only",
+      "setup": {
+        "family": 2,
+        "rooms": 2
+      },
+      "action": {
+        "play": "A010"
+      },
+      "expected": {
+        "housing_capacity": 3
+      }
+    },
+    {
+      "id": "A010-renovation",
+      "scope": "effect_only",
+      "setup": {
+        "renovations_left": 1
+      },
+      "action": {
+        "play": "A010",
+        "renovate": true
+      },
+      "expected": {
+        "renovation_allowed": false
+      }
+    },
+    {
+      "id": "A010-wrong-action",
+      "scope": "effect_only",
+      "setup": {
+        "action": "minor_improvement"
+      },
+      "action": {
+        "play": "A010"
+      },
+      "expected": {
+        "play_rejected": true
+      }
+    }
+  ]
+}

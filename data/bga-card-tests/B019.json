@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "B019",
+  "cases": [
+    {
+      "id": "B019-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_fields": 2
+      },
+      "action": {
+        "use_space": "farmland",
+        "use_card": true
+      },
+      "expected": {
+        "fields_delta": 1,
+        "card_fields": 1
+      }
+    },
+    {
+      "id": "B019-exhausted",
+      "scope": "effect_only",
+      "setup": {
+        "card_fields": 0
+      },
+      "action": {
+        "use_space": "farmland",
+        "use_card": true
+      },
+      "expected": {
+        "fields_delta": 0
+      }
+    }
+  ]
+}

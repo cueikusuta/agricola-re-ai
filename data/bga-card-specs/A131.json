@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "card_id": "A131",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "工芸指南",
+    "name_en": "Craft Teacher"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3294",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_improvement",
+      "conditions": [
+        {
+          "predicate": "has_improvement",
+          "params": {
+            "kind": "joinery"
+          }
+        },
+        {
+          "predicate": "has_improvement",
+          "params": {
+            "kind": "pottery"
+          }
+        },
+        {
+          "predicate": "has_improvement",
+          "params": {
+            "kind": "basketmakers_workshop"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "play_occupation",
+            "free": true,
+            "max_count": 2
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A131-normal",
+      "A131-incomplete"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "After building Joinery, Pottery and Basketmaker's Workshop: up to 2 free occupations."
+  }
+}

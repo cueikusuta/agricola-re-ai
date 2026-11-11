@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "A043",
+  "cases": [
+    {
+      "id": "A043-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stables_built": 1
+      },
+      "action": {
+        "end_turn": true
+      },
+      "expected": {
+        "rounds_with_food": 3
+      }
+    },
+    {
+      "id": "A043-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "stables_built": 0
+      },
+      "action": {
+        "end_turn": true
+      },
+      "expected": {
+        "rounds_with_food": 0
+      }
+    }
+  ]
+}
