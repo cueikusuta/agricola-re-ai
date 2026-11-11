@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "card_id": "A071",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "掘り返しシャベル",
+    "name_en": "Clearing Spade"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3354",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "anytime_free_action_window_and_deterministic_replay"
+    ],
+    "test_case_ids": [
+      "A071-normal",
+      "A071-boundary",
+      "A071-not-triggered",
+      "A071-free-action-contract-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Moving a crop at any time is described by BGA, but a passive modifier alone does not define the decision API, allowed windows or replay. Marked unresolved until legal free-action contract is specified; do not treat as implemented."
+  }
+}

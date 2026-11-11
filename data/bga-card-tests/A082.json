@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "card_id": "A082",
+  "cases": [
+    {
+      "id": "A082-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_counts": {
+          "forest": 4,
+          "clay_pit": 2
+        }
+      },
+      "action": {
+        "use_space": "day_laborer"
+      },
+      "expected": {
+        "take_1_from_accumulation": "forest",
+        "owner_wood_delta": 1,
+        "forest_count_after": 3
+      }
+    },
+    {
+      "id": "A082-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_counts": {
+          "forest": 3,
+          "clay_pit": 3,
+          "reed_bank": 3,
+          "western_quarry": 3
+        }
+      },
+      "action": {
+        "use_space": "day_laborer"
+      },
+      "expected": {
+        "take_1_from_accumulation": null
+      }
+    },
+    {
+      "id": "A082-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_counts": {
+          "reed_bank": 5,
+          "forest": 4
+        }
+      },
+      "action": {
+        "use_space": "reed_bank",
+        "normal_collect_all": 5,
+        "choose_bonus_from": "forest"
+      },
+      "expected": {
+        "take_1_from_accumulation": "forest",
+        "owner_reed_delta": 5,
+        "owner_wood_delta": 1,
+        "reed_bank_count_after": 0,
+        "forest_count_after": 3
+      },
+      "notes": "The used Reed Bank is empty after its normal action; the bonus must come from a different 4+ material space."
+    },
+    {
+      "id": "A082-normal-action-drains-space",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_counts": {
+          "reed_bank": 5
+        }
+      },
+      "action": {
+        "use_space": "reed_bank",
+        "normal_collect_all": 5
+      },
+      "expected": {
+        "owner_reed_delta": 5,
+        "reed_bank_count_after": 0,
+        "take_1_from_accumulation": null
+      },
+      "notes": "Do not count the five collected reeds a second time for a post-action 4+ threshold."
+    }
+  ]
+}
