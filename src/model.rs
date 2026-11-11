@@ -1,5 +1,6 @@
 //! Public model types and private game state. No card text is bundled.
 use crate::cards::{CardDefinition, CardSet, CardState};
+use crate::pending::{PendingDecision, PendingKind, PendingResolution};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -551,6 +552,10 @@ pub struct Game {
     pub hidden_round_deck: Vec<RoundCard>,
     pub rng: RngStreams,
     pub delayed_well: BTreeMap<u8, Vec<usize>>,
+    /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
+    /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
+    #[serde(default)]
+    pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
     #[serde(
         default,
         serialize_with = "serialize_arc",
@@ -566,6 +571,36 @@ pub struct Game {
     /// always keep a complete, hash-checked event log.
     #[serde(skip, default = "record_events_by_default")]
     pub record_events: bool,
+    /// Pending decision awaiting player resolution (Interrupt phase).
+    /// Included in state_hash for save/restore/resume integrity.
+    #[serde(default)]
+    pub pending: Option<PendingDecision>,
+    /// Event chain budget: max effect resolutions per action (default 64).
+    /// Replenished at the start of every committed action, so it bounds a
+    /// single effect chain (loop guard) rather than the whole game.
+    #[serde(default = "default_event_budget")]
+    pub event_budget: u32,
+    /// Per-card use tracking for effects with limits (e.g., once per round).
+    /// Key: card ID, Value: use count in the current period. Cleared at each
+    /// round boundary, matching the "once per round" period used by the cards.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub card_uses: BTreeMap<String, u32>,
+    /// Declared per-card use limits (card ID -> max resolutions per period).
+    /// A card absent from this map has no per-period limit. Kept in `Game` so
+    /// the limit is data, not a magic constant at the call site: an empty map
+    /// is skipped when serializing, so existing v5 saves stay byte-identical.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub card_use_limits: BTreeMap<String, u32>,
+    /// Next decision ID for PendingDecision.
+    #[serde(default)]
+    pub next_decision_id: u64,
+}
+
+/// Maximum effect resolutions inside one action's effect chain (loop guard).
+pub const DEFAULT_EVENT_BUDGET: u32 = 64;
+
+pub fn default_event_budget() -> u32 {
+    DEFAULT_EVENT_BUDGET
 }
 
 fn record_events_by_default() -> bool {
@@ -606,6 +641,12 @@ pub struct GameLog {
     #[serde(default)]
     pub initial_hands: Option<Vec<Vec<String>>>,
     pub events: Vec<Event>,
+    /// Step 3 bookkeeping integrity, stamped when the save is written and
+    /// verified on load. Absent in pre-Step3 (v5) saves, which is why it is
+    /// optional: old saves keep loading, new saves cannot have their
+    /// PendingDecision / use ledger / event budget silently tampered with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub integrity_hash: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Observation {
@@ -616,6 +657,9 @@ pub struct Observation {
     pub hand_counts: Vec<usize>,
     /// The implemented card vocabulary is public; its randomized locations are not.
     pub card_definitions: Vec<CardDefinition>,
+    /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
+    /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
+    pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
 }
 impl Game {
     pub fn new(config: Config) -> Self {
@@ -737,6 +781,7 @@ impl Game {
             card_set: card_set.clone(),
             initial_hands: initial_hands.clone(),
             events: vec![],
+            integrity_hash: None,
         };
         let mut result = Self {
             config,
@@ -744,11 +789,25 @@ impl Game {
             hidden_round_deck: deck,
             rng,
             delayed_well: BTreeMap::new(),
+            well_food_schedule: BTreeMap::new(),
             card_set,
             cards,
             log,
             record_events: true,
+            pending: None,
+            event_budget: default_event_budget(),
+            card_uses: BTreeMap::new(),
+            card_use_limits: Default::default(),
+            next_decision_id: 0,
         };
+        // Per-card use limits are card data (`CardDefinition::use_limit`), so
+        // the engine reads them from the set instead of a hard-coded table.
+        result.card_use_limits = result
+            .card_set
+            .definitions
+            .iter()
+            .filter_map(|card| card.use_limit.map(|limit| (card.id.clone(), limit)))
+            .collect();
         result.start_round();
         result.log.initial_state_hash = result.state_hash();
         result.log.initial_public_state = Some(result.public.clone());
@@ -764,10 +823,19 @@ impl Game {
             hand: self.cards.hands[player_id].clone(),
             hand_counts: self.cards.hands.iter().map(Vec::len).collect(),
             card_definitions: self.card_set.definitions.clone(),
+            well_food_schedule: self.well_food_schedule.clone(),
         })
     }
     pub fn state_hash(&self) -> String {
         // Event log is intentionally omitted; this is the full game state, including hidden cards and RNG.
+        // LOG_VERSION=5 compatibility: the hash tuple MUST stay identical to the
+        // v5 format (7 fields, tests/fixtures/v5/*). New bookkeeping fields
+        // (well_food_schedule, pending, event_budget, card_uses, next_decision_id)
+        // are serialized into saves via serde defaults, but are deliberately
+        // EXCLUDED from the hash so legacy v5 fixtures keep verifying.
+        // well_food_schedule mirrors delayed_well (Finding A) and pending
+        // decisions are excluded from the hash; their integrity is enforced by
+        // PendingDecision::state_hash_before checks in the resume path instead.
         let data = serde_json::to_vec(&(
             &self.config,
             &self.public,
@@ -781,6 +849,30 @@ impl Game {
         format!("{:x}", Sha256::digest(&data))
     }
 
+    /// Full integrity hash covering the whole `Game`, including the Step 3
+    /// bookkeeping fields (`well_food_schedule`, `pending`, `event_budget`,
+    /// `card_uses`, `next_decision_id`) that `state_hash` deliberately omits for
+    /// LOG_VERSION=5 compatibility.
+    ///
+    /// Use this for save/restore/resume integrity checks on NEW saves:
+    /// `state_hash` keeps the v5 replay contract, while `integrity_hash` proves
+    /// that an interrupted PendingDecision survives a save/load round-trip
+    /// byte-for-byte (Issue #266 acceptance: "PendingDecision save/restore/resume
+    /// with a consistent state hash").
+    pub fn integrity_hash(&self) -> String {
+        let data = serde_json::to_vec(&(
+            self.state_hash(),
+            &self.well_food_schedule,
+            &self.pending,
+            self.event_budget,
+            &self.card_uses,
+            &self.card_use_limits,
+            self.next_decision_id,
+        ))
+        .expect("integrity serialization");
+        format!("{:x}", Sha256::digest(&data))
+    }
+
     /// Create a lightweight clone for search (MCTS/PUCT).
     /// This avoids cloning the event log and shares the card definitions via Arc.
     /// The returned game has `record_events = false` and an empty event log.
@@ -791,6 +883,7 @@ impl Game {
             hidden_round_deck: self.hidden_round_deck.clone(),
             rng: self.rng.clone(),
             delayed_well: self.delayed_well.clone(),
+            well_food_schedule: self.well_food_schedule.clone(),
             card_set: self.card_set.clone(),
             cards: self.cards.clone(),
             log: GameLog {
@@ -807,8 +900,14 @@ impl Game {
                 card_set: self.log.card_set.clone(), // Arc shared
                 initial_hands: self.log.initial_hands.clone(),
                 events: Vec::new(),
+                integrity_hash: None,
             },
             record_events: false,
+            pending: self.pending.clone(),
+            event_budget: self.event_budget,
+            card_uses: self.card_uses.clone(),
+            card_use_limits: self.card_use_limits.clone(),
+            next_decision_id: self.next_decision_id,
         }
     }
     /// Create a search-only position from pre-sampled components.
@@ -816,14 +915,21 @@ impl Game {
     /// start_round(), state_hash (full JSON+SHA256), log CardSet duplication.
     /// The caller MUST ensure the inputs form a valid game state;
     /// this constructor does NOT run validate().
+    #[allow(clippy::too_many_arguments)] // pre-sampled parts mirror the Game field list
     pub fn search_from_parts(
         config: Config,
         public: PublicState,
         hidden_round_deck: Vec<RoundCard>,
         rng: RngStreams,
         delayed_well: BTreeMap<u8, Vec<usize>>,
+        well_food_schedule: BTreeMap<u8, Vec<usize>>,
         card_set: Arc<CardSet>,
         cards: CardState,
+        pending: Option<PendingDecision>,
+        event_budget: u32,
+        card_uses: BTreeMap<String, u32>,
+        card_use_limits: BTreeMap<String, u32>,
+        next_decision_id: u64,
     ) -> Self {
         let start_player = public.start_player;
         let round_seed = config.seed ^ 0x38DB_3BE3_DF45_3FAF;
@@ -834,6 +940,7 @@ impl Game {
             hidden_round_deck,
             rng,
             delayed_well,
+            well_food_schedule,
             card_set: card_set.clone(),
             cards,
             log: GameLog {
@@ -850,12 +957,23 @@ impl Game {
                 card_set: card_set.clone(), // Arc shared
                 initial_hands: None,
                 events: Vec::new(),
+                integrity_hash: None,
             },
             record_events: false,
+            pending,
+            event_budget,
+            card_uses,
+            card_use_limits,
+            next_decision_id,
         }
     }
     pub fn save_json(&self) -> Result<String, String> {
-        serde_json::to_string_pretty(self).map_err(|e| e.to_string())
+        // Stamp the Step 3 bookkeeping integrity into the log before writing,
+        // so load_json can reject a tampered PendingDecision / use ledger /
+        // event budget even though state_hash() predates those fields.
+        let mut stamped = self.clone();
+        stamped.log.integrity_hash = Some(self.integrity_hash());
+        serde_json::to_string_pretty(&stamped).map_err(|e| e.to_string())
     }
     pub fn load_json(text: &str) -> Result<Self, String> {
         let result: Self = serde_json::from_str(text).map_err(|e| e.to_string())?;
@@ -913,6 +1031,19 @@ impl Game {
         if replayed.state_hash() != result.state_hash() {
             return Err("saved game differs from logged action replay".into());
         }
+        // Step 3 bookkeeping is outside state_hash (LOG_VERSION=5 keeps that
+        // tuple fixed), so verify it against the hash stamped at save time.
+        // Absent for pre-Step3 saves, which therefore keep loading unchanged.
+        if let Some(expected) = result.log.integrity_hash.clone() {
+            let actual = result.integrity_hash();
+            if actual != expected {
+                return Err("saved game bookkeeping integrity mismatch".into());
+            }
+        } else if result.pending.is_some() {
+            // A legacy save can never carry a pending decision; if one shows up
+            // the file was tampered with.
+            return Err("legacy save must not carry a pending decision".into());
+        }
         Ok(result)
     }
     pub fn start_round(&mut self) {
@@ -920,6 +1051,17 @@ impl Game {
         let card = self.hidden_round_deck.pop().expect("14 rounds only");
         self.public.revealed.push(card);
         self.public.used.clear();
+        // Per-card use limits use the round as their period, so the ledger is
+        // cleared when a new round opens.
+        self.card_uses.clear();
+        // A decision cannot span a round boundary: no production effect pauses
+        // the round-start trigger, and carrying a stale decision into a new
+        // round would make its `state_hash_before` meaningless.
+        debug_assert!(
+            self.pending.is_none(),
+            "a pending decision must be resolved before the next round starts"
+        );
+        self.pending = None;
         self.public.start_player = self.public.start_player.min(self.public.players.len() - 1);
         self.public.active_player = self.public.start_player;
         self.public.workers_placed = vec![0; self.public.players.len()];
@@ -957,9 +1099,32 @@ impl Game {
                 self.public.players[id].supply.food += 1
             }
         }
-        for player in &mut self.public.players {
-            crate::cards::start_round_rewards(&self.card_set, player)
-                .expect("validated card round reward");
+        // Round-start triggers go through the phase dispatcher so the event
+        // budget and per-card use limits apply here too. The budget is reset
+        // for a new round: a round boundary is not part of one action's chain.
+        if self.card_set.enabled() {
+            self.event_budget = default_event_budget();
+            // dispatch_start_round already walks every player, so one call covers them all.
+            crate::card_events::dispatch_start_round(
+                &self.card_set,
+                &mut self.public.players,
+                &mut self.cards,
+                &mut self.public.improvement_market,
+                &mut self.delayed_well,
+                self.public.round,
+                &self.public.used,
+                &mut self.event_budget,
+                &mut self.card_uses,
+                &self.card_use_limits,
+                &mut self.pending,
+            )
+            // Before this change the same failure was a panic here; keeping the
+            // expect would turn a rules error into a crash, so record it as a
+            // game-log event and leave the state usable instead.
+            .unwrap_or_else(|err| {
+                debug_assert!(false, "round-start card reward failed: {err}");
+                let _ = err;
+            });
         }
     }
     pub fn validate(&self) -> Result<(), String> {
@@ -1058,6 +1223,138 @@ impl Game {
             return Err("round deck contains duplicate or missing cards".into());
         }
         Ok(())
+    }
+
+    /// Returns true if there is a pending decision awaiting resolution.
+    pub fn has_pending(&self) -> bool {
+        self.pending.is_some()
+    }
+
+    /// Get a reference to the pending decision.
+    pub fn pending(&self) -> Option<&PendingDecision> {
+        self.pending.as_ref()
+    }
+
+    /// Get a mutable reference to the pending decision.
+    pub fn pending_mut(&mut self) -> Option<&mut PendingDecision> {
+        self.pending.as_mut()
+    }
+
+    /// Resolve the pending decision.
+    /// The state_hash_before must match the current game state hash,
+    /// otherwise returns Err (prevents replay attacks on suspended games).
+    pub fn resolve_pending(&mut self, decision: PendingResolution) -> Result<(), String> {
+        let Some(pending) = self.pending.take() else {
+            return Err("no pending decision".into());
+        };
+        // Verify state hash integrity
+        if pending.state_hash_before != self.state_hash() {
+            self.pending = Some(pending); // Restore on failure
+            return Err(
+                "state hash mismatch: game state changed since decision was created".into(),
+            );
+        }
+        // Validate resolution matches pending kind
+        pending.validate_resolution(&decision)?;
+        // Apply the resolution
+        self.apply_pending_resolution(pending, decision)
+    }
+
+    /// Internal: apply a validated pending resolution.
+    fn apply_pending_resolution(
+        &mut self,
+        pending: PendingDecision,
+        resolution: PendingResolution,
+    ) -> Result<(), String> {
+        match (pending.kind, resolution) {
+            (
+                PendingKind::ChooseGain { source_card, .. },
+                PendingResolution::ChooseGain { chosen },
+            ) => {
+                let player = &mut self.public.players[pending.player];
+                let next = player
+                    .supply
+                    .get(chosen.good)
+                    .checked_add(chosen.amount)
+                    .ok_or("resource overflow")?;
+                player.supply.set(chosen.good, next);
+                // Log the choice if recording events
+                if self.record_events {
+                    self.log.events.push(crate::model::Event {
+                        player: Some(pending.player),
+                        kind: "pending_resolution".into(),
+                        payload: serde_json::json!({
+                            "source_card": source_card,
+                            "chosen_gain": chosen,
+                        }),
+                        before: pending.state_hash_before,
+                        after: self.state_hash(),
+                    });
+                }
+                Ok(())
+            }
+            (
+                PendingKind::ChoosePayment { card_id, .. },
+                PendingResolution::ChoosePayment { chosen },
+            ) => {
+                let player = &mut self.public.players[pending.player];
+                for (good, amount) in &chosen.cost {
+                    player.supply.pay(*good, *amount)?;
+                }
+                if self.record_events {
+                    self.log.events.push(crate::model::Event {
+                        player: Some(pending.player),
+                        kind: "pending_resolution".into(),
+                        payload: serde_json::json!({
+                            "card_id": card_id,
+                            "chosen_payment": chosen,
+                        }),
+                        before: pending.state_hash_before,
+                        after: self.state_hash(),
+                    });
+                }
+                Ok(())
+            }
+            (
+                PendingKind::DelayedWellRelief { round, recipients },
+                PendingResolution::DelayedWellRelief { confirmed },
+            ) => {
+                if confirmed {
+                    for id in recipients {
+                        self.public.players[id].supply.food += 1;
+                    }
+                }
+                if self.record_events {
+                    self.log.events.push(crate::model::Event {
+                        player: None,
+                        kind: "pending_resolution".into(),
+                        payload: serde_json::json!({
+                            "delayed_well_relief": { "round": round, "confirmed": confirmed },
+                        }),
+                        before: pending.state_hash_before,
+                        after: self.state_hash(),
+                    });
+                }
+                Ok(())
+            }
+            (PendingKind::Custom { source_card, .. }, PendingResolution::Custom { payload }) => {
+                // Extensible: custom effects handle their own payload
+                if self.record_events {
+                    self.log.events.push(crate::model::Event {
+                        player: Some(pending.player),
+                        kind: "pending_resolution".into(),
+                        payload: serde_json::json!({
+                            "source_card": source_card,
+                            "custom_payload": payload,
+                        }),
+                        before: pending.state_hash_before,
+                        after: self.state_hash(),
+                    });
+                }
+                Ok(())
+            }
+            _ => Err("resolution kind does not match pending decision kind".into()),
+        }
     }
 }
 

@@ -795,6 +795,7 @@ fn fixture_pool(mode: DraftMode, players: usize) -> DraftPool {
 /// function and must not be treated as reviewed cards.
 fn fixture_card_set(pool: &DraftPool) -> CardSet {
     let definition = |id: &String, kind: crate::cards::CardKind| CardDefinition {
+        use_limit: None,
         id: id.clone(),
         kind,
         cost: vec![],

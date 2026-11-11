@@ -341,8 +341,14 @@ pub fn sample_game_with_set(
         deck,
         rng_streams,
         BTreeMap::new(), // delayed_well not reconstructable from observation
+        obs.well_food_schedule.clone(), // public mirror for determinization
         Arc::clone(set),
         cards,
+        None,            // pending
+        64,              // event_budget
+        BTreeMap::new(), // card_uses
+        BTreeMap::new(), // card_use_limits
+        0,               // next_decision_id
     ))
 }
 
@@ -1286,6 +1292,7 @@ mod tests {
                     })
                     .collect();
                 definitions.push(CardDefinition {
+                    use_limit: None,
                     id: format!("card-{i:03}"),
                     kind: if i % 2 == 0 {
                         CardKind::Occupation

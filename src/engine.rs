@@ -1,5 +1,7 @@
 //! Transactional rule application. Detail policies live outside this module.
 use crate::breeding::BreedingPlan;
+use crate::card_events::dispatch_play;
+use crate::card_zones::{play_from_hand, CardMoveCtx};
 use crate::harvest::{FeedingPlan, HarvestDetailPolicy, SimpleHarvestDetails};
 use crate::model::*;
 use serde::{Deserialize, Serialize};
@@ -355,26 +357,81 @@ fn affordable(p: &Player, i: Improvement) -> bool {
 impl Game {
     /// Apply post-placement card rewards identically in committed moves and
     /// harvest previews, before the space becomes occupied.
+    ///
+    /// All three triggers go through the phase dispatcher rather than the legacy
+    /// `cards::*` hooks, so the event budget and per-card use limits apply on
+    /// the production path too. The legacy functions stay for the equivalence
+    /// tests: #266 requires staged migration, so the old path is kept as the
+    /// differential reference rather than deleted.
     fn apply_post_work_card_effects(
         &mut self,
         player: usize,
         action: &Action,
         previous: &Player,
     ) -> Result<()> {
-        let current = &mut self.public.players[player];
-        crate::cards::after_harvest_baking(
+        // No cards means no card effects; skip the dispatch entirely so the
+        // cardless hot path keeps its Step 2 cost.
+        if !self.card_set.enabled() {
+            return Ok(());
+        }
+        // Bake trigger: only when this action actually baked bread, matching
+        // cards::after_harvest_baking's own gate (round >= 2, harvest round).
+        if is_bake_bread_detail(&action.detail) {
+            crate::card_events::dispatch_after_harvest_bake(
+                &self.card_set,
+                player,
+                &mut self.cards,
+                &mut self.public.players,
+                &mut self.public.improvement_market,
+                &mut self.delayed_well,
+                self.public.round,
+                &self.public.used,
+                &mut self.event_budget,
+                &mut self.card_uses,
+                &self.card_use_limits,
+                &mut self.pending,
+            )?;
+        }
+        // Clay-construction trigger: `previous` is the pre-action player, so a
+        // longer improvements list means this action bought one.
+        let bought = if previous.improvements.len() < self.public.players[player].improvements.len()
+        {
+            self.public.players[player].improvements.last().copied()
+        } else {
+            None
+        };
+        crate::card_events::dispatch_after_clay_construction(
             &self.card_set,
-            current,
+            player,
+            previous,
+            bought,
+            &mut self.cards,
+            &mut self.public.players,
+            &mut self.public.improvement_market,
+            &mut self.delayed_well,
             self.public.round,
-            is_bake_bread_detail(&action.detail),
-        )?;
-        crate::cards::after_clay_construction(&self.card_set, previous, current)?;
-        crate::cards::after_worker(&self.card_set, current, action.space)?;
-        crate::cards::after_worker_if_used(
-            &self.card_set,
-            current,
-            action.space,
             &self.public.used,
+            &mut self.event_budget,
+            &mut self.card_uses,
+            &self.card_use_limits,
+            &mut self.pending,
+        )?;
+        // Worker trigger: AfterWorkerGain and AfterWorkerGainIfUsed, in the
+        // active player's played_cards order.
+        crate::card_events::dispatch_after_worker(
+            &self.card_set,
+            player,
+            action.space,
+            &mut self.cards,
+            &mut self.public.players,
+            &mut self.public.improvement_market,
+            &mut self.delayed_well,
+            self.public.round,
+            &self.public.used,
+            &mut self.event_budget,
+            &mut self.card_uses,
+            &self.card_use_limits,
+            &mut self.pending,
         )?;
         Ok(())
     }
@@ -721,6 +778,9 @@ impl Game {
         } else {
             String::new()
         };
+        // The event budget guards against unbounded effect chains WITHIN one
+        // action, so each action starts from the full budget again.
+        next.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         next.execute_work(player, &action)?;
         next.apply_post_work_card_effects(player, &action, &self.public.players[player])?;
         next.public.used.insert(action.space);
@@ -847,6 +907,8 @@ impl Game {
         } else {
             String::new()
         };
+        // Same per-action budget reset as apply_with_plans.
+        next.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         next.execute_free(player, &free)?;
         crate::validation::validate_free_action_or_full(&next, self, player)?;
         if record {
@@ -1028,53 +1090,119 @@ impl Game {
                 p.supply.gain(kind, n);
             }
             Space::MeetingPlace => {
+                // Handle card play first (before borrowing p for the rest).
+                // PlayMinor is valid even when the card set is disabled: the
+                // legacy main-branch semantics accept the detail and rely on
+                // cards::play to reject plays when no set exists.
                 match detail {
                     Detail::None => {}
                     Detail::PlayMinor { card_id } if self.card_set.enabled() => {
-                        crate::cards::play(
+                        // Validate and pay costs
+                        crate::cards::play_validate_pay(
                             &self.card_set,
                             &mut self.cards.hands[id],
-                            p,
+                            &mut self.public.players[id],
                             card_id,
                             crate::cards::CardKind::MinorImprovement,
                             0,
                         )?;
+                        // Canonical zone move: hand -> played (2016 Lookout p.6)
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        play_from_hand(&mut ctx, id, card_id)?;
+                        // Dispatch Replace/Before phases for the new card only
+                        dispatch_play(
+                            &self.card_set,
+                            id,
+                            card_id,
+                            &mut self.cards,
+                            &mut self.public.players,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            self.public.round,
+                            &self.public.used,
+                            &mut self.event_budget,
+                            &mut self.card_uses,
+                            &self.card_use_limits,
+                            &mut self.pending,
+                        )?;
+                        // Update card points
+                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                        crate::cards::update_card_points_on_play(
+                            &mut self.public.players[id],
+                            card.points,
+                        )?;
                     }
                     _ => return Err("invalid starting-player details".into()),
                 }
+                // Now handle the rest of the action
                 let n = self.public.accumulations.remove(&space).unwrap_or(0);
-                p.supply.food += n;
+                self.public.players[id].supply.food += n;
                 self.public.start_player = id;
             }
             Space::Lessons | Space::ExtraLessons => {
-                if let Detail::PlayOccupation { card_id } = detail {
-                    let count = p
-                        .played_cards
-                        .iter()
-                        .filter(|id| {
-                            self.card_set
-                                .definition(id)
-                                .is_some_and(|c| c.kind == crate::cards::CardKind::Occupation)
-                        })
-                        .count();
-                    let fee = if space == Space::Lessons {
-                        u32::from(count > 0)
-                    } else if self.config.players == 3 || count >= 2 {
-                        2
-                    } else {
-                        1
-                    };
-                    crate::cards::play(
-                        &self.card_set,
-                        &mut self.cards.hands[id],
-                        p,
-                        card_id,
-                        crate::cards::CardKind::Occupation,
-                        fee,
-                    )?;
-                } else {
+                // Occupation play: Lessons requires an occupation selection.
+                // (2016 Lookout p.8: multiple card effects → active player's
+                // chosen order; here the play IS the selection.)
+                let Detail::PlayOccupation { card_id } = detail else {
                     return Err("occupation selection required".into());
-                }
+                };
+                let count = self.public.players[id]
+                    .played_cards
+                    .iter()
+                    .filter(|pid| {
+                        self.card_set
+                            .definition(pid)
+                            .is_some_and(|c| c.kind == crate::cards::CardKind::Occupation)
+                    })
+                    .count();
+                let fee = if space == Space::Lessons {
+                    u32::from(count > 0)
+                } else if self.config.players == 3 || count >= 2 {
+                    2
+                } else {
+                    1
+                };
+                crate::cards::play_validate_pay(
+                    &self.card_set,
+                    &mut self.cards.hands[id],
+                    &mut self.public.players[id],
+                    card_id,
+                    crate::cards::CardKind::Occupation,
+                    fee,
+                )?;
+                // Canonical zone move: hand -> played (2016 Lookout p.6)
+                let mut ctx = CardMoveCtx {
+                    cards: &mut self.cards,
+                    players: &mut self.public.players,
+                    improvement_market: &mut self.public.improvement_market,
+                };
+                play_from_hand(&mut ctx, id, card_id)?;
+                // Dispatch Replace/Before phases for the new card only
+                dispatch_play(
+                    &self.card_set,
+                    id,
+                    card_id,
+                    &mut self.cards,
+                    &mut self.public.players,
+                    &mut self.public.improvement_market,
+                    &mut self.delayed_well,
+                    self.public.round,
+                    &self.public.used,
+                    &mut self.event_budget,
+                    &mut self.card_uses,
+                    &self.card_use_limits,
+                    &mut self.pending,
+                )?;
+                // Update card points
+                let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                crate::cards::update_card_points_on_play(
+                    &mut self.public.players[id],
+                    card.points,
+                )?;
             }
             Space::DayLaborer => {
                 require_none(detail)?;
@@ -1132,22 +1260,59 @@ impl Game {
                 _ => return Err("pasture details required".into()),
             },
             Space::FamilyGrowthWithRoom | Space::ModestFamilyGrowth => {
+                // Round gate for ModestFamilyGrowth must be checked BEFORE any card play
+                // (legacy semantics: gate error before paying costs)
                 if space == Space::ModestFamilyGrowth && self.public.round < 5 {
                     return Err("modest family growth is only available from round 5".into());
                 }
-                match detail {
-                    Detail::None => grow(p, true)?,
-                    Detail::GrowWithMinor { card_id } if self.card_set.enabled() => {
-                        grow(p, true)?;
-                        crate::cards::play(
+                // Handle card play first (before borrowing p for the rest)
+                if let Detail::GrowWithMinor { card_id } = detail {
+                    if self.card_set.enabled() {
+                        // Validate and pay costs (use internal fn; cards::play does full legacy for direct callers)
+                        crate::cards::play_validate_pay(
                             &self.card_set,
                             &mut self.cards.hands[id],
-                            p,
+                            &mut self.public.players[id],
                             card_id,
                             crate::cards::CardKind::MinorImprovement,
                             0,
                         )?;
+                        // Move card from hand to played
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        play_from_hand(&mut ctx, id, card_id)?;
+                        // Dispatch Replace/Before phases
+                        dispatch_play(
+                            &self.card_set,
+                            id,
+                            card_id,
+                            &mut self.cards,
+                            &mut self.public.players,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            self.public.round,
+                            &self.public.used,
+                            &mut self.event_budget,
+                            &mut self.card_uses,
+                            &self.card_use_limits,
+                            &mut self.pending,
+                        )?;
+                        // Update card points
+                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                        crate::cards::update_card_points_on_play(
+                            &mut self.public.players[id],
+                            card.points,
+                        )?;
                     }
+                }
+                // Now handle the rest of the action
+                let p = &mut self.public.players[id];
+                match detail {
+                    Detail::None => grow(p, true)?,
+                    Detail::GrowWithMinor { .. } => {} // Already handled above
                     _ => return Err("invalid growth details".into()),
                 }
             }
@@ -1190,62 +1355,105 @@ impl Game {
                 }
             }
             Space::MajorImprovement => match detail {
+                // Handle card play first (before borrowing p for the rest)
                 Detail::PlayMinor { card_id } if self.card_set.enabled() => {
-                    crate::cards::play(
+                    // Validate and pay costs (use internal fn; cards::play does full legacy for direct callers)
+                    crate::cards::play_validate_pay(
                         &self.card_set,
                         &mut self.cards.hands[id],
-                        p,
+                        &mut self.public.players[id],
                         card_id,
                         crate::cards::CardKind::MinorImprovement,
                         0,
+                    )?;
+                    // Move card from hand to played
+                    let mut ctx = CardMoveCtx {
+                        cards: &mut self.cards,
+                        players: &mut self.public.players,
+                        improvement_market: &mut self.public.improvement_market,
+                    };
+                    play_from_hand(&mut ctx, id, card_id)?;
+                    // Dispatch Replace/Before phases
+                    dispatch_play(
+                        &self.card_set,
+                        id,
+                        card_id,
+                        &mut self.cards,
+                        &mut self.public.players,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        self.public.round,
+                        &self.public.used,
+                        &mut self.event_budget,
+                        &mut self.card_uses,
+                        &self.card_use_limits,
+                        &mut self.pending,
+                    )?;
+                    // Update card points
+                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                    crate::cards::update_card_points_on_play(
+                        &mut self.public.players[id],
+                        card.points,
                     )?;
                 }
                 Detail::Buy {
                     improvement,
                     instant_bake,
-                } => buy_improvement(
-                    p,
-                    &mut self.public.improvement_market,
-                    &mut self.delayed_well,
-                    self.public.round,
-                    *improvement,
-                    PurchaseArgs {
-                        instant_bake: *instant_bake,
-                        allocation: None,
-                        mode: PurchaseMode::Auto,
-                    },
-                )?,
+                } => {
+                    let p = &mut self.public.players[id];
+                    buy_improvement(
+                        p,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        &mut self.well_food_schedule,
+                        self.public.round,
+                        *improvement,
+                        PurchaseArgs {
+                            instant_bake: *instant_bake,
+                            allocation: None,
+                            mode: PurchaseMode::Auto,
+                        },
+                    )?;
+                }
                 Detail::BuyDetailed {
                     improvement,
                     instant_baking,
-                } => buy_improvement(
-                    p,
-                    &mut self.public.improvement_market,
-                    &mut self.delayed_well,
-                    self.public.round,
-                    *improvement,
-                    PurchaseArgs {
-                        instant_bake: 0,
-                        allocation: Some(instant_baking),
-                        mode: PurchaseMode::Auto,
-                    },
-                )?,
+                } => {
+                    let p = &mut self.public.players[id];
+                    buy_improvement(
+                        p,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        &mut self.well_food_schedule,
+                        self.public.round,
+                        *improvement,
+                        PurchaseArgs {
+                            instant_bake: 0,
+                            allocation: Some(instant_baking),
+                            mode: PurchaseMode::Auto,
+                        },
+                    )?;
+                }
                 Detail::BuyWithMode {
                     improvement,
                     instant_baking,
                     mode,
-                } => buy_improvement(
-                    p,
-                    &mut self.public.improvement_market,
-                    &mut self.delayed_well,
-                    self.public.round,
-                    *improvement,
-                    PurchaseArgs {
-                        instant_bake: 0,
-                        allocation: Some(instant_baking),
-                        mode: *mode,
-                    },
-                )?,
+                } => {
+                    let p = &mut self.public.players[id];
+                    buy_improvement(
+                        p,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        &mut self.well_food_schedule,
+                        self.public.round,
+                        *improvement,
+                        PurchaseArgs {
+                            instant_bake: 0,
+                            allocation: Some(instant_baking),
+                            mode: *mode,
+                        },
+                    )?;
+                }
                 _ => return Err("improvement required".into()),
             },
             Space::HouseRedevelopment => match detail {
@@ -1263,6 +1471,7 @@ impl Game {
                             p,
                             &mut self.public.improvement_market,
                             &mut self.delayed_well,
+                            &mut self.well_food_schedule,
                             self.public.round,
                             *i,
                             PurchaseArgs {
@@ -1291,6 +1500,7 @@ impl Game {
                             p,
                             &mut self.public.improvement_market,
                             &mut self.delayed_well,
+                            &mut self.well_food_schedule,
                             self.public.round,
                             *improvement,
                             PurchaseArgs {
@@ -1617,7 +1827,8 @@ struct PurchaseArgs<'a> {
 fn buy_improvement(
     p: &mut Player,
     market: &mut Vec<Improvement>,
-    well: &mut BTreeMap<u8, Vec<usize>>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     item: Improvement,
     options: PurchaseArgs<'_>,
@@ -1667,7 +1878,8 @@ fn buy_improvement(
     p.improvements.push(item);
     if item == Improvement::Well {
         for r in round + 1..=14u8.min(round.saturating_add(5)) {
-            well.entry(r).or_default().push(p.id)
+            delayed_well.entry(r).or_default().push(p.id);
+            well_food_schedule.entry(r).or_default().push(p.id);
         }
     }
     if (instant_bake > 0 || allocation.is_some_and(|a| !a.is_empty()))

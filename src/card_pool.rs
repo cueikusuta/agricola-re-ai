@@ -305,6 +305,7 @@ mod tests {
 
     fn def(id: &str, kind: CardKind) -> CardDefinition {
         CardDefinition {
+            use_limit: None,
             id: id.to_owned(),
             kind,
             cost: vec![],

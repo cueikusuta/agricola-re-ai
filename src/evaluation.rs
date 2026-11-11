@@ -657,6 +657,12 @@ fn project_action(obs: &Observation, action: &Action) -> Option<Player> {
     let set = crate::cards::CardSet {
         definitions: obs.card_definitions.clone(),
     };
+    // Projection only: this runs on an Observation (no event budget, no
+    // discontinuing), so it deliberately reuses the deterministic legacy hooks.
+    // The committed engine path applies the same effects through the phase
+    // dispatcher with budget and per-card use limits enforced; a limited card
+    // may therefore be slightly over-valued here, which only affects AI
+    // preference and never the rules outcome.
     crate::cards::after_worker(&set, &mut p, action.space).ok()?;
     // The engine applies conditional worker rewards before occupying this
     // action space, so the trigger sees only *previously* used spaces.
@@ -901,6 +907,7 @@ mod projection_tests {
 
         let mut obs = observed(|_| {});
         obs.card_definitions.push(CardDefinition {
+            use_limit: None,
             id: "sample_occ".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -969,6 +976,7 @@ mod projection_tests {
         use crate::cards::{CardDefinition, CardEffect, CardKind, ScoreBonusRule};
         let mut obs = observed(|_| {});
         obs.card_definitions.push(CardDefinition {
+            use_limit: None,
             id: "bonus".into(),
             kind: CardKind::Occupation,
             cost: vec![],
@@ -988,6 +996,7 @@ mod projection_tests {
         use crate::cards::{CardDefinition, CardEffect, CardKind};
         let mut obs = observed(|p| p.played_cards.push("conditional".into()));
         obs.card_definitions.push(CardDefinition {
+            use_limit: None,
             id: "conditional".into(),
             kind: CardKind::Occupation,
             cost: vec![],
