@@ -949,6 +949,13 @@ pub fn dispatch_after_harvest_bake(
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<(), String> {
+    // Same gate as the legacy cards::after_harvest_baking: a bake bonus only
+    // exists in the round immediately after a harvest round. Without this the
+    // dispatcher would award bake bonuses in rounds where the legacy path (and
+    // every existing test) awards nothing.
+    if round < 2 || !crate::model::HARVEST_ROUNDS.contains(&(round - 1)) {
+        return Ok(());
+    }
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -1783,6 +1790,56 @@ mod tests {
         )
         .unwrap();
         assert_eq!(legacy[0].supply.food, c.players[0].supply.food);
+    }
+
+    /// The bake bonus must only fire in the round after a harvest round, exactly
+    /// like the legacy cards::after_harvest_baking. A missing gate here would
+    /// award free food in ordinary rounds (round 4 review, P0).
+    #[test]
+    fn equivalence_bake_bonus_round_gate_matches_legacy() {
+        let set = equivalence_pool();
+        // Every round 1..=14, baked=true, single C4 in play (AfterHarvestBakeGain 3).
+        for round in 1u8..=14 {
+            let mut legacy = [Player::new(0, 0)];
+            legacy[0].played_cards = vec!["C4".into()];
+            crate::cards::after_harvest_baking(&set, &mut legacy[0], round, true).unwrap();
+
+            let mut c = Ctx::new();
+            c.players[0].played_cards = vec!["C4".into()];
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            dispatch_after_harvest_bake(
+                &set,
+                0,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                round,
+                &std::collections::BTreeSet::new(),
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+            )
+            .unwrap();
+
+            assert_eq!(
+                legacy[0].supply.food, c.players[0].supply.food,
+                "round {round}: bake bonus must match the legacy gate"
+            );
+            // The gate is: round >= 2 and round-1 is a harvest round.
+            let expected = if round >= 2 && crate::model::HARVEST_ROUNDS.contains(&(round - 1)) {
+                3
+            } else {
+                0
+            };
+            assert_eq!(
+                c.players[0].supply.food, expected,
+                "round {round}: expected {expected} food from the bake bonus"
+            );
+        }
     }
 
     /// Clay-construction rewards must fire on the construction condition alone.
