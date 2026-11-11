@@ -52,6 +52,23 @@
         "counts_as_newborn": true
       },
       "notes": "Paying 1 food is required for the early action."
+    },
+    {
+      "id": "A092-timing-contract-pending",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "round": 4,
+        "family_grown_this_round": 1
+      },
+      "action": {
+        "request_unspecified_immediate_worker_placement": true
+      },
+      "expected": {
+        "review_status": "needs_resolution",
+        "automatic_effect_execution_allowed": false
+      },
+      "notes": "The published effect does not determine the exact payment and action window; guard against an unverified automatic action."
     }
   ]
 }

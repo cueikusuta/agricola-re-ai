@@ -59,6 +59,22 @@
       "expected": {
         "bonus_good": null
       }
+    },
+    {
+      "id": "A103-tier-contract-pending",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "food_taken_from_accumulation": 3
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "review_status": "needs_resolution",
+        "automatic_effect_execution_allowed": false
+      },
+      "notes": "Conflicting BGA prose is not a safe executable mapping for the tiered reward."
     }
   ]
 }
