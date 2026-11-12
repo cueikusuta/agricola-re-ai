@@ -190,7 +190,7 @@ fn resolve_phase_scan(
             let result = match effect {
                 #[cfg(test)]
                 CardEffect::PendingProbe { options } => {
-                    handle_pending_probe(ctx, player, &card_id, options.clone())?
+                    handle_pending_probe(ctx, player, card_id, options.clone())?
                 }
                 CardEffect::Prerequisite { rule } => {
                     handle_prerequisite(ctx, player, card_id, rule, trigger_data)?
