@@ -19,16 +19,12 @@
 //! simulation samples hidden information from [`Observation`] only, through the
 //! same `sample_game` helper the baseline uses.
 use crate::evaluation::{action_value_with_details, evaluate_player, WeightedEvaluationPolicy};
-use crate::mcts::{
-    rollout, sample_game_with_set, search_card_set, CardLookup, MctsOutcome, SearchLimit,
-    SearchMode,
-};
+use crate::mcts::{rollout, sample_game, MctsOutcome, SearchLimit, SearchMode};
 use crate::model::{Game, Observation, Space};
 use crate::policy::{weight, DetailPolicy, SimpleDetails, SpacePolicy};
 use crate::score::standings_with_cards;
 use rand_chacha::ChaCha8Rng;
 use std::collections::BTreeMap;
-use std::sync::Arc;
 use std::time::Instant;
 
 /// How the value of a depth-limited leaf is estimated.
@@ -363,18 +359,6 @@ impl PuctPolicy {
         let mut simulations_completed = 0usize;
         let mut timed_out = false;
 
-        // Hoist CardSet creation and validation outside the simulation loop (P1-B).
-        let set = match search_card_set(obs) {
-            Some(set) => Arc::clone(&set),
-            None => {
-                let space = fallback(obs, legal, rng)
-                    .filter(|space| legal.contains(space))
-                    .or_else(|| legal.first().copied())?;
-                return Some((space, outcome(0, true, false, started.elapsed())));
-            }
-        };
-        let lookup = CardLookup::from_card_set(&set);
-
         for _ in 0..max_simulations {
             if let Some(limit) = deadline {
                 if Instant::now() >= limit {
@@ -382,7 +366,7 @@ impl PuctPolicy {
                     break;
                 }
             }
-            let Some(mut game) = sample_game_with_set(obs, &set, lookup.as_ref(), rng) else {
+            let Some(mut game) = sample_game(obs, rng) else {
                 continue;
             };
             let mut path = vec![0usize];

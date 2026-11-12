@@ -380,7 +380,16 @@ impl CardState {
         })
     }
 
-    pub fn validate(&self, set: &CardSet, players: &[Player]) -> Result<(), String> {
+    /// In-game location validation: every implemented card ID occupies exactly
+    /// one zone (undealt, a hand, or a played area), with no duplicates and no
+    /// orphans. This is the invariant every card move must preserve, so it
+    /// holds for the whole game — including positions where cards changed hands
+    /// or were acquired after the initial deal.
+    pub fn validate_location_invariant(
+        &self,
+        set: &CardSet,
+        players: &[Player],
+    ) -> Result<(), String> {
         if self.hands.len() != players.len() {
             return Err("card hand count mismatch".into());
         }
@@ -398,6 +407,23 @@ impl CardState {
         if all.len() != set.definitions.len() {
             return Err("card partition does not match card set".into());
         }
+        Ok(())
+    }
+
+    /// Initial distribution validation: each player starts with exactly seven
+    /// occupations and seven minor improvements across hand + played area.
+    ///
+    /// This is a *setup* property, not a running invariant: once play begins,
+    /// cards change hands and can be acquired, so the per-player 7+7 count stops
+    /// holding by design. Enforce it at deal/setup time only.
+    pub fn validate_initial_distribution(
+        &self,
+        set: &CardSet,
+        players: &[Player],
+    ) -> Result<(), String> {
+        if self.hands.len() != players.len() {
+            return Err("card hand count mismatch".into());
+        }
         for (hand, player) in self.hands.iter().zip(players) {
             let own = hand.iter().chain(player.played_cards.iter());
             for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
@@ -409,6 +435,14 @@ impl CardState {
                     return Err("player has incorrect original card allocation".into());
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Card score invariant: a player's cached `card_points` equals the sum of
+    /// the points printed on the cards in their played area.
+    pub fn validate_card_points(&self, set: &CardSet, players: &[Player]) -> Result<(), String> {
+        for (_hand, player) in self.hands.iter().zip(players) {
             let points: i32 = player
                 .played_cards
                 .iter()
@@ -420,6 +454,23 @@ impl CardState {
             }
         }
         Ok(())
+    }
+
+    /// Running-position validation: location partition + card score. Use this
+    /// for any state reached by play; it does not assume the initial 7+7 deal.
+    pub fn validate_in_game(&self, set: &CardSet, players: &[Player]) -> Result<(), String> {
+        self.validate_location_invariant(set, players)?;
+        self.validate_card_points(set, players)
+    }
+
+    /// Full validation: the running invariants plus the initial-distribution
+    /// count. Keep this for setup/deal state; in-game callers use
+    /// [`Self::validate_in_game`], because a transfer or a newly acquired card
+    /// legitimately breaks the per-player 7+7 count.
+    pub fn validate(&self, set: &CardSet, players: &[Player]) -> Result<(), String> {
+        self.validate_location_invariant(set, players)?;
+        self.validate_initial_distribution(set, players)?;
+        self.validate_card_points(set, players)
     }
 }
 
