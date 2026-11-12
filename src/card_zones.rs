@@ -549,4 +549,120 @@ mod tests {
         .unwrap_err();
         assert!(matches!(err, CardZoneError::InvalidMove(_)));
     }
+
+    #[test]
+    fn move_card_failure_leaves_location_completely_unchanged() {
+        let (set, mut cards, mut players) = test_setup();
+        let before_cards = cards.clone();
+        let before_players = players.clone();
+        let mut market = vec![];
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+
+        // Card A002 is not in player 0's hand: move must fail without mutating.
+        let err = move_card(
+            &mut ctx,
+            "A002",
+            CardZone::Hand { player: 0 },
+            CardZone::Played { player: 0 },
+        )
+        .unwrap_err();
+        assert!(matches!(err, CardZoneError::CardNotInZone(_, _)));
+
+        // Cross-player hand -> played is rejected.
+        let err = move_card(
+            &mut ctx,
+            "A001",
+            CardZone::Hand { player: 0 },
+            CardZone::Played { player: 1 },
+        )
+        .unwrap_err();
+        assert!(matches!(err, CardZoneError::InvalidMove(_)));
+
+        assert_eq!(&*ctx.cards, &before_cards);
+        assert_eq!(ctx.players, before_players);
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
+    }
+
+    #[test]
+    fn move_card_rejects_duplicate_in_played_state_unchanged() {
+        let (_set, mut cards, mut players) = test_setup();
+        players[0].played_cards.push("A001".into());
+        let before_cards = cards.clone();
+        let before_players = players.clone();
+        let mut market = vec![];
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        let err = play_from_hand(&mut ctx, 0, "A001").unwrap_err();
+        assert!(matches!(err, CardZoneError::DuplicateInPlayed(_)));
+        // State unchanged after the rejected move.
+        assert_eq!(&*ctx.cards, &before_cards);
+        assert_eq!(ctx.players, before_players);
+    }
+
+    #[test]
+    fn move_card_transfer_between_players_preserves_partition() {
+        let (set, mut cards, mut players) = test_setup();
+        // Give player 1 an empty hand, player 0 holds A001.
+        let mut market = vec![];
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        // Transfer A001: hand(0) -> undealt, then undealt -> hand(1).
+        move_card(
+            &mut ctx,
+            "A001",
+            CardZone::Hand { player: 0 },
+            CardZone::Undealt,
+        )
+        .unwrap();
+        move_card(
+            &mut ctx,
+            "A001",
+            CardZone::Undealt,
+            CardZone::Hand { player: 1 },
+        )
+        .unwrap();
+        assert!(ctx.cards.hands[0].is_empty());
+        assert_eq!(ctx.cards.hands[1], vec!["A002", "A001"]);
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
+    }
+
+    #[test]
+    fn move_card_additional_acquisition_from_undealt() {
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                use_limit: None,
+                id: "A001".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            }],
+        };
+        let mut cards = CardState {
+            hands: vec![vec![]],
+            undealt: vec!["A001".into()],
+        };
+        let mut players = vec![Player::new(0, 0)];
+        let mut market = vec![];
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        // Acquire the remaining undealt card into the hand.
+        deal_initial_hands(&mut ctx, &[vec!["A001".into()]]).unwrap();
+        assert!(ctx.cards.undealt.is_empty());
+        assert_eq!(ctx.cards.hands[0], vec!["A001"]);
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
+    }
 }
