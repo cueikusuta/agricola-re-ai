@@ -1,6 +1,7 @@
 //! Public model types and private game state. No card text is bundled.
 use crate::cards::{CardDefinition, CardSet, CardState};
-use crate::pending::{PendingDecision, PendingKind, PendingResolution};
+use crate::harvest::HarvestDetailPolicy;
+use crate::pending::{PendingDecision, PendingKind, PendingResolution, Transition};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -1105,7 +1106,7 @@ impl Game {
         if self.card_set.enabled() {
             self.event_budget = default_event_budget();
             // dispatch_start_round already walks every player, so one call covers them all.
-            crate::card_events::dispatch_start_round(
+            let _ = crate::card_events::dispatch_start_round(
                 &self.card_set,
                 &mut self.public.players,
                 &mut self.cards,
@@ -1123,7 +1124,7 @@ impl Game {
             // game-log event and leave the state usable instead.
             .unwrap_or_else(|err| {
                 debug_assert!(false, "round-start card reward failed: {err}");
-                let _ = err;
+                Transition::Completed
             });
         }
     }
@@ -1273,6 +1274,124 @@ impl Game {
         }
     }
 
+    /// Resolve the pending decision AND run its continuation (if any).
+    /// This is the primary way to complete a paused action: the resolution
+    /// is applied, then the stored continuation (e.g., finishing a work
+    /// action's card-effect chain) is executed.
+    pub fn resolve_pending_and_resume(
+        &mut self,
+        resolution: PendingResolution,
+    ) -> Result<Transition, String> {
+        // Validate BEFORE touching the stored decision.
+        let Some(pending) = self.pending.as_ref() else {
+            return Err("no pending decision".into());
+        };
+        // Verify state hash integrity
+        if pending.state_hash_before != self.state_hash() {
+            return Err(
+                "state hash mismatch: game state changed since decision was created".into(),
+            );
+        }
+        // Validate resolution matches pending kind
+        pending.validate_resolution(&resolution)?;
+        // Take the decision and its continuation
+        let pending = self.pending.take().expect("checked above");
+        let continuation = pending.continuation.clone();
+        // Apply the resolution
+        self.apply_pending_resolution(&pending, resolution)?;
+        // Run the continuation if present
+        match continuation {
+            crate::pending::Continuation::None => Ok(Transition::Completed),
+            crate::pending::Continuation::PostWork {
+                player,
+                resume,
+                completion,
+            } => self.resume_post_work(player, resume, *completion),
+        }
+    }
+
+    /// Execute the post-work continuation after a decision resolves.
+    fn resume_post_work(
+        &mut self,
+        player: usize,
+        _resume: crate::pending::PostWorkResume,
+        completion: crate::pending::WorkCompletion,
+    ) -> Result<Transition, String> {
+        // Re-apply the work action to advance used/workers_placed and run
+        // the harvest/breeding/round-end logic that was deferred.
+        // The completion struct holds everything we need.
+        let mut next = self.clone();
+        // The action's space was not yet marked used; do it now.
+        next.public.used.insert(completion.action.space);
+        next.public.workers_placed[player] += 1;
+        let will_harvest = next.public.workers_placed == next.public.work_quota
+            && HARVEST_ROUNDS.contains(&next.public.round);
+        // Feeding/breeding plans from the original action (or generated now)
+        let policy = crate::harvest::SimpleHarvestDetails;
+        let harvest_plans = if will_harvest {
+            let plans = if let Some(value) = completion.harvest_plans {
+                value
+            } else {
+                let mut preview = next.clone();
+                preview.harvest_fields();
+                (0..preview.public.players.len())
+                    .map(|id| policy.plan_feeding(&preview.observation(id).expect("valid player")))
+                    .collect::<Vec<_>>()
+            };
+            if plans.len() != next.public.players.len() {
+                return Err("feeding plan count mismatch".into());
+            }
+            for plan in &plans {
+                plan.validate()?;
+            }
+            Some(plans)
+        } else {
+            None
+        };
+        let breeding_plans = if will_harvest {
+            let mut preview = next.clone();
+            preview.harvest_fields();
+            preview.feed_after_fields(harvest_plans.as_deref().expect("feeding plans"))?;
+            let plans = if let Some(value) = completion.breeding_plans {
+                value
+            } else {
+                (0..preview.public.players.len())
+                    .map(|id| policy.plan_breeding(&preview.observation(id).expect("valid player")))
+                    .collect::<Vec<_>>()
+            };
+            if plans.len() != preview.public.players.len() {
+                return Err("breeding plan count mismatch".into());
+            }
+            for (player, plan) in preview.public.players.iter().zip(&plans) {
+                plan.apply(&mut player.clone())?;
+            }
+            Some(plans)
+        } else {
+            None
+        };
+        next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
+        crate::validation::validate_incremental_or_full(&next, self)?;
+        // Record the work event if we were recording
+        if self.record_events {
+            let after = next.state_hash();
+            next.log.events.push(crate::model::Event {
+                player: Some(player),
+                kind: "work".into(),
+                payload: serde_json::to_value(crate::engine::RecordedAction::Work {
+                    player,
+                    action: completion.action,
+                    harvest_plans,
+                    breeding_plans,
+                })
+                .map_err(|e| e.to_string())?,
+                before: completion.logged_before,
+                after,
+            });
+        }
+        *self = next;
+        Ok(Transition::Completed)
+    }
+
     /// Internal: apply a validated pending resolution.
     fn apply_pending_resolution(
         &mut self,
@@ -1299,6 +1418,7 @@ impl Game {
                         payload: serde_json::json!({
                             "source_card": source_card,
                             "chosen_gain": chosen,
+                            "decision_id": pending.id,
                         }),
                         before: pending.state_hash_before.clone(),
                         after: self.state_hash(),
@@ -1326,6 +1446,7 @@ impl Game {
                         payload: serde_json::json!({
                             "card_id": card_id,
                             "chosen_payment": chosen,
+                            "decision_id": pending.id,
                         }),
                         before: pending.state_hash_before.clone(),
                         after: self.state_hash(),
@@ -1348,6 +1469,7 @@ impl Game {
                         kind: "pending_resolution".into(),
                         payload: serde_json::json!({
                             "delayed_well_relief": { "round": round, "confirmed": confirmed },
+                            "decision_id": pending.id,
                         }),
                         before: pending.state_hash_before.clone(),
                         after: self.state_hash(),
@@ -1364,6 +1486,7 @@ impl Game {
                         payload: serde_json::json!({
                             "source_card": source_card,
                             "custom_payload": payload,
+                            "decision_id": pending.id,
                         }),
                         before: pending.state_hash_before.clone(),
                         after: self.state_hash(),

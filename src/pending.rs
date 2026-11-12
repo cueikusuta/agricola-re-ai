@@ -5,12 +5,106 @@
 //! player (or AI) to resolve it. The decision context is serialized so that
 //! save/load/resume produces identical state hashes.
 
-use crate::model::Good;
+use crate::breeding::BreedingPlan;
+use crate::card_events::TriggerPhase;
+use crate::engine::Action;
+use crate::harvest::FeedingPlan;
+use crate::model::{Good, Player};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Unique ID for a pending decision (monotonically increasing).
 pub type DecisionId = u64;
+
+/// Outcome of one engine transition (Issue #268: a pause is a distinct
+/// outcome, not an `Err("pending decision")` sentinel).
+///
+/// `apply` returns [`Transition::Completed`] when the whole action —
+/// including its card-effect chain — is applied and committed. It returns
+/// [`Transition::Paused`] when a card effect interrupted the chain: the
+/// mid-action state IS committed (with the decision stored in
+/// `Game::pending`), and the remainder runs after `resolve_pending`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Transition {
+    /// Fully applied; no decision outstanding.
+    Completed,
+    /// Paused: the carried decision is stored on the game and awaits
+    /// `resolve_pending`.
+    Paused(Box<PendingDecision>),
+}
+
+/// Where in a card's effect list a pause occurred, so the resumed scan can
+/// skip everything up to and including this position (Issue #268). The
+/// indices address the same scan order the dispatcher used: `card_index`
+/// over the acting player's `played_cards`, `effect_index` over that
+/// card's `effects`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct ChainPosition {
+    pub card_index: usize,
+    pub effect_index: usize,
+}
+
+/// One dispatcher of the post-work effect chain. The pause/resume contract
+/// in this issue covers the post-work chain; other dispatch sites surface
+/// typed errors instead (they never half-commit a decision).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChainStep {
+    AfterHarvestBake,
+    AfterClayConstruction,
+    AfterWorker,
+}
+
+/// Where the post-work chain paused: which dispatcher step, which phase
+/// inside that step, and the effect position to resume strictly after.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PostWorkResume {
+    pub step: ChainStep,
+    pub phase: TriggerPhase,
+    pub after: ChainPosition,
+}
+
+/// The remainder of a work action interrupted by a pending decision
+/// (Issue #268). Everything the resumed execution needs is frozen here
+/// because the committed pause state no longer contains it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkCompletion {
+    /// The action whose effect chain paused. Its space is not yet in
+    /// `used` and its worker not yet counted: both happen at completion.
+    pub action: Action,
+    /// Pre-action snapshot of the acting player. The clay-construction
+    /// trigger compares against it, so it must survive the pause.
+    pub previous_player: Player,
+    /// Explicit feeding plans supplied to the original apply. `None` means
+    /// the resumed completion generates plans with the default policy
+    /// (`SimpleHarvestDetails`); the policy object itself is not
+    /// serialized.
+    pub harvest_plans: Option<Vec<FeedingPlan>>,
+    /// Explicit breeding plans, same contract as `harvest_plans`.
+    pub breeding_plans: Option<Vec<BreedingPlan>>,
+    /// Pre-action state hash for the work event's `before` field when the
+    /// game records events; empty string otherwise.
+    pub logged_before: String,
+}
+
+/// What to execute after the decision resolves (Issue #268 typed
+/// continuation). `None` covers decisions created outside the transactional
+/// action path (direct injection, legacy saves): resolving them applies the
+/// choice and nothing else.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Continuation {
+    /// No engine chain to resume.
+    #[default]
+    None,
+    /// Resume the post-work card chain from `resume`, then finish the
+    /// paused work action described by `completion`.
+    PostWork {
+        player: usize,
+        resume: PostWorkResume,
+        completion: Box<WorkCompletion>,
+    },
+}
 
 /// The kind of decision pending.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -70,6 +164,10 @@ pub struct PendingDecision {
     pub state_hash_before: String,
     /// Additional context for the resolver (e.g., which space triggered it).
     pub context: serde_json::Value,
+    /// How to continue after resolution (Issue #268). Defaults to `None`
+    /// so pre-#268 saves keep loading.
+    #[serde(default)]
+    pub continuation: Continuation,
 }
 
 /// Resolution provided by the player/AI.
@@ -84,6 +182,7 @@ pub enum PendingResolution {
 
 impl PendingDecision {
     /// Create a new pending decision with the current state hash.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: DecisionId,
         player: usize,
@@ -97,6 +196,7 @@ impl PendingDecision {
             kind,
             state_hash_before,
             context,
+            continuation: Continuation::None,
         }
     }
 
@@ -137,6 +237,12 @@ pub trait PendingExt {
 
     /// Resolve the pending decision. The state_hash_before must match the
     /// current game state hash, otherwise returns Err (prevents replay attacks).
+    ///
+    /// Applying the resolution does NOT by itself finish a paused work
+    /// action: after this returns Ok the game is mid-action with the
+    /// decision cleared but `Continuation::PostWork` still to run. Call
+    /// `Game::resume_pending_work` (via `apply_pending_resolution` /
+    /// `resolve_pending_and_resume`) to complete the action.
     fn resolve_pending(&mut self, decision: PendingResolution) -> Result<(), String>;
 
     /// Get a reference to the pending decision (for inspection/UI).
