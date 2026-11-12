@@ -90,9 +90,12 @@ impl From<CardZoneError> for String {
 /// - For `Hand`/`Played`/`Discard` zones, the player index must be valid.
 ///
 /// Postconditions:
-/// - `id` is removed from `from` and added to `to`.
-/// - All storages remain consistent (no duplicates, no orphan cards).
-/// - Returns `Err` if the move would violate invariants.
+/// - On `Ok(())`, `id` is removed from `from` and added to `to`, and all
+///   storages remain consistent (no duplicates, no orphan cards).
+/// - On `Err`, no storage is mutated: the card stays exactly where it was.
+///
+/// Every precondition is validated before the first storage write, so a failed
+/// move is a no-op instead of a partial transfer that loses the card.
 pub fn move_card(
     ctx: &mut CardMoveCtx<'_>,
     id: &str,
@@ -105,8 +108,18 @@ pub fn move_card(
         ));
     }
 
-    // The hand -> played transfer has exactly one implementation (hand_to_played);
-    // every other pair goes through the generic remove/add pair below.
+    // Player-index bounds for every player-specific zone involved.
+    for zone in [from, to] {
+        if let Some(player) = zone.player() {
+            if player >= ctx.players.len() {
+                return Err(CardZoneError::InvalidMove(format!(
+                    "player index {player} out of bounds"
+                )));
+            }
+        }
+    }
+
+    // A hand -> played transfer must stay within one player.
     if let (
         CardZone::Hand {
             player: from_player,
@@ -119,130 +132,105 @@ pub fn move_card(
                 "hand -> played moves must stay within one player".into(),
             ));
         }
-        let hand = &mut ctx.cards.hands[from_player];
-        return hand_to_played(hand, &mut ctx.players[from_player], id);
     }
 
-    // Remove from source zone
-    let removed = remove_from_zone(ctx, id, from)?;
-    if !removed {
+    // ImprovementMarket and Discard are not backed by card storage.
+    if matches!(from, CardZone::ImprovementMarket | CardZone::Discard { .. }) {
+        return Err(CardZoneError::InvalidMove(
+            "source zone is not backed by card storage".into(),
+        ));
+    }
+    if matches!(to, CardZone::ImprovementMarket | CardZone::Discard { .. }) {
+        return Err(CardZoneError::InvalidMove(
+            "destination zone is not backed by card storage".into(),
+        ));
+    }
+
+    // Pre-validate: the card must currently occupy the source zone.
+    if !card_in_zone(ctx, id, from) {
         return Err(CardZoneError::CardNotInZone(id.to_string(), from));
     }
 
-    // Add to destination zone
-    add_to_zone(ctx, id, to)?;
+    // Pre-validate: the destination must not already hold the card.
+    if let CardZone::Played { player } = to {
+        if ctx.players[player].played_cards.iter().any(|x| x == id) {
+            return Err(CardZoneError::DuplicateInPlayed(id.to_string()));
+        }
+    }
+
+    // Every precondition holds, so the two writes cannot fail half-way.
+    remove_from_zone(ctx, id, from);
+    add_to_zone(ctx, id, to);
 
     Ok(())
 }
 
-/// Remove `id` from `zone`. Returns `true` if the card was found and removed.
-fn remove_from_zone(
-    ctx: &mut CardMoveCtx<'_>,
-    id: &str,
-    zone: CardZone,
-) -> Result<bool, CardZoneError> {
+/// Returns `true` if `id` currently occupies `zone`.
+fn card_in_zone(ctx: &CardMoveCtx<'_>, id: &str, zone: CardZone) -> bool {
+    match zone {
+        CardZone::Undealt => ctx.cards.undealt.iter().any(|x| x == id),
+        CardZone::Hand { player } => {
+            player < ctx.players.len()
+                && ctx
+                    .cards
+                    .hands
+                    .get(player)
+                    .is_some_and(|hand| hand.iter().any(|x| x == id))
+        }
+        CardZone::Played { player } => {
+            player < ctx.players.len()
+                && ctx
+                    .players
+                    .get(player)
+                    .is_some_and(|p| p.played_cards.iter().any(|x| x == id))
+        }
+        CardZone::ImprovementMarket | CardZone::Discard { .. } => false,
+    }
+}
+
+/// Remove `id` from `zone`. The caller has already validated that the card is
+/// present and that the zone is backed by storage, so this only writes.
+fn remove_from_zone(ctx: &mut CardMoveCtx<'_>, id: &str, zone: CardZone) {
     match zone {
         CardZone::Undealt => {
             if let Some(pos) = ctx.cards.undealt.iter().position(|x| x == id) {
                 ctx.cards.undealt.remove(pos);
-                Ok(true)
-            } else {
-                Ok(false)
             }
         }
         CardZone::Hand { player } => {
-            if player >= ctx.players.len() {
-                return Err(CardZoneError::InvalidMove(format!(
-                    "player index {player} out of bounds"
-                )));
-            }
-            let hand = &mut ctx.cards.hands[player];
-            if let Some(pos) = hand.iter().position(|x| x == id) {
-                hand.remove(pos);
-                Ok(true)
-            } else {
-                Ok(false)
+            if let Some(pos) = ctx.cards.hands[player].iter().position(|x| x == id) {
+                ctx.cards.hands[player].remove(pos);
             }
         }
         CardZone::Played { player } => {
-            if player >= ctx.players.len() {
-                return Err(CardZoneError::InvalidMove(format!(
-                    "player index {player} out of bounds"
-                )));
-            }
-            let played = &mut ctx.players[player].played_cards;
-            if let Some(pos) = played.iter().position(|x| x == id) {
-                played.remove(pos);
-                Ok(true)
-            } else {
-                Ok(false)
+            if let Some(pos) = ctx.players[player]
+                .played_cards
+                .iter()
+                .position(|x| x == id)
+            {
+                ctx.players[player].played_cards.remove(pos);
             }
         }
-        CardZone::ImprovementMarket => {
-            // Cards are not stored in improvement_market; this zone is for
-            // major improvements (Improvement enum), not minor/occupation cards.
-            // This should not be called for card IDs.
-            Err(CardZoneError::InvalidMove(
-                "ImprovementMarket zone is for major improvements, not card IDs".into(),
-            ))
-        }
-        CardZone::Discard { player } => {
-            if player >= ctx.players.len() {
-                return Err(CardZoneError::InvalidMove(format!(
-                    "player index {player} out of bounds"
-                )));
-            }
-            // Discard pile is not currently tracked per-player in CardState.
-            // This would need extension if discard tracking is added.
-            Err(CardZoneError::InvalidMove(
-                "Discard zone not yet implemented in CardState".into(),
-            ))
-        }
+        CardZone::ImprovementMarket | CardZone::Discard { .. } => {}
     }
 }
 
-/// Add `id` to `zone`.
-fn add_to_zone(ctx: &mut CardMoveCtx<'_>, id: &str, zone: CardZone) -> Result<(), CardZoneError> {
+/// Add `id` to `zone`. The caller has already validated that the addition is
+/// legal, so this only writes.
+fn add_to_zone(ctx: &mut CardMoveCtx<'_>, id: &str, zone: CardZone) {
     match zone {
-        CardZone::Undealt => {
-            ctx.cards.undealt.push(id.to_string());
-            Ok(())
-        }
-        CardZone::Hand { player } => {
-            if player >= ctx.players.len() {
-                return Err(CardZoneError::InvalidMove(format!(
-                    "player index {player} out of bounds"
-                )));
-            }
-            ctx.cards.hands[player].push(id.to_string());
-            Ok(())
-        }
+        CardZone::Undealt => ctx.cards.undealt.push(id.to_string()),
+        CardZone::Hand { player } => ctx.cards.hands[player].push(id.to_string()),
         CardZone::Played { player } => {
-            if player >= ctx.players.len() {
-                return Err(CardZoneError::InvalidMove(format!(
-                    "player index {player} out of bounds"
-                )));
-            }
             let played = &mut ctx.players[player].played_cards;
-            // Enforce no duplicates in played_cards
-            if played.iter().any(|x| x == id) {
-                return Err(CardZoneError::DuplicateInPlayed(id.to_string()));
-            }
+            debug_assert!(
+                !played.iter().any(|x| x == id),
+                "move_card pre-validates duplicate played cards"
+            );
             played.push(id.to_string());
-            Ok(())
         }
-        CardZone::ImprovementMarket => Err(CardZoneError::InvalidMove(
-            "ImprovementMarket zone is for major improvements, not card IDs".into(),
-        )),
-        CardZone::Discard { player } => {
-            if player >= ctx.players.len() {
-                return Err(CardZoneError::InvalidMove(format!(
-                    "player index {player} out of bounds"
-                )));
-            }
-            Err(CardZoneError::InvalidMove(
-                "Discard zone not yet implemented in CardState".into(),
-            ))
+        CardZone::ImprovementMarket | CardZone::Discard { .. } => {
+            debug_assert!(false, "move_card pre-validates zone backing");
         }
     }
 }
@@ -560,5 +548,121 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, CardZoneError::InvalidMove(_)));
+    }
+
+    #[test]
+    fn move_card_failure_leaves_location_completely_unchanged() {
+        let (set, mut cards, mut players) = test_setup();
+        let before_cards = cards.clone();
+        let before_players = players.clone();
+        let mut market = vec![];
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+
+        // Card A002 is not in player 0's hand: move must fail without mutating.
+        let err = move_card(
+            &mut ctx,
+            "A002",
+            CardZone::Hand { player: 0 },
+            CardZone::Played { player: 0 },
+        )
+        .unwrap_err();
+        assert!(matches!(err, CardZoneError::CardNotInZone(_, _)));
+
+        // Cross-player hand -> played is rejected.
+        let err = move_card(
+            &mut ctx,
+            "A001",
+            CardZone::Hand { player: 0 },
+            CardZone::Played { player: 1 },
+        )
+        .unwrap_err();
+        assert!(matches!(err, CardZoneError::InvalidMove(_)));
+
+        assert_eq!(&*ctx.cards, &before_cards);
+        assert_eq!(ctx.players, before_players);
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
+    }
+
+    #[test]
+    fn move_card_rejects_duplicate_in_played_state_unchanged() {
+        let (_set, mut cards, mut players) = test_setup();
+        players[0].played_cards.push("A001".into());
+        let before_cards = cards.clone();
+        let before_players = players.clone();
+        let mut market = vec![];
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        let err = play_from_hand(&mut ctx, 0, "A001").unwrap_err();
+        assert!(matches!(err, CardZoneError::DuplicateInPlayed(_)));
+        // State unchanged after the rejected move.
+        assert_eq!(&*ctx.cards, &before_cards);
+        assert_eq!(ctx.players, before_players);
+    }
+
+    #[test]
+    fn move_card_transfer_between_players_preserves_partition() {
+        let (set, mut cards, mut players) = test_setup();
+        // Give player 1 an empty hand, player 0 holds A001.
+        let mut market = vec![];
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        // Transfer A001: hand(0) -> undealt, then undealt -> hand(1).
+        move_card(
+            &mut ctx,
+            "A001",
+            CardZone::Hand { player: 0 },
+            CardZone::Undealt,
+        )
+        .unwrap();
+        move_card(
+            &mut ctx,
+            "A001",
+            CardZone::Undealt,
+            CardZone::Hand { player: 1 },
+        )
+        .unwrap();
+        assert!(ctx.cards.hands[0].is_empty());
+        assert_eq!(ctx.cards.hands[1], vec!["A002", "A001"]);
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
+    }
+
+    #[test]
+    fn move_card_additional_acquisition_from_undealt() {
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                use_limit: None,
+                id: "A001".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            }],
+        };
+        let mut cards = CardState {
+            hands: vec![vec![]],
+            undealt: vec!["A001".into()],
+        };
+        let mut players = vec![Player::new(0, 0)];
+        let mut market = vec![];
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        // Acquire the remaining undealt card into the hand.
+        deal_initial_hands(&mut ctx, &[vec!["A001".into()]]).unwrap();
+        assert!(ctx.cards.undealt.is_empty());
+        assert_eq!(ctx.cards.hands[0], vec!["A001"]);
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
     }
 }

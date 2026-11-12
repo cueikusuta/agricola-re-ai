@@ -1133,7 +1133,10 @@ impl Game {
             return Err("player count mismatch".into());
         }
         self.card_set.validate(self.config.players)?;
-        self.cards.validate(&self.card_set, &p.players)?;
+        // Running-position check: the initial 7+7 deal count is a setup
+        // property, so a state reached by play is validated on the location
+        // partition + card score only (Issue #269 P1-D).
+        self.cards.validate_in_game(&self.card_set, &p.players)?;
         if self.config.additional_action_space_enabled != p.additional_action_space_enabled {
             return Err("setting mutated".into());
         }
