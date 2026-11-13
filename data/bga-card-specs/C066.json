@@ -72,7 +72,8 @@
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "none"
+      "decision_owner": "none",
+      "notes": "After each harvest, if you have at least 2 grain in your supply, gain 1 food."
     },
     {
       "trigger": "after_harvest",

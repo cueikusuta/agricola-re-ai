@@ -72,7 +72,8 @@
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "none"
+      "decision_owner": "none",
+      "notes": "On play, gain 5 food."
     },
     {
       "trigger": "after_worker_space",
