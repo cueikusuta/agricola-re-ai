@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "card_id": "B056",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "小川",
+    "name_en": "Brook"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3201",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "worker_on_space",
+        "params": {
+          "space": "fishing"
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "custom",
+          "params": {
+            "kind": "spaces_above_fishing"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time you use one of the four action spaces above the Fishing accumulation space, gain 1 additional food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: 'worker_on_space fishing' means a family member is currently on the Fishing space; modeled using precedent E029 'worker_on_space day_laborer'",
+      "effects.0.conditions: the four action spaces above Fishing are not named by the wiki; the BGA board layout has 3-6 spaces above Fishing depending on player count; the exact four-space set is unresolved"
+    ],
+    "test_case_ids": [
+      "B056-prereq-ok",
+      "B056-prereq-fail"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Free cost; prereq a family member on Fishing. Each use of one of the four action spaces above Fishing grants +1 food. bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
+  }
+}

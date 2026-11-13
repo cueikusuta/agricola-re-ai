@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "B067",
+  "cases": [
+    {
+      "id": "B067-normal",
+      "scope": "effect_only",
+      "setup": {
+        "family_on_accumulation": 2
+      },
+      "action": {
+        "bake_bread": true
+      },
+      "expected": {
+        "grain_delta": 2
+      }
+    },
+    {
+      "id": "B067-none",
+      "scope": "effect_only",
+      "setup": {
+        "family_on_accumulation": 0
+      },
+      "action": {
+        "bake_bread": true
+      },
+      "expected": {
+        "grain_delta": 0
+      }
+    },
+    {
+      "id": "B067-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "family_on_accumulation": 1
+      },
+      "action": {
+        "sow": true
+      },
+      "expected": {
+        "grain_delta": 0
+      }
+    }
+  ]
+}

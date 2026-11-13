@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "card_id": "B046",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "会館",
+    "name_en": "Club House"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3211",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": null,
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": "3 木/2 レンガ"
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "amounts": [
+              {
+                "good": "food",
+                "amount": 1
+              },
+              {
+                "good": "food",
+                "amount": 1
+              },
+              {
+                "good": "food",
+                "amount": 1
+              },
+              {
+                "good": "food",
+                "amount": 1
+              },
+              {
+                "good": "stone",
+                "amount": 1
+              }
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Place 1 food on each of the next 4 round spaces, and 1 stone on the 5th round space."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: the wiki shows only the alternative cost (3 wood / 2 clay); the base resource cost is not stated"
+    ],
+    "test_case_ids": [
+      "B046-normal",
+      "B046-late"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Place 1 food on each of the next 4 round spaces, and 1 stone on the following round space. bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
+  }
+}

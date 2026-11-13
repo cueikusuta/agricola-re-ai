@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "B043",
+  "cases": [
+    {
+      "id": "B043-normal",
+      "scope": "effect_only",
+      "setup": {
+        "grain_seeds_available": true
+      },
+      "action": {
+        "use_space": "grain_seeds"
+      },
+      "expected": {
+        "food_marked_on_rounds": true,
+        "rounds_marked": {
+          "op": "custom",
+          "args": [
+            "3_or_2"
+          ]
+        }
+      }
+    },
+    {
+      "id": "B043-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "grain_seeds_available": true
+      },
+      "action": {
+        "use_space": "farmland"
+      },
+      "expected": {
+        "food_marked_on_rounds": false
+      }
+    }
+  ]
+}

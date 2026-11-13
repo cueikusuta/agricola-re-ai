@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "B052",
+  "cases": [
+    {
+      "id": "B052-normal",
+      "scope": "effect_only",
+      "setup": {
+        "pasture_spaces": 5,
+        "completed_rounds": 4,
+        "current_round": 5
+      },
+      "action": {
+        "play": "B052"
+      },
+      "expected": {
+        "food_delta": 5
+      }
+    },
+    {
+      "id": "B052-prereq-fail",
+      "scope": "legal_play",
+      "setup": {
+        "pasture_spaces": 3,
+        "completed_rounds": 4
+      },
+      "action": {
+        "play": "B052"
+      },
+      "expected": {
+        "play_allowed": false,
+        "error": "prerequisite_not_met"
+      }
+    }
+  ]
+}

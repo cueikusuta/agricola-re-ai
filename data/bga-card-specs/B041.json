@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "card_id": "B041",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ハウベルグ",
+    "name_en": "Hauberg"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3216",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 3
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "rounds": 4,
+            "amounts": [
+              {
+                "good": "wood",
+                "amount": 2
+              },
+              {
+                "good": "wild_boar",
+                "amount": 1
+              },
+              {
+                "good": "wood",
+                "amount": 2
+              },
+              {
+                "good": "wild_boar",
+                "amount": 1
+              }
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Alternately place 2 wood and 1 wild boar on the next 4 round spaces; owner chooses which good starts. At the start of those rounds you get the goods."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B041-wood-first",
+      "B041-boar-first",
+      "B041-late"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Alternately place 2 wood and 1 wild boar on the next 4 round spaces; owner chooses which good starts. bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
+  }
+}

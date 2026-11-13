@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "card_id": "B042",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "森の宿屋",
+    "name_en": "Forest Inn"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3215",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 1
+      },
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "round_in",
+        "params": {
+          "values": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "space_is",
+          "params": {
+            "space": "forest_inn"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "board",
+          "params": {
+            "kind": "grant_public_action_space"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "This card becomes an action space usable by all players."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "forest_inn"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "wood",
+                "amount": {
+                  "op": "table",
+                  "args": [
+                    "player_count",
+                    {
+                      "2": 5,
+                      "3": 7,
+                      "4": 9
+                    }
+                  ]
+                }
+              }
+            ],
+            "receive": [
+              {
+                "good": "wood",
+                "amount": 8
+              },
+              {
+                "good": "food",
+                "amount": {
+                  "op": "table",
+                  "args": [
+                    "player_count",
+                    {
+                      "2": 2,
+                      "3": 4,
+                      "4": 7
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Player using the space exchanges wood for 8 wood + food (amounts by player count: 2p=5w->8w+2f, 3p=7w->8w+4f, 4p=9w->8w+7f). Other players must pay owner 1 food first."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.public_space: the 'grant_public_action_space' kind has no established encoding; modeled provisionally",
+      "effects.1.player_count_table: the 5/7/9 and 2/4/7 exchange amounts are interpreted as player-count-dependent; alternative reading (choice of three exchanges) cannot be ruled out from the wiki text alone"
+    ],
+    "test_case_ids": [
+      "B042-legal-play",
+      "B042-too-late",
+      "B042-tax"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Public action space: any player may use it to exchange wood for wood+food (amounts vary by player count). Other players pay owner 1 food first. bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
+  }
+}

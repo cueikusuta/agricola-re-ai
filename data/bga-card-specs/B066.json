@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "card_id": "B066",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "荷車",
+    "name_en": "Sack Cart"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3191",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 2
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "grain",
+            "amount": 1,
+            "fixed_rounds": [
+              5,
+              8,
+              11,
+              14
+            ],
+            "only_remaining": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Place 1 grain on each of the remaining round spaces for rounds 5, 8, 11, and 14."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B066-early",
+      "B066-mid",
+      "B066-late"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 2 wood; prereq 2 occupations. Place 1 grain on each remaining round space of rounds 5, 8, 11, 14. bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
+  }
+}

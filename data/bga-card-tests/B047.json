@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "card_id": "B047",
+  "cases": [
+    {
+      "id": "B047-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "rounds_with_food": 3
+      }
+    },
+    {
+      "id": "B047-twice",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "use_space": "fishing",
+        "times": 2
+      },
+      "expected": {
+        "rounds_with_food": 6
+      }
+    },
+    {
+      "id": "B047-not-triggered",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "use_space": "clay_pit"
+      },
+      "expected": {
+        "rounds_with_food": 0
+      }
+    }
+  ]
+}

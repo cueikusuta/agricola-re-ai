@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "B046",
+  "cases": [
+    {
+      "id": "B046-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 3
+      },
+      "action": {
+        "play": "B046"
+      },
+      "expected": {
+        "food_rounds": [
+          4,
+          5,
+          6,
+          7
+        ],
+        "stone_round": 8
+      }
+    },
+    {
+      "id": "B046-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 12
+      },
+      "action": {
+        "play": "B046"
+      },
+      "expected": {
+        "food_rounds": [
+          13,
+          14
+        ],
+        "stone_round": []
+      }
+    }
+  ]
+}

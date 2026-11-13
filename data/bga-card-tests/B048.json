@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "card_id": "B048",
+  "cases": [
+    {
+      "id": "B048-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 2
+      },
+      "action": {
+        "play": "B048"
+      },
+      "expected": {
+        "food_on_card": 2
+      }
+    },
+    {
+      "id": "B048-wood",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 2
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "food_on_card": 1,
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "B048-stone",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 0
+      },
+      "action": {
+        "use_space": "western_quarry"
+      },
+      "expected": {
+        "food_on_card": 2
+      }
+    }
+  ]
+}

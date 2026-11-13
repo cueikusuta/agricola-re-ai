@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "card_id": "B041",
+  "cases": [
+    {
+      "id": "B041-wood-first",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "B041",
+        "choose": "wood_first"
+      },
+      "expected": {
+        "marked_rounds": [
+          6,
+          7,
+          8,
+          9
+        ],
+        "goods_per_space": [
+          {
+            "wood": 2
+          },
+          {
+            "wild_boar": 1
+          },
+          {
+            "wood": 2
+          },
+          {
+            "wild_boar": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "B041-boar-first",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "B041",
+        "choose": "boar_first"
+      },
+      "expected": {
+        "marked_rounds": [
+          6,
+          7,
+          8,
+          9
+        ],
+        "goods_per_space": [
+          {
+            "wild_boar": 1
+          },
+          {
+            "wood": 2
+          },
+          {
+            "wild_boar": 1
+          },
+          {
+            "wood": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "B041-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 13
+      },
+      "action": {
+        "play": "B041",
+        "choose": "wood_first"
+      },
+      "expected": {
+        "marked_rounds": [
+          14
+        ],
+        "goods_per_space": [
+          {
+            "wood": 2
+          }
+        ]
+      }
+    }
+  ]
+}

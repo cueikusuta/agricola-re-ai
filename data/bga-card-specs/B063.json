@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "B063",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "味見",
+    "name_en": "Tasting"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3194",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 1
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "lessons"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "grain",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 4
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each time you use the Lessons space, before paying the occupation cost, you may exchange 1 grain for 4 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B063-normal",
+      "B063-decline",
+      "B063-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 2 wood. On Lessons use, optional exchange 1 grain for 4 food before paying occupation cost. bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
+  }
+}

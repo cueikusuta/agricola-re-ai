@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "card_id": "B043",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "料理店",
+    "name_en": "Chophouse"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3214",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": null,
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": "2 木/2 レンガ"
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "grain_seeds",
+              "vegetable_seeds"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "food",
+            "amount": 1,
+            "rounds": {
+              "op": "custom",
+              "args": [
+                "three_or_two_rounds_unresolved",
+                "see_review_unresolved"
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time you use the Grain Seeds or Vegetable Seeds action space, place 1 food on each of the next 3/2 round spaces. The 3/2 mapping (by house type or player count) is not stated on the wiki."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: the wiki shows only the alternative cost (2 wood / 2 clay); the base resource cost is not stated",
+      "effects.0.rounds: the wiki lists 3/2 next-round spaces with no stated condition (candidates: house type wood 3/clay 2, or player count 2p=3/3-4p=2); the BGA page does not disambiguate"
+    ],
+    "test_case_ids": [
+      "B043-normal",
+      "B043-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Each use of Grain/Vegetable Seeds places 1 food on next 3/2 round spaces (3/2 condition unresolved). bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
+  }
+}

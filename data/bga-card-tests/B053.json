@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "B053",
+  "cases": [
+    {
+      "id": "B053-wood",
+      "scope": "effect_only",
+      "setup": {
+        "round_has_no_harvest": true,
+        "wood": 1
+      },
+      "action": {
+        "choose": "wood_to_food"
+      },
+      "expected": {
+        "wood_delta": -1,
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "B053-stone",
+      "scope": "effect_only",
+      "setup": {
+        "round_has_no_harvest": true,
+        "stone": 1
+      },
+      "action": {
+        "choose": "stone_to_food"
+      },
+      "expected": {
+        "stone_delta": -1,
+        "food_delta": 4
+      }
+    },
+    {
+      "id": "B053-harvest-round",
+      "scope": "effect_only",
+      "setup": {
+        "round_has_no_harvest": false
+      },
+      "action": {},
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

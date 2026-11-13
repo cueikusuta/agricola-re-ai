@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "card_id": "B052",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "成育農場",
+    "name_en": "Growing Farm"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3205",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 2
+      },
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "custom",
+        "params": {
+          "kind": "pasture_spaces_at_least_completed_rounds"
+        }
+      }
+    ],
+    "printed_points": 2
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "count",
+              "args": [
+                "current_round"
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Gain food equal to the current round number."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: the wiki says 'pasture spaces >= completed rounds'; modeled as custom predicate 'pasture_spaces_at_least_completed_rounds' with no established encoding",
+      "effects.0.amount: 'current_round' count source has no established encoding; modeled as custom count"
+    ],
+    "test_case_ids": [
+      "B052-normal",
+      "B052-prereq-fail"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 2 clay + 1 reed. Playable only if pasture spaces >= completed rounds; gain food equal to current round. bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
+  }
+}

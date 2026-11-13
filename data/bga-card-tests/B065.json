@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "B065",
+  "cases": [
+    {
+      "id": "B065-wood",
+      "scope": "effect_only",
+      "setup": {
+        "paid_material": "wood"
+      },
+      "action": {
+        "play": "B065"
+      },
+      "expected": {
+        "marked_rounds_count": 2
+      }
+    },
+    {
+      "id": "B065-clay",
+      "scope": "effect_only",
+      "setup": {
+        "paid_material": "clay"
+      },
+      "action": {
+        "play": "B065"
+      },
+      "expected": {
+        "marked_rounds_count": 3
+      }
+    },
+    {
+      "id": "B065-stone",
+      "scope": "effect_only",
+      "setup": {
+        "paid_material": "stone"
+      },
+      "action": {
+        "play": "B065"
+      },
+      "expected": {
+        "marked_rounds_count": 4
+      }
+    }
+  ]
+}

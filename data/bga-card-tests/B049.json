@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "card_id": "B049",
+  "cases": [
+    {
+      "id": "B049-balance-occ",
+      "scope": "effect_only",
+      "setup": {
+        "improvements": 1,
+        "occupations": 1
+      },
+      "action": {
+        "play_occupation": true
+      },
+      "expected": {
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "B049-balance-imp",
+      "scope": "effect_only",
+      "setup": {
+        "improvements": 1,
+        "occupations": 1
+      },
+      "action": {
+        "play_minor_improvement": true
+      },
+      "expected": {
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "B049-unbalanced",
+      "scope": "effect_only",
+      "setup": {
+        "improvements": 2,
+        "occupations": 1
+      },
+      "action": {
+        "play_occupation": true
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "B049-prereq",
+      "scope": "legal_play",
+      "setup": {
+        "occupations": 0
+      },
+      "action": {
+        "play": "B049"
+      },
+      "expected": {
+        "play_allowed": true
+      }
+    },
+    {
+      "id": "B049-prereq-fail",
+      "scope": "legal_play",
+      "setup": {
+        "occupations": 1
+      },
+      "action": {
+        "play": "B049"
+      },
+      "expected": {
+        "play_allowed": false,
+        "error": "prerequisite_not_met"
+      }
+    }
+  ]
+}
