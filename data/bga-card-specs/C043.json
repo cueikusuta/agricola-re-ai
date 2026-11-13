@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "card_id": "C043",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "農舎",
+    "name_en": "Farm Building"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3015",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 1
+      },
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": null,
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "end_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": {
+              "op": "constant",
+              "args": [
+                1
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "end_of_game",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Effect details from BGA wiki pending resolution"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "inventory_only",
+    "unresolved_fields": [
+      "effects.full",
+      null,
+      "play.prerequisites.exact",
+      "bga.eligibility"
+    ],
+    "test_case_ids": [
+      "C043-normal",
+      "C043-edge"
+    ],
+    "checked_by": "AI ledger import",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Inventory-only record from base ledger; full BGA wiki verification pending"
+  }
+}

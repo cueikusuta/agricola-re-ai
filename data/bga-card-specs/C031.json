@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "card_id": "C031",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "書斎",
+    "name_en": "Writing Chamber"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3027",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 2
+      }
+    ],
+    "prerequisites": null,
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "inventory_only",
+    "unresolved_fields": [
+      "effects.full",
+      null,
+      "play.prerequisites.exact",
+      "bga.eligibility"
+    ],
+    "test_case_ids": [
+      "C031-normal",
+      "C031-edge"
+    ],
+    "checked_by": "AI ledger import",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Inventory-only record from base ledger; full BGA wiki verification pending"
+  }
+}

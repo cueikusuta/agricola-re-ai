@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "card_id": "C031",
+  "cases": [
+    {
+      "id": "C031-normal",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        },
+        "notes": "Minimal setup for effect evaluation"
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C031",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "points_gained": null,
+        "notes": "Inventory-only test contract; expected outcomes pending BGA verification"
+      },
+      "notes": "Placeholder test case; full setup/action/expected pending BGA wiki verification"
+    },
+    {
+      "id": "C031-edge",
+      "scope": "legal_play",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        },
+        "notes": "Edge case: missing prerequisites / insufficient resources"
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C031",
+        "cost_paid": false
+      },
+      "expected": {
+        "effect_applies": false,
+        "error": "insufficient_cost_or_prereq",
+        "notes": "Card should not be playable without meeting cost/prerequisites"
+      },
+      "notes": "Placeholder edge case test"
+    }
+  ]
+}
