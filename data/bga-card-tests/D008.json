@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "card_id": "D008",
+  "cases": [
+    {
+      "id": "D008-normal",
+      "scope": "legal_play",
+      "setup": {
+        "empty_fields": 1,
+        "cultivated_fields": 2
+      },
+      "action": {
+        "play": "D008"
+      },
+      "expected": {
+        "play_allowed": true,
+        "food_gained": 2,
+        "grain_gained": 1,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "D008 is free; requires 1 empty field and 2 cultivated fields; gains food2 and grain1; rotates to left neighbor"
+    },
+    {
+      "id": "D008-grain-must-sow",
+      "scope": "effect_only",
+      "setup": {
+        "empty_fields": 1,
+        "cultivated_fields": 2
+      },
+      "action": {
+        "play": "D008",
+        "gain": {
+          "good": "grain",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "sow_obligation": true,
+        "grain_must_be_sown_immediately": true
+      },
+      "notes": "The grain gained from D008 must be sown immediately (follow-up action; formalization unresolved)"
+    }
+  ]
+}

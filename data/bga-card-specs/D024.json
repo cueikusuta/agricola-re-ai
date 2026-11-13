@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "card_id": "D024",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "兄弟愛",
+    "name_en": "Brotherly Love"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2897",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent while exactly 4 people: place 3rd and 4th person simultaneously"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: \"ちょうど人物4人でいる間\" - exact-4-people condition needs formalization",
+      "effects: \"3人目と4人目の人物を同時に配置できる\" - simultaneous placement and same-action-space permission need definition",
+      "effects: whether effect ends when people count changes from 4 need confirmation"
+    ],
+    "test_case_ids": [
+      "D024-four-people",
+      "D024-not-four-people"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost food1. Effect: while exactly 4 people are present, place the 3rd and 4th person simultaneously each work phase (same action space allowed). Condition formalization needs resolution."
+  }
+}

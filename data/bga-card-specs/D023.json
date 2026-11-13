@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "card_id": "D023",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "開拓者の魂",
+    "name_en": "Pioneering Spirit"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2898",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Player-only action space, round-dependent"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: \"このカードはあなただけ使えるアクションスペース\" - owner-only action space creation needs formalization",
+      "effects: round-dependent behavior (rounds 3-5: renovate action; rounds 6-8: gain vegetable/boar/cattle) needs trigger and timing definition",
+      "effects: whether the action space persists across rounds or is consumed need confirmation"
+    ],
+    "test_case_ids": [
+      "D023-rounds3to5",
+      "D023-rounds6to8"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost none. Effect: your-only action space. Rounds 3-5: perform a renovation action. Rounds 6-8: gain one of vegetable/boar/cattle. Action-space formalization needs resolution."
+  }
+}

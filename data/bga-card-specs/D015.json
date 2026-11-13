@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "card_id": "D015",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "レンガの柱",
+    "name_en": "Clay Supports"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2906",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_room_construction",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "good": "brick",
+            "amount": {
+              "op": "table",
+              "args": [
+                "house",
+                {
+                  "wood": "brick",
+                  "clay": "clay",
+                  "stone": "stone"
+                }
+              ]
+            },
+            "scope": "room_building"
+          },
+          "notes": "When building a brick room: pay brick2 wood1 reed1 instead of brick5 reed2"
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent brick-room cost discount"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "D015-normal",
+      "D015-not-brick-room"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost wood2. Effect: each time a brick room is built, pay brick2 wood1 reed1 instead of brick5 reed2. Formalized as discount_cost on brick-room construction."
+  }
+}

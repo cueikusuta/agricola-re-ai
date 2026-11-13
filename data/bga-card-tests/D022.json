@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "card_id": "D022",
+  "cases": [
+    {
+      "id": "D022-normal",
+      "scope": "legal_play",
+      "setup": {
+        "food": 1,
+        "building_materials": 1
+      },
+      "action": {
+        "play": "D022",
+        "pay": {
+          "good": "food",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "target_round": "current_round + held_building_materials",
+        "place_person_on_target_round": true
+      },
+      "notes": "D022 costs food1, requires 1+ building materials in stock; current round + materials = target round; place 1 person on that round (arithmetic formalization unresolved)"
+    }
+  ]
+}

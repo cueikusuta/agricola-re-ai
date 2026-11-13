@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "card_id": "D037",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "彫像",
+    "name_en": "Sculpture"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2884",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "stone",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "下記参照: 未使用の農場スペースより未プレイのラウンドが多い場合のみ出せる"
+        }
+      }
+    ],
+    "printed_points": 2,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Conditional play; end-game 2 points"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: play condition \"未使用の農場スペースより未プレイのラウンドが多い場合のみ\" - comparison of unused farm spaces vs unplayed rounds needs formalization",
+      "effects: card grants 2 points but wiki lists it under 勝利点 role; whether points are printed or end-game need confirmation (ledger says printed_points 2)",
+      "play.prerequisites: predicate uses raw_text; round/space comparison not in vocabulary"
+    ],
+    "test_case_ids": [
+      "D037-playable",
+      "D037-not-playable"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost stone1. Prereq: unused farm spaces fewer than unplayed rounds. Effect: playable only when unplayed rounds exceed unused farm spaces; worth 2 points. Play-condition formalization needs resolution."
+  }
+}

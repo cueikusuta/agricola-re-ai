@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "card_id": "D014",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ハンマー破砕機",
+    "name_en": "Hammer Crusher"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2907",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent before-stone-renovation resource gain + room action"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: \"石の家に改築する直前にレンガ2と葦1を得る\" - timing relative to renovation action and resource grant need formalization",
+      "effects: \"部屋の建設アクションを行える\" - grant of an extra room-building action needs definition",
+      "effects: whether this is a one-time or per-renovation trigger is not stated on the wiki page"
+    ],
+    "test_case_ids": [
+      "D014-normal"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 1 wood. Effect: immediately before renovating to a stone house, gain brick2 and reed1; also perform a room-building action. Exact trigger timing needs resolution."
+  }
+}

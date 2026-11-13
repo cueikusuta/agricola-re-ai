@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "D027",
+  "cases": [
+    {
+      "id": "D027-furniture-to-pottery",
+      "scope": "legal_play",
+      "setup": {
+        "food": 1,
+        "occupations": 1,
+        "has_furniture_workshop": true
+      },
+      "action": {
+        "play": "D027",
+        "pay": {
+          "good": "food",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "after_renovation_turn_exchange": true,
+        "exchange_options": ["furniture_workshop->pottery", "pottery->basket_workshop"]
+      },
+      "notes": "D027 costs food1, requires 1 occupation; at end of the turn you renovate, exchange furniture workshop for pottery, or pottery for basket workshop (mechanics unresolved)"
+    },
+    {
+      "id": "D027-pottery-to-basket",
+      "scope": "legal_play",
+      "setup": {
+        "food": 1,
+        "occupations": 1,
+        "has_pottery": true
+      },
+      "action": {
+        "play": "D027",
+        "pay": {
+          "good": "food",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "exchange_available": true
+      },
+      "notes": "Exchange pottery for basket workshop at end of a renovation turn"
+    }
+  ]
+}

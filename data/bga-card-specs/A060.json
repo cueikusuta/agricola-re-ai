@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "card_id": "A060",
+  "identity": {
+    "kind": "multi_type",
+    "name_ja": "東洋かまど",
+    "name_en": "Oriental Fireplace"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3365",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "special",
+    "cost": null,
+    "prerequisites": null,
+    "printed_points": 1,
+    "alternative_cost_notes": "return one かまど or 調理場 to the supply instead of a resource cost"
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Stays in play area as a conversion facility"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: cost is \"return かまど or 調理場\" not a standard resource cost; exact exchange timing and supply-return rules need formalization",
+      "effects: multi-type conversion rates (vegetable->food 1:4, sheep->food 1:3, cattle->food 1:5, bread grain->food 1:2) and boar exclusion need precise operation definitions",
+      "effects: \"パンを焼く\" (bread baking) conversion only available during the bread-bake action; trigger timing needs definition",
+      "identity.kind: multi_type (小進歩|大進歩); which deck slot and placement rules apply is not confirmed from the ledger alone"
+    ],
+    "test_case_ids": [
+      "A060-conversion",
+      "A060-bread",
+      "A060-boar-excluded"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "A060 is multi_type (小進歩|大進歩). Cost: return one かまど or 調理場. Effect: anytime convert vegetable1->food4, sheep1->food3, cattle1->food5; during bread baking convert grain1->food2. Boar cannot be converted. Exact exchange mechanics and bread-bake timing need formalization."
+  }
+}

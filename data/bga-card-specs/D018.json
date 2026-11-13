@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "card_id": "D018",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "蒸気鋤",
+    "name_en": "Steam Plow"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2903",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      },
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent after-return-home plow-without-person ability"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: \"帰宅フェイズの直後に、木材2と食料1を払って、人物を配置せずにアクションスペース農地を使用できる\" - trigger timing (after return-home phase) and grant of plow-field without person need definition",
+      "effects: cost wood2 food1 per use and whether repeatable each round need confirmation"
+    ],
+    "test_case_ids": [
+      "D018-normal",
+      "D018-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost wood1 food1. Effect: after the return-home phase, pay wood2 food1 to use the plow-field action space without placing a person. Timing and repeatability need resolution."
+  }
+}

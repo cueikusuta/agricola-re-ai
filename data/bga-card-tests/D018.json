@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "D018",
+  "cases": [
+    {
+      "id": "D018-normal",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 1,
+        "food": 1
+      },
+      "action": {
+        "play": "D018",
+        "pay": {
+          "good": "wood",
+          "amount": 1
+        },
+        "pay2": {
+          "good": "food",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "after_return_home_plow_without_person": true,
+        "plow_activation_cost": {
+          "wood": 2,
+          "food": 1
+        }
+      },
+      "notes": "D018 costs wood1 food1; after the return-home phase, pay wood2 food1 to plow without placing a person (trigger timing unresolved)"
+    },
+    {
+      "id": "D018-not-triggered",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 1,
+        "food": 1
+      },
+      "action": {
+        "play": "D018",
+        "pay": {
+          "good": "wood",
+          "amount": 1
+        },
+        "pay2": {
+          "good": "food",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "plow_without_person_available": false,
+        "note": "Plow-without-person is only available after the return-home phase"
+      },
+      "notes": "Outside the return-home phase, D018's plow ability is not triggered"
+    }
+  ]
+}

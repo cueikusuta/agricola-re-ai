@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "card_id": "D033",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "避暑地の別荘",
+    "name_en": "Summer House"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2888",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 3
+      },
+      {
+        "good": "stone",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "まだ木の家: 現在の家が木の家であること"
+        }
+      }
+    ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent end-game adjacent-empty-space bonus (stone house only)"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: \"石の家に住んでいれば\" - stone-house condition needs formalization",
+      "effects: \"家と縦横に隣接する未使用スペースそれぞれにつきボーナス2点\" - adjacency and empty-space counting need geometry formalization",
+      "play.prerequisites: predicate uses raw_text; wood-house condition not in vocabulary"
+    ],
+    "test_case_ids": [
+      "D033-stone-house",
+      "D033-not-stone-house"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost wood3 stone1. Prereq: currently a wood house. Effect: end-game scoring: if living in a stone house, 2 bonus points per horizontally/vertically adjacent unused board space. Adjacency formalization needs resolution."
+  }
+}

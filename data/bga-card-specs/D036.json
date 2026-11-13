@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "card_id": "D036",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "品種登録",
+    "name_en": "Breed Registry"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2885",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "羊なし: プレイヤーが羊を0頭持っていること（出し条件）"
+        }
+      }
+    ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent end-game sheep-limit bonus"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: \"繁殖フェイズで得たものを除いて羊を2頭までしか得ておらず\" - sheep-acquisition limit excluding breeding needs tracking across the whole game",
+      "effects: \"ゲーム中羊を食料に換えていなければ\" - no-sheep-eaten constraint needs game-history tracking",
+      "effects[0].steps: gain_points 3 with two negative constraints needs formalization",
+      "play.prerequisites: predicate uses raw_text; no-sheep condition not in vocabulary"
+    ],
+    "test_case_ids": [
+      "D036-zero-sheep",
+      "D036-two-sheep"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost none. Prereq: no sheep. Effect: end-game scoring: if you gained at most 2 sheep (excluding breeding) and never converted sheep to food during the game, gain 3 bonus points. Whole-game tracking needs resolution."
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "D031",
+  "cases": [
+    {
+      "id": "D031-pairs",
+      "scope": "effect_only",
+      "setup": {
+        "grain_stock": 4,
+        "vegetable_stock": 4,
+        "grain_fields": 0,
+        "vegetable_fields": 0
+      },
+      "action": {
+        "score": true
+      },
+      "expected": {
+        "bonus_points": 2,
+        "note": "4 grain + 4 vegetable = 4 pairs, 0.5 each rounded up -> 2 points"
+      },
+      "notes": "D031: end-game scoring, 0.5 bonus point (rounded up) per grain+vegetable pair counting stock and field crops (rounding formalization unresolved)"
+    },
+    {
+      "id": "D031-no-crops",
+      "scope": "effect_only",
+      "setup": {
+        "grain_stock": 0,
+        "vegetable_stock": 0
+      },
+      "action": {
+        "score": true
+      },
+      "expected": {
+        "bonus_points": 0
+      },
+      "notes": "No crops -> no bonus"
+    }
+  ]
+}

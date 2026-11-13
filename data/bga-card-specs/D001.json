@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "card_id": "D001",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ジグザグ鍬",
+    "name_en": "Zigzag Harrow"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2920",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "L字型の畑3: プレイ中の畑タイルがL字型（テトリスのSまたはZ）を形成する3つの畑があること"
+        }
+      }
+    ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "plow_field",
+          "target": "board",
+          "params": {
+            "amount": 1
+          },
+          "notes": "Plow exactly 1 field so that the farm fields form an L/Z (tetris S/Z) shape"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "回る進歩: use once then pass to left neighbor"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: zigzag/L-shape field-placement condition (テトリスS/Z形) needs precise geometry formalization",
+      "effects[0].steps: plow_field amount and adjacency/scope params for zigzag shape need definition",
+      "play.prerequisites: predicate uses raw_text; formal field-shape predicate not in vocabulary"
+    ],
+    "test_case_ids": [
+      "D001-normal",
+      "D001-not-zigzag"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 1 wood. Prereq: L-shaped 3 fields (テトリスS/Z). Effect: immediately plow 1 field in a zigzag shape; pass to left neighbor. Zigzag geometry needs formalization."
+  }
+}

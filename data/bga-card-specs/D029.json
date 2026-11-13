@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "card_id": "D029",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "畜糞用くまで",
+    "name_en": "Muck Rake"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2892",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent end-game stable bonus"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: \"柵で囲われていない厩ちょうど1に羊ちょうど1\" - unfenced-stable and exactly-1-animal conditions need formalization",
+      "effects: applies separately to boar and cattle in other unfenced stables; max 3 points - threshold counting needs definition",
+      "effects[0].steps: gain_points formula needs formalization"
+    ],
+    "test_case_ids": [
+      "D029-sheep-stable",
+      "D029-no-stable"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost wood1. Effect: end-game scoring: 1 bonus point per unfenced stable holding exactly 1 sheep; similarly 1 point per unfenced stable holding exactly 1 boar and 1 per unfenced stable holding exactly 1 cattle (max 3 points). Condition formalization needs resolution."
+  }
+}

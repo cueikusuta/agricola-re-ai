@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "card_id": "D013",
+  "cases": [
+    {
+      "id": "D013-wood-house",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 1,
+        "house": "wood"
+      },
+      "action": {
+        "play": "D013",
+        "pay": {
+          "good": "wood",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "stone_renovation_available": true,
+        "wood_house_renovation_cost": {
+          "stone": 1,
+          "reed": 1,
+          "food": 1
+        },
+        "cost_per_room": true
+      },
+      "notes": "D013 costs 1 wood; from a wood house, stone-renovation costs stone1 reed1 food1 per room (cost formalization unresolved)"
+    },
+    {
+      "id": "D013-brick-house",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 1,
+        "house": "clay"
+      },
+      "action": {
+        "play": "D013",
+        "pay": {
+          "good": "wood",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "stone_renovation_available": true,
+        "brick_house_renovation_cost": {
+          "stone": 1
+        },
+        "cost_per_room": true
+      },
+      "notes": "From a brick (clay) house, stone-renovation costs stone1 per room (cost formalization unresolved)"
+    }
+  ]
+}

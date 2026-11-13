@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "D036",
+  "cases": [
+    {
+      "id": "D036-zero-sheep",
+      "scope": "legal_play",
+      "setup": {
+        "sheep": 0,
+        "sheep_gained_excl_breeding": 0,
+        "sheep_converted_to_food": false
+      },
+      "action": {
+        "play": "D036"
+      },
+      "expected": {
+        "play_allowed": true,
+        "end_game_bonus": 3,
+        "condition": "at most 2 sheep gained (excl. breeding) and never converted sheep to food"
+      },
+      "notes": "D036 is free, requires no sheep to play; end-game scoring: if at most 2 sheep gained excluding breeding and never converted sheep to food, gain 3 bonus points (whole-game tracking unresolved)"
+    },
+    {
+      "id": "D036-two-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "sheep_gained_excl_breeding": 2,
+        "sheep_converted_to_food": false
+      },
+      "action": {
+        "score": true
+      },
+      "expected": {
+        "bonus_points": 3
+      },
+      "notes": "Gained exactly 2 sheep (excl. breeding) and never converted -> 3 bonus points"
+    }
+  ]
+}

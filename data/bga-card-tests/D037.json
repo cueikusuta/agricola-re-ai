@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "D037",
+  "cases": [
+    {
+      "id": "D037-playable",
+      "scope": "legal_play",
+      "setup": {
+        "unused_farm_spaces": 2,
+        "unplayed_rounds": 5,
+        "stone": 1
+      },
+      "action": {
+        "play": "D037",
+        "pay": {
+          "good": "stone",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "points": 2
+      },
+      "notes": "D037 costs stone1; playable only when unplayed rounds exceed unused farm spaces; worth 2 points (play-condition formalization unresolved)"
+    },
+    {
+      "id": "D037-not-playable",
+      "scope": "legal_play",
+      "setup": {
+        "unused_farm_spaces": 8,
+        "unplayed_rounds": 3,
+        "stone": 1
+      },
+      "action": {
+        "play": "D037",
+        "pay": {
+          "good": "stone",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_rejected": true,
+        "reason": "unused farm spaces exceed unplayed rounds"
+      },
+      "notes": "When unused farm spaces are not fewer than unplayed rounds, D037 cannot be played"
+    }
+  ]
+}

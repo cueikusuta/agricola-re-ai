@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "D029",
+  "cases": [
+    {
+      "id": "D029-sheep-stable",
+      "scope": "effect_only",
+      "setup": {
+        "unfenced_stables": 1,
+        "sheep": 1,
+        "boar": 0,
+        "cattle": 0
+      },
+      "action": {
+        "score": true
+      },
+      "expected": {
+        "bonus_points": 1
+      },
+      "notes": "D029: end-game scoring, 1 bonus point per unfenced stable holding exactly 1 sheep (max 3 across sheep/boar/cattle; condition formalization unresolved)"
+    },
+    {
+      "id": "D029-no-stable",
+      "scope": "effect_only",
+      "setup": {
+        "unfenced_stables": 0,
+        "sheep": 1
+      },
+      "action": {
+        "score": true
+      },
+      "expected": {
+        "bonus_points": 0
+      },
+      "notes": "No unfenced stable with exactly 1 animal -> no bonus"
+    }
+  ]
+}
