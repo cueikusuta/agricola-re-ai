@@ -1019,11 +1019,11 @@ mod tests {
         }
         let digest = format!("{:x}", hasher.finalize());
         // This value was recorded from the current implementation.
-                // DO NOT CHANGE unless the implementation is intentionally replaced.
-                // Updated: added A077 Hod to verified_immediate_resource_cards (pool size 30->31)
-                assert_eq!(
-                    digest, "a1439a3d33027fc63a75c1e1102d973c75cbda321ea25c17d5aca9df7e3f7723",
-                    "sample_game distribution changed — update this test only if intentional"
-                );
+        // DO NOT CHANGE unless the implementation is intentionally replaced.
+        // Updated: added A077 Hod to verified_immediate_resource_cards (pool size 30->31)
+        assert_eq!(
+            digest, "a1439a3d33027fc63a75c1e1102d973c75cbda321ea25c17d5aca9df7e3f7723",
+            "sample_game distribution changed — update this test only if intentional"
+        );
     }
 }
