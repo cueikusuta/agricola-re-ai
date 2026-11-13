@@ -1410,6 +1410,8 @@ impl Game {
 
             // Get the played_cards for this player before creating mutable context.
             let played_cards = players[player].played_cards.clone();
+            // Clone players for all_players parameter to avoid borrow checker issues
+            let all_players = players.clone();
 
             match step {
                 crate::pending::ChainStep::AfterHarvestBake => {
@@ -1427,6 +1429,9 @@ impl Game {
                             card_uses: &mut card_uses,
                             card_use_limits: &card_use_limits,
                             pending: &mut pending,
+                            actor: player,
+                            card_owner: player,
+                            beneficiary: player,
                         };
                         let trigger = crate::card_events::PhaseTriggerData {
                             space: None,
@@ -1442,6 +1447,7 @@ impl Game {
                                 player,
                                 crate::card_events::TriggerPhase::After,
                                 &trigger,
+                                &all_players,
                             )?;
                         }
                         // Interrupt phase (with resume if this is the paused step)
@@ -1453,6 +1459,7 @@ impl Game {
                                 &trigger,
                                 &played_cards,
                                 Some(after),
+                                &all_players,
                             )?
                         } else {
                             crate::card_events::resolve_phase(
@@ -1460,6 +1467,7 @@ impl Game {
                                 player,
                                 crate::card_events::TriggerPhase::Interrupt,
                                 &trigger,
+                                &all_players,
                             )?
                         };
                         if let Transition::Paused(p) = transition {
@@ -1488,6 +1496,9 @@ impl Game {
                         card_uses: &mut card_uses,
                         card_use_limits: &card_use_limits,
                         pending: &mut pending,
+                        actor: player,
+                        card_owner: player,
+                        beneficiary: player,
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: None,
@@ -1502,6 +1513,7 @@ impl Game {
                             player,
                             crate::card_events::TriggerPhase::After,
                             &trigger,
+                            &all_players,
                         )?;
                     }
                     let transition = if let Some(after) = after {
@@ -1512,6 +1524,7 @@ impl Game {
                             &trigger,
                             &played_cards,
                             Some(after),
+                            &all_players,
                         )?
                     } else {
                         crate::card_events::resolve_phase(
@@ -1519,6 +1532,7 @@ impl Game {
                             player,
                             crate::card_events::TriggerPhase::Interrupt,
                             &trigger,
+                            &all_players,
                         )?
                     };
                     if let Transition::Paused(p) = transition {
@@ -1538,6 +1552,9 @@ impl Game {
                         card_uses: &mut card_uses,
                         card_use_limits: &card_use_limits,
                         pending: &mut pending,
+                        actor: player,
+                        card_owner: player,
+                        beneficiary: player,
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: Some(completion.action.space),
@@ -1552,6 +1569,7 @@ impl Game {
                             player,
                             crate::card_events::TriggerPhase::After,
                             &trigger,
+                            &all_players,
                         )?;
                     }
                     let transition = if let Some(after) = after {
@@ -1562,6 +1580,7 @@ impl Game {
                             &trigger,
                             &played_cards,
                             Some(after),
+                            &all_players,
                         )?
                     } else {
                         crate::card_events::resolve_phase(
@@ -1569,6 +1588,7 @@ impl Game {
                             player,
                             crate::card_events::TriggerPhase::Interrupt,
                             &trigger,
+                            &all_players,
                         )?
                     };
                     if let Transition::Paused(p) = transition {
@@ -1684,6 +1704,98 @@ impl Game {
                     for id in recipients {
                         self.public.players[*id].supply.food += 1;
                     }
+                }
+                Ok(())
+            }
+            (
+                PendingKind::ChooseTriggerOrder { phase, triggers },
+                PendingResolution::ChooseTriggerOrder { chosen_order },
+            ) => {
+                // Execute the triggers in the chosen order
+                // Reconstruct triggerable effects from context
+                let triggerable_json = pending
+                    .context
+                    .get("triggerable_effects")
+                    .and_then(|v| v.as_array())
+                    .ok_or("missing triggerable_effects in context")?;
+
+                let triggerable: Vec<crate::card_events::TriggerableEffect> = triggerable_json
+                    .iter()
+                    .filter_map(|v| {
+                        let card_id = v.get("card_id")?.as_str()?.to_string();
+                        let effect_index = v.get("effect_index")?.as_u64()? as usize;
+                        let description = v.get("description")?.as_str()?.to_string();
+                        Some(crate::card_events::TriggerableEffect {
+                            card_id,
+                            effect_index,
+                            description,
+                        })
+                    })
+                    .collect();
+
+                if triggerable.len() != triggers.len() {
+                    return Err("triggerable effects count mismatch".into());
+                }
+
+                // Get the card owner from context
+                let card_owner = pending
+                    .context
+                    .get("card_owner")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(pending.player as u64) as usize;
+
+                // Build trigger data (empty for now - could be enhanced)
+                let trigger_data = crate::card_events::PhaseTriggerData {
+                    space: None,
+                    improvement: None,
+                    baked: false,
+                    previous_player: None,
+                    used_spaces: self.public.used.clone(),
+                };
+
+                // Collect all players for snapshot
+                let all_players = self.public.players.clone();
+
+                // Build dispatch context for the card owner
+                let mut ctx = crate::card_events::DispatchContext {
+                    card_set: &self.card_set,
+                    player: &mut self.public.players[card_owner],
+                    cards: &mut self.cards,
+                    improvement_market: &mut self.public.improvement_market,
+                    delayed_well: &mut self.delayed_well,
+                    round: self.public.round,
+                    used_spaces: &self.public.used,
+                    event_budget: &mut self.event_budget,
+                    card_uses: &mut self.card_uses,
+                    card_use_limits: &self.card_use_limits,
+                    pending: &mut self.pending,
+                    actor: pending.player,
+                    card_owner,
+                    beneficiary: card_owner,
+                };
+
+                // Execute in chosen order
+                crate::card_events::execute_chosen_triggers(
+                    &mut ctx,
+                    card_owner,
+                    *phase,
+                    &trigger_data,
+                    &all_players,
+                    chosen_order,
+                    &triggerable,
+                )?;
+
+                if self.record_events {
+                    self.log.events.push(crate::model::Event {
+                        player: Some(pending.player),
+                        kind: "pending_resolution".into(),
+                        payload: serde_json::json!({
+                            "phase": format!("{:?}", phase),
+                            "chosen_order": chosen_order,
+                        }),
+                        before: pending.state_hash_before.clone(),
+                        after: self.state_hash(),
+                    });
                 }
                 Ok(())
             }

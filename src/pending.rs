@@ -133,6 +133,15 @@ pub enum PendingKind {
         /// Players who receive food (public knowledge).
         recipients: Vec<usize>,
     },
+    /// Choose the order of simultaneous trigger resolution (2016 Lookout p.8).
+    /// When multiple card effects trigger simultaneously in After/Interrupt phase,
+    /// the active player chooses the resolution order.
+    ChooseTriggerOrder {
+        /// The phase in which triggers fire.
+        phase: TriggerPhase,
+        /// The triggerable effects: (card_id, effect_index, effect_description).
+        triggers: Vec<(String, usize, String)>,
+    },
     /// Generic extensible decision for future effects.
     Custom {
         source_card: String,
@@ -177,6 +186,7 @@ pub enum PendingResolution {
     ChooseGain { chosen: GainOption },
     ChoosePayment { chosen: PaymentOption },
     DelayedWellRelief { confirmed: bool },
+    ChooseTriggerOrder { chosen_order: Vec<usize> },
     Custom { payload: serde_json::Value },
 }
 
@@ -224,6 +234,23 @@ impl PendingDecision {
                 PendingKind::DelayedWellRelief { .. },
                 PendingResolution::DelayedWellRelief { .. },
             ) => Ok(()),
+            (
+                PendingKind::ChooseTriggerOrder { triggers, .. },
+                PendingResolution::ChooseTriggerOrder { chosen_order },
+            ) => {
+                // Validate that chosen_order is a permutation of 0..triggers.len()
+                if chosen_order.len() != triggers.len() {
+                    return Err("chosen order length must match number of triggers".into());
+                }
+                let mut seen = vec![false; triggers.len()];
+                for &idx in chosen_order {
+                    if idx >= triggers.len() || seen[idx] {
+                        return Err("chosen order must be a valid permutation".into());
+                    }
+                    seen[idx] = true;
+                }
+                Ok(())
+            }
             (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => Ok(()),
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
