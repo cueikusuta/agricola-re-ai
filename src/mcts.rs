@@ -1022,8 +1022,9 @@ mod tests {
         // DO NOT CHANGE unless the implementation is intentionally replaced.
         // Updated: added A077 Hod to verified_immediate_resource_cards (pool size 30->31)
         // Updated: added A051 Drift-Net Boat to verified_minor_worker_cards (pool size 31->32)
+        // Updated: added A122 Pot-Hash Pfannkuchen to verified_worker_bonus_cards (pool size 32->33)
         assert_eq!(
-            digest, "54f487dfe96db9ca45ffc79de9475e9d398fae91f58fd4d995222bffc8c0c75b",
+            digest, "81e786b3fd6915cda9745b82dbaec5f5389ff6d648862f1406f08a8f3933eee8",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
