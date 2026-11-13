@@ -28,6 +28,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: web-e2e
+      - name: Install Japanese UI fonts for screenshot evidence
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-color-emoji
+          fc-match 'Noto Sans CJK JP' -f '%{family}\n'
       - name: Install pinned browser driver (use runner's Chrome)
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Build local web server
@@ -57,6 +62,14 @@ jobs:
             /tmp/agricola-web-e2e.log
           if-no-files-found: ignore
 
+      - name: Preserve BGA-reference tabletop screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-bga-tabletop
+          path: artifacts/bga-tabletop-*.png
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Preserve responsive screenshots
         if: always()
         uses: actions/upload-artifact@v4

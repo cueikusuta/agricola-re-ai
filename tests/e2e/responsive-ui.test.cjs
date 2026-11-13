@@ -26,6 +26,7 @@ test("Issue #241: responsive layout, keyboard action and private card view in Ch
       "horizontal page overflow at "+size.width+"px: "+JSON.stringify(dimensions));
     const firstCard=page.locator("#cardBrowser .cardTile").first();
     assert.ok(await firstCard.count()>0,"own hand should render as cards");
+    assert.ok((await firstCard.locator(".cardExcerpt").innerText()).length>5,"a closed card must show a readable effect preview");
     await firstCard.locator("summary").focus();
     await page.keyboard.press("Enter");
     assert.equal(await firstCard.getAttribute("open"),"","Enter must expand card details");

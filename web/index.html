@@ -79,14 +79,279 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
  .buttons button,.tabs button{min-height:44px}
 }
 
+
+/* #246 BGA-reference tabletop skin. All artwork is CSS, no imported BGA assets. */
+:root{--soil:#413221;--ink:#392d20;--parchment:#efe4c8;--grain:#c99e5f;--wood:#7b5a32;--leaf:#385e31;--grass:#59834b;font-family:system-ui,-apple-system,"Noto Sans CJK JP","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;color:var(--ink);background:#d6c6a2}
+body{background:radial-gradient(ellipse at 48% 7%,#f2e6c3 0,#d5c29c 54%,#bda77f 100%);min-height:100vh}
+.screen{max-width:1650px;gap:12px;padding:12px 18px 24px}
+.screen>.panel{box-shadow:0 2px 7px #59442f28}
+.tableHeader{background:linear-gradient(125deg,#433321,#6f4d2b 45%,#3b3024);color:#fffaed;border:4px solid #795c38;border-radius:9px;padding:11px 18px;box-shadow:0 3px 8px #3b261843}
+.brandLockup{display:flex;align-items:center;gap:12px}.brandLeaf{font-size:30px;color:#dec082}
+.tableHeader h1{font-family:Georgia,serif;font-size:27px;font-weight:750;letter-spacing:.04em;line-height:1.1}
+.brandEn{font-weight:500;font-size:15px;letter-spacing:.2em;color:#dbc391}
+.brandSub{font-size:10px;letter-spacing:.11em;color:#e5d2b4}
+.topNav{display:flex;flex-wrap:wrap;gap:8px}.topNav a{border:1px solid #b69b6c;border-radius:4px;padding:7px 9px;color:#f9ecca;text-decoration:none;font-size:12px;background:#5f442ccc}
+.topNav a:hover,.topNav a:focus-visible{background:#8e6b3b}
+.panel{background:linear-gradient(160deg,#f4ebd4,#e5d7b6);border:1px solid #ad9366;border-radius:9px;color:var(--ink);padding:12px;box-shadow:0 2px 7px #5844261f}
+.panel h2,.panel h3{color:#382b1c}
+.minor{color:#685943}
+button,select,input,textarea{background:#f8f1df;color:#332c21;border:1px solid #a79371;border-radius:5px}
+button:hover{background:#e9d6aa}button.active,.primary{color:#fffaec;background:#59764a;border-color:#2e4f32}
+button:disabled{opacity:.45}
+.statusStrip{background:#e6d6aa;border-left:5px solid #7b8852}
+.statusStrip strong{font-family:Georgia,"Noto Sans CJK JP",serif;font-size:20px}
+.tableHud{background:linear-gradient(90deg,#e3d1a5,#f7edcf);border-left:5px solid #7e6240;padding:10px 13px}
+.workerBadge{background:#447044;border-color:#789b65;color:#fff6df;font-weight:700}
+#turnWorkers,#turnActions,#turnView{color:#49391f}
+.tabletopLayout{display:grid;grid-template-columns:minmax(0,1.13fr) minmax(380px,.87fr);align-items:start;gap:13px}
+.tabletopMain,.tabletopRail{min-width:0;display:grid;gap:13px}
+.sectionEyebrow{font-weight:800;font-size:10px;letter-spacing:.16em;color:#7a6846;margin-bottom:5px}
+.actionTablePanel{background:radial-gradient(ellipse at 60% 35%,#8bad63,#55753e 74%,#3c5732);border:9px solid #9a7440;box-shadow:inset 0 0 0 2px #d0b780,0 5px 15px #45351d55;padding:13px;border-radius:10px;color:#f6f2dc}
+.actionTablePanel .sectionEyebrow,.actionTablePanel h2{color:#f7efd1;text-shadow:0 1px 2px #30452c}
+.actionPanelHeading{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.actionPanelHeading h2{font-family:Georgia,"Noto Sans CJK JP",serif;font-size:22px}
+.roundPill{font-size:12px;font-weight:700;border:1px solid #e8d59d;background:#3e5b34;border-radius:999px;padding:5px 10px;color:#fbf1d6}
+#boardSummary{color:#e6efce;font-size:12px;margin:5px 0 10px}
+#notice{color:#fff0ba;font-size:13px;min-height:18px}
+#actions.actionBoard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:11px}
+.actionGroup{background:#42633370;border:1px solid #c2d09966;box-shadow:inset 0 1px 5px #2b44275a;border-radius:8px;padding:8px}
+.actionGroup h3{font-family:Georgia,"Noto Sans CJK JP",serif;font-size:14px;font-weight:700;margin:0 0 9px;color:#ffefd0;letter-spacing:.04em;padding:0 2px 4px;border-bottom:1px solid #bed09a8a}
+.actionTiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.actionTile{position:relative;min-width:0;min-height:91px;border:2px solid #80643b;border-radius:5px;background:linear-gradient(145deg,#fff4cf 0%,#e4cd9a 75%,#d5b982 100%);box-shadow:1px 2px 0 #2c4427,0 3px 8px #27391e75;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.actionTile::before{content:"";position:absolute;inset:5px;border:1px solid #bda47699;border-radius:2px;pointer-events:none}
+.actionTile button{z-index:1;position:relative;background:transparent;border:none;box-shadow:none;text-align:left;font-family:Georgia,"Noto Sans CJK JP",serif;color:#3f3221;font-size:14px;font-weight:800;line-height:1.4;padding:8px 7px 1px;min-height:40px;max-width:100%;border-radius:0;overflow-wrap:anywhere}
+.actionTile button:hover{background:#fdf4d5cc;color:#244f2a}
+.actionTile .tileMeta{z-index:1;color:#665030;padding:0 8px 8px;font-size:11px;line-height:1.3}
+.actionTile.occupied{filter:saturate(.54);border-color:#756a53;background:linear-gradient(145deg,#ded4af,#beae8f)}
+.actionTile.occupied .tileMeta{font-weight:750;color:#693d2f}
+.actionTile:focus-within{outline:3px solid #ffedaa;outline-offset:2px}
+.actionGlyph{position:absolute;right:6px;top:5px;font-size:18px;opacity:.48;pointer-events:none;line-height:1.1}
+.actionCount{display:inline-flex;align-items:center;gap:5px;padding:2px 6px;border-radius:100px;font-size:11px;font-weight:800;background:#ece0b9;border:1px solid #bca070;color:#46351f;max-width:100%}
+.actionCount .tokenDot{width:11px;height:11px;border-radius:50%;border:2px solid #806745;background:#a87a40}
+.actionCount .tokenDot.clay{background:#bc6738}.actionCount .tokenDot.reed{background:#e5d6a0}
+.actionCount .tokenDot.stone{background:#8d9192}.actionCount .tokenDot.food{background:#d2a642}
+.actionCount .tokenDot.sheep{background:#f7f7ee}.actionCount .tokenDot.boar{background:#68635e}.actionCount .tokenDot.cattle{background:#aa7157}
+.workerOnTile{position:absolute;right:8px;bottom:7px;width:16px;height:16px;border:3px solid #ead9aa;border-radius:50% 50% 5px 5px;background:#765244;box-shadow:0 0 0 1px #513d2d;transform:rotate(-8deg)}
+#usedActions{padding:7px 0 0;color:#f5f0d5;font-size:11px}
+.usedSpace{background:#415d38;border-color:#b8c58e;color:#fbf1dd;padding:2px 6px}
+.farmPanel{padding:12px;background:linear-gradient(150deg,#f1e4bf,#e0cba3)}
+.farmPanel .tabs{margin:8px 0 10px;gap:5px}
+.farmPanel .tabs button{font-size:12px;font-weight:750;padding:5px 7px;min-height:36px}
+.boardArea{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.boardPane{min-width:0}.boardPane h2{margin-bottom:9px;font-size:17px}
+.farmField{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;max-width:100%;padding:7px;border:7px solid #987643;border-radius:8px;background:#47652f;box-shadow:inset 0 0 0 2px #cdb17e,0 3px 5px #443c2369}
+.farmField .cell{position:relative;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;min-width:0;min-height:70px;padding:6px 2px;background:radial-gradient(#8fb76c 2%,#5a913f 85%);border:1px solid #466b2e;border-radius:4px;color:#f5ffdf;font-weight:650;box-shadow:inset 0 0 3px #305328;overflow:hidden}
+.farmField .cell.room{background:linear-gradient(150deg,#8f7044,#5d4529);border:3px ridge #d8b77d;color:#fff0c3}
+.farmField .cell.field-tile{background:repeating-linear-gradient(155deg,#806536,#806536 5px,#a28a54 6px,#a28a54 9px);border:2px solid #b8a072;color:#fff5d7}
+.farmField .cell.pasture{background:linear-gradient(145deg,#719f53,#4b753b);border:3px dashed #d0b580}
+.farmField .cellIndex{position:absolute;top:2px;left:4px;opacity:.6;font-size:10px}
+.farmField .cellIcon{font-size:23px;line-height:1.2;text-shadow:0 1px 1px #253d25}
+.farmField .cellLabel{font-size:10px;line-height:1.25;white-space:normal;overflow-wrap:anywhere}
+.stats h2{font-size:14px;margin:1px 0 7px}.stats{min-width:0}
+.statGrid{grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.stat{padding:7px 2px 5px;background:#eee0b8;border:1px solid #c2ac80;border-radius:4px;font-size:11px;min-width:0;overflow-wrap:anywhere}
+#improvements{font-size:12px;line-height:1.5;margin:7px 0 0}
+.rivalsPanel{background:linear-gradient(145deg,#f2e6ca,#e0d0ad)}
+#opponentBoards{display:grid;gap:7px}
+.opponentCard{display:grid;grid-template-columns:120px minmax(0,1fr);gap:9px;padding:7px;border:1px solid #bba477;border-radius:7px;background:#f8eed2}
+.opponentCard.isActive{border:2px solid #688a55}
+.opponentSelect{width:100%;padding:4px;border:0;background:transparent;font-size:12px;font-weight:800;text-align:left;min-height:30px}
+.opponentMeta{font-size:11px;color:#65583d;line-height:1.55;overflow-wrap:anywhere}
+.opponentSupply{font-size:11px;line-height:1.5;margin-top:3px;color:#4d432f}
+.miniFarm{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;background:#6f8452;border:3px solid #937641;border-radius:4px;padding:3px}
+.miniCell{height:17px;min-width:0;border:1px solid #53733d;border-radius:2px;background:#86ae61;text-align:center;line-height:16px;font-size:11px;color:#fff9e3;overflow:hidden}
+.miniCell.room{background:#816139;border-color:#ccb47d}
+.miniCell.field-tile{background:#a88b4f;border-color:#cdb275}
+.miniCell.pasture{background:#507a40;border:1px dashed #d5c089}
+.cardsPanel{border-top:5px solid #ad8a56;background:linear-gradient(140deg,#f3e6c6,#e9d6b1)}
+.cardShelfHeading{display:flex;align-items:start;justify-content:space-between;flex-wrap:wrap;gap:6px}
+#hand{font-size:12px;max-width:72ch}
+#cardBrowser{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));gap:9px}
+.cardTile{min-height:120px;display:flex;flex-direction:column;border:3px solid #836747;border-radius:5px;background:linear-gradient(160deg,#e5cb8b,#f9edcb 24%,#efe1bd 85%,#dec58c);box-shadow:2px 3px 0 #8b735050,0 3px 8px #74614e33;padding:7px}
+.cardTile summary{display:list-item;font-family:Georgia,"Noto Sans CJK JP",serif;font-size:13px;color:#3f2d1d;min-height:74px;line-height:1.45;cursor:pointer}
+.cardTileBody{border-top:1px solid #bba073;margin-top:6px;padding:7px 2px 1px;font-size:11px;color:#56452c}
+.cardTile[open]{border-color:#4b6e43}
+.operationsPanel{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.operationsPanel h2{margin:0}.operationsPanel .minor{margin:0}
+#history{width:100%;margin:0;color:#63563f}
+#gameSettings,.screen>#draftPanel{background:#e7d9b9}
+#gameSettings::before{content:"対戦オプション";display:block;font-size:15px;font-weight:800;margin-bottom:8px;color:#59422d}
+#draftPanel>h2{font-size:16px}
+footer{color:#705e41;font-size:12px}
+@media(max-width:1090px){
+ .tabletopLayout{grid-template-columns:minmax(0,1fr)}
+ .tabletopRail{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+ .actionTablePanel{border-width:6px}
+}
+@media(max-width:760px){
+ .screen{width:100%;padding:7px;gap:8px}
+ .tableHeader{padding:9px 10px;gap:9px;flex-wrap:wrap}.tableHeader h1{font-size:22px}
+ .topNav{width:100%;justify-content:space-between;gap:5px}.topNav a{font-size:11px;padding:5px}
+ .tabletopRail{grid-template-columns:minmax(0,1fr)}
+ #actions.actionBoard{grid-template-columns:minmax(0,1fr)}
+ .actionTiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .actionGroup{padding:6px}.actionTile{min-height:77px}
+ .actionTile button{font-size:13px}.actionTile .tileMeta{font-size:10px}
+ .farmField .cell{min-height:58px}.farmField .cellIcon{font-size:20px}
+ .statGrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .opponentCard{grid-template-columns:120px minmax(0,1fr)}
+ #cardBrowser{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .cardTile{min-height:105px}
+}
+
+
+/* #246 visual review fixes: compact printed spaces and keep the draft form inside phone width. */
+#actions.actionBoard{align-items:start;grid-auto-rows:min-content}
+#actions .actionGroup{align-self:start}
+#actions .actionTiles{align-content:start;grid-auto-rows:min-content}
+#actions .actionTile{height:91px;min-height:91px;max-height:91px}
+#actions .occupiedTitle{font-family:Georgia,"Noto Sans CJK JP",serif;font-size:14px;line-height:1.35;color:#4d4638;z-index:1;position:relative;padding:10px 6px 0}
+#draftPanel .buttons label{min-width:0;max-width:100%;display:inline-flex;align-items:center;flex-wrap:wrap;gap:5px}
+#draftPanel .buttons select{min-width:0;max-width:100%;width:auto}
+#draftPool{width:min(100%,290px)!important}
+@media(max-width:760px){
+ #actions .actionTile{height:84px;min-height:84px;max-height:84px}
+ #draftPanel .buttons label{width:100%}
+ #draftPanel .buttons select{flex:1 1 160px;min-width:0}
+ #draftPool{width:min(100%,270px)!important}
+}
+
+
+/* #246 card polish: a readable face even before expansion, without copyrighted artwork. */
+#cardBrowser{grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr));gap:10px}
+#cardBrowser .cardTile{min-height:205px;max-height:none;padding:0;border-width:3px;overflow:hidden}
+#cardBrowser .cardTile.occupationCard{border-color:#4a6673;background:linear-gradient(160deg,#d3e5e7,#f4eee0 60%,#d5dfdc)}
+#cardBrowser .cardTile.improvementCard{border-color:#906b42;background:linear-gradient(165deg,#f4dfb7,#f9edcf 56%,#e6d6ad)}
+#cardBrowser .cardTile summary{display:flex;flex-direction:column;align-items:stretch;gap:6px;list-style:none;min-height:192px;cursor:pointer;font-family:Georgia,"Noto Sans CJK JP",serif;padding:0;color:#382c1f}
+#cardBrowser .cardTile summary::-webkit-details-marker{display:none}
+#cardBrowser .cardKindBar{display:block;font:700 10px system-ui,"Noto Sans CJK JP",sans-serif;letter-spacing:.03em;line-height:1.3;padding:5px 8px;color:#fff6dc;background:#7c5f38}
+#cardBrowser .occupationCard .cardKindBar{background:#415f6a;color:#f4f9f4}
+#cardBrowser .cardName{font-weight:800;font-size:13px;line-height:1.4;min-height:34px;overflow-wrap:anywhere;padding:0 8px}
+#cardBrowser .cardIllustration{display:flex;align-items:center;justify-content:center;flex:1 0 44px;margin:0 8px;border:2px double #b9a67e;background:radial-gradient(ellipse at 50% 60%,#f2eccd,#c7ae7d);font-size:32px;font-weight:400;color:#8a7049}
+#cardBrowser .occupationCard .cardIllustration{background:radial-gradient(ellipse,#e5e8d6,#a9bcc0);color:#496d71;border-color:#92abb2}
+#cardBrowser .cardExcerpt{font:11px/1.35 system-ui,"Noto Sans CJK JP",sans-serif;color:#534832;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 7px 7px;overflow-wrap:anywhere}
+#cardBrowser .cardTileBody{font-size:12px;line-height:1.55;padding:9px 8px 12px;margin:0;background:#fff7e9}
+#cardBrowser .cardTile[open]{outline:2px solid #527448;outline-offset:1px}
+@media(max-width:760px){
+ #cardBrowser{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ #cardBrowser .cardTile{min-height:168px}
+ #cardBrowser .cardTile summary{min-height:160px}
+ #cardBrowser .cardName{font-size:12px;min-height:32px}
+ #cardBrowser .cardIllustration{font-size:25px;min-height:32px}
+}
+
+
+/* #246 Interaction pass — concise visible status, detailed context only on demand */
+.tableHeader{padding-block:9px}.brandSub{display:none}
+.topNav a{display:inline-flex;gap:5px;align-items:center;font-weight:650}
+.actionPanelHeading{gap:6px}
+#notice:empty{display:none}
+#boardSummary{font-size:11px;margin:3px 0 8px;opacity:.9}
+#usedActions{font-size:10px;opacity:.8;gap:3px}
+#usedActions .usedSpace{padding:1px 5px}
+#stats .stat{cursor:help;position:relative;display:flex;align-items:center;justify-content:center;gap:3px;flex-direction:column;font-size:11px;line-height:1.25;min-height:51px}
+#stats .stat::before{content:attr(data-icon);display:block;font-size:21px;line-height:1.2}
+#stats .stat:hover,#stats .stat:focus-within{border-color:#6d8650;background:#f6ebcd}
+.opponentSupply{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin:4px 0}
+.opponentResource{display:inline-flex;align-items:center;gap:2px;border:1px solid #d1bd92;border-radius:5px;padding:1px 4px;background:#efe3c1;white-space:nowrap;font-size:11px;color:#433521}
+.opponentResource:hover{background:#fff4d3;border-color:#94784d}
+.resourcePictogram{font-size:14px;line-height:1.2}
+.farmField .cell,.miniFarm .miniCell{cursor:help}
+.farmField .cell:hover{outline:2px solid #fff2af;outline-offset:-3px;z-index:2}
+.farmField .cellLabel{font-size:10px}
+#cardsPanel .cardTile{transition:transform .12s ease,box-shadow .12s ease}
+#cardsPanel .cardTile:hover,#cardsPanel .cardTile:focus-within{transform:translateY(-2px);box-shadow:0 5px 9px #77654b55}
+.compactHelp{position:relative;font-size:13px;max-width:100%}
+.compactHelp summary{display:flex;align-items:center;justify-content:center;width:30px;height:30px;cursor:pointer;list-style:none;border-radius:50%;color:#f7eccd;background:#46603d;border:1px solid #9db78b;font-size:20px;font-weight:700}
+.compactHelp summary::-webkit-details-marker{display:none}
+.compactHelp[open] summary{background:#b58f5b;color:#34281b}
+.compactHelp .helpContent{position:absolute;right:0;top:calc(100% + 6px);z-index:45;width:min(290px,calc(100vw - 32px));padding:10px 12px;background:#fff7e3;border:2px solid #98754c;box-shadow:0 7px 16px #33251655;border-radius:7px;color:#352718;line-height:1.6;font-size:12px}
+.compactHistory summary{cursor:pointer;list-style:none;font-size:12px;font-weight:600;color:#624b32;white-space:nowrap}
+.compactHistory summary::-webkit-details-marker{display:none}
+.compactHistory[open]{width:100%;line-height:1.55}
+#history{padding:4px 0}
+#draftPanel .compactHistory{padding:4px 0}
+#actions .actionTile{overflow:visible;z-index:1;isolation:isolate;cursor:pointer}
+#actions .actionTile:has(.tileInfo:hover),#actions .actionTile.helpOpen,#actions .actionTile:hover,#actions .actionTile:focus-within{z-index:50}
+#actions .actionTile:hover:not(.occupied),#actions .actionTile:focus-within:not(.occupied){border-color:#e4d28d;box-shadow:0 0 0 2px #edd89980,0 5px 12px #263a245c}
+#actions .actionGlyph{right:8px;top:5px;font-size:24px;opacity:.97;filter:drop-shadow(0 1px 1px #41371b55)}
+#actions .actionTile button[data-space]{max-width:calc(100% - 30px);padding:7px 0 0 7px;font-size:13px;min-height:47px;text-align:left;overflow-wrap:anywhere}
+#actions .actionTile .occupiedTitle{max-width:calc(100% - 27px);display:block;padding:8px 0 0 7px}
+#actions .actionTile .tileMeta{font-size:11px;padding:0 40px 6px 6px;line-height:1.1}
+#actions .actionCount{font-size:11px;font-weight:850;padding:3px 4px;max-width:none;white-space:nowrap}
+#actions .actionCount .tokenDot{width:8px;height:8px}
+#actions .tileInfo{display:flex;align-items:center;justify-content:center;position:absolute;right:3px;bottom:3px;width:35px;height:34px;z-index:3;color:#644f33;font-size:18px;border:1px solid #b89c6e;border-radius:6px;background:#fff3d2;line-height:1;cursor:help;user-select:none}
+#actions .tileInfo:hover,#actions .tileInfo:focus-visible,#actions .actionTile.helpOpen .tileInfo{background:#f8d785;border-color:#6e593a;color:#3c2c16;outline-offset:0}
+#actions .tileTooltip{display:none;position:absolute;left:0;bottom:calc(100% + 7px);z-index:60;width:min(258px,calc(100vw - 38px));padding:10px 11px;flex-direction:column;gap:6px;color:#2c2418;background:#fff9e8;border:2px solid #94774c;border-radius:7px;box-shadow:0 7px 18px #27221b8c;text-align:left;cursor:auto;font-size:12px;line-height:1.5;pointer-events:auto}
+#actions .tileTooltip strong{font-size:13px;color:#3b331f}
+#actions .tileTooltip small{color:#6b5d44;font-size:11px;border-top:1px solid #d9c7a2;padding-top:5px}
+#actions .actionTile:nth-child(even) .tileTooltip{left:auto;right:0}
+#actions .actionTile:hover .tileTooltip,#actions .actionTile:focus-within .tileTooltip,#actions .actionTile.helpOpen .tileTooltip{display:flex}
+@media(hover:none){#actions .actionTile:hover:not(.helpOpen):not(:focus-within) .tileTooltip{display:none}}
+@media(prefers-reduced-motion:reduce){#cardsPanel .cardTile{transition:none}}
+@media(max-width:760px){
+ .topNav a{font-size:12px}
+ #actions .actionTile .tileMeta{padding-right:38px}
+ #actions .actionTile button[data-space]{max-width:calc(100% - 31px);font-size:12px}
+ #actions .actionGlyph{font-size:20px}
+ #actions .actionTile .occupiedTitle{font-size:12px}
+ #stats .stat{font-size:10px;min-height:47px}
+ #stats .stat::before{font-size:18px}
+ .compactHelp .helpContent{right:-2px}
+}
+
+
+/* History stays readable to human users and existing browser contracts, but uses one compact line. */
+.operationsPanel .recentActions{display:flex;align-items:center;gap:5px;max-width:100%;width:100%;min-width:0;color:#766246;font-size:11px;margin-top:2px}
+.operationsPanel .recentActions #history{width:100%;min-width:0;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.45}
+#actions .actionTile.helpDismissed .tileTooltip{display:none!important}
+
+
+/* Frequently used actions remain reachable even when full setup controls are below the game. */
+.quickActions{display:flex;align-items:center;gap:5px}
+.quickActions button{display:inline-flex;align-items:center;gap:5px;min-height:34px;padding:5px 9px;background:#705335;border:1px solid #baa071;border-radius:6px;color:#fff0cf;font-size:12px;font-weight:750;white-space:nowrap}
+.quickActions button:hover{background:#987446}
+.quickActions #quickNew{background:#44633b;border-color:#91b17c}
+.quickActions #quickNew:hover{background:#547c4b}
+@media(max-width:760px){.tableHeader{gap:6px}.quickActions{margin-left:auto}.quickActions button{min-height:34px;padding:5px 8px}}
+
+
+/* Tooltips describe a tile but must NEVER cover the click target of any other action. */
+#actions .tileTooltip{pointer-events:none!important;user-select:none}
+
 </style></head>
 <body><div class="screen">
-<header><h1>アグリコラ <span class="minor">Revised / 手動対戦</span></h1><span class="minor">ローカル専用</span></header>
-<section class="panel" id="turnBar" aria-live="polite">
+<header class="tableHeader">
+  <div class="brandLockup"><span class="brandLeaf" aria-hidden="true">✦</span><div><h1>アグリコラ <span class="brandEn">AGRICOLA</span></h1><span class="brandSub">REVISED · 人間 vs AI</span></div></div>
+  <nav class="topNav" aria-label="画面内の移動"><a href="#actionPanel" title="アクション盤へ"><span aria-hidden="true">🎯</span> 盤面</a><a href="#playerFarmPanel" title="自分と相手の農場へ"><span aria-hidden="true">🏡</span> 農場</a><a href="#cardsPanel" title="カード一覧へ"><span aria-hidden="true">🃏</span> カード</a><a href="#gameSettings" title="対戦設定へ"><span aria-hidden="true">⚙️</span> 設定</a></nav><div class="quickActions"><button id="quickSave" type="button" title="現在の対戦を保存" aria-label="対戦を保存">💾 <span>保存</span></button><button id="quickNew" type="button" title="設定中の条件で新しい対戦を開始" aria-label="新しい対戦">▶ <span>新規</span></button></div>
+</header>
+<section class="panel tableHud" id="turnBar" aria-live="polite">
 <div class="turnInfo"><span id="turnWorkers" class="workerBadge"></span><span id="turnActions" class="minor"></span><span id="turnView" class="minor"></span></div>
 <div id="alert" class="alert" role="alert" hidden></div>
 </section>
-<section class="panel settings">
+<section class="panel status statusStrip"><strong id="turn">読み込み中...</strong><span id="summary" class="minor"></span></section>
+
+
+<main class="tabletopLayout" id="tabletopLayout"><div class="tabletopMain"><section class="panel actionTablePanel" id="actionPanel">
+ <div class="actionPanelHeading"><h2 id="actionTitle">🎯 アクション盤</h2><span class="roundPill" id="nextHarvest">次の収穫まで —</span><details id="boardHelp" class="compactHelp"><summary aria-label="アクションの操作説明" title="操作方法を見る">ⓘ</summary><div class="helpContent">盤面のアクションをクリックしてワーカーを配置。<strong>ⓘ</strong>で詳細を表示できます。使用済みは駒で表示します。</div></details></div>
+ <p id="boardSummary" aria-live="polite"></p><div id="notice"></div>
+ <div class="actions actionBoard" id="actions" aria-label="使用可能なアクションボード"></div>
+ <div class="buttons" id="actionNav"></div><div id="usedActions" aria-label="今ラウンドの使用済みスペース"></div>
+</section></div><aside class="tabletopRail"><section class="panel farmPanel" id="playerFarmPanel">
+  
+  <div class="tabs" id="tabs" role="group" aria-label="表示するプレイヤーの農場"></div>
+  <div class="boardArea">
+    <div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field farmField" aria-label="5×3マスの農場"></div></div>
+    <div class="stats"><h2>ストック・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p></div>
+  </div>
+</section>
+<section class="panel rivalsPanel" id="opponentPanel"><h2>👥 ほかの農場</h2><div id="opponentBoards" aria-label="他のプレイヤーの公開農場"></div></section></aside></main>
+<section class="panel cardsPanel" id="cardsPanel">
+ <div class="cardShelfHeading"><h2>🃏 カード</h2><p id="hand" class="minor"></p></div>
+ <div id="cardBrowser" aria-label="自分の手札と公開された使用済みカード"></div>
+ <details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details>
+</section>
+<section class="panel operationsPanel"><h2>🧺 任意操作</h2><button id="free" title="調理・食料変換・家畜の移動・廃棄">食料変換・家畜の移動</button><details class="compactHelp"><summary aria-label="任意操作の説明" title="操作説明">ⓘ</summary><div class="helpContent">ワーカーを使わない操作です。ゲーム側が合法性を判定します。</div></details><div class="recentActions" title="直近の操作"><span aria-hidden="true">🕓</span><p id="history" aria-label="直近の操作履歴"></p></div></section>
+<section class="panel settings" id="gameSettings">
 <label>人数 <select id="players"><option value="2">2人</option><option value="3">3人</option><option value="4">4人</option></select></label>
 <label><input id="extra" type="checkbox">追加アクション</label>
 <label>対戦AI <select id="ai"><option value="eval">評価関数</option><option value="mcts">MCTS</option></select></label>
@@ -98,7 +363,6 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <label>カード <select id="cards"><option value="none">カードなし</option><option value="verified">A/B実装済み（2人戦）</option><option value="json">外部定義JSON</option></select></label>
 <details><summary>外部カード定義JSONを読み込む</summary><textarea id="cardJson" placeholder='{"definitions":[]}'></textarea><p class="minor">空欄ならカードなし。原文や画像は不要です。公式カードを自動収録する機能はありません。</p></details>
 </section>
-<section class="panel status"><strong id="turn">読み込み中...</strong><span id="summary" class="minor"></span></section>
 <section class="panel" id="draftPanel"><h2>ドラフト（M11・テスト用フィクスチャ）</h2>
 <div class="buttons">
 <label>方式 <select id="draftMode"><option value="deal_7">通常7枚配布</option><option value="draft_7_7">7-7ドラフト</option><option value="draft_10_7_simultaneous">10-7同時ドラフト</option><option value="choose_10_7">10-7選択</option></select></label>
@@ -111,14 +375,10 @@ dialog::backdrop{background:#050b10c9}.details{display:grid;gap:12px;margin:12px
 <label>CPUのドラフトAI <select id="draftAi"><option value="random">ランダム</option><option value="card_value">カード価値</option><option value="synergy">シナジー</option></select></label>
 <button id="draftNew">ドラフト開始</button><button id="draftReset">ドラフト解除</button>
 </div>
-<p class="minor">受渡方向は両カード種別とも時計回り（1P→2P→3P→4P→1P）です。初回スタートプレイヤーはドラフト前に抽選します。フェーズ順は選択式で、出版社付録にある左回りの変則ルールとは異なるプロジェクト採用ルールです。カードプールで「テスト用フィクスチャ」を選んだ場合、カードは<strong>検証用の架空カード</strong>です。「実装済み公式カードプール」は収録数が限られ、公式照合も継続中です。人間は1Pとして選択し、他席は観測可能情報だけで選ぶCPUです。</p>
+<details class="compactHistory"><summary>ⓘ ドラフトの説明</summary><p class="minor">受渡方向は時計回りです。開始プレイヤーはドラフト前に抽選。テスト用フィクスチャは架空カードです。実装済みカードは公式照合中で、参加可能人数に制限があります。人間は1P、ほかはCPUです。</p></details>
 <div id="draftStatus"></div><div id="draftOffered" class="chips"></div><div id="draftActions" class="buttons"></div><div id="draftLog" class="minor"></div>
 </section>
-<section class="panel"><div class="tabs" id="tabs"></div><div class="boardArea"><div class="boardPane"><h2 id="farmName">農場</h2><div id="farm" class="field"></div></div>
-<div class="stats"><h2>資源・得点</h2><div id="stats" class="statGrid"></div><p id="improvements" class="minor"></p><p id="hand" class="minor"></p><div id="cardBrowser" aria-label="自分の手札と公開された使用済みカード"></div><details id="cardHelp" hidden><summary>カードの効果・費用の概要</summary><div id="cardHelpBody"></div></details><p id="history"></p></div></div></section>
-<section class="panel" id="actionPanel"><h2 id="actionTitle">アクションの詳細を手動指定</h2><p id="boardSummary" aria-live="polite"></p><div id="notice"></div><div class="actions actionBoard" id="actions" aria-label="使用可能なアクションボード"></div><div class="buttons" id="actionNav"></div><div id="usedActions" aria-label="今ラウンドの使用済みスペース"></div></section>
-<section class="panel"><h2>任意の操作</h2><button id="free">食料変換・動物の配置換え・廃棄</button><p class="minor">ワーカーを使わない操作。エンジンが合法性を判定します。</p></section>
-<footer>1Pが人間、残りはCPU。畑は左上から0〜14番です。種まきは1畑につき種1個を使います。無効な指定は適用されず、内容を直して再送信できます。</footer>
+<footer>1Pが人間 · 詳細は各ⓘ・カード・農場マスで確認できます</footer>
 </div>
 <dialog id="editor"><h2 id="editorTitle"></h2><p class="minor" id="editorHint" role="alert"></p>
 <form id="detailForm"><div class="details" id="fields"></div><div class="buttons" id="editorFooter">
@@ -166,9 +426,20 @@ function renderCardBrowser(player){
  const own=viewPlayer===0?state.hand:[],played=player.played_cards||[];
  function section(title,ids){
   for(const id of ids){
-   const detail=document.createElement("details");detail.className="cardTile";
-   const summary=document.createElement("summary");summary.textContent=title+"："+cardLabel(id);
-   const body=document.createElement("div");body.className="cardTileBody";body.textContent=cardSummary(id);
+   const definition=state.card_definitions.find(x=>x.id===id);
+   const occupation=definition?.kind==="occupation";
+   const detail=document.createElement("details");detail.className="cardTile "+(occupation?"occupationCard":"improvementCard");
+   const summary=document.createElement("summary");
+   const category=document.createElement("span");category.className="cardKindBar";
+   category.textContent=title+" · "+(occupation?"職業":"小さい進歩");
+   const name=document.createElement("span");name.className="cardName";name.textContent=cardLabel(id);
+   const art=document.createElement("span");art.className="cardIllustration";art.setAttribute("aria-hidden","true");
+   art.textContent=occupation?"♙":"✧";
+   const excerpt=document.createElement("span");excerpt.className="cardExcerpt";
+   const description=cardSummary(id);
+   excerpt.textContent=description==="カード情報なし"?"カード情報なし":description.slice(0,92)+(description.length>92?"…":"");
+   summary.append(category,name,art,excerpt);
+   const body=document.createElement("div");body.className="cardTileBody";body.textContent=description;
    detail.append(summary,body);host.append(detail);
   }
  }
@@ -177,6 +448,12 @@ function renderCardBrowser(player){
 const feeds={stored_food:"所持食料",joinery:"製材所",pottery:"製陶所",basketry:"かご製作所",vegetables:"野菜",grain:"麦",sheep:"羊",boar:"猪",cattle:"牛"};
 let state=null,viewPlayer=0,busy=false,actionPage=0,mode=null,selectedSpace=null,feedOrder=Object.keys(feeds);
 const $=id=>document.getElementById(id);
+$("quickSave").onclick=()=>$("saveGame").click();
+$("quickNew").onclick=()=>{
+ const started=state&&state.public&&!state.public.finished&&(state.public.round>1||(state.public.workers_placed||[]).some(x=>x>0));
+ if(started&&!window.confirm("現在の対戦を終了して、新しい対戦を始めますか？"))return;
+ $("new").click();
+};
 const val=id=>$(id).value;
 const num=id=>Number(val(id));
 const checked=id=>$(id).checked;
@@ -188,45 +465,155 @@ function tileName(cell){const t=cell.tile;const key=typeof t==="string"?t:Object
 if(key==="Room")return ["部屋","room"];if(key==="Pasture")return ["牧場","pasture"];
 if(key==="Field"){const f=t.Field;return [f.crop==="grain"?"麦畑":f.crop==="vegetable"?"野菜畑":"畑","field-tile"];}
 return [cell.stable?"厩":"空き",""];}
-function putStats(label,value){const d=document.createElement("div");d.className="stat";d.textContent=label+" "+value;$("stats").append(d);}
-// #239: Render only spaces published by the server. Never invent future round spaces.
+const resourceIcons={wood:"🪵",clay:"🧱",reed:"🌾",stone:"🪨",food:"🍞",grain:"🌽",vegetable:"🥕",sheep:"🐑",boar:"🐗",cattle:"🐄"};
+const resourceNames={...goods,...animals};
+const iconForLabel=Object.fromEntries(Object.entries(resourceNames).map(([key,label])=>[label,resourceIcons[key]]));
+const spaceIcons={forest:"🌲",clay_pit:"🧱",reed_bank:"🌾",fishing:"🐟",day_laborer:"🧺",grain_seeds:"🌽",farmland:"🚜",farm_expansion:"🏠",meeting_place:"⭐",major_improvement:"🔨",fencing:"🪵",grain_utilization:"🌱",sheep_market:"🐑",family_growth_with_room:"👨‍👩‍👧",house_redevelopment:"🛠️",western_quarry:"⛏️",vegetable_seeds:"🥕",pig_market:"🐗",cattle_market:"🐄",eastern_quarry:"🪨",family_growth_no_room:"👶",cultivation:"🌾",farm_redevelopment:"🪚",copse:"🌳",resource_market:"🛒",animal_market:"🐑",modest_family_growth:"👶",grove:"🌲",hollow:"🧱",traveling_players:"🎭",lessons:"📜",extra_lessons:"📚"};
+function putStats(label,value){const d=document.createElement("div");d.className="stat";d.dataset.icon=iconForLabel[label]||(label==="部屋"?"🏠":"🪵");d.textContent=label+" "+value;d.title=label+"："+value;d.setAttribute("aria-label",label+"："+value);$("stats").append(d);}
+// Farm renderer is shared with public opponent overviews: all values come from public.players.
+function farmDecor(player,index){
+ const cell=player.farm[index],[label,cls]=tileName(cell),tile=cell.tile;
+ const kind=typeof tile==="string"?tile:Object.keys(tile||{})[0]||"";
+ let icon="";let note=label;
+ if(kind==="Room")icon="🏠";
+ else if(kind==="Field"){const crop=tile.Field?.crop;icon=crop==="grain"?"🌾":crop==="vegetable"?"🥕":"〰";
+  note=label+(tile.Field?.remaining?(" "+tile.Field.remaining):"");
+ }else if(kind==="Pasture"){
+  const id=tile.Pasture?.id,pasture=(player.pastures||[]).find(x=>x.id===id);
+  const animal=pasture?.animal;icon=animal==="sheep"?"🐑":animal==="boar"?"🐗":animal==="cattle"?"🐄":"♧";
+  note=animal?(animals[animal]||animal)+" "+pasture.quantity+"頭":"牧場";
+ }else if(cell.stable)icon="🏚️";
+ return {label:note,cls,icon:icon||"🌱"};
+}
+function renderFarmSquare(player,index,mini){
+ const cell=player.farm[index],info=farmDecor(player,index);
+ const d=document.createElement("div");d.className=(mini?"miniCell":"cell")+" "+info.cls;
+ d.title="農場マス"+index+" "+info.label+(cell.stable?"・厩あり":"");
+ d.setAttribute("aria-label",d.title);
+ if(mini){d.textContent=info.icon;return d;}
+ const indexTag=document.createElement("span");indexTag.className="cellIndex";indexTag.textContent=String(index);
+ const icon=document.createElement("span");icon.className="cellIcon";icon.textContent=info.icon;icon.setAttribute("aria-hidden","true");
+ const label=document.createElement("span");label.className="cellLabel";label.textContent=info.label+(cell.stable&&info.icon!=="♜"?" ▣":"");
+ d.append(indexTag,icon,label);return d;
+}
+function renderOpponentBoards(players,p,scores){
+ const host=$("opponentBoards");host.replaceChildren();
+ for(const person of players){
+  if(person.id===viewPlayer)continue;
+  const card=document.createElement("article");card.className="opponentCard"+(p.active_player===person.id?" isActive":"");
+  card.dataset.player=String(person.id);
+  const left=document.createElement("div");
+  const select=document.createElement("button");select.className="opponentSelect";select.type="button";
+  select.textContent=(person.id+1)+"Pの農場 "+(p.start_player===person.id?"★":"");
+  select.title=(person.id+1)+"Pの農場を大きく表示";select.onclick=()=>{viewPlayer=person.id;render();};
+  const miniature=document.createElement("div");miniature.className="miniFarm";
+  miniature.setAttribute("aria-label",(person.id+1)+"Pの5×3農場");
+  for(let i=0;i<person.farm.length;i++)miniature.append(renderFarmSquare(person,i,true));
+  left.append(select,miniature);
+  const right=document.createElement("div");right.className="opponentMeta";
+  const remaining=Math.max(0,(p.work_quota[person.id]||0)-(p.workers_placed[person.id]||0));
+  const score=scores.scores[person.id]?.total??"–";
+  const summary=document.createElement("div");summary.textContent="👨‍👩‍👧 "+person.family+"人  ·  ♟ "+remaining+"手  ·  ⭐ "+score+"点";
+  const supplies=document.createElement("div");supplies.className="opponentSupply";
+  for(const [key,name] of Object.entries(goods)){
+   const token=document.createElement("span");token.className="opponentResource";
+   token.title=name+"："+(person.supply[key]??0);token.setAttribute("aria-label",token.title);
+   const glyph=document.createElement("span");glyph.className="resourcePictogram";glyph.textContent=resourceIcons[key]||"◆";glyph.setAttribute("aria-hidden","true");
+   const count=document.createElement("span");count.textContent=String(person.supply[key]??0);
+   token.append(glyph,count);supplies.append(token);
+  }
+  const played=document.createElement("div");played.className="opponentSupply";
+  played.textContent="🃏 "+(person.played_cards||[]).length+"枚";
+  right.append(summary,supplies,played);card.append(left,right);host.append(card);
+ }
+}
+// #246: Use only published, unlocked/used action spaces; future round cards are never invented.
+const roundSpaces=new Set(["major_improvement","fencing","grain_utilization","sheep_market","family_growth_with_room","house_redevelopment","western_quarry","vegetable_seeds","pig_market","cattle_market","eastern_quarry","family_growth_no_room","cultivation","farm_redevelopment"]);
 const boardGroups=[
- ["資源・採集",["forest","clay_pit","reed_bank","fishing","western_quarry","eastern_quarry","copse","grove","hollow","traveling_players","resource_market","animal_market"]],
- ["農場・建築",["farmland","farm_expansion","fencing","grain_utilization","cultivation","farm_redevelopment","house_redevelopment","sheep_market","pig_market","cattle_market"]],
- ["家族・カード",["meeting_place","lessons","extra_lessons","major_improvement","family_growth_with_room","family_growth_no_room","modest_family_growth"]],
- ["その他",[]]
+ ["採集と資源",["forest","clay_pit","reed_bank","fishing","copse","grove","hollow","traveling_players","resource_market","animal_market"]],
+ ["畑と家づくり",["farmland","farm_expansion","grain_seeds","day_laborer"]],
+ ["家族と仕事",["meeting_place","lessons","extra_lessons","modest_family_growth"]],
+ ["ラウンドで追加されたアクション",[]]
 ];
-function boardGroup(key){return boardGroups.findIndex(([,list])=>list.includes(key))>=0?boardGroups.findIndex(([,list])=>list.includes(key)):boardGroups.length-1;}
+const spaceHelp={forest:"木を集める資源スペース",clay_pit:"粘土を集める資源スペース",reed_bank:"葦を集める資源スペース",fishing:"食料を集める資源スペース",grain_seeds:"穀物を得る",vegetable_seeds:"野菜を得る",day_laborer:"労働による食料収入",farmland:"農場の空きマスを畑にする",farm_expansion:"部屋や厩を建築する",meeting_place:"スタートプレイヤーを選ぶ",fencing:"牧場を柵で囲う",grain_utilization:"種まき・パン焼きを行う",sheep_market:"羊を受け取り収容する",pig_market:"猪を受け取り収容する",cattle_market:"牛を受け取り収容する",family_growth_with_room:"居住スペースを確保して家族を増やす",family_growth_no_room:"家族を増やす",major_improvement:"主要改善などを建設する",lessons:"手札の職業を使用する",extra_lessons:"追加の職業アクション",resource_market:"追加資源を得る",animal_market:"家畜市場を利用する",house_redevelopment:"家を改築する",farm_redevelopment:"改築と柵に関するアクション",cultivation:"畑を耕し種まきする"};
+function closeTileHelp(except){
+ for(const tile of document.querySelectorAll("#actions .actionTile.helpOpen")){
+  if(tile===except)continue;tile.classList.remove("helpOpen");tile.querySelector(".tileInfo")?.setAttribute("aria-expanded","false");
+ }
+}
+function boardGroup(key){if(roundSpaces.has(key))return boardGroups.length-1;const i=boardGroups.findIndex(([,list])=>list.includes(key));return i<0?boardGroups.length-2:i;}
 function tileMeta(key,p){
  const accum=p.accumulations||{},animalsOnBoard=p.animal_accumulations||{};
- if(Object.prototype.hasOwnProperty.call(accum,key))return "累積資源 "+accum[key]+"個";
- if(Object.prototype.hasOwnProperty.call(animalsOnBoard,key))return "累積家畜 "+animalsOnBoard[key]+"頭";
- return "詳細を選んで確定";
+ if(Object.prototype.hasOwnProperty.call(accum,key)){
+  const material=(["clay_pit","hollow"].includes(key)?"clay":["reed_bank"].includes(key)?"reed":["fishing","meeting_place","traveling_players"].includes(key)?"food":["western_quarry","eastern_quarry"].includes(key)?"stone":"wood");
+  return {text:"累積 "+accum[key]+" 個",kind:material,count:accum[key]};
+ }
+ if(Object.prototype.hasOwnProperty.call(animalsOnBoard,key)){
+  const kind=key==="sheep_market"?"sheep":key==="pig_market"?"boar":"cattle";
+  return {text:"累積 "+animalsOnBoard[key]+" 頭",kind,count:animalsOnBoard[key]};
+ }
+ return {text:"選んで詳細を指定",kind:null,count:null};
 }
 function renderActionBoard(available,candidate,p){
- const groups=boardGroups.map(()=>[]);for(const key of available)groups[boardGroup(key)].push(key);
+ const used=Array.isArray(p.used)?p.used:[];
+ const usedSet=new Set(used);
+ const unique=[...new Set([...available,...used])];
+ const groups=boardGroups.map(()=>[]);
+ for(const key of unique)groups[boardGroup(key)].push(key);
  $("actions").replaceChildren();$("actionNav").replaceChildren();$("usedActions").replaceChildren();
  for(let i=0;i<groups.length;i++){
   if(!groups[i].length)continue;
-  const group=document.createElement("section");group.className="actionGroup";
+  const group=document.createElement("section");group.className="actionGroup";group.dataset.group=String(i);
   const heading=document.createElement("h3");heading.textContent=boardGroups[i][0];group.append(heading);
   const tiles=document.createElement("div");tiles.className="actionTiles";
   for(const key of groups[i]){
-   const tile=document.createElement("div");tile.className="actionTile";tile.dataset.space=key;
-   const b=document.createElement("button");b.type="button";b.dataset.space=key;
-   b.textContent=(names[key]||key)+(candidate.has(key)?"":"（詳細指定）");
-   b.title=candidate.has(key)?"アクションを選び詳細を入力":"詳細を指定すれば選べるアクション";
-   b.disabled=busy;b.onclick=()=>openWork(key);
-   const meta=document.createElement("div");meta.className="tileMeta";meta.textContent=tileMeta(key,p);
-   tile.append(b,meta);tiles.append(tile);
+   const occupied=usedSet.has(key),tile=document.createElement("div");
+   tile.className="actionTile"+(occupied?" occupied":"");tile.dataset.space=key;
+   const glyph=document.createElement("span");glyph.className="actionGlyph";glyph.textContent=spaceIcons[key]||"🎯";glyph.setAttribute("aria-hidden","true");
+   if(occupied){
+    const name=document.createElement("strong");name.className="occupiedTitle";name.textContent=names[key]||key;
+    const worker=document.createElement("span");worker.className="workerOnTile";worker.setAttribute("aria-hidden","true");
+    tile.append(name,glyph,worker);
+   }else{
+    const button=document.createElement("button");button.type="button";button.dataset.space=key;
+    button.textContent=names[key]||key;button.setAttribute("aria-label",(names[key]||key)+"を選択");
+    button.title="ワーカーを置く · "+(names[key]||key);
+    button.disabled=busy;button.onclick=()=>openWork(key);
+    tile.append(button,glyph);tile.onclick=e=>{if(!busy&&!e.target.closest("button,.tileInfo,.tileTooltip"))openWork(key);};
+   }
+   const meta=document.createElement("div"),value=tileMeta(key,p);meta.className="tileMeta";
+   if(occupied){meta.textContent="使用済み";tile.setAttribute("aria-label",(names[key]||key)+" 使用済み");}
+   else if(value.kind){
+    const count=document.createElement("span");count.className="actionCount";
+    const dot=document.createElement("span");dot.className="tokenDot "+value.kind;dot.setAttribute("aria-hidden","true");
+    count.append(dot,document.createTextNode(value.text));meta.append(count);
+   }else meta.textContent=value.kind?value.text:"";
+   tile.append(meta);
+   const tipId="tile-tip-"+key;
+   const help=document.createElement("span");help.className="tileInfo";help.tabIndex=0;
+   help.setAttribute("role","button");help.setAttribute("aria-label",(names[key]||key)+"の説明");
+   help.setAttribute("aria-expanded","false");help.setAttribute("aria-controls",tipId);
+   help.textContent="ⓘ";
+   const tooltip=document.createElement("div");tooltip.className="tileTooltip";tooltip.id=tipId;tooltip.setAttribute("role","tooltip");
+   const heading=document.createElement("strong");heading.textContent=(spaceIcons[key]||"🎯")+" "+(names[key]||key);
+   const description=document.createElement("span");description.textContent=spaceHelp[key]||"アクションを選んで操作の詳細を指定";
+   tooltip.append(heading,description);
+   if(occupied){const status=document.createElement("small");status.textContent="♟ 今ラウンドは使用済み";tooltip.append(status);}
+   else if(value.kind){const qty=document.createElement("small");qty.textContent="現在の"+value.text;tooltip.append(qty);}
+   const toggle=()=>{const open=!tile.classList.contains("helpOpen");closeTileHelp(tile);tile.classList.remove("helpDismissed");tile.classList.toggle("helpOpen",open);help.setAttribute("aria-expanded",String(open));};
+   help.onclick=e=>{e.stopPropagation();toggle();};
+   help.onblur=()=>tile.classList.remove("helpDismissed");
+   help.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();e.stopPropagation();toggle();}
+      if(e.key==="Escape"){tile.classList.remove("helpOpen");tile.classList.add("helpDismissed");help.setAttribute("aria-expanded","false");e.stopPropagation();}};
+   tooltip.onclick=e=>e.stopPropagation();
+   tile.append(help,tooltip);tiles.append(tile);
   }
   group.append(tiles);$("actions").append(group);
  }
- const used=Array.isArray(p.used)?p.used:[];
- const heading=document.createElement("span");heading.textContent="使用済み: ";$("usedActions").append(heading);
- for(const key of used){const item=document.createElement("span");item.className="usedSpace";item.textContent=names[key]||key;$("usedActions").append(item);}
+ const heading=document.createElement("span");heading.textContent="今ラウンド使用済み: ";$("usedActions").append(heading);
+ for(const key of used){const tag=document.createElement("span");tag.className="usedSpace";tag.textContent=names[key]||key;$("usedActions").append(tag);}
  if(!used.length){const item=document.createElement("span");item.textContent="なし";$("usedActions").append(item);}
- $("boardSummary").textContent="選択可能 "+available.length+"件 / 使用済み "+used.length+"件（サーバの公開情報）";
+ $("boardSummary").textContent="選択可能 "+available.length+"件 / 使用済み "+used.length+"件";
 }
 function render(){
 if(!state)return;
@@ -234,20 +621,22 @@ renderDraft();
 const p=state.public,scores=state.standings,harvest=state.harvest,shown=harvest?harvest.preview:p;
 $("turn").textContent=p.finished?"対戦終了":harvest?"収穫の詳細を決めてください":"ラウンド "+p.round+"/14・"+(p.active_player+1)+"Pの手番";
 $("summary").textContent=p.players.length+"人戦 / 追加タイル "+(p.additional_action_space_enabled?"ON":"OFF")+" / "+(state.card_enabled?"カードあり":"カードなし");
+const nextHarvest=[4,7,9,11,13,14].find(round=>round>=p.round)||14;
+$("nextHarvest").textContent=p.finished?"最終収穫終了":(nextHarvest===p.round?"このラウンド終了後に収穫":"次の収穫まで "+(nextHarvest-p.round)+" ラウンド");
 renderTurnBar();
 $("tabs").replaceChildren();
 for(const pl of shown.players){const b=document.createElement("button");b.type="button";b.className=viewPlayer===pl.id?"active":"";b.setAttribute("aria-pressed",String(viewPlayer===pl.id));b.textContent=(pl.id+1)+"P "+scores.scores[pl.id].total+"点 残"+Math.max(0,(state.public.work_quota[pl.id]||0)-(state.public.workers_placed[pl.id]||0));b.onclick=()=>{viewPlayer=pl.id;render();};$("tabs").append(b);}
 const pl=shown.players[viewPlayer];$("farmName").textContent=(viewPlayer+1)+"Pの農場（家族"+pl.family+"人）";$("farm").replaceChildren();
-for(let i=0;i<pl.farm.length;i++){const cell=pl.farm[i],[label,cls]=tileName(cell),d=document.createElement("div");d.className="cell "+cls;d.textContent=i+" "+label+(cell.stable?" ▣":"");$("farm").append(d);}
+for(let i=0;i<pl.farm.length;i++)$("farm").append(renderFarmSquare(pl,i,false));
 $("stats").replaceChildren();for(const [good,label] of Object.entries(goods))putStats(label,pl.supply[good]);
 putStats("部屋",pl.farm.filter(c=>c.tile==="Room").length);putStats("柵",pl.fences.length);
-$("improvements").textContent="主要改善: "+(pl.improvements.map(x=>improvements[x]||x).join(" / ")||"なし")+" / 職業・小改善: "+(pl.played_cards||[]).map(cardLabel).join(" / ");
-$("hand").textContent=viewPlayer===0?"手札: "+(state.hand.map(cardLabel).join(" / ")||"なし"):"手札: 非公開";
-renderCardHelp(pl);renderCardBrowser(pl);$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
+$("improvements").textContent=pl.improvements.length?"🔨 主要改善: "+pl.improvements.map(x=>improvements[x]||x).join(" / "):"";
+$("hand").textContent=viewPlayer===0?"手札: "+state.hand.length+"枚（カードを選ぶと効果を確認できます）":"手札: 非公開";
+renderCardHelp(pl);renderCardBrowser(pl);renderOpponentBoards(shown.players,p,scores);$("history").textContent=state.last_actions.slice(0,3).map(e=>(e.player===null?"-":e.player+1)+"P: "+(names[e.space]||e.kind)).join(" / ");
 $("actions").replaceChildren();$("actionNav").replaceChildren();$("usedActions").replaceChildren();$("boardSummary").textContent="";$("free").disabled=busy||!!harvest||p.finished;
 if(p.finished){$("notice").textContent="最終順位: "+scores.rank.map((r,i)=>(i+1)+"P "+r+"位").join("、");return;}
 if(harvest){$("notice").textContent=harvest.phase==="feeding"?"収穫：給餌順と工房加工を選択":"収穫：繁殖する子の置き場所を選択";const b=document.createElement("button");b.textContent="収穫の詳細を指定";b.onclick=()=>openHarvest();$("actions").append(b);return;}
-$("notice").textContent="1Pの手番です。自動の詳細選択は使用しません。";
+$("notice").textContent="";
 const available=state.available||state.legal||[];const candidate=new Set(state.legal||[]);
 renderActionBoard(available,candidate,p);
 }
