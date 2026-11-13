@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "card_id": "B013",
+  "cases": [
+    {
+      "id": "B013-wooden-room",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "stone": 1,
+        "wood": 1
+      },
+      "action": {},
+      "expected": {
+        "wooden_room_cost": 2
+      }
+    }
+  ]
+}
