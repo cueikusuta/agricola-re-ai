@@ -1448,6 +1448,7 @@ impl Game {
                                 crate::card_events::TriggerPhase::After,
                                 &trigger,
                                 &all_players,
+                                true, // post-work chain: allow ChooseTriggerOrder pause
                             )?;
                         }
                         // Interrupt phase (with resume if this is the paused step)
@@ -1460,6 +1461,7 @@ impl Game {
                                 &played_cards,
                                 Some(after),
                                 &all_players,
+                                true, // post-work chain: allow ChooseTriggerOrder pause
                             )?
                         } else {
                             crate::card_events::resolve_phase(
@@ -1468,6 +1470,7 @@ impl Game {
                                 crate::card_events::TriggerPhase::Interrupt,
                                 &trigger,
                                 &all_players,
+                                true, // post-work chain: allow ChooseTriggerOrder pause
                             )?
                         };
                         if let Transition::Paused(p) = transition {
@@ -1514,6 +1517,7 @@ impl Game {
                             crate::card_events::TriggerPhase::After,
                             &trigger,
                             &all_players,
+                            true, // post-work chain: allow ChooseTriggerOrder pause
                         )?;
                     }
                     let transition = if let Some(after) = after {
@@ -1525,6 +1529,7 @@ impl Game {
                             &played_cards,
                             Some(after),
                             &all_players,
+                            true, // post-work chain: allow ChooseTriggerOrder pause
                         )?
                     } else {
                         crate::card_events::resolve_phase(
@@ -1533,6 +1538,7 @@ impl Game {
                             crate::card_events::TriggerPhase::Interrupt,
                             &trigger,
                             &all_players,
+                            true, // post-work chain: allow ChooseTriggerOrder pause
                         )?
                     };
                     if let Transition::Paused(p) = transition {
@@ -1570,6 +1576,7 @@ impl Game {
                             crate::card_events::TriggerPhase::After,
                             &trigger,
                             &all_players,
+                            true, // post-work chain: allow ChooseTriggerOrder pause
                         )?;
                     }
                     let transition = if let Some(after) = after {
@@ -1581,6 +1588,7 @@ impl Game {
                             &played_cards,
                             Some(after),
                             &all_players,
+                            true, // post-work chain: allow ChooseTriggerOrder pause
                         )?
                     } else {
                         crate::card_events::resolve_phase(
@@ -1589,6 +1597,7 @@ impl Game {
                             crate::card_events::TriggerPhase::Interrupt,
                             &trigger,
                             &all_players,
+                            true, // post-work chain: allow ChooseTriggerOrder pause
                         )?
                     };
                     if let Transition::Paused(p) = transition {

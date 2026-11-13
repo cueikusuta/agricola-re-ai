@@ -400,6 +400,7 @@ impl Game {
                 &mut self.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
+                true, // post-work chain: allow ChooseTriggerOrder pause
             )?;
             if let Transition::Paused(_) = result {
                 return Ok((result, Some(crate::pending::ChainStep::AfterHarvestBake)));
@@ -428,6 +429,7 @@ impl Game {
             &mut self.card_uses,
             &self.card_use_limits,
             &mut self.pending,
+            true, // post-work chain: allow ChooseTriggerOrder pause
         )?;
         if let Transition::Paused(_) = result {
             return Ok((
@@ -451,6 +453,7 @@ impl Game {
             &mut self.card_uses,
             &self.card_use_limits,
             &mut self.pending,
+            true, // post-work chain: allow ChooseTriggerOrder pause
         )?;
         if let Transition::Paused(_) = result {
             return Ok((result, Some(crate::pending::ChainStep::AfterWorker)));
