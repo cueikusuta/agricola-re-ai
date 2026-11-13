@@ -83,7 +83,8 @@
     "unresolved_fields": [
       "play.cost: the wiki cost is あなたのサプライの厩ひとつ (return 1 stable from your supply); paying in stables has no established cost encoding — modeled as alternative_cost_notes with cost=null",
       "effects.0.timing: the wiki allows the exchange after the field phase of each harvest; after_field_phase is outside the established trigger vocabulary, modeled as harvest_feeding",
-      "play.printed_points: the ledger lists 0 while the wiki info table shows no victory points; recorded as null (unverified) rather than 0"
+      "play.printed_points: the ledger lists 0 while the wiki info table shows no victory points; recorded as null (unverified) rather than 0",
+      "effects.0.fence_to_wood: the wiki requires giving 1 fence in the harvest exchange; the engine models fences as an unspendable construction, so the exchange is encoded as wood:1 from the player's supply while real fence payment capability is unresolved"
     ],
     "test_case_ids": [
       "C054-normal",

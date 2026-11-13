@@ -82,13 +82,16 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.stock_condition: the wiki grants 1 food when, immediately after using a wood accumulation space, the player's own stock is at most 5 wood; no established predicate expresses a supply-at-most threshold on the owner's own stock (resource_at_least/resource_greater_than cover at-least/greater comparisons only)"
+    ],
     "test_case_ids": [
       "C058-normal",
       "C058-boundary",
       "C058-not-triggered",
-      "C058-other-space"
+      "C058-other-space",
+      "C058-timing-pending"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-13",

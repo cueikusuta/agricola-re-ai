@@ -39,21 +39,21 @@
         "amount": 2
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
     "printed_points": 0,
     "alternative_cost_notes": null
   },
   "effects": [
     {
-      "trigger": "after_card_played",
-      "conditions": [
-        {
-          "predicate": "card_played_is",
-          "params": {
-            "card_kind": "occupation"
-          }
-        }
-      ],
+      "trigger": "after_occupation",
+      "conditions": [],
       "steps": [
         {
           "operation": "gain_resource",
