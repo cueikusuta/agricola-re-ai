@@ -3378,19 +3378,156 @@ mod tests {
         );
     }
 
-    // --- New tests for ChooseTriggerOrder pause/resume (Issue #270) ---
+    // --- Engine-path e2e test for ChooseTriggerOrder pause/resume (Issue #270 P2) ---
     //
-    // NOTE: The following test is commented out due to an issue where
-    // the ChooseTriggerOrder pause is not triggering in the engine path.
-    // The implementation works correctly for the dispatcher direct-call path
-    // and for PendingProbe pauses, but the ChooseTriggerOrder pause in the
-    // engine's post-work chain needs further investigation.
-    //
-    // /// Engine-path e2e test for ChooseTriggerOrder pause/resume (Issue #270 P2).
-    // /// Uses the full engine path: apply_with_plans → Paused(ChooseTriggerOrder)
-    // /// → resolve(chosen_order=[1,0]) → resume Completed.
-    // /// Verifies: effects fire in chosen order, both fire once, space used,
-    // /// no double-fire, invalid permutation rejected, A078 real pool via Fishing.
-    // #[test]
-    // fn choose_trigger_order_e2e_engine_path_pause_resume() { ... }
+    // The full engine path: apply_with_plans -> Ok(Paused(ChooseTriggerOrder))
+    // -> resolve(chosen_order=[1,0]) -> resume Completed.
+    // Verifies: the pause is created on the real engine path (not just the
+    // dispatcher), the effects fire in the chosen order exactly once each,
+    // the space is marked used, budget and use ledger are exact, and the
+    // permutation validator rejects invalid orders.
+    #[test]
+    fn choose_trigger_order_e2e_engine_path_pause_resume() {
+        use crate::engine::Action;
+        use crate::model::Config;
+
+        // Two simultaneous After-phase effects on Fishing (A078-like).
+        let card = CardDefinition {
+            use_limit: None,
+            id: "AW2".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 1,
+            effects: vec![
+                CardEffect::AfterWorkerGain {
+                    space: Space::Fishing,
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerGain {
+                    space: Space::Fishing,
+                    good: Good::Reed,
+                    amount: 1,
+                },
+            ],
+        };
+        let mut definitions = vec![card];
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        let occ_ids: Vec<String> = (1..=14).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=13).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![vec!["AW2".to_string()], vec![]];
+        hands[0].extend(occ_ids[0..7].iter().cloned());
+        hands[0].extend(minor_ids[0..6].iter().cloned());
+        hands[1].extend(occ_ids[7..14].iter().cloned());
+        hands[1].extend(minor_ids[6..13].iter().cloned());
+
+        let mut game = crate::model::Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 7,
+                additional_action_space_enabled: false,
+            },
+            set,
+            hands,
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = 0;
+        game.public.players[0].played_cards.push("AW2".into());
+        assert!(
+            game.legal_spaces().contains(&Space::Fishing),
+            "Fishing must be legal in round 1"
+        );
+
+        // 1. The engine path pauses with ChooseTriggerOrder on 2 simultaneous
+        //    After-phase triggers.
+        let action = Action {
+            space: Space::Fishing,
+            detail: crate::engine::Detail::None,
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(
+            matches!(result, Ok(Transition::Paused(_))),
+            "the engine path must pause, got: {result:?}"
+        );
+        let pending = game.pending.clone().expect("a decision must be recorded");
+        match &pending.kind {
+            PendingKind::ChooseTriggerOrder { phase, triggers } => {
+                assert_eq!(*phase, TriggerPhase::After);
+                assert_eq!(triggers.len(), 2, "both effects must be offered");
+            }
+            other => panic!("expected ChooseTriggerOrder, got: {other:?}"),
+        }
+        // The continuation carries the After-phase resume position so the
+        // resumed scan does not re-fire or skip effects.
+        let resume = match &pending.continuation {
+            crate::pending::Continuation::PostWork { resume, .. } => resume,
+            other => panic!("expected a PostWork continuation, got: {other:?}"),
+        };
+        assert_eq!(
+            resume.phase,
+            TriggerPhase::After,
+            "pause phase must be After"
+        );
+        assert_eq!(
+            (resume.after.card_index, resume.after.effect_index),
+            (0, 1),
+            "resume position must be the last triggerable effect"
+        );
+
+        // 2. Invalid permutations are rejected.
+        for bad in [vec![0, 0], vec![0], vec![2, 0]] {
+            let err = game.resolve_pending_and_resume(
+                crate::pending::PendingResolution::ChooseTriggerOrder { chosen_order: bad },
+            );
+            assert!(err.is_err(), "invalid permutation must be rejected");
+            assert!(game.has_pending(), "the decision must remain resolvable");
+        }
+
+        // 3. Resolve with the reverse order and resume: both effects fire
+        //    exactly once; budget/use/space are exact.
+        let outcome = game
+            .resolve_pending_and_resume(crate::pending::PendingResolution::ChooseTriggerOrder {
+                chosen_order: vec![1, 0],
+            })
+            .expect("resolution must succeed");
+        assert_eq!(outcome, Transition::Completed, "resume must complete");
+        assert!(!game.has_pending(), "no pending after resume");
+        assert_eq!(
+            game.public.players[0].supply.food, 4,
+            "food +1 on top of the initial 3"
+        );
+        assert_eq!(game.public.players[0].supply.reed, 1, "reed +1");
+        assert!(
+            game.public.used.contains(&Space::Fishing),
+            "the action space must be marked used by the resume"
+        );
+        assert_eq!(
+            game.card_uses.get("AW2").copied(),
+            Some(2),
+            "each effect must fire exactly once"
+        );
+        assert_eq!(game.event_budget, 62, "two effects consume two budget");
+    }
 }

@@ -921,9 +921,22 @@ impl Game {
                     });
                 // P1-3: Pass the actual ChainStep from apply_post_work_card_effects through the pause path
                 let step = pause_step.unwrap_or(crate::pending::ChainStep::AfterWorker);
+                // The phase the pause occurred in: a #270 ChooseTriggerOrder
+                // pause records the phase it collected the simultaneous
+                // triggers in ("After") in its context; the classic #268
+                // Interrupt pause has none, so it defaults to Interrupt.
+                let pause_phase = pending
+                    .context
+                    .get("phase")
+                    .and_then(|v| v.as_str())
+                    .map(|s| match s {
+                        "After" => crate::card_events::TriggerPhase::After,
+                        _ => crate::card_events::TriggerPhase::Interrupt,
+                    })
+                    .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
                 let resume = crate::pending::PostWorkResume {
                     step,
-                    phase: crate::card_events::TriggerPhase::Interrupt,
+                    phase: pause_phase,
                     after,
                 };
                 let completion = Box::new(crate::pending::WorkCompletion {

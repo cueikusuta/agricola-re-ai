@@ -1441,8 +1441,29 @@ impl Game {
                             previous_player: None,
                             used_spaces: used_spaces.clone(),
                         };
-                        // After phase (only if not the paused step, since it already completed)
-                        if !is_paused_step {
+                        // After phase. If THIS is the paused step and the pause
+                        // was in the After phase (a resolved ChooseTriggerOrder,
+                        // Issue #270), the effects before the resume position
+                        // were already applied by the resolution — continue
+                        // strictly after `resume.after`. Otherwise run fully.
+                        let after_transition = if is_paused_step
+                            && resume.phase == crate::card_events::TriggerPhase::After
+                        {
+                            crate::card_events::resolve_phase_from(
+                                &mut ctx,
+                                player,
+                                crate::card_events::TriggerPhase::After,
+                                &trigger,
+                                &played_cards,
+                                after,
+                                &all_players,
+                                true, // post-work chain: allow ChooseTriggerOrder pause
+                            )?
+                        } else if is_paused_step {
+                            // Interrupt-phase pause (classic #268): the After
+                            // phase already completed before the pause.
+                            crate::pending::Transition::Completed
+                        } else {
                             crate::card_events::resolve_phase(
                                 &mut ctx,
                                 player,
@@ -1450,20 +1471,35 @@ impl Game {
                                 &trigger,
                                 &all_players,
                                 true, // post-work chain: allow ChooseTriggerOrder pause
-                            )?;
-                        }
-                        // Interrupt phase (with resume if this is the paused step)
-                        let transition = if let Some(after) = after {
-                            crate::card_events::resolve_phase_from(
-                                &mut ctx,
-                                player,
-                                crate::card_events::TriggerPhase::Interrupt,
-                                &trigger,
-                                &played_cards,
-                                Some(after),
-                                &all_players,
-                                true, // post-work chain: allow ChooseTriggerOrder pause
                             )?
+                        };
+                        if let Transition::Paused(p) = after_transition {
+                            // Should not happen: the decision was just resolved.
+                            return Err(format!("unexpected pause during resume: {p:?}"));
+                        }
+                        // Interrupt phase (resume only for an Interrupt-phase pause).
+                        let transition = if let Some(after) = after {
+                            if resume.phase == crate::card_events::TriggerPhase::Interrupt {
+                                crate::card_events::resolve_phase_from(
+                                    &mut ctx,
+                                    player,
+                                    crate::card_events::TriggerPhase::Interrupt,
+                                    &trigger,
+                                    &played_cards,
+                                    Some(after),
+                                    &all_players,
+                                    true, // post-work chain: allow ChooseTriggerOrder pause
+                                )?
+                            } else {
+                                crate::card_events::resolve_phase(
+                                    &mut ctx,
+                                    player,
+                                    crate::card_events::TriggerPhase::Interrupt,
+                                    &trigger,
+                                    &all_players,
+                                    true, // post-work chain: allow ChooseTriggerOrder pause
+                                )?
+                            }
                         } else {
                             crate::card_events::resolve_phase(
                                 &mut ctx,
@@ -1511,7 +1547,26 @@ impl Game {
                         previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
                     };
-                    if !is_paused_step {
+                    // After phase. If THIS is the paused step and the pause was
+                    // in the After phase (resolved ChooseTriggerOrder, Issue
+                    // #270), continue strictly after `resume.after`; classic
+                    // #268 Interrupt pauses skip the After phase entirely.
+                    let after_transition = if is_paused_step
+                        && resume.phase == crate::card_events::TriggerPhase::After
+                    {
+                        crate::card_events::resolve_phase_from(
+                            &mut ctx,
+                            player,
+                            crate::card_events::TriggerPhase::After,
+                            &trigger,
+                            &played_cards,
+                            after,
+                            &all_players,
+                            true, // post-work chain: allow ChooseTriggerOrder pause
+                        )?
+                    } else if is_paused_step {
+                        crate::pending::Transition::Completed
+                    } else {
                         crate::card_events::resolve_phase(
                             &mut ctx,
                             player,
@@ -1519,19 +1574,34 @@ impl Game {
                             &trigger,
                             &all_players,
                             true, // post-work chain: allow ChooseTriggerOrder pause
-                        )?;
-                    }
-                    let transition = if let Some(after) = after {
-                        crate::card_events::resolve_phase_from(
-                            &mut ctx,
-                            player,
-                            crate::card_events::TriggerPhase::Interrupt,
-                            &trigger,
-                            &played_cards,
-                            Some(after),
-                            &all_players,
-                            true, // post-work chain: allow ChooseTriggerOrder pause
                         )?
+                    };
+                    if let Transition::Paused(p) = after_transition {
+                        return Err(format!("unexpected pause during resume: {p:?}"));
+                    }
+                    // Interrupt phase (resume only for an Interrupt-phase pause).
+                    let transition = if let Some(after) = after {
+                        if resume.phase == crate::card_events::TriggerPhase::Interrupt {
+                            crate::card_events::resolve_phase_from(
+                                &mut ctx,
+                                player,
+                                crate::card_events::TriggerPhase::Interrupt,
+                                &trigger,
+                                &played_cards,
+                                Some(after),
+                                &all_players,
+                                true, // post-work chain: allow ChooseTriggerOrder pause
+                            )?
+                        } else {
+                            crate::card_events::resolve_phase(
+                                &mut ctx,
+                                player,
+                                crate::card_events::TriggerPhase::Interrupt,
+                                &trigger,
+                                &all_players,
+                                true, // post-work chain: allow ChooseTriggerOrder pause
+                            )?
+                        }
                     } else {
                         crate::card_events::resolve_phase(
                             &mut ctx,
@@ -1570,7 +1640,26 @@ impl Game {
                         previous_player: None,
                         used_spaces: used_spaces.clone(),
                     };
-                    if !is_paused_step {
+                    // After phase. If THIS is the paused step and the pause was
+                    // in the After phase (resolved ChooseTriggerOrder, Issue
+                    // #270), continue strictly after `resume.after`; classic
+                    // #268 Interrupt pauses skip the After phase entirely.
+                    let after_transition = if is_paused_step
+                        && resume.phase == crate::card_events::TriggerPhase::After
+                    {
+                        crate::card_events::resolve_phase_from(
+                            &mut ctx,
+                            player,
+                            crate::card_events::TriggerPhase::After,
+                            &trigger,
+                            &played_cards,
+                            after,
+                            &all_players,
+                            true, // post-work chain: allow ChooseTriggerOrder pause
+                        )?
+                    } else if is_paused_step {
+                        crate::pending::Transition::Completed
+                    } else {
                         crate::card_events::resolve_phase(
                             &mut ctx,
                             player,
@@ -1578,19 +1667,34 @@ impl Game {
                             &trigger,
                             &all_players,
                             true, // post-work chain: allow ChooseTriggerOrder pause
-                        )?;
-                    }
-                    let transition = if let Some(after) = after {
-                        crate::card_events::resolve_phase_from(
-                            &mut ctx,
-                            player,
-                            crate::card_events::TriggerPhase::Interrupt,
-                            &trigger,
-                            &played_cards,
-                            Some(after),
-                            &all_players,
-                            true, // post-work chain: allow ChooseTriggerOrder pause
                         )?
+                    };
+                    if let Transition::Paused(p) = after_transition {
+                        return Err(format!("unexpected pause during resume: {p:?}"));
+                    }
+                    // Interrupt phase (resume only for an Interrupt-phase pause).
+                    let transition = if let Some(after) = after {
+                        if resume.phase == crate::card_events::TriggerPhase::Interrupt {
+                            crate::card_events::resolve_phase_from(
+                                &mut ctx,
+                                player,
+                                crate::card_events::TriggerPhase::Interrupt,
+                                &trigger,
+                                &played_cards,
+                                Some(after),
+                                &all_players,
+                                true, // post-work chain: allow ChooseTriggerOrder pause
+                            )?
+                        } else {
+                            crate::card_events::resolve_phase(
+                                &mut ctx,
+                                player,
+                                crate::card_events::TriggerPhase::Interrupt,
+                                &trigger,
+                                &all_players,
+                                true, // post-work chain: allow ChooseTriggerOrder pause
+                            )?
+                        }
                     } else {
                         crate::card_events::resolve_phase(
                             &mut ctx,
@@ -1754,14 +1858,18 @@ impl Game {
                     .and_then(|v| v.as_u64())
                     .unwrap_or(pending.player as u64) as usize;
 
-                // Build trigger data (empty for now - could be enhanced)
-                let trigger_data = crate::card_events::PhaseTriggerData {
-                    space: None,
-                    improvement: None,
-                    baked: false,
-                    previous_player: None,
-                    used_spaces: self.public.used.clone(),
-                };
+                // Rebuild the phase trigger data captured at pause time, so
+                // condition re-checks at resolution see the exact same context
+                // (space/bake/clay-construction/used spaces) as the original
+                // scan. Without this the Fishing-only effects would re-check
+                // against an empty trigger (space=None) and be skipped
+                // silently, applying nothing (Issue #270 R4 verification).
+                let trigger_data: crate::card_events::PhaseTriggerData = pending
+                    .context
+                    .get("trigger_data")
+                    .cloned()
+                    .and_then(|v| serde_json::from_value(v).ok())
+                    .ok_or("missing trigger_data in ChooseTriggerOrder context")?;
 
                 // Collect all players for snapshot
                 let all_players = self.public.players.clone();
