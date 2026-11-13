@@ -1391,6 +1391,20 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         },
+        // D004 Cross-Cut Wood (横挽きの木材): OnPlayGainPerStored wood per stone in supply, cost 1 food.
+        CardDefinition {
+            use_limit: None,
+            id: "D004".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGainPerStored {
+                stored: Good::Stone,
+                divisor: 1,
+                good: Good::Wood,
+                amount: 1,
+            }],
+        },
     ]
 }
 
@@ -1490,6 +1504,27 @@ mod verified_immediate_resource_tests {
         let mut player = Player::new(0, 0);
         let old = player.clone();
         assert!(play_card("E008", &mut player).is_err());
+        assert_eq!(player, old);
+    }
+
+    #[test]
+    fn d004_on_play_gains_wood_per_stone() {
+        let mut player = Player::new(0, 0);
+        player.supply.food = 1;
+        player.supply.stone = 3;
+        play_card("D004", &mut player).unwrap();
+        assert_eq!(player.supply.wood, 3);
+        assert_eq!(player.supply.food, 0);
+        assert_eq!(player.supply.stone, 3);
+        assert_eq!(player.played_cards, vec!["D004"]);
+    }
+
+    #[test]
+    fn d004_cannot_play_without_food() {
+        let mut player = Player::new(0, 0);
+        player.supply.stone = 2;
+        let old = player.clone();
+        assert!(play_card("D004", &mut player).is_err());
         assert_eq!(player, old);
     }
 }
