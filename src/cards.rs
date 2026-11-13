@@ -1332,6 +1332,18 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         },
+        // E007 Pumpernickel (ライ麦パン): OnPlayGain 4 food, cost 1 grain.
+        CardDefinition {
+            use_limit: None,
+            id: "E007".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Grain, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 4,
+            }],
+        },
     ]
 }
 
@@ -1395,6 +1407,24 @@ mod verified_immediate_resource_tests {
         let mut player = Player::new(0, 0);
         let old = player.clone();
         assert!(play_card("A077", &mut player).is_err());
+        assert_eq!(player, old);
+    }
+
+    #[test]
+    fn e007_on_play_gains_four_food() {
+        let mut player = Player::new(0, 0);
+        player.supply.grain = 1;
+        play_card("E007", &mut player).unwrap();
+        assert_eq!(player.supply.food, 4);
+        assert_eq!(player.supply.grain, 0);
+        assert_eq!(player.played_cards, vec!["E007"]);
+    }
+
+    #[test]
+    fn e007_cannot_play_without_grain() {
+        let mut player = Player::new(0, 0);
+        let old = player.clone();
+        assert!(play_card("E007", &mut player).is_err());
         assert_eq!(player, old);
     }
 }
@@ -2030,7 +2060,12 @@ pub fn verified_basic_card_set(players: usize) -> Result<CardSet, String> {
     let mut definitions = Vec::new();
     definitions.extend(verified_scoring_cards(players));
     definitions.extend(verified_minor_worker_cards(players));
-    definitions.extend(verified_immediate_resource_cards());
+    // Exclude expansion (E-prefixed) cards from the A/B verified pool.
+    definitions.extend(
+        verified_immediate_resource_cards()
+            .into_iter()
+            .filter(|c| !c.id.starts_with('E')),
+    );
     definitions.extend(verified_worker_bonus_cards(players));
     definitions.extend(verified_round_and_harvest_cards());
     definitions.extend(verified_passive_cards());
