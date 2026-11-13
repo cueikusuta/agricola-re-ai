@@ -1026,8 +1026,9 @@ mod tests {
         // Updated: added E007/E008 to verified_immediate_resource_cards — E-prefixed cards are
         // excluded from the verified pool, so the sample_game distribution is unchanged.
         // Updated: added A042 Forest Lake Hut to verified_minor_worker_cards (pool size 33->34)
+        // Updated: added A121 Brick Stamping to verified_minor_worker_cards (pool size 34->35)
         assert_eq!(
-            digest, "10625b22dd5ac0f1a6593249643f108f40bc3ea8098b15399f1a7f0fb8b7503e",
+            digest, "a024ed2ee08bad2a70262613afa86f07d89686e4f28cb17c0a6415d700104e99",
             "sample_game distribution changed — update this test only if intentional"
         );
     }

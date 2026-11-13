@@ -1200,6 +1200,21 @@ pub fn verified_minor_worker_cards(players: usize) -> Vec<CardDefinition> {
         geologist.push(gain(Space::ClayPit, Good::Clay, 1));
     }
     result.push(card("B121", CardKind::Occupation, vec![], 0, geologist));
+    // A121 レンガの刻印打ち: on_play clay 1 + after_worker lessons/clay_pit -> clay 1
+    result.push(card(
+        "A121",
+        CardKind::Occupation,
+        vec![],
+        0,
+        vec![
+            CardEffect::OnPlayGain {
+                good: Good::Clay,
+                amount: 1,
+            },
+            gain(Space::Lessons, Good::Clay, 1),
+            gain(Space::ClayPit, Good::Clay, 1),
+        ],
+    ));
     result
 }
 
@@ -1355,6 +1370,50 @@ mod verified_minor_worker_tests {
         p.supply.clay = 2;
         assert!(can_play(&set, card, &p, 0));
         assert_eq!(card.points, 1);
+    }
+    #[test]
+    fn a121_on_play_gains_one_clay() {
+        let set = CardSet {
+            definitions: verified_minor_worker_cards(2),
+        };
+        let card = set.definition("A121").unwrap();
+        assert_eq!(card.kind, CardKind::Occupation);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+        let mut p = Player::new(0, 0);
+        let mut hand = vec!["A121".to_string()];
+        play(&set, &mut hand, &mut p, "A121", CardKind::Occupation, 0).unwrap();
+        assert_eq!(p.supply.clay, 1);
+        assert_eq!(p.played_cards, vec!["A121"]);
+    }
+    #[test]
+    fn a121_after_worker_lessons_and_clay_pit_grant_clay() {
+        let p = owner(
+            "A121",
+            2,
+            &[
+                Space::Lessons,
+                Space::ClayPit,
+                Space::Lessons,
+                Space::Forest,
+            ],
+        );
+        // owner() only calls after_worker, not play(), so on_play is not triggered
+        assert_eq!(p.supply.clay, 3); // lessons 1 + clay_pit 1 + lessons 1 = 3
+    }
+    #[test]
+    fn a121_not_triggered_by_other_spaces() {
+        let p = owner(
+            "A121",
+            2,
+            &[
+                Space::Forest,
+                Space::ReedBank,
+                Space::Fishing,
+                Space::DayLaborer,
+            ],
+        );
+        assert_eq!(p.supply.clay, 0); // no on_play, no triggering spaces
     }
 }
 
@@ -2333,7 +2392,7 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 34);
+        assert_eq!(set.definitions.len(), 35);
         assert_eq!(
             set.definitions
                 .iter()
@@ -2346,7 +2405,7 @@ mod simple_occupation_tests {
                 .iter()
                 .filter(|x| x.kind == CardKind::Occupation)
                 .count(),
-            15
+            16
         );
         assert!(verified_basic_card_set(3).is_err());
     }
