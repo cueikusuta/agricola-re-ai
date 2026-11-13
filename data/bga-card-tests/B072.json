@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "B072",
+  "cases": [
+    {
+      "id": "B072-sow-on-1-pasture",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures_1_space": 1,
+        "pastures_2_space": 0
+      },
+      "action": {
+        "sow_on_pasture": 1
+      },
+      "expected": {
+        "fields_added": 1,
+        "pasture_capacity_reduction": 1
+      }
+    },
+    {
+      "id": "B072-sow-on-2-pasture",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures_2_space": 1
+      },
+      "action": {
+        "sow_on_pasture": 1
+      },
+      "expected": {
+        "fields_added": 1,
+        "pasture_capacity_reduction": 2
+      }
+    }
+  ]
+}

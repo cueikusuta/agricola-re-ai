@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "card_id": "B085",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "作手",
+    "name_en": "Farm Hand"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3172",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_build_stable",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "owner",
+          "params": {
+            "condition": "2x2_field_arrangement",
+            "once_per_game": true,
+            "center_of_2x2": true,
+            "person_capacity": 1,
+            "animal_capacity": 0
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B085-normal",
+      "B085-no-2x2",
+      "B085-once-per-game"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "When you have 4 field tiles in a 2x2 arrangement and use the Build Stable action, once per game you may build 1 stable in the center of the 2x2. This stable holds 1 person but no animals."
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "card_id": "B089",
+  "cases": [
+    {
+      "id": "B089-immediate-wood",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 0
+      },
+      "action": {},
+      "expected": {
+        "wood_delta": 1
+      }
+    },
+    {
+      "id": "B089-stone-house-build-stable",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 1,
+        "living_in_stone_house": true,
+        "current_round": 3
+      },
+      "action": {
+        "round_start": true,
+        "build_stable_for_wood": 1
+      },
+      "expected": {
+        "stable_built": true,
+        "wood_delta": -1
+      }
+    },
+    {
+      "id": "B089-not-stone-house",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 1,
+        "living_in_stone_house": false,
+        "current_round": 3
+      },
+      "action": {
+        "round_start": true,
+        "build_stable_for_wood": 1
+      },
+      "expected": {
+        "stable_built": false
+      }
+    },
+    {
+      "id": "B089-limit-one-per-round",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 5,
+        "living_in_stone_house": true,
+        "current_round": 3
+      },
+      "action": {
+        "round_start": true,
+        "build_stable_for_wood": 2
+      },
+      "expected": {
+        "stable_built": 1,
+        "wood_delta": -1
+      }
+    }
+  ]
+}

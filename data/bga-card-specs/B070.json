@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "card_id": "B070",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "新規購入",
+    "name_en": "New Purchase"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3187",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_start",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "offers": [
+              {
+                "cost": {
+                  "food": 2
+                },
+                "gain": {
+                  "grain": 1
+                }
+              },
+              {
+                "cost": {
+                  "food": 4
+                },
+                "gain": {
+                  "vegetable": 1
+                }
+              }
+            ],
+            "max_per_type": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B070-buy-grain",
+      "B070-buy-vegetable",
+      "B070-buy-both"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Before each harvest round, you may buy up to 1 grain of each type: 2 food → 1 grain, 4 food → 1 vegetable."
+  }
+}

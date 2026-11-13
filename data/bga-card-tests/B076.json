@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "B076",
+  "cases": [
+    {
+      "id": "B076-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 0,
+        "current_round": 1
+      },
+      "action": {},
+      "expected": {
+        "wood_gained_round_2": 1,
+        "wood_gained_round_3": 1,
+        "wood_gained_round_4": 1,
+        "wood_gained_round_5": 1,
+        "wood_gained_round_6": 1
+      }
+    },
+    {
+      "id": "B076-cancel-on-renovation",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 0,
+        "current_round": 1,
+        "scheduled_wood": [
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "action": {
+        "renovate": true
+      },
+      "expected": {
+        "future_wood_cancelled": true
+      }
+    }
+  ]
+}
