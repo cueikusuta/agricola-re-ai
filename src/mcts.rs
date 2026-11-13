@@ -1021,8 +1021,9 @@ mod tests {
         // This value was recorded from the current implementation.
         // DO NOT CHANGE unless the implementation is intentionally replaced.
         // Updated: added A077 Hod to verified_immediate_resource_cards (pool size 30->31)
+        // Updated: added A051 Drift-Net Boat to verified_minor_worker_cards (pool size 31->32)
         assert_eq!(
-            digest, "a1439a3d33027fc63a75c1e1102d973c75cbda321ea25c17d5aca9df7e3f7723",
+            digest, "54f487dfe96db9ca45ffc79de9475e9d398fae91f58fd4d995222bffc8c0c75b",
             "sample_game distribution changed — update this test only if intentional"
         );
     }

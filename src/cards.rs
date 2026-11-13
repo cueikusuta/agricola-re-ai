@@ -1131,6 +1131,13 @@ pub fn verified_minor_worker_cards(players: usize) -> Vec<CardDefinition> {
     let minor = CardKind::MinorImprovement;
     let mut result = vec![
         card(
+            "A051",
+            minor,
+            vec![(Good::Wood, 1), (Good::Reed, 1)],
+            1,
+            vec![gain(Space::Fishing, Good::Food, 2)],
+        ),
+        card(
             "A067",
             minor,
             vec![(Good::Wood, 1)],
@@ -1272,6 +1279,34 @@ mod verified_minor_worker_tests {
         let three = owner("B121", 3, &[Space::Forest, Space::ReedBank, Space::ClayPit]);
         assert_eq!(two.supply.clay, 2);
         assert_eq!(three.supply.clay, 3);
+    }
+    #[test]
+    fn a051_fishing_grants_food_two() {
+        let p = owner("A051", 2, &[Space::Fishing, Space::Fishing, Space::Forest]);
+        assert_eq!(p.supply.food, 4);
+    }
+    #[test]
+    fn a051_only_triggers_on_fishing() {
+        let p = owner(
+            "A051",
+            2,
+            &[Space::Forest, Space::ReedBank, Space::DayLaborer],
+        );
+        assert_eq!(p.supply.food, 0);
+    }
+    #[test]
+    fn a051_cost_requires_wood_and_reed() {
+        let set = CardSet {
+            definitions: verified_minor_worker_cards(2),
+        };
+        let card = set.definition("A051").unwrap();
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        p.supply.reed = 0;
+        assert!(!can_play(&set, card, &p, 0));
+        p.supply.reed = 1;
+        assert!(can_play(&set, card, &p, 0));
+        assert_eq!(card.points, 1);
     }
 }
 
