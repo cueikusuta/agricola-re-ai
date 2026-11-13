@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "card_id": "C060",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "陶工の小窯",
+    "name_en": "Small Potter's Oven"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3029",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "has_improvement",
+        "params": {
+          "kind": [
+            "clay_oven",
+            "stone_oven"
+          ]
+        }
+      }
+    ],
+    "printed_points": 5,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 5
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "bake_bread"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "build_improvement",
+            "options": [
+              "clay_oven",
+              "stone_oven"
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Each time before you take a Bake Bread action you may build the Clay Oven or Stone Oven major improvement (build window flagged in unresolved)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: the wiki requires returning the Clay Oven or Stone Oven major improvement; 'return an owned major improvement' has no established prerequisite predicate — encoded as has_improvement and flagged",
+      "effects.1.timing: the wiki allows building Clay Oven or Stone Oven before each Bake Bread action; a pre-action build window has no established trigger — modeled with after_worker_space on the bake_bread space and flagged"
+    ],
+    "test_case_ids": [
+      "C060-normal",
+      "C060-build",
+      "C060-declined",
+      "C060-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "On play, immediately gain 5 food. Each time before you get a Bake Bread action, you may build the Clay Oven or Stone Oven major improvement."
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "C052",
+  "cases": [
+    {
+      "id": "C052-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0,
+        "wild_boar": 0
+      },
+      "action": {
+        "other_player_uses": "boar_at_once"
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "C052-two-boars",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0,
+        "wild_boar": 0
+      },
+      "action": {
+        "other_player_uses": "boar_at_once",
+        "boars_gained": 2
+      },
+      "expected": {
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "C052-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0,
+        "wild_boar": 0
+      },
+      "action": {
+        "other_player_uses": "cattle_market"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

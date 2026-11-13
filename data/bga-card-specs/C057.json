@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "card_id": "C057",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "生野菜",
+    "name_en": "Crudite"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3032",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "food",
+                "amount": 3
+              }
+            ],
+            "receive": [
+              {
+                "good": "vegetable",
+                "amount": 1
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When you play this card you may immediately buy exactly 1 vegetable for 3 food."
+    },
+    {
+      "trigger": "anytime",
+      "conditions": [
+        {
+          "predicate": "field_vegetable_stacked",
+          "params": {
+            "min_stack": 2
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "vegetable",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 4
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "At any time, discard the top vegetable of a stack of 2+ vegetables in a field to gain 4 food (timing vocabulary flagged)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.1.timing: いつでも (at any time) exceeds the established trigger vocabulary; execution windows and replay ordering are not specified (same class as C018/A071/E022)"
+    ],
+    "test_case_ids": [
+      "C057-buy",
+      "C057-decline-buy",
+      "C057-cook",
+      "C057-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "On play, immediately buy exactly 1 vegetable for 3 food. At any time, discard 1 vegetable stacked on another in a field to gain 4 food."
+  }
+}

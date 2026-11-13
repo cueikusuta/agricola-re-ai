@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "card_id": "C070",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "レタス畑",
+    "name_en": "Lettuce Patch"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3019",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "become_vegetable_field",
+            "field_size": 1,
+            "crops": "vegetables_only"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "This card is a field that can only grow vegetables (card-as-field modeling flagged in unresolved)."
+    },
+    {
+      "trigger": "harvest_field",
+      "conditions": [
+        {
+          "predicate": "harvested_from",
+          "params": {
+            "source": "card_field"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "vegetable",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 4
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "You may immediately turn each vegetable harvested from this card into 4 food (trigger name descriptive; see unresolved)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.modeling: this card itself becomes a field that can only grow vegetables; a minor improvement acting as a farmyard field has no established modeling — encoded as a special step and flagged",
+      "effects.1.granularity: converting each harvested vegetable from this card's field into 4 food immediately is a card-field harvest hook; the harvest granularity for a card-held field is not covered by the established vocabulary"
+    ],
+    "test_case_ids": [
+      "C070-field",
+      "C070-cook",
+      "C070-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "This card is a field that can only grow vegetables. You may immediately turn each vegetable you harvest from this card into 4 food."
+  }
+}

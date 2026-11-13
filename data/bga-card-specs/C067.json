@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "C067",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ミネラルフィーダー",
+    "name_en": "Mineral Feeder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3022",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "round_has_no_harvest",
+          "params": {}
+        },
+        {
+          "predicate": "animal_count_at_least",
+          "params": {
+            "animal": "sheep",
+            "n": 1,
+            "location": "pasture"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At the start of each round that does not end with a harvest, if you have at least 1 sheep in a pasture, gain 1 grain."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C067-normal",
+      "C067-harvest-round",
+      "C067-no-sheep"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "At the start of each round that does not end with a harvest, if you have at least 1 sheep in a pasture, gain 1 grain."
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "C063",
+  "cases": [
+    {
+      "id": "C063-normal",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 1,
+        "field_grain": 1,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "use_card": true
+      },
+      "expected": {
+        "grain_delta": -1,
+        "field_grain_delta": -1,
+        "food_delta": 4,
+        "points_delta": 2
+      }
+    },
+    {
+      "id": "C063-no-field-grain",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 1,
+        "field_grain": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "use_card": true
+      },
+      "expected": {
+        "food_delta": 0,
+        "points_delta": 0
+      }
+    },
+    {
+      "id": "C063-declined",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2,
+        "field_grain": 1,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "use_card": false
+      },
+      "expected": {
+        "food_delta": 0,
+        "points_delta": 0
+      }
+    }
+  ]
+}

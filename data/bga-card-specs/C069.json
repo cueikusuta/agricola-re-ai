@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "card_id": "C069",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "区画整理",
+    "name_en": "Land Consolidation"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3020",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "anytime",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "field_internal_exchange",
+            "give_good": "grain",
+            "give_amount": 3,
+            "receive_good": "vegetable",
+            "receive_amount": 1,
+            "same_field": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "At any time, you may exchange 3 grain in one field for 1 vegetable placed in that same field (timing vocabulary flagged)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.timing: いつでも (at any time) exceeds the established trigger vocabulary; execution windows and replay ordering are not specified (same class as C018/A071/E022)"
+    ],
+    "test_case_ids": [
+      "C069-normal",
+      "C069-not-enough",
+      "C069-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "At any time, you can exchange 3 grain in a field for 1 vegetable in that field."
+  }
+}
