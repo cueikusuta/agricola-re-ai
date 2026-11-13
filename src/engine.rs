@@ -1385,6 +1385,17 @@ impl Game {
                 // Determine if this is a harvest turn by checking the state
                 // before the action (current replay state).
                 let is_harvest_turn = self.will_harvest_after_work();
+                // The recorded plans must match the turn shape: a harvest turn
+                // carries both feeding and breeding plans; a non-harvest turn
+                // carries none. A missing/unexpected set is a tampered or
+                // truncated log and must be rejected (replay_integrity).
+                if is_harvest_turn {
+                    if harvest_plans.is_none() || breeding_plans.is_none() {
+                        return Err("replay harvest decisions missing or unexpected".into());
+                    }
+                } else if harvest_plans.is_some() || breeding_plans.is_some() {
+                    return Err("replay harvest decisions missing or unexpected".into());
+                }
                 if is_harvest_turn {
                     // Harvest turn: the original game used apply_with_harvest_policy
                     // with the recorded feeding/breeding plans.
