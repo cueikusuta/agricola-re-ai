@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "card_id": "C021",
+  "cases": [
+    {
+      "id": "C021-normal",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 3,
+        "persons": 2
+      },
+      "action": {
+        "reveal_quarry_space": true
+      },
+      "expected": {
+        "persons_delta": 1,
+        "workers_placed": 0
+      },
+      "notes": "Family Growth without placing a person on a board space."
+    },
+    {
+      "id": "C021-no-room",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 2,
+        "persons": 2
+      },
+      "action": {
+        "reveal_quarry_space": true
+      },
+      "expected": {
+        "persons_delta": 0
+      },
+      "notes": "No free room blocks the growth."
+    },
+    {
+      "id": "C021-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 2,
+        "persons": 1
+      },
+      "action": {
+        "reveal_space": "clay_pit"
+      },
+      "expected": {
+        "persons_delta": 0
+      },
+      "notes": "Only the stone quarry reveal triggers the effect."
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "card_id": "C009",
+  "cases": [
+    {
+      "id": "C009-buy-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "animal_capacity": {
+          "sheep": 1
+        },
+        "food": 0
+      },
+      "action": {
+        "buy_animal": "sheep"
+      },
+      "expected": {
+        "sheep_delta": 1,
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "C009-buy-boar",
+      "scope": "effect_only",
+      "setup": {
+        "animal_capacity": {
+          "wild_boar": 1
+        },
+        "food": 1
+      },
+      "action": {
+        "buy_animal": "wild_boar"
+      },
+      "expected": {
+        "wild_boar_delta": 1,
+        "food_delta": -1
+      }
+    },
+    {
+      "id": "C009-no-capacity",
+      "scope": "effect_only",
+      "setup": {
+        "animal_capacity": {
+          "sheep": 0
+        },
+        "food": 5
+      },
+      "action": {
+        "buy_animal": "sheep"
+      },
+      "expected": {
+        "sheep_delta": 0
+      },
+      "notes": "Without capacity the animal cannot be bought."
+    },
+    {
+      "id": "C009-no-food-boar",
+      "scope": "effect_only",
+      "setup": {
+        "animal_capacity": {
+          "wild_boar": 1
+        },
+        "food": 0
+      },
+      "action": {
+        "buy_animal": "wild_boar"
+      },
+      "expected": {
+        "wild_boar_delta": 0,
+        "food_delta": 0
+      },
+      "notes": "1 food is required for a boar; 0 food blocks the purchase."
+    }
+  ]
+}

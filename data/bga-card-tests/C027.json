@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "C027",
+  "cases": [
+    {
+      "id": "C027-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 1,
+        "minor_improvement_action": true
+      },
+      "action": {
+        "buy_major": "joinery"
+      },
+      "expected": {
+        "joinery_owned": true,
+        "stone_delta": -1
+      }
+    },
+    {
+      "id": "C027-other-major",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 1,
+        "minor_improvement_action": true
+      },
+      "action": {
+        "buy_major": "fireplace"
+      },
+      "expected": {
+        "buy_allowed": false
+      },
+      "notes": "Other major improvements are not covered by the card."
+    },
+    {
+      "id": "C027-cost",
+      "scope": "effect_only",
+      "setup": {
+        "food": 1
+      },
+      "action": {
+        "play": "C027"
+      },
+      "expected": {
+        "food_delta": -1
+      }
+    }
+  ]
+}

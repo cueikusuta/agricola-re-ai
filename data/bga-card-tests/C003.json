@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "card_id": "C003",
+  "cases": [
+    {
+      "id": "C003-normal",
+      "scope": "effect_only",
+      "setup": {
+        "phase": "work",
+        "unplaced_persons": 1,
+        "persons": 3
+      },
+      "action": {
+        "play": "C003"
+      },
+      "expected": {
+        "extra_person_placed": true,
+        "unplaced_persons": 0
+      }
+    },
+    {
+      "id": "C003-not-in-work-phase",
+      "scope": "effect_only",
+      "setup": {
+        "phase": "not_work",
+        "unplaced_persons": 1
+      },
+      "action": {
+        "play": "C003"
+      },
+      "expected": {
+        "extra_person_placed": false
+      },
+      "notes": "Played outside the work phase the placement does not happen."
+    },
+    {
+      "id": "C003-cost",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0,
+        "wood": 0,
+        "clay": 0,
+        "stone": 0,
+        "reed": 0
+      },
+      "action": {
+        "play": "C003"
+      },
+      "expected": {
+        "playable_without_resources": true
+      },
+      "notes": "The card has no resource cost; it is playable with an empty stock."
+    },
+    {
+      "id": "C003-pass-left",
+      "scope": "effect_only",
+      "setup": {
+        "hand_before": 1
+      },
+      "action": {
+        "play": "C003"
+      },
+      "expected": {
+        "post_play": "left_neighbor_hand"
+      }
+    }
+  ]
+}

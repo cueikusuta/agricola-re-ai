@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "card_id": "C009",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "自動水受け皿",
+    "name_en": "Automatic Water Trough"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3080",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "buy_animal",
+            "animal": [
+              "sheep",
+              "wild_boar",
+              "cattle"
+            ],
+            "food_cost": {
+              "sheep": 0,
+              "wild_boar": 1,
+              "cattle": 2
+            },
+            "requires_capacity": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When you can keep the animal, you may buy sheep/wild boar/cattle for 0/1/2 food."
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.purchase_window: the wiki text does not state when the purchase may happen (any time / own action only / also on other players' turns); only the food prices are certain"
+    ],
+    "test_case_ids": [
+      "C009-buy-sheep",
+      "C009-buy-boar",
+      "C009-no-capacity",
+      "C009-no-food-boar"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Buy sheep/boar/cattle for 0/1/2 food when you can keep them; pass left. Purchase timing not stated by the wiki; kept unresolved."
+  }
+}

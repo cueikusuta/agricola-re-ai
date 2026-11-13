@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "card_id": "C014",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "わら葺き屋根",
+    "name_en": "Straw-Thatched Roof"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3075",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "grain_field_count",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
+    "printed_points": 1
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "ignore_cost",
+            "good": "reed",
+            "scope": [
+              "room_building",
+              "renovation"
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Building rooms and renovating no longer require reed."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C014-room-no-reed",
+      "C014-renovation-no-reed",
+      "C014-points",
+      "C014-prerequisite"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Rooms and renovation no longer need reed. Requires 3 grain fields to play (grain_field_count n=3, same threshold vocabulary as A026)."
+  }
+}

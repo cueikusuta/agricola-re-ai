@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "card_id": "C018",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "回転鋤",
+    "name_en": "Roll-Over Plow"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3071",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "anytime",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "discard_field_goods_plow_one",
+            "requires_cultivated_fields": 3,
+            "fields_to_clear": 1,
+            "plow_amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "At any time with at least 3 cultivated fields: discard all goods on one of them and plow 1 field."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.timing: 'いつでも' (any time) exceeds the established trigger vocabulary; execution windows and replay ordering are not specified"
+    ],
+    "test_case_ids": [
+      "C018-normal",
+      "C018-boundary",
+      "C018-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Any time, with 3+ cultivated fields: throw away one field's goods and plow 1 field. The anytime window has no trigger vocabulary; marked unresolved."
+  }
+}

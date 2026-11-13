@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "card_id": "C006",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "石取り作業",
+    "name_en": "Stone Clearing"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3083",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "add_good_to_empty_fields",
+            "good": "stone",
+            "amount": 1,
+            "per_field": 1,
+            "harvest_at": "next_field_phase",
+            "fields_count_as_cultivated": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Immediately place 1 stone on each empty field. At the next field phase each stone is harvested; until then the fields count as cultivated."
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C006-normal",
+      "C006-zero-empty",
+      "C006-harvest",
+      "C006-prerequisite"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Place 1 stone on every empty field; collect them at the next field phase (fields count as cultivated until then); pass left."
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "card_id": "C019",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "耕運鋤",
+    "name_en": "Swing Plow"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3070",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 3
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "stack_field_tiles_on_card",
+            "amount": 4
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Place 4 field tiles on this card."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "farmland"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "plow_field",
+          "target": "board",
+          "params": {
+            "amount": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "count",
+                  "args": [
+                    "field_tiles_on_card"
+                  ]
+                },
+                2
+              ]
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each Farmland use plows up to 2 more fields from the tiles on the card."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C019-normal",
+      "C019-boundary",
+      "C019-not-triggered",
+      "C019-prerequisite"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "4 field tiles go on the card; each Farmland use plows up to 2 of them (limited by remaining tiles)."
+  }
+}

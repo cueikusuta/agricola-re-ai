@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "C015",
+  "cases": [
+    {
+      "id": "C015-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4,
+        "buildable_fences": 4
+      },
+      "action": {
+        "use_space": "pig_market",
+        "build_fences": 4
+      },
+      "expected": {
+        "wild_boar_delta": 1,
+        "fences_delta": 4,
+        "wood_delta": -4
+      }
+    },
+    {
+      "id": "C015-declined",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4
+      },
+      "action": {
+        "use_space": "pig_market"
+      },
+      "expected": {
+        "wild_boar_delta": 1,
+        "fences_delta": 0
+      }
+    },
+    {
+      "id": "C015-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4
+      },
+      "action": {
+        "use_space": "sheep_market"
+      },
+      "expected": {
+        "fences_delta": 0
+      },
+      "notes": "Sheep Market does not trigger the fence action."
+    }
+  ]
+}

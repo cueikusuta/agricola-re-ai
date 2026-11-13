@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "C012",
+  "cases": [
+    {
+      "id": "C012-normal",
+      "scope": "effect_only",
+      "setup": {
+        "pastures": 2,
+        "cattle": 0
+      },
+      "action": {
+        "play": "C012"
+      },
+      "expected": {
+        "card_cattle_capacity": 2
+      }
+    },
+    {
+      "id": "C012-zero-pastures",
+      "scope": "effect_only",
+      "setup": {
+        "pastures": 0,
+        "cattle": 0
+      },
+      "action": {
+        "play": "C012"
+      },
+      "expected": {
+        "card_cattle_capacity": 0
+      },
+      "notes": "Without pastures the card holds no cattle."
+    },
+    {
+      "id": "C012-cost",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1
+      },
+      "action": {
+        "play": "C012"
+      },
+      "expected": {
+        "wood_delta": -1,
+        "post_play": "played_area"
+      }
+    }
+  ]
+}
