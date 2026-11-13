@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "D009",
+  "cases": [
+    {
+      "id": "D009-normal",
+      "scope": "legal_play",
+      "setup": {
+        "sheep": 2
+      },
+      "action": {
+        "play": "D009",
+        "pay": {
+          "good": "sheep",
+          "amount": 2
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "boar_gained": 1,
+        "cattle_gained": 1,
+        "sheep_delta": -2,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "D009 costs 2 sheep; immediately gains boar1 and cattle1 (exchange 2 sheep -> 1 boar + 1 cattle); rotates to left neighbor"
+    },
+    {
+      "id": "D009-no-sheep",
+      "scope": "legal_play",
+      "setup": {
+        "sheep": 0
+      },
+      "action": {
+        "play": "D009",
+        "pay": {
+          "good": "sheep",
+          "amount": 2
+        }
+      },
+      "expected": {
+        "play_rejected": true,
+        "reason": "insufficient sheep to pay cost"
+      },
+      "notes": "Cannot pay the 2-sheep cost when no sheep are held"
+    }
+  ]
+}

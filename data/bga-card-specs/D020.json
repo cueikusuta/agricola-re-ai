@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "card_id": "D020",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "折り返し鋤",
+    "name_en": "Turnwrest Plow"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2901",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 3
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 2
+        }
+      }
+    ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent field-placement + extra-plowing ability"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: \"このカードの上に畑タイル2枚を置く\" - card-as-field-storage needs formalization",
+      "effects: \"農地または耕作を使用するたび、このカードの畑2までを追加で耕してよい\" - extra plowing tied to action-space use needs definition",
+      "effects: whether the 2 extra plows are per-use and whether fields on card are consumed need confirmation"
+    ],
+    "test_case_ids": [
+      "D020-normal",
+      "D020-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost wood3. Prereq: 2 occupations. Effect: place 2 field tiles on this card; when using plow-field or cultivate, plow up to 2 additional fields from this card. Field tracking needs resolution."
+  }
+}

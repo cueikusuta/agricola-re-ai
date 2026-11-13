@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "card_id": "D009",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "獲物の交換",
+    "name_en": "Game Trade"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2912",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "sheep",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "sheep",
+                "amount": 2
+              }
+            ],
+            "receive": [
+              {
+                "good": "boar",
+                "amount": 1
+              },
+              {
+                "good": "cattle",
+                "amount": 1
+              }
+            ]
+          },
+          "notes": "Exchange 2 sheep for 1 boar + 1 cattle"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "回る進歩"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "D009-normal",
+      "D009-no-sheep"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 2 sheep. Effect: immediately gain boar1 and cattle1 (= exchange 2 sheep for 1 boar + 1 cattle). Pass to left neighbor."
+  }
+}

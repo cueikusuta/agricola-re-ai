@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "card_id": "D031",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "貯蔵部屋",
+    "name_en": "Storeroom"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2890",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      },
+      {
+        "good": "stone",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent end-game grain/vegetable pair bonus"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: \"小麦と野菜のペアごとにボーナス0.5点（切り上げ）\" - pair counting (min of grain and vegetable totals) and half-point rounding up need formalization",
+      "effects: \"ストックと畑の上にある全ての農作物を数える\" - stock + field crops both counted; scope definition needed",
+      "effects[0].steps: gain_points fractional amount with ceiling not directly in expression vocabulary"
+    ],
+    "test_case_ids": [
+      "D031-pairs",
+      "D031-no-crops"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost wood1 stone2. Effect: end-game scoring: 0.5 bonus point (rounded up) per grain+vegetable pair, counting all crops in stock and on fields. Fractional rounding and pair scope need resolution."
+  }
+}

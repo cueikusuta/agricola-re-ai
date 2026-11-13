@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "D033",
+  "cases": [
+    {
+      "id": "D033-stone-house",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 3,
+        "stone": 1,
+        "house": "wood",
+        "adjacent_empty_spaces": 3
+      },
+      "action": {
+        "play": "D033",
+        "pay": {
+          "good": "wood",
+          "amount": 3
+        },
+        "pay2": {
+          "good": "stone",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "end_game_bonus_per_adjacent_empty_space": 2,
+        "total_bonus": 6
+      },
+      "notes": "D033 costs wood3 stone1, requires currently a wood house; end-game scoring: if living in a stone house, 2 points per adjacent empty board space (adjacency formalization unresolved)"
+    },
+    {
+      "id": "D033-not-stone-house",
+      "scope": "effect_only",
+      "setup": {
+        "house": "clay",
+        "adjacent_empty_spaces": 3
+      },
+      "action": {
+        "score": true
+      },
+      "expected": {
+        "bonus_points": 0,
+        "note": "Stone-house condition not met"
+      },
+      "notes": "The bonus only applies when living in a stone house"
+    }
+  ]
+}

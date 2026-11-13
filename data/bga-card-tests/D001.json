@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "D001",
+  "cases": [
+    {
+      "id": "D001-normal",
+      "scope": "legal_play",
+      "setup": {
+        "fields": [
+          {
+            "cells": [1, 2, 3],
+            "shape": "L"
+          }
+        ],
+        "wood": 1
+      },
+      "action": {
+        "play": "D001",
+        "pay": {
+          "good": "wood",
+          "amount": 1
+        },
+        "plow_cell": 4
+      },
+      "expected": {
+        "play_allowed": true,
+        "fields_delta": 1,
+        "wood_delta": -1,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "D001 costs 1 wood, requires an L-shaped set of 3 fields; plows 1 field and rotates to the left neighbor"
+    },
+    {
+      "id": "D001-not-zigzag",
+      "scope": "legal_play",
+      "setup": {
+        "fields": [
+          {
+            "cells": [1, 2, 3],
+            "shape": "straight"
+          }
+        ],
+        "wood": 1
+      },
+      "action": {
+        "play": "D001",
+        "pay": {
+          "good": "wood",
+          "amount": 1
+        },
+        "plow_cell": 4
+      },
+      "expected": {
+        "play_rejected": true,
+        "reason": "fields do not form an L/Z (tetris) shape"
+      },
+      "notes": "Without an L/Z-shaped field group, the zigzag plow precondition is not met"
+    }
+  ]
+}

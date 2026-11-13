@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "card_id": "D030",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "職人地区",
+    "name_en": "Artisan District"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2891",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "stone",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "end_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": {
+              "op": "custom",
+              "args": [
+                "threshold_table",
+                "major_improvement_bottom_row",
+                {
+                  "threshold": 3,
+                  "points": 2
+                },
+                {
+                  "threshold": 4,
+                  "points": 5
+                },
+                {
+                  "threshold": 5,
+                  "points": 8
+                }
+              ]
+            }
+          },
+          "notes": "3/4/5 bottom-row major improvements -> 2/5/8 bonus points"
+        }
+      ],
+      "optional": false,
+      "frequency": "end_of_game",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent end-game major-improvement bonus"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "D030-three-majors",
+      "D030-less-than-three"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost stone1. Prereq: 3 occupations. Effect: end-game scoring: holding 3/4/5 major improvements on the bottom row of the supply board gives bonus 2/5/8 points. Formalized as count of major_improvement_bottom_row with a points table."
+  }
+}

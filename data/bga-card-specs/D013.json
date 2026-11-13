@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "card_id": "D013",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "こて",
+    "name_en": "Trowel"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2908",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent anytime stone-renovation ability"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: stone-renovation cost structure differs by current house (wood house: stone1 reed1 food1 per room; brick house: stone1 per room) needs formalization",
+      "effects[0].steps: \"いつでも石の家に改築できる\" - grant of anytime renovation action and per-room cost params need definition",
+      "play.prerequisites: none"
+    ],
+    "test_case_ids": [
+      "D013-wood-house",
+      "D013-brick-house"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 1 wood. Effect: anytime renovate to a stone house. From a wood house: stone1 reed1 food1 per room. From a brick house: stone1 per room. Cost formalization needs resolution."
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "card_id": "D014",
+  "cases": [
+    {
+      "id": "D014-normal",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 1
+      },
+      "action": {
+        "play": "D014",
+        "pay": {
+          "good": "wood",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "before_stone_renovation_gain": {
+          "brick": 2,
+          "reed": 1
+        },
+        "room_build_action_available": true,
+        "passes_to_play_area": true
+      },
+      "notes": "D014 costs 1 wood; immediately before renovating to a stone house, gain brick2 reed1; also grants a room-building action (trigger timing unresolved)"
+    }
+  ]
+}

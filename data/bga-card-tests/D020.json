@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "D020",
+  "cases": [
+    {
+      "id": "D020-normal",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 3,
+        "occupations": 2
+      },
+      "action": {
+        "play": "D020",
+        "pay": {
+          "good": "wood",
+          "amount": 3
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "fields_on_card": 2,
+        "extra_plow_on_farm_action": true
+      },
+      "notes": "D020 costs wood3, requires 2 occupations; places 2 field tiles on this card; when using plow-field/cultivate, may plow up to 2 additional fields from this card (tracking unresolved)"
+    },
+    {
+      "id": "D020-not-triggered",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 3,
+        "occupations": 1
+      },
+      "action": {
+        "play": "D020",
+        "pay": {
+          "good": "wood",
+          "amount": 3
+        }
+      },
+      "expected": {
+        "play_rejected": true,
+        "reason": "prerequisite: 2 occupations not met"
+      },
+      "notes": "D020 requires 2 occupations to play"
+    }
+  ]
+}

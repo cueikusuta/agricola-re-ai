@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "card_id": "D027",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "再教育",
+    "name_en": "Retraining"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2894",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Persistent after-renovation facility-exchange ability"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: \"改築した手番の終わりに、家具製作所を製陶所に、もしくは製陶所をカゴ製作所に交換できる\" - which facilities are exchangeable and the exchange mechanics need definition",
+      "effects: trigger \"改築した手番の終わり\" (end of the turn you renovate) needs precise event definition",
+      "effects: whether exchange is optional and once-per-renovation need confirmation"
+    ],
+    "test_case_ids": [
+      "D027-furniture-to-pottery",
+      "D027-pottery-to-basket"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost food1. Prereq: 1 occupation. Effect: at end of the turn you renovate, exchange your furniture workshop for a pottery, or a pottery for a basket workshop. Exchange mechanics need resolution."
+  }
+}

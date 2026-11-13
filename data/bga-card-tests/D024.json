@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "card_id": "D024",
+  "cases": [
+    {
+      "id": "D024-four-people",
+      "scope": "legal_play",
+      "setup": {
+        "people": 4
+      },
+      "action": {
+        "play": "D024",
+        "pay": {
+          "good": "food",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "place_3rd_and_4th_simultaneously": true,
+        "same_action_space_allowed": true
+      },
+      "notes": "D024 costs food1; while exactly 4 people, place the 3rd and 4th person simultaneously each work phase (condition formalization unresolved)"
+    },
+    {
+      "id": "D024-not-four-people",
+      "scope": "legal_play",
+      "setup": {
+        "people": 3
+      },
+      "action": {
+        "play": "D024",
+        "pay": {
+          "good": "food",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "simultaneous_placement": false,
+        "note": "Effect only active while exactly 4 people"
+      },
+      "notes": "The simultaneous-placement effect is conditional on exactly 4 people"
+    }
+  ]
+}

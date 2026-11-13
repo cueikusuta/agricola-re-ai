@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "card_id": "D025",
+  "cases": [
+    {
+      "id": "D025-multi-role",
+      "scope": "legal_play",
+      "setup": {},
+      "action": {
+        "play": "D025",
+        "via": "minor_improvement_action"
+      },
+      "expected": {
+        "play_allowed": true,
+        "multi_role_card": true,
+        "roles": ["field", "occupation", "oven"]
+      },
+      "notes": "D025 is unimplemented on BGA; a sowable field, an occupation, and a big-improvement oven with no effect; playable only via the minor-improvement action. All data fields unknown (needs_resolution)."
+    }
+  ]
+}

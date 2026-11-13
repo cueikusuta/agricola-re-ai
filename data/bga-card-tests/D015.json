@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "card_id": "D015",
+  "cases": [
+    {
+      "id": "D015-normal",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 2
+      },
+      "action": {
+        "play": "D015",
+        "pay": {
+          "good": "wood",
+          "amount": 2
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "brick_room_discount_active": true,
+        "brick_room_cost": {
+          "brick": 2,
+          "wood": 1,
+          "reed": 1
+        },
+        "standard_brick_room_cost": {
+          "brick": 5,
+          "reed": 2
+        }
+      },
+      "notes": "D015 costs wood2; when building a brick room, pay brick2 wood1 reed1 instead of brick5 reed2"
+    },
+    {
+      "id": "D015-not-brick-room",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 2
+      },
+      "action": {
+        "play": "D015",
+        "pay": {
+          "good": "wood",
+          "amount": 2
+        },
+        "build_room": {
+          "house": "wood"
+        }
+      },
+      "expected": {
+        "play_allowed": true,
+        "discount_applies": false,
+        "note": "Discount only applies to brick (clay) room construction"
+      },
+      "notes": "The brick-room cost discount does not apply to wood/clay/stone rooms"
+    }
+  ]
+}

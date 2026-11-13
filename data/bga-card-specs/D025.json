@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "D025",
+  "identity": {
+    "kind": "multi_type",
+    "name_ja": "魔女の踊り場",
+    "name_en": "Witch's Dance Floor"
+  },
+  "bga": {
+    "listed": "no",
+    "playable": "no",
+    "ban_status": "none",
+    "base_2016": "unknown",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/unimplemented/",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki unimplemented-card list; one-line description only, no cost/points data"
+      }
+    ]
+  },
+  "play": {
+    "action": "special",
+    "cost": null,
+    "prerequisites": null,
+    "printed_points": null,
+    "alternative_cost_notes": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "unknown",
+    "notes": "Card not implemented on BGA; placement destination unknown"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "identity.kind: multi_type (field + occupation + big-improvement oven); exact kind assignment not confirmed",
+      "play.cost: unknown (unimplemented card)",
+      "play.prerequisites: unknown",
+      "play.printed_points: unknown",
+      "effects: \"種をまける畑であり、職業であり、また、効果を持たない大きい進歩のかまどである。このカードは小さい進歩アクションでのみ出せる\" - multi-role semantics and oven-without-effect need formalization",
+      "post_play: destination unknown for a multi-role card"
+    ],
+    "test_case_ids": [
+      "D025-multi-role"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "D025 is unimplemented on BGA (listed=no, playable=no). Wiki: a sowable field, an occupation, and a big-improvement oven with no effect; playable only via the minor-improvement action. All data fields unknown."
+  }
+}

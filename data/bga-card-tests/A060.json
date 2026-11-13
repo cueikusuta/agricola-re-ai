@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "card_id": "A060",
+  "cases": [
+    {
+      "id": "A060-conversion",
+      "scope": "legal_play",
+      "setup": {},
+      "action": {
+        "play": "A060",
+        "pay_alternative": "return_one_fireplace_or_oven"
+      },
+      "expected": {
+        "play_allowed": true,
+        "card_in_play_area": true
+      },
+      "notes": "A060 cost is return of one かまど or 調理場 (non-standard); verifies the card can be played via the special alternative cost"
+    },
+    {
+      "id": "A060-bread",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "A060",
+        "bake_bread": true,
+        "spend": {
+          "good": "grain",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "food_gained": 2
+      },
+      "notes": "During bread baking, A060 converts grain1->food2 (unresolved: exact trigger timing)"
+    },
+    {
+      "id": "A060-boar-excluded",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "A060",
+        "convert": {
+          "good": "boar",
+          "amount": 1
+        }
+      },
+      "expected": {
+        "conversion_rejected": true
+      },
+      "notes": "Boar cannot be converted by A060 (explicit exclusion on the wiki page)"
+    }
+  ]
+}
