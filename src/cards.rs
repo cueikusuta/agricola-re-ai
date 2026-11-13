@@ -1379,6 +1379,18 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 amount: 4,
             }],
         },
+        // E008 農産物直売所 (Farmers Market): OnPlayGain 1 vegetable, cost 2 food.
+        CardDefinition {
+            use_limit: None,
+            id: "E008".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Vegetable,
+                amount: 1,
+            }],
+        },
     ]
 }
 
@@ -1460,6 +1472,24 @@ mod verified_immediate_resource_tests {
         let mut player = Player::new(0, 0);
         let old = player.clone();
         assert!(play_card("E007", &mut player).is_err());
+        assert_eq!(player, old);
+    }
+
+    #[test]
+    fn e008_on_play_gains_one_vegetable() {
+        let mut player = Player::new(0, 0);
+        player.supply.food = 2;
+        play_card("E008", &mut player).unwrap();
+        assert_eq!(player.supply.vegetable, 1);
+        assert_eq!(player.supply.food, 0);
+        assert_eq!(player.played_cards, vec!["E008"]);
+    }
+
+    #[test]
+    fn e008_cannot_play_without_food() {
+        let mut player = Player::new(0, 0);
+        let old = player.clone();
+        assert!(play_card("E008", &mut player).is_err());
         assert_eq!(player, old);
     }
 }
