@@ -190,7 +190,7 @@ fn resolve_phase_scan(
             let result = match effect {
                 #[cfg(test)]
                 CardEffect::PendingProbe { options } => {
-                    handle_pending_probe(ctx, player, card_id, options.clone())?
+                    handle_pending_probe(ctx, player, card_id, options.clone(), trigger_data)?
                 }
                 CardEffect::Prerequisite { rule } => {
                     handle_prerequisite(ctx, player, card_id, rule, trigger_data)?
@@ -344,13 +344,27 @@ pub struct PhaseTriggerData {
 // --- Effect Handlers (each phase handler cites the official timing rule) ---
 /// Test-only handler for the Interrupt branch: it produces a PendingDecision
 /// instead of resolving immediately, so the pause/resume contract is covered.
+///
+/// It does NOT fire inside the clay-construction window. That dispatcher
+/// re-scans the acting player's already-played cards within the same worker
+/// action (it is gated by `improvement`/`previous_player`, both present only on
+/// a purchase), so a probe there would fire a second time in one action and the
+/// resume would re-pause on its own card. Firing only in the genuine
+/// own-effect windows (round start, harvest-bake, worker completion) models a
+/// single Interrupt choice per action (Issue #268 R2-P0-1).
 #[cfg(test)]
 fn handle_pending_probe(
     _ctx: &mut DispatchContext<'_>,
     player: usize,
     card_id: &str,
     options: Vec<(Good, u32)>,
+    trigger_data: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
+    let is_clay_construction_window =
+        trigger_data.space.is_none() && trigger_data.previous_player.is_some();
+    if is_clay_construction_window {
+        return Ok(EffectResult::Resolved);
+    }
     let kind = crate::pending::PendingKind::ChooseGain {
         source_card: card_id.to_string(),
         options: options
@@ -666,11 +680,14 @@ fn handle_harvest_field_gain(
 
 // --- Public Dispatcher Entry Points ---
 /// Dispatch all phases for a card play action.
-/// Returns Ok(Completed) if fully resolved; Ok(Paused) is impossible here —
-/// a pause during a card PLAY aborts the play, because the cost/zone move
-/// prerequisites already committed and the Replace/Before phases gate whether
-/// the play is legal at all. Test-only probes pause via dispatch_after_worker
-/// instead; the resume contract covers the post-work chain.
+///
+/// Returns `Ok(Transition::Completed)` when the play's Replace/Before phases
+/// fully resolved. A play-time interrupt (a choice in a card's Before phase)
+/// canNOT be represented here — the cost/zone move prerequisites are already
+/// mid-flight on the caller's working clone — so it is aborted with a precise
+/// `Err` rather than silently dropping a `Transition::Paused` (Issue #268
+/// R2-P0-2). Test-only probes pause via `dispatch_after_worker` instead; the
+/// resume contract covers the post-work chain.
 /// Only the newly played card's Replace/Before effects are resolved (prerequisites gate the play,
 /// on-play gains/passives apply once). Already-played cards' effects are NOT re-fired.
 #[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
@@ -688,7 +705,7 @@ pub fn dispatch_play(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
-) -> Result<Transition, String> {
+) -> Result<(), String> {
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -724,18 +741,26 @@ pub fn dispatch_play(
     }
 
     // Phase 2: Before (on-play gains, passives) - ONLY for the new card
-    if let Transition::Paused(pending) = resolve_phase_for_card(
+    if let Transition::Paused(_) = resolve_phase_for_card(
         &mut ctx,
         player,
         TriggerPhase::Before,
         &trigger,
         new_card_id,
     )? {
-        // test-only probe during a play's Before phase: surface the pause to
-        // the caller WITHOUT the sentinel error. The play transaction is
-        // aborted by the caller (a probe card is never a legal play target
-        // on its own), keeping the pre-play state intact.
-        return Ok(Transition::Paused(pending));
+        // A choice in a play's Before phase is a play-time interrupt. The play
+        // transaction (cost payment + hand->played zone move) is already applied
+        // on the caller's working clone and cannot be resumed here, so abort the
+        // play with a precise `Err`. Returning it (instead of an Ok(Paused) the
+        // callers dropped) is what stops the interrupt being silently discarded
+        // (Issue #268 R2-P0-2). The `Err` propagates out of `execute_work`
+        // before the working clone is committed, so the pre-play state stays
+        // intact.
+        return Err(
+            "play-time interrupt during a card's Before phase is not supported by the \
+             work executor"
+                .into(),
+        );
     }
 
     // Phase 3: Core action (card is moved to played zone — handled by caller via move_card)
@@ -743,7 +768,7 @@ pub fn dispatch_play(
     // Phase 4: After (no play-time after effects currently)
     // NOTE: After phase is a no-op for OnPlay cards; no need to resolve for new card
 
-    Ok(Transition::Completed)
+    Ok(())
 }
 
 /// Dispatch AfterWorker phase for a completed worker action.
