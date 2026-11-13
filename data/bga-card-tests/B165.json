@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "B165",
+  "cases": [
+    {
+      "id": "B165-discard-1",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B165",
+        "event": "before_harvest",
+        "discard_grain": 1
+      },
+      "expected": {
+        "grain_delta": -1,
+        "boar_delta": 1
+      },
+      "notes": "Discard grain 1 => gain boar 1."
+    },
+    {
+      "id": "B165-discard-3",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B165",
+        "event": "before_harvest",
+        "discard_grain": 3
+      },
+      "expected": {
+        "grain_delta": -3,
+        "boar_delta": 2
+      },
+      "notes": "Discard grain 3 => gain boar 2."
+    },
+    {
+      "id": "B165-discard-4",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B165",
+        "event": "before_harvest",
+        "discard_grain": 4
+      },
+      "expected": {
+        "grain_delta": -4,
+        "boar_delta": 3
+      },
+      "notes": "Discard grain 4 => gain boar 3."
+    }
+  ]
+}

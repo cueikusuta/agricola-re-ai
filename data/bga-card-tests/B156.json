@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "card_id": "B156",
+  "cases": [
+    {
+      "id": "B156-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B156",
+        "event": "use_material_market",
+        "choose": "brick"
+      },
+      "expected": {
+        "brick_delta": 1
+      },
+      "notes": "Using Material Market: gain brick 1 or grain 1 (choosing brick)."
+    }
+  ]
+}

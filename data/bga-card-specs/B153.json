@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "card_id": "B153",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "寮長",
+    "name_en": "Housemaster"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3104",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "final_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "score_major_improvements",
+            "double_lowest": true,
+            "bonus_thresholds": [5, 7, 9, 11],
+            "bonus_points": [1, 2, 3, 4]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At final scoring: sum major improvement scores, doubling the lowest one. Total >= 5/7/9/11 gives bonus 1/2/3/4 points."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": ["B153-normal"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Final scoring: sum major improvement scores, double lowest. Total >=5/7/9/11 gives bonus 1/2/3/4 points. bga_checked is third-party BGA wiki cross-check, not official Lookout verification."
+  }
+}

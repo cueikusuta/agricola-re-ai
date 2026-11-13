@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "card_id": "B167",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "厩舎長",
+    "name_en": "Stable Sergeant"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3090",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "food",
+                    "amount": 2
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "sheep",
+                    "amount": 1
+                  },
+                  {
+                    "good": "boar",
+                    "amount": 1
+                  },
+                  {
+                    "good": "cattle",
+                    "amount": 1
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "On play: pay food 2 to gain sheep 1, boar 1, cattle 1 (only if all 3 can be kept on farm)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": ["B167-normal", "B167-not-triggered"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "On play: pay food 2 to gain sheep1/boar1/cattle1 if all fit on farm. bga_checked is third-party BGA wiki cross-check, not official Lookout verification."
+  }
+}

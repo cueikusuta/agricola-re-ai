@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "card_id": "B167",
+  "cases": [
+    {
+      "id": "B167-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B167",
+        "event": "pay_food_2",
+        "can_keep_all": true
+      },
+      "expected": {
+        "food_spent": 2,
+        "sheep_delta": 1,
+        "boar_delta": 1,
+        "cattle_delta": 1
+      },
+      "notes": "Pay food 2: gain sheep1/boar1/cattle1 if all fit on farm."
+    },
+    {
+      "id": "B167-not-triggered",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B167",
+        "event": "pay_food_2",
+        "can_keep_all": false
+      },
+      "expected": {
+        "food_spent": 0,
+        "sheep_delta": 0,
+        "boar_delta": 0,
+        "cattle_delta": 0
+      },
+      "notes": "Cannot keep all 3 animals: effect not gained."
+    }
+  ]
+}

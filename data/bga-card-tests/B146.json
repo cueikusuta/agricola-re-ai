@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "B146",
+  "cases": [
+    {
+      "id": "B146-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B146",
+        "event": "use_cumulative_space",
+        "space": "clay_pit",
+        "discard_card": true
+      },
+      "expected": {
+        "clay_gained": 2,
+        "card_delta": -1
+      },
+      "notes": "Using clay pit with cumulative clay: discard 1 card to gain 1 additional clay."
+    },
+    {
+      "id": "B146-not-triggered",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B146",
+        "event": "use_cumulative_space",
+        "space": "clay_pit",
+        "discard_card": false
+      },
+      "expected": {
+        "clay_gained": 1,
+        "card_delta": 0
+      },
+      "notes": "Without discarding a card, only the normal accumulated good is gained."
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "card_id": "B149",
+  "cases": [
+    {
+      "id": "B149-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B149"
+      },
+      "expected": {
+        "stables_removed_from_stock": 3,
+        "wood_spent": 2,
+        "pasture_built": 1
+      },
+      "notes": "On play: remove 3 stables from stock, pay wood 2, build 1 pasture."
+    }
+  ]
+}
