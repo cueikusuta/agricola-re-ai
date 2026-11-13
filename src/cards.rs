@@ -1318,6 +1318,20 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // A077 Hod (fallback for A072 Calcium Fertilizers): OnPlayGain 1 clay.
+        // The spec's second effect (any-player Pig Market clay gain) is not expressible
+        // with current CardEffect variants (no any-player condition on AfterWorkerGain).
+        CardDefinition {
+            use_limit: None,
+            id: "A077".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Clay,
+                amount: 1,
+            }],
+        },
     ]
 }
 
@@ -1364,6 +1378,24 @@ mod verified_immediate_resource_tests {
             (wrong.supply.clay, wrong.supply.reed, wrong.supply.stone),
             (0, 0, 0)
         );
+    }
+
+    #[test]
+    fn a077_on_play_gains_one_clay() {
+        let mut player = Player::new(0, 0);
+        player.supply.wood = 1;
+        play_card("A077", &mut player).unwrap();
+        assert_eq!(player.supply.clay, 1);
+        assert_eq!(player.supply.wood, 0);
+        assert_eq!(player.played_cards, vec!["A077"]);
+    }
+
+    #[test]
+    fn a077_cannot_play_without_wood() {
+        let mut player = Player::new(0, 0);
+        let old = player.clone();
+        assert!(play_card("A077", &mut player).is_err());
+        assert_eq!(player, old);
     }
 }
 
@@ -2071,13 +2103,13 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 30);
+        assert_eq!(set.definitions.len(), 31);
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::MinorImprovement)
                 .count(),
-            16
+            17
         );
         assert_eq!(
             set.definitions
