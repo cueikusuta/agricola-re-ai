@@ -357,7 +357,9 @@ fn major_cost(p: &Player, i: Improvement) -> Vec<(Good, u32)> {
         })
         .collect()
 }
-fn affordable(p: &Player, i: Improvement) -> bool {
+// Discounted affordability, shared with the detail policies so a space the
+// engine considers legal (can_buy uses the same math) always admits a detail.
+pub(crate) fn affordable(p: &Player, i: Improvement) -> bool {
     major_cost(p, i).iter().all(|&(g, n)| p.supply.get(g) >= n)
 }
 
