@@ -3378,6 +3378,70 @@ mod tests {
         );
     }
 
+    // --- Engine-path e2e test for the REAL verified A078 card (Issue #270 R5) ---
+    //
+    // Same contract as `choose_trigger_order_e2e_engine_path_pause_resume`
+    // above, but on the real verified card set: A078 (Canoe, two
+    // AfterWorkerGain(Fishing) effects) loaded through
+    // `verified_basic_card_set`. This pins the exact user-visible regression
+    // the reviewers reproduced: placing a worker on Fishing with A078 played
+    // must pause, and the resume must apply BOTH bonuses.
+    #[test]
+    fn a078_two_fishing_effects_apply_after_engine_pause_resume() {
+        use crate::model::Config;
+
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let mut game = crate::model::Game::with_cards(
+            Config {
+                players: 2,
+                seed: 7,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = 0;
+        game.public.players[0].played_cards.push("A078".into());
+
+        let action = crate::engine::Action {
+            space: Space::Fishing,
+            detail: crate::engine::Detail::None,
+        };
+        let transition =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        let paused = matches!(transition, Ok(Transition::Paused(_)));
+        assert!(
+            paused,
+            "two simultaneous A078 Fishing triggers must pause, got: {transition:?}"
+        );
+        let before = (
+            game.public.players[0].supply.food,
+            game.public.players[0].supply.reed,
+        );
+
+        let outcome = game
+            .resolve_pending_and_resume(crate::pending::PendingResolution::ChooseTriggerOrder {
+                chosen_order: vec![0, 1],
+            })
+            .expect("resolution must succeed");
+        assert_eq!(outcome, Transition::Completed, "resume must complete");
+        let player = &game.public.players[0];
+        assert_eq!(
+            player.supply.food,
+            before.0 + 1,
+            "A078 food bonus lost after resume (before={before:?})"
+        );
+        assert_eq!(
+            player.supply.reed,
+            before.1 + 1,
+            "A078 reed bonus lost after resume (before={before:?})"
+        );
+        assert!(
+            game.public.used.contains(&Space::Fishing),
+            "the action space must be marked used by the resume"
+        );
+    }
+
     // --- Engine-path e2e test for ChooseTriggerOrder pause/resume (Issue #270 P2) ---
     //
     // The full engine path: apply_with_plans -> Ok(Paused(ChooseTriggerOrder))
