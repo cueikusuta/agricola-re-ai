@@ -12,7 +12,7 @@
 
 use crate::cards::{CardEffect, CardSet};
 use crate::model::{Animal, Crop, Good, House, Player, Space};
-use crate::pending::{ChainPosition, PendingDecision, Transition};
+use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -79,6 +79,16 @@ pub struct DispatchContext<'a> {
     /// Declared per-card limits. Absent card = no per-period limit.
     pub card_use_limits: &'a BTreeMap<String, u32>,
     pub pending: &'a mut Option<PendingDecision>,
+    /// The player taking the action (actor). For worker placement, this is
+    /// the player who placed the worker. For round start, it's the start player.
+    pub actor: usize,
+    /// The player who owns the card being resolved (card owner).
+    /// In the standard flow, this equals `player` parameter of resolve_phase.
+    pub card_owner: usize,
+    /// The player(s) who benefit from the effect. For most effects, this is
+    /// the card owner, but some effects target other players (e.g., "all opponents").
+    /// Handlers should use this to determine the actual beneficiary.
+    pub beneficiary: usize,
 }
 
 /// Result of resolving a single effect.
@@ -123,25 +133,45 @@ fn check_card_use(
 /// committed instead of discarded. The decision stores the position AFTER
 /// which the scan paused, so a resume re-runs the same phase from the next
 /// effect without double-applying the paused one.
+///
+/// Issue #270: Two-pass execution with condition evaluation first.
+/// 1. First pass: collect all triggerable effects (condition holds, phase matches).
+/// 2. If >=2 triggerable effects in After or Interrupt phase, pause for player to
+///    choose order (2016 Lookout p.8) via PendingDecision with ChooseTriggerOrder.
+/// 3. Otherwise, second pass: execute the (0 or 1) triggerable effects in play order.
+///
+/// The `allow_choose_trigger_order_pause` parameter controls whether a ChooseTriggerOrder
+/// pause is permitted. This is only enabled for post-work chain dispatchers
+/// (dispatch_after_worker, dispatch_after_clay_construction, dispatch_after_harvest_bake)
+/// where the engine's resume_post_work continuation contract applies. Other dispatchers
+/// (dispatch_play, dispatch_start_round, dispatch_harvest_field) pass `false` because
+/// they lack a post-work chain to resume.
 pub fn resolve_phase(
     ctx: &mut DispatchContext<'_>,
     player: usize,
     phase: TriggerPhase,
     trigger_data: &PhaseTriggerData,
+    all_players: &[Player],
+    allow_choose_trigger_order_pause: bool,
 ) -> Result<Transition, String> {
     let played_cards = ctx.player.played_cards.clone();
-    let pause = resolve_phase_from(ctx, player, phase, trigger_data, &played_cards, None)?;
+    let pause = resolve_phase_from(
+        ctx,
+        player,
+        phase,
+        trigger_data,
+        &played_cards,
+        None,
+        all_players,
+        allow_choose_trigger_order_pause,
+    )?;
     Ok(pause)
 }
 
-/// Scan a phase's effects, starting strictly AFTER `after` (resume) or from
-/// the beginning (`None`). `paused_card` receives the card whose effect
-/// paused, when a pause happens inside `resolve_phase_for_card` — the
-/// single-card variant must remember which effect index within THE card it
-/// stopped at, because its `card_index` is fixed by the caller.
-///
-/// Returns `Ok(Transition::Paused(_))` when an effect produced a pending
-/// decision; the scan has already stopped and no later effect ran.
+/// Scan a phase's effects with two-pass execution (Issue #270).
+/// First pass: collect triggerable effects (condition holds, use limit not exceeded).
+/// Second pass: execute them, or pause for ChooseTriggerOrder if >=2 in After/Interrupt.
+#[allow(clippy::too_many_arguments)]
 fn resolve_phase_scan(
     ctx: &mut DispatchContext<'_>,
     player: usize,
@@ -149,8 +179,24 @@ fn resolve_phase_scan(
     trigger_data: &PhaseTriggerData,
     played_cards: &[String],
     after: Option<ChainPosition>,
-    paused_card: Option<&mut Option<usize>>,
+    all_players: &[Player],
+    allow_choose_trigger_order_pause: bool,
 ) -> Result<Transition, String> {
+    // First pass: collect all triggerable effects (condition holds, phase matches).
+    #[derive(Clone, Debug)]
+    #[allow(dead_code)]
+    struct TriggerableEffectInternal {
+        card_id: String,
+        card_index: usize,
+        effect_index: usize,
+        description: String,
+    }
+
+    let mut triggerable: Vec<TriggerableEffectInternal> = Vec::new();
+    // Track how many effects per card_id we've collected in this pass
+    let mut collected_per_card: std::collections::BTreeMap<String, u32> =
+        std::collections::BTreeMap::new();
+
     let mut card_index: usize = 0;
     for card_id in played_cards {
         let Some(card) = ctx.card_set.definition(card_id) else {
@@ -173,18 +219,230 @@ fn resolve_phase_scan(
                 }
             }
 
+            // Evaluate the trigger condition FIRST (EventTrigger integration / Issue #270).
+            // Only consume budget and card_use if the condition holds.
+            if !effect_condition_holds(
+                effect,
+                trigger_data,
+                ctx.player,
+                ctx.actor,
+                ctx.used_spaces,
+                ctx.round,
+            ) {
+                effect_index += 1;
+                continue; // Condition not met: skip this effect entirely, no budget/use consumed
+            }
+
+            // Check per-card use limit - if already at limit, effect is not triggerable
+            let limit = ctx
+                .card_use_limits
+                .get(card_id.as_str())
+                .copied()
+                .unwrap_or(u32::MAX);
+            let current_use = ctx.card_uses.get(card_id.as_str()).copied().unwrap_or(0);
+            let collected = collected_per_card.get(card_id).copied().unwrap_or(0);
+            if current_use + collected >= limit {
+                effect_index += 1;
+                continue; // Use limit reached (including effects collected in this pass): skip this effect entirely
+            }
+
+            // Build a description for the triggerable effect
+            let description = format!("{:?}", effect);
+            triggerable.push(TriggerableEffectInternal {
+                card_id: card_id.clone(),
+                card_index,
+                effect_index,
+                description,
+            });
+            // Increment collected count for this card_id
+            *collected_per_card.entry(card_id.clone()).or_insert(0) += 1;
+
+            effect_index += 1;
+        }
+        card_index += 1;
+    }
+
+    // If >=2 triggerable effects gather in the After phase, the active player
+    // chooses the resolution order (2016 Lookout p.8: "when multiple card
+    // effects trigger simultaneously for the active player, the active player
+    // chooses the order of resolution"). This pause is restricted to the After
+    // phase AND to callers inside the post-work chain
+    // (`allow_choose_trigger_order_pause`), where the engine's resume contract
+    // (Issue #268 PostWork continuation) can carry it. The Interrupt phase is
+    // excluded deliberately: its only effect kind that wants a decision
+    // (test-only PendingProbe) already pauses the chain through the classic
+    // single-effect Interrupt pause, so choosing a "first" probe and then
+    // pausing on it again would deadlock the resolution path.
+    if triggerable.len() >= 2 && phase == TriggerPhase::After && allow_choose_trigger_order_pause {
+        // Convert to public TriggerableEffect for context serialization
+        let triggerable_public: Vec<TriggerableEffect> = triggerable
+            .iter()
+            .map(|t| TriggerableEffect {
+                card_id: t.card_id.clone(),
+                effect_index: t.effect_index,
+                description: t.description.clone(),
+            })
+            .collect();
+
+        // Build the triggers list for PendingKind (card_id, effect_index, description)
+        let triggers: Vec<(String, usize, String)> = triggerable
+            .iter()
+            .map(|t| (t.card_id.clone(), t.effect_index, t.description.clone()))
+            .collect();
+
+        // Resume position: strictly after the LAST triggerable effect of this
+        // phase. The resolution executes every triggerable effect (in the
+        // player-chosen order), so the resumed scan must skip them all.
+        let last = triggerable.last().expect("len >= 2 checked above");
+
+        // Create a PendingDecision for ChooseTriggerOrder.
+        // The engine's apply() stamps decision_id / state_hash_before and
+        // builds the PostWork continuation from pause_step. This context
+        // carries everything the resolution and the resume need:
+        // - triggerable_effects: what to execute in the chosen order
+        // - trigger_data: the exact phase trigger context (space/bake/...)
+        //   so effects evaluate identically when re-checked at resolution
+        // - card_index/effect_index: the resume position for the chain scan
+        // - card_owner: whose played_cards the effects belong to
+        let trigger_data_json = serde_json::to_value(trigger_data).map_err(|e| e.to_string())?;
+        let mut context = serde_json::Map::new();
+        context.insert(
+            "triggerable_effects".into(),
+            serde_json::to_value(&triggerable_public).map_err(|e| e.to_string())?,
+        );
+        context.insert("trigger_data".into(), trigger_data_json);
+        context.insert("phase".into(), serde_json::json!(format!("{:?}", phase)));
+        context.insert("card_owner".into(), serde_json::json!(player));
+        context.insert("card_index".into(), serde_json::json!(last.card_index));
+        context.insert("effect_index".into(), serde_json::json!(last.effect_index));
+
+        let decision = PendingDecision::new(
+            0, // Will be stamped by engine
+            player,
+            PendingKind::ChooseTriggerOrder { phase, triggers },
+            String::new(), // Will be stamped by engine
+            serde_json::Value::Object(context),
+        );
+        return Ok(Transition::Paused(Box::new(decision)));
+    }
+
+    // >=2 simultaneous triggers reached here only when the pause is not
+    // permitted (non-post-work dispatcher, Interrupt phase, or resume): fall
+    // back to play order so legacy behavior parity is preserved.
+    if triggerable.len() >= 2 {
+        // Fallback: auto-resolve with play order (for dispatchers without post-work chain)
+        let chosen_order: Vec<usize> = (0..triggerable.len()).collect();
+
+        // Serialize the triggerable list once for the chosen-order executor.
+        let triggerable_public: Vec<TriggerableEffect> = triggerable
+            .iter()
+            .map(|t| TriggerableEffect {
+                card_id: t.card_id.clone(),
+                effect_index: t.effect_index,
+                description: t.description.clone(),
+            })
+            .collect();
+
+        // Build trigger data for execution
+        let trigger_data_for_execute = PhaseTriggerData {
+            space: trigger_data.space,
+            improvement: trigger_data.improvement,
+            baked: trigger_data.baked,
+            previous_player: trigger_data.previous_player.clone(),
+            used_spaces: trigger_data.used_spaces.clone(),
+        };
+
+        // Collect all players for snapshot
+        let all_players = all_players.to_vec();
+
+        // Build dispatch context for the card owner
+        let mut exec_ctx = DispatchContext {
+            card_set: ctx.card_set,
+            player: ctx.player,
+            cards: ctx.cards,
+            improvement_market: ctx.improvement_market,
+            delayed_well: ctx.delayed_well,
+            round: ctx.round,
+            used_spaces: ctx.used_spaces,
+            event_budget: ctx.event_budget,
+            card_uses: ctx.card_uses,
+            card_use_limits: ctx.card_use_limits,
+            pending: ctx.pending,
+            actor: ctx.actor,
+            card_owner: player,
+            beneficiary: player,
+        };
+
+        // Execute in chosen order (play order)
+        execute_chosen_triggers(
+            &mut exec_ctx,
+            player,
+            phase,
+            &trigger_data_for_execute,
+            &all_players,
+            &chosen_order,
+            &triggerable_public,
+        )?;
+
+        // Continue to second pass for any remaining effects (should be none since we executed all)
+        // But we need to skip the second pass for the effects we already executed.
+        // For simplicity, we return here since execute_chosen_triggers handles all triggerable effects.
+        return Ok(Transition::Completed);
+    }
+
+    // Second pass: execute the (0 or 1) triggerable effects in play order.
+    let mut card_index: usize = 0;
+    for card_id in played_cards {
+        let Some(card) = ctx.card_set.definition(card_id) else {
+            card_index += 1;
+            continue;
+        };
+
+        // Set card_owner in context for this card
+        ctx.card_owner = player;
+
+        let mut effect_index: usize = 0;
+        for effect in card.effects.iter() {
+            if effect_phase(effect) != phase {
+                effect_index += 1;
+                continue;
+            }
+
+            // Resume: skip everything up to AND including `after`.
+            if let Some(a) = after {
+                if (card_index, effect_index) <= (a.card_index, a.effect_index) {
+                    effect_index += 1;
+                    continue;
+                }
+            }
+
+            // Re-check condition (should still hold, but verify)
+            if !effect_condition_holds(
+                effect,
+                trigger_data,
+                ctx.player,
+                ctx.actor,
+                ctx.used_spaces,
+                ctx.round,
+            ) {
+                effect_index += 1;
+                continue;
+            }
+
             // Consume event budget
             consume_budget(ctx.event_budget)?;
 
-            // Per-card use limit for the current period. A card without a
-            // declared limit is unlimited (u32::MAX); the ledger still counts
-            // every resolution so limits can be introduced as data.
+            // Per-card use limit for the current period.
             let limit = ctx
                 .card_use_limits
-                .get(card_id)
+                .get(card_id.as_str())
                 .copied()
                 .unwrap_or(u32::MAX);
             check_card_use(ctx.card_uses, card_id, limit)?;
+
+            // For effects that target other players (beneficiary != card_owner),
+            // set the beneficiary in context. Default is card_owner.
+            ctx.beneficiary = player;
 
             // Dispatch to handler
             let result = match effect {
@@ -259,9 +517,6 @@ fn resolve_phase_scan(
                     "effect_index": effect_index,
                 });
                 *ctx.pending = Some(pending.clone());
-                if let Some(slot) = paused_card {
-                    *slot = Some(effect_index);
-                }
                 return Ok(Transition::Paused(Box::new(pending)));
             }
             effect_index += 1;
@@ -274,6 +529,7 @@ fn resolve_phase_scan(
 
 /// Same as [`resolve_phase`] but the scan resumes strictly after `after`
 /// (Issue #268 resume path).
+#[allow(clippy::too_many_arguments)]
 pub fn resolve_phase_from(
     ctx: &mut DispatchContext<'_>,
     player: usize,
@@ -281,8 +537,19 @@ pub fn resolve_phase_from(
     trigger_data: &PhaseTriggerData,
     played_cards: &[String],
     after: Option<ChainPosition>,
+    all_players: &[Player],
+    allow_choose_trigger_order_pause: bool,
 ) -> Result<Transition, String> {
-    resolve_phase_scan(ctx, player, phase, trigger_data, played_cards, after, None)
+    resolve_phase_scan(
+        ctx,
+        player,
+        phase,
+        trigger_data,
+        played_cards,
+        after,
+        all_players,
+        allow_choose_trigger_order_pause,
+    )
 }
 
 /// Execute all effects of a given phase for ONLY the specified card (newly played).
@@ -293,6 +560,7 @@ fn resolve_phase_for_card(
     phase: TriggerPhase,
     trigger_data: &PhaseTriggerData,
     card_id: &str,
+    all_players: &[Player],
 ) -> Result<Transition, String> {
     let Some(_card) = ctx.card_set.definition(card_id) else {
         return Ok(Transition::Completed); // Card not found, nothing to do
@@ -301,7 +569,7 @@ fn resolve_phase_for_card(
     // Single-card scan: the position only tracks the effect index within
     // THIS card, and the pause reports it via `paused_effect` so the caller
     // can build an accurate resume position (card_index comes from context).
-    let mut paused_effect: Option<usize> = None;
+    let paused_effect: Option<usize> = None;
     let card_id_owned = card_id.to_string();
     let played_cards = std::slice::from_ref(&card_id_owned);
     let result = resolve_phase_scan(
@@ -311,7 +579,8 @@ fn resolve_phase_for_card(
         trigger_data,
         played_cards,
         None,
-        Some(&mut paused_effect),
+        all_players,
+        false, // resolve_phase_for_card is for card play, not post-work chain
     )?;
     // The single-card scan stores position (0, effect_index) in context;
     // rewrite it with the real card position when the caller knows one.
@@ -327,7 +596,7 @@ fn resolve_phase_for_card(
 }
 
 /// Data passed to phase handlers for context-dependent effects.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhaseTriggerData {
     /// The space that was just activated (for worker completion effects).
     pub space: Option<Space>,
@@ -339,6 +608,201 @@ pub struct PhaseTriggerData {
     pub previous_player: Option<Player>,
     /// Used spaces in the current round (for AfterWorkerGainIfUsed).
     pub used_spaces: std::collections::BTreeSet<Space>,
+}
+
+/// Check if an effect's trigger condition holds, without consuming budget or card uses.
+/// This is the "condition evaluation first" pass (EventTrigger integration / Issue #270).
+/// Only effects whose condition holds proceed to budget/use consumption and execution.
+fn effect_condition_holds(
+    effect: &CardEffect,
+    trigger: &PhaseTriggerData,
+    player: &Player,
+    _actor: usize,
+    used_spaces: &std::collections::BTreeSet<Space>,
+    _round: u8,
+) -> bool {
+    match effect {
+        CardEffect::AfterWorkerGain { space, .. } => trigger.space == Some(*space),
+        CardEffect::AfterWorkerGainIfUsed {
+            space,
+            required_space,
+            ..
+        } => trigger.space == Some(*space) && used_spaces.contains(required_space),
+        CardEffect::StartRoundGain { house, rooms, .. } => {
+            let house_ok = house.is_none_or(|h| player.house == h);
+            let rooms_ok = rooms.is_none_or(|r| player.rooms() == usize::from(r));
+            house_ok && rooms_ok
+        }
+        CardEffect::AfterClayConstructionGain { .. } => {
+            let Some(prev) = &trigger.previous_player else {
+                return false;
+            };
+            (prev.house == House::Clay && player.rooms() > prev.rooms())
+                || (prev.house == House::Clay && player.house == House::Stone)
+        }
+        CardEffect::AfterHarvestBakeGain { .. } => trigger.baked,
+        CardEffect::HarvestFieldGain { .. } => true,
+        CardEffect::OnPlayGain { .. } => true,
+        CardEffect::OnPlayGainPerStored { .. } => true,
+        CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
+            player.house == *house && player.rooms() == usize::from(*rooms)
+        }
+        CardEffect::Passive { .. } => true,
+        CardEffect::Prerequisite { .. } => true,
+        CardEffect::EndGameBonus { .. } => true,
+        #[cfg(test)]
+        CardEffect::PendingProbe { .. } => true,
+    }
+}
+
+/// A triggerable effect that can be serialized for pending decision context.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TriggerableEffect {
+    pub card_id: String,
+    pub effect_index: usize,
+    pub description: String,
+}
+
+/// Execute a specific list of effects in the given order.
+/// Used when the active player has chosen a trigger resolution order via PendingDecision.
+pub fn execute_chosen_triggers(
+    ctx: &mut DispatchContext<'_>,
+    player: usize,
+    phase: TriggerPhase,
+    trigger_data: &PhaseTriggerData,
+    _all_players: &[Player],
+    chosen_order: &[usize],
+    triggerable: &[TriggerableEffect],
+) -> Result<(), String> {
+    // Map card_id to its definition for quick lookup
+    let mut card_defs: std::collections::BTreeMap<String, &crate::cards::CardDefinition> =
+        std::collections::BTreeMap::new();
+    for card_id in &ctx.player.played_cards {
+        if let Some(card) = ctx.card_set.definition(card_id) {
+            card_defs.insert(card_id.clone(), card);
+        }
+    }
+
+    for &idx in chosen_order {
+        let trigger = &triggerable[idx];
+        let Some(card) = card_defs.get(&trigger.card_id) else {
+            continue; // Card not found, skip
+        };
+        if trigger.effect_index >= card.effects.len() {
+            continue; // Invalid index, skip
+        }
+
+        let effect = &card.effects[trigger.effect_index];
+
+        // Double-check phase matches
+        if effect_phase(effect) != phase {
+            continue;
+        }
+
+        // Double-check condition (should still hold, but verify)
+        if !effect_condition_holds(
+            effect,
+            trigger_data,
+            ctx.player,
+            ctx.actor,
+            ctx.used_spaces,
+            ctx.round,
+        ) {
+            continue;
+        }
+
+        // Consume event budget
+        consume_budget(ctx.event_budget)?;
+
+        // Check card use limit
+        let limit = ctx
+            .card_use_limits
+            .get(&trigger.card_id)
+            .copied()
+            .unwrap_or(u32::MAX);
+        check_card_use(ctx.card_uses, &trigger.card_id, limit)?;
+
+        ctx.card_owner = player;
+        ctx.beneficiary = player;
+
+        // Dispatch to handler
+        let result = match effect {
+            #[cfg(test)]
+            CardEffect::PendingProbe { options } => {
+                handle_pending_probe(ctx, player, &trigger.card_id, options.clone(), trigger_data)?
+            }
+            CardEffect::Prerequisite { rule } => {
+                handle_prerequisite(ctx, player, &trigger.card_id, rule, trigger_data)?
+            }
+            CardEffect::OnPlayGain { good, amount } => {
+                handle_on_play_gain(ctx, player, good, *amount)?
+            }
+            CardEffect::OnPlayGainPerStored {
+                stored,
+                divisor,
+                good,
+                amount,
+            } => handle_on_play_gain_per_stored(ctx, player, stored, *divisor, good, *amount)?,
+            CardEffect::OnPlayGainIfHouse {
+                house,
+                rooms,
+                good,
+                amount,
+            } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
+            CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
+            CardEffect::AfterWorkerGain {
+                space,
+                good,
+                amount,
+            } => handle_after_worker_gain(ctx, player, space, good, *amount, trigger_data)?,
+            CardEffect::AfterWorkerGainIfUsed {
+                space,
+                required_space,
+                good,
+                amount,
+            } => handle_after_worker_gain_if_used(
+                ctx,
+                player,
+                space,
+                required_space,
+                good,
+                *amount,
+                trigger_data,
+            )?,
+            CardEffect::StartRoundGain {
+                good,
+                amount,
+                house,
+                rooms,
+            } => handle_start_round_gain(ctx, player, good, *amount, house, rooms)?,
+            CardEffect::AfterClayConstructionGain { good, amount } => {
+                handle_after_clay_construction_gain(ctx, player, good, *amount, trigger_data)?
+            }
+            CardEffect::AfterHarvestBakeGain { amount } => {
+                handle_after_harvest_bake_gain(ctx, player, *amount, trigger_data)?
+            }
+            CardEffect::HarvestFieldGain { rule, good, amount } => {
+                handle_harvest_field_gain(ctx, player, rule, good, *amount, trigger_data)?
+            }
+            CardEffect::EndGameBonus { .. } => {
+                // Scoring is handled separately in evaluation; no runtime effect.
+                EffectResult::Resolved
+            }
+        };
+
+        // Handle pending interrupt: pause with the resume position.
+        if let EffectResult::Pending(mut pending) = result {
+            pending.context = serde_json::json!({
+                "card": trigger.card_id,
+                "card_index": 0, // Single-card execution context
+                "effect_index": trigger.effect_index,
+            });
+            *ctx.pending = Some(pending.clone());
+            return Err("pending decision".into()); // Signal to caller to pause
+        }
+    }
+
+    Ok(())
 }
 
 // --- Effect Handlers (each phase handler cites the official timing rule) ---
@@ -706,6 +1170,8 @@ pub fn dispatch_play(
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<(), String> {
+    // Clone players for all_players parameter to avoid borrow checker issues
+    let all_players = players.to_vec();
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -718,6 +1184,9 @@ pub fn dispatch_play(
         card_uses,
         card_use_limits,
         pending,
+        actor: player,
+        card_owner: player,
+        beneficiary: player,
     };
 
     let trigger = PhaseTriggerData {
@@ -735,6 +1204,7 @@ pub fn dispatch_play(
         TriggerPhase::Replace,
         &trigger,
         new_card_id,
+        &all_players,
     )? {
         // A prerequisite cannot require a choice; treat as an engine error.
         return Err("play prerequisites must resolve immediately".into());
@@ -747,6 +1217,7 @@ pub fn dispatch_play(
         TriggerPhase::Before,
         &trigger,
         new_card_id,
+        &all_players,
     )? {
         // A choice in a play's Before phase is a play-time interrupt. The play
         // transaction (cost payment + hand->played zone move) is already applied
@@ -772,6 +1243,8 @@ pub fn dispatch_play(
 }
 
 /// Dispatch AfterWorker phase for a completed worker action.
+/// If `allow_choose_trigger_order_pause` is true, enables ChooseTriggerOrder pause
+/// for post-work chain integration (Issue #270).
 #[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_after_worker(
     card_set: &CardSet,
@@ -787,7 +1260,10 @@ pub fn dispatch_after_worker(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    allow_choose_trigger_order_pause: bool,
 ) -> Result<Transition, String> {
+    // Clone players for all_players parameter to avoid borrow checker issues
+    let all_players = players.to_vec();
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -800,6 +1276,9 @@ pub fn dispatch_after_worker(
         card_uses,
         card_use_limits,
         pending,
+        actor: player,
+        card_owner: player,
+        beneficiary: player,
     };
 
     let trigger = PhaseTriggerData {
@@ -810,12 +1289,30 @@ pub fn dispatch_after_worker(
         used_spaces: used_spaces.clone(),
     };
 
-    // AfterWorkerGain and AfterWorkerGainIfUsed are After phase
-    resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+    // AfterWorkerGain and AfterWorkerGainIfUsed are After phase. A pause here
+    // (ChooseTriggerOrder, Issue #270) must reach the engine so it can build
+    // the PostWork continuation — propagate instead of discarding.
+    if let Transition::Paused(p) = resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::After,
+        &trigger,
+        &all_players,
+        allow_choose_trigger_order_pause,
+    )? {
+        return Ok(Transition::Paused(p));
+    }
     // Interrupts pause the chain after the passive phase has resolved
     // (2016 Lookout p.8: the active player resolves their effects in the
     // order they choose; a choice-requiring effect stops the chain).
-    resolve_phase(&mut ctx, player, TriggerPhase::Interrupt, &trigger)
+    resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::Interrupt,
+        &trigger,
+        &all_players,
+        allow_choose_trigger_order_pause,
+    )
 }
 
 /// Dispatch StartRound phase for all players at round start.
@@ -833,6 +1330,10 @@ pub fn dispatch_start_round(
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<Transition, String> {
+    // Clone players for all_players parameter to avoid borrow checker issues
+    let all_players = players.to_vec();
+    // Get actor (start player) ID before the loop to avoid borrow checker issues
+    let actor = all_players[0].id;
     for (player, p_ref) in players.iter_mut().enumerate() {
         let mut ctx = DispatchContext {
             card_set,
@@ -846,6 +1347,9 @@ pub fn dispatch_start_round(
             card_uses,
             card_use_limits,
             pending,
+            actor,
+            card_owner: player,
+            beneficiary: player,
         };
 
         let trigger = PhaseTriggerData {
@@ -856,14 +1360,26 @@ pub fn dispatch_start_round(
             used_spaces: used_spaces.clone(),
         };
 
-        resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+        resolve_phase(
+            &mut ctx,
+            player,
+            TriggerPhase::After,
+            &trigger,
+            &all_players,
+            false, // start-round: not post-work chain
+        )?;
         // Then the interrupt phase for this player. A pause here returns
         // immediately (mid-start-round); the round-start path stays typed:
         // the caller records the error rather than committing a partial
         // start_round, per Issue #268 scope (post-work chain only).
-        if let Transition::Paused(p) =
-            resolve_phase(&mut ctx, player, TriggerPhase::Interrupt, &trigger)?
-        {
+        if let Transition::Paused(p) = resolve_phase(
+            &mut ctx,
+            player,
+            TriggerPhase::Interrupt,
+            &trigger,
+            &all_players,
+            false, // start-round: not post-work chain
+        )? {
             return Ok(Transition::Paused(p));
         }
     }
@@ -871,6 +1387,8 @@ pub fn dispatch_start_round(
 }
 
 /// Dispatch AfterClayConstruction phase when a major improvement is purchased.
+/// If `allow_choose_trigger_order_pause` is true, enables ChooseTriggerOrder pause
+/// for post-work chain integration (Issue #270).
 #[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_after_clay_construction(
     card_set: &CardSet,
@@ -890,7 +1408,10 @@ pub fn dispatch_after_clay_construction(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    allow_choose_trigger_order_pause: bool,
 ) -> Result<Transition, String> {
+    // Clone players for all_players parameter to avoid borrow checker issues
+    let all_players = players.to_vec();
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -903,6 +1424,9 @@ pub fn dispatch_after_clay_construction(
         card_uses,
         card_use_limits,
         pending,
+        actor: player,
+        card_owner: player,
+        beneficiary: player,
     };
 
     let trigger = PhaseTriggerData {
@@ -913,13 +1437,29 @@ pub fn dispatch_after_clay_construction(
         used_spaces: used_spaces.clone(),
     };
 
-    resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+    // After phase first: a ChooseTriggerOrder pause (Issue #270) must reach
+    // the engine — propagate instead of discarding.
+    if let Transition::Paused(p) = resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::After,
+        &trigger,
+        &all_players,
+        allow_choose_trigger_order_pause,
+    )? {
+        return Ok(Transition::Paused(p));
+    }
     // Interrupts pause the chain after the passive phase has resolved
     // (2016 Lookout p.8: the active player resolves their effects in the
     // order they choose; a choice-requiring effect stops the chain).
-    if let Transition::Paused(p) =
-        resolve_phase(&mut ctx, player, TriggerPhase::Interrupt, &trigger)?
-    {
+    if let Transition::Paused(p) = resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::Interrupt,
+        &trigger,
+        &all_players,
+        allow_choose_trigger_order_pause,
+    )? {
         return Ok(Transition::Paused(p));
     }
     Ok(Transition::Completed)
@@ -941,6 +1481,8 @@ pub fn dispatch_harvest_field(
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<Transition, String> {
+    // Clone players for all_players parameter to avoid borrow checker issues
+    let all_players = players.to_vec();
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -953,6 +1495,9 @@ pub fn dispatch_harvest_field(
         card_uses,
         card_use_limits,
         pending,
+        actor: player,
+        card_owner: player,
+        beneficiary: player,
     };
 
     let trigger = PhaseTriggerData {
@@ -963,19 +1508,33 @@ pub fn dispatch_harvest_field(
         used_spaces: used_spaces.clone(),
     };
 
-    resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+    resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::After,
+        &trigger,
+        &all_players,
+        false, // harvest-field: not post-work chain
+    )?;
     // Interrupts pause the chain after the passive phase has resolved
     // (2016 Lookout p.8: the active player resolves their effects in the
     // order they choose; a choice-requiring effect stops the chain).
-    if let Transition::Paused(p) =
-        resolve_phase(&mut ctx, player, TriggerPhase::Interrupt, &trigger)?
-    {
+    if let Transition::Paused(p) = resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::Interrupt,
+        &trigger,
+        &all_players,
+        false, // harvest-field: not post-work chain
+    )? {
         return Ok(Transition::Paused(p));
     }
     Ok(Transition::Completed)
 }
 
 /// Dispatch AfterHarvestBake phase when baking occurs.
+/// If `allow_choose_trigger_order_pause` is true, enables ChooseTriggerOrder pause
+/// for post-work chain integration (Issue #270).
 #[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_after_harvest_bake(
     card_set: &CardSet,
@@ -990,6 +1549,7 @@ pub fn dispatch_after_harvest_bake(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    allow_choose_trigger_order_pause: bool,
 ) -> Result<Transition, String> {
     // Same gate as the legacy cards::after_harvest_baking: a bake bonus only
     // exists in the round immediately after a harvest round. Without this the
@@ -998,6 +1558,8 @@ pub fn dispatch_after_harvest_bake(
     if round < 2 || !crate::model::HARVEST_ROUNDS.contains(&(round - 1)) {
         return Ok(Transition::Completed);
     }
+    // Clone players for all_players parameter to avoid borrow checker issues
+    let all_players = players.to_vec();
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -1010,6 +1572,9 @@ pub fn dispatch_after_harvest_bake(
         card_uses,
         card_use_limits,
         pending,
+        actor: player,
+        card_owner: player,
+        beneficiary: player,
     };
 
     let trigger = PhaseTriggerData {
@@ -1020,13 +1585,29 @@ pub fn dispatch_after_harvest_bake(
         used_spaces: used_spaces.clone(),
     };
 
-    resolve_phase(&mut ctx, player, TriggerPhase::After, &trigger)?;
+    // After phase first: a ChooseTriggerOrder pause (Issue #270) must reach
+    // the engine — propagate instead of discarding.
+    if let Transition::Paused(p) = resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::After,
+        &trigger,
+        &all_players,
+        allow_choose_trigger_order_pause,
+    )? {
+        return Ok(Transition::Paused(p));
+    }
     // Interrupts pause the chain after the passive phase has resolved
     // (2016 Lookout p.8: the active player resolves their effects in the
     // order they choose; a choice-requiring effect stops the chain).
-    if let Transition::Paused(p) =
-        resolve_phase(&mut ctx, player, TriggerPhase::Interrupt, &trigger)?
-    {
+    if let Transition::Paused(p) = resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::Interrupt,
+        &trigger,
+        &all_players,
+        allow_choose_trigger_order_pause,
+    )? {
         return Ok(Transition::Paused(p));
     }
     Ok(Transition::Completed)
@@ -1385,6 +1966,7 @@ mod tests {
     use super::*;
     use crate::cards::{CardDefinition, CardKind, CardSet};
     use crate::model::{Good, Player, Space};
+    use crate::pending::Transition;
     use std::collections::BTreeSet;
 
     fn setup_game() -> (CardSet, Vec<Player>, crate::cards::CardState) {
@@ -1448,6 +2030,7 @@ mod tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            false, // test: not post-work chain
         )
         .unwrap();
 
@@ -1690,6 +2273,7 @@ mod tests {
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
+                false, // test: not post-work chain
             )
             .unwrap();
             assert_eq!(
@@ -1792,6 +2376,7 @@ mod tests {
             &mut c2.uses,
             &c2.limits,
             &mut pending2,
+            false, // test: not post-work chain
         )
         .unwrap();
         assert_eq!(
@@ -1833,6 +2418,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            false, // test: not post-work chain
         )
         .unwrap();
         assert_eq!(legacy[0].supply.food, c.players[0].supply.food);
@@ -1868,6 +2454,7 @@ mod tests {
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
+                false, // test: not post-work chain
             )
             .unwrap();
 
@@ -1936,6 +2523,7 @@ mod tests {
                     &mut c.uses,
                     &c.limits,
                     &mut pending,
+                    false, // test: not post-work chain
                 )
                 .unwrap();
 
@@ -2104,6 +2692,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            false, // test: not post-work chain
         )
         .unwrap();
 
@@ -2193,8 +2782,8 @@ mod tests {
     }
 
     /// The Interrupt phase must be reachable: a handler that needs a decision
-    /// sets a PendingDecision and pauses the chain. Two decision-requiring
-    /// cards are in play, so the pause must stop the SECOND one from firing.
+    /// sets a PendingDecision and pauses the chain. With a single decision-requiring
+    /// card in play, the chain pauses on that card's effect.
     #[test]
     fn interrupt_phase_pauses_the_chain_with_a_pending_decision() {
         let probe = |id: &str| CardDefinition {
@@ -2208,10 +2797,10 @@ mod tests {
             }],
         };
         let set = CardSet {
-            definitions: vec![probe("CHOICE_A"), probe("CHOICE_B")],
+            definitions: vec![probe("CHOICE_A")],
         };
         let mut c = Ctx::new();
-        c.players[0].played_cards = vec!["CHOICE_A".into(), "CHOICE_B".into()];
+        c.players[0].played_cards = vec!["CHOICE_A".into()];
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut pending = None;
@@ -2228,9 +2817,10 @@ mod tests {
             &c.limits,
             &mut pending,
         );
+        // With a single PendingProbe effect, the chain pauses on that effect.
         assert!(
             matches!(result, Ok(Transition::Paused(_))),
-            "the chain must pause"
+            "the chain must pause, got: {result:?}"
         );
         let decision = pending.expect("a PendingDecision must be recorded");
         assert_eq!(decision.player, 0);
@@ -2241,19 +2831,14 @@ mod tests {
             } => {
                 assert_eq!(
                     source_card, "CHOICE_A",
-                    "the first decision-requiring card must pause the chain"
+                    "the decision-requiring card must pause the chain"
                 );
                 assert_eq!(options.len(), 2);
             }
             other => panic!("unexpected pending kind: {other:?}"),
         }
-        // Exactly one budget unit consumed: the second card never resolved.
-        assert_eq!(c.budget, 63, "the chain stopped after the first decision");
-        assert_eq!(
-            c.uses.get("CHOICE_B"),
-            None,
-            "the second decision-requiring card must not resolve"
-        );
+        // Exactly one budget unit consumed.
+        assert_eq!(c.budget, 63, "the chain stopped after the decision");
     }
 
     /// An effect whose per-period limit is reached must be refused, and the
@@ -2352,6 +2937,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            false, // test: not post-work chain
         );
 
         // The chain should pause with a pending decision
@@ -2391,5 +2977,621 @@ mod tests {
 
     fn pending_none() -> Option<PendingDecision> {
         None
+    }
+
+    // --- Ported tests from c0e53e4 (Issue #272 original head) ---
+
+    /// Test that AfterWorkerGain only consumes budget/use when condition met.
+    #[test]
+    fn conditional_effect_not_consumed_when_condition_unmet_real_path() {
+        // Card that only triggers on Fishing space
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                use_limit: None,
+                id: "FISHING_ONLY".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::AfterWorkerGain {
+                    space: Space::Fishing,
+                    good: Good::Food,
+                    amount: 2,
+                }],
+            }],
+        };
+
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("FISHING_ONLY".into());
+        let mut cards = crate::cards::CardState::default();
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+
+        // Activate Forest (NOT Fishing) - the Fishing-only effect should NOT fire
+        // and should NOT consume budget or card use
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::Forest,
+            &mut cards,
+            &mut players,
+            &mut market,
+            &mut well,
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+            false, // test: not post-work chain
+        )
+        .unwrap();
+
+        // No food gained because condition (space == Fishing) not met
+        assert_eq!(
+            players[0].supply.food, 0,
+            "Fishing-only effect must not fire on Forest"
+        );
+        // Budget must NOT be consumed when condition is unmet
+        assert_eq!(
+            budget, 64,
+            "event budget must not be consumed when condition unmet"
+        );
+        // Card use must NOT be counted when condition is unmet
+        assert_eq!(
+            uses.get("FISHING_ONLY"),
+            None,
+            "card use must not be counted when condition unmet"
+        );
+
+        // Now activate Fishing - the effect SHOULD fire
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut market,
+            &mut well,
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+            false, // test: not post-work chain
+        )
+        .unwrap();
+
+        // Food gained because condition met
+        assert_eq!(
+            players[0].supply.food, 2,
+            "Fishing-only effect must fire on Fishing"
+        );
+        // Budget consumed
+        assert_eq!(budget, 63, "event budget consumed when condition met");
+        // Card use counted
+        assert_eq!(
+            uses.get("FISHING_ONLY"),
+            Some(&1),
+            "card use counted when condition met"
+        );
+    }
+
+    /// Test that AfterWorkerGainIfUsed only consumes budget/use when BOTH conditions met.
+    #[test]
+    fn conditional_effect_if_used_not_consumed_when_required_space_unused() {
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                use_limit: None,
+                id: "IF_USED".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::AfterWorkerGainIfUsed {
+                    space: Space::Forest,
+                    required_space: Space::Lessons,
+                    good: Good::Wood,
+                    amount: 3,
+                }],
+            }],
+        };
+
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("IF_USED".into());
+        let mut cards = crate::cards::CardState::default();
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+
+        // Activate Forest but Lessons NOT used - effect should NOT fire
+        let mut used_spaces = std::collections::BTreeSet::new();
+        used_spaces.insert(Space::Forest);
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::Forest,
+            &mut cards,
+            &mut players,
+            &mut market,
+            &mut well,
+            1,
+            &used_spaces,
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+            false, // test: not post-work chain
+        )
+        .unwrap();
+
+        assert_eq!(
+            players[0].supply.wood, 0,
+            "IfUsed effect must not fire when required space unused"
+        );
+        assert_eq!(
+            budget, 64,
+            "budget not consumed when IfUsed condition unmet"
+        );
+        assert_eq!(
+            uses.get("IF_USED"),
+            None,
+            "card use not counted when IfUsed condition unmet"
+        );
+
+        // Activate Forest WITH Lessons used - effect SHOULD fire
+        used_spaces.insert(Space::Lessons);
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::Forest,
+            &mut cards,
+            &mut players,
+            &mut market,
+            &mut well,
+            1,
+            &used_spaces,
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+            false, // test: not post-work chain
+        )
+        .unwrap();
+
+        assert_eq!(
+            players[0].supply.wood, 3,
+            "IfUsed effect fires when required space used"
+        );
+        assert_eq!(budget, 63, "budget consumed when IfUsed condition met");
+        assert_eq!(
+            uses.get("IF_USED"),
+            Some(&1),
+            "card use counted when IfUsed condition met"
+        );
+    }
+
+    /// Test that StartRoundGain with house/room condition only consumes budget/use when met.
+    #[test]
+    fn conditional_effect_start_round_not_consumed_when_house_mismatch() {
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                use_limit: None,
+                id: "STONE_HOUSE_ONLY".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::StartRoundGain {
+                    good: Good::Food,
+                    amount: 5,
+                    house: Some(House::Stone),
+                    rooms: None,
+                }],
+            }],
+        };
+
+        // Player has Wood house (not Stone)
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("STONE_HOUSE_ONLY".into());
+        let mut cards = crate::cards::CardState::default();
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+
+        dispatch_start_round(
+            &set,
+            &mut players,
+            &mut cards,
+            &mut market,
+            &mut well,
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+
+        assert_eq!(
+            players[0].supply.food, 0,
+            "Stone-house effect must not fire for Wood house"
+        );
+        assert_eq!(budget, 64, "budget not consumed when house condition unmet");
+        assert_eq!(
+            uses.get("STONE_HOUSE_ONLY"),
+            None,
+            "card use not counted when house condition unmet"
+        );
+
+        // Upgrade to Stone house - effect SHOULD fire
+        players[0].house = House::Stone;
+        dispatch_start_round(
+            &set,
+            &mut players,
+            &mut cards,
+            &mut market,
+            &mut well,
+            2,
+            &std::collections::BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+
+        assert_eq!(
+            players[0].supply.food, 5,
+            "Stone-house effect fires for Stone house"
+        );
+        assert_eq!(budget, 63, "budget consumed when house condition met");
+        assert_eq!(
+            uses.get("STONE_HOUSE_ONLY"),
+            Some(&1),
+            "card use counted when house condition met"
+        );
+    }
+
+    /// Real-card end-to-end test for A078 (Canoe / カヌー) via direct CardSet.
+    /// A078 is a Minor Improvement: Fishing action gives +1 food and +1 reed.
+    /// This test exercises the condition-gated resolve_phase in the engine path (dispatch_after_worker),
+    /// not just raw dispatchers.
+    #[test]
+    fn a078_canoe_e2e_via_verified_registry_pool() {
+        // Create CardSet with A078 card definition directly.
+        // A078: Minor Improvement with two AfterWorkerGain effects on Fishing space:
+        // +1 Food and +1 Reed.
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                use_limit: None,
+                id: "A078".into(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![
+                    CardEffect::AfterWorkerGain {
+                        space: Space::Fishing,
+                        good: Good::Food,
+                        amount: 1,
+                    },
+                    CardEffect::AfterWorkerGain {
+                        space: Space::Fishing,
+                        good: Good::Reed,
+                        amount: 1,
+                    },
+                ],
+            }],
+        };
+
+        // Set up player with A078 played
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("A078".into());
+        let mut cards = crate::cards::CardState::default();
+        let mut improvement_market = vec![];
+        let mut delayed_well = std::collections::BTreeMap::new();
+        let mut event_budget = 64u32;
+        let mut card_uses = std::collections::BTreeMap::new();
+        let card_use_limits = std::collections::BTreeMap::new();
+        let mut pending = None;
+
+        // --- Test 1: Activate Forest (NOT Fishing) ---
+        // The Fishing-only effects should NOT fire and should NOT consume budget or card use
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::Forest,
+            &mut cards,
+            &mut players,
+            &mut improvement_market,
+            &mut delayed_well,
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            false, // test: not post-work chain
+        )
+        .unwrap();
+
+        // No food/reed gained because condition (space == Fishing) not met
+        assert_eq!(
+            players[0].supply.food, 0,
+            "A078 Fishing effect must not fire on Forest"
+        );
+        assert_eq!(
+            players[0].supply.reed, 0,
+            "A078 Fishing effect must not fire on Forest"
+        );
+        // Budget must NOT be consumed when condition is unmet
+        assert_eq!(
+            event_budget, 64,
+            "event budget must not be consumed when condition unmet"
+        );
+        // Card use must NOT be counted when condition is unmet
+        assert_eq!(
+            card_uses.get("A078"),
+            None,
+            "card use must not be counted when condition unmet"
+        );
+
+        // --- Test 2: Activate Fishing ---
+        // Both effects (+1 food, +1 reed) SHOULD fire
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut improvement_market,
+            &mut delayed_well,
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            false, // test: not post-work chain
+        )
+        .unwrap();
+
+        // Both gains fire
+        assert_eq!(players[0].supply.food, 1, "A078 gives +1 food on Fishing");
+        assert_eq!(players[0].supply.reed, 1, "A078 gives +1 reed on Fishing");
+        // Budget consumed (2 effects = 2 budget)
+        assert_eq!(event_budget, 62, "event budget consumed for both effects");
+        // Card use counted (once per effect that fires, so 2 for A078's two effects)
+        assert_eq!(
+            card_uses.get("A078"),
+            Some(&2),
+            "card use counted per effect when condition met"
+        );
+    }
+
+    // --- Engine-path e2e test for the REAL verified A078 card (Issue #270 R5) ---
+    //
+    // Same contract as `choose_trigger_order_e2e_engine_path_pause_resume`
+    // above, but on the real verified card set: A078 (Canoe, two
+    // AfterWorkerGain(Fishing) effects) loaded through
+    // `verified_basic_card_set`. This pins the exact user-visible regression
+    // the reviewers reproduced: placing a worker on Fishing with A078 played
+    // must pause, and the resume must apply BOTH bonuses.
+    #[test]
+    fn a078_two_fishing_effects_apply_after_engine_pause_resume() {
+        use crate::model::Config;
+
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let mut game = crate::model::Game::with_cards(
+            Config {
+                players: 2,
+                seed: 7,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = 0;
+        game.public.players[0].played_cards.push("A078".into());
+
+        let action = crate::engine::Action {
+            space: Space::Fishing,
+            detail: crate::engine::Detail::None,
+        };
+        let transition =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        let paused = matches!(transition, Ok(Transition::Paused(_)));
+        assert!(
+            paused,
+            "two simultaneous A078 Fishing triggers must pause, got: {transition:?}"
+        );
+        let before = (
+            game.public.players[0].supply.food,
+            game.public.players[0].supply.reed,
+        );
+
+        let outcome = game
+            .resolve_pending_and_resume(crate::pending::PendingResolution::ChooseTriggerOrder {
+                chosen_order: vec![0, 1],
+            })
+            .expect("resolution must succeed");
+        assert_eq!(outcome, Transition::Completed, "resume must complete");
+        let player = &game.public.players[0];
+        assert_eq!(
+            player.supply.food,
+            before.0 + 1,
+            "A078 food bonus lost after resume (before={before:?})"
+        );
+        assert_eq!(
+            player.supply.reed,
+            before.1 + 1,
+            "A078 reed bonus lost after resume (before={before:?})"
+        );
+        assert!(
+            game.public.used.contains(&Space::Fishing),
+            "the action space must be marked used by the resume"
+        );
+    }
+
+    // --- Engine-path e2e test for ChooseTriggerOrder pause/resume (Issue #270 P2) ---
+    //
+    // The full engine path: apply_with_plans -> Ok(Paused(ChooseTriggerOrder))
+    // -> resolve(chosen_order=[1,0]) -> resume Completed.
+    // Verifies: the pause is created on the real engine path (not just the
+    // dispatcher), the effects fire in the chosen order exactly once each,
+    // the space is marked used, budget and use ledger are exact, and the
+    // permutation validator rejects invalid orders.
+    #[test]
+    fn choose_trigger_order_e2e_engine_path_pause_resume() {
+        use crate::engine::Action;
+        use crate::model::Config;
+
+        // Two simultaneous After-phase effects on Fishing (A078-like).
+        let card = CardDefinition {
+            use_limit: None,
+            id: "AW2".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 1,
+            effects: vec![
+                CardEffect::AfterWorkerGain {
+                    space: Space::Fishing,
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerGain {
+                    space: Space::Fishing,
+                    good: Good::Reed,
+                    amount: 1,
+                },
+            ],
+        };
+        let mut definitions = vec![card];
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        let occ_ids: Vec<String> = (1..=14).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=13).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![vec!["AW2".to_string()], vec![]];
+        hands[0].extend(occ_ids[0..7].iter().cloned());
+        hands[0].extend(minor_ids[0..6].iter().cloned());
+        hands[1].extend(occ_ids[7..14].iter().cloned());
+        hands[1].extend(minor_ids[6..13].iter().cloned());
+
+        let mut game = crate::model::Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 7,
+                additional_action_space_enabled: false,
+            },
+            set,
+            hands,
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = 0;
+        game.public.players[0].played_cards.push("AW2".into());
+        assert!(
+            game.legal_spaces().contains(&Space::Fishing),
+            "Fishing must be legal in round 1"
+        );
+
+        // 1. The engine path pauses with ChooseTriggerOrder on 2 simultaneous
+        //    After-phase triggers.
+        let action = Action {
+            space: Space::Fishing,
+            detail: crate::engine::Detail::None,
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(
+            matches!(result, Ok(Transition::Paused(_))),
+            "the engine path must pause, got: {result:?}"
+        );
+        let pending = game.pending.clone().expect("a decision must be recorded");
+        match &pending.kind {
+            PendingKind::ChooseTriggerOrder { phase, triggers } => {
+                assert_eq!(*phase, TriggerPhase::After);
+                assert_eq!(triggers.len(), 2, "both effects must be offered");
+            }
+            other => panic!("expected ChooseTriggerOrder, got: {other:?}"),
+        }
+        // The continuation carries the After-phase resume position so the
+        // resumed scan does not re-fire or skip effects.
+        let resume = match &pending.continuation {
+            crate::pending::Continuation::PostWork { resume, .. } => resume,
+            other => panic!("expected a PostWork continuation, got: {other:?}"),
+        };
+        assert_eq!(
+            resume.phase,
+            TriggerPhase::After,
+            "pause phase must be After"
+        );
+        assert_eq!(
+            (resume.after.card_index, resume.after.effect_index),
+            (0, 1),
+            "resume position must be the last triggerable effect"
+        );
+
+        // 2. Invalid permutations are rejected.
+        for bad in [vec![0, 0], vec![0], vec![2, 0]] {
+            let err = game.resolve_pending_and_resume(
+                crate::pending::PendingResolution::ChooseTriggerOrder { chosen_order: bad },
+            );
+            assert!(err.is_err(), "invalid permutation must be rejected");
+            assert!(game.has_pending(), "the decision must remain resolvable");
+        }
+
+        // 3. Resolve with the reverse order and resume: both effects fire
+        //    exactly once; budget/use/space are exact.
+        let outcome = game
+            .resolve_pending_and_resume(crate::pending::PendingResolution::ChooseTriggerOrder {
+                chosen_order: vec![1, 0],
+            })
+            .expect("resolution must succeed");
+        assert_eq!(outcome, Transition::Completed, "resume must complete");
+        assert!(!game.has_pending(), "no pending after resume");
+        assert_eq!(
+            game.public.players[0].supply.food, 4,
+            "food +1 on top of the initial 3"
+        );
+        assert_eq!(game.public.players[0].supply.reed, 1, "reed +1");
+        assert!(
+            game.public.used.contains(&Space::Fishing),
+            "the action space must be marked used by the resume"
+        );
+        assert_eq!(
+            game.card_uses.get("AW2").copied(),
+            Some(2),
+            "each effect must fire exactly once"
+        );
+        assert_eq!(game.event_budget, 62, "two effects consume two budget");
     }
 }

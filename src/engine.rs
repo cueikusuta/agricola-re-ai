@@ -375,11 +375,18 @@ impl Game {
     ///
     /// Returns the ChainStep where a pause occurred (if any) so the caller can
     /// record the correct resume position (Issue #268 P1-3).
+    ///
+    /// When `allow_pause` is false (one-shot `apply` API), ChooseTriggerOrder
+    /// pauses are disabled in the post-work chain so the one-shot path never
+    /// encounters a pause it cannot represent. When `allow_pause` is true
+    /// (`apply_with_plans`), pauses are enabled and propagated to the engine
+    /// for the full resume contract.
     fn apply_post_work_card_effects(
         &mut self,
         player: usize,
         action: &Action,
         previous: &Player,
+        allow_pause: bool,
     ) -> std::result::Result<(Transition, Option<crate::pending::ChainStep>), String> {
         // No cards means no card effects; skip the dispatch entirely so the
         // cardless hot path keeps its Step 2 cost.
@@ -402,6 +409,7 @@ impl Game {
                 &mut self.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
+                allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
             )?;
             if let Transition::Paused(_) = result {
                 return Ok((result, Some(crate::pending::ChainStep::AfterHarvestBake)));
@@ -430,6 +438,7 @@ impl Game {
             &mut self.card_uses,
             &self.card_use_limits,
             &mut self.pending,
+            allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
         )?;
         if let Transition::Paused(_) = result {
             return Ok((
@@ -453,6 +462,7 @@ impl Game {
             &mut self.card_uses,
             &self.card_use_limits,
             &mut self.pending,
+            allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
         )?;
         if let Transition::Paused(_) = result {
             return Ok((result, Some(crate::pending::ChainStep::AfterWorker)));
@@ -859,8 +869,12 @@ impl Game {
         // action, so each action starts from the full budget again.
         next.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         next.execute_work(player, &action)?;
-        let (card_transition, pause_step) =
-            next.apply_post_work_card_effects(player, &action, &self.public.players[player])?;
+        let (card_transition, pause_step) = next.apply_post_work_card_effects(
+            player,
+            &action,
+            &self.public.players[player],
+            allow_pause,
+        )?;
         match card_transition {
             Transition::Completed => {}
             Transition::Paused(_) if !allow_pause => {
@@ -909,9 +923,22 @@ impl Game {
                     });
                 // P1-3: Pass the actual ChainStep from apply_post_work_card_effects through the pause path
                 let step = pause_step.unwrap_or(crate::pending::ChainStep::AfterWorker);
+                // The phase the pause occurred in: a #270 ChooseTriggerOrder
+                // pause records the phase it collected the simultaneous
+                // triggers in ("After") in its context; the classic #268
+                // Interrupt pause has none, so it defaults to Interrupt.
+                let pause_phase = pending
+                    .context
+                    .get("phase")
+                    .and_then(|v| v.as_str())
+                    .map(|s| match s {
+                        "After" => crate::card_events::TriggerPhase::After,
+                        _ => crate::card_events::TriggerPhase::Interrupt,
+                    })
+                    .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
                 let resume = crate::pending::PostWorkResume {
                     step,
-                    phase: crate::card_events::TriggerPhase::Interrupt,
+                    phase: pause_phase,
                     after,
                 };
                 let completion = Box::new(crate::pending::WorkCompletion {
@@ -1050,7 +1077,7 @@ impl Game {
         let id = next.public.active_player;
         next.execute_work(id, action)?;
         let (transition, _) =
-            next.apply_post_work_card_effects(id, action, &self.public.players[id])?;
+            next.apply_post_work_card_effects(id, action, &self.public.players[id], false)?;
         if let Transition::Paused(_) = transition {
             return Err("preview cannot handle paused decision".into());
         }
@@ -1136,6 +1163,24 @@ impl Game {
         first_start_player: Option<usize>,
         events: &[Event],
     ) -> Result<Self> {
+        Self::replay_with_setup_and_start_player_inner(
+            config,
+            cards,
+            hands,
+            first_start_player,
+            events,
+            false,
+        )
+    }
+    /// Internal replay with optional pause-at-end handling for load_json verification.
+    pub(crate) fn replay_with_setup_and_start_player_inner(
+        config: Config,
+        cards: crate::cards::CardSet,
+        hands: Option<Vec<Vec<String>>>,
+        first_start_player: Option<usize>,
+        events: &[Event],
+        expect_pause_at_end: bool,
+    ) -> Result<Self> {
         let mut g = match (hands, first_start_player) {
             (Some(hands), Some(starter)) => {
                 Game::with_cards_and_hands_with_start_player(config, cards, hands, starter)?
@@ -1144,8 +1189,34 @@ impl Game {
             (None, None) => Game::with_cards(config, cards)?,
             (None, Some(_)) => return Err("start player override requires draft hands".into()),
         };
-        for event in events {
-            g.apply_recorded(event)?;
+        // Replay events with pause/resume handling. A work event that paused
+        // in the original game is followed by a pending_resolution event.
+        // We detect this by looking ahead one event.
+        let mut event_iter = events.iter().peekable();
+        while let Some(event) = event_iter.next() {
+            let action: RecordedAction =
+                serde_json::from_value(event.payload.clone()).map_err(|e| e.to_string())?;
+            let is_work = matches!(action, RecordedAction::Work { .. });
+            if is_work {
+                // Check if next event is pending_resolution (indicating a pause occurred)
+                let next_is_resolution = event_iter
+                    .peek()
+                    .map(|e| e.kind == "pending_resolution")
+                    .unwrap_or(false);
+                // Also check if this is the last event and we expect a pause at the end
+                let is_last_event = event_iter.peek().is_none();
+                if next_is_resolution || (expect_pause_at_end && is_last_event) {
+                    // Original game paused: use apply_with_plans and process resolution next
+                    g.apply_recorded_with_pause(event)?;
+                    // The next event (pending_resolution) will be processed in the next iteration
+                } else {
+                    // Original game did not pause: use one-shot apply_with_harvest_policy
+                    g.apply_recorded_no_pause(event)?;
+                }
+            } else {
+                // Free actions and pending_resolution events use the standard path
+                g.apply_recorded(event)?;
+            }
         }
         Ok(g)
     }
@@ -1171,26 +1242,37 @@ impl Game {
                 {
                     return Err("replay work metadata/player mismatch".into());
                 }
-                let mut placements = self.public.workers_placed.clone();
-                placements[player] += 1;
-                let will_harvest = placements == self.public.work_quota
-                    && HARVEST_ROUNDS.contains(&self.public.round);
-                // A recorded paused work action carries only the FORCED harvest
-                // plans (usually `None`): its harvest decisions are supplied by
-                // the following `pending_resolution` event, or recomputed by the
-                // resume policy. So the plan-presence check applies only to an
-                // action that commits in one shot (Issue #268 R2-P0-1).
-                let transition = self.apply_with_plans(
-                    action,
-                    harvest_plans.clone(),
-                    breeding_plans.clone(),
-                    &SimpleHarvestDetails,
-                )?;
-                if transition == Transition::Completed
-                    && (harvest_plans.is_some() != will_harvest
-                        || breeding_plans.is_some() != will_harvest)
-                {
-                    return Err("replay harvest decisions missing or unexpected".into());
+                // Determine if this is a harvest turn by checking the state
+                // before the action (current replay state).
+                let is_harvest_turn = self.will_harvest_after_work();
+                if is_harvest_turn {
+                    // Harvest turn: the original game used apply_with_harvest_policy
+                    // with the recorded feeding/breeding plans.
+                    struct ReplayHarvestPolicy {
+                        feeding: Vec<FeedingPlan>,
+                        breeding: Vec<BreedingPlan>,
+                    }
+                    impl HarvestDetailPolicy for ReplayHarvestPolicy {
+                        fn plan_feeding(&self, obs: &Observation) -> FeedingPlan {
+                            self.feeding[obs.player_id].clone()
+                        }
+                        fn plan_breeding(&self, obs: &Observation) -> BreedingPlan {
+                            self.breeding[obs.player_id].clone()
+                        }
+                    }
+                    let feeding = harvest_plans
+                        .unwrap_or_else(|| vec![FeedingPlan::default(); self.config.players]);
+                    let breeding = breeding_plans.unwrap_or_else(|| {
+                        (0..self.config.players)
+                            .map(|i| BreedingPlan::simple(&self.public.players[i]))
+                            .collect()
+                    });
+                    let policy = ReplayHarvestPolicy { feeding, breeding };
+                    self.apply_with_harvest_policy(action, &policy)?;
+                } else {
+                    // Non-harvest turn: the original game used apply (one-shot).
+                    // Use apply_with_harvest_policy with SimpleHarvestDetails to match.
+                    self.apply_with_harvest_policy(action, &SimpleHarvestDetails)?;
                 }
             }
             RecordedAction::Free { player, action } => {
@@ -1223,9 +1305,145 @@ impl Game {
         }
         Ok(())
     }
-}
 
-/// Compute the expected next active player given the current state.
+    /// Variant of `apply_recorded` for work events that DID pause in the
+    /// original game. Uses `apply_with_plans` (allow_pause=true) to match
+    /// the pausing behavior, and expects the next event to be a
+    /// `pending_resolution` that will resolve the pause.
+    fn apply_recorded_with_pause(&mut self, event: &Event) -> Result<()> {
+        if self.state_hash() != event.before {
+            return Err("replay prestate hash mismatch".into());
+        }
+        let action: RecordedAction =
+            serde_json::from_value(event.payload.clone()).map_err(|e| e.to_string())?;
+        match action {
+            RecordedAction::Work {
+                player,
+                action,
+                harvest_plans,
+                breeding_plans,
+            } => {
+                if event.kind != "work"
+                    || event.player != Some(player)
+                    || player != self.public.active_player
+                {
+                    return Err("replay work metadata/player mismatch".into());
+                }
+                // Use apply_with_plans which allows pauses (allow_pause=true)
+                let transition = self.apply_with_plans(
+                    action,
+                    harvest_plans.clone(),
+                    breeding_plans.clone(),
+                    &SimpleHarvestDetails,
+                )?;
+                // The work event's `after` hash should be the paused state (if paused)
+                // or the final state (if completed). Since we detected a pending_resolution
+                // next, we expect a pause.
+                if transition == Transition::Completed
+                    && (harvest_plans.is_some() || breeding_plans.is_some())
+                {
+                    return Err("replay harvest decisions missing or unexpected".into());
+                }
+            }
+            RecordedAction::Free { player, action } => {
+                if event.kind != "free" || event.player != Some(player) {
+                    return Err("replay free action metadata/player mismatch".into());
+                }
+                self.apply_free(player, action)?;
+            }
+            RecordedAction::PendingResolution { .. } => {
+                return Err("pending_resolution not expected in with-pause path".into());
+            }
+        }
+        if self.state_hash() != event.after {
+            return Err("replay poststate hash mismatch".into());
+        }
+        Ok(())
+    }
+
+    /// Variant of `apply_recorded` for work events that did NOT pause in the
+    /// original game. Uses `apply_with_harvest_policy` (allow_pause=false) to
+    /// match the one-shot apply behavior. Used for work events without a
+    /// following pending_resolution, and for all free/pending_resolution events.
+    fn apply_recorded_no_pause(&mut self, event: &Event) -> Result<()> {
+        if self.state_hash() != event.before {
+            return Err("replay prestate hash mismatch".into());
+        }
+        let action: RecordedAction =
+            serde_json::from_value(event.payload.clone()).map_err(|e| e.to_string())?;
+        match action {
+            RecordedAction::Work {
+                player,
+                action,
+                harvest_plans,
+                breeding_plans,
+            } => {
+                if event.kind != "work"
+                    || event.player != Some(player)
+                    || player != self.public.active_player
+                {
+                    return Err("replay work metadata/player mismatch".into());
+                }
+                // Determine if this is a harvest turn by checking the state
+                // before the action (current replay state).
+                let is_harvest_turn = self.will_harvest_after_work();
+                // The recorded plans must match the turn shape: a harvest turn
+                // carries both feeding and breeding plans; a non-harvest turn
+                // carries none. A missing/unexpected set is a tampered or
+                // truncated log and must be rejected (replay_integrity).
+                if is_harvest_turn {
+                    if harvest_plans.is_none() || breeding_plans.is_none() {
+                        return Err("replay harvest decisions missing or unexpected".into());
+                    }
+                } else if harvest_plans.is_some() || breeding_plans.is_some() {
+                    return Err("replay harvest decisions missing or unexpected".into());
+                }
+                if is_harvest_turn {
+                    // Harvest turn: the original game used apply_with_harvest_policy
+                    // with the recorded feeding/breeding plans.
+                    struct ReplayHarvestPolicy {
+                        feeding: Vec<FeedingPlan>,
+                        breeding: Vec<BreedingPlan>,
+                    }
+                    impl HarvestDetailPolicy for ReplayHarvestPolicy {
+                        fn plan_feeding(&self, obs: &Observation) -> FeedingPlan {
+                            self.feeding[obs.player_id].clone()
+                        }
+                        fn plan_breeding(&self, obs: &Observation) -> BreedingPlan {
+                            self.breeding[obs.player_id].clone()
+                        }
+                    }
+                    let feeding = harvest_plans
+                        .unwrap_or_else(|| vec![FeedingPlan::default(); self.config.players]);
+                    let breeding = breeding_plans.unwrap_or_else(|| {
+                        (0..self.config.players)
+                            .map(|i| BreedingPlan::simple(&self.public.players[i]))
+                            .collect()
+                    });
+                    let policy = ReplayHarvestPolicy { feeding, breeding };
+                    self.apply_with_harvest_policy(action, &policy)?;
+                } else {
+                    // Non-harvest turn: the original game used apply (one-shot).
+                    // Use apply_with_harvest_policy with SimpleHarvestDetails to match.
+                    self.apply_with_harvest_policy(action, &SimpleHarvestDetails)?;
+                }
+            }
+            RecordedAction::Free { player, action } => {
+                if event.kind != "free" || event.player != Some(player) {
+                    return Err("replay free action metadata/player mismatch".into());
+                }
+                self.apply_free(player, action)?;
+            }
+            RecordedAction::PendingResolution { .. } => {
+                return Err("pending_resolution not expected in no-pause path".into());
+            }
+        }
+        if self.state_hash() != event.after {
+            return Err("replay poststate hash mismatch".into());
+        }
+        Ok(())
+    }
+}
 /// This is the single implementation shared by `next_worker_or_round`
 /// and the validation layer (`validate_incremental`/`validate_free_action`).
 /// Returns the index of the next player who has not placed all their workers,
