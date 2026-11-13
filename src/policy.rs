@@ -261,7 +261,9 @@ fn improvement_choice(obs: &Observation) -> Option<Improvement> {
         .iter()
         .copied()
         .filter(|&i| {
-            i.cost().iter().all(|(g, n)| p.supply.get(*g) >= *n)
+            // Same discounted affordability the engine's can_buy uses, so a
+            // legal MajorImprovement space always has a purchasable detail.
+            crate::engine::affordable(p, i)
                 || matches!(i, Improvement::Hearth4 | Improvement::Hearth5)
                     && p.improvements
                         .iter()

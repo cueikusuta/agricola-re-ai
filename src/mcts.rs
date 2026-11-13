@@ -1020,8 +1020,9 @@ mod tests {
         let digest = format!("{:x}", hasher.finalize());
         // This value was recorded from the current implementation.
         // DO NOT CHANGE unless the implementation is intentionally replaced.
+        // Updated: added A077 Hod to verified_immediate_resource_cards (pool size 30->31)
         assert_eq!(
-            digest, "671cb86115b48192c203d35b7afbfb6b59c488acaca4adfc84e1be6872438a27",
+            digest, "a1439a3d33027fc63a75c1e1102d973c75cbda321ea25c17d5aca9df7e3f7723",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
