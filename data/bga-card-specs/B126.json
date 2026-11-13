@@ -3,8 +3,8 @@
   "card_id": "B126",
   "identity": {
     "kind": "occupation",
-    "name_ja": "部屋の費用",
-    "name_en": "Room Cost"
+    "name_ja": "大工",
+    "name_en": "Carpenter"
   },
   "bga": {
     "listed": "yes",

@@ -130,7 +130,7 @@
     "test_case_ids": [
       "B121-forest",
       "B121-reed-bank",
-      "B121-clay-pit"
+      "B121-clay-pit-3p"
     ],
     "checked_by": "AI source comparison vs Rust CardDefinition",
     "checked_on": "2026-11-13",

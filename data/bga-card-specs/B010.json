@@ -3,13 +3,13 @@
   "card_id": "B010",
   "identity": {
     "kind": "minor_improvement",
-    "name_ja": "居住スペース",
-    "name_en": "Living Space"
+    "name_ja": "移動住宅",
+    "name_en": "Caravan"
   },
   "bga": {
     "listed": "yes",
     "playable": "yes",
-    "ban_status": "none",
+    "ban_status": "strong",
     "base_2016": "yes",
     "eligibility": {
       "2": "yes",
