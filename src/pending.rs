@@ -1009,7 +1009,7 @@ mod tests {
             vec![],
         ];
         // Player 0: probe card (Occupation) + 6 more occupations + 7 minor improvements = 14 cards
-        hands[0].extend(occ_ids.iter().cloned().take(6));
+        hands[0].extend(occ_ids.iter().take(6).cloned());
         hands[0].extend(minor_ids[0..7].iter().cloned());
         // Player 1: 7 occupations + 7 minor improvements = 14 cards
         hands[1].extend(occ_ids[6..13].iter().cloned());
