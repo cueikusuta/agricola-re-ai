@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "B040",
+  "cases": [
+    {
+      "id": "B040-fishing",
+      "scope": "effect_only",
+      "setup": { "occupations": 2, "grain": 0, "wood": 0 },
+      "action": { "use_fishing_accumulation": true },
+      "expected": { "grain": 1, "wood": 1 },
+      "notes": "Used Fishing accumulation -> +1 grain +1 wood"
+    },
+    {
+      "id": "B040-reed",
+      "scope": "effect_only",
+      "setup": { "occupations": 2, "grain": 0, "wood": 0 },
+      "action": { "use_reed_accumulation": true },
+      "expected": { "grain": 1, "wood": 1 },
+      "notes": "Used Reed accumulation -> +1 grain +1 wood"
+    }
+  ]
+}

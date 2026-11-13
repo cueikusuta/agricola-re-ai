@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "card_id": "B011",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "畝",
+    "name_en": "Feedyard"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3246",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      { "good": "clay", "amount": 1 },
+      { "good": "grain", "amount": 1 }
+    ],
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "description": "This card becomes a space where livestock can be kept. Different types allowed. Capacity equals number of pastures on farm. After each harvest breeding phase, gain 1 food per unused capacity slot on this card."
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Card acts as additional pasture space; capacity = number of pastures on farm. After each harvest breeding phase, gain 1 food per unused slot."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Stays in play area as a persistent card providing livestock space"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].operation: exact mechanics of livestock placement on card and capacity tracking need formalization",
+      "effects[0].steps[0].params: food gain timing relative to breeding phase needs precise definition"
+    ],
+    "test_case_ids": ["B011-capacity", "B011-food-gain"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 clay + 1 grain. 1 printed point. Effect: card becomes livestock holding space (capacity = pastures on farm). After each harvest breeding phase, gain 1 food per unused capacity. Effect details need formalization for implementation."
+  }
+}

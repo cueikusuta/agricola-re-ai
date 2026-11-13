@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "B028",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "林学教育",
+    "name_en": "Forestry Studies"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3229", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [ { "good": "food", "amount": 2 } ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_use_forest_accumulation",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": { "description": "When using Forest accumulation space, may return 2 wood to the space to play 1 occupation without paying its cost." }
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Forest space: return 2 wood to play occupation for free"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: on_use_forest_accumulation needs formal trigger definition",
+      "effects[0].steps[0].operation: returning resources to accumulation space and free occupation play need formalization"
+    ],
+    "test_case_ids": ["B028-free-occupation"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 2 food. 0 points. Effect: when using Forest, may return 2 wood to play occupation for free. Trigger and resource return mechanic need formalization."
+  }
+}

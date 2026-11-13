@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "card_id": "B027",
+  "cases": [
+    {
+      "id": "B027-major-improvement",
+      "scope": "effect_only",
+      "setup": { "wood": 3, "clay": 2 },
+      "action": { "build_room": true, "then_build_joinery": true },
+      "expected": { "room_built": true, "joinery_built": true },
+      "notes": "Built room, then at turn end built Joinery (major improvement)"
+    }
+  ]
+}

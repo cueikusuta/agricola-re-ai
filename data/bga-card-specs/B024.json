@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "B024",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "投げ縄",
+    "name_en": "Lasso"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3233", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [ { "good": "reed", "amount": 1 } ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": { "description": "Place 2 family members consecutively. At least 1 must be placed on Sheep Market, Boar Market, or Cattle Market." }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Place 2 people; at least 1 on livestock market space"
+    }
+  ],
+  "post_play": { "destination": "left_neighbor_hand", "notes": "Minor improvement passes to left neighbor" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].operation: double placement with market constraint needs formalization"
+    ],
+    "test_case_ids": ["B024-valid-placement", "B024-invalid-placement"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 reed. 0 points. Effect: place 2 family members consecutively; at least 1 on Sheep/Boar/Cattle Market. Constraint needs formalization."
+  }
+}

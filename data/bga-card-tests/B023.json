@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "card_id": "B023",
+  "cases": [
+    {
+      "id": "B023-early-reveal",
+      "scope": "effect_only",
+      "setup": { "round": 10 },
+      "action": { "play": "B023" },
+      "expected": { "round_14_space_revealed": true, "available_on_board": true },
+      "notes": "Round 14 action space revealed early and added to board"
+    }
+  ]
+}

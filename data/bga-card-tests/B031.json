@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "B031",
+  "cases": [
+    {
+      "id": "B031-adjacent-spaces",
+      "scope": "effect_only",
+      "setup": { "has_pottery": true, "adjacent_unused_spaces": 2 },
+      "action": { "scoring": true },
+      "expected": { "bonus_points": 2 },
+      "notes": "Has Pottery, 2 adjacent unused spaces -> 2 bonus points"
+    },
+    {
+      "id": "B031-no-adjacent-spaces",
+      "scope": "effect_only",
+      "setup": { "has_pottery": true, "adjacent_unused_spaces": 1 },
+      "action": { "scoring": true },
+      "expected": { "bonus_points": 0 },
+      "notes": "Only 1 adjacent unused space -> no bonus"
+    }
+  ]
+}

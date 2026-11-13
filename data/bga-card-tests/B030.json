@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "B030",
+  "cases": [
+    {
+      "id": "B030-wood-fence",
+      "scope": "effect_only",
+      "setup": { "wood": 6, "fence_pieces": 0 },
+      "action": { "build_fence_perimeter": { "wood_used": 4 } },
+      "expected": { "fence_built": true, "wood_spent": 4, "fence_pieces_used": 0 },
+      "notes": "Built fence using 4 wood (2 wood per fence segment) instead of fence pieces"
+    },
+    {
+      "id": "B030-bonus-points",
+      "scope": "effect_only",
+      "setup": { "wood": 6 },
+      "action": { "build_fence_perimeter": { "wood_used": 6 } },
+      "expected": { "bonus_points": 3 },
+      "notes": "Used 6 wood for fences -> 3 segments -> 3 bonus points"
+    }
+  ]
+}

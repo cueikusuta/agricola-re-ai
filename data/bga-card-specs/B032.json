@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "B032",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "煮沸釜",
+    "name_en": "Kettle"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3225", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [ { "good": "clay", "amount": 1 } ],
+    "prerequisites": [ { "predicate": "has_grain_field", "params": { "count": 1 }, "negate": false } ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "any_time",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": { "description": "May exchange 1/3/5 grain for 3/4/5 food and 0/1/2 bonus points respectively." }
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Exchange grain for food + bonus points: 1 grain -> 3 food + 0 pts; 3 grain -> 4 food + 1 pt; 5 grain -> 5 food + 2 pts"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: any_time needs formal trigger definition",
+      "effects[0].steps[0].operation: multi-tier exchange (1/3/5 grain -> different food/points) needs formalization"
+    ],
+    "test_case_ids": ["B032-exchange-1", "B032-exchange-3", "B032-exchange-5"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 clay. Prereq: 1+ grain field. 0 points. Effect: exchange 1/3/5 grain for 3/4/5 food + 0/1/2 bonus points. Multi-tier exchange needs formalization."
+  }
+}

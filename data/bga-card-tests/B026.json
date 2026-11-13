@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "card_id": "B026",
+  "cases": [
+    {
+      "id": "B026-fence-substitution",
+      "scope": "effect_only",
+      "setup": { "grain": 2 },
+      "action": { "use_grain_utilization": { "action1": "build_fences", "action2": "bake_bread" } },
+      "expected": { "fences_built": true, "bread_baked": true },
+      "notes": "Used Grain Utilization; substituted one action for Build Fences"
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "card_id": "B012",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "家畜収容所",
+    "name_en": "Stockyard"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3245",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      { "good": "wood", "amount": 1 },
+      { "good": "stone", "amount": 1 }
+    ],
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "description": "This card can hold up to 3 animals of the same type. It does not count as a pasture."
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Card holds up to 3 livestock of same type. Not a pasture (no breeding)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Stays in play area as persistent livestock holding space"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].operation: exact mechanics of livestock placement (same type only) and capacity limit (3) need formalization",
+      "effects[0].steps[0].params: not-a-pasture means no breeding occurs on this card"
+    ],
+    "test_case_ids": ["B012-capacity", "B012-same-type"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 wood + 1 stone. 1 printed point. Effect: holds up to 3 animals of same type. Not a pasture. Effect details need formalization."
+  }
+}

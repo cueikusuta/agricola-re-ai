@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "B023",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "最終章",
+    "name_en": "Final Scenario"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3234", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [ { "predicate": "round_lte", "params": { "round": 13 }, "negate": false } ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": { "description": "Place round 14 action space card face up in front of you. It becomes available on the game board." }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Reveals round 14 action space early; adds it to board"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "prerequisites[0]: round_lte predicate needs implementation",
+      "effects[0].steps[0].operation: round 14 action space reveal mechanic needs formalization"
+    ],
+    "test_case_ids": ["B023-early-reveal"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: free. Prereq: play by round 13. 0 points. Effect: reveal round 14 action space card early. Needs formalization for round-based action space reveal."
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "B015",
+  "cases": [
+    {
+      "id": "B015-wooden-room-discount",
+      "scope": "effect_only",
+      "setup": { "wood": 5 },
+      "action": { "build_wooden_room": true },
+      "expected": { "wood_spent": 3 },
+      "notes": "Wooden room normally costs 5 wood; with discount costs 3 wood"
+    },
+    {
+      "id": "B015-pasture-from-wood",
+      "scope": "effect_only",
+      "setup": { "wood": 0 },
+      "action": { "use_wood_accumulation": 3, "build_pasture": true },
+      "expected": { "pasture_built": true, "wood_remaining": 0 },
+      "notes": "After gaining 3 wood from accumulation, can build 1 pasture using only that wood"
+    }
+  ]
+}

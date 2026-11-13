@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "B014",
+  "cases": [
+    {
+      "id": "B014-stone-house",
+      "scope": "effect_only",
+      "setup": { "house_type": "stone", "round": 12 },
+      "action": { "round_start": 12 },
+      "expected": { "stone_room_built": true, "cost_paid": false },
+      "notes": "In stone house at round 12: stone room built for free"
+    },
+    {
+      "id": "B014-no-stone-house",
+      "scope": "effect_only",
+      "setup": { "house_type": "clay", "round": 12 },
+      "action": { "round_start": 12 },
+      "expected": { "stone_room_built": false, "card_discarded": true },
+      "notes": "Not in stone house at round 12: stone room discarded"
+    }
+  ]
+}
