@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "C035",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ランタンの家",
+    "name_en": "Lantern House"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3054",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page cross-check"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "custom",
+        "params": {
+          "text": "職業なし"
+        }
+      }
+    ],
+    "printed_points": 7,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "end_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": {
+              "op": "constant",
+              "args": [
+                7
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "end_of_game",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Effect details pending BGA verification"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "inventory_only",
+    "unresolved_fields": [
+      "effects.full",
+      "bga.eligibility"
+    ],
+    "test_case_ids": [
+      "C035-normal",
+      "C035-edge"
+    ],
+    "checked_by": "AI ledger import",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Inventory-only from base ledger; full BGA verification pending"
+  }
+}

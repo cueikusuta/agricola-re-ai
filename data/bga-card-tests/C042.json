@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "C042",
+  "cases": [
+    {
+      "id": "C042-normal",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C042",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "points_gained": null,
+        "notes": "Inventory-only test contract"
+      },
+      "notes": "Placeholder test case"
+    },
+    {
+      "id": "C042-edge",
+      "scope": "legal_play",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C042",
+        "cost_paid": false
+      },
+      "expected": {
+        "effect_applies": false,
+        "error": "insufficient_cost_or_prereq",
+        "notes": "Card should not be playable without meeting cost/prerequisites"
+      },
+      "notes": "Placeholder edge case test"
+    }
+  ]
+}
