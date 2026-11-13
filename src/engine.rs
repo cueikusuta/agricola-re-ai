@@ -4,6 +4,7 @@ use crate::card_events::dispatch_play;
 use crate::card_zones::{play_from_hand, CardMoveCtx};
 use crate::harvest::{FeedingPlan, HarvestDetailPolicy, SimpleHarvestDetails};
 use crate::model::*;
+use crate::pending::Transition;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -191,9 +192,15 @@ pub enum RecordedAction {
         player: usize,
         action: FreeAction,
     },
+    /// A pending decision was resolved (Issue #268 replay integrity).
+    PendingResolution {
+        player: usize,
+        decision_id: u64,
+        resolution: crate::pending::PendingResolution,
+    },
 }
 
-fn is_bake_bread_detail(detail: &Detail) -> bool {
+pub(crate) fn is_bake_bread_detail(detail: &Detail) -> bool {
     match detail {
         Detail::Sow { bake, .. }
         | Detail::Buy {
@@ -363,21 +370,24 @@ impl Game {
     /// the production path too. The legacy functions stay for the equivalence
     /// tests: #266 requires staged migration, so the old path is kept as the
     /// differential reference rather than deleted.
+    ///
+    /// Returns the ChainStep where a pause occurred (if any) so the caller can
+    /// record the correct resume position (Issue #268 P1-3).
     fn apply_post_work_card_effects(
         &mut self,
         player: usize,
         action: &Action,
         previous: &Player,
-    ) -> Result<()> {
+    ) -> std::result::Result<(Transition, Option<crate::pending::ChainStep>), String> {
         // No cards means no card effects; skip the dispatch entirely so the
         // cardless hot path keeps its Step 2 cost.
         if !self.card_set.enabled() {
-            return Ok(());
+            return Ok((Transition::Completed, None));
         }
         // Bake trigger: only when this action actually baked bread, matching
         // cards::after_harvest_baking's own gate (round >= 2, harvest round).
         if is_bake_bread_detail(&action.detail) {
-            crate::card_events::dispatch_after_harvest_bake(
+            let result = crate::card_events::dispatch_after_harvest_bake(
                 &self.card_set,
                 player,
                 &mut self.cards,
@@ -391,6 +401,9 @@ impl Game {
                 &self.card_use_limits,
                 &mut self.pending,
             )?;
+            if let Transition::Paused(_) = result {
+                return Ok((result, Some(crate::pending::ChainStep::AfterHarvestBake)));
+            }
         }
         // Clay-construction trigger: `previous` is the pre-action player, so a
         // longer improvements list means this action bought one.
@@ -400,7 +413,7 @@ impl Game {
         } else {
             None
         };
-        crate::card_events::dispatch_after_clay_construction(
+        let result = crate::card_events::dispatch_after_clay_construction(
             &self.card_set,
             player,
             previous,
@@ -416,9 +429,15 @@ impl Game {
             &self.card_use_limits,
             &mut self.pending,
         )?;
+        if let Transition::Paused(_) = result {
+            return Ok((
+                result,
+                Some(crate::pending::ChainStep::AfterClayConstruction),
+            ));
+        }
         // Worker trigger: AfterWorkerGain and AfterWorkerGainIfUsed, in the
         // active player's played_cards order.
-        crate::card_events::dispatch_after_worker(
+        let result = crate::card_events::dispatch_after_worker(
             &self.card_set,
             player,
             action.space,
@@ -433,7 +452,10 @@ impl Game {
             &self.card_use_limits,
             &mut self.pending,
         )?;
-        Ok(())
+        if let Transition::Paused(_) = result {
+            return Ok((result, Some(crate::pending::ChainStep::AfterWorker)));
+        }
+        Ok((Transition::Completed, None))
     }
 
     /// Spaces that exist on the board for the current mode/round, before the
@@ -461,6 +483,17 @@ impl Game {
     /// propose. Detail-level legality is enforced by `execute_work` and the
     /// final `validate` invariant check in the transactional apply path.
     pub fn available_spaces(&self) -> Vec<Space> {
+        if self.public.finished || self.pending.is_some() {
+            return vec![];
+        }
+        self.available_spaces_for_resume()
+    }
+
+    /// Same space filter as [`Self::available_spaces`] but WITHOUT the
+    /// `pending.is_some()` short-circuit. The resume legality re-check runs
+    /// while the decision is still stored, so it needs the revealed/unused/
+    /// mutual-exclusion filter on its own (Issue #268 R2-P1-1).
+    pub(crate) fn available_spaces_for_resume(&self) -> Vec<Space> {
         if self.public.finished {
             return vec![];
         }
@@ -545,15 +578,31 @@ impl Game {
         });
         list
     }
+    /// One-shot transactional apply that CANNOT represent a card-effect
+    /// interrupt.
+    ///
+    /// Contract (Issue #268 / R2-P0-2): if the action's post-work card chain
+    /// would pause on an Interrupt-phase choice, the call returns a precise
+    /// `Err` and the game state is left byte-for-byte unchanged (the pause is
+    /// detected on a working clone before any commit). Callers that must
+    /// support interrupts use [`Self::apply_with_plans`] and then
+    /// `Game::resolve_pending_and_resume`.
     pub fn apply(&mut self, action: Action) -> Result<()> {
+        if self.pending.is_some() {
+            return Err("pending decision must be resolved before new action".into());
+        }
         self.apply_with_harvest_policy(action, &SimpleHarvestDetails)
     }
+    /// One-shot apply with an explicit harvest policy. Same interrupt contract
+    /// as [`Self::apply`]: a pause is rejected with a precise `Err` and no
+    /// state change.
     pub fn apply_with_harvest_policy(
         &mut self,
         action: Action,
         policy: &dyn HarvestDetailPolicy,
     ) -> Result<()> {
-        self.apply_with_plans(action, None, None, policy)
+        self.apply_with_plans_impl(action, None, None, policy, false)
+            .map(|_| ())
     }
 
     /// Read-only, transactional validation using the exact same engine path as
@@ -561,7 +610,9 @@ impl Game {
     /// modifies `self` and rejects illegal details before any state change.
     pub fn validate_action(&self, action: &Action) -> Result<()> {
         let mut probe = self.search_clone();
-        probe.apply_with_plans(action.clone(), None, None, &SimpleHarvestDetails)
+        probe
+            .apply_with_plans(action.clone(), None, None, &SimpleHarvestDetails)
+            .map(|_| ())
     }
 
     /// Staged detail query for the active player. See [`DetailHints`].
@@ -760,13 +811,37 @@ impl Game {
         }
     }
 
-    fn apply_with_plans(
+    /// Full transactional apply that CAN report a card-effect interrupt.
+    ///
+    /// Contract (Issue #268): a work action whose post-work card chain hits an
+    /// Interrupt-phase choice returns [`Transition::Paused`]; the mid-action
+    /// state is committed and the decision (with its typed continuation) is
+    /// stored in `Game::pending`. The caller completes the action with
+    /// `Game::resolve_pending_and_resume`.
+    pub(crate) fn apply_with_plans(
         &mut self,
         action: Action,
         forced: Option<Vec<FeedingPlan>>,
         forced_breeding: Option<Vec<BreedingPlan>>,
         policy: &dyn HarvestDetailPolicy,
-    ) -> Result<()> {
+    ) -> std::result::Result<Transition, String> {
+        self.apply_with_plans_impl(action, forced, forced_breeding, policy, true)
+    }
+
+    /// Shared implementation of the transactional apply. `allow_pause` selects
+    /// the interrupt contract: when `true` a pause is committed and returned
+    /// (the full API); when `false` a pause is rejected with a precise `Err`
+    /// BEFORE any state is committed, leaving the game untouched (the one-shot
+    /// `apply`/`apply_with_harvest_policy` API, which cannot represent a paused
+    /// state). See [`Self::apply`].
+    fn apply_with_plans_impl(
+        &mut self,
+        action: Action,
+        forced: Option<Vec<FeedingPlan>>,
+        forced_breeding: Option<Vec<BreedingPlan>>,
+        policy: &dyn HarvestDetailPolicy,
+        allow_pause: bool,
+    ) -> std::result::Result<Transition, String> {
         let player = self.public.active_player;
         if !self.available_spaces().contains(&action.space) {
             return Err(format!("illegal space {:?}", action.space));
@@ -782,7 +857,102 @@ impl Game {
         // action, so each action starts from the full budget again.
         next.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         next.execute_work(player, &action)?;
-        next.apply_post_work_card_effects(player, &action, &self.public.players[player])?;
+        let (card_transition, pause_step) =
+            next.apply_post_work_card_effects(player, &action, &self.public.players[player])?;
+        match card_transition {
+            Transition::Completed => {}
+            Transition::Paused(_) if !allow_pause => {
+                // R2-P0-2: `apply`/`apply_with_harvest_policy` cannot represent a
+                // paused state. Reject BEFORE committing `next`, so the game is
+                // byte-for-byte unchanged and the caller gets a precise reason
+                // instead of a later opaque "illegal space" refusal.
+                return Err(
+                    "action paused on a pending decision; apply cannot represent an \
+                     interrupt — use apply_with_plans and Game::resolve_pending_and_resume"
+                        .into(),
+                );
+            }
+            Transition::Paused(mut pending) => {
+                // P0-1: Commit the mid-action state (worker action + partial card effects applied)
+                // so resume does not lose mid-action modifications.
+                *self = next;
+                // Stamp the decision with engine-level metadata (Issue #268):
+                // - decision ID
+                // - state_hash_before (state hash before the action started)
+                // - increment next_decision_id
+                // - continuation position for resume
+                let decision_id = self.next_decision_id;
+                self.next_decision_id += 1;
+                pending.id = decision_id;
+                pending.state_hash_before = self.state_hash();
+                // Build continuation from the pause context (card index, effect index)
+                // and the work completion data needed to finish the action.
+                let after = pending
+                    .context
+                    .get("card_index")
+                    .and_then(|v| v.as_u64())
+                    .and_then(|ci| {
+                        pending
+                            .context
+                            .get("effect_index")
+                            .and_then(|v| v.as_u64())
+                            .map(|ei| crate::pending::ChainPosition {
+                                card_index: ci as usize,
+                                effect_index: ei as usize,
+                            })
+                    })
+                    .unwrap_or(crate::pending::ChainPosition {
+                        card_index: 0,
+                        effect_index: 0,
+                    });
+                // P1-3: Pass the actual ChainStep from apply_post_work_card_effects through the pause path
+                let step = pause_step.unwrap_or(crate::pending::ChainStep::AfterWorker);
+                let resume = crate::pending::PostWorkResume {
+                    step,
+                    phase: crate::card_events::TriggerPhase::Interrupt,
+                    after,
+                };
+                let completion = Box::new(crate::pending::WorkCompletion {
+                    action: action.clone(),
+                    previous_player: self.public.players[player].clone(),
+                    harvest_plans: forced.clone(),
+                    breeding_plans: forced_breeding.clone(),
+                    logged_before: if record {
+                        before.clone()
+                    } else {
+                        String::new()
+                    },
+                });
+                pending.continuation = crate::pending::Continuation::PostWork {
+                    player,
+                    resume,
+                    completion,
+                };
+                // Commit the stamped decision to self so it survives.
+                self.pending = Some((*pending).clone());
+                // Record the work event NOW, with `after` = the paused state.
+                // The mid-action state is committed (P0-1), so the event log must
+                // be able to reproduce it; the resolution event (logged by
+                // `resolve_pending_and_resume`) then chains to the final state.
+                if record {
+                    let payload = serde_json::to_value(RecordedAction::Work {
+                        player,
+                        action: action.clone(),
+                        harvest_plans: forced.clone(),
+                        breeding_plans: forced_breeding.clone(),
+                    })
+                    .map_err(|e| e.to_string())?;
+                    self.log.events.push(Event {
+                        player: Some(player),
+                        kind: "work".into(),
+                        payload,
+                        before: before.clone(),
+                        after: self.state_hash(),
+                    });
+                }
+                return Ok(Transition::Paused(pending));
+            }
+        }
         next.public.used.insert(action.space);
         next.public.workers_placed[player] += 1;
         let will_harvest = next.public.workers_placed == next.public.work_quota
@@ -850,7 +1020,7 @@ impl Game {
             });
         }
         *self = next;
-        Ok(())
+        Ok(Transition::Completed)
     }
     /// Does the current placement finish a round that includes a harvest?
     /// The UI uses this to pause before the harvest choices are committed.
@@ -877,7 +1047,11 @@ impl Game {
         let mut next = self.clone();
         let id = next.public.active_player;
         next.execute_work(id, action)?;
-        next.apply_post_work_card_effects(id, action, &self.public.players[id])?;
+        let (transition, _) =
+            next.apply_post_work_card_effects(id, action, &self.public.players[id])?;
+        if let Transition::Paused(_) = transition {
+            return Err("preview cannot handle paused decision".into());
+        }
         next.public.used.insert(action.space);
         next.public.workers_placed[id] += 1;
         next.harvest_fields();
@@ -899,6 +1073,9 @@ impl Game {
     pub fn apply_free(&mut self, player: usize, free: FreeAction) -> Result<()> {
         if self.public.finished || player >= self.public.players.len() {
             return Err("not an active game/player".into());
+        }
+        if self.pending.is_some() {
+            return Err("pending decision must be resolved before new action".into());
         }
         let mut next = self.clone();
         let record = self.record_events;
@@ -996,18 +1173,47 @@ impl Game {
                 placements[player] += 1;
                 let will_harvest = placements == self.public.work_quota
                     && HARVEST_ROUNDS.contains(&self.public.round);
-                if harvest_plans.is_some() != will_harvest
-                    || breeding_plans.is_some() != will_harvest
+                // A recorded paused work action carries only the FORCED harvest
+                // plans (usually `None`): its harvest decisions are supplied by
+                // the following `pending_resolution` event, or recomputed by the
+                // resume policy. So the plan-presence check applies only to an
+                // action that commits in one shot (Issue #268 R2-P0-1).
+                let transition = self.apply_with_plans(
+                    action,
+                    harvest_plans.clone(),
+                    breeding_plans.clone(),
+                    &SimpleHarvestDetails,
+                )?;
+                if transition == Transition::Completed
+                    && (harvest_plans.is_some() != will_harvest
+                        || breeding_plans.is_some() != will_harvest)
                 {
                     return Err("replay harvest decisions missing or unexpected".into());
                 }
-                self.apply_with_plans(action, harvest_plans, breeding_plans, &SimpleHarvestDetails)?
             }
             RecordedAction::Free { player, action } => {
                 if event.kind != "free" || event.player != Some(player) {
                     return Err("replay free action metadata/player mismatch".into());
                 }
                 self.apply_free(player, action)?;
+            }
+            RecordedAction::PendingResolution {
+                player,
+                decision_id,
+                resolution,
+            } => {
+                if event.kind != "pending_resolution" || event.player != Some(player) {
+                    return Err("replay pending_resolution metadata/player mismatch".into());
+                }
+                // Verify the decision ID matches (if we have a pending decision)
+                if let Some(pending) = self.pending.as_ref() {
+                    if pending.id != decision_id {
+                        return Err("replay pending decision ID mismatch".into());
+                    }
+                }
+                // During replay, resolve the pending decision AND run its continuation
+                // (if any) to match the original game's resume behavior.
+                self.resolve_pending_and_resume(resolution).map(|_| ())?;
             }
         }
         if self.state_hash() != event.after {
@@ -1039,7 +1245,7 @@ pub fn expected_active_player(
 }
 
 impl Game {
-    fn next_worker_or_round(
+    pub(crate) fn next_worker_or_round(
         &mut self,
         feeding: Option<&[FeedingPlan]>,
         breeding: Option<&[BreedingPlan]>,

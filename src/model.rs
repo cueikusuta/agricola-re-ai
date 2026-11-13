@@ -1,6 +1,8 @@
 //! Public model types and private game state. No card text is bundled.
 use crate::cards::{CardDefinition, CardSet, CardState};
-use crate::pending::{PendingDecision, PendingKind, PendingResolution};
+use crate::engine::is_bake_bread_detail;
+use crate::harvest::HarvestDetailPolicy;
+use crate::pending::{PendingDecision, PendingKind, PendingResolution, Transition};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -1105,7 +1107,7 @@ impl Game {
         if self.card_set.enabled() {
             self.event_budget = default_event_budget();
             // dispatch_start_round already walks every player, so one call covers them all.
-            crate::card_events::dispatch_start_round(
+            let _ = crate::card_events::dispatch_start_round(
                 &self.card_set,
                 &mut self.public.players,
                 &mut self.cards,
@@ -1123,7 +1125,7 @@ impl Game {
             // game-log event and leave the state usable instead.
             .unwrap_or_else(|err| {
                 debug_assert!(false, "round-start card reward failed: {err}");
-                let _ = err;
+                Transition::Completed
             });
         }
     }
@@ -1247,33 +1249,412 @@ impl Game {
     /// The state_hash_before must match the current game state hash,
     /// otherwise returns Err (prevents replay attacks on suspended games).
     pub fn resolve_pending(&mut self, decision: PendingResolution) -> Result<(), String> {
-        let Some(pending) = self.pending.take() else {
+        // Validate BEFORE touching the stored decision. Taking it first (the
+        // previous behaviour) meant any rejected selection destroyed the
+        // decision, so an invalid click could silently drop a pause. Every
+        // fallible check now runs against `&self.pending` and leaves both the
+        // decision and the game state byte-for-byte unchanged on rejection.
+        let Some(pending) = self.pending.as_ref() else {
             return Err("no pending decision".into());
         };
         // Verify state hash integrity
         if pending.state_hash_before != self.state_hash() {
-            self.pending = Some(pending); // Restore on failure
             return Err(
                 "state hash mismatch: game state changed since decision was created".into(),
             );
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&decision)?;
-        // Apply the resolution
-        self.apply_pending_resolution(pending, decision)
+        // Only now remove the decision. The steps below are individually
+        // atomic (see `apply_pending_resolution`); if one still fails the
+        // decision is put back so it stays resolvable.
+        let pending = self.pending.take().expect("checked above");
+        match self.apply_pending_resolution(&pending, &decision) {
+            Ok(()) => self.record_pending_resolution(&pending, &decision),
+            Err(err) => {
+                self.pending = Some(pending);
+                Err(err)
+            }
+        }
     }
 
-    /// Internal: apply a validated pending resolution.
+    /// Resolve the pending decision AND run its continuation (if any).
+    /// This is the primary way to complete a paused action: the resolution
+    /// is applied, then the stored continuation (e.g., finishing a work
+    /// action's card-effect chain) is executed.
+    pub fn resolve_pending_and_resume(
+        &mut self,
+        resolution: PendingResolution,
+    ) -> Result<Transition, String> {
+        // Validate BEFORE touching the stored decision.
+        let Some(pending) = self.pending.as_ref() else {
+            return Err("no pending decision".into());
+        };
+        // Verify state hash integrity
+        if pending.state_hash_before != self.state_hash() {
+            return Err(
+                "state hash mismatch: game state changed since decision was created".into(),
+            );
+        }
+        // Validate resolution matches pending kind
+        pending.validate_resolution(&resolution)?;
+        // R2-P1-1: a paused work action's space must still be revealed/available
+        // at resume time. Check it BEFORE taking the decision so a stale or
+        // tampered save is refused atomically — nothing is applied and the
+        // decision stays resolvable — instead of smuggling a non-revealed space
+        // into `used`. `available_spaces_for_resume` is the same filter the
+        // original apply used, minus the `pending` short-circuit.
+        if let crate::pending::Continuation::PostWork { completion, .. } = &pending.continuation {
+            if !self
+                .available_spaces_for_resume()
+                .contains(&completion.action.space)
+            {
+                return Err(format!(
+                    "resume cannot use space {:?}: not available at resume time",
+                    completion.action.space
+                ));
+            }
+        }
+        // Take the decision and its continuation
+        let pending = self.pending.take().expect("checked above");
+        let continuation = pending.continuation.clone();
+        // Apply the resolution WITHOUT logging it: the pending_resolution event
+        // must chain from the paused state to the FINAL state (after the
+        // continuation), so it is appended at the end of this method.
+        self.apply_pending_resolution(&pending, &resolution)?;
+        let transition = match continuation {
+            crate::pending::Continuation::None => Transition::Completed,
+            crate::pending::Continuation::PostWork {
+                player,
+                resume,
+                completion,
+            } => {
+                // The `work` event for the paused action was already recorded at
+                // pause time (with `after` = the paused hash), so only the
+                // resolution event is appended here; it spans the whole resume.
+                self.resume_post_work(player, resume, *completion)?
+            }
+        };
+        // The resolution event spans the whole resume, so it is logged last:
+        // before == the paused hash the event chain already reached, after ==
+        // the final (resumed) state.
+        self.record_pending_resolution(&pending, &resolution)?;
+        Ok(transition)
+    }
+
+    /// Execute the post-work continuation after a decision resolves.
+    fn resume_post_work(
+        &mut self,
+        player: usize,
+        resume: crate::pending::PostWorkResume,
+        completion: crate::pending::WorkCompletion,
+    ) -> Result<Transition, String> {
+        // The paused space must still be legal at resume time: a stale save (or
+        // a tampered one) must not smuggle a space that is no longer revealed /
+        // available into `used`. `available_spaces()` re-applies the same
+        // revealed/unused/mutual-exclusion filters the original apply used
+        // (Issue #268 R2-P1-1). `self.pending` is already cleared by the caller.
+        if !self.available_spaces().contains(&completion.action.space) {
+            return Err(format!(
+                "resume cannot use space {:?}: not available at resume time",
+                completion.action.space
+            ));
+        }
+        // Re-apply the work action to advance used/workers_placed and run
+        // the harvest/breeding/round-end logic that was deferred.
+        // The completion struct holds everything we need.
+        let mut next = self.clone();
+        // The action's space was not yet marked used; do it now.
+        next.public.used.insert(completion.action.space);
+        next.public.workers_placed[player] += 1;
+        let will_harvest = next.public.workers_placed == next.public.work_quota
+            && HARVEST_ROUNDS.contains(&next.public.round);
+
+        // P0-2: Re-run the remaining card-effect dispatchers from the pause point.
+        // The dispatchers run in order: AfterHarvestBake -> AfterClayConstruction -> AfterWorker.
+        // Each dispatcher runs After phase then Interrupt phase. The pause occurred in the
+        // Interrupt phase of `resume.step`. We must:
+        // 1. For the step where we paused: resume the Interrupt phase from `resume.after`.
+        // 2. For subsequent steps: run them fully.
+        //
+        // We inline the dispatcher logic here with resume support to avoid duplicating
+        // the full dispatcher signatures.
+
+        let card_set = next.card_set.clone();
+        let mut cards = next.cards.clone();
+        let mut players = next.public.players.clone();
+        let mut improvement_market = next.public.improvement_market.clone();
+        let mut delayed_well = next.delayed_well.clone();
+        let round = next.public.round;
+        let used_spaces = next.public.used.clone();
+        let mut event_budget = next.event_budget;
+        let mut card_uses = next.card_uses.clone();
+        let card_use_limits = next.card_use_limits.clone();
+        let mut pending = next.pending.clone(); // Should be None after resolution
+
+        // Determine which steps remain to run based on where we paused.
+        let steps = [
+            crate::pending::ChainStep::AfterHarvestBake,
+            crate::pending::ChainStep::AfterClayConstruction,
+            crate::pending::ChainStep::AfterWorker,
+        ];
+        let start_index = steps.iter().position(|s| *s == resume.step).unwrap_or(0);
+
+        for (i, &step) in steps.iter().enumerate().skip(start_index) {
+            let is_paused_step = i == start_index;
+            let after = if is_paused_step {
+                Some(resume.after)
+            } else {
+                None
+            };
+
+            // Get the played_cards for this player before creating mutable context.
+            let played_cards = players[player].played_cards.clone();
+
+            match step {
+                crate::pending::ChainStep::AfterHarvestBake => {
+                    // Only run if this action actually baked bread.
+                    if is_bake_bread_detail(&completion.action.detail) {
+                        let mut ctx = crate::card_events::DispatchContext {
+                            card_set: &card_set,
+                            player: &mut players[player],
+                            cards: &mut cards,
+                            improvement_market: &mut improvement_market,
+                            delayed_well: &mut delayed_well,
+                            round,
+                            used_spaces: &used_spaces,
+                            event_budget: &mut event_budget,
+                            card_uses: &mut card_uses,
+                            card_use_limits: &card_use_limits,
+                            pending: &mut pending,
+                        };
+                        let trigger = crate::card_events::PhaseTriggerData {
+                            space: None,
+                            improvement: None,
+                            baked: true,
+                            previous_player: None,
+                            used_spaces: used_spaces.clone(),
+                        };
+                        // After phase (only if not the paused step, since it already completed)
+                        if !is_paused_step {
+                            crate::card_events::resolve_phase(
+                                &mut ctx,
+                                player,
+                                crate::card_events::TriggerPhase::After,
+                                &trigger,
+                            )?;
+                        }
+                        // Interrupt phase (with resume if this is the paused step)
+                        let transition = if let Some(after) = after {
+                            crate::card_events::resolve_phase_from(
+                                &mut ctx,
+                                player,
+                                crate::card_events::TriggerPhase::Interrupt,
+                                &trigger,
+                                &played_cards,
+                                Some(after),
+                            )?
+                        } else {
+                            crate::card_events::resolve_phase(
+                                &mut ctx,
+                                player,
+                                crate::card_events::TriggerPhase::Interrupt,
+                                &trigger,
+                            )?
+                        };
+                        if let Transition::Paused(p) = transition {
+                            // Should not happen: the decision was just resolved.
+                            return Err(format!("unexpected pause during resume: {p:?}"));
+                        }
+                    }
+                }
+                crate::pending::ChainStep::AfterClayConstruction => {
+                    let bought = if completion.previous_player.improvements.len()
+                        < players[player].improvements.len()
+                    {
+                        players[player].improvements.last().copied()
+                    } else {
+                        None
+                    };
+                    let mut ctx = crate::card_events::DispatchContext {
+                        card_set: &card_set,
+                        player: &mut players[player],
+                        cards: &mut cards,
+                        improvement_market: &mut improvement_market,
+                        delayed_well: &mut delayed_well,
+                        round,
+                        used_spaces: &used_spaces,
+                        event_budget: &mut event_budget,
+                        card_uses: &mut card_uses,
+                        card_use_limits: &card_use_limits,
+                        pending: &mut pending,
+                    };
+                    let trigger = crate::card_events::PhaseTriggerData {
+                        space: None,
+                        improvement: bought,
+                        baked: false,
+                        previous_player: Some(completion.previous_player.clone()),
+                        used_spaces: used_spaces.clone(),
+                    };
+                    if !is_paused_step {
+                        crate::card_events::resolve_phase(
+                            &mut ctx,
+                            player,
+                            crate::card_events::TriggerPhase::After,
+                            &trigger,
+                        )?;
+                    }
+                    let transition = if let Some(after) = after {
+                        crate::card_events::resolve_phase_from(
+                            &mut ctx,
+                            player,
+                            crate::card_events::TriggerPhase::Interrupt,
+                            &trigger,
+                            &played_cards,
+                            Some(after),
+                        )?
+                    } else {
+                        crate::card_events::resolve_phase(
+                            &mut ctx,
+                            player,
+                            crate::card_events::TriggerPhase::Interrupt,
+                            &trigger,
+                        )?
+                    };
+                    if let Transition::Paused(p) = transition {
+                        return Err(format!("unexpected pause during resume: {p:?}"));
+                    }
+                }
+                crate::pending::ChainStep::AfterWorker => {
+                    let mut ctx = crate::card_events::DispatchContext {
+                        card_set: &card_set,
+                        player: &mut players[player],
+                        cards: &mut cards,
+                        improvement_market: &mut improvement_market,
+                        delayed_well: &mut delayed_well,
+                        round,
+                        used_spaces: &used_spaces,
+                        event_budget: &mut event_budget,
+                        card_uses: &mut card_uses,
+                        card_use_limits: &card_use_limits,
+                        pending: &mut pending,
+                    };
+                    let trigger = crate::card_events::PhaseTriggerData {
+                        space: Some(completion.action.space),
+                        improvement: None,
+                        baked: false,
+                        previous_player: None,
+                        used_spaces: used_spaces.clone(),
+                    };
+                    if !is_paused_step {
+                        crate::card_events::resolve_phase(
+                            &mut ctx,
+                            player,
+                            crate::card_events::TriggerPhase::After,
+                            &trigger,
+                        )?;
+                    }
+                    let transition = if let Some(after) = after {
+                        crate::card_events::resolve_phase_from(
+                            &mut ctx,
+                            player,
+                            crate::card_events::TriggerPhase::Interrupt,
+                            &trigger,
+                            &played_cards,
+                            Some(after),
+                        )?
+                    } else {
+                        crate::card_events::resolve_phase(
+                            &mut ctx,
+                            player,
+                            crate::card_events::TriggerPhase::Interrupt,
+                            &trigger,
+                        )?
+                    };
+                    if let Transition::Paused(p) = transition {
+                        return Err(format!("unexpected pause during resume: {p:?}"));
+                    }
+                }
+            }
+        }
+
+        // Write back the mutated state from the dispatcher run.
+        next.public.players = players;
+        next.cards = cards;
+        next.public.improvement_market = improvement_market;
+        next.delayed_well = delayed_well;
+        next.event_budget = event_budget;
+        next.card_uses = card_uses;
+        next.pending = pending; // Should remain None
+
+        // Feeding/breeding plans from the original action (or generated now)
+        let policy = crate::harvest::SimpleHarvestDetails;
+        let harvest_plans = if will_harvest {
+            let plans = if let Some(value) = completion.harvest_plans {
+                value
+            } else {
+                let mut preview = next.clone();
+                preview.harvest_fields();
+                (0..preview.public.players.len())
+                    .map(|id| policy.plan_feeding(&preview.observation(id).expect("valid player")))
+                    .collect::<Vec<_>>()
+            };
+            if plans.len() != next.public.players.len() {
+                return Err("feeding plan count mismatch".into());
+            }
+            for plan in &plans {
+                plan.validate()?;
+            }
+            Some(plans)
+        } else {
+            None
+        };
+        let breeding_plans = if will_harvest {
+            let mut preview = next.clone();
+            preview.harvest_fields();
+            preview.feed_after_fields(harvest_plans.as_deref().expect("feeding plans"))?;
+            let plans = if let Some(value) = completion.breeding_plans {
+                value
+            } else {
+                (0..preview.public.players.len())
+                    .map(|id| policy.plan_breeding(&preview.observation(id).expect("valid player")))
+                    .collect::<Vec<_>>()
+            };
+            if plans.len() != preview.public.players.len() {
+                return Err("breeding plan count mismatch".into());
+            }
+            for (player, plan) in preview.public.players.iter().zip(&plans) {
+                plan.apply(&mut player.clone())?;
+            }
+            Some(plans)
+        } else {
+            None
+        };
+        next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
+        crate::validation::validate_incremental_or_full(&next, self)?;
+        // The `work` event for this paused action is recorded by
+        // `resolve_pending_and_resume` (with the paused hash as `after`), not
+        // here: only that frame still holds the paused hash and it must be
+        // logged before the `pending_resolution` event to keep the chain valid.
+        *self = next;
+        Ok(Transition::Completed)
+    }
+
+    /// Internal: apply a validated pending resolution to the game state.
+    ///
+    /// Recording is deliberately NOT done here: `pending_resolution` events are
+    /// appended by [`Self::record_pending_resolution`], which the two public
+    /// resolvers call at the point where the event's `before`/`after` hashes
+    /// form a valid replay chain. For a resumed work action that means AFTER the
+    /// continuation, so the logged order is
+    /// `work.before -> work.after == paused -> pending_resolution.after`.
     fn apply_pending_resolution(
         &mut self,
-        pending: PendingDecision,
-        resolution: PendingResolution,
+        pending: &PendingDecision,
+        resolution: &PendingResolution,
     ) -> Result<(), String> {
-        match (pending.kind, resolution) {
-            (
-                PendingKind::ChooseGain { source_card, .. },
-                PendingResolution::ChooseGain { chosen },
-            ) => {
+        match (&pending.kind, resolution) {
+            (PendingKind::ChooseGain { .. }, PendingResolution::ChooseGain { chosen }) => {
                 let player = &mut self.public.players[pending.player];
                 let next = player
                     .supply
@@ -1281,83 +1662,65 @@ impl Game {
                     .checked_add(chosen.amount)
                     .ok_or("resource overflow")?;
                 player.supply.set(chosen.good, next);
-                // Log the choice if recording events
-                if self.record_events {
-                    self.log.events.push(crate::model::Event {
-                        player: Some(pending.player),
-                        kind: "pending_resolution".into(),
-                        payload: serde_json::json!({
-                            "source_card": source_card,
-                            "chosen_gain": chosen,
-                        }),
-                        before: pending.state_hash_before,
-                        after: self.state_hash(),
-                    });
-                }
                 Ok(())
             }
-            (
-                PendingKind::ChoosePayment { card_id, .. },
-                PendingResolution::ChoosePayment { chosen },
-            ) => {
+            (PendingKind::ChoosePayment { .. }, PendingResolution::ChoosePayment { chosen }) => {
                 let player = &mut self.public.players[pending.player];
+                // Atomic payment: a multi-good cost is paid against a copy and
+                // only committed once every good succeeded, so a shortage on
+                // the second good cannot leave the first one deducted.
+                let mut paid = player.supply.clone();
                 for (good, amount) in &chosen.cost {
-                    player.supply.pay(*good, *amount)?;
+                    paid.pay(*good, *amount)?;
                 }
-                if self.record_events {
-                    self.log.events.push(crate::model::Event {
-                        player: Some(pending.player),
-                        kind: "pending_resolution".into(),
-                        payload: serde_json::json!({
-                            "card_id": card_id,
-                            "chosen_payment": chosen,
-                        }),
-                        before: pending.state_hash_before,
-                        after: self.state_hash(),
-                    });
-                }
+                player.supply = paid;
                 Ok(())
             }
             (
-                PendingKind::DelayedWellRelief { round, recipients },
+                PendingKind::DelayedWellRelief { recipients, .. },
                 PendingResolution::DelayedWellRelief { confirmed },
             ) => {
-                if confirmed {
+                if *confirmed {
                     for id in recipients {
-                        self.public.players[id].supply.food += 1;
+                        self.public.players[*id].supply.food += 1;
                     }
-                }
-                if self.record_events {
-                    self.log.events.push(crate::model::Event {
-                        player: None,
-                        kind: "pending_resolution".into(),
-                        payload: serde_json::json!({
-                            "delayed_well_relief": { "round": round, "confirmed": confirmed },
-                        }),
-                        before: pending.state_hash_before,
-                        after: self.state_hash(),
-                    });
                 }
                 Ok(())
             }
-            (PendingKind::Custom { source_card, .. }, PendingResolution::Custom { payload }) => {
-                // Extensible: custom effects handle their own payload
-                if self.record_events {
-                    self.log.events.push(crate::model::Event {
-                        player: Some(pending.player),
-                        kind: "pending_resolution".into(),
-                        payload: serde_json::json!({
-                            "source_card": source_card,
-                            "custom_payload": payload,
-                        }),
-                        before: pending.state_hash_before,
-                        after: self.state_hash(),
-                    });
-                }
+            (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => {
+                // Extensible: custom effects handle their own payload.
                 Ok(())
             }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
+    }
+
+    /// Append the `pending_resolution` event for a resolved decision, in the
+    /// `RecordedAction::PendingResolution` shape that [`Self::apply_recorded`]
+    /// deserialises. `before` is the paused pre-decision state; `after` is the
+    /// state once the resolution (and any continuation) has been applied.
+    fn record_pending_resolution(
+        &mut self,
+        pending: &PendingDecision,
+        resolution: &PendingResolution,
+    ) -> Result<(), String> {
+        if !self.record_events {
+            return Ok(());
+        }
+        let payload = serde_json::to_value(crate::engine::RecordedAction::PendingResolution {
+            player: pending.player,
+            decision_id: pending.id,
+            resolution: resolution.clone(),
+        })
+        .map_err(|e| e.to_string())?;
+        self.log.events.push(Event {
+            player: Some(pending.player),
+            kind: "pending_resolution".into(),
+            payload,
+            before: pending.state_hash_before.clone(),
+            after: self.state_hash(),
+        });
+        Ok(())
     }
 }
 

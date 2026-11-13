@@ -5,12 +5,106 @@
 //! player (or AI) to resolve it. The decision context is serialized so that
 //! save/load/resume produces identical state hashes.
 
-use crate::model::Good;
+use crate::breeding::BreedingPlan;
+use crate::card_events::TriggerPhase;
+use crate::engine::Action;
+use crate::harvest::FeedingPlan;
+use crate::model::{Good, Player};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Unique ID for a pending decision (monotonically increasing).
 pub type DecisionId = u64;
+
+/// Outcome of one engine transition (Issue #268: a pause is a distinct
+/// outcome, not an `Err("pending decision")` sentinel).
+///
+/// `apply` returns [`Transition::Completed`] when the whole action —
+/// including its card-effect chain — is applied and committed. It returns
+/// [`Transition::Paused`] when a card effect interrupted the chain: the
+/// mid-action state IS committed (with the decision stored in
+/// `Game::pending`), and the remainder runs after `resolve_pending`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Transition {
+    /// Fully applied; no decision outstanding.
+    Completed,
+    /// Paused: the carried decision is stored on the game and awaits
+    /// `resolve_pending`.
+    Paused(Box<PendingDecision>),
+}
+
+/// Where in a card's effect list a pause occurred, so the resumed scan can
+/// skip everything up to and including this position (Issue #268). The
+/// indices address the same scan order the dispatcher used: `card_index`
+/// over the acting player's `played_cards`, `effect_index` over that
+/// card's `effects`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct ChainPosition {
+    pub card_index: usize,
+    pub effect_index: usize,
+}
+
+/// One dispatcher of the post-work effect chain. The pause/resume contract
+/// in this issue covers the post-work chain; other dispatch sites surface
+/// typed errors instead (they never half-commit a decision).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChainStep {
+    AfterHarvestBake,
+    AfterClayConstruction,
+    AfterWorker,
+}
+
+/// Where the post-work chain paused: which dispatcher step, which phase
+/// inside that step, and the effect position to resume strictly after.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PostWorkResume {
+    pub step: ChainStep,
+    pub phase: TriggerPhase,
+    pub after: ChainPosition,
+}
+
+/// The remainder of a work action interrupted by a pending decision
+/// (Issue #268). Everything the resumed execution needs is frozen here
+/// because the committed pause state no longer contains it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkCompletion {
+    /// The action whose effect chain paused. Its space is not yet in
+    /// `used` and its worker not yet counted: both happen at completion.
+    pub action: Action,
+    /// Pre-action snapshot of the acting player. The clay-construction
+    /// trigger compares against it, so it must survive the pause.
+    pub previous_player: Player,
+    /// Explicit feeding plans supplied to the original apply. `None` means
+    /// the resumed completion generates plans with the default policy
+    /// (`SimpleHarvestDetails`); the policy object itself is not
+    /// serialized.
+    pub harvest_plans: Option<Vec<FeedingPlan>>,
+    /// Explicit breeding plans, same contract as `harvest_plans`.
+    pub breeding_plans: Option<Vec<BreedingPlan>>,
+    /// Pre-action state hash for the work event's `before` field when the
+    /// game records events; empty string otherwise.
+    pub logged_before: String,
+}
+
+/// What to execute after the decision resolves (Issue #268 typed
+/// continuation). `None` covers decisions created outside the transactional
+/// action path (direct injection, legacy saves): resolving them applies the
+/// choice and nothing else.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Continuation {
+    /// No engine chain to resume.
+    #[default]
+    None,
+    /// Resume the post-work card chain from `resume`, then finish the
+    /// paused work action described by `completion`.
+    PostWork {
+        player: usize,
+        resume: PostWorkResume,
+        completion: Box<WorkCompletion>,
+    },
+}
 
 /// The kind of decision pending.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -70,6 +164,10 @@ pub struct PendingDecision {
     pub state_hash_before: String,
     /// Additional context for the resolver (e.g., which space triggered it).
     pub context: serde_json::Value,
+    /// How to continue after resolution (Issue #268). Defaults to `None`
+    /// so pre-#268 saves keep loading.
+    #[serde(default)]
+    pub continuation: Continuation,
 }
 
 /// Resolution provided by the player/AI.
@@ -84,6 +182,7 @@ pub enum PendingResolution {
 
 impl PendingDecision {
     /// Create a new pending decision with the current state hash.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: DecisionId,
         player: usize,
@@ -97,6 +196,7 @@ impl PendingDecision {
             kind,
             state_hash_before,
             context,
+            continuation: Continuation::None,
         }
     }
 
@@ -137,6 +237,12 @@ pub trait PendingExt {
 
     /// Resolve the pending decision. The state_hash_before must match the
     /// current game state hash, otherwise returns Err (prevents replay attacks).
+    ///
+    /// Applying the resolution does NOT by itself finish a paused work
+    /// action: after this returns Ok the game is mid-action with the
+    /// decision cleared but `Continuation::PostWork` still to run. Call
+    /// `Game::resume_pending_work` (via `apply_pending_resolution` /
+    /// `resolve_pending_and_resume`) to complete the action.
     fn resolve_pending(&mut self, decision: PendingResolution) -> Result<(), String>;
 
     /// Get a reference to the pending decision (for inspection/UI).
@@ -361,6 +467,181 @@ mod tests {
             })
             .unwrap_err();
         assert!(err.contains("no pending decision"), "got: {err}");
+    }
+
+    /// Minimum reproduction for P1-B (Issue #268): the previous
+    /// `resolve_pending` called `take()` before validating, so a selection that
+    /// was not one of the offered options destroyed the decision and left the
+    /// game unresolvable. The decision, the state hash and the supply must all
+    /// be untouched by the rejected attempt.
+    #[test]
+    fn an_invalid_selection_leaves_the_decision_and_the_state_unchanged() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 41,
+            additional_action_space_enabled: false,
+        });
+        let options = vec![
+            GainOption {
+                good: Good::Food,
+                amount: 1,
+            },
+            GainOption {
+                good: Good::Wood,
+                amount: 2,
+            },
+        ];
+        let decision = PendingDecision::new(
+            game.next_decision_id,
+            0,
+            PendingKind::ChooseGain {
+                source_card: "A001".into(),
+                options,
+            },
+            game.state_hash(),
+            serde_json::json!({}),
+        );
+        game.pending = Some(decision.clone());
+
+        let hash_before = game.state_hash();
+        let integrity_before = game.integrity_hash();
+        let supply_before = game.public.players[0].supply.clone();
+
+        // Stone is not offered.
+        let err = game
+            .resolve_pending(PendingResolution::ChooseGain {
+                chosen: GainOption {
+                    good: Good::Stone,
+                    amount: 1,
+                },
+            })
+            .unwrap_err();
+        assert!(
+            err.contains("not in available options"),
+            "the selection must be rejected as unavailable, got: {err}"
+        );
+        assert_eq!(
+            game.pending(),
+            Some(&decision),
+            "a rejected selection must not consume the decision"
+        );
+        assert_eq!(game.state_hash(), hash_before, "state must be unchanged");
+        assert_eq!(
+            game.integrity_hash(),
+            integrity_before,
+            "no bookkeeping may change either"
+        );
+        assert_eq!(
+            game.public.players[0].supply, supply_before,
+            "no resource may be granted"
+        );
+
+        // The decision is still usable: a legal option now succeeds.
+        game.resolve_pending(PendingResolution::ChooseGain {
+            chosen: GainOption {
+                good: Good::Wood,
+                amount: 2,
+            },
+        })
+        .expect("a legal selection must still resolve after a rejected attempt");
+        assert_eq!(game.public.players[0].supply.wood, supply_before.wood + 2);
+        assert!(!game.has_pending());
+    }
+
+    /// Same defect, different branch: a resolution of the wrong kind used to be
+    /// an error raised *after* the decision had already been taken.
+    #[test]
+    fn a_resolution_of_the_wrong_kind_keeps_the_decision_pending() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 42,
+            additional_action_space_enabled: false,
+        });
+        let decision = PendingDecision::new(
+            game.next_decision_id,
+            0,
+            PendingKind::ChooseGain {
+                source_card: "A001".into(),
+                options: vec![GainOption {
+                    good: Good::Food,
+                    amount: 1,
+                }],
+            },
+            game.state_hash(),
+            serde_json::json!({}),
+        );
+        game.pending = Some(decision.clone());
+        let mut cost = BTreeMap::new();
+        cost.insert(Good::Wood, 1);
+
+        let err = game
+            .resolve_pending(PendingResolution::ChoosePayment {
+                chosen: PaymentOption { cost },
+            })
+            .unwrap_err();
+        assert!(err.contains("does not match"), "got: {err}");
+        assert_eq!(
+            game.pending(),
+            Some(&decision),
+            "a kind mismatch must not consume the decision"
+        );
+    }
+
+    /// Minimum reproduction for the ChoosePayment atomicity requirement
+    /// (Issue #268): `Food` sorts before `Wood`, so the old sequential loop
+    /// deducted the affordable food and only then failed on the wood.
+    #[test]
+    fn a_failed_multi_good_payment_leaves_no_partial_deduction() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 43,
+            additional_action_space_enabled: false,
+        });
+        game.public.players[0].supply.food = 1;
+        game.public.players[0].supply.wood = 1;
+
+        let mut cost = BTreeMap::new();
+        cost.insert(Good::Food, 1);
+        cost.insert(Good::Wood, 5);
+        let offered = PaymentOption { cost };
+        let decision = PendingDecision::new(
+            game.next_decision_id,
+            0,
+            PendingKind::ChoosePayment {
+                card_id: "A002".into(),
+                options: vec![offered.clone()],
+            },
+            game.state_hash(),
+            serde_json::json!({}),
+        );
+        game.pending = Some(decision.clone());
+
+        // The offered option is legal as a *choice*, but unaffordable.
+        let err = game
+            .resolve_pending(PendingResolution::ChoosePayment {
+                chosen: offered.clone(),
+            })
+            .unwrap_err();
+        assert!(err.contains("insufficient"), "got: {err}");
+        assert_eq!(
+            game.public.players[0].supply.food, 1,
+            "the affordable prefix of the cost must not be deducted"
+        );
+        assert_eq!(game.public.players[0].supply.wood, 1);
+        assert_eq!(
+            game.pending(),
+            Some(&decision),
+            "a failed payment must not consume the decision"
+        );
+
+        // Once affordable, the same choice deducts the whole cost exactly once.
+        game.public.players[0].supply.wood = 5;
+        let hash_after_topup = game.state_hash();
+        game.pending.as_mut().unwrap().state_hash_before = hash_after_topup;
+        game.resolve_pending(PendingResolution::ChoosePayment { chosen: offered })
+            .expect("an affordable payment resolves");
+        assert_eq!(game.public.players[0].supply.food, 0);
+        assert_eq!(game.public.players[0].supply.wood, 0);
     }
 
     /// Per-card use limits and the event budget are both enforced (Issue #266
@@ -666,5 +947,416 @@ mod tests {
             game.public.players[active].supply.wood, 1,
             "an unlimited card resolves normally"
         );
+    }
+
+    /// End-to-end test for Issue #268 completion condition:
+    /// real card event → pause → save → restore → resolve → resume → replay succeeds consistently.
+    ///
+    /// This test uses a real card (PendingProbe) that triggers a pending decision during
+    /// the post-work card effect chain, exercises the full pause/resume cycle including
+    /// save/restore, and verifies the replay produces identical state.
+    #[test]
+    fn e2e_real_card_event_pause_save_restore_resolve_resume_replay() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::Action;
+        use crate::model::Space;
+
+        // Create a valid card set with 14 occupations and 14 minor improvements
+        // (required by CardState::deal for 2 players: 7 cards of each kind per player).
+        let mut definitions = Vec::new();
+        // The probe card that triggers a pending decision on worker completion (Occupation played via Lessons)
+        definitions.push(CardDefinition {
+            use_limit: None,
+            id: "CHOICE_CARD".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::PendingProbe {
+                options: vec![(Good::Food, 2), (Good::Wood, 1)],
+            }],
+        });
+        // Add 13 more occupations to reach 14 total
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        // Add 14 minor improvements
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        // Create a game with the custom card set and exact initial hands from the start
+        let active = 0; // We'll make player 0 the active player
+                        // Split 14 occupations and 14 minors between the two players (7 each)
+        let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![
+            vec!["CHOICE_CARD".to_string()], // Player 0 gets the probe card (Occupation)
+            vec![],
+        ];
+        // Player 0: probe card (Occupation) + 6 more occupations + 7 minor improvements = 14 cards
+        hands[0].extend(occ_ids.iter().take(6).cloned());
+        hands[0].extend(minor_ids[0..7].iter().cloned());
+        // Player 1: 7 occupations + 7 minor improvements = 14 cards
+        hands[1].extend(occ_ids[6..13].iter().cloned());
+        hands[1].extend(minor_ids[7..14].iter().cloned());
+
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 42,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands.clone(),
+        )
+        .expect("game creation must succeed");
+        // Ensure player 0 is the active player (start player)
+        game.public.active_player = active;
+        game.public.start_player = active;
+        game.card_use_limits = set
+            .definitions
+            .iter()
+            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+            .collect();
+
+        // First worker action: Player 0 uses Lessons to play the probe card (Occupation).
+        // This triggers a pause during AfterWorker phase (probe card fires in Interrupt phase).
+        // We resolve it AND resume the continuation to complete the play action.
+        let play_action = Action {
+            space: Space::Lessons,
+            detail: crate::engine::Detail::PlayOccupation {
+                card_id: "CHOICE_CARD".into(),
+            },
+        };
+        let play_result = game.apply_with_plans(
+            play_action,
+            None,
+            None,
+            &crate::harvest::SimpleHarvestDetails,
+        );
+        assert!(
+            matches!(play_result, Ok(Transition::Paused(_))),
+            "playing probe card should pause during AfterWorker, got: {play_result:?}"
+        );
+        assert!(game.has_pending(), "pending decision after play action");
+        // Resolve the pause AND resume the continuation (completes the work action)
+        let play_resolution = crate::pending::PendingResolution::ChooseGain {
+            chosen: crate::pending::GainOption {
+                good: Good::Food,
+                amount: 2,
+            },
+        };
+        let play_resume_result = game
+            .resolve_pending_and_resume(play_resolution)
+            .expect("resolve and resume for play action must succeed");
+        assert_eq!(
+            play_resume_result,
+            Transition::Completed,
+            "play action resume should complete"
+        );
+        assert!(
+            !game.has_pending(),
+            "no pending decision after play action resume"
+        );
+
+        // Second worker action: Player 1 does a dummy action (DayLaborer) so turn advances back to player 0.
+        let dummy_action = Action {
+            space: Space::DayLaborer,
+            detail: crate::engine::Detail::None,
+        };
+        game.apply(dummy_action).expect("dummy action must succeed");
+
+        // Third worker action: Player 0 uses Forest. The probe card is now in played_cards,
+        // so its PendingProbe effect will fire during the AfterWorker -> Interrupt phase chain,
+        // triggering the pause we want to test.
+        let action = Action {
+            space: Space::Forest,
+            detail: crate::engine::Detail::None,
+        };
+        let result = game.apply_with_plans(
+            action.clone(),
+            None,
+            None,
+            &crate::harvest::SimpleHarvestDetails,
+        );
+
+        // The chain should pause with a pending decision
+        assert!(
+            matches!(result, Ok(Transition::Paused(_))),
+            "worker action should pause, got: {result:?}"
+        );
+        assert!(
+            game.has_pending(),
+            "game should have pending decision after pause"
+        );
+
+        // Save the game state (includes the pending decision with continuation)
+        let saved = game.save_json().expect("save must succeed");
+        let integrity_hash = game.integrity_hash();
+
+        // Restore the game from save
+        let mut restored = Game::load_json(&saved).expect("load must succeed");
+        assert_eq!(
+            restored.integrity_hash(),
+            integrity_hash,
+            "integrity hash must survive save/load"
+        );
+        assert!(
+            restored.has_pending(),
+            "pending decision must survive save/load"
+        );
+
+        // Resolve the pending decision AND resume the continuation
+        let food_before = restored.public.players[active].supply.food;
+        let resolution = crate::pending::PendingResolution::ChooseGain {
+            chosen: crate::pending::GainOption {
+                good: Good::Food,
+                amount: 2,
+            },
+        };
+        let resume_result = restored
+            .resolve_pending_and_resume(resolution)
+            .expect("resolve and resume must succeed");
+
+        // The action should now be fully completed
+        assert_eq!(
+            resume_result,
+            Transition::Completed,
+            "resume should complete the action"
+        );
+        assert!(
+            !restored.has_pending(),
+            "decision should be cleared after resolution"
+        );
+
+        // Verify the choice was applied (the resolution grants 2 food). The
+        // absolute total is not asserted: the play action earlier in the game
+        // also resolved a probe choice, so only the delta is meaningful.
+        assert_eq!(
+            restored.public.players[active].supply.food,
+            food_before + 2,
+            "the resumed choice must grant exactly its 2 food"
+        );
+
+        // Verify the action completed for real (space marked used, worker placed):
+        // a resume that merely applied the choice would leave these unset.
+        assert!(
+            restored.public.used.contains(&Space::Forest),
+            "action space should be marked used"
+        );
+        assert_eq!(
+            restored.public.workers_placed[active], 2,
+            "both of player 0's workers (Lessons then Forest) must be placed"
+        );
+
+        // Now test replay: replay the events from the restored game and verify
+        // the final state matches
+        let replayed = Game::replay_with_setup_and_start_player(
+            restored.config.clone(),
+            (*restored.card_set).clone(),
+            restored.log.initial_hands.clone(),
+            restored.log.initial_start_player_override,
+            &restored.log.events,
+        )
+        .expect("replay must succeed");
+
+        // The replayed game should have the same state hash as the restored game
+        assert_eq!(
+            replayed.state_hash(),
+            restored.state_hash(),
+            "replay must produce identical state hash"
+        );
+        assert_eq!(
+            replayed.integrity_hash(),
+            restored.integrity_hash(),
+            "replay must produce identical integrity hash"
+        );
+
+        // Verify the replayed game also has the final food total and used space
+        assert_eq!(
+            replayed.public.players[active].supply.food,
+            restored.public.players[active].supply.food,
+            "replay must reproduce the final food total"
+        );
+        assert!(
+            replayed.public.used.contains(&Space::Forest),
+            "replay must have the used space"
+        );
+        assert_eq!(
+            replayed.public.workers_placed, restored.public.workers_placed,
+            "replay must reproduce the worker placements"
+        );
+    }
+
+    /// R2-P0-2 regression: the one-shot `apply` API must refuse a card-effect
+    /// interrupt with a precise `Err` and leave the game byte-for-byte unchanged,
+    /// instead of silently committing a mid-action state that later surfaces as
+    /// an opaque "illegal space" refusal.
+    #[test]
+    fn apply_rejects_a_card_interrupt_without_changing_state() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::Action;
+        use crate::model::Space;
+
+        let probe = CardDefinition {
+            use_limit: None,
+            id: "PROBE".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::PendingProbe {
+                options: vec![(Good::Food, 2)],
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![probe],
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 51,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = std::collections::BTreeMap::new();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec![], vec![]],
+            undealt: vec![],
+        };
+        let active = game.public.active_player;
+        game.public.players[active]
+            .played_cards
+            .push("PROBE".into());
+
+        let hash_before = game.state_hash();
+        let food_before = game.public.players[active].supply.food;
+        let wood_before = game.public.players[active].supply.wood;
+        let used_before = game.public.used.clone();
+        let workers_before = game.public.workers_placed.clone();
+
+        let action = Action {
+            space: Space::Forest,
+            detail: crate::engine::Detail::None,
+        };
+        let err = game.apply(action).unwrap_err();
+        assert!(
+            err.contains("cannot represent an"),
+            "apply must refuse with a precise Err, got: {err}"
+        );
+        // No state change at all: no pending, no hash drift, no resources granted.
+        assert!(!game.has_pending(), "no mid-action pause may be committed");
+        assert_eq!(game.state_hash(), hash_before, "state must be unchanged");
+        assert_eq!(
+            game.public.players[active].supply.food, food_before,
+            "food must be unchanged"
+        );
+        assert_eq!(
+            game.public.players[active].supply.wood, wood_before,
+            "wood must be unchanged"
+        );
+        assert_eq!(game.public.used, used_before, "no space may be marked used");
+        assert_eq!(
+            game.public.workers_placed, workers_before,
+            "no worker may be placed"
+        );
+    }
+
+    /// R2-P1-1 regression: a pending work resume must re-check that the frozen
+    /// action's space is still revealed/available. A stale or tampered save must
+    /// not smuggle a space that is not on the board into `used`.
+    #[test]
+    fn resume_rejects_a_space_that_is_not_available_at_resume_time() {
+        use crate::engine::Action;
+        use crate::model::Space;
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 61,
+            additional_action_space_enabled: false,
+        });
+        // `Copse` is an additional space and additional spaces are OFF, so it is not
+        // on this board.
+        let bogus = Space::Copse;
+        assert!(
+            !game.available_spaces_for_resume().contains(&bogus),
+            "the probe space must genuinely be unavailable"
+        );
+
+        game.pending = Some(PendingDecision {
+            id: 0,
+            player: 0,
+            kind: PendingKind::ChooseGain {
+                source_card: "PROBE".into(),
+                options: vec![GainOption {
+                    good: Good::Food,
+                    amount: 1,
+                }],
+            },
+            state_hash_before: game.state_hash(),
+            context: serde_json::json!({}),
+            continuation: Continuation::PostWork {
+                player: 0,
+                resume: PostWorkResume {
+                    step: ChainStep::AfterWorker,
+                    phase: crate::card_events::TriggerPhase::Interrupt,
+                    after: ChainPosition {
+                        card_index: 0,
+                        effect_index: 0,
+                    },
+                },
+                completion: Box::new(WorkCompletion {
+                    action: Action {
+                        space: bogus,
+                        detail: crate::engine::Detail::None,
+                    },
+                    previous_player: game.public.players[0].clone(),
+                    harvest_plans: None,
+                    breeding_plans: None,
+                    logged_before: String::new(),
+                }),
+            },
+        });
+        let food_before = game.public.players[0].supply.food;
+        let used_before = game.public.used.clone();
+        let workers_before = game.public.workers_placed.clone();
+
+        let err = game
+            .resolve_pending_and_resume(PendingResolution::ChooseGain {
+                chosen: GainOption {
+                    good: Good::Food,
+                    amount: 1,
+                },
+            })
+            .unwrap_err();
+        assert!(
+            err.contains("not available at resume time"),
+            "the resume must refuse an unavailable space, got: {err}"
+        );
+        // Refused atomically: nothing applied, decision preserved.
+        assert_eq!(game.public.used, used_before, "no space may be marked used");
+        assert_eq!(
+            game.public.workers_placed, workers_before,
+            "no worker may be placed"
+        );
+        assert_eq!(
+            game.public.players[0].supply.food, food_before,
+            "the choice must not be applied"
+        );
+        assert!(game.has_pending(), "the decision must stay resolvable");
     }
 }
