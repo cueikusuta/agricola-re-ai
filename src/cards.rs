@@ -2138,13 +2138,13 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 31);
+        assert_eq!(set.definitions.len(), 32);
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::MinorImprovement)
                 .count(),
-            17
+            18
         );
         assert_eq!(
             set.definitions
