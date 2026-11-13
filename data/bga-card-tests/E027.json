@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "card_id": "E027",
+  "cases": [
+    {
+      "id": "E027-accumulate",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 0
+      },
+      "action": {
+        "end_work_phase": true,
+        "place_food": true
+      },
+      "expected": {
+        "food_on_card": 1
+      }
+    },
+    {
+      "id": "E027-build",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 6
+      },
+      "action": {
+        "discard_six_food": true,
+        "build_major_improvement": true
+      },
+      "expected": {
+        "food_on_card": 0,
+        "resources_spent": 0,
+        "major_improvement_built": true
+      }
+    },
+    {
+      "id": "E027-insufficient",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 3
+      },
+      "action": {
+        "build_major_improvement_for_free": true
+      },
+      "expected": {
+        "food_on_card": 3,
+        "major_improvement_built": false
+      }
+    }
+  ]
+}

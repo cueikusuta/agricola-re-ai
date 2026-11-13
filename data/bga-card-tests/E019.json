@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "E019",
+  "cases": [
+    {
+      "id": "E019-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2,
+        "empty_farmland": true
+      },
+      "action": {
+        "use_space": "cattle_market",
+        "pay_food": 2,
+        "plow": 1
+      },
+      "expected": {
+        "food_delta": -2,
+        "fields_plowed": 1
+      }
+    },
+    {
+      "id": "E019-declined",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2,
+        "empty_farmland": true
+      },
+      "action": {
+        "use_space": "cattle_market",
+        "pay_food": 0
+      },
+      "expected": {
+        "food_delta": 0,
+        "fields_plowed": 0
+      }
+    }
+  ]
+}

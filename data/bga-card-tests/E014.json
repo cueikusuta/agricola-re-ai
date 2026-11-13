@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "card_id": "E014",
+  "cases": [
+    {
+      "id": "E014-grant",
+      "scope": "effect_only",
+      "setup": {
+        "own_family": 2,
+        "other_family": [
+          3,
+          3
+        ]
+      },
+      "action": {
+        "take_action": "build_rooms"
+      },
+      "expected": {
+        "action_allowed": true,
+        "person_placed": false
+      }
+    },
+    {
+      "id": "E014-not-eligible",
+      "scope": "effect_only",
+      "setup": {
+        "own_family": 2,
+        "other_family": [
+          2,
+          3
+        ]
+      },
+      "action": {
+        "take_action": "build_rooms"
+      },
+      "expected": {
+        "action_allowed": false
+      }
+    }
+  ]
+}

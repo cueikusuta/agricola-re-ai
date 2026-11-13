@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "card_id": "E011",
+  "cases": [
+    {
+      "id": "E011-normal",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 3,
+        "pasture_adjacent_to_house": true
+      },
+      "action": {
+        "capacity_check": true
+      },
+      "expected": {
+        "card_animal_capacity": 3
+      }
+    },
+    {
+      "id": "E011-mixed",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 2,
+        "pasture_adjacent_to_house": true,
+        "sheep_on_card": 1
+      },
+      "action": {
+        "place_animal": {
+          "type": "cattle"
+        }
+      },
+      "expected": {
+        "animals_on_card": 2,
+        "cattle_on_card": 1,
+        "placement_allowed": true
+      }
+    },
+    {
+      "id": "E011-no-pasture",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 3,
+        "pasture_adjacent_to_house": false
+      },
+      "action": {
+        "capacity_check": true
+      },
+      "expected": {
+        "card_animal_capacity": 0
+      }
+    }
+  ]
+}

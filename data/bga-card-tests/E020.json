@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "E020",
+  "cases": [
+    {
+      "id": "E020-normal",
+      "scope": "effect_only",
+      "setup": {
+        "worker_on": [
+          "grain_seeds",
+          "vegetable_seeds"
+        ]
+      },
+      "action": {
+        "end_work_phase": true,
+        "plow": 1
+      },
+      "expected": {
+        "fields_plowed": 1
+      }
+    },
+    {
+      "id": "E020-partial",
+      "scope": "effect_only",
+      "setup": {
+        "worker_on": [
+          "grain_seeds"
+        ]
+      },
+      "action": {
+        "end_work_phase": true
+      },
+      "expected": {
+        "fields_plowed": 0
+      }
+    }
+  ]
+}

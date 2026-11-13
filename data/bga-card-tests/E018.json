@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "E018",
+  "cases": [
+    {
+      "id": "E018-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 1,
+        "empty_farmland": true
+      },
+      "action": {
+        "play_minor_improvement": true,
+        "pay_food": true,
+        "plow": 1
+      },
+      "expected": {
+        "food_delta": -1,
+        "fields_plowed": 1
+      }
+    },
+    {
+      "id": "E018-declined",
+      "scope": "effect_only",
+      "setup": {
+        "food": 1,
+        "empty_farmland": true
+      },
+      "action": {
+        "play_minor_improvement": true,
+        "pay_food": false
+      },
+      "expected": {
+        "food_delta": 0,
+        "fields_plowed": 0
+      }
+    }
+  ]
+}

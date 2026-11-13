@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "card_id": "E027",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "貯金箱",
+    "name_en": "Piggy Bank"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2726",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_work_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "stack_goods_on_card",
+            "good": "food",
+            "amount_per_use": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    },
+    {
+      "trigger": "any_time",
+      "conditions": [
+        {
+          "predicate": "card_food_at_least",
+          "params": {
+            "n": 6
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "discard_food_from_card",
+            "amount": 6
+          }
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "major_improvement",
+            "free": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.steps.0.params.source: whether the food placed on this card each work phase comes from the owner's supply or the general supply is not stated on the wiki page"
+    ],
+    "test_case_ids": [
+      "E027-accumulate",
+      "E027-build",
+      "E027-insufficient"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "At the end of each work phase you can place 1 food on this card; at any time you can discard 6 food from it to build 1 major improvement for free."
+  }
+}

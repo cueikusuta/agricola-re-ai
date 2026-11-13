@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "card_id": "E030",
+  "cases": [
+    {
+      "id": "E030-newborn",
+      "scope": "effect_only",
+      "setup": {
+        "newborns": 1
+      },
+      "action": {
+        "harvest_feeding": true
+      },
+      "expected": {
+        "food_required_per_newborn": 2
+      }
+    },
+    {
+      "id": "E030-no-newborn",
+      "scope": "effect_only",
+      "setup": {
+        "newborns": 0
+      },
+      "action": {
+        "harvest_feeding": true
+      },
+      "expected": {
+        "extra_food_required": 0
+      }
+    },
+    {
+      "id": "E030-points",
+      "scope": "legal_play",
+      "setup": {
+        "played": "E030",
+        "adults": 2
+      },
+      "action": {
+        "end_game_scoring": true
+      },
+      "expected": {
+        "printed_points": 2
+      }
+    }
+  ]
+}
