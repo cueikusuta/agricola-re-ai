@@ -1477,6 +1477,14 @@ pub fn verified_worker_bonus_cards(players: usize) -> Vec<CardDefinition> {
             .map(|space| gain(space, Good::Wood, 1))
             .collect(),
         ),
+        // A122 鍋パン作り: after_worker_space grain_utilization -> gain clay 2 + wood 1
+        occupation(
+            "A122",
+            vec![
+                gain(Space::GrainUtilization, Good::Clay, 2),
+                gain(Space::GrainUtilization, Good::Wood, 1),
+            ],
+        ),
     ];
     if players >= 4 {
         cards.push(occupation(
@@ -1522,12 +1530,12 @@ mod verified_worker_bonus_tests {
         let two = verified_worker_bonus_cards(2);
         let three = verified_worker_bonus_cards(3);
         let four = verified_worker_bonus_cards(4);
-        assert_eq!(two.len(), 2);
+        assert_eq!(two.len(), 3);
         assert!(!two.iter().any(|c| c.id == "A155" || c.id == "B142"));
-        assert_eq!(three.len(), 3);
+        assert_eq!(three.len(), 4);
         assert!(three.iter().any(|c| c.id == "B142"));
         assert!(!three.iter().any(|c| c.id == "A155"));
-        assert_eq!(four.len(), 4);
+        assert_eq!(four.len(), 5);
     }
 
     #[test]
@@ -1568,6 +1576,45 @@ mod verified_worker_bonus_tests {
         let player = applied("B142", &[Space::GrainSeeds, Space::Farmland]);
         assert_eq!(player.supply.vegetable, 1);
         assert_eq!(player.supply.grain, 0);
+    }
+
+    #[test]
+    fn a122_clay_and_wood_from_grain_utilization_only() {
+        let player = applied(
+            "A122",
+            &[Space::GrainUtilization, Space::GrainSeeds, Space::Farmland],
+        );
+        assert_eq!(player.supply.clay, 2);
+        assert_eq!(player.supply.wood, 1);
+        assert_eq!(player.supply.grain, 0);
+        assert_eq!(player.supply.vegetable, 0);
+    }
+
+    #[test]
+    fn a122_not_triggered_by_other_spaces() {
+        let player = applied(
+            "A122",
+            &[
+                Space::Forest,
+                Space::ClayPit,
+                Space::ReedBank,
+                Space::Fishing,
+            ],
+        );
+        assert_eq!(player.supply.clay, 0);
+        assert_eq!(player.supply.wood, 0);
+    }
+
+    #[test]
+    fn a122_occupation_has_no_cost_and_is_playable() {
+        let definitions = verified_worker_bonus_cards(2);
+        let card = definitions.iter().find(|c| c.id == "A122").unwrap().clone();
+        assert_eq!(card.kind, CardKind::Occupation);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+        let set = CardSet { definitions };
+        let player = Player::new(0, 0);
+        assert!(can_play(&set, &card, &player, 0));
     }
 }
 
@@ -2151,7 +2198,7 @@ mod simple_occupation_tests {
                 .iter()
                 .filter(|x| x.kind == CardKind::Occupation)
                 .count(),
-            14
+            15
         );
         assert!(verified_basic_card_set(3).is_err());
     }
