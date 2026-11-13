@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "E059",
+  "cases": [
+    {
+      "id": "E059-1-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "sheep_on_sheep_market": 1
+      },
+      "action": {
+        "use_day_laborer": true
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "E059-4-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "sheep_on_sheep_market": 4
+      },
+      "action": {
+        "use_day_laborer": true
+      },
+      "expected": {
+        "food_delta": 4
+      }
+    },
+    {
+      "id": "E059-5-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "sheep_on_sheep_market": 5
+      },
+      "action": {
+        "use_day_laborer": true
+      },
+      "expected": {
+        "food_delta": 4
+      }
+    }
+  ]
+}

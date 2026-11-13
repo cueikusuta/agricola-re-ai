@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "card_id": "E068",
+  "cases": [
+    {
+      "id": "E068-plant-harvest",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E068",
+        "sow_wood": 1,
+        "harvest": true
+      },
+      "expected": {
+        "wood_delta": 1,
+        "vegetable_delta": 1
+      }
+    }
+  ]
+}

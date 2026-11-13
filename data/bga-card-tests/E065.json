@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "E065",
+  "cases": [
+    {
+      "id": "E065-round-1",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 1
+      },
+      "action": {
+        "play": "E065"
+      },
+      "expected": {
+        "grain_delta": 0
+      }
+    },
+    {
+      "id": "E065-round-4",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 4
+      },
+      "action": {
+        "play": "E065"
+      },
+      "expected": {
+        "grain_delta": 2
+      }
+    },
+    {
+      "id": "E065-round-7",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 7
+      },
+      "action": {
+        "play": "E065"
+      },
+      "expected": {
+        "grain_delta": 3
+      }
+    }
+  ]
+}
