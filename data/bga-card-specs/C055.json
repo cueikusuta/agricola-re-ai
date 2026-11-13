@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "card_id": "C055",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "アトリエ",
+    "name_en": "Studio"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3034",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 1
+      },
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "harvest_feeding",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "wood",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 2
+              }
+            ]
+          }
+        },
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "clay",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 2
+              }
+            ]
+          }
+        },
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "stone",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 3
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Feeding phase: use this card to turn exactly 1 wood or 1 clay into 2 food, or 1 stone into 3 food (exactly one conversion per feeding phase)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C055-wood",
+      "C055-clay",
+      "C055-stone",
+      "C055-declined"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "In the feeding phase of each harvest, use this card to turn exactly 1 wood/clay/stone into 2/2/3 food."
+  }
+}

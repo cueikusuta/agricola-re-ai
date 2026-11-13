@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "card_id": "C066",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "永遠のライ麦畑",
+    "name_en": "Eternal Rye Cultivation"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3023",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "grain_field_count",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_harvest",
+      "conditions": [
+        {
+          "predicate": "resource_at_least",
+          "params": {
+            "good": "grain",
+            "n": 2
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "After each harvest, if you have at least 2 grain in your supply, gain 1 food."
+    },
+    {
+      "trigger": "after_harvest",
+      "conditions": [
+        {
+          "predicate": "resource_at_least",
+          "params": {
+            "good": "grain",
+            "n": 3
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "2 grain in supply after the harvest: 1 food; 3+ grain: 1 additional grain instead of the food (the wiki's 'instead' is encoded as an optional second step and flagged in the notes)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C066-two",
+      "C066-three",
+      "C066-one"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "After each harvest, if you have 2 grain in your supply, gain 1 food; with 3 or more, gain 1 additional grain instead."
+  }
+}

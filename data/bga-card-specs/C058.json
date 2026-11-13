@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "C058",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "木彫",
+    "name_en": "Woodcraft"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3031",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "forest"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "conditional_gain_after_use",
+            "good": "food",
+            "amount": 1,
+            "check": "wood_supply_at_most",
+            "n": 5
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time you use a wood accumulation space, if immediately afterward you have at most 5 wood in your supply, gain 1 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.stock_condition: the wiki grants 1 food when, immediately after using a wood accumulation space, the player's own stock is at most 5 wood; no established predicate expresses a supply-at-most threshold on the owner's own stock (resource_at_least/resource_greater_than cover at-least/greater comparisons only)"
+    ],
+    "test_case_ids": [
+      "C058-normal",
+      "C058-boundary",
+      "C058-not-triggered",
+      "C058-other-space",
+      "C058-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Each time you use a wood accumulation space, if immediately afterward you have at most 5 wood in your supply, gain 1 food."
+  }
+}

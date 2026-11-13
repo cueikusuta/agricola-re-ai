@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "C067",
+  "cases": [
+    {
+      "id": "C067-normal",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 1,
+        "next_round_harvest": false,
+        "grain": 0
+      },
+      "action": {
+        "start_round": true
+      },
+      "expected": {
+        "grain_delta": 1
+      }
+    },
+    {
+      "id": "C067-harvest-round",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 1,
+        "next_round_harvest": true,
+        "grain": 0
+      },
+      "action": {
+        "start_round": true
+      },
+      "expected": {
+        "grain_delta": 0
+      }
+    },
+    {
+      "id": "C067-no-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 0,
+        "next_round_harvest": false,
+        "grain": 0
+      },
+      "action": {
+        "start_round": true
+      },
+      "expected": {
+        "grain_delta": 0
+      }
+    }
+  ]
+}

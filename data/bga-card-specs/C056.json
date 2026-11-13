@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "card_id": "C056",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "給餌柵",
+    "name_en": "Feed Fence"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3033",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_stable_built",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "For each newly built stable gain 1 food; for the last one gain 3 food instead (provisional: encoded as +1 per build with the final-build bonus left to the predicate flagged in unresolved)."
+    },
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "build_stable_alternate_cost",
+            "pay_good": "clay",
+            "pay_amount": 1,
+            "once_per_build": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Each time you build stables you may build exactly 1 of them for 1 clay instead of 1 wood."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.last_stable_detection: the wiki grants 3 food instead of 1 for the final newly built stable; 'last stable' (no farmyard space remains for another stable / last one built in the game) has no established predicate — threshold table keyed on stable count used as a provisional encoding and flagged",
+      "effects.1.alternate_cost: building exactly 1 stable for 1 clay instead of wood each time you build stables; a per-build alternative payment is offered by no established discount vocabulary"
+    ],
+    "test_case_ids": [
+      "C056-normal",
+      "C056-clay-build",
+      "C056-clay-limited",
+      "C056-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "For each new stable you build, gain 1 food (3 food for your last one). Each time you build stables, you may build exactly 1 stable for 1 clay instead of wood."
+  }
+}

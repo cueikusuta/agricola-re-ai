@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "card_id": "C061",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ビールジョッキ",
+    "name_en": "Beer Stein"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3028",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "bake_bread"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "grain",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 2
+              },
+              {
+                "good": "points",
+                "amount": 1
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each time you take a Bake Bread action, you may use this card once to turn 1 grain into 2 food and 1 bonus point."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C061-normal",
+      "C061-declined",
+      "C061-no-grain"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Each Bake Bread action: use this card once to turn 1 grain into 2 food and 1 bonus point."
+  }
+}

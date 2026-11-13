@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "card_id": "C058",
+  "cases": [
+    {
+      "id": "C058-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4
+      },
+      "action": {
+        "use_space": "forest",
+        "wood_gained": 1
+      },
+      "expected": {
+        "wood": 5,
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "C058-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 5
+      },
+      "action": {
+        "use_space": "forest",
+        "wood_gained": 0
+      },
+      "expected": {
+        "wood": 5,
+        "food_delta": 1
+      },
+      "notes": "At most 5 wood after the use still grants the food."
+    },
+    {
+      "id": "C058-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 6
+      },
+      "action": {
+        "use_space": "forest",
+        "wood_gained": 2
+      },
+      "expected": {
+        "wood": 8,
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "C058-other-space",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 2,
+        "clay": 0
+      },
+      "action": {
+        "use_space": "clay_pit"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "C058-timing-pending",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 5
+      },
+      "action": {
+        "use_space": "forest",
+        "wood_gained": 0,
+        "check_after_use": true
+      },
+      "expected": {
+        "review_status": "needs_resolution"
+      },
+      "notes": "Fail-closed: 'immediately after the use, own stock at most 5 wood' has no established predicate; engine implementation must not run this effect until the vocabulary is extended."
+    }
+  ]
+}

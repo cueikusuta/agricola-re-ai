@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "card_id": "C062",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "調理場の拡張",
+    "name_en": "Cooking Hearth Extension"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3027",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "harvest_feeding",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "cooking_double_food",
+            "once_per_improvement": true,
+            "applicable": [
+              "animal",
+              "vegetable"
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each harvest, use each of your cooking improvements once to get double the food for 1 animal or vegetable (per-improvement granularity flagged)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.scope: the wiki lets each of your cooking improvements convert 1 animal or vegetable to double food once per harvest; a per-improvement once-per-harvest double conversion has no established operation — modeled as one harvest_feeding step and flagged"
+    ],
+    "test_case_ids": [
+      "C062-normal",
+      "C062-once-per-improvement",
+      "C062-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Each harvest, use each of your cooking improvements once to get double the amount of food for 1 animal or vegetable."
+  }
+}

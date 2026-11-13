@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "card_id": "C053",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "三つ足やかん",
+    "name_en": "Gypsy's Crock"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3036",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_cooking_conversion",
+      "conditions": [
+        {
+          "predicate": "cooking_conversion_goods",
+          "params": {
+            "n": 2,
+            "source": "cooking_improvement"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time a cooking improvement turns 2 goods into food at the same time, gain 1 additional food (trigger name descriptive; see unresolved)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.granularity: the wiki grants 1 additional food each time a cooking improvement turns exactly 2 goods into food at the same time; no established condition captures a per-conversion-count event inside a cooking improvement"
+    ],
+    "test_case_ids": [
+      "C053-normal",
+      "C053-one-good",
+      "C053-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Each time you use a cooking improvement to turn 2 goods into food at the same time, get 1 additional food."
+  }
+}

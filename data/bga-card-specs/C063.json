@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "card_id": "C063",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "クラフトビール醸造所",
+    "name_en": "Craft Brewery"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3026",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 2
+      },
+      {
+        "good": "clay",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "harvest_feeding",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "grain",
+                "amount": 1
+              },
+              {
+                "good": "field_grain",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 4
+              },
+              {
+                "good": "points",
+                "amount": 2
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Feeding phase: exchange 1 grain from your supply plus 1 grain from a field for 2 bonus points and 4 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C063-normal",
+      "C063-no-field-grain",
+      "C063-declined"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "In the feeding phase of each harvest, exchange 1 grain from your supply plus 1 grain from a field for 2 bonus points and 4 food."
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "card_id": "C064",
+  "cases": [
+    {
+      "id": "C064-normal",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2,
+        "round": 4
+      },
+      "action": {
+        "pay_and_place": true
+      },
+      "expected": {
+        "grain_delta": -1,
+        "rounds_with_food": 4
+      }
+    },
+    {
+      "id": "C064-no-grain",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 0,
+        "round": 4
+      },
+      "action": {
+        "pay_and_place": true
+      },
+      "expected": {
+        "rounds_with_food": 0
+      }
+    },
+    {
+      "id": "C064-late",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 1,
+        "round": 12
+      },
+      "action": {
+        "pay_and_place": true
+      },
+      "expected": {
+        "rounds_with_food": 2
+      },
+      "notes": "Only the remaining round spaces can be marked."
+    }
+  ]
+}

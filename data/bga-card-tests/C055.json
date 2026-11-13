@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "card_id": "C055",
+  "cases": [
+    {
+      "id": "C055-wood",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "convert": "wood"
+      },
+      "expected": {
+        "food_delta": 2,
+        "wood_delta": -1
+      }
+    },
+    {
+      "id": "C055-clay",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 1,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "convert": "clay"
+      },
+      "expected": {
+        "food_delta": 2,
+        "clay_delta": -1
+      }
+    },
+    {
+      "id": "C055-stone",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 1,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "convert": "stone"
+      },
+      "expected": {
+        "food_delta": 3,
+        "stone_delta": -1
+      }
+    },
+    {
+      "id": "C055-declined",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "convert": null
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

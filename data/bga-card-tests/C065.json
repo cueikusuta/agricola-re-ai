@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "card_id": "C065",
+  "cases": [
+    {
+      "id": "C065-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "C065"
+      },
+      "expected": {
+        "marked_rounds": [
+          8,
+          10,
+          12
+        ],
+        "grain_per_space": 1
+      }
+    },
+    {
+      "id": "C065-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 9
+      },
+      "action": {
+        "play": "C065"
+      },
+      "expected": {
+        "marked_rounds": [
+          10,
+          12
+        ]
+      },
+      "notes": "Round 8 is already past, so only 10 and 12 are marked."
+    },
+    {
+      "id": "C065-last",
+      "scope": "effect_only",
+      "setup": {
+        "round": 11
+      },
+      "action": {
+        "play": "C065"
+      },
+      "expected": {
+        "marked_rounds": [
+          12
+        ]
+      }
+    }
+  ]
+}

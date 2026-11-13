@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "C068",
+  "cases": [
+    {
+      "id": "C068-normal",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 0
+      },
+      "action": {
+        "play_occupation": 1
+      },
+      "expected": {
+        "vegetable_delta": 1
+      }
+    },
+    {
+      "id": "C068-two",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 0
+      },
+      "action": {
+        "play_occupation": 2
+      },
+      "expected": {
+        "vegetable_delta": 2
+      }
+    },
+    {
+      "id": "C068-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 0
+      },
+      "action": {
+        "play_minor_improvement": 1
+      },
+      "expected": {
+        "vegetable_delta": 0
+      }
+    }
+  ]
+}

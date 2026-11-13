@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "card_id": "C059",
+  "cases": [
+    {
+      "id": "C059-cook",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 2,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "use_card": true
+      },
+      "expected": {
+        "vegetable_delta": -1,
+        "food_delta": 5
+      }
+    },
+    {
+      "id": "C059-declined",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 2,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "use_card": false
+      },
+      "expected": {
+        "vegetable_delta": 0,
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "C059-score-5",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 5
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 1
+      }
+    },
+    {
+      "id": "C059-score-6",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 6
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 2
+      }
+    },
+    {
+      "id": "C059-score-4",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable": 4
+      },
+      "action": {
+        "end_scoring": true
+      },
+      "expected": {
+        "points_delta": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "card_id": "C056",
+  "cases": [
+    {
+      "id": "C056-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0,
+        "stables": 1
+      },
+      "action": {
+        "build_stables": 1
+      },
+      "expected": {
+        "food_delta": 1,
+        "stables_delta": 1
+      }
+    },
+    {
+      "id": "C056-clay-build",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 1,
+        "wood": 0,
+        "stables": 0
+      },
+      "action": {
+        "build_stables": 1,
+        "pay": "clay"
+      },
+      "expected": {
+        "stables_delta": 1,
+        "clay_delta": -1
+      }
+    },
+    {
+      "id": "C056-clay-limited",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 3,
+        "wood": 3,
+        "stables": 0
+      },
+      "action": {
+        "build_stables": 2,
+        "pay": "clay"
+      },
+      "expected": {
+        "stables_delta": 2,
+        "clay_delta": -1,
+        "wood_delta": -1
+      },
+      "notes": "Exactly 1 stable per build action may use the clay alternative."
+    },
+    {
+      "id": "C056-timing-pending",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 4,
+        "farmyard_space_left": 0
+      },
+      "action": {
+        "build_stables": 1
+      },
+      "expected": {
+        "review_status": "needs_resolution"
+      },
+      "notes": "Fail-closed: 'last stable' cannot be detected with the established predicates."
+    }
+  ]
+}

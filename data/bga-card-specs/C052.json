@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "card_id": "C052",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "猟師の帽子",
+    "name_en": "Huntsman's Hat"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3037",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "has_improvement",
+        "params": {
+          "kind": [
+            "fireplace",
+            "cooking_hearth"
+          ]
+        }
+      }
+    ],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "pig_market"
+          }
+        },
+        {
+          "predicate": "any_player",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "per",
+              "args": [
+                {
+                  "op": "count",
+                  "args": [
+                    "new_wild_boar_gained"
+                  ]
+                },
+                1
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "For each new wild boar gained from the effect of an action space, also gain 1 food (modeled on the pig_market space; per-boar vs per-use granularity flagged in unresolved)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: the wiki lists ':鍋:の進歩' (a cooking improvement in play); encoded as has_improvement kind=[fireplace, cooking_hearth] and flagged for review confirmation",
+      "effects.0.granularity: the wiki grants 1 food for each NEW wild boar gained from an action-space effect; whether the bonus stacks per boar or per use is not stated by the established vocabulary"
+    ],
+    "test_case_ids": [
+      "C052-normal",
+      "C052-two-boars",
+      "C052-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "For each new wild boar gained from an action-space effect, also gain 1 food."
+  }
+}
