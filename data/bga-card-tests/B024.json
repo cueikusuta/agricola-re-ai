@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "B024",
+  "cases": [
+    {
+      "id": "B024-valid-placement",
+      "scope": "effect_only",
+      "setup": {},
+      "action": { "place_family": ["sheep_market", "day_laborer"] },
+      "expected": { "placements_allowed": true },
+      "notes": "1 on sheep market (livestock market), 1 on day laborer - valid"
+    },
+    {
+      "id": "B024-invalid-placement",
+      "scope": "legal_play",
+      "setup": {},
+      "action": { "place_family": ["day_laborer", "fishing"] },
+      "expected": { "placements_allowed": false },
+      "notes": "Neither on livestock market - invalid"
+    }
+  ]
+}

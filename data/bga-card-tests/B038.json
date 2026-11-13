@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "card_id": "B038",
+  "cases": [
+    {
+      "id": "B038-adjacent-scoring",
+      "scope": "effect_only",
+      "setup": { "all_other_spaces_used": true, "adjacent_unused": 2 },
+      "action": { "scoring": true },
+      "expected": { "bonus_points": 2 },
+      "notes": "All other spaces used, 2 adjacent unused -> count as used for scoring"
+    }
+  ]
+}

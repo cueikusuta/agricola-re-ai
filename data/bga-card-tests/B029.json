@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "card_id": "B029",
+  "cases": [
+    {
+      "id": "B029-bonus-point",
+      "scope": "effect_only",
+      "setup": {},
+      "action": { "use_lesson": true, "use_major_improvement_pot": true },
+      "expected": { "bonus_points_gained": 1 },
+      "notes": "Used Lesson and pot-symbol Major Improvement in same turn -> 1 bonus point"
+    }
+  ]
+}

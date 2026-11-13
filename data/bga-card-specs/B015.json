@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "card_id": "B015",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "工作台",
+    "name_en": "Carpenter's Bench"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3242",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [ { "good": "wood", "amount": 1 } ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": { "cost_type": "wooden_room", "amount": 2 }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Wooden room cost reduced by 2 wood (persistent)"
+    },
+    {
+      "trigger": "on_use_wood_accumulation",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "description": "After using a wood accumulation space, may build exactly 1 pasture using only the wood gained from that space."
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "After using wood accumulation space, can build 1 pasture with that wood only"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area with persistent effects" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[1].trigger: on_use_wood_accumulation needs formal trigger definition",
+      "effects[1].steps[0].operation: building pasture with only newly gained wood needs precise rules"
+    ],
+    "test_case_ids": ["B015-wooden-room-discount", "B015-pasture-from-wood"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 wood. 0 points. Strong ban status. Effects: (1) Wooden room cost -2 wood persistent. (2) After using wood accumulation space, may build 1 pasture using only that wood. Second effect needs formalization."
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "card_id": "B014",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "鷹の塔",
+    "name_en": "Hawktower"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3243",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [ { "good": "clay", "amount": 2 } ],
+    "prerequisites": [ { "predicate": "round_lte", "params": { "round": 7 }, "negate": false } ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "description": "Place a stone room on round space 12. At start of that round, if you live in a stone house, build it for free; otherwise discard it."
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Places stone room on round 12 space. Conditional free build at round 12 start if in stone house."
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area; effect triggers at round 12" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].operation: round 12 delayed trigger and conditional free build need formalization",
+      "prerequisites[0]: round_lte predicate needs implementation"
+    ],
+    "test_case_ids": ["B014-stone-house", "B014-no-stone-house"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 2 clay. Prereq: must play by round 7. 0 points. Effect: place stone room on round 12; at round 12 start, if in stone house build free else discard. Needs formalization for round-based trigger."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "card_id": "B034",
+  "cases": [
+    {
+      "id": "B034-livestock-accommodated",
+      "scope": "effect_only",
+      "setup": { "livestock": 0, "accumulation_livestock": ["sheep", "boar"] },
+      "action": { "accommodate_all": true },
+      "expected": { "bonus_points": 2 },
+      "notes": "First time accommodating 2 livestock from accumulation -> 2 bonus points"
+    }
+  ]
+}

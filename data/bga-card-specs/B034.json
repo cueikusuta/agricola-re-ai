@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "card_id": "B034",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "特別な餌",
+    "name_en": "Special Food"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3223", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [ { "predicate": "no_livestock", "params": {}, "negate": false } ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "first_time_all_livestock_fed_from_accumulation",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": { "good": "bonus_points", "amount": 1 }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "First time all livestock gained from accumulation spaces are accommodated on farm: gain bonus points equal to number of such animals"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "prerequisites[0]: no_livestock predicate needs implementation",
+      "effects[0].trigger: first_time_all_livestock_fed_from_accumulation needs formal trigger definition",
+      "effects[0].steps[0].params: bonus point amount equals number of animals accommodated (dynamic)"
+    ],
+    "test_case_ids": ["B034-livestock-accommodated"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: free. Prereq: no livestock on farm. 0 points. Effect: first time all accumulation-space livestock are accommodated, gain bonus points = number of animals. Complex trigger and dynamic points need formalization."
+  }
+}

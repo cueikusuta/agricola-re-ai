@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "B038",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "建設予定地",
+    "name_en": "Future Building Site"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3219", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [ { "predicate": "round_lte", "params": { "round": 4 }, "negate": false } ],
+    "printed_points": 3,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": { "good": "bonus_points", "amount": 1 }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At scoring: adjacent unused farm spaces count as used if all other farm spaces are used"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "prerequisites[0]: round_lte predicate needs implementation",
+      "effects[0].steps[0].operation: conditional farm space scoring (adjacent unused count as used when all others used) needs formalization"
+    ],
+    "test_case_ids": ["B038-adjacent-scoring"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: free. Prereq: play by round 4. 3 printed points. Effect: scoring - adjacent unused spaces count as used if all other farm spaces used. Complex conditional scoring needs formalization."
+  }
+}

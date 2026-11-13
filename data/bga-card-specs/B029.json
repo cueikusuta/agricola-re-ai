@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "B029",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "料理教室",
+    "name_en": "Cookery Lesson"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3228", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [ { "good": "food", "amount": 2 } ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_use_lesson_and_major_improvement",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": { "good": "bonus_points", "amount": 1 }
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When using both Lesson and a Major Improvement (pot symbol) in same turn, gain 1 bonus point"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: on_use_lesson_and_major_improvement needs formal trigger definition (detecting Lesson + pot-symbol major improvement in same turn)",
+      "effects[0].steps[0].operation: bonus_points resource type needs definition"
+    ],
+    "test_case_ids": ["B029-bonus-point"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 2 food. 0 points. Effect: same turn using Lesson action and a pot-symbol Major Improvement -> 1 bonus point. Trigger detection needs formalization."
+  }
+}

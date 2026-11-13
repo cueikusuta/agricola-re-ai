@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "B012",
+  "cases": [
+    {
+      "id": "B012-capacity",
+      "scope": "effect_only",
+      "setup": {},
+      "action": { "play": "B012" },
+      "expected": { "max_livestock": 3, "counts_as_pasture": false },
+      "notes": "Can hold up to 3 animals of same type. Does not count as pasture."
+    },
+    {
+      "id": "B012-same-type",
+      "scope": "effect_only",
+      "setup": { "card_livestock": ["sheep", "sheep"] },
+      "action": { "add_livestock": "boar" },
+      "expected": { "allowed": false },
+      "notes": "Only same type of livestock allowed on this card."
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "B030",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "棒杭柵",
+    "name_en": "Wood Palisades"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3227", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [ { "good": "food", "amount": 1 } ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_build_fence",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": { "description": "When building fences on farm perimeter, may place 2 wood from supply instead of fence pieces. Each 2 wood so placed gives 1 bonus point." }
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Fence building: can use 2 wood instead of fence piece; each 2 wood = 1 bonus point"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: on_build_fence needs formal trigger definition",
+      "effects[0].steps[0].operation: wood-for-fence substitution and bonus point tracking need formalization"
+    ],
+    "test_case_ids": ["B030-wood-fence", "B030-bonus-points"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 food. 0 points. Effect: when building perimeter fences, may use 2 wood instead of fence piece; each 2 wood = 1 bonus point. Substitution and scoring need formalization."
+  }
+}

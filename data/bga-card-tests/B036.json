@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "B036",
+  "cases": [
+    {
+      "id": "B036-cost-2p",
+      "scope": "effect_only",
+      "setup": { "family_size": 2, "clay": 2, "food": 2 },
+      "action": { "play": "B036" },
+      "expected": { "clay_spent": 2, "food_spent": 2, "printed_points": 4 },
+      "notes": "2 family members -> cost 2 clay + 2 food"
+    },
+    {
+      "id": "B036-cost-4p",
+      "scope": "effect_only",
+      "setup": { "family_size": 4, "clay": 4, "food": 4 },
+      "action": { "play": "B036" },
+      "expected": { "clay_spent": 4, "food_spent": 4, "printed_points": 4 },
+      "notes": "4 family members -> cost 4 clay + 4 food"
+    }
+  ]
+}

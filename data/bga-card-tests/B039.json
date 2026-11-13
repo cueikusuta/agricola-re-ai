@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "card_id": "B039",
+  "cases": [
+    {
+      "id": "B039-field-phase-1-sheep",
+      "scope": "effect_only",
+      "setup": { "sheep": 1, "occupations": 2 },
+      "action": { "field_phase": true },
+      "expected": { "food_gained": 1 },
+      "notes": "1 sheep -> 1 food in field phase"
+    },
+    {
+      "id": "B039-field-phase-4-sheep",
+      "scope": "effect_only",
+      "setup": { "sheep": 4, "occupations": 2 },
+      "action": { "field_phase": true },
+      "expected": { "food_gained": 2 },
+      "notes": "4 sheep -> 2 food in field phase"
+    },
+    {
+      "id": "B039-scoring",
+      "scope": "effect_only",
+      "setup": { "sheep": 6 },
+      "action": { "scoring": true },
+      "expected": { "bonus_points": 2 },
+      "notes": "6 sheep -> 2 bonus points (1 per 3)"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "card_id": "B022",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "旅行靴",
+    "name_en": "Walking Boots"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3235",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [ { "predicate": "family_size_lte", "params": { "size": 4 }, "negate": false } ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        { "operation": "gain_resource", "target": "owner", "params": { "good": "food", "amount": 2 } },
+        { "operation": "gain_resource", "target": "owner", "params": { "good": "family_growth", "amount": 1 } }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Immediately gain 2 food and 1 family growth (place 1 person from supply)"
+    }
+  ],
+  "post_play": { "destination": "left_neighbor_hand", "notes": "Minor improvement passes to left neighbor" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "prerequisites[0]: family_size_lte predicate needs implementation",
+      "effects[0].steps[1].operation: family_growth resource type needs definition"
+    ],
+    "test_case_ids": ["B022-eligible", "B022-not-eligible"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: free. Prereq: 4 or fewer family members. 0 points. Strong ban. Effect: gain 2 food and place 1 family member from supply. Prereq needs formalization."
+  }
+}

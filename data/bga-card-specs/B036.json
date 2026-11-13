@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "B036",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ガラスビン",
+    "name_en": "Bottles"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3221", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 4,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": { "description": "Play by paying 1 clay + 1 food per family member. Cost scales with family size." }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Variable cost: 1 clay + 1 food per family member at time of play"
+    }
+  ],
+  "post_play": { "destination": "left_neighbor_hand", "notes": "Minor improvement passes to left neighbor" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: cost is not fixed but scales with family size (1 clay + 1 food per person) - needs special cost handling",
+      "effects[0].steps[0].operation: dynamic cost calculation at play time needs formalization"
+    ],
+    "test_case_ids": ["B036-cost-2p", "B036-cost-4p"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: variable (1 clay + 1 food per family member). 4 printed points. Effect: cost scales with family size at play time. Dynamic cost needs formalization."
+  }
+}

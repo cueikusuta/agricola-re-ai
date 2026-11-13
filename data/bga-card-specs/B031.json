@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "card_id": "B031",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "製陶所の敷地",
+    "name_en": "Pottery Yard"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3226", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [ { "predicate": "has_pottery_or_upgrade", "params": {}, "negate": false } ],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": { "good": "bonus_points", "amount": 2 }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At scoring: if 2+ adjacent unused farm spaces, gain 2 bonus points"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "prerequisites[0]: has_pottery_or_upgrade predicate needs implementation",
+      "effects[0].steps[0].operation: adjacency check for 2+ unused farm spaces needs formalization",
+      "effects[0].steps[0].params: bonus_points resource type needs definition"
+    ],
+    "test_case_ids": ["B031-adjacent-spaces", "B031-no-adjacent-spaces"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: free. Prereq: has Pottery or its upgrade. 1 printed point. Effect: scoring - if 2+ adjacent unused farm spaces, gain 2 bonus points. Prereq and adjacency check need formalization."
+  }
+}

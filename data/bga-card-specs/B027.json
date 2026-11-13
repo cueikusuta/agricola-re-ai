@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "B027",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "工具箱",
+    "name_en": "Toolbox"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3230", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [ { "good": "wood", "amount": 1 } ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_build_room_stable_fence",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": { "description": "After building at least 1 room, stable, or fence in a work phase, may build one of Joinery, Pottery, or Basketmaker's Workshop at end of turn." }
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "After building room/stable/fence, may build 1 major improvement (Joinery/Pottery/Basketmaker) at turn end"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: on_build_room_stable_fence needs formal trigger definition",
+      "effects[0].steps[0].operation: delayed major improvement build at turn end needs formalization"
+    ],
+    "test_case_ids": ["B027-major-improvement"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 wood. 0 points. Effect: after building room/stable/fence, may build Joinery/Pottery/Basketmaker at turn end. Trigger and delayed build need formalization."
+  }
+}

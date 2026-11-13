@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "B040",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "醸造所の池",
+    "name_en": "Brewery Pond"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3217", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [ { "predicate": "occupation_count_gte", "params": { "count": 2 }, "negate": false } ],
+    "printed_points": -1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_use_fishing_or_reed_accumulation",
+      "conditions": [],
+      "steps": [
+        { "operation": "gain_resource", "target": "owner", "params": { "good": "grain", "amount": 1 } },
+        { "operation": "gain_resource", "target": "owner", "params": { "good": "wood", "amount": 1 } }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time using Fishing or Reed accumulation space: gain 1 grain and 1 wood"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "prerequisites[0]: occupation_count_gte predicate needs implementation",
+      "effects[0].trigger: on_use_fishing_or_reed_accumulation needs formal trigger definition",
+      "play.printed_points: -1 (negative points) needs confirmation"
+    ],
+    "test_case_ids": ["B040-fishing", "B040-reed"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: free. Prereq: 2+ occupations. -1 printed point (negative). Effect: each Fishing/Reed use -> +1 grain +1 wood. Negative printed points and trigger need formalization."
+  }
+}

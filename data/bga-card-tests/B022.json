@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "B022",
+  "cases": [
+    {
+      "id": "B022-eligible",
+      "scope": "effect_only",
+      "setup": { "family_size": 3, "food": 0 },
+      "action": { "play": "B022" },
+      "expected": { "food": 2, "family_size": 4, "post_play": "left_neighbor_hand" },
+      "notes": "With 3 family members, can play: gain 2 food + 1 family growth"
+    },
+    {
+      "id": "B022-not-eligible",
+      "scope": "legal_play",
+      "setup": { "family_size": 5 },
+      "action": { "play": "B022" },
+      "expected": { "legal": false },
+      "notes": "With 5 family members, cannot play (prereq: 4 or fewer)"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "B011",
+  "cases": [
+    {
+      "id": "B011-capacity",
+      "scope": "effect_only",
+      "setup": {
+        "pastures": 2,
+        "sheep": 1
+      },
+      "action": {
+        "play": "B011"
+      },
+      "expected": {
+        "card_capacity": 2,
+        "can_hold_livestock": true
+      },
+      "notes": "Capacity equals number of pastures on farm (2). Can hold 1 sheep, 1 slot free."
+    },
+    {
+      "id": "B011-food-gain",
+      "scope": "effect_only",
+      "setup": {
+        "pastures": 2,
+        "card_livestock": 1
+      },
+      "action": {
+        "harvest_breeding_phase": true
+      },
+      "expected": {
+        "food_gained": 1
+      },
+      "notes": "After breeding phase, gain 1 food per unused capacity (2 capacity - 1 used = 1 food)"
+    }
+  ]
+}

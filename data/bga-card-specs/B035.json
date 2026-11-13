@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "B035",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "装蹄刀",
+    "name_en": "Hook Knife"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3222", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [ { "good": "wood", "amount": 1 } ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": { "good": "bonus_points", "amount": 2 }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At scoring: if sheep count >= threshold (9/8/7/6/5/5 for 1-6 players), gain 2 bonus points once"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params: sheep threshold varies by player count (1p:9, 2p:8, 3p:7, 4p:6, 5p:5, 6p:5) needs formalization",
+      "effects[0].steps[0].params: bonus_points resource type needs definition"
+    ],
+    "test_case_ids": ["B035-sheep-threshold-2p", "B035-sheep-threshold-4p"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 wood. 0 points. Effect: at scoring, if sheep >= threshold (varies by player count), gain 2 bonus points once. Player-count-dependent threshold needs formalization."
+  }
+}

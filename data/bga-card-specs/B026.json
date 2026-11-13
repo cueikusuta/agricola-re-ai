@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "B026",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "耕地の垣根",
+    "name_en": "Agrarian Fences"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
+    "references": [
+      { "url": "https://agricola.cloudfree.jp/?p=3231", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_use_grain_utilization",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": { "description": "When using Grain Utilization space, may replace one of its two actions with Build Fences action." }
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Grain Utilization: can swap one action for Build Fences"
+    }
+  ],
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: on_use_grain_utilization needs formal trigger definition",
+      "effects[0].steps[0].operation: action substitution mechanic needs formalization"
+    ],
+    "test_case_ids": ["B026-fence-substitution"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: free. 0 points. Effect: when using Grain Utilization, may replace one action with Build Fences. Trigger and substitution need formalization."
+  }
+}
