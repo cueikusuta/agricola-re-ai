@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "card_id": "B163",
+  "cases": [
+    {
+      "id": "B163-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B163",
+        "event": "only_owner_with_two_room_house",
+        "condition_met": true
+      },
+      "expected": {
+        "wood_delta": 3,
+        "brick_delta": 2,
+        "reed_delta": 1,
+        "stone_delta": 1
+      },
+      "notes": "Only owner with 2-room house: gain wood3/brick2/reed1/stone1."
+    },
+    {
+      "id": "B163-not-triggered",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B163",
+        "event": "only_owner_with_two_room_house",
+        "condition_met": false
+      },
+      "expected": {
+        "wood_delta": 0,
+        "brick_delta": 0,
+        "reed_delta": 0,
+        "stone_delta": 0
+      },
+      "notes": "Condition not met: no resources gained."
+    }
+  ]
+}

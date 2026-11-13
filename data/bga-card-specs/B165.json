@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "card_id": "B165",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "獲物調達人",
+    "name_en": "Game Provider"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3092",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "before_harvest",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 1
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "boar",
+                    "amount": 1
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 3
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "boar",
+                    "amount": 2
+                  }
+                ]
+              },
+              {
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 4
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "boar",
+                    "amount": 3
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "instant",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Before each harvest: discard grain 1/3/4 from separate fields to gain boar 1/2/3."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": ["B165-discard-1", "B165-discard-3", "B165-discard-4"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Before harvest: discard grain 1/3/4 from separate fields => gain boar 1/2/3. bga_checked is third-party BGA wiki cross-check, not official Lookout verification."
+  }
+}

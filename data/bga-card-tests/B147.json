@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "B147",
+  "cases": [
+    {
+      "id": "B147-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B147",
+        "event": "use_cumulative_space",
+        "space": "wood_cumulative",
+        "pay_grain": true
+      },
+      "expected": {
+        "grain_spent": 1,
+        "boar_gained": 1
+      },
+      "notes": "Using wood cumulative space: pay grain 1 to gain boar 1."
+    },
+    {
+      "id": "B147-not-triggered",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B147",
+        "event": "use_cumulative_space",
+        "space": "wood_cumulative",
+        "pay_grain": false
+      },
+      "expected": {
+        "grain_spent": 0,
+        "boar_gained": 0
+      },
+      "notes": "Without paying grain, no boar is gained."
+    }
+  ]
+}

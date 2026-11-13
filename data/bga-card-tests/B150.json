@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "B150",
+  "cases": [
+    {
+      "id": "B150-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B150",
+        "event": "use_farm_expansion",
+        "other_space_empty": true,
+        "pay_food": true
+      },
+      "expected": {
+        "food_spent": 1,
+        "major_improvement_used": true
+      },
+      "notes": "Using Farm Expansion: if Major Improvement is empty, pay food 1 to use it with same worker."
+    },
+    {
+      "id": "B150-not-triggered",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B150",
+        "event": "use_farm_expansion",
+        "other_space_empty": true,
+        "pay_food": false
+      },
+      "expected": {
+        "food_spent": 0,
+        "major_improvement_used": false
+      },
+      "notes": "Without paying food, the other space cannot be used."
+    }
+  ]
+}

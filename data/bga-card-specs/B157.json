@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "B157",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "塩作り",
+    "name_en": "Salter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3100",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "anytime",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "pay_animal",
+            "animals": ["sheep", "boar", "cattle"],
+            "count": 1
+          }
+        },
+        {
+          "operation": "other",
+          "target": "board",
+          "params": {
+            "kind": "place_food_on_future_rounds",
+            "rounds": [3, 5, 7],
+            "food_per_round": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Anytime: pay 1 sheep/boar/cattle. Then place food 1 on each of next 3/5/7 round spaces; receive food at each round start."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": ["B157-normal"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Anytime: pay animal 1, place food 1 on rounds 3/5/7, receive at round starts. bga_checked is third-party BGA wiki cross-check, not official Lookout verification."
+  }
+}

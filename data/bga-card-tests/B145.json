@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "B145",
+  "cases": [
+    {
+      "id": "B145-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B145",
+        "event": "renovate",
+        "reed_cost": 1,
+        "substitute": true
+      },
+      "expected": {
+        "wood_spent": 1,
+        "reed_spent": 0
+      },
+      "notes": "Renovating with reed cost 1 can substitute wood 1 instead of reed."
+    },
+    {
+      "id": "B145-substitute",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B145",
+        "event": "renovate",
+        "reed_cost": 2,
+        "substitute": true
+      },
+      "expected": {
+        "wood_spent": 1,
+        "reed_spent": 0
+      },
+      "notes": "Renovating with reed cost 2 can substitute wood 1 instead of reed."
+    }
+  ]
+}

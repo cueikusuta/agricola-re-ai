@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "B157",
+  "cases": [
+    {
+      "id": "B157-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B157",
+        "event": "pay_animal",
+        "animal": "sheep"
+      },
+      "expected": {
+        "sheep_delta": -1,
+        "food_placed_on_rounds": [3, 5, 7],
+        "food_per_round": 1
+      },
+      "notes": "Pay sheep 1, place food 1 on rounds 3/5/7."
+    }
+  ]
+}

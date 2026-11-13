@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "card_id": "B162",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "伐採人",
+    "name_en": "Forest Clearer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3095",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "store_from_cumulative_space",
+      "conditions": [
+        {
+          "predicate": "stored_exact_wood",
+          "params": {
+            "amounts": [2, 3, 4]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "bonus_for_stored_wood",
+            "mapping": {
+              "2": { "wood": 1, "food": 1 },
+              "3": { "wood": 1, "food": 0 },
+              "4": { "wood": 1, "food": 1 }
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Storing exactly wood 2/3/4 from wood cumulative space: gain wood 1 plus food 1/0/1 respectively."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": ["B162-store-2", "B162-store-3", "B162-store-4"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Store wood 2 => wood1+food1; store wood 3 => wood1+food0; store wood 4 => wood1+food1. bga_checked is third-party BGA wiki cross-check, not official Lookout verification."
+  }
+}

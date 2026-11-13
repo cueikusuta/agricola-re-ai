@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "B155",
+  "cases": [
+    {
+      "id": "B155-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B155"
+      },
+      "expected": {
+        "wood_delta": 1,
+        "reed_delta": 1
+      },
+      "notes": "On play: gain wood 1 and reed 1."
+    },
+    {
+      "id": "B155-cost-payment",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B155",
+        "event": "pay_occupation_cost",
+        "use_small_theater_food": true
+      },
+      "expected": {
+        "food_spent_from_cumulative_space": 1
+      },
+      "notes": "Paying occupation cost: use food from cumulative space Small Theater."
+    }
+  ]
+}

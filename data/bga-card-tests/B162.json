@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "B162",
+  "cases": [
+    {
+      "id": "B162-store-2",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B162",
+        "event": "store_from_cumulative_space",
+        "wood_stored": 2
+      },
+      "expected": {
+        "wood_delta": 1,
+        "food_delta": 1
+      },
+      "notes": "Store wood 2: gain wood 1 + food 1."
+    },
+    {
+      "id": "B162-store-3",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B162",
+        "event": "store_from_cumulative_space",
+        "wood_stored": 3
+      },
+      "expected": {
+        "wood_delta": 1,
+        "food_delta": 0
+      },
+      "notes": "Store wood 3: gain wood 1 + food 0."
+    },
+    {
+      "id": "B162-store-4",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "B162",
+        "event": "store_from_cumulative_space",
+        "wood_stored": 4
+      },
+      "expected": {
+        "wood_delta": 1,
+        "food_delta": 1
+      },
+      "notes": "Store wood 4: gain wood 1 + food 1."
+    }
+  ]
+}
