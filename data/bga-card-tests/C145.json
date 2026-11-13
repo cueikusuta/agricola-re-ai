@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "C145",
+  "cases": [
+    {
+      "id": "C145-pair-condition",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0,
+        "grove_occupied": true
+      },
+      "action": {
+        "other_player_uses": "forest"
+      },
+      "expected": {
+        "reed_delta": 1
+      }
+    },
+    {
+      "id": "C145-other-unoccupied",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0,
+        "grove_occupied": false
+      },
+      "action": {
+        "owner_uses": "forest"
+      },
+      "expected": {
+        "reed_delta": 0
+      }
+    },
+    {
+      "id": "C145-timing-pending",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0,
+        "grove_occupied": true
+      },
+      "action": {
+        "other_player_uses": "forest"
+      },
+      "expected": {
+        "review_status": "needs_resolution"
+      },
+      "notes": "Fail-closed: the relational pair-occupancy condition has no established predicate."
+    }
+  ]
+}

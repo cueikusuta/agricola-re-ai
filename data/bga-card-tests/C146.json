@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "C146",
+  "cases": [
+    {
+      "id": "C146-pairs-placed",
+      "scope": "effect_only",
+      "setup": {
+        "improvements_owned": 2
+      },
+      "action": {
+        "play": "C146"
+      },
+      "expected": {
+        "pairs_placed_per_improvement": 1,
+        "pair_size": 2,
+        "all_pairs_distinct": true,
+        "within_pair_goods_distinct": true
+      },
+      "notes": "Verifiable structural facts only; resource source is flagged."
+    },
+    {
+      "id": "C146-claim-pair",
+      "scope": "effect_only",
+      "setup": {
+        "improvements_owned": 1,
+        "pairs_on_improvements": 1
+      },
+      "action": {
+        "other_player_renovates": "stone"
+      },
+      "expected": {
+        "owner_supply_pair_delta": 1,
+        "pairs_on_improvements_delta": -1
+      },
+      "notes": "One opt-in move per trigger; pair contents are building resources."
+    },
+    {
+      "id": "C146-modeling-pending",
+      "scope": "effect_only",
+      "setup": {
+        "improvements_owned": 1,
+        "pairs_on_improvements": 1
+      },
+      "action": {
+        "other_player_renovates": "stone"
+      },
+      "expected": {
+        "review_status": "needs_resolution"
+      },
+      "notes": "Fail-closed: the flagged item has no established vocabulary; blocked until resolved."
+    }
+  ]
+}

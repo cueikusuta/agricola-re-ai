@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "card_id": "C149",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "資材再生業者",
+    "name_en": "Resource Recycler"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2940",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_renovation",
+      "conditions": [
+        {
+          "predicate": "other_player_only",
+          "params": {}
+        },
+        {
+          "predicate": "room_type_is",
+          "params": {
+            "type": "stone",
+            "scope": "renovating_player"
+          }
+        },
+        {
+          "predicate": "house_is",
+          "params": {
+            "house": "clay"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 2
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "build_room_with_discount",
+            "room_type": "clay",
+            "discount": {
+              "reed": 1,
+              "clay": 1
+            },
+            "description": "build 1 clay room paying no build materials"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each time another player renovates to stone, if you live in a clay house you may pay 2 food to build a clay room paying no materials (renovation-scope predicate flagged in unresolved; A128 build_room_with_discount pattern)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.renovation_to_stone: observing that another player renovated to stone needs the room type of another player's renovation event; room_type_is (B111) covers only the owner's own build, so the renovating-player scope has no established predicate"
+    ],
+    "test_case_ids": [
+      "C149-normal",
+      "C149-not-clay-house",
+      "C149-scope-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Each time another player renovates to stone, if you live in a clay house you can pay 2 food to build a clay room at no additional cost."
+  }
+}

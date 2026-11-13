@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "card_id": "C144",
+  "cases": [
+    {
+      "id": "C144-other-renovation",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0
+      },
+      "action": {
+        "other_player_renovates": "stone"
+      },
+      "expected": {
+        "reed_delta": 1
+      }
+    },
+    {
+      "id": "C144-owner-renovation",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0
+      },
+      "action": {
+        "owner_renovates": "stone"
+      },
+      "expected": {
+        "reed_delta": 0
+      }
+    },
+    {
+      "id": "C144-three-player",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0,
+        "player_count": 3
+      },
+      "action": {
+        "play": "C144"
+      },
+      "expected": {
+        "reed_delta": 1
+      }
+    },
+    {
+      "id": "C144-two-or-four-player",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0,
+        "player_count": 2
+      },
+      "action": {
+        "play": "C144"
+      },
+      "expected": {
+        "reed_delta": 0
+      },
+      "notes": "Same expectation for player_count=4."
+    }
+  ]
+}

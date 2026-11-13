@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "C151",
+  "cases": [
+    {
+      "id": "C151-normal",
+      "scope": "effect_only",
+      "setup": {
+        "granted_actions": []
+      },
+      "action": {
+        "other_player_uses": "grain_utilization"
+      },
+      "expected": {
+        "granted_actions": [
+          "sow"
+        ]
+      }
+    },
+    {
+      "id": "C151-owner-use",
+      "scope": "effect_only",
+      "setup": {
+        "granted_actions": []
+      },
+      "action": {
+        "owner_uses": "grain_utilization"
+      },
+      "expected": {
+        "granted_actions": []
+      }
+    },
+    {
+      "id": "C151-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "granted_actions": []
+      },
+      "action": {
+        "other_player_uses": "farmland"
+      },
+      "expected": {
+        "granted_actions": []
+      }
+    }
+  ]
+}

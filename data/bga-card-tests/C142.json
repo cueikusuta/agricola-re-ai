@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "C142",
+  "cases": [
+    {
+      "id": "C142-take-extra",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 0,
+        "vegetable": 0,
+        "player_count": 3
+      },
+      "action": {
+        "use_space": "grain_seeds",
+        "take_additional": true
+      },
+      "expected": {
+        "grain_delta": 1,
+        "vegetable_delta": 1,
+        "other_players_grain_delta_each": 1
+      },
+      "notes": "Card contribution only beyond the space's own grain."
+    },
+    {
+      "id": "C142-decline",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 0,
+        "vegetable": 0,
+        "player_count": 3
+      },
+      "action": {
+        "use_space": "grain_seeds",
+        "take_additional": false
+      },
+      "expected": {
+        "grain_delta": 0,
+        "vegetable_delta": 0,
+        "other_players_grain_delta_each": 0
+      }
+    },
+    {
+      "id": "C142-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 0,
+        "vegetable": 0,
+        "player_count": 3
+      },
+      "action": {
+        "use_space": "farmland",
+        "take_additional": true
+      },
+      "expected": {
+        "action_rejected": true
+      }
+    }
+  ]
+}
