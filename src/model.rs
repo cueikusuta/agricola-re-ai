@@ -1023,12 +1023,13 @@ impl Game {
         }
         // Check the complete event chain, rather than trusting only the
         // last event hash; otherwise earlier tampering could go unnoticed.
-        let replayed = Game::replay_with_setup_and_start_player(
+        let replayed = Game::replay_with_setup_and_start_player_inner(
             result.config.clone(),
             (*result.card_set).clone(),
             result.log.initial_hands.clone(),
             result.log.initial_start_player_override,
             &result.log.events,
+            result.pending.is_some(),
         )?;
         if replayed.state_hash() != result.state_hash() {
             return Err("saved game differs from logged action replay".into());
