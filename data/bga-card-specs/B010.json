@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "B010",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "居住スペース",
+    "name_en": "Living Space"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3207",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 3
+      },
+      {
+        "good": "food",
+        "amount": 3
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "modify_capacity",
+          "target": "owner",
+          "params": {
+            "capacity_type": "housing",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B010-housing"
+    ],
+    "checked_by": "AI source comparison vs Rust CardDefinition",
+    "checked_on": "2026-11-13",
+    "implementation_status": "implemented",
+    "notes": "Verified against Rust CardDefinition in verified_extra_simple_cards(): MinorImprovement, cost Wood 3 + Food 3, points 0, Passive HousingSpace(1). Zero diff."
+  }
+}

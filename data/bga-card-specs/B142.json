@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "B142",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "野菜の種まき",
+    "name_en": "Vegetable Sowing"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3207",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "grain_seeds"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "vegetable",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Only applies at 3+ players per Rust implementation"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B142-vegetable"
+    ],
+    "checked_by": "AI source comparison vs Rust CardDefinition",
+    "checked_on": "2026-11-13",
+    "implementation_status": "implemented",
+    "notes": "Verified against Rust CardDefinition in verified_worker_bonus_cards(): Occupation, cost [], points 0, AfterWorkerGain GrainSeeds -> Vegetable 1. Only included at 3+ players. Zero diff."
+  }
+}

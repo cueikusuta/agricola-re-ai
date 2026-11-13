@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "card_id": "B121",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "地質学者",
+    "name_en": "Geologist"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3207",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "forest"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "reed_bank"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "clay_pit"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 2,
+      "decision_owner": "none",
+      "notes": "Only applies at 3+ players per Rust implementation"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B121-forest",
+      "B121-reed-bank",
+      "B121-clay-pit"
+    ],
+    "checked_by": "AI source comparison vs Rust CardDefinition",
+    "checked_on": "2026-11-13",
+    "implementation_status": "implemented",
+    "notes": "Verified against Rust CardDefinition in verified_minor_worker_cards(): Occupation, cost [], points 0, AfterWorkerGain for Forest/ReedBank/ClayPit -> Clay 1 each. ClayPit effect only at 3+ players. Zero diff."
+  }
+}
