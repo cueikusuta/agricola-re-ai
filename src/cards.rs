@@ -2207,11 +2207,11 @@ pub fn verified_basic_card_set(players: usize) -> Result<CardSet, String> {
     let mut definitions = Vec::new();
     definitions.extend(verified_scoring_cards(players));
     definitions.extend(verified_minor_worker_cards(players));
-    // Exclude expansion (E-prefixed) cards from the A/B verified pool.
+    // Exclude expansion (E-prefixed) and D-deck cards from the A/B verified pool.
     definitions.extend(
         verified_immediate_resource_cards()
             .into_iter()
-            .filter(|c| !c.id.starts_with('E')),
+            .filter(|c| !c.id.starts_with('E') && !c.id.starts_with('D')),
     );
     definitions.extend(verified_worker_bonus_cards(players));
     definitions.extend(verified_round_and_harvest_cards());
