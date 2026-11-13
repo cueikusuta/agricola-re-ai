@@ -1,0 +1,100 @@
+{
+ "schema_version": 1,
+ "card_id": "B135",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "栄養士",
+  "name_en": "Nutrition Expert"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3122",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "round_start",
+   "conditions": [],
+   "steps": [
+    {
+     "operation": "exchange",
+     "target": "owner",
+     "params": {
+      "give": [
+       {
+        "good": "animal_of_owned_type",
+        "amount": 1
+       },
+       {
+        "good": "grain",
+        "amount": 1
+       },
+       {
+        "good": "vegetable",
+        "amount": 1
+       }
+      ],
+      "receive": [
+       {
+        "good": "food",
+        "amount": 5
+       },
+       {
+        "good": "points",
+        "amount": 2
+       }
+      ]
+     }
+    }
+   ],
+   "optional": true,
+   "frequency": "every_round",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "owner"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "bga_checked",
+  "unresolved_fields": [],
+  "test_case_ids": [
+   "B135-exchange",
+   "B135-declined",
+   "B135-missing-animal"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "animal_of_owned_type (D084) used on give side for '1 animal of any type you own'. Exchange with points in receive (C063 precedent). Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

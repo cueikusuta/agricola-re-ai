@@ -1,0 +1,122 @@
+{
+ "schema_version": 1,
+ "card_id": "B137",
+ "cases": [
+  {
+   "id": "B137-r8",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B137"
+    ],
+    "round": 8,
+    "round_space_card": "vegetable_seeds",
+    "card_stack": {
+     "vegetable": 1,
+     "wild_boar": 1,
+     "stone": 1,
+     "cattle": 1
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "vegetable_seeds",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "vegetable": 1
+     },
+     "card_stack_delta": {
+      "vegetable": -1
+     }
+    }
+   },
+   "notes": "Use round space 8 (Vegetable Seeds) -> gain vegetable from card"
+  },
+  {
+   "id": "B137-r11",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B137"
+    ],
+    "round": 11,
+    "round_space_card": "cattle_market",
+    "card_stack": {
+     "vegetable": 1,
+     "wild_boar": 1,
+     "stone": 1,
+     "cattle": 1
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "cattle_market",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "cattle": 1
+     },
+     "card_stack_delta": {
+      "cattle": -1
+     }
+    }
+   },
+   "notes": "Use round space 11 (Cattle Market) -> gain cattle from card"
+  },
+  {
+   "id": "B137-other-round",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B137"
+    ],
+    "round": 7,
+    "round_space_card": "family_growth_with_room"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "family_growth_with_room",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {},
+     "card_stack_delta": {}
+    }
+   },
+   "notes": "Use round space 7 -> no gain from card"
+  }
+ ]
+}

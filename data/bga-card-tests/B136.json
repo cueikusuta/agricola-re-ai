@@ -1,0 +1,96 @@
+{
+ "schema_version": 1,
+ "card_id": "B136",
+ "cases": [
+  {
+   "id": "B136-9-rounds-left",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "hand": [
+     "B136"
+    ],
+    "round": 6
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "play_card",
+      "card": "B136",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "wood": 4
+     }
+    }
+   },
+   "notes": "9 rounds remaining at play -> 4 wood"
+  },
+  {
+   "id": "B136-6-rounds-left",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "hand": [
+     "B136"
+    ],
+    "round": 9
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "play_card",
+      "card": "B136",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "wood": 3
+     }
+    }
+   },
+   "notes": "6 rounds remaining at play -> 3 wood"
+  },
+  {
+   "id": "B136-scoring-pending",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B136"
+    ],
+    "room_counts": {
+     "p1": 5,
+     "p2": 5,
+     "p3": 3
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "end_scoring"
+     }
+    ]
+   },
+   "expected": {
+    "note": "Global most-rooms bonus to all tied players not expressible with established vocabulary; marked needs_resolution"
+   },
+   "notes": "Most-rooms shared bonus (needs_resolution gap)"
+  }
+ ]
+}

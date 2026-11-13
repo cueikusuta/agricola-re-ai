@@ -1,0 +1,172 @@
+{
+ "schema_version": 1,
+ "card_id": "B134",
+ "cases": [
+  {
+   "id": "B134-round11",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B134"
+    ],
+    "round": 11,
+    "house": "clay"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "renovate",
+      "player": "p1",
+      "to": "stone"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "food": 3
+     },
+     "points_delta": 3
+    }
+   },
+   "notes": "Renovate to stone in round 11 -> 3 food, 3 pts"
+  },
+  {
+   "id": "B134-round12",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B134"
+    ],
+    "round": 12,
+    "house": "clay"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "renovate",
+      "player": "p1",
+      "to": "stone"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "food": 2
+     },
+     "points_delta": 2
+    }
+   },
+   "notes": "Renovate to stone in round 12 -> 2 food, 2 pts"
+  },
+  {
+   "id": "B134-round13",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B134"
+    ],
+    "round": 13,
+    "house": "clay"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "renovate",
+      "player": "p1",
+      "to": "stone"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "food": 1
+     },
+     "points_delta": 1
+    }
+   },
+   "notes": "Renovate to stone in round 13 -> 1 food, 1 pt"
+  },
+  {
+   "id": "B134-round14",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B134"
+    ],
+    "round": 14,
+    "house": "clay"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "renovate",
+      "player": "p1",
+      "to": "stone"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {},
+     "points_delta": 0
+    }
+   },
+   "notes": "Renovate to stone in round 14 -> nothing"
+  },
+  {
+   "id": "B134-clay-renovation",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B134"
+    ],
+    "round": 11,
+    "house": "wood"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "renovate",
+      "player": "p1",
+      "to": "clay"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {},
+     "points_delta": 0
+    }
+   },
+   "notes": "Wood->Clay renovation -> no trigger (not stone)"
+  }
+ ]
+}

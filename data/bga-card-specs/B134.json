@@ -1,0 +1,196 @@
+{
+ "schema_version": 1,
+ "card_id": "B134",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "名家録の編纂者",
+  "name_en": "Housebook Master"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3123",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "after_renovation",
+   "conditions": [
+    {
+     "predicate": "house_is",
+     "params": {
+      "house": "stone"
+     }
+    },
+    {
+     "predicate": "round_in",
+     "params": {
+      "values": [
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11
+      ]
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "food",
+      "amount": 3
+     }
+    },
+    {
+     "operation": "gain_points",
+     "target": "owner",
+     "params": {
+      "points": 3
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "once_per_game",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "after_renovation",
+   "conditions": [
+    {
+     "predicate": "house_is",
+     "params": {
+      "house": "stone"
+     }
+    },
+    {
+     "predicate": "round_in",
+     "params": {
+      "values": [
+       12
+      ]
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "food",
+      "amount": 2
+     }
+    },
+    {
+     "operation": "gain_points",
+     "target": "owner",
+     "params": {
+      "points": 2
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "once_per_game",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 1,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "after_renovation",
+   "conditions": [
+    {
+     "predicate": "house_is",
+     "params": {
+      "house": "stone"
+     }
+    },
+    {
+     "predicate": "round_in",
+     "params": {
+      "values": [
+       13
+      ]
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "food",
+      "amount": 1
+     }
+    },
+    {
+     "operation": "gain_points",
+     "target": "owner",
+     "params": {
+      "points": 1
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "once_per_game",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 2,
+   "decision_owner": "none"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "bga_checked",
+  "unresolved_fields": [],
+  "test_case_ids": [
+   "B134-round11",
+   "B134-round12",
+   "B134-round13",
+   "B134-round14",
+   "B134-clay-renovation"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "Renovate to stone by round ≤11 → 3 food/3 pts; round 12 → 2/2; round 13 → 1/1. After playing the card; non-retroactive. Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

@@ -1,0 +1,95 @@
+{
+ "schema_version": 1,
+ "card_id": "B128",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "配管工",
+  "name_en": "Plumber"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3129",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "after_worker_space",
+   "conditions": [
+    {
+     "predicate": "worker_space_used",
+     "params": {
+      "space": "major_improvement"
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "discount_cost",
+     "target": "owner",
+     "params": {
+      "good": "clay_or_stone",
+      "amount": 2,
+      "scope": "renovation",
+      "one_material_only": true
+     }
+    },
+    {
+     "operation": "grant_action",
+     "target": "owner",
+     "params": {
+      "action": "renovation",
+      "must_pay_cost": true
+     }
+    }
+   ],
+   "optional": true,
+   "frequency": "every_use",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "owner"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "bga_checked",
+  "unresolved_fields": [],
+  "test_case_ids": [
+   "B128-normal",
+   "B128-declined",
+   "B128-other-space"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "Discount modeled as discount_cost clay_or_stone 2 + grant_action renovation; discount applies only to the granted renovation. Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

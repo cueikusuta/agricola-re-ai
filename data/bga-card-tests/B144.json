@@ -1,0 +1,105 @@
+{
+ "schema_version": 1,
+ "card_id": "B144",
+ "cases": [
+  {
+   "id": "B144-clay-pit",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B144"
+    ],
+    "phase": "work_phase"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "clay_pit",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "wood": 1,
+      "reed": 1,
+      "clay": 1
+     }
+    }
+   },
+   "notes": "Use Clay Pit -> gain 1 wood + 1 reed"
+  },
+  {
+   "id": "B144-hollow",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B144"
+    ],
+    "phase": "work_phase"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "hollow",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "wood": 1,
+      "clay": 1
+     }
+    }
+   },
+   "notes": "Use Hollow -> gain 1 wood only"
+  },
+  {
+   "id": "B144-other-space",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B144"
+    ],
+    "phase": "work_phase"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "forest",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "wood": 3
+     }
+    }
+   },
+   "notes": "Use other space -> no effect"
+  }
+ ]
+}

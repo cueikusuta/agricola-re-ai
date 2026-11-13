@@ -1,0 +1,28 @@
+{
+ "schema_version": 1,
+ "card_id": "B129",
+ "cases": [
+  {
+   "id": "B129-timing-pending",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B129"
+    ],
+    "round": 13
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "none"
+     }
+    ]
+   },
+   "expected": {
+    "note": "Round-space-13 identity varies by shuffle; neighbor-only exemption not in established vocabulary; marked needs_resolution"
+   },
+   "notes": "Round-space-13 neighbor occupancy exemption needs engine support (fail-closed)"
+  }
+ ]
+}

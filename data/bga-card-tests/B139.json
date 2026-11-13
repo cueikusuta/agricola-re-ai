@@ -1,0 +1,121 @@
+{
+ "schema_version": 1,
+ "card_id": "B139",
+ "cases": [
+  {
+   "id": "B139-round3",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B139"
+    ],
+    "round": 3,
+    "board_wood": 0
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "returning_home",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "food": 1
+     }
+    }
+   },
+   "notes": "Round 3, no wood on board -> 1 food"
+  },
+  {
+   "id": "B139-round5",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B139"
+    ],
+    "round": 5,
+    "board_wood": 0
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "returning_home",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "food": 2
+     }
+    }
+   },
+   "notes": "Round 5, no wood on board -> 2 food"
+  },
+  {
+   "id": "B139-wood-remains",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B139"
+    ],
+    "round": 3,
+    "board_wood": 2
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "returning_home",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {}
+    }
+   },
+   "notes": "Wood on board -> no food"
+  },
+  {
+   "id": "B139-timing-pending",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B139"
+    ]
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "none"
+     }
+    ]
+   },
+   "expected": {
+    "note": "Board-wide 'no wood' condition not in established predicates; marked needs_resolution"
+   },
+   "notes": "Board-wide wood-empty predicate gap (C058 precedent)"
+  }
+ ]
+}

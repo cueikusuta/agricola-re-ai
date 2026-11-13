@@ -1,0 +1,100 @@
+{
+ "schema_version": 1,
+ "card_id": "B124",
+ "cases": [
+  {
+   "id": "B124-normal",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B124"
+    ],
+    "phase": "work_phase",
+    "farmyard_spaces_used": 10
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "fencing",
+      "player": "p1"
+     },
+     {
+      "action": "build_fence",
+      "player": "p1",
+      "new_enclosed_spaces": 1
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "stone": 2
+     }
+    }
+   },
+   "notes": "Build fence enclosing 1 new farmyard space -> gain 2 stone"
+  },
+  {
+   "id": "B124-subdivide",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B124"
+    ],
+    "phase": "work_phase"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "fencing",
+      "player": "p1"
+     },
+     {
+      "action": "build_fence",
+      "player": "p1",
+      "subdivide_only": true
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {}
+    }
+   },
+   "notes": "Subdivide existing pasture (no new spaces) -> no stone (gap: work-phase cap not encoded)"
+  },
+  {
+   "id": "B124-timing-pending",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B124"
+    ]
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "none"
+     }
+    ]
+   },
+   "expected": {
+    "note": "Timing cap (once per work phase) not expressible with established vocabulary; marked needs_resolution"
+   },
+   "notes": "Work-phase once-per-cap timing needs engine support (fail-closed)"
+  }
+ ]
+}

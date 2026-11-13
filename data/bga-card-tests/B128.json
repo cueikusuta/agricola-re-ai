@@ -1,0 +1,111 @@
+{
+ "schema_version": 1,
+ "card_id": "B128",
+ "cases": [
+  {
+   "id": "B128-normal",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B128"
+    ],
+    "phase": "work_phase"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "major_improvement",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "accept",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "actions_granted": [
+      "renovation"
+     ],
+     "discount_active": {
+      "scope": "renovation",
+      "good": "clay_or_stone",
+      "amount": 2
+     }
+    }
+   },
+   "notes": "Use Major Improvement space -> grant Renovation with 2 clay/stone discount"
+  },
+  {
+   "id": "B128-declined",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B128"
+    ],
+    "phase": "work_phase"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "major_improvement",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "decline",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "actions_granted": []
+    }
+   },
+   "notes": "Use Major Improvement but decline Renovation"
+  },
+  {
+   "id": "B128-other-space",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B128"
+    ],
+    "phase": "work_phase"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "forest",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "wood": 3
+     }
+    }
+   },
+   "notes": "Use non-Major Improvement space -> no effect"
+  }
+ ]
+}

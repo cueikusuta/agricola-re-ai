@@ -1,0 +1,107 @@
+{
+ "schema_version": 1,
+ "card_id": "B122",
+ "cases": [
+  {
+   "id": "B122-clay-space",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B122"
+    ],
+    "phase": "work_phase",
+    "spaces_used": []
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "clay_pit",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "stone": 1,
+      "clay": 1
+     }
+    }
+   },
+   "notes": "Use clay accumulation space (clay_pit) -> gain 1 stone"
+  },
+  {
+   "id": "B122-stone-space",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B122"
+    ],
+    "phase": "work_phase",
+    "spaces_used": []
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "western_quarry",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "stone": 3,
+      "clay": 1
+     }
+    }
+   },
+   "notes": "Use stone accumulation space (western_quarry) -> gain 1 clay"
+  },
+  {
+   "id": "B122-other-space",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B122"
+    ],
+    "phase": "work_phase",
+    "spaces_used": []
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "forest",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "wood": 3
+     }
+    }
+   },
+   "notes": "Use non-accumulation space -> no bonus"
+  }
+ ]
+}

@@ -1,0 +1,116 @@
+{
+ "schema_version": 1,
+ "card_id": "B135",
+ "cases": [
+  {
+   "id": "B135-exchange",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B135"
+    ],
+    "goods": {
+     "sheep": 1,
+     "grain": 1,
+     "vegetable": 1
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "round_start",
+      "round": 5
+     },
+     {
+      "action": "choose",
+      "choice": "accept",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "sheep": -1,
+      "grain": -1,
+      "vegetable": -1,
+      "food": 5
+     },
+     "points_delta": 2
+    }
+   },
+   "notes": "Round start, have 1 animal, 1 grain, 1 vegetable -> exchange for 5 food, 2 pts"
+  },
+  {
+   "id": "B135-declined",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B135"
+    ],
+    "goods": {
+     "sheep": 1,
+     "grain": 1,
+     "vegetable": 1
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "round_start",
+      "round": 5
+     },
+     {
+      "action": "choose",
+      "choice": "decline",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {}
+    }
+   },
+   "notes": "Decline exchange"
+  },
+  {
+   "id": "B135-missing-animal",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B135"
+    ],
+    "goods": {
+     "grain": 1,
+     "vegetable": 1
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "round_start",
+      "round": 5
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {}
+    }
+   },
+   "notes": "Missing animal -> cannot exchange"
+  }
+ ]
+}
