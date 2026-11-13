@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "C003",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "馬車旅行",
+    "name_en": "Carriage Trip"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3086",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_person",
+            "during": "work_phase",
+            "immediately": true,
+            "requires_unplaced_person": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When played during the work phase, immediately place another one of your unplaced people."
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: ledger lists 未配置の人物1 (one unplaced person still unplaced); no established predicate covers an unplaced-person requirement"
+    ],
+    "test_case_ids": [
+      "C003-normal",
+      "C003-not-in-work-phase",
+      "C003-cost",
+      "C003-pass-left"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Played in the work phase: immediately place another unplaced person; the card then goes to the left neighbour's hand. Prerequisite recorded in unresolved_fields (no predicate for unplaced person)."
+  }
+}

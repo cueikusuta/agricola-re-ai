@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "card_id": "C013",
+  "cases": [
+    {
+      "id": "C013-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "wooden_rooms": 5,
+        "renovations_done": 0
+      },
+      "action": {
+        "renovate": "stone"
+      },
+      "expected": {
+        "stone_cost_reduction": 2,
+        "house_after": "stone"
+      }
+    },
+    {
+      "id": "C013-fewer-rooms",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "wooden_rooms": 4,
+        "renovations_done": 0
+      },
+      "action": {
+        "renovate": "stone"
+      },
+      "expected": {
+        "stone_cost_reduction": 0
+      },
+      "notes": "Below 5 wooden rooms the direct-to-stone discount does not apply."
+    },
+    {
+      "id": "C013-second-renovation",
+      "scope": "effect_only",
+      "setup": {
+        "house": "clay",
+        "wooden_rooms": 0,
+        "renovations_done": 1
+      },
+      "action": {
+        "renovate": "stone"
+      },
+      "expected": {
+        "stone_cost_reduction": 0
+      },
+      "notes": "Only the first renovation benefits."
+    },
+    {
+      "id": "C013-cost",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1
+      },
+      "action": {
+        "play": "C013"
+      },
+      "expected": {
+        "wood_delta": -1
+      }
+    }
+  ]
+}

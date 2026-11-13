@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "card_id": "C023",
+  "cases": [
+    {
+      "id": "C023-normal",
+      "scope": "effect_only",
+      "setup": {
+        "day_laborer_free": true,
+        "lessons_free": true
+      },
+      "action": {
+        "place_person": [
+          "day_laborer",
+          "lessons"
+        ]
+      },
+      "expected": {
+        "food_delta": 1,
+        "lessons_used": true,
+        "spaces_occupied": 2
+      }
+    },
+    {
+      "id": "C023-lessons-taken",
+      "scope": "effect_only",
+      "setup": {
+        "day_laborer_free": true,
+        "lessons_free": false
+      },
+      "action": {
+        "place_person": "day_laborer"
+      },
+      "expected": {
+        "lessons_used": false,
+        "spaces_occupied": 1
+      },
+      "notes": "Lessons occupied by another player blocks the double use."
+    },
+    {
+      "id": "C023-prerequisite",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 0
+      },
+      "action": {
+        "play": "C023"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Playable only while no occupation has been played."
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "card_id": "C014",
+  "cases": [
+    {
+      "id": "C014-room-no-reed",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0,
+        "clay": 1
+      },
+      "action": {
+        "build_room": 1
+      },
+      "expected": {
+        "rooms_delta": 1,
+        "reed_delta": 0
+      },
+      "notes": "After the card is in play, room building costs no reed."
+    },
+    {
+      "id": "C014-renovation-no-reed",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0,
+        "clay": 2
+      },
+      "action": {
+        "renovate": "clay"
+      },
+      "expected": {
+        "renovation_done": true,
+        "reed_delta": 0
+      }
+    },
+    {
+      "id": "C014-points",
+      "scope": "effect_only",
+      "setup": {
+        "final_scoring": true
+      },
+      "action": {},
+      "expected": {
+        "printed_points": 1
+      }
+    },
+    {
+      "id": "C014-prerequisite",
+      "scope": "effect_only",
+      "setup": {
+        "grain_fields": 3
+      },
+      "action": {
+        "play": "C014"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Play requires 3 grain fields (grain_field_count n=3, threshold semantics as in A026)."
+    }
+  ]
+}

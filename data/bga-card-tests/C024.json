@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "card_id": "C024",
+  "cases": [
+    {
+      "id": "C024-normal",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 3,
+        "persons": 2,
+        "harvest_index_offset": 1
+      },
+      "action": {
+        "run_next_harvest_start": true
+      },
+      "expected": {
+        "persons_delta": 1
+      }
+    },
+    {
+      "id": "C024-no-room",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 2,
+        "persons": 2,
+        "harvest_index_offset": 1
+      },
+      "action": {
+        "run_next_harvest_start": true
+      },
+      "expected": {
+        "persons_delta": 0
+      }
+    },
+    {
+      "id": "C024-later-harvest",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 3,
+        "persons": 2,
+        "harvest_index_offset": 2
+      },
+      "action": {
+        "run_harvest_start": 2
+      },
+      "expected": {
+        "persons_delta": 0
+      },
+      "notes": "Only the first harvest after playing the card benefits."
+    },
+    {
+      "id": "C024-prerequisite",
+      "scope": "effect_only",
+      "setup": {
+        "grain_fields": 1
+      },
+      "action": {
+        "play": "C024"
+      },
+      "expected": {
+        "play_allowed": true
+      }
+    }
+  ]
+}

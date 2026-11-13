@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "card_id": "C021",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "石の心臓",
+    "name_en": "Heart of Stone"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3068",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 4
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "stone_accumulation_space_revealed",
+      "conditions": [
+        {
+          "predicate": "has_empty_room",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "family_growth",
+            "without_person": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_occurrence",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Whenever the stone quarry accumulation space is revealed: with a free room, immediately take the Family Growth action without placing a person."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C021-normal",
+      "C021-no-room",
+      "C021-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "On each new stone-quarry space reveal, a free-room owner gets Family Growth without placing a person."
+  }
+}

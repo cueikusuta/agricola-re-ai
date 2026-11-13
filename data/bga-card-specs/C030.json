@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "card_id": "C030",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "木骨の屋敷",
+    "name_en": "Half-Timbered House"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3059",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      },
+      {
+        "good": "clay",
+        "amount": 1
+      },
+      {
+        "good": "stone",
+        "amount": 2
+      },
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "end_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": {
+              "op": "per",
+              "args": [
+                {
+                  "op": "count",
+                  "args": [
+                    "stone_room"
+                  ]
+                },
+                1
+              ]
+            },
+            "once_per_card": true,
+            "exclusive_group": "stone_house_bonus"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "end_of_game",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At scoring: +1 point per stone room; only one card granting stone-house bonus points may apply."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C030-normal",
+      "C030-zero-stone-rooms",
+      "C030-exclusive"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "1 bonus point per stone room at scoring; mutually exclusive with the other stone-house bonus cards."
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "C020",
+  "cases": [
+    {
+      "id": "C020-normal",
+      "scope": "effect_only",
+      "setup": {
+        "empty_spaces": 3
+      },
+      "action": {
+        "use_space": "farmland",
+        "plow_extra": 1
+      },
+      "expected": {
+        "fields_delta": 1
+      }
+    },
+    {
+      "id": "C020-cultivation",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2,
+        "fields_available": 2
+      },
+      "action": {
+        "use_space": "cultivation",
+        "plow_extra": 1
+      },
+      "expected": {
+        "fields_delta": 1
+      }
+    },
+    {
+      "id": "C020-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "empty_spaces": 3
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "fields_delta": 0
+      }
+    }
+  ]
+}

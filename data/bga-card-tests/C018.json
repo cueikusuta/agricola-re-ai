@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "C018",
+  "cases": [
+    {
+      "id": "C018-normal",
+      "scope": "effect_only",
+      "setup": {
+        "cultivated_fields": 3,
+        "field_goods": [
+          {
+            "field": 0,
+            "good": "grain",
+            "amount": 2
+          }
+        ],
+        "empty_spaces": 1
+      },
+      "action": {
+        "discard_field": 0,
+        "plow": 1
+      },
+      "expected": {
+        "fields_plowed": 1,
+        "grain_removed": 2
+      }
+    },
+    {
+      "id": "C018-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "cultivated_fields": 2
+      },
+      "action": {
+        "discard_field": 0,
+        "plow": 1
+      },
+      "expected": {
+        "effect_allowed": false
+      },
+      "notes": "With fewer than 3 cultivated fields the effect may not be used."
+    },
+    {
+      "id": "C018-timing-pending",
+      "scope": "effect_only",
+      "setup": {
+        "window": "between_worker_placements"
+      },
+      "action": {
+        "use_anytime_effect": true
+      },
+      "expected": {
+        "review_status": "needs_resolution",
+        "automatic_effect_execution_allowed": false
+      },
+      "notes": "Block execution until the anytime free-action API is specified."
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "card_id": "C006",
+  "cases": [
+    {
+      "id": "C006-normal",
+      "scope": "effect_only",
+      "setup": {
+        "empty_fields": 2,
+        "occupied_fields": 1
+      },
+      "action": {
+        "play": "C006"
+      },
+      "expected": {
+        "stones_on_fields": 2,
+        "fields_count_as_cultivated": true
+      }
+    },
+    {
+      "id": "C006-zero-empty",
+      "scope": "effect_only",
+      "setup": {
+        "empty_fields": 0,
+        "occupied_fields": 3
+      },
+      "action": {
+        "play": "C006"
+      },
+      "expected": {
+        "stones_on_fields": 0
+      },
+      "notes": "No empty field means nothing is placed, but the card may still be played."
+    },
+    {
+      "id": "C006-harvest",
+      "scope": "effect_only",
+      "setup": {
+        "stones_on_fields": 3,
+        "phase": "next_field_phase"
+      },
+      "action": {
+        "run_field_phase": true
+      },
+      "expected": {
+        "owner_stone_delta": 3
+      },
+      "notes": "At the next field phase the placed stones are harvested by the owner."
+    },
+    {
+      "id": "C006-prerequisite",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 1,
+        "food": 1
+      },
+      "action": {
+        "play": "C006"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Requires 1 occupation already played and 1 food."
+    }
+  ]
+}

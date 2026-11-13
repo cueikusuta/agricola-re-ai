@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "C025",
+  "cases": [
+    {
+      "id": "C025-normal",
+      "scope": "effect_only",
+      "setup": {
+        "oven": true
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "bake_bread_granted": true
+      },
+      "notes": "Forest is an accumulation space; bake bread follows."
+    },
+    {
+      "id": "C025-non-accumulation",
+      "scope": "effect_only",
+      "setup": {
+        "oven": true
+      },
+      "action": {
+        "use_space": "farmland"
+      },
+      "expected": {
+        "bake_bread_granted": false
+      },
+      "notes": "Non-accumulation spaces do not grant the action."
+    },
+    {
+      "id": "C025-points",
+      "scope": "effect_only",
+      "setup": {
+        "final_scoring": true
+      },
+      "action": {},
+      "expected": {
+        "printed_points": 1
+      }
+    }
+  ]
+}

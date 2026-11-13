@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "card_id": "C029",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ビアテーブル",
+    "name_en": "Beer Table"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3060",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "resource_count",
+        "params": {
+          "good": "grain",
+          "n": 0
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_field_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": 2
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 0,
+            "to": "all_other_players",
+            "amount_each": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "At each field phase end: pay 1 grain for 2 bonus points; each other player then gains 1 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: ledger lists ストックに小麦なし (no grain in your stock); the resource_count n=0 gate below assumes zero stock, keep confirmed at review"
+    ],
+    "test_case_ids": [
+      "C029-normal",
+      "C029-declined",
+      "C029-no-grain",
+      "C029-prerequisite"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Each field phase end: 1 grain -> 2 points, other players +1 food. Play gate 'no grain in stock' encoded as resource_count grain 0 (flagged)."
+  }
+}

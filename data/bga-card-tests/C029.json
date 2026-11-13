@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "card_id": "C029",
+  "cases": [
+    {
+      "id": "C029-normal",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 1
+      },
+      "action": {
+        "field_phase_end": true,
+        "pay_grain": 1
+      },
+      "expected": {
+        "points_delta": 2,
+        "grain_delta": -1,
+        "other_players_food_delta_each": 1
+      }
+    },
+    {
+      "id": "C029-declined",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 1
+      },
+      "action": {
+        "field_phase_end": true
+      },
+      "expected": {
+        "points_delta": 0,
+        "grain_delta": 0,
+        "other_players_food_delta_each": 0
+      }
+    },
+    {
+      "id": "C029-no-grain",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 0
+      },
+      "action": {
+        "field_phase_end": true,
+        "pay_grain": 1
+      },
+      "expected": {
+        "points_delta": 0
+      },
+      "notes": "No grain means no exchange; the 'no grain at play' gate is separate."
+    },
+    {
+      "id": "C029-prerequisite",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 0
+      },
+      "action": {
+        "play": "C029"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "The card is only playable while the stock holds no grain."
+    }
+  ]
+}

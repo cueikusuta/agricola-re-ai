@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "C030",
+  "cases": [
+    {
+      "id": "C030-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stone_rooms": 5
+      },
+      "action": {
+        "final_scoring": true
+      },
+      "expected": {
+        "bonus_points": 5
+      }
+    },
+    {
+      "id": "C030-zero-stone-rooms",
+      "scope": "effect_only",
+      "setup": {
+        "stone_rooms": 0
+      },
+      "action": {
+        "final_scoring": true
+      },
+      "expected": {
+        "bonus_points": 0
+      }
+    },
+    {
+      "id": "C030-exclusive",
+      "scope": "effect_only",
+      "setup": {
+        "stone_rooms": 4,
+        "other_stone_house_bonus_card": true
+      },
+      "action": {
+        "final_scoring": true
+      },
+      "expected": {
+        "bonus_points": 0,
+        "notes": "another stone-house bonus card already applied"
+      }
+    }
+  ]
+}

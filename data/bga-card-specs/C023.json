@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "card_id": "C023",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "雇用契約",
+    "name_en": "Job Contract"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3066",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 0
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "use_two_spaces_one_person",
+            "spaces": [
+              "day_laborer",
+              "lessons"
+            ],
+            "order": "listed",
+            "requires_both_unoccupied": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "With Day Laborer and the adjacent Lessons both unoccupied, one of your people may use both spaces in this order; both then count as occupied."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: the card requires that you have not played any occupation; the occupation_count n=0 gate below assumes zero is 'no occupation played', keep confirmed at review"
+    ],
+    "test_case_ids": [
+      "C023-normal",
+      "C023-lessons-taken",
+      "C023-prerequisite"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "One person may use Day Laborer + Lessons together while both are free; prerequisite 'no occupation played yet' encoded as occupation_count 0 (flagged for confirmation)."
+  }
+}

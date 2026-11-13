@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "C022",
+  "cases": [
+    {
+      "id": "C022-normal",
+      "scope": "effect_only",
+      "setup": {
+        "persons_placed_this_phase": 2,
+        "unplaced_persons": 0
+      },
+      "action": {
+        "play": "C022",
+        "recall_person": "first_this_phase"
+      },
+      "expected": {
+        "persons_on_card": 1,
+        "free_person_to_place": 1
+      }
+    },
+    {
+      "id": "C022-boundary",
+      "scope": "effect_only",
+      "setup": {
+        "persons_placed_this_phase": 1,
+        "unplaced_persons": 0
+      },
+      "action": {
+        "play": "C022",
+        "recall_person": "first_this_phase"
+      },
+      "expected": {
+        "persons_on_card": 1,
+        "free_person_to_place": 1
+      }
+    },
+    {
+      "id": "C022-points",
+      "scope": "effect_only",
+      "setup": {
+        "final_scoring": true
+      },
+      "action": {},
+      "expected": {
+        "printed_points": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "C022",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "籠椅子",
+    "name_en": "Basket Chair"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3067",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 1
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "recall_first_placed_person",
+            "during": "work_phase",
+            "place_another_person_after": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When played during the work phase, move the first person you placed this phase onto this card; you may then immediately place another person."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C022-normal",
+      "C022-boundary",
+      "C022-points"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "Recall the first person placed this work phase onto the card; place another person immediately afterwards. 1 point."
+  }
+}

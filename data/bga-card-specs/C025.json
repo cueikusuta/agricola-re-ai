@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "C025",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "蒸気機械",
+    "name_en": "Steam Machine"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3064",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 1
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "accumulation_any"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "bake_bread"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "In the work phase, when the last action space you used was an accumulation space, immediately take a Bake Bread action."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C025-normal",
+      "C025-non-accumulation",
+      "C025-points"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "After using an accumulation space as your last action: one immediate Bake Bread action. 1 point."
+  }
+}

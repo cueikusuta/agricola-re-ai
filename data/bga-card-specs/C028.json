@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "card_id": "C028",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "教師机",
+    "name_en": "Teacher's Desk"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3061",
+        "language": "ja",
+        "checked_on": "2026-11-13",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-13",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "major_improvement",
+              "renovation"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "play_occupation"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each Major Improvement or Renovation space use: pay 1 food to play 1 additional occupation."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C028-normal",
+      "C028-renovation",
+      "C028-not-triggered",
+      "C028-prerequisite"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-13",
+    "implementation_status": "not_started",
+    "notes": "After Major Improvement or Renovation: 1 food to play 1 extra occupation."
+  }
+}
