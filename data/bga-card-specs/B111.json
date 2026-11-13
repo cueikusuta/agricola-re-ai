@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "card_id": "B111",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "純朴な人",
+    "name_en": "Rustic"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3146",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "build_room",
+      "conditions": [
+        {
+          "predicate": "room_type_is",
+          "params": { "type": "clay" }
+        },
+        {
+          "predicate": "not_renovation_from_wood",
+          "params": {}
+        },
+        {
+          "predicate": "not_stone_room",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 2
+          }
+        },
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_clay_room_built",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each newly built Clay room (not wood renovation, not stone): gain 2 food and 1 bonus point"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B111-build-clay-room-food-points",
+      "B111-build-wood-renovation-no-effect",
+      "B111-build-stone-room-no-effect"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Verified against BGA wiki card page. Each new Clay room (not wood renovation, not stone): 2 food + 1 point."
+  }
+}

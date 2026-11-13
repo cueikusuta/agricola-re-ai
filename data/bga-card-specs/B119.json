@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "card_id": "B119",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "杣人",
+    "name_en": "Lumberjack"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3138",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "On play: immediately gain 1 wood"
+    },
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "resource": "wood",
+            "amount": 1,
+            "spaces_ahead": "fences_built_count",
+            "description": "place_resource_on_future_spaces"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Place 1 wood on future round spaces equal to number of fences built"
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "wood_on_this_round_space",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_round_with_wood",
+      "duration": "while_wood_on_spaces",
+      "snapshot": "before_event",
+      "order": 2,
+      "decision_owner": "none",
+      "notes": "Each round start: gain the wood placed on that round's space"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B119-on-play-wood",
+      "B119-place-wood-future-spaces-by-fences",
+      "B119-round-start-gain-wood-from-spaces"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Verified against BGA wiki card page. On play: 1 wood + place 1 wood per fence on future spaces. Each round start: gain wood from that space."
+  }
+}

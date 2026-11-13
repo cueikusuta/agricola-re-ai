@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "card_id": "B104",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "夢羊病者",
+    "name_en": "Sheep Walker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3153",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "any_time",
+      "conditions": [
+        {
+          "predicate": "has_sheep_on_farm",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": { "good": "sheep", "amount": 1 },
+            "receive_options": [
+              { "good": "boar", "amount": 1 },
+              { "good": "vegetable", "amount": 1 },
+              { "good": "stone", "amount": 1 }
+            ],
+            "choose": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "unlimited",
+      "duration": "persistent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Anytime: exchange 1 sheep on farm for 1 boar, 1 vegetable, or 1 stone"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B104-exchange-sheep-for-boar",
+      "B104-exchange-sheep-for-vegetable",
+      "B104-exchange-sheep-for-stone"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Verified against BGA wiki card page. Anytime exchange 1 farm sheep for 1 boar/vegetable/stone. Sheep must be on farm."
+  }
+}

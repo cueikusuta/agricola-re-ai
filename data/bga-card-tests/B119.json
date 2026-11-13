@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "card_id": "B119",
+  "cases": [
+    {
+      "id": "B119-on-play-wood",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {},
+      "expected": {
+        "wood_gained": 1
+      },
+      "notes": "On play should immediately gain 1 wood"
+    },
+    {
+      "id": "B119-place-wood-future-spaces-by-fences",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "fences_built": 5
+      },
+      "action": {},
+      "expected": {
+        "wood_on_future_round_spaces": 5
+      },
+      "notes": "With 5 fences built, should place 1 wood on 5 future round spaces"
+    },
+    {
+      "id": "B119-round-start-gain-wood-from-spaces",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood_on_current_round_space": 1
+      },
+      "action": {
+        "round_start": true
+      },
+      "expected": {
+        "wood_gained": 1
+      },
+      "notes": "At round start with wood on space, gain that wood"
+    }
+  ]
+}

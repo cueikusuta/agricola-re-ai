@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "B092",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "靴下編み",
+    "name_en": "Little Stick Knitter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3165",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_action_space_use",
+      "conditions": [
+        {
+          "predicate": "is_cumulative_space",
+          "params": { "space_name": "羊市場" }
+        },
+        {
+          "predicate": "round_at_least",
+          "params": { "round": 5 }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "family_growth_if_room"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_use",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Round 5+, each use of Sheep Market cumulative space grants additional Family Growth if room action"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B092-sheep-market-family-growth"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Verified against BGA wiki card page. Effect: Round 5+, each Sheep Market use grants extra Family Growth if room."
+  }
+}

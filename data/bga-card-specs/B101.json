@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "card_id": "B101",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "建具大工",
+    "name_en": "Furniture Carpenter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3156",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest",
+      "conditions": [
+        {
+          "predicate": "any_player_has_card",
+          "params": { "card_name": "家具製作所" }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "cost": { "food": 2 },
+            "points": 1,
+            "limit_per_harvest": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "per_harvest",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each harvest, if any player has Furniture Workshop or its upgrade, may pay 2 food for 1 bonus point (once per harvest)"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B101-harvest-furniture-workshop-buy-point"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Verified against BGA wiki card page. Each harvest: if any player has Furniture Workshop/upgrade, pay 2 food for 1 point (max 1 per harvest). Ban status: weak."
+  }
+}

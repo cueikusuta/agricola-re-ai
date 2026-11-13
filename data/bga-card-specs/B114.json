@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "card_id": "B114",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "子なし",
+    "name_en": "Childless"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3143",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "rooms_at_least",
+          "params": { "count": 3 }
+        },
+        {
+          "predicate": "family_exactly",
+          "params": { "count": 2 }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "options": [
+              { "good": "grain", "amount": 1 },
+              { "good": "vegetable", "amount": 1 }
+            ],
+            "choose": 1,
+            "description": "gain_resource_choice"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_round",
+      "duration": "while_condition_met",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each round start: if 3+ rooms and exactly 2 family, gain 1 food and 1 grain or 1 vegetable"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B114-round-start-3-rooms-2-family-food-grain",
+      "B114-round-start-3-rooms-2-family-food-vegetable",
+      "B114-round-start-not-3-rooms-no-effect"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Verified against BGA wiki card page. Each round start with 3+ rooms and 2 family: 1 food + 1 grain/vegetable."
+  }
+}

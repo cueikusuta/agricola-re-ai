@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "card_id": "B110",
+  "cases": [
+    {
+      "id": "B110-setup-phase-end-stone-food",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "stone_in_stock": 2,
+        "round": 5
+      },
+      "action": {
+        "setup_phase_end": true
+      },
+      "expected": {
+        "food_gained": 1
+      },
+      "notes": "Setup phase end with stone in stock (not round 14) should gain 1 food"
+    },
+    {
+      "id": "B110-round14-setup-phase-end-stone-vegetable",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "stone_in_stock": 2,
+        "round": 14
+      },
+      "action": {
+        "setup_phase_end": true
+      },
+      "expected": {
+        "vegetable_gained": 1,
+        "food_gained": 0
+      },
+      "notes": "Round 14 setup phase end with stone in stock should gain 1 vegetable instead of food"
+    },
+    {
+      "id": "B110-setup-phase-end-no-stone",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "stone_in_stock": 0,
+        "round": 5
+      },
+      "action": {
+        "setup_phase_end": true
+      },
+      "expected": {
+        "food_gained": 0
+      },
+      "notes": "Setup phase end without stone in stock should gain nothing"
+    }
+  ]
+}

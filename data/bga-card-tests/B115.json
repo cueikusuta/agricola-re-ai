@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "B115",
+  "cases": [
+    {
+      "id": "B115-pasture-without-stable-holds-animal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures_without_stable": 1
+      },
+      "action": {
+        "place_animal_in_pasture_without_stable": true
+      },
+      "expected": {
+        "animal_placed": true,
+        "capacity_used": 1
+      },
+      "notes": "Pasture without stable should hold 1 animal"
+    },
+    {
+      "id": "B115-sow-action-extra-crop-per-field",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "fields": 3,
+        "sowing_grain_on_all": true
+      },
+      "action": {
+        "sow": true
+      },
+      "expected": {
+        "extra_grain_per_field": 1,
+        "total_extra_grain": 3
+      },
+      "notes": "Sow action on 3 fields should give +1 grain per field (3 total extra)"
+    }
+  ]
+}

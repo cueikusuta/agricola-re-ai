@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "B115",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "板金工の親方",
+    "name_en": "Tinsmith Master"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3142",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "continuous",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "modify_capacity",
+          "target": "owner",
+          "params": {
+            "allow_animals_without_stable": true,
+            "animals_per_pasture": 1,
+            "description": "modify_pasture_capacity"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "persistent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Pastures without stables can each hold 1 animal"
+    },
+    {
+      "trigger": "sow",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "per_field": true,
+            "matching_crop": true,
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_sow_action",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Each Sow action: each field gets +1 matching crop"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B115-pasture-without-stable-holds-animal",
+      "B115-sow-action-extra-crop-per-field"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Verified against BGA wiki card page. Pastures without stables hold 1 animal each. Each Sow: each field gets +1 matching crop."
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "B096",
+  "cases": [
+    {
+      "id": "B096-place-wood-odd-rounds",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {},
+      "expected": {
+        "wood_on_next_2_odd_round_spaces": 1
+      },
+      "notes": "On play, 1 wood should be placed on each of the next 2 odd-numbered round spaces"
+    },
+    {
+      "id": "B096-odd-round-start-wood-and-minor-improvement",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "current_round_is_odd": true,
+        "wood_on_current_round_space": 1
+      },
+      "action": {
+        "round_start": true
+      },
+      "expected": {
+        "wood_gained": 1,
+        "granted_actions": ["minor_improvement"]
+      },
+      "notes": "At odd round start with wood on space, gain the wood and a Minor Improvement action"
+    }
+  ]
+}
