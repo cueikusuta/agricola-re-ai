@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "card_id": "E060",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "軍手",
+    "name_en": "Working Gloves"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2693",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": "ー"
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "On play, gain 1 food."
+    },
+    {
+      "trigger": "pay_occupation_cost",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "max_food_substitution": 2,
+            "substitute_with": "building_material",
+            "ratio": {
+              "food": 2,
+              "material": 1
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "When paying an occupation cost, may substitute up to 2 food with 1 building material (wood/clay/stone/reed)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "trigger 'pay_occupation_cost' needs formal definition with access to payment context",
+      "operation 'discount_cost' with substitution logic needs engine support - '食料2までを建築資材1つで代用' means 2 food = 1 building material",
+      "which building materials are eligible needs clarification (wood, clay, stone, reed?)"
+    ],
+    "test_case_ids": [
+      "E060-on-play",
+      "E060-cost-sub"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Third-party BGA wiki cross-check only; not official Lookout verification."
+  }
+}

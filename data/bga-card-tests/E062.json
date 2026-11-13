@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "E062",
+  "cases": [
+    {
+      "id": "E062-use",
+      "scope": "effect_only",
+      "setup": {
+        "others_have_people": true
+      },
+      "action": {
+        "skip_placement": true
+      },
+      "expected": {
+        "bake_bread_granted": true
+      }
+    },
+    {
+      "id": "E062-not-all",
+      "scope": "effect_only",
+      "setup": {
+        "others_have_people": false
+      },
+      "action": {
+        "skip_placement": true
+      },
+      "expected": {
+        "bake_bread_granted": false
+      }
+    }
+  ]
+}

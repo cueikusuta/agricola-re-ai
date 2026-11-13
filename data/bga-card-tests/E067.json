@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "E067",
+  "cases": [
+    {
+      "id": "E067-0-oven",
+      "scope": "effect_only",
+      "setup": {
+        "bake_bread_improvements": 0
+      },
+      "action": {
+        "use_grain_seeds": true
+      },
+      "expected": {
+        "grain_delta": 1
+      }
+    },
+    {
+      "id": "E067-2-ovens",
+      "scope": "effect_only",
+      "setup": {
+        "bake_bread_improvements": 2
+      },
+      "action": {
+        "use_grain_seeds": true
+      },
+      "expected": {
+        "grain_delta": 3
+      }
+    }
+  ]
+}

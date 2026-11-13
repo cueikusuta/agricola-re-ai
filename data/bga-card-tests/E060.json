@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "E060",
+  "cases": [
+    {
+      "id": "E060-on-play",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E060"
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "E060-cost-sub",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2,
+        "wood": 1
+      },
+      "action": {
+        "pay_occupation_cost": 3,
+        "substitute_food": 2
+      },
+      "expected": {
+        "food_spent": 0,
+        "wood_spent": 1
+      }
+    }
+  ]
+}
