@@ -56,3 +56,12 @@ jobs:
             artifacts/
             /tmp/agricola-web-e2e.log
           if-no-files-found: ignore
+
+      - name: Preserve responsive screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-ui-responsive
+          path: artifacts/ui-responsive-*.png
+          if-no-files-found: ignore
+          retention-days: 7
