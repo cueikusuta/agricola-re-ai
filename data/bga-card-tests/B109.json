@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "B109",
+  "cases": [
+    {
+      "id": "B109-play-occupation-pay-wood-gain-food",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "occupations_in_play": 2
+      },
+      "action": {
+        "play_occupation": true,
+        "pay_wood": 1
+      },
+      "expected": {
+        "food_gained": 2,
+        "wood_spent": 1
+      },
+      "notes": "Playing an Occupation with 2 existing Occupations, paying 1 wood should gain 2 food"
+    },
+    {
+      "id": "B109-play-occupation-no-pay",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "occupations_in_play": 2
+      },
+      "action": {
+        "play_occupation": true,
+        "pay_wood": 0
+      },
+      "expected": {
+        "food_gained": 0
+      },
+      "notes": "Without paying wood, no food gained"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "B120",
+  "cases": [
+    {
+      "id": "B120-action-space-above-recent-round-space-clay",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "most_recent_round_space_card": "some_card",
+        "action_space_above_it": "day_laborer"
+      },
+      "action": {
+        "use_space": "action_space_above_most_recent_round_space_card"
+      },
+      "expected": {
+        "clay_gained": 2
+      },
+      "notes": "Using action space above most recent round space card should grant 2 clay before action"
+    },
+    {
+      "id": "B120-other-action-space-no-clay",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "most_recent_round_space_card": "some_card"
+      },
+      "action": {
+        "use_space": "other_action_space"
+      },
+      "expected": {
+        "clay_gained": 0
+      },
+      "notes": "Using a different action space should not grant clay"
+    }
+  ]
+}

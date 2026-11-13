@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "card_id": "B097",
+  "cases": [
+    {
+      "id": "B097-stone-house-round-start-play-card",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "has_stone_house": true
+      },
+      "action": {
+        "round_start": true,
+        "choose_action": "play_occupation",
+        "pay_food": 1
+      },
+      "expected": {
+        "occupation_played": true,
+        "food_spent": 1
+      },
+      "notes": "In Stone House at round start, can pay 1 food to play an Occupation"
+    },
+    {
+      "id": "B097-stone-house-round-start-minor-improvement",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "has_stone_house": true
+      },
+      "action": {
+        "round_start": true,
+        "choose_action": "play_minor_improvement",
+        "pay_normal_cost": true
+      },
+      "expected": {
+        "minor_improvement_played": true
+      },
+      "notes": "In Stone House at round start, can pay normal cost to play a Minor Improvement"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "card_id": "B113",
+  "cases": [
+    {
+      "id": "B113-on-play-buy-grain",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {
+        "on_play_buy": "grain",
+        "pay_food": 1
+      },
+      "expected": {
+        "grain_gained": 1,
+        "food_spent": 1
+      },
+      "notes": "On play, paying 1 food should gain 1 grain"
+    },
+    {
+      "id": "B113-on-play-buy-vegetable",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {
+        "on_play_buy": "vegetable",
+        "pay_food": 3
+      },
+      "expected": {
+        "vegetable_gained": 1,
+        "food_spent": 3
+      },
+      "notes": "On play, paying 3 food should gain 1 vegetable"
+    },
+    {
+      "id": "B113-counts-as-field",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {},
+      "expected": {
+        "field_count_bonus": 1
+      },
+      "notes": "Card should count as 1 field"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "B104",
+  "cases": [
+    {
+      "id": "B104-exchange-sheep-for-boar",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "sheep_on_farm": 1
+      },
+      "action": {
+        "exchange_sheep": "boar"
+      },
+      "expected": {
+        "sheep_lost": 1,
+        "boar_gained": 1
+      },
+      "notes": "Exchange 1 sheep on farm for 1 boar"
+    },
+    {
+      "id": "B104-exchange-sheep-for-vegetable",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "sheep_on_farm": 1
+      },
+      "action": {
+        "exchange_sheep": "vegetable"
+      },
+      "expected": {
+        "sheep_lost": 1,
+        "vegetable_gained": 1
+      },
+      "notes": "Exchange 1 sheep on farm for 1 vegetable"
+    },
+    {
+      "id": "B104-exchange-sheep-for-stone",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "sheep_on_farm": 1
+      },
+      "action": {
+        "exchange_sheep": "stone"
+      },
+      "expected": {
+        "sheep_lost": 1,
+        "stone_gained": 1
+      },
+      "notes": "Exchange 1 sheep on farm for 1 stone"
+    }
+  ]
+}

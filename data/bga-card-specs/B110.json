@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "card_id": "B110",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "路面舗装工",
+    "name_en": "Pavior"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3147",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "setup_phase_end",
+      "conditions": [
+        {
+          "predicate": "has_stone_in_stock",
+          "params": { "minimum": 1 }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_round",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each setup phase end: if 1+ stone in stock, gain 1 food"
+    },
+    {
+      "trigger": "setup_phase_end",
+      "conditions": [
+        {
+          "predicate": "round_is",
+          "params": { "round": 14 }
+        },
+        {
+          "predicate": "has_stone_in_stock",
+          "params": { "minimum": 1 }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "vegetable",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Round 14 setup phase end: if 1+ stone in stock, gain 1 vegetable instead of food"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B110-setup-phase-end-stone-food",
+      "B110-round14-setup-phase-end-stone-vegetable"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Verified against BGA wiki card page. Each setup phase end with stone: gain 1 food. Round 14: gain 1 vegetable instead."
+  }
+}

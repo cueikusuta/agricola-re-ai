@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "card_id": "B109",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "紙すき",
+    "name_en": "Paper Maker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3148",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play_occupation",
+      "conditions": [
+        {
+          "predicate": "pay_wood",
+          "params": { "amount": 1 }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount_per_occupation": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "per_occupation_played",
+      "duration": "persistent",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When playing an Occupation, may pay 1 wood to gain 1 food per Occupation already in play"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B109-play-occupation-pay-wood-gain-food"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Verified against BGA wiki card page. On playing Occupation: may pay 1 wood to gain 1 food per existing Occupation. Enhancement: '授業' (Class)."
+  }
+}

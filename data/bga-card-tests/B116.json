@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "B116",
+  "cases": [
+    {
+      "id": "B116-on-play-wood",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {},
+      "expected": {
+        "wood_gained": 1
+      },
+      "notes": "On play should gain 1 wood"
+    },
+    {
+      "id": "B116-reed-bed-receives-reed-wood",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {
+        "reed_bed_cumulative_space_receives_reed": true
+      },
+      "expected": {
+        "wood_gained": 1
+      },
+      "notes": "When empty Reed Bed cumulative space receives reed, gain 1 wood"
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "card_id": "B093",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "腹心の友",
+    "name_en": "Confidant"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3164",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "resource": "food",
+            "amount": 1,
+            "rounds_ahead": [2, 3, 4],
+            "description": "place_resource_on_future_spaces"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "persistent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "On play, place 1 food on each of the next 2-4 round spaces"
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1,
+            "description": "retrieve_resource_from_space"
+          }
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "sow_or_build_fences",
+            "description": "grant_action_choice_sow_build_fences"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_round",
+      "duration": "while_food_on_spaces",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each round start, retrieve the food from that round's space and choose Sow or Build Fences action"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B093-place-food-future-spaces",
+      "B093-round-start-retrieve-and-action"
+    ],
+    "checked_by": "AI source comparison vs BGA wiki",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Verified against BGA wiki card page. On play: place 1 food on rounds 2,3,4 ahead. Each round start: take food back, choose Sow or Build Fences."
+  }
+}
