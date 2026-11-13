@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - 'tests/e2e/full-game.cjs'
+      - 'web/index.html' # UI behavior changes must also preserve all 14 rounds
       - '.github/workflows/web-full-game.yml'
 
 permissions:
