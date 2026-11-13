@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "card_id": "D046",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ペレット圧縮機",
+    "name_en": "Pellet Press"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2875",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "custom",
+        "params": {
+          "note": "職業2"
+        },
+        "negate": false
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "whether reed payment is optional each round",
+      "exact timing of food placement"
+    ],
+    "test_case_ids": [
+      "D046-cost-prereq"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Once per round, you may pay 1 reed. If you do, place 1 food on each of the next 4 round spaces. At the start of those rounds, gain that food."
+  }
+}

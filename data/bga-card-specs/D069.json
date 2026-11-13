@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "card_id": "D069",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "小温室",
+    "name_en": "Small Greenhouse"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2852",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "custom",
+        "params": {
+          "note": "職業1"
+        },
+        "negate": false
+      }
+    ],
+    "printed_points": 1
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "exact round calculation",
+      "whether both spaces get vegetable or just one"
+    ],
+    "test_case_ids": [
+      "D069-cost-prereq"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Add 4 and 7 to the current round, place 1 vegetable on the corresponding round spaces. At the start of those rounds, gain 1 food and the vegetable."
+  }
+}

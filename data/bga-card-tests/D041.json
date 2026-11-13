@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "card_id": "D041",
+  "cases": [
+    {
+      "id": "D041-cost-prereq",
+      "scope": "legal_play",
+      "setup": {},
+      "action": {
+        "play": "D041"
+      },
+      "expected": {
+        "can_play": true
+      },
+      "notes": "Verify cost and prerequisite for D041"
+    }
+  ]
+}
