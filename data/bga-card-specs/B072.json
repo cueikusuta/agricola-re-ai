@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "card_id": "B072",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "農業愛",
+    "name_en": "Love for Agriculture"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3185",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "description": "Allow sowing on up to 2 pastures (1-2 farm spaces each). Sown pastures become fields with animal capacity reduced by 1 per farm space."
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B072-sow-on-1-pasture",
+      "B072-sow-on-2-pasture"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "You may sow on 1-2 farm space pastures. If you do, that pasture also counts as a field, and its animal capacity is reduced by 1 or 2 respectively."
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "card_id": "B080",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "硬磁器",
+    "name_en": "Hard Porcelain"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3177",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "any_time",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "rates": [
+              {
+                "from": {
+                  "good": "clay",
+                  "amount": 2
+                },
+                "to": {
+                  "good": "stone",
+                  "amount": 1
+                }
+              },
+              {
+                "from": {
+                  "good": "clay",
+                  "amount": 3
+                },
+                "to": {
+                  "good": "stone",
+                  "amount": 2
+                }
+              },
+              {
+                "from": {
+                  "good": "clay",
+                  "amount": 4
+                },
+                "to": {
+                  "good": "stone",
+                  "amount": 3
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B080-exchange-2",
+      "B080-exchange-3",
+      "B080-exchange-4"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "At any time you may exchange 2/3/4 clay for 1/2/3 stone."
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "card_id": "B089",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "馬手",
+    "name_en": "Groom"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "yes",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3168",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "description": "Immediate: gain 1 wood. Conditional (stone house): at each round start, may build 1 stable for 1 wood (limit 1 per round)."
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B089-immediate-wood",
+      "B089-stone-house-build-stable",
+      "B089-not-stone-house",
+      "B089-limit-one-per-round"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "When you play this card, immediately gain 1 wood. Once you live in a stone house, at the start of each round you may build 1 stable (only) for 1 wood."
+  }
+}

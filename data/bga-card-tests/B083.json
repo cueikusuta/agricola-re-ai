@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "card_id": "B083",
+  "cases": [
+    {
+      "id": "B083-take-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "clay": 1,
+        "sheep": 0
+      },
+      "action": {
+        "take_from_stack": true
+      },
+      "expected": {
+        "sheep_delta": 1,
+        "clay_delta": -1,
+        "stack_remaining": 4
+      }
+    },
+    {
+      "id": "B083-take-food-then-cattle",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "clay": 2,
+        "food": 0,
+        "cattle": 0
+      },
+      "action": {
+        "take_from_stack": true,
+        "take_from_stack_2": true
+      },
+      "expected": {
+        "food_delta": 1,
+        "cattle_delta": 1,
+        "clay_delta": -2,
+        "stack_remaining": 3
+      }
+    }
+  ]
+}

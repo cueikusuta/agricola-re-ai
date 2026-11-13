@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "card_id": "B090",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "組合の鋤手",
+    "name_en": "Cooperative Plower"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3167",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_use_cultivation",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "plow_field",
+          "target": "owner",
+          "params": {
+            "condition": "grain_seeds_occupied",
+            "extra_fields": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B090-grain-seeds-occupied",
+      "B090-grain-seeds-free"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "While the Grain Seeds action space is occupied, each time you use the Cultivation action space, you may plow 1 additional field."
+  }
+}

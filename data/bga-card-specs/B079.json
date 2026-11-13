@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "B079",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "荷揚げかご",
+    "name_en": "Corf"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3178",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_any_player_take_accumulation",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "condition": "stone_taken >= 3",
+            "good": "stone",
+            "amount": 1,
+            "source": "common_stock"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "B079-other-player-takes-3",
+      "B079-self-takes-4",
+      "B079-takes-2-no-trigger"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Whenever any player (including you) takes 3+ stone from an accumulation space, you gain 1 stone from the common stock."
+  }
+}

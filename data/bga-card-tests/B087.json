@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "card_id": "B087",
+  "cases": [
+    {
+      "id": "B087-build-room",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 5,
+        "reed": 2
+      },
+      "action": {
+        "use_day_laborer": true,
+        "build_room": true
+      },
+      "expected": {
+        "room_built": true,
+        "cost_paid": true
+      }
+    },
+    {
+      "id": "B087-renovate",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 3,
+        "clay": 4
+      },
+      "action": {
+        "use_day_laborer": true,
+        "renovate": true
+      },
+      "expected": {
+        "renovated": true,
+        "cost_paid": true
+      }
+    }
+  ]
+}

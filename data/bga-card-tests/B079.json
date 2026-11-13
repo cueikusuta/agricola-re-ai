@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "B079",
+  "cases": [
+    {
+      "id": "B079-other-player-takes-3",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "stone": 0
+      },
+      "action": {
+        "other_player_takes_stone": 3
+      },
+      "expected": {
+        "stone_delta": 1
+      }
+    },
+    {
+      "id": "B079-self-takes-4",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "stone": 0
+      },
+      "action": {
+        "self_takes_stone": 4
+      },
+      "expected": {
+        "stone_delta": 1
+      }
+    },
+    {
+      "id": "B079-takes-2-no-trigger",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "stone": 0
+      },
+      "action": {
+        "other_player_takes_stone": 2
+      },
+      "expected": {
+        "stone_delta": 0
+      }
+    }
+  ]
+}
