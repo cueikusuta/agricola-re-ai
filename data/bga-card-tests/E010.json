@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "E010",
+  "cases": [
+    {
+      "id": "E010-move",
+      "scope": "effect_only",
+      "setup": {
+        "round": 3,
+        "worker_on": [
+          "farmland"
+        ]
+      },
+      "action": {
+        "move_person_to": "copse"
+      },
+      "expected": {
+        "person_moved": true,
+        "action_taken": "copse",
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "E010-food",
+      "scope": "effect_only",
+      "setup": {
+        "round": 3,
+        "worker_on": [
+          "farmland"
+        ]
+      },
+      "action": {
+        "choose": "food"
+      },
+      "expected": {
+        "food_delta": 1,
+        "person_moved": false
+      }
+    },
+    {
+      "id": "E010-round4",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4,
+        "worker_on": [
+          "farmland"
+        ]
+      },
+      "action": {
+        "end_work_phase": true
+      },
+      "expected": {
+        "food_delta": 0,
+        "person_moved": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "card_id": "E021",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "羊皮の絨毯",
+    "name_en": "Sheep Rug"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2732",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": null,
+    "prerequisites": [
+      {
+        "predicate": "at_least_animals",
+        "params": {
+          "animal": "sheep",
+          "n": 4
+        }
+      }
+    ],
+    "printed_points": 1,
+    "alternative_cost_notes": "1 羊"
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "ignore_occupation",
+            "space": "wish_for_children",
+            "occupied_by_others": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: the wiki shows only the alternative cost (1 sheep); the base resource cost is not stated"
+    ],
+    "test_case_ids": [
+      "E021-occupied",
+      "E021-other-space"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "All Wish for Children action spaces can be used even when occupied by another player's person."
+  }
+}

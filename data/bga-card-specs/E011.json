@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "card_id": "E011",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ふれあい動物園",
+    "name_en": "Petting Zoo"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2742",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "pasture_adjacent_to_house",
+          "params": {
+            "orthogonal": true
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "modify_capacity",
+          "target": "board",
+          "params": {
+            "scope": "card",
+            "animal_capacity": {
+              "op": "room_count",
+              "args": []
+            },
+            "any_type": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E011-normal",
+      "E011-mixed",
+      "E011-no-pasture"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "With a pasture orthogonally adjacent to your house, you can keep animals of any type on this card, up to the number of rooms in your house."
+  }
+}

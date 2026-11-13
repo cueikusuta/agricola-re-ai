@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "E017",
+  "cases": [
+    {
+      "id": "E017-plow-two",
+      "scope": "effect_only",
+      "setup": {
+        "worker_space_used": "farmland"
+      },
+      "action": {
+        "use_space": "farmland",
+        "plow": 2
+      },
+      "expected": {
+        "fields_plowed": 2
+      }
+    },
+    {
+      "id": "E017-sow-reduced",
+      "scope": "effect_only",
+      "setup": {
+        "grain_fields": 1,
+        "grain_supply": 5
+      },
+      "action": {
+        "sow": {
+          "crop": "grain"
+        }
+      },
+      "expected": {
+        "grain_on_field": 1,
+        "grain_supply_delta": -1
+      }
+    }
+  ]
+}

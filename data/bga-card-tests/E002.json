@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "card_id": "E002",
+  "cases": [
+    {
+      "id": "E002-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "rooms": 2,
+        "clay": 3,
+        "reed": 1
+      },
+      "action": {
+        "play": "E002"
+      },
+      "expected": {
+        "house_after": "clay",
+        "clay_delta": 0,
+        "reed_delta": 0,
+        "card_in_left_neighbor_hand": true
+      }
+    },
+    {
+      "id": "E002-rejected",
+      "scope": "legal_play",
+      "setup": {
+        "house": "clay",
+        "rooms": 2,
+        "clay": 3,
+        "reed": 1
+      },
+      "action": {
+        "play": "E002"
+      },
+      "expected": {
+        "play_rejected": true
+      }
+    }
+  ]
+}

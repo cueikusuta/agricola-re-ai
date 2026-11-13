@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "card_id": "E021",
+  "cases": [
+    {
+      "id": "E021-occupied",
+      "scope": "effect_only",
+      "setup": {
+        "space_occupied_by_other": true
+      },
+      "action": {
+        "use_space": "wish_for_children"
+      },
+      "expected": {
+        "action_allowed": true
+      }
+    },
+    {
+      "id": "E021-other-space",
+      "scope": "effect_only",
+      "setup": {
+        "space_occupied_by_other": true
+      },
+      "action": {
+        "use_space": "farmland"
+      },
+      "expected": {
+        "action_allowed": false
+      }
+    }
+  ]
+}

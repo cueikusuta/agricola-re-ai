@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "E003",
+  "cases": [
+    {
+      "id": "E003-normal",
+      "scope": "effect_only",
+      "setup": {
+        "worker_on": [
+          "grain_utilization"
+        ]
+      },
+      "action": {
+        "play": "E003"
+      },
+      "expected": {
+        "person_returned_home": true,
+        "may_place_person_again_this_round": true,
+        "card_in_left_neighbor_hand": true
+      }
+    },
+    {
+      "id": "E003-no-worker",
+      "scope": "legal_play",
+      "setup": {
+        "worker_on": []
+      },
+      "action": {
+        "play": "E003"
+      },
+      "expected": {
+        "play_rejected": true
+      }
+    }
+  ]
+}

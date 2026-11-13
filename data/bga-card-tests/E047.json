@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "E047",
+  "cases": [
+    {
+      "id": "E047-wood-gain",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_next_round_space": 0
+      },
+      "action": {
+        "gain_wood_from_action_space": 2
+      },
+      "expected": {
+        "food_on_next_round_space": 1
+      }
+    },
+    {
+      "id": "E047-round-start",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_next_round_space": 1
+      },
+      "action": {
+        "start_round": true
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "E047-no-wood",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_next_round_space": 0
+      },
+      "action": {
+        "use_space": "day_laborer"
+      },
+      "expected": {
+        "food_on_next_round_space": 0
+      }
+    }
+  ]
+}

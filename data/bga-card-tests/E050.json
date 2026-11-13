@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "card_id": "E050",
+  "cases": [
+    {
+      "id": "E050-one-type",
+      "scope": "effect_only",
+      "setup": {
+        "grain_fields": 2,
+        "grain_supply": 4
+      },
+      "action": {
+        "sow": {
+          "crop": "grain"
+        }
+      },
+      "expected": {
+        "food_delta": 1
+      }
+    },
+    {
+      "id": "E050-two-types",
+      "scope": "effect_only",
+      "setup": {
+        "grain_supply": 2,
+        "vegetable_supply": 1
+      },
+      "action": {
+        "sow": {
+          "crops": [
+            "grain",
+            "vegetable"
+          ]
+        }
+      },
+      "expected": {
+        "food_delta": 2
+      }
+    }
+  ]
+}

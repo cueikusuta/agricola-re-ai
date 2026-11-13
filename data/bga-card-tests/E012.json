@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "card_id": "E012",
+  "cases": [
+    {
+      "id": "E012-unfenced-stable",
+      "scope": "effect_only",
+      "setup": {
+        "unfenced_stable": 1,
+        "base_animal_capacity": 1
+      },
+      "action": {
+        "capacity_check": true
+      },
+      "expected": {
+        "animal_capacity": 2
+      }
+    },
+    {
+      "id": "E012-pasture-with-stable",
+      "scope": "effect_only",
+      "setup": {
+        "pasture_cells": 2,
+        "stable_in_pasture": 1,
+        "base_animal_capacity": 4
+      },
+      "action": {
+        "capacity_check": true
+      },
+      "expected": {
+        "animal_capacity": 6
+      }
+    }
+  ]
+}
