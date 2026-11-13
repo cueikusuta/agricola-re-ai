@@ -1131,6 +1131,18 @@ pub fn verified_minor_worker_cards(players: usize) -> Vec<CardDefinition> {
     let minor = CardKind::MinorImprovement;
     let mut result = vec![
         card(
+            "A042",
+            minor,
+            vec![(Good::Clay, 2)],
+            1,
+            vec![
+                gain(Space::Fishing, Good::Wood, 1),
+                gain(Space::Forest, Good::Food, 1),
+                gain(Space::Copse, Good::Food, 1),
+                gain(Space::Grove, Good::Food, 1),
+            ],
+        ),
+        card(
             "A051",
             minor,
             vec![(Good::Wood, 1), (Good::Reed, 1)],
@@ -1305,6 +1317,42 @@ mod verified_minor_worker_tests {
         p.supply.reed = 0;
         assert!(!can_play(&set, card, &p, 0));
         p.supply.reed = 1;
+        assert!(can_play(&set, card, &p, 0));
+        assert_eq!(card.points, 1);
+    }
+    #[test]
+    fn a042_fishing_grants_wood() {
+        let p = owner("A042", 2, &[Space::Fishing, Space::Fishing]);
+        assert_eq!(p.supply.wood, 2);
+    }
+    #[test]
+    fn a042_wood_spaces_grant_food() {
+        let p = owner("A042", 2, &[Space::Forest, Space::Copse, Space::Grove]);
+        assert_eq!(p.supply.food, 3);
+    }
+    #[test]
+    fn a042_only_triggers_on_listed_spaces() {
+        let p = owner(
+            "A042",
+            2,
+            &[Space::DayLaborer, Space::ReedBank, Space::GrainSeeds],
+        );
+        assert_eq!(p.supply.wood, 0);
+        assert_eq!(p.supply.food, 0);
+    }
+    #[test]
+    fn a042_cost_requires_two_clay() {
+        let set = CardSet {
+            definitions: verified_minor_worker_cards(2),
+        };
+        let card = set.definition("A042").unwrap();
+        let mut p = Player::new(0, 0);
+        p.supply.clay = 1;
+        assert!(!can_play(&set, card, &p, 0));
+        let old = p.clone();
+        assert!(!can_play(&set, card, &p, 0));
+        assert_eq!(p, old);
+        p.supply.clay = 2;
         assert!(can_play(&set, card, &p, 0));
         assert_eq!(card.points, 1);
     }
@@ -2285,13 +2333,13 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 33);
+        assert_eq!(set.definitions.len(), 34);
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::MinorImprovement)
                 .count(),
-            18
+            19
         );
         assert_eq!(
             set.definitions

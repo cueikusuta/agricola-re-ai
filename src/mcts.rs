@@ -1025,8 +1025,9 @@ mod tests {
         // Updated: added A122 Pot-Hash Pfannkuchen to verified_worker_bonus_cards (pool size 32->33)
         // Updated: added E007/E008 to verified_immediate_resource_cards — E-prefixed cards are
         // excluded from the verified pool, so the sample_game distribution is unchanged.
+        // Updated: added A042 Forest Lake Hut to verified_minor_worker_cards (pool size 33->34)
         assert_eq!(
-            digest, "81e786b3fd6915cda9745b82dbaec5f5389ff6d648862f1406f08a8f3933eee8",
+            digest, "10625b22dd5ac0f1a6593249643f108f40bc3ea8098b15399f1a7f0fb8b7503e",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
