@@ -12,29 +12,36 @@
     "ban_status": "none",
     "base_2016": "no",
     "eligibility": {
-      "2": "unknown",
-      "3": "unknown",
-      "4": "unknown"
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
     },
     "references": [
       {
-        "url": "https://agricola.cloudfree.jp/?p=3020",
+        "url": "https://agricola.cloudfree.jp/?p=3051",
         "language": "ja",
         "checked_on": "2026-11-13",
-        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+        "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
         "checked_on": "2026-11-13",
-        "note": "English list page row used to cross-check the card id and name"
+        "note": "English list page cross-check"
       }
     ]
   },
   "play": {
     "action": "minor_improvement",
     "cost": null,
-    "prerequisites": null,
+    "prerequisites": [
+      {
+        "predicate": "custom",
+        "params": {
+          "text": "ちょうど羊1"
+        }
+      }
+    ],
     "printed_points": 2,
     "alternative_cost_notes": null
   },
@@ -62,7 +69,7 @@
       "snapshot": "live_state",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Effect details from BGA wiki pending resolution"
+      "notes": "Effect details pending BGA verification"
     }
   ],
   "post_play": {
@@ -72,9 +79,8 @@
     "status": "inventory_only",
     "unresolved_fields": [
       "effects.full",
-      "play.cost.exact",
-      "play.prerequisites.exact",
-      "bga.eligibility"
+      "bga.eligibility",
+      "play.cost.exact"
     ],
     "test_case_ids": [
       "C038-normal",
@@ -83,6 +89,6 @@
     "checked_by": "AI ledger import",
     "checked_on": "2026-11-13",
     "implementation_status": "not_started",
-    "notes": "Inventory-only record from base ledger; full BGA wiki verification pending"
+    "notes": "Inventory-only from base ledger; full BGA verification pending"
   }
 }

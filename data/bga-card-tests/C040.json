@@ -9,8 +9,7 @@
         "player": {
           "supply": {},
           "played_cards": []
-        },
-        "notes": "Minimal setup for effect evaluation"
+        }
       },
       "action": {
         "type": "play_card",
@@ -20,9 +19,9 @@
       "expected": {
         "effect_applies": true,
         "points_gained": 1,
-        "notes": "Inventory-only test contract; expected outcomes pending BGA verification"
+        "notes": "Inventory-only test contract"
       },
-      "notes": "Placeholder test case; full setup/action/expected pending BGA wiki verification"
+      "notes": "Placeholder test case"
     },
     {
       "id": "C040-edge",
@@ -31,8 +30,7 @@
         "player": {
           "supply": {},
           "played_cards": []
-        },
-        "notes": "Edge case: missing prerequisites / insufficient resources"
+        }
       },
       "action": {
         "type": "play_card",
