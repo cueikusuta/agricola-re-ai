@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "card_id": "E128",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "馬具屋",
+    "name_en": "Saddler"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2625",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_build_major_improvement",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "plow_field",
+          "target": "owner",
+          "params": {
+            "cost_food": 1,
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_event",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When building a major improvement, may pay 1 food to plow 1 field"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: whether this applies to ALL major improvements or only specific ones",
+      "effects: can pay 1 food multiple times for multiple fields per major improvement"
+    ],
+    "test_case_ids": [
+      "E128-normal"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "When building a major improvement, may pay 1 food to plow 1 field. Occupations stay in play area."
+  }
+}

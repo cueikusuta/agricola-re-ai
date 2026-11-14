@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "E124",
+  "cases": [
+    {
+      "id": "E124-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 0,
+        "stone": 0
+      },
+      "action": {
+        "play_occupation": "E124"
+      },
+      "expected": {
+        "wood_delta": 2,
+        "stone_delta": 2
+      },
+      "notes": "On play, gain 2 wood and 2 stone"
+    },
+    {
+      "id": "E124-scoring",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 3,
+        "stone": 2
+      },
+      "action": {
+        "end_game_scoring": {}
+      },
+      "expected": {
+        "points_delta": -5
+      },
+      "notes": "At scoring, -1 point per wood (3) and per stone (2) = -5 points"
+    }
+  ]
+}
