@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "card_id": "D131",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "職人技術奨励者",
+    "name_en": "Craftsmanship Promoter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2790",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "On play: gain 1 stone. Major improvements in lower supply board row can be built via Minor Improvement action."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: rule modification allowing Major Improvements to be built via Minor Improvement action needs action-type remapping formalization",
+      "effects: 'lower supply board row' scope needs precise supply-board region definition"
+    ],
+    "test_case_ids": [
+      "D131-on-play-gain-stone",
+      "D131-major-improvement-via-minor-action"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. On play gain 1 stone. Ongoing: Major improvements in the lower row of the supply board can be built using a Minor Improvement action. Status: needs_resolution due to action-type remapping formalization."
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "card_id": "D130",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "日曜大工",
+    "name_en": "Recreational Carpenter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2791",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "At end of work phase if you didn't use Meeting Place action space: may take Build Room action without placing a person."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: end-of-work-phase trigger with negative condition (did not use Meeting Place) needs phase timing formalization",
+      "effects: 'without placing a person' means free action slot; interaction with Archway (move worker) noted as not triggering in same round"
+    ],
+    "test_case_ids": [
+      "D130-did-not-use-meeting-place-build-room",
+      "D130-used-meeting-place-no-effect",
+      "D130-archway-interaction"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. At end of work phase, if you did not use the Meeting Place action space, may take a Build Room action without placing a person. Archway interaction: if worker moved via Archway, Sunday Carpenter does not trigger that round (timing: end of work phase -> return home phase). Status: needs_resolution due to phase timing and negative condition formalization."
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "D127",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "稼ぎ頭",
+    "name_en": "Hardworking Man"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2794",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "This card is an action space only you can use. If every other player has more rooms than you, you may take Day Laborer, Build Room, AND Major Improvement actions (all three)."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: card becomes exclusive action space with compound action (3 actions in one) needs action-space formalization",
+      "effects: condition 'every other player has more rooms' needs precise room-count comparison predicate",
+      "effects: 'Day Laborer' action here does not trigger day-laborer combos (e.g., Furrow Assistant) per wiki note",
+      "effects: Major Improvement only (no Minor Improvement) restriction needs action-type filter"
+    ],
+    "test_case_ids": [
+      "D127-condition-met-take-all-three",
+      "D127-condition-not-met-cannot-use",
+      "D127-no-day-laborer-combo"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. Card acts as personal action space. Usable only if all other players have strictly more rooms. Grants Day Laborer + Build Room + Major Improvement as a combined action. Does not trigger Day Laborer combos. Only Major Improvements (not Minor). Status: needs_resolution due to complex action-space and condition formalization."
+  }
+}

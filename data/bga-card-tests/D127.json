@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "D127",
+  "cases": [
+    {
+      "id": "D127-condition-met-take-all-three",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D127"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D127: This card is an action space only you can use. If every other player has more rooms than you, you may take Day Laborer, Build Room, AND Major Improvement actions (all three)."
+    },
+    {
+      "id": "D127-condition-not-met-cannot-use",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D127"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D127: This card is an action space only you can use. If every other player has more rooms than you, you may take Day Laborer, Build Room, AND Major Improvement actions (all three)."
+    },
+    {
+      "id": "D127-no-day-laborer-combo",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D127"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D127: This card is an action space only you can use. If every other player has more rooms than you, you may take Day Laborer, Build Room, AND Major Improvement actions (all three)."
+    }
+  ]
+}

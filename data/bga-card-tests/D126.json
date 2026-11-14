@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "D126",
+  "cases": [
+    {
+      "id": "D126-on-play-stack-goods",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D126"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D126: On play: stack 7 goods (wood, brick, reed, stone, reed, brick, wood) on this card. Each harvest from field tiles: take top good from stack."
+    },
+    {
+      "id": "D126-harvest-field-take-good",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D126"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D126: On play: stack 7 goods (wood, brick, reed, stone, reed, brick, wood) on this card. Each harvest from field tiles: take top good from stack."
+    },
+    {
+      "id": "D126-harvest-order",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D126"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D126: On play: stack 7 goods (wood, brick, reed, stone, reed, brick, wood) on this card. Each harvest from field tiles: take top good from stack."
+    }
+  ]
+}

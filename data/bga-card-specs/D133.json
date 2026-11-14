@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "card_id": "D133",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "ビール露店経営者",
+    "name_en": "Beer Tent Operator"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2788",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "During harvest feeding phase: may use this card to convert 1 wood + 1 grain into 1 bonus point + 2 food."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: feeding-phase conversion with specific resource costs (1 wood + 1 grain) for 1 VP + 2 food needs phase-scoped action formalization",
+      "effects: 'use this card' implies optional activation; decision_owner and frequency (once per harvest?) needs clarification"
+    ],
+    "test_case_ids": [
+      "D133-feeding-phase-convert-wood-grain",
+      "D133-optional-activation"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. During harvest feeding phase, may convert 1 wood + 1 grain into 1 bonus VP + 2 food. Optional. Synergizes with Brewery Pond (醸造所の池) and Magician (奇術師). Status: needs_resolution due to feeding-phase action formalization."
+  }
+}

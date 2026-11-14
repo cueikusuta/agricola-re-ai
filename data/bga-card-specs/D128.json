@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "D128",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "建設の獅子",
+    "name_en": "Building Tycoon"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2793",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "Each time another player builds 1+ rooms, you may pay that player 1 food to immediately build exactly 1 room (paying normal cost)."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: reaction to opponent's build with immediate build action needs trigger formalization",
+      "effects: payment to specific player (not supply) and 'exactly 1 room' limit needs transfer/action params",
+      "effects: normal room cost still paid by you in addition to 1 food to opponent"
+    ],
+    "test_case_ids": [
+      "D128-opponent-builds-react-build-room",
+      "D128-pay-food-to-opponent",
+      "D128-exactly-one-room-limit"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. Reaction: when another player builds >=1 room, may pay that player 1 food to immediately build exactly 1 room (paying normal room cost). Status: needs_resolution due to reaction trigger and inter-player payment formalization."
+  }
+}

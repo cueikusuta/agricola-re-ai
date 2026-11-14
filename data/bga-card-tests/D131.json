@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "card_id": "D131",
+  "cases": [
+    {
+      "id": "D131-on-play-gain-stone",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D131"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D131: On play: gain 1 stone. Major improvements in lower supply board row can be built via Minor Improvement action."
+    },
+    {
+      "id": "D131-major-improvement-via-minor-action",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D131"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D131: On play: gain 1 stone. Major improvements in lower supply board row can be built via Minor Improvement action."
+    }
+  ]
+}

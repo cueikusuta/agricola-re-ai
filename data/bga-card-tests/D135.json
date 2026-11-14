@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "D135",
+  "cases": [
+    {
+      "id": "D135-on-play-9-rounds-remaining-gain-4-wood",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D135"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D135: If 3/6/9 rounds remaining: immediately gain 2/3/4 wood. At scoring: player with most vegetables on fields gains 2 bonus points."
+    },
+    {
+      "id": "D135-on-play-6-rounds-remaining-gain-3-wood",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D135"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D135: If 3/6/9 rounds remaining: immediately gain 2/3/4 wood. At scoring: player with most vegetables on fields gains 2 bonus points."
+    },
+    {
+      "id": "D135-scoring-most-vegetables-bonus",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D135"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D135: If 3/6/9 rounds remaining: immediately gain 2/3/4 wood. At scoring: player with most vegetables on fields gains 2 bonus points."
+    }
+  ]
+}

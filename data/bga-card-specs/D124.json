@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "card_id": "D124",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "密使",
+    "name_en": "Emissary"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2797",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "Anytime: place 1 good from supply on this card to gain 1 stone. Each good placed must be different (food counts as a good)."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: anytime exchange with uniqueness constraint on placed goods needs stateful tracking formalization",
+      "effects: 'food counts as a good' expands good types; needs engine good-type enum alignment"
+    ],
+    "test_case_ids": [
+      "D124-exchange-wood-for-stone",
+      "D124-exchange-food-for-stone",
+      "D124-uniqueness-constraint"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. Anytime ability: place 1 good from supply on card to gain 1 stone. Each good type can only be placed once. Food counts as a good. Status: needs_resolution due to stateful uniqueness constraint."
+  }
+}

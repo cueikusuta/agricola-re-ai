@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "D134",
+  "cases": [
+    {
+      "id": "D134-opponent-uses-fishing-gain-point",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D134"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D134: Each time Fishing accumulation space is used: gain 1 bonus point, but must skip next person placement that round (that person can be placed later)."
+    },
+    {
+      "id": "D134-skip-next-placement",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D134"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D134: Each time Fishing accumulation space is used: gain 1 bonus point, but must skip next person placement that round (that person can be placed later)."
+    },
+    {
+      "id": "D134-multiple-fishing-combo",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D134"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D134: Each time Fishing accumulation space is used: gain 1 bonus point, but must skip next person placement that round (that person can be placed later)."
+    }
+  ]
+}

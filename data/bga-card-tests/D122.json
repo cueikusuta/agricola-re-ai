@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "card_id": "D122",
+  "cases": [
+    {
+      "id": "D122-on-play-gain-brick",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D122"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D122: On play: gain 2 brick. Once per round, anytime: pay 2 food to buy 2 brick."
+    },
+    {
+      "id": "D122-exchange-food-for-brick",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D122"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D122: On play: gain 2 brick. Once per round, anytime: pay 2 food to buy 2 brick."
+    }
+  ]
+}

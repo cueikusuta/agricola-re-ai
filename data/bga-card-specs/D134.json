@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "D134",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "牡蠣食べ",
+    "name_en": "Oyster Eater"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2787",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "Each time Fishing accumulation space is used: gain 1 bonus point, but must skip next person placement that round (that person can be placed later)."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: trigger on any player's use of Fishing space (not just owner) needs trigger scope clarification",
+      "effects: mandatory skip of next person placement with later-round placement needs turn-order formalization",
+      "effects: interaction with 'もり打ち' (multiple fishing) noted as strong combo"
+    ],
+    "test_case_ids": [
+      "D134-opponent-uses-fishing-gain-point",
+      "D134-skip-next-placement",
+      "D134-multiple-fishing-combo"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. Whenever the Fishing accumulation space is used (by any player), gain 1 bonus VP but must skip your next person placement that round (the skipped person can be placed later in the round). Triggers on opponent's Fishing too. Status: needs_resolution due to trigger scope and turn-skip formalization."
+  }
+}

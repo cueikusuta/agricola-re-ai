@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "D126",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "畑の耕作者",
+    "name_en": "Field Cultivator"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2795",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "On play: stack 7 goods (wood, brick, reed, stone, reed, brick, wood) on this card. Each harvest from field tiles: take top good from stack."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: stateful stack of 7 specific goods with ordered consumption needs persistent card-state formalization",
+      "effects: triggers only on field-tile harvest (not card-based harvest) needs precise harvest-source predicate",
+      "effects: multi-harvest from single field (e.g., via Scythe) yields only 1 good per harvest action needs clarification"
+    ],
+    "test_case_ids": [
+      "D126-on-play-stack-goods",
+      "D126-harvest-field-take-good",
+      "D126-harvest-order"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. On play, stack 7 goods in order: wood, brick, reed, stone, reed, brick, wood. Each harvest from a field tile takes the top good. Card-based harvests don't trigger. Multi-harvest from one field yields 1 good per harvest action. Status: needs_resolution due to stateful stack and harvest-source predicate."
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "card_id": "D121",
+  "cases": [
+    {
+      "id": "D121-renovation-cost",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D121"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D121: Renovation to brick house costs exactly 1 brick + 1 reed. Building a brick room costs 3 brick + 2 reed."
+    },
+    {
+      "id": "D121-build-brick-room-cost",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D121"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D121: Renovation to brick house costs exactly 1 brick + 1 reed. Building a brick room costs 3 brick + 2 reed."
+    }
+  ]
+}

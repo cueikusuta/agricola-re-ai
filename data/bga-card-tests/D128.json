@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "D128",
+  "cases": [
+    {
+      "id": "D128-opponent-builds-react-build-room",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D128"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D128: Each time another player builds 1+ rooms, you may pay that player 1 food to immediately build exactly 1 room (paying normal cost)."
+    },
+    {
+      "id": "D128-pay-food-to-opponent",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D128"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D128: Each time another player builds 1+ rooms, you may pay that player 1 food to immediately build exactly 1 room (paying normal cost)."
+    },
+    {
+      "id": "D128-exactly-one-room-limit",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D128"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D128: Each time another player builds 1+ rooms, you may pay that player 1 food to immediately build exactly 1 room (paying normal cost)."
+    }
+  ]
+}
