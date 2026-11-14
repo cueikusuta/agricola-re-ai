@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "card_id": "E142",
+  "cases": [
+    {
+      "id": "E142-play",
+      "scope": "legal_play",
+      "setup": {
+        "card_in_hand": true
+      },
+      "action": {
+        "play_occupation": {}
+      },
+      "expected": {
+        "play_legal": true,
+        "cost_paid": [],
+        "printed_points": 0
+      },
+      "notes": "Verify occupation can be played for free with no prerequisites."
+    }
+  ]
+}

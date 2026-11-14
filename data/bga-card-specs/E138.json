@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "E138",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "家畜の専門家",
+    "name_en": "Livestock Expert"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2615",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "unknown",
+    "notes": "Destination not confirmed; typical occupation stays in played area."
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects",
+      "post_play.destination"
+    ],
+    "test_case_ids": [
+      "E138-play"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation card. BGA rating 6.00. Goods hint: 羊猪牛. Upgrade hint: none. Effect details unresolved pending official source verification."
+  }
+}
