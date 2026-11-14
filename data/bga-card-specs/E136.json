@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "card_id": "E136",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "畜産労働者",
+    "name_en": "Animal Husbandry Worker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2617",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "game_start",
+      "conditions": [
+        {
+          "predicate": "pre_rounds_at_least",
+          "params": {
+            "n": 3
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 2
+          }
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action_type": "build_fence"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "game_start",
+      "conditions": [
+        {
+          "predicate": "pre_rounds_at_least",
+          "params": {
+            "n": 6
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 3
+          }
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action_type": "build_fence"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "game_start",
+      "conditions": [
+        {
+          "predicate": "pre_rounds_at_least",
+          "params": {
+            "n": 9
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 4
+          }
+        },
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action_type": "build_fence"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 2,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "end_game_scoring",
+      "conditions": [
+        {
+          "predicate": "most_pastures",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 3,
+      "decision_owner": "none",
+      "notes": "At scoring, player(s) with most pastures gain 2 bonus points"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: whether pre-rounds wood/fence gains are cumulative (2+3+4=9 wood at 9 pre-rounds) or only the highest applies",
+      "effects: whether '柵の建設' action is gained as an extra action space use or as a free fence build",
+      "effects: tie-breaking for 'most pastures' bonus"
+    ],
+    "test_case_ids": [
+      "E136-pre-rounds",
+      "E136-scoring"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Pre-rounds: if 3/6/9 pre-rounds, gain 2/3/4 wood and 'build fence' action each. Scoring: most pastures = 2 bonus points (tied players all get it). Occupations stay in play area."
+  }
+}

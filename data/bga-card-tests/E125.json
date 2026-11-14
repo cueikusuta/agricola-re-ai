@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "card_id": "E125",
+  "cases": [
+    {
+      "id": "E125-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "wood": 0
+      },
+      "action": {
+        "play_occupation": "E125",
+        "choose_resource": "wood"
+      },
+      "expected": {
+        "wood_delta": 1
+      },
+      "notes": "On play, gain 1 building resource of choice"
+    },
+    {
+      "id": "E125-extra-person",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "persons_in_stock": 1,
+        "all_placed": true
+      },
+      "action": {
+        "round_end": {},
+        "place_extra_person": true
+      },
+      "expected": {
+        "persons_on_board_delta": 1,
+        "persons_in_stock_delta": -1
+      },
+      "notes": "After all persons placed, may place 1 person from stock"
+    }
+  ]
+}

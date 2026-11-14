@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "card_id": "E127",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "勤勉な農夫",
+    "name_en": "Diligent Farmer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2626",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "max_score_categories_at_4",
+          "params": {
+            "count": 3
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "build_room",
+          "target": "board",
+          "params": {
+            "free": true,
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "If 3 scoring categories are at max 4 points (including fenced stables), may build 1 room for free"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: which scoring categories count and how to check 'max 4 points' condition",
+      "effects: whether 'fenced stables' count as a separate category or part of pastures"
+    ],
+    "test_case_ids": [
+      "E127-normal"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "On play: if 3 scoring categories at max 4 points (incl. fenced stables), may build 1 room for free. Occupations stay in play area."
+  }
+}

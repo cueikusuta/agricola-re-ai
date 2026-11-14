@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "card_id": "E123",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "資材ためこみ屋",
+    "name_en": "Resource Hoarder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2630",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_build_room_or_play_improvement_or_renovate",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "use_resource_from_card",
+            "resources": [
+              "stone",
+              "brick",
+              "stone",
+              "reed",
+              "wood",
+              "brick"
+            ],
+            "order": "top_down",
+            "multiple_allowed": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_event",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Resources stacked on card (bottom to top: stone, brick, stone, reed, wood, brick). When building room, playing/building improvement, or renovating, may use topmost resources in order, multiple at once."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact mechanics of resource stacking and usage - wiki says resources are placed on card in specific order (down to up: stone, brick, stone, reed, wood, brick), can use topmost resources when building room/improvement/renovating"
+    ],
+    "test_case_ids": [
+      "E123-normal"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Resources stacked on card in fixed order. When building room, playing/building improvement, or renovating, may use topmost resources from stack. Occupations stay in play area."
+  }
+}

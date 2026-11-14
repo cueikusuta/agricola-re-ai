@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "E121",
+  "cases": [
+    {
+      "id": "E121-wheat-seed",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "brick": 0
+      },
+      "action": {
+        "use_action_space": "小麦の種"
+      },
+      "expected": {
+        "brick_delta": 2
+      },
+      "notes": "Using '小麦の種' action space grants 2 brick"
+    },
+    {
+      "id": "E121-veg-seed",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "brick": 0
+      },
+      "action": {
+        "use_action_space": "野菜の種"
+      },
+      "expected": {
+        "brick_delta": 3
+      },
+      "notes": "Using '野菜の種' action space grants 3 brick"
+    }
+  ]
+}

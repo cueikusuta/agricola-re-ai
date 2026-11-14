@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "card_id": "E133",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "チャンピオンブリーダー",
+    "name_en": "Champion Breeder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2620",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_breeding",
+      "conditions": [
+        {
+          "predicate": "animal_type_at_least_2_3_bred",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": 0.5,
+            "per_animal_bred": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_animal",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "During harvest breeding phase, for each animal type where 2/3+ of that animal were newly bred, gain 0.5 points per such animal"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact condition '2/3以上の家畜の子を農場に新しく飼う' - whether it's per animal type (e.g., if you have 3 sheep and breed 2, that's 2/3) or total animals",
+      "effects: whether bonus is 0.5 points per qualifying animal or 1/2 point per animal type",
+      "effects: how fractional points are handled"
+    ],
+    "test_case_ids": [
+      "E133-normal"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "During harvest breeding: for each animal type where 2/3+ of that type were newly bred, gain 0.5 points per such animal. Occupations stay in play area."
+  }
+}
