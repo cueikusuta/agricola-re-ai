@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "C123",
+  "cases": [
+    {
+      "id": "C123-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C123"
+      },
+      "expected": {
+        "resources_gained": {}
+      },
+      "notes": "No immediate effect on play"
+    },
+    {
+      "id": "C123-clay-house",
+      "scope": "effect_only",
+      "setup": {
+        "house_type": "clay",
+        "rooms": 2
+      },
+      "action": {
+        "play": "C123",
+        "then_advance_to_work_phase": true
+      },
+      "expected": {
+        "resources_gained": {
+          "clay": 2
+        }
+      },
+      "notes": "At start of Work Phase, gain 2 clay when in 2-room clay house"
+    },
+    {
+      "id": "C123-stone-house",
+      "scope": "effect_only",
+      "setup": {
+        "house_type": "stone",
+        "rooms": 2
+      },
+      "action": {
+        "play": "C123",
+        "then_advance_to_work_phase": true
+      },
+      "expected": {
+        "resources_gained": {
+          "stone": 2
+        }
+      },
+      "notes": "At start of Work Phase, gain 2 stone when in 2-room stone house"
+    }
+  ]
+}

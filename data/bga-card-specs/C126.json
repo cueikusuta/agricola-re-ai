@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "card_id": "C126",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "発掘者",
+    "name_en": "Excavator"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2963",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "action_space_used",
+          "params": {
+            "space": "day_laborer"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time Day Laborer space is used, gain 1 wood and 1 clay"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "action_space_used",
+          "params": {
+            "space": "day_laborer"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "pay_for_resource",
+            "cost": {
+              "food": 1
+            },
+            "gain": {
+              "stone": 1
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Additionally, may pay 1 food to gain 1 stone when using Day Laborer"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact name of 'Day Laborer' action space in BGA",
+      "effects: whether food payment for stone is per use or once per round",
+      "effects: timing of stone gain relative to wood/clay gain"
+    ],
+    "test_case_ids": [
+      "C126-normal",
+      "C126-day-laborer",
+      "C126-day-laborer-with-stone"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Each time you use the Day Laborer action space, gain 1 wood and 1 clay. May also pay 1 food to gain 1 stone."
+  }
+}

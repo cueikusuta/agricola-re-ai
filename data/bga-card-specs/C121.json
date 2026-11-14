@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "card_id": "C121",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "陶土こね",
+    "name_en": "Clay Kneader"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2968",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "action_space_used",
+          "params": {
+            "space": "grain_seeds"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "action_space_used",
+          "params": {
+            "space": "vegetable_seeds"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 2,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact trigger condition for grain/vegetable seeds spaces (name matching)",
+      "effects: whether wood gain stacks when both spaces used in same round"
+    ],
+    "test_case_ids": [
+      "C121-normal",
+      "C121-grain-seeds",
+      "C121-vegetable-seeds"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "On play: gain 1 wood and 2 clay. Each time you use Grain Seeds or Vegetable Seeds action space, gain 1 wood."
+  }
+}

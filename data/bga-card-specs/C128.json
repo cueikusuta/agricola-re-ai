@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "card_id": "C128",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "木の家増築士",
+    "name_en": "Wooden Hut Extender"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2961",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "modify_capacity",
+          "target": "board",
+          "params": {
+            "scope": "wood_room_cost",
+            "base_wood": 5,
+            "base_reed": 1,
+            "round_thresholds": [
+              {
+                "max_round": 5,
+                "wood": 5
+              },
+              {
+                "max_round": 7,
+                "wood": 4
+              },
+              {
+                "max_round": 14,
+                "wood": 3
+              }
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Wood room cost: always 1 reed + wood (5 until round 5, 4 in rounds 6-7, 3 from round 8)"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact round boundaries (round 5 inclusive/exclusive)",
+      "effects: whether this replaces or modifies base wood room cost",
+      "effects: interaction with other room cost modifiers"
+    ],
+    "test_case_ids": [
+      "C128-normal",
+      "C128-round-4",
+      "C128-round-6",
+      "C128-round-8"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Wood room cost becomes: 1 reed + 5 wood (rounds 1-5), 1 reed + 4 wood (rounds 6-7), 1 reed + 3 wood (round 8+). Not available in 2-player games."
+  }
+}

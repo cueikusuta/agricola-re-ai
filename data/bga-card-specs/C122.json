@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "C122",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "レンガ貼り",
+    "name_en": "Bricklayer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2967",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "applies_to": ["minor_improvement", "major_improvement", "renovation"],
+            "resource": "clay",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "applies_to": ["build_room"],
+            "resource": "clay",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact list of actions considered 'improvements and renovation' vs 'room building'",
+      "effects: whether discounts stack with other cost reductions",
+      "effects: minimum cost floor (cannot go below 0)"
+    ],
+    "test_case_ids": [
+      "C122-normal",
+      "C122-improvement-discount",
+      "C122-room-discount"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Improvements and renovation cost 1 less clay. Building rooms costs 2 less clay."
+  }
+}

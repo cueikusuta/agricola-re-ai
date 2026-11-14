@@ -1,0 +1,261 @@
+{
+  "schema_version": 1,
+  "card_id": "C124",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "石材輸入業者",
+    "name_en": "Stone Importer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2965",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "harvest_number",
+          "params": {
+            "n": 1
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "pay_for_resource",
+            "cost": {
+              "food": 2
+            },
+            "gain": {
+              "stone": 1
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "During 1st harvest Breeding Phase, may pay 2 food to gain 1 stone"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "harvest_number",
+          "params": {
+            "n": 2
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "pay_for_resource",
+            "cost": {
+              "food": 2
+            },
+            "gain": {
+              "stone": 1
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "During 2nd harvest Breeding Phase, may pay 2 food to gain 1 stone"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "harvest_number",
+          "params": {
+            "n": 3
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "pay_for_resource",
+            "cost": {
+              "food": 3
+            },
+            "gain": {
+              "stone": 1
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 2,
+      "decision_owner": "owner",
+      "notes": "During 3rd harvest Breeding Phase, may pay 3 food to gain 1 stone"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "harvest_number",
+          "params": {
+            "n": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "pay_for_resource",
+            "cost": {
+              "food": 3
+            },
+            "gain": {
+              "stone": 1
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 3,
+      "decision_owner": "owner",
+      "notes": "During 4th harvest Breeding Phase, may pay 3 food to gain 1 stone"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "harvest_number",
+          "params": {
+            "n": 5
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "pay_for_resource",
+            "cost": {
+              "food": 4
+            },
+            "gain": {
+              "stone": 1
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 4,
+      "decision_owner": "owner",
+      "notes": "During 5th harvest Breeding Phase, may pay 4 food to gain 1 stone"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "harvest_number",
+          "params": {
+            "n": 6
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "pay_for_resource",
+            "cost": {
+              "food": 1
+            },
+            "gain": {
+              "stone": 1
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 5,
+      "decision_owner": "owner",
+      "notes": "During 6th harvest Breeding Phase, may pay 1 food to gain 1 stone"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact mapping of harvest number to food cost (2/2/3/3/4/1)",
+      "effects: whether this is usable once per harvest or once per game per harvest",
+      "effects: timing within Breeding Phase relative to other effects"
+    ],
+    "test_case_ids": [
+      "C124-normal",
+      "C124-harvest-1",
+      "C124-harvest-3",
+      "C124-harvest-6"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "During each harvest's Breeding Phase (1-6), may pay food (2/2/3/3/4/1 respectively) to gain 1 stone. Usable once per harvest."
+  }
+}

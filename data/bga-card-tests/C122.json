@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "C122",
+  "cases": [
+    {
+      "id": "C122-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C122"
+      },
+      "expected": {
+        "resources_gained": {}
+      },
+      "notes": "No immediate effect on play; passive discounts apply"
+    },
+    {
+      "id": "C122-improvement-discount",
+      "scope": "effect_only",
+      "setup": {
+        "resources": {
+          "clay": 3
+        }
+      },
+      "action": {
+        "play": "C122",
+        "then_play_minor_improvement": "costs_2_clay"
+      },
+      "expected": {
+        "resources_spent": {
+          "clay": 1
+        }
+      },
+      "notes": "Minor improvement costing 2 clay costs only 1 clay"
+    },
+    {
+      "id": "C122-room-discount",
+      "scope": "effect_only",
+      "setup": {
+        "resources": {
+          "clay": 5,
+          "reed": 2
+        }
+      },
+      "action": {
+        "play": "C122",
+        "then_build_room": "wood"
+      },
+      "expected": {
+        "resources_spent": {
+          "clay": 3,
+          "reed": 2
+        }
+      },
+      "notes": "Building a wood room normally costs 5 clay + 2 reed; with discount costs 3 clay + 2 reed"
+    }
+  ]
+}

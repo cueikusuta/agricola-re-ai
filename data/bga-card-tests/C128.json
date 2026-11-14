@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "C128",
+  "cases": [
+    {
+      "id": "C128-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C128"
+      },
+      "expected": {
+        "resources_gained": {}
+      },
+      "notes": "No immediate effect on play"
+    },
+    {
+      "id": "C128-round-4",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4,
+        "resources": {
+          "wood": 6,
+          "reed": 2
+        }
+      },
+      "action": {
+        "play": "C128",
+        "then_build_wood_room": true
+      },
+      "expected": {
+        "resources_spent": {
+          "wood": 5,
+          "reed": 1
+        }
+      },
+      "notes": "Round 4: wood room costs 5 wood + 1 reed"
+    },
+    {
+      "id": "C128-round-6",
+      "scope": "effect_only",
+      "setup": {
+        "round": 6,
+        "resources": {
+          "wood": 5,
+          "reed": 2
+        }
+      },
+      "action": {
+        "play": "C128",
+        "then_build_wood_room": true
+      },
+      "expected": {
+        "resources_spent": {
+          "wood": 4,
+          "reed": 1
+        }
+      },
+      "notes": "Round 6: wood room costs 4 wood + 1 reed"
+    },
+    {
+      "id": "C128-round-8",
+      "scope": "effect_only",
+      "setup": {
+        "round": 8,
+        "resources": {
+          "wood": 4,
+          "reed": 2
+        }
+      },
+      "action": {
+        "play": "C128",
+        "then_build_wood_room": true
+      },
+      "expected": {
+        "resources_spent": {
+          "wood": 3,
+          "reed": 1
+        }
+      },
+      "notes": "Round 8: wood room costs 3 wood + 1 reed"
+    }
+  ]
+}

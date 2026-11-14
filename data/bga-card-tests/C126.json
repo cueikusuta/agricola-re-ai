@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "C126",
+  "cases": [
+    {
+      "id": "C126-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C126"
+      },
+      "expected": {
+        "resources_gained": {}
+      },
+      "notes": "No immediate effect on play"
+    },
+    {
+      "id": "C126-day-laborer",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C126",
+        "then_use_action": "day_laborer"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 1,
+          "clay": 1
+        }
+      },
+      "notes": "Using Day Laborer grants 1 wood and 1 clay"
+    },
+    {
+      "id": "C126-day-laborer-with-stone",
+      "scope": "effect_only",
+      "setup": {
+        "resources": {
+          "food": 2
+        }
+      },
+      "action": {
+        "play": "C126",
+        "then_use_action": "day_laborer",
+        "choose_pay_food_for_stone": true
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 1,
+          "clay": 1,
+          "stone": 1
+        },
+        "resources_spent": {
+          "food": 1
+        }
+      },
+      "notes": "Using Day Laborer and paying 1 food grants additional 1 stone"
+    }
+  ]
+}

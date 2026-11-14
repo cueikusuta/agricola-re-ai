@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "C121",
+  "cases": [
+    {
+      "id": "C121-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C121"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 1,
+          "clay": 2
+        }
+      },
+      "notes": "On play, gain 1 wood and 2 clay"
+    },
+    {
+      "id": "C121-grain-seeds",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C121",
+        "then_use_action": "grain_seeds"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 1
+        }
+      },
+      "notes": "Using Grain Seeds action space grants 1 wood"
+    },
+    {
+      "id": "C121-vegetable-seeds",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C121",
+        "then_use_action": "vegetable_seeds"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 1
+        }
+      },
+      "notes": "Using Vegetable Seeds action space grants 1 wood"
+    }
+  ]
+}
