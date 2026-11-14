@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "card_id": "C154",
+  "cases": [
+    {
+      "id": "C154-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C154"
+      },
+      "expected": {
+        "review_status": "needs_resolution"
+      },
+      "notes": "Fail-closed: effect details need resolution before executable test can be written."
+    }
+  ]
+}

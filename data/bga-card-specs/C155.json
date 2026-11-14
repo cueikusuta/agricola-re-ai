@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "C155",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "食料供給人",
+    "name_en": "Food Distributor"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2934",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effect: このカードを出したとき、すぐに小麦1を得て、このラウンドの帰宅フェイズの開始時に、占有されているアクションスペースカードと同じ数の食料を得る。 - full effect semantics not yet encoded in established vocabulary"
+    ],
+    "test_case_ids": [
+      "C155-normal"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "このカードを出したとき、すぐに小麦1を得て、このラウンドの帰宅フェイズの開始時に、占有されているアクションスペースカードと同じ数の食料を得る。"
+  }
+}

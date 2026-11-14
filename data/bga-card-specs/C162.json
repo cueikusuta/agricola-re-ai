@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "C162",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "森林所有者",
+    "name_en": "Forest Owner"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2927",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effect: このカードは全員が使えるアクションスペースになる。他のプレイヤーがこのカードを使う場合、共通のストックからそのプレイヤーは木材3を得て、あなたは木材1を得る。あなたが使う場合、木材4を得る。 - full effect semantics not yet encoded in established vocabulary"
+    ],
+    "test_case_ids": [
+      "C162-normal"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "このカードは全員が使えるアクションスペースになる。他のプレイヤーがこのカードを使う場合、共通のストックからそのプレイヤーは木材3を得て、あなたは木材1を得る。あなたが使う場合、木材4を得る。"
+  }
+}
