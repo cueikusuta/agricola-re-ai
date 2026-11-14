@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "card_id": "C129",
+  "cases": [
+    {
+      "id": "C129-normal",
+      "scope": "effect_only",
+      "setup": {
+        "resources": {
+          "food": 5
+        }
+      },
+      "action": {
+        "play": "C129"
+      },
+      "expected": {
+        "resources_spent": {
+          "food": 2
+        },
+        "family_members_gained": 1,
+        "room_required": false
+      },
+      "notes": "On play: pay 2 food for Family Growth without room"
+    },
+    {
+      "id": "C129-urgent-child-wish",
+      "scope": "effect_only",
+      "setup": {
+        "round": 12,
+        "space_occupied_by_other": true,
+        "occupier_is_first_person": true
+      },
+      "action": {
+        "play": "C129",
+        "then_use_action": "urgent_child_wish"
+      },
+      "expected": {
+        "action_allowed": true
+      },
+      "notes": "Can use Urgent Child Wish even if occupied by another's first person"
+    }
+  ]
+}

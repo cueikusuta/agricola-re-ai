@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "C134",
+  "cases": [
+    {
+      "id": "C134-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C134"
+      },
+      "expected": {
+        "resources_gained": {}
+      },
+      "notes": "No immediate effect on play"
+    },
+    {
+      "id": "C134-scoring",
+      "scope": "effect_only",
+      "setup": {
+        "cattle_locations": [
+          "pasture_1",
+          "pasture_2",
+          "room_1"
+        ]
+      },
+      "action": {
+        "play": "C134",
+        "then_score": true
+      },
+      "expected": {
+        "bonus_points": 3
+      },
+      "notes": "3 spaces with cattle (2 pastures + 1 room) = 3 bonus points"
+    }
+  ]
+}

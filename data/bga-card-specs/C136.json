@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "card_id": "C136",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "牧場長",
+    "name_en": "Ranch Provost"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2953",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "rounds_remaining",
+          "params": {
+            "min": 3
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "On play: if 3+ rounds remaining, gain 2 wood"
+    },
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "rounds_remaining",
+          "params": {
+            "min": 6
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "On play: if 6+ rounds remaining, gain additional 1 wood (total 3)"
+    },
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "rounds_remaining",
+          "params": {
+            "min": 9
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 2,
+      "decision_owner": "none",
+      "notes": "On play: if 9+ rounds remaining, gain additional 1 wood (total 4)"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "source": "highest_animal_capacity",
+            "points": 3,
+            "tie_break": "shared"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_at_scoring",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 3,
+      "decision_owner": "none",
+      "notes": "At scoring, player(s) with highest animal capacity gain 3 bonus points"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact calculation of 'rounds remaining' at time of play",
+      "effects: whether wood gains are 2/3/4 for 3+/6+/9+ rounds remaining",
+      "effects: exact definition of 'animal capacity' (pastures + stables + other?)",
+      "effects: tie-breaking for highest capacity"
+    ],
+    "test_case_ids": [
+      "C136-normal",
+      "C136-early-play",
+      "C136-late-play",
+      "C136-scoring-highest-capacity"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "On play: gain wood based on rounds remaining (2/3/4 for 3+/6+/9+ rounds). At scoring: player(s) with highest animal capacity gain 3 bonus points. Not available in 2-player games."
+  }
+}

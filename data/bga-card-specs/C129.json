@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "card_id": "C129",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "二人目の配偶者",
+    "name_en": "Second Spouse"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2960",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "family_growth_without_room",
+            "cost": {
+              "food": 2
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "On play, pay 2 food for Family Growth without room"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "use_action_space_even_if_occupied",
+            "space": "urgent_child_wish",
+            "rounds": [12, 13]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Can use Urgent Child Wish space (rounds 12-13) even if occupied by another player's first person"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact name of 'Urgent Child Wish' action space in BGA",
+      "effects: whether 'first person' means first worker placed that round or first family member",
+      "effects: interaction with other space-sharing effects"
+    ],
+    "test_case_ids": [
+      "C129-normal",
+      "C129-urgent-child-wish"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "On play: pay 2 food for Family Growth without room. Can use Urgent Child Wish space (rounds 12-13) even if occupied by another player's first person. Not available in 2-player games."
+  }
+}

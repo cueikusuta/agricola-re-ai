@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "C133",
+  "cases": [
+    {
+      "id": "C133-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C133"
+      },
+      "expected": {
+        "resources_gained": {}
+      },
+      "notes": "No immediate effect on play"
+    },
+    {
+      "id": "C133-scoring-with-pairs",
+      "scope": "effect_only",
+      "setup": {
+        "resources": {
+          "stone": 3,
+          "wood": 2
+        }
+      },
+      "action": {
+        "play": "C133",
+        "then_score": true
+      },
+      "expected": {
+        "bonus_points": 2,
+        "stone_used_for_bonus": 2,
+        "wood_used_for_bonus": 2
+      },
+      "notes": "3 stone + 2 wood = 2 pairs = 2 bonus points; 1 stone remains for other scoring"
+    }
+  ]
+}
