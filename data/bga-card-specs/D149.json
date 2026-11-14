@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "card_id": "D149",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "臨時労働者",
+    "name_en": "Casual Worker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2772",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_other_player_action",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "name": "quarry"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When another player uses the Quarry (stone accumulation), may gain 1 food."
+    },
+    {
+      "trigger": "on_other_player_action",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "name": "quarry"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "owner",
+          "params": {
+            "cost_wood": 0,
+            "note": "Build 1 stable without paying wood cost"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "When another player uses the Quarry, may build 1 stable without paying wood cost. Choose either food OR stable, not both."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: action_space_name predicate needs formalization",
+      "effects: whether the two effects are mutually exclusive choices (food OR stable) or both can be taken",
+      "effects[1].steps[0].params: build_stable with cost_wood=0 needs formalization - normally stable costs wood",
+      "effects[0].decision_owner: owner chooses whether to take the benefit"
+    ],
+    "test_case_ids": [
+      "D149-other-player-quarry-choose-food",
+      "D149-other-player-quarry-choose-stable",
+      "D149-other-player-quarry-decline",
+      "D149-other-player-other-action"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When another player uses Quarry, may choose: gain 1 food OR build 1 stable without wood cost. Not eligible for 2-3 player games. Effect formalization needs resolution."
+  }
+}

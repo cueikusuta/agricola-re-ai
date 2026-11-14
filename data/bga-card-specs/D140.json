@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "card_id": "D140",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "大口たたき",
+    "name_en": "Loudmouth"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2781",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_take_from_accumulation",
+      "conditions": [
+        {
+          "predicate": "accumulation_resource_count_at_least",
+          "params": {
+            "resource_category": "building_material",
+            "count": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When taking 4 or more building materials (wood, clay, reed, stone) from an accumulation space, gain 1 food."
+    },
+    {
+      "trigger": "on_take_from_accumulation",
+      "conditions": [
+        {
+          "predicate": "accumulation_resource_count_at_least",
+          "params": {
+            "resource_category": "livestock",
+            "count": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "When taking 4 or more livestock (sheep, boar, cattle) from an accumulation space, gain 1 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: accumulation_resource_count_at_least predicate with resource_category needs formalization",
+      "effects[0].trigger: on_take_from_accumulation needs to be in vocabulary and distinguish from on_action_use",
+      "effects[0].steps: whether this triggers once per action or per resource type taken"
+    ],
+    "test_case_ids": [
+      "D140-take-4-wood",
+      "D140-take-4-sheep",
+      "D140-take-3-wood",
+      "D140-take-mixed"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When taking 4+ building materials OR 4+ livestock from an accumulation space, gain 1 food. Weak ban. Effect formalization needs resolution."
+  }
+}

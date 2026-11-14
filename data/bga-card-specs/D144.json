@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "card_id": "D144",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "水辺の労働者",
+    "name_en": "Water Worker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2777",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_action_use",
+      "conditions": [
+        {
+          "predicate": "action_space_name_in",
+          "params": {
+            "names": ["fishing", "reed_bank", "day_laborer"]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "reed",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When using Fishing, Reed Bank, or Day Laborer action spaces, gain 1 additional reed."
+    },
+    {
+      "trigger": "on_action_use",
+      "conditions": [
+        {
+          "predicate": "round_number",
+          "params": {
+            "number": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "reed",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "When using any action space revealed in Round 4, gain 1 reed."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: action_space_name_in predicate needs formalization",
+      "effects[1].conditions: round_number predicate needs formalization and how it interacts with 'newly revealed in round 4' action spaces",
+      "effects[1].trigger: whether this triggers on ANY action in round 4 or only on the newly revealed round 4 action spaces"
+    ],
+    "test_case_ids": [
+      "D144-fishing-gain-reed",
+      "D144-reed-bank-gain-reed",
+      "D144-day-laborer-gain-reed",
+      "D144-round4-action-gain-reed",
+      "D144-other-action-no-gain"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When using Fishing/Reed Bank/Day Laborer, gain 1 reed. Also when using any Round 4 action space, gain 1 reed. Effect formalization needs resolution."
+  }
+}

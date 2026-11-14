@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "card_id": "D147",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "罠づくり",
+    "name_en": "Trap Builder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2774",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_action_use",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "name": "day_laborer"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "board",
+          "params": {
+            "resources_by_round_offset": [
+              { "offset": 1, "good": "food", "amount": 1 },
+              { "offset": 2, "good": "food", "amount": 1 },
+              { "offset": 3, "good": "boar", "amount": 1 }
+            ],
+            "note": "Place 1 food on next round's action spaces, 1 food on round after, 1 boar on third round. At start of those rounds, gain the resource. Custom operation: delayed resource placement on future rounds."
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_use",
+      "duration": "delayed_3_rounds",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When using Day Laborer, place resources on the next 3 rounds' action spaces: Round+1: 1 food, Round+2: 1 food, Round+3: 1 boar. At the start of each of those rounds, the player gains that resource."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: on_action_use for Day Laborer",
+      "effects[0].steps[0].operation: place_resource_on_future_rounds is a custom operation needing formal definition - delayed resource placement on future round action spaces",
+      "effects[0].steps[0].params: resources_by_round_offset structure needs formalization",
+      "effects[0].duration: delayed_3_rounds needs vocabulary definition",
+      "effects[0].notes: whether the resources are placed on the Day Laborer space specifically or on all action spaces of those rounds"
+    ],
+    "test_case_ids": [
+      "D147-day-laborer-place-resources",
+      "D147-other-action-no-effect"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When using Day Laborer, place 1 food on next round, 1 food on round after, 1 boar on third round. At start of those rounds, gain the resource. Effect formalization needs resolution."
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "card_id": "D139",
+  "cases": [
+    {
+      "id": "D139-other-player-meeting",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "current_player": 2,
+        "players": [
+          { "food": 0 },
+          { "food": 0 }
+        ]
+      },
+      "action": {
+        "player_uses_action": {
+          "player": 2,
+          "action": "meeting_place"
+        }
+      },
+      "expected": {
+        "players": [
+          { "food": 1 },
+          { "food": 1 }
+        ]
+      },
+      "notes": "Player 2 uses Meeting Place. Before action resolves, both player 1 (Chairman owner) and player 2 gain 1 food."
+    },
+    {
+      "id": "D139-owner-meeting",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "current_player": 1,
+        "players": [
+          { "food": 0 }
+        ]
+      },
+      "action": {
+        "player_uses_action": {
+          "player": 1,
+          "action": "meeting_place"
+        }
+      },
+      "expected": {
+        "players": [
+          { "food": 1 }
+        ]
+      },
+      "notes": "Owner uses Meeting Place. Owner gains 1 food."
+    },
+    {
+      "id": "D139-other-action",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "current_player": 2,
+        "players": [
+          { "food": 0 },
+          { "food": 0 }
+        ]
+      },
+      "action": {
+        "player_uses_action": {
+          "player": 2,
+          "action": "day_laborer"
+        }
+      },
+      "expected": {
+        "players": [
+          { "food": 0 },
+          { "food": 0 }
+        ]
+      },
+      "notes": "Other player uses Day Laborer, not Meeting Place. No food gained."
+    }
+  ]
+}

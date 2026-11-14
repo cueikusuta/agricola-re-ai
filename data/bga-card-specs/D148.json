@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "card_id": "D148",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "屋内飼育の専門家",
+    "name_en": "Domestician Expert"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2773",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "modify_capacity",
+          "target": "board",
+          "params": {
+            "scope": "pasture_capacity_between_rooms",
+            "animal": "sheep",
+            "capacity_per_gap": 2,
+            "note": "Between each pair of orthogonally adjacent rooms, 2 sheep can be kept in the fence space between them."
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Passive effect: Between each pair of orthogonally adjacent rooms, the fence space between them can hold 2 sheep. This is in addition to normal pasture capacity."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].operation: modify_capacity with scope 'pasture_capacity_between_rooms' needs formalization - this is a novel capacity type",
+      "effects[0].steps[0].params: capacity_per_gap and adjacency definition (orthogonal rooms) need formalization",
+      "effects[0].notes: whether this stacks with normal pastures and whether the fence space is a new zone type"
+    ],
+    "test_case_ids": [
+      "D148-two-adjacent-rooms-2-sheep",
+      "D148-three-rooms-linear-4-sheep",
+      "D148-four-rooms-square-8-sheep",
+      "D148-no-adjacent-rooms"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: Between each pair of orthogonally adjacent rooms, the fence space can hold 2 sheep. 3 rooms linear = 4 sheep, 4 rooms square = 8 sheep. Not eligible for 2-3 player games. Effect formalization needs resolution."
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "card_id": "D146",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "荷物運搬人",
+    "name_en": "Porter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2775",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_take_from_accumulation",
+      "conditions": [
+        {
+          "predicate": "accumulation_resource_count_at_least",
+          "params": {
+            "resource_category": "building_material",
+            "count": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "same_resource_taken",
+            "amount": 1,
+            "note": "Gain 1 of the same building material that was taken (wood/clay/reed/stone)"
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When taking 4 or more of the same building material (wood, clay, reed, stone) from an accumulation space, gain 1 additional of that material and 1 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: accumulation_resource_count_at_least with resource_category needs formalization",
+      "effects[0].steps[0].params: same_resource_taken reference needs formalization - gain 1 of the specific resource type taken",
+      "effects[0].trigger: on_take_from_accumulation needs to be in vocabulary"
+    ],
+    "test_case_ids": [
+      "D146-take-4-wood-gain-wood-food",
+      "D146-take-4-clay-gain-clay-food",
+      "D146-take-3-wood-no-gain",
+      "D146-take-mixed-no-gain"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When taking 4+ of same building material from accumulation, gain 1 more of that material + 1 food. Effect formalization needs resolution."
+  }
+}

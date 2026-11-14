@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "card_id": "D142",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "じゃがいも植え",
+    "name_en": "Potato Planter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2779",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "end_of_work_phase",
+      "conditions": [
+        {
+          "predicate": "occupies_accumulation_space",
+          "params": {
+            "space_name": "clay_pit"
+          }
+        },
+        {
+          "predicate": "accumulation_space_unoccupied",
+          "params": {
+            "space_name": "reed_bank"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "vegetable",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_round",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At end of work phase, if you occupy Clay Pit and Reed Bank is unoccupied, gain 1 vegetable."
+    },
+    {
+      "trigger": "end_of_work_phase",
+      "conditions": [
+        {
+          "predicate": "occupies_accumulation_space",
+          "params": {
+            "space_name": "reed_bank"
+          }
+        },
+        {
+          "predicate": "accumulation_space_unoccupied",
+          "params": {
+            "space_name": "clay_pit"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "vegetable",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_round",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "At end of work phase, if you occupy Reed Bank and Clay Pit is unoccupied, gain 1 vegetable."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: end_of_work_phase needs to be in vocabulary and precisely timed",
+      "effects[0].conditions: occupies_accumulation_space and accumulation_space_unoccupied predicates need formalization",
+      "effects: whether both conditions can trigger in the same round (occupying both is impossible, so mutually exclusive)"
+    ],
+    "test_case_ids": [
+      "D142-clay-pit-occupied-reed-free",
+      "D142-reed-bank-occupied-clay-free",
+      "D142-both-occupied",
+      "D142-neither-occupied"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: At end of work phase, if you occupy Clay Pit and Reed Bank is free (or vice versa), gain 1 vegetable. Effect formalization needs resolution."
+  }
+}
