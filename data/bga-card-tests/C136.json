@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "card_id": "C136",
+  "cases": [
+    {
+      "id": "C136-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 10
+      },
+      "action": {
+        "play": "C136"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 2
+        }
+      },
+      "notes": "Round 10: 4 rounds remaining (10-13), 3+ rounds = 2 wood, 6+ not met = total 2 wood"
+    },
+    {
+      "id": "C136-early-play",
+      "scope": "effect_only",
+      "setup": {
+        "round": 2
+      },
+      "action": {
+        "play": "C136"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 4
+        }
+      },
+      "notes": "Round 2: 12 rounds remaining, 9+ rounds = 4 wood"
+    },
+    {
+      "id": "C136-late-play",
+      "scope": "effect_only",
+      "setup": {
+        "round": 12
+      },
+      "action": {
+        "play": "C136"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 2
+        }
+      },
+      "notes": "Round 12: 2 rounds remaining, 3+ not met = 0 wood"
+    },
+    {
+      "id": "C136-scoring-highest-capacity",
+      "scope": "effect_only",
+      "setup": {
+        "animal_capacity": {
+          "player1": 8,
+          "player2": 10,
+          "player3": 10,
+          "player4": 5
+        }
+      },
+      "action": {
+        "play": "C136",
+        "then_score": true
+      },
+      "expected": {
+        "bonus_points": {
+          "player1": 0,
+          "player2": 3,
+          "player3": 3,
+          "player4": 0
+        }
+      },
+      "notes": "Players 2 and 3 tie for highest capacity (10) -> each gets 3 bonus points"
+    }
+  ]
+}

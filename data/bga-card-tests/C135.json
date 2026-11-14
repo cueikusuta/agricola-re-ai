@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "card_id": "C135",
+  "cases": [
+    {
+      "id": "C135-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 10
+      },
+      "action": {
+        "play": "C135"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 3
+        }
+      },
+      "notes": "Round 10: 4 rounds remaining (10-13), 3+ rounds = 2 wood, 1+ rounds = 1 wood, total 3 wood"
+    },
+    {
+      "id": "C135-early-play",
+      "scope": "effect_only",
+      "setup": {
+        "round": 2
+      },
+      "action": {
+        "play": "C135"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 4
+        }
+      },
+      "notes": "Round 2: 12 rounds remaining, 9+ rounds = 4 wood"
+    },
+    {
+      "id": "C135-late-play",
+      "scope": "effect_only",
+      "setup": {
+        "round": 13
+      },
+      "action": {
+        "play": "C135"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 1
+        }
+      },
+      "notes": "Round 13: 1 round remaining, 1+ rounds = 1 wood"
+    },
+    {
+      "id": "C135-scoring-no-negatives",
+      "scope": "effect_only",
+      "setup": {
+        "player_scores": {
+          "player1": {
+            "categories": {
+              "fields": 2,
+              "pastures": 1,
+              "grain": 3,
+              "vegetables": 1,
+              "sheep": 1,
+              "boar": 0,
+              "cattle": 1,
+              "unused_spaces": 0,
+              "fences": 2,
+              "rooms": 3,
+              "family": 3,
+              "cards": 5
+            }
+          },
+          "player2": {
+            "categories": {
+              "fields": -1,
+              "pastures": 1,
+              "grain": 2,
+              "vegetables": 1,
+              "sheep": 1,
+              "boar": 0,
+              "cattle": 0,
+              "unused_spaces": -1,
+              "fences": 1,
+              "rooms": 2,
+              "family": 2,
+              "cards": 3
+            }
+          }
+        }
+      },
+      "action": {
+        "play": "C135",
+        "then_score": true
+      },
+      "expected": {
+        "bonus_points": {
+          "player1": 1,
+          "player2": 0
+        }
+      },
+      "notes": "Player 1 has no negative categories -> 1 bonus point. Player 2 has negative fields and unused spaces -> 0 bonus points"
+    }
+  ]
+}

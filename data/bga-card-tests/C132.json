@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "C132",
+  "cases": [
+    {
+      "id": "C132-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C132"
+      },
+      "expected": {
+        "resources_gained": {}
+      },
+      "notes": "No immediate effect on play"
+    },
+    {
+      "id": "C132-renovation",
+      "scope": "effect_only",
+      "setup": {
+        "house_type": "clay",
+        "rooms": 3
+      },
+      "action": {
+        "play": "C132",
+        "then_renovate_to_stone": true
+      },
+      "expected": {
+        "wood_placed_on_rooms": 3,
+        "wood_source": "supply"
+      },
+      "notes": "Renovating 3-room clay to stone: place 1 wood from supply on each room"
+    },
+    {
+      "id": "C132-scoring",
+      "scope": "effect_only",
+      "setup": {
+        "house_type": "stone",
+        "rooms": 4
+      },
+      "action": {
+        "play": "C132",
+        "then_score": true
+      },
+      "expected": {
+        "bonus_points": 4
+      },
+      "notes": "4-room stone house: 4 bonus points at scoring"
+    }
+  ]
+}

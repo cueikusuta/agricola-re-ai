@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "card_id": "C132",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "こけら葺き職人",
+    "name_en": "Timber Shingle Maker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2957",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "renovation_to_stone_house",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_wood_from_supply_on_rooms",
+            "max_per_room": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When renovating to stone house, may place up to 1 wood from supply on each room"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "source": "stone_house_rooms",
+            "points_per_room": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_at_scoring",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "At scoring, gain 1 bonus point per stone house room"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: whether wood placement is from personal supply or common supply",
+      "effects: whether wood on rooms counts for other scoring effects",
+      "effects: exact timing of renovation trigger"
+    ],
+    "test_case_ids": [
+      "C132-normal",
+      "C132-renovation",
+      "C132-scoring"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "When renovating to stone house, may place up to 1 wood from supply on each room. At scoring, gain 1 bonus point per stone house room. Not available in 2-player games."
+  }
+}

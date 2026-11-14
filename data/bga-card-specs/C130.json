@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "card_id": "C130",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "郊外指導者",
+    "name_en": "Outskirts Director"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2959",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "action_space_used",
+          "params": {
+            "space": "small_forest"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time Small Forest accumulation space is used, gain 1 clay from supply"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "action_space_used",
+          "params": {
+            "space": "hollow"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Each time Hollow accumulation space is used, gain 1 wood from supply"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact BGA names for 'Small Forest' and 'Hollow' accumulation spaces",
+      "effects: whether gain is from common supply or bank",
+      "effects: whether this triggers on opponent's use or only own use"
+    ],
+    "test_case_ids": [
+      "C130-normal",
+      "C130-small-forest",
+      "C130-hollow"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Each time you use Small Forest, gain 1 clay. Each time you use Hollow, gain 1 wood. Gains from common supply. Not available in 2-player games."
+  }
+}

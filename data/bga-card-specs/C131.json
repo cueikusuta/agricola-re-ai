@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "card_id": "C131",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "個人教師",
+    "name_en": "Private Teacher"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2958",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "action_space_occupied",
+          "params": {
+            "space": "lesson"
+          }
+        },
+        {
+          "predicate": "action_space_used",
+          "params": {
+            "space": "grain_seeds"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "play_occupation_from_hand_free",
+            "count": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When any Lesson space is occupied, using Grain Seeds lets you play 1 occupation from hand for free"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact BGA name for 'Lesson' action space(s)",
+      "effects: whether 'occupied' means any player or specific player",
+      "effects: whether free occupation play ignores all costs or just occupation cost",
+      "effects: timing - does occupation play happen immediately after Grain Seeds?"
+    ],
+    "test_case_ids": [
+      "C131-normal",
+      "C131-grain-seeds-with-lesson-occupied"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "When a Lesson space is already occupied, each time you use Grain Seeds, you may play 1 occupation from hand without paying its cost. Not available in 2-player games."
+  }
+}

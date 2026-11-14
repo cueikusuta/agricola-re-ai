@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "C130",
+  "cases": [
+    {
+      "id": "C130-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C130"
+      },
+      "expected": {
+        "resources_gained": {}
+      },
+      "notes": "No immediate effect on play"
+    },
+    {
+      "id": "C130-small-forest",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C130",
+        "then_use_action": "small_forest"
+      },
+      "expected": {
+        "resources_gained": {
+          "clay": 1
+        }
+      },
+      "notes": "Using Small Forest grants 1 clay from supply"
+    },
+    {
+      "id": "C130-hollow",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C130",
+        "then_use_action": "hollow"
+      },
+      "expected": {
+        "resources_gained": {
+          "wood": 1
+        }
+      },
+      "notes": "Using Hollow grants 1 wood from supply"
+    }
+  ]
+}
