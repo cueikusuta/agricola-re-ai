@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "D159",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "葦売り",
+    "name_en": "Reed Seller"
+  },
+  "bga": {
+    "listed": "no",
+    "playable": "no",
+    "ban_status": "none",
+    "base_2016": "unknown",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/unimplemented/",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": null
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects",
+      "bga.base_2016",
+      "play.printed_points"
+    ],
+    "test_case_ids": [
+      "D159-reed-to-food",
+      "D159-other-player-block"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Unimplemented card per wiki. Reed -> 3 food exchange, blockable by other players paying 2 food. BGA listed=no, playable=no, eligibility 2=no, 3=no, 4=yes, ban_status=none per ledger. Printed points unknown per ledger."
+  }
+}

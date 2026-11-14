@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "card_id": "D164",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "ペット育成人",
+    "name_en": "Pet Grower"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2757",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects"
+    ],
+    "test_case_ids": [
+      "D164-livestock-space-no-animals"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Trigger on livestock accumulation space use. Condition: no animals in home after. Gain 1 sheep. Home animal check timing unresolved. Eligibility per ledger: 2=no, 3=no, 4=yes."
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "card_id": "D160",
+  "cases": [
+    {
+      "id": "D160-other-player-family-growth",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {
+        "verify_effect": "D160-other-player-family-growth"
+      },
+      "expected": {
+        "effect_verified": true
+      },
+      "notes": "Test case for D160: D160-other-player-family-growth"
+    }
+  ]
+}
