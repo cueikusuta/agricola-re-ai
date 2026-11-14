@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "C158",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "森林活動家",
+    "name_en": "Forest Campaigner"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2931",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effect: あなたが人物を置く前、累積スペースに木材が合計8以上ある場合、そのたびに食料1を得る。 - full effect semantics not yet encoded in established vocabulary"
+    ],
+    "test_case_ids": [
+      "C158-normal"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "あなたが人物を置く前、累積スペースに木材が合計8以上ある場合、そのたびに食料1を得る。"
+  }
+}
