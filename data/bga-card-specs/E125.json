@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "card_id": "E125",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "遅れてきた旅人",
+    "name_en": "Delayed Wayfarer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2628",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "any_building_resource",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    },
+    {
+      "trigger": "round_end",
+      "conditions": [
+        {
+          "predicate": "all_persons_placed",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action_type": "place_person",
+            "from_stock": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_round",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "After all persons placed this round, may place 1 person from stock"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: which building resource can be chosen (wood/brick/reed/stone)",
+      "effects: exact timing of extra person placement - 'after all persons placed this round'"
+    ],
+    "test_case_ids": [
+      "E125-normal",
+      "E125-extra-person"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "On play: gain 1 building resource of choice. At round end after all persons placed: may place 1 person from stock. Occupations stay in play area."
+  }
+}

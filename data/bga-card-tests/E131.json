@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "card_id": "E131",
+  "cases": [
+    {
+      "id": "E131-normal",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "occupations_in_hand": 1,
+        "food": 1,
+        "is_last_person_of_round": true
+      },
+      "action": {
+        "use_action_space": "小劇場",
+        "play_occupation": true,
+        "pay_food": 1
+      },
+      "expected": {
+        "occupation_played": true,
+        "food_delta": -1
+      },
+      "notes": "When placing last person of round on Small Theater, may pay 1 food to play 1 occupation"
+    }
+  ]
+}

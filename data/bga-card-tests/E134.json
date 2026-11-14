@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "E134",
+  "cases": [
+    {
+      "id": "E134-harvest",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "card_goods": []
+      },
+      "action": {
+        "harvest": {},
+        "place_on_card": "wheat"
+      },
+      "expected": {
+        "card_goods": ["wheat"]
+      },
+      "notes": "Each harvest, may place 1 harvested crop or animal offspring on card"
+    },
+    {
+      "id": "E134-scoring",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "card_goods": [
+          "wheat",
+          "vegetable",
+          "sheep"
+        ]
+      },
+      "action": {
+        "end_game_scoring": {},
+        "convert_distinct": 3
+      },
+      "expected": {
+        "points_delta": 7
+      },
+      "notes": "At scoring, 3 distinct goods on card = 7 bonus points"
+    }
+  ]
+}

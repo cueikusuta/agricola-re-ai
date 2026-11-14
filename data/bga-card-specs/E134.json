@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "card_id": "E134",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "総合農家",
+    "name_en": "Omnifarmer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2619",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_harvested_on_card",
+            "max_per_harvest": 1,
+            "allowed_types": [
+              "crop",
+              "animal_offspring"
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    },
+    {
+      "trigger": "end_game_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "conversion": {
+              "distinct_types_on_card": [2, 3, 4, 5],
+              "points": [3, 5, 7, 9]
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Once per game at scoring: convert 2/3/4/5 distinct goods on card to 3/5/7/9 bonus points"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: whether 'distinct types' includes both crops and animals mixed",
+      "effects: whether the conversion can be done once per game at any time or only at scoring",
+      "effects: exact list of goods that can be placed on card (crops: wheat/veg, animals: sheep/boar/cattle offspring)"
+    ],
+    "test_case_ids": [
+      "E134-harvest",
+      "E134-scoring"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Each harvest: may place 1 harvested crop or animal offspring on card. Once at scoring: convert 2/3/4/5 distinct goods on card to 3/5/7/9 points. Occupations stay in play area."
+  }
+}

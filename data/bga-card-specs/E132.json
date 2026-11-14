@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "card_id": "E132",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "野菜愛好家",
+    "name_en": "Veggie Lover"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2621",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "input": {
+              "wheat": 1,
+              "vegetable": 1
+            },
+            "output": {
+              "food": 6
+            },
+            "max_conversions": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    },
+    {
+      "trigger": "end_game_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "conversion": {
+              "input": {
+                "wheat": 1,
+                "vegetable": 1
+              },
+              "output_points": 2,
+              "max_conversions": 3
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "At scoring: convert 1/2/3 wheat+vegetable pairs to 2/4/6 bonus points (1 pair = 2pts, 2 pairs = 4pts, 3 pairs = 6pts)"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact scoring conversion - wiki says '1/2/3 [小麦+野菜]=1x=>2/4/6点' meaning 1 pair=2pts, 2 pairs=4pts, 3 pairs=6pts (not cumulative)",
+      "effects: whether harvest conversion and scoring conversion use same pairs or separate"
+    ],
+    "test_case_ids": [
+      "E132-harvest",
+      "E132-scoring"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Harvest: once, convert 1 wheat+1 vegetable to 6 food. Scoring: convert up to 3 wheat+veg pairs to 2/4/6 points. Occupations stay in play area."
+  }
+}
