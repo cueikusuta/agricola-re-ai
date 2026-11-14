@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "card_id": "D051",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "アーチ道",
+    "name_en": "Archway"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2870",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "custom",
+        "params": {
+          "note": "職業なし"
+        },
+        "negate": false
+      }
+    ],
+    "printed_points": 4
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "full action space effect",
+      "whether it stays as permanent action space"
+    ],
+    "test_case_ids": [
+      "D051-cost-prereq"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "This card is an action space usable by all players. The player who uses this space immediately gains 1 food. During return home phase..."
+  }
+}

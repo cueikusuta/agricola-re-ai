@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "card_id": "D050",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "対外援助",
+    "name_en": "Foreign Aid"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2871",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "custom",
+        "params": {
+          "note": "ラウンド11以前に出す"
+        },
+        "negate": false
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "exact restriction on rounds 12-14",
+      "whether it blocks all actions or specific ones"
+    ],
+    "test_case_ids": [
+      "D050-cost-prereq"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "When you play this card, immediately gain 6 food. However, you cannot use round 12-14 action spaces until game end."
+  }
+}

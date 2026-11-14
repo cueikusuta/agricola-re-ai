@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "card_id": "D064",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "焼き菓子教室",
+    "name_en": "Baking Course"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2857",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "custom",
+        "params": {
+          "note": "職業1"
+        },
+        "negate": false
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "whether it works in rounds without harvest only",
+      "exact definition of 'round without harvest'"
+    ],
+    "test_case_ids": [
+      "D064-cost-prereq"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "At the end of a round without harvest, you may take a 'Bake bread' action."
+  }
+}

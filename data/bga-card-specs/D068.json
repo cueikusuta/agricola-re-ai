@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "card_id": "D068",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "小さなかご",
+    "name_en": "Small Basket"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2853",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "custom",
+        "params": {
+          "note": "職業2"
+        },
+        "negate": false
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "4+ player game additional effect",
+      "whether reed payment is optional each use"
+    ],
+    "test_case_ids": [
+      "D068-cost-prereq"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Each time you use the 'Reed Bed' accumulation space, you may pay 1 reed to gain 1 vegetable. In 4+ player games, the paid reed..."
+  }
+}

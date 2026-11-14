@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "card_id": "D045",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "羊の井戸",
+    "name_en": "Sheep Well"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2876",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "stone",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 2
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "which future rounds",
+      "whether placement is immediate on play"
+    ],
+    "test_case_ids": [
+      "D045-cost-prereq"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Place 1 food on future round spaces up to the number of sheep you own. At the start of those rounds, gain that food."
+  }
+}
