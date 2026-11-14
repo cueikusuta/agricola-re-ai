@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "card_id": "E161",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "パン職人の長老",
+    "name_en": "Elder Baker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2592",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "board",
+          "params": {
+            "kind": "grant_private_action_space",
+            "space": "elder_baker",
+            "owner_only": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "This card becomes an action space usable by the owner only."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "elder_baker"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 3
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Use the card's action space: gain 3 grain."
+    },
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "allow_major_via_minor",
+            "improvements": [
+              "stone_oven"
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 2,
+      "decision_owner": "none",
+      "notes": "The Stone Oven major improvement may be built even on a Minor Improvement action."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0 kind 'grant_private_action_space' has no precedent (D023 owner-only action space is needs_resolution; B042 covers a public space only)",
+      "effects.0.space id 'elder_baker': the card becomes a new action space whose identity and physical placement need definition"
+    ],
+    "test_case_ids": [
+      "E161-use",
+      "E161-stone-oven-via-minor",
+      "E161-other-major"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Owner-only action space granting 3 grain on use; the Stone Oven major improvement can be built even on a Minor Improvement action. Status: needs_resolution due to the private action space. Third-party BGA wiki cross-check only; not official Lookout verification."
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "E156",
+  "cases": [
+    {
+      "id": "E156-clay-improvement",
+      "scope": "effect_only",
+      "setup": {
+        "acting_player": "other",
+        "improvement_cost": {
+          "clay": 2
+        }
+      },
+      "action": {
+        "play_improvement": true
+      },
+      "expected": {
+        "food_delta": 1,
+        "clay_delta": 1
+      }
+    },
+    {
+      "id": "E156-no-clay",
+      "scope": "effect_only",
+      "setup": {
+        "acting_player": "other",
+        "improvement_cost": {
+          "wood": 2
+        }
+      },
+      "action": {
+        "play_improvement": true
+      },
+      "expected": {
+        "food_delta": 0,
+        "clay_delta": 0
+      }
+    },
+    {
+      "id": "E156-owner",
+      "scope": "effect_only",
+      "setup": {
+        "acting_player": "owner",
+        "improvement_cost": {
+          "clay": 2
+        }
+      },
+      "action": {
+        "play_improvement": true
+      },
+      "expected": {
+        "food_delta": 0,
+        "clay_delta": 0
+      },
+      "notes": "Only another player's improvement triggers the owner's gain"
+    }
+  ]
+}

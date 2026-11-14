@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "E163",
+  "cases": [
+    {
+      "id": "E163-after",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_after_this_card": 1
+      },
+      "action": {
+        "play_occupation": true,
+        "choose_resource": "stone"
+      },
+      "expected": {
+        "resource_delta": {
+          "stone": 1
+        }
+      }
+    },
+    {
+      "id": "E163-before",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_before_this_card": 1
+      },
+      "action": {
+        "play_occupation": false
+      },
+      "expected": {
+        "resource_delta": {}
+      },
+      "notes": "Occupations played before this card do not trigger"
+    }
+  ]
+}

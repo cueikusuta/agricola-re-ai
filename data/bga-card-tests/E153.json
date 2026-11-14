@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "card_id": "E153",
+  "cases": [
+    {
+      "id": "E153-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 2,
+        "food": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "use_card": true
+      },
+      "expected": {
+        "stone_delta": -1,
+        "food_delta": 1,
+        "bonus_points_delta": 1
+      }
+    },
+    {
+      "id": "E153-declined",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 2
+      },
+      "action": {
+        "run_harvest": true,
+        "use_card": false
+      },
+      "expected": {
+        "stone_delta": 0,
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "E153-no-stone",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 0
+      },
+      "action": {
+        "run_harvest": true,
+        "use_card": true
+      },
+      "expected": {
+        "exchange_allowed": false,
+        "stone_delta": 0
+      }
+    }
+  ]
+}

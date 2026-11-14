@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "card_id": "E155",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "空想家",
+    "name_en": "Visionary"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2598",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "round_in",
+          "params": {
+            "values": [
+              1,
+              2,
+              3,
+              4
+            ]
+          },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "stone",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "vegetable",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wild_boar",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "If played in rounds 1-4: gain 1 stone, 1 vegetable and 2 wild boar (A126 round_in [1,2,3,4] precedent)."
+    },
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "forbid_family_growth",
+            "until_round": 11,
+            "unless": "all_other_players_grew_family"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "The owner cannot grow the family until round 11 unless every other player already has."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.1 kind 'forbid_family_growth': no established encoding prohibits the owner's family growth (nearest: forbid_renovation / forbid_house_animals)",
+      "effects.1 escape condition: '他のプレイヤー全員が家族を増やさない限り' (unless every other player has already grown their family) needs a formal predicate (nearest: all_other_players_more_family, E014; not identical)",
+      "effects.1 boundary: 'ラウンド11まで' (until round 11) - whether round 11 itself is included is not stated"
+    ],
+    "test_case_ids": [
+      "E155-round4",
+      "E155-round5",
+      "E155-restriction",
+      "E155-escape"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Played in rounds 1-4: 1 stone, 1 vegetable, 2 wild boar. Until round 11 the owner cannot grow the family unless every other player already did. Status: needs_resolution due to the prohibition kind and escape condition. Third-party BGA wiki cross-check only; not official Lookout verification."
+  }
+}

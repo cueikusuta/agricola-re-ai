@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "card_id": "E162",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "起業家",
+    "name_en": "Entrepreneur"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2591",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "round_start",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "place_food_on_card",
+                "amount": 1,
+                "source": "owner_supply"
+              },
+              {
+                "kind": "discard_food_from_card",
+                "amount": 1
+              }
+            ]
+          },
+          "notes": "Move 1 food from the owner's supply onto this card, or discard 1 food from it."
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "good": "wood",
+                "amount": 1
+              },
+              {
+                "good": "clay",
+                "amount": 1
+              },
+              {
+                "good": "reed",
+                "amount": 1
+              },
+              {
+                "good": "stone",
+                "amount": 1
+              }
+            ],
+            "require_not_owned": true,
+            "choose": 1
+          },
+          "notes": "Only if one of the previous options was taken: gain 1 building resource of a type the owner currently holds none of."
+        }
+      ],
+      "optional": true,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "At the start of each round: may move 1 food onto this card or discard 1 food from it; doing either grants 1 building resource of a type not currently held."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.steps[1]: 'あなたが現在持っていない種類の建築資材1つ' needs a predicate for building-resource types the owner currently holds none of (no precedent)",
+      "effects.0.steps[0]: whether the food moved onto the card comes from the owner's supply or the general supply is not stated by the source"
+    ],
+    "test_case_ids": [
+      "E162-move",
+      "E162-discard",
+      "E162-none",
+      "E162-all-types"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Round start: move 1 food onto the card or discard 1 food from it; doing either grants 1 building resource of a type not currently held. Status: needs_resolution due to the missing-type selection and the food source ambiguity. Third-party BGA wiki cross-check only; not official Lookout verification."
+  }
+}

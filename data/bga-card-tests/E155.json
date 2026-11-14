@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "card_id": "E155",
+  "cases": [
+    {
+      "id": "E155-round4",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4
+      },
+      "action": {
+        "play": "E155"
+      },
+      "expected": {
+        "stone_delta": 1,
+        "vegetable_delta": 1,
+        "wild_boar_delta": 2
+      }
+    },
+    {
+      "id": "E155-round5",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "E155"
+      },
+      "expected": {
+        "stone_delta": 0,
+        "vegetable_delta": 0,
+        "wild_boar_delta": 0
+      }
+    },
+    {
+      "id": "E155-restriction",
+      "scope": "effect_only",
+      "setup": {
+        "round": 6,
+        "other_players_grew_family": false
+      },
+      "action": {
+        "family_growth": true
+      },
+      "expected": {
+        "family_growth_allowed": false
+      }
+    },
+    {
+      "id": "E155-escape",
+      "scope": "effect_only",
+      "setup": {
+        "round": 6,
+        "other_players_grew_family": true
+      },
+      "action": {
+        "family_growth": true
+      },
+      "expected": {
+        "family_growth_allowed": true
+      }
+    }
+  ]
+}

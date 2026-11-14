@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "card_id": "E158",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "石材保管人",
+    "name_en": "Stone Custodian"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2595",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_work_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "custom",
+              "args": [
+                "count",
+                "stone_accumulation_spaces_with_stone"
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At the end of each work phase: gain 1 food per stone accumulation space that currently holds stone."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.amount: count source 'stone_accumulation_spaces_with_stone' has no precedent (nearest custom sources: clay_on_other_accumulation, A140); the number of stone accumulation spaces depends on player count (2p: 1, 3-4p: 2) and must come from the board state"
+    ],
+    "test_case_ids": [
+      "E158-one-space",
+      "E158-two-spaces",
+      "E158-none"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "End of each work phase: 1 food per stone accumulation space holding stone. Status: needs_resolution due to the new count source. Third-party BGA wiki cross-check only; not official Lookout verification."
+  }
+}

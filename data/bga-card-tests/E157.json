@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "E157",
+  "cases": [
+    {
+      "id": "E157-first",
+      "scope": "effect_only",
+      "setup": {
+        "own_occupations_before": 0,
+        "occupations_in_play_by_all": 3
+      },
+      "action": {
+        "play": "E157"
+      },
+      "expected": {
+        "food_delta": 3
+      }
+    },
+    {
+      "id": "E157-cap",
+      "scope": "effect_only",
+      "setup": {
+        "own_occupations_before": 0,
+        "occupations_in_play_by_all": 9
+      },
+      "action": {
+        "play": "E157"
+      },
+      "expected": {
+        "food_delta": 7
+      }
+    },
+    {
+      "id": "E157-not-first",
+      "scope": "effect_only",
+      "setup": {
+        "own_occupations_before": 1,
+        "occupations_in_play_by_all": 4
+      },
+      "action": {
+        "play": "E157"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}

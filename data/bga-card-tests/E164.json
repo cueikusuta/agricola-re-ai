@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "E164",
+  "cases": [
+    {
+      "id": "E164-one",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "plow": 1
+      },
+      "expected": {
+        "sheep_delta": 1
+      }
+    },
+    {
+      "id": "E164-three",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "plow": 3
+      },
+      "expected": {
+        "sheep_delta": 3
+      }
+    },
+    {
+      "id": "E164-none",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "plow": 0
+      },
+      "expected": {
+        "sheep_delta": 0
+      }
+    }
+  ]
+}

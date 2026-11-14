@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "E162",
+  "cases": [
+    {
+      "id": "E162-move",
+      "scope": "effect_only",
+      "setup": {
+        "food": 1,
+        "food_on_card": 0,
+        "owned_resource_types": [
+          "wood"
+        ]
+      },
+      "action": {
+        "use_card": true,
+        "move_food_to_card": true,
+        "choose_resource": "clay"
+      },
+      "expected": {
+        "food_delta": -1,
+        "food_on_card": 1,
+        "clay_delta": 1
+      }
+    },
+    {
+      "id": "E162-discard",
+      "scope": "effect_only",
+      "setup": {
+        "food_on_card": 1,
+        "owned_resource_types": [
+          "wood",
+          "clay"
+        ]
+      },
+      "action": {
+        "use_card": true,
+        "discard_food_from_card": true,
+        "choose_resource": "reed"
+      },
+      "expected": {
+        "food_on_card": 0,
+        "reed_delta": 1
+      }
+    },
+    {
+      "id": "E162-none",
+      "scope": "effect_only",
+      "setup": {
+        "food": 1,
+        "food_on_card": 0
+      },
+      "action": {
+        "use_card": false
+      },
+      "expected": {
+        "food_delta": 0,
+        "food_on_card": 0,
+        "resources_gained": 0
+      }
+    },
+    {
+      "id": "E162-all-types",
+      "scope": "effect_only",
+      "setup": {
+        "owned_resource_types": [
+          "wood",
+          "clay",
+          "reed",
+          "stone"
+        ],
+        "food": 1,
+        "food_on_card": 0
+      },
+      "action": {
+        "use_card": true,
+        "move_food_to_card": true
+      },
+      "expected": {
+        "resources_gained": 0
+      },
+      "notes": "No building-resource type is missing, so nothing is gained"
+    }
+  ]
+}
