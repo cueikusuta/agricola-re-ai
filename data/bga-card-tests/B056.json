@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "B056",
+  "cases": [
+    {
+      "id": "B056-prereq-ok",
+      "scope": "legal_play",
+      "setup": {
+        "worker_on_fishing": true
+      },
+      "action": {
+        "play": "B056"
+      },
+      "expected": {
+        "play_allowed": true
+      }
+    },
+    {
+      "id": "B056-prereq-fail",
+      "scope": "legal_play",
+      "setup": {
+        "worker_on_fishing": false
+      },
+      "action": {
+        "play": "B056"
+      },
+      "expected": {
+        "play_allowed": false,
+        "error": "prerequisite_not_met"
+      }
+    }
+  ]
+}

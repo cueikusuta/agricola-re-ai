@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "B051",
+  "cases": [
+    {
+      "id": "B051-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wild_boar": 2
+      },
+      "action": {
+        "use_space": "clay_pit"
+      },
+      "expected": {
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "B051-zero",
+      "scope": "effect_only",
+      "setup": {
+        "wild_boar": 0
+      },
+      "action": {
+        "use_space": "clay_pit"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "B051-round-prereq",
+      "scope": "legal_play",
+      "setup": {
+        "round": 7
+      },
+      "action": {
+        "play": "B051"
+      },
+      "expected": {
+        "play_allowed": true
+      }
+    },
+    {
+      "id": "B051-too-early",
+      "scope": "legal_play",
+      "setup": {
+        "round": 6
+      },
+      "action": {
+        "play": "B051"
+      },
+      "expected": {
+        "play_allowed": false,
+        "error": "prerequisite_not_met"
+      }
+    }
+  ]
+}

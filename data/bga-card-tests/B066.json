@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "card_id": "B066",
+  "cases": [
+    {
+      "id": "B066-early",
+      "scope": "effect_only",
+      "setup": {
+        "round": 2
+      },
+      "action": {
+        "play": "B066"
+      },
+      "expected": {
+        "marked_rounds": [
+          5,
+          8,
+          11,
+          14
+        ]
+      }
+    },
+    {
+      "id": "B066-mid",
+      "scope": "effect_only",
+      "setup": {
+        "round": 9
+      },
+      "action": {
+        "play": "B066"
+      },
+      "expected": {
+        "marked_rounds": [
+          11,
+          14
+        ]
+      }
+    },
+    {
+      "id": "B066-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 12
+      },
+      "action": {
+        "play": "B066"
+      },
+      "expected": {
+        "marked_rounds": [
+          14
+        ]
+      }
+    }
+  ]
+}

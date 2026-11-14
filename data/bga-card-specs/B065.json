@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "card_id": "B065",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "小麦貯蔵庫",
+    "name_en": "Grain Depot"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3192",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": null,
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": "2 木/2 レンガ/2 石"
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "custom",
+          "params": {
+            "kind": "paid_good_in",
+            "goods": [
+              "wood",
+              "clay",
+              "stone"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "grain",
+            "amount": 1,
+            "rounds": {
+              "op": "table",
+              "args": [
+                "paid_material",
+                {
+                  "wood": 2,
+                  "clay": 3,
+                  "stone": 4
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "If you paid wood/clay/stone for this card, place 1 grain on each of the next 2/3/4 round spaces (wood=2, clay=3, stone=4). The mapping follows the enumeration order in the card text."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: the wiki shows only the alternative cost (2 wood / 2 clay / 2 stone); the base resource cost is not stated",
+      "effects.0.rounds: the 2/3/4 round mapping to wood/clay/stone follows the card text enumeration order, but this is an interpretation; the BGA wiki does not explicitly state the mapping"
+    ],
+    "test_case_ids": [
+      "B065-wood",
+      "B065-clay",
+      "B065-stone"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost: choose 2 wood OR 2 clay OR 2 stone. Place 1 grain on next 2/3/4 round spaces depending on material paid (wood=2, clay=3, stone=4). bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
+  }
+}

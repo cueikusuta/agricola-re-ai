@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "B064",
+  "cases": [
+    {
+      "id": "B064-normal",
+      "scope": "effect_only",
+      "setup": {
+        "fishing_occupied": true
+      },
+      "action": {
+        "use_space": "grain_utilization"
+      },
+      "expected": {
+        "food_delta": 2
+      }
+    },
+    {
+      "id": "B064-fishing-free",
+      "scope": "effect_only",
+      "setup": {
+        "fishing_occupied": false
+      },
+      "action": {
+        "use_space": "grain_utilization"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    },
+    {
+      "id": "B064-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "fishing_occupied": true
+      },
+      "action": {
+        "use_space": "grain_seeds"
+      },
+      "expected": {
+        "food_delta": 0
+      }
+    }
+  ]
+}
