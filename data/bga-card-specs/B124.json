@@ -1,0 +1,87 @@
+{
+ "schema_version": 1,
+ "card_id": "B124",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "整地人",
+  "name_en": "Trimmer"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "yes",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3133",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "after_fence_build",
+   "conditions": [
+    {
+     "predicate": "new_pasture_created",
+     "params": {
+      "min_spaces": 1
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "stone",
+      "amount": 2
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_use",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "none"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "needs_resolution",
+  "unresolved_fields": [
+   "effects.0.frequency: the wiki caps the effect at once per work phase; no established frequency token expresses a once-per-work-phase cap (established: every_use/once_per_round/once_per_play/etc). Encoded with every_use and documented in notes."
+  ],
+  "test_case_ids": [
+   "B124-normal",
+   "B124-subdivide",
+   "B124-timing-pending"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "Each time you enclose ≥1 farmyard space (new pasture, not subdivision) you get 2 stone. Once per work phase cap documented in notes. Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

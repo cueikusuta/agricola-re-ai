@@ -1,0 +1,128 @@
+{
+ "schema_version": 1,
+ "card_id": "B127",
+ "cases": [
+  {
+   "id": "B127-round5-plus",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "hand": [
+     "B127"
+    ],
+    "round": 5,
+    "goods": {
+     "stone": 1,
+     "grain": 1,
+     "vegetable": 1,
+     "sheep": 1
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "play_card",
+      "card": "B127",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "accept",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "stone": -1,
+      "grain": -1,
+      "vegetable": -1,
+      "sheep": -1
+     },
+     "actions_granted": [
+      "family_growth"
+     ]
+    }
+   },
+   "notes": "Play in round 5 with goods -> grant Family Growth action"
+  },
+  {
+   "id": "B127-before-round5",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "hand": [
+     "B127"
+    ],
+    "round": 4,
+    "goods": {
+     "stone": 1,
+     "grain": 1,
+     "vegetable": 1,
+     "sheep": 1
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "play_card",
+      "card": "B127",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {}
+    }
+   },
+   "notes": "Play in round 4 -> no effect (condition fails)"
+  },
+  {
+   "id": "B127-declined",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "hand": [
+     "B127"
+    ],
+    "round": 5,
+    "goods": {
+     "stone": 1,
+     "grain": 1,
+     "vegetable": 1,
+     "sheep": 1
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "play_card",
+      "card": "B127",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "decline",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {}
+    }
+   },
+   "notes": "Play in round 5 but decline -> goods kept"
+  }
+ ]
+}

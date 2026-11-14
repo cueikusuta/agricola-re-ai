@@ -1,0 +1,128 @@
+{
+ "schema_version": 1,
+ "card_id": "B127",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "女たらし",
+  "name_en": "Seducer"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3130",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "on_play",
+   "conditions": [
+    {
+     "predicate": "round_in",
+     "params": {
+      "values": [
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14
+      ]
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "spend_resource",
+     "target": "owner",
+     "params": {
+      "good": "stone",
+      "amount": 1
+     }
+    },
+    {
+     "operation": "spend_resource",
+     "target": "owner",
+     "params": {
+      "good": "grain",
+      "amount": 1
+     }
+    },
+    {
+     "operation": "spend_resource",
+     "target": "owner",
+     "params": {
+      "good": "vegetable",
+      "amount": 1
+     }
+    },
+    {
+     "operation": "spend_resource",
+     "target": "owner",
+     "params": {
+      "good": "sheep",
+      "amount": 1
+     }
+    },
+    {
+     "operation": "grant_action",
+     "target": "owner",
+     "params": {
+      "action": "family_growth",
+      "without_room": true
+     }
+    }
+   ],
+   "optional": true,
+   "frequency": "once_per_play",
+   "duration": "instant",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "owner"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "bga_checked",
+  "unresolved_fields": [],
+  "test_case_ids": [
+   "B127-round5-plus",
+   "B127-before-round5",
+   "B127-declined"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "Conditional on round >=5 (round_in values 5..14). Pay 4 goods, grant Family Growth Even without Room action (B021 precedent). Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

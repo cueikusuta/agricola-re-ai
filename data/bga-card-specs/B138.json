@@ -1,0 +1,122 @@
+{
+ "schema_version": 1,
+ "card_id": "B138",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "森の守護者",
+  "name_en": "Forest Guardian"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3119",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "on_play",
+   "conditions": [],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "wood",
+      "amount": 2
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "once_per_play",
+   "duration": "instant",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "before_worker_space",
+   "conditions": [
+    {
+     "predicate": "other_player_uses",
+     "params": {
+      "spaces": [
+       "forest",
+       "copse",
+       "grove"
+      ]
+     }
+    },
+    {
+     "predicate": "accumulation_at_least",
+     "params": {
+      "good": "wood",
+      "n": 5
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "spend_resource",
+     "target": "owner",
+     "params": {
+      "good": "food",
+      "amount": 1,
+      "source": "other_player",
+      "target": "owner"
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_use",
+   "duration": "permanent",
+   "snapshot": "before_event",
+   "order": 1,
+   "decision_owner": "none"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "needs_resolution",
+  "unresolved_fields": [
+   "effects.1.tax: the mandatory pre-use payment by another player (food 1 before taking ≥5 wood) has no established step vocabulary — same gap as C051 (tax_space_use); modeled with spend_resource source other_player → owner, flagged",
+   "effects.1.threshold: 'takes at least 5 wood' is modeled as pile ≥5 via accumulation_at_least (assuming take-all); exact take amount not established"
+  ],
+  "test_case_ids": [
+   "B138-on-play",
+   "B138-tax",
+   "B138-below-threshold",
+   "B138-timing-pending"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "C051 precedent (needs_resolution) for mandatory other-player tax; B138 adds ≥5 wood threshold. Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

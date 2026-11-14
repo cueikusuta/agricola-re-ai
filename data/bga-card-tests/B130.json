@@ -1,0 +1,169 @@
+{
+ "schema_version": 1,
+ "card_id": "B130",
+ "cases": [
+  {
+   "id": "B130-normal",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B130"
+    ],
+    "phase": "work_phase",
+    "goods": {
+     "food": 1
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "grain_utilization",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "accept",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "food": -1
+     },
+     "extra_actions": [
+      "fencing"
+     ]
+    }
+   },
+   "notes": "Use Grain Utilization, other space (Fencing) unoccupied, pay 1 food -> use other space with same person"
+  },
+  {
+   "id": "B130-other-occupied",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B130"
+    ],
+    "phase": "work_phase",
+    "goods": {
+     "food": 1
+    },
+    "space_occupied": {
+     "fencing": true
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "grain_utilization",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "accept",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {},
+     "extra_actions": []
+    }
+   },
+   "notes": "Other space occupied -> cannot use (even_occupied:false)"
+  },
+  {
+   "id": "B130-declined",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B130"
+    ],
+    "phase": "work_phase",
+    "goods": {
+     "food": 1
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "grain_utilization",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "decline",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {}
+    }
+   },
+   "notes": "Decline optional payment"
+  },
+  {
+   "id": "B130-max-per-turn",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B130"
+    ],
+    "phase": "work_phase",
+    "goods": {
+     "food": 2
+    }
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "grain_utilization",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "accept",
+      "player": "p1"
+     },
+     {
+      "action": "use_space",
+      "space": "fencing",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "extra_actions": 1,
+     "note": "max_per_turn cap limits to 1 per turn"
+    }
+   },
+   "notes": "Second trigger same work phase -> capped (max_per_turn:1)"
+  }
+ ]
+}

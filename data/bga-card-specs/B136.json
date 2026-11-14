@@ -1,0 +1,113 @@
+{
+ "schema_version": 1,
+ "card_id": "B136",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "執事",
+  "name_en": "House Steward"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "yes",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3121",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "on_play",
+   "conditions": [],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "wood",
+      "amount": {
+       "op": "table",
+       "args": [
+        "remaining_rounds",
+        {
+         "1": 1,
+         "3": 2,
+         "6": 3,
+         "9": 4
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "once_per_play",
+   "duration": "instant",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "end_scoring",
+   "conditions": [],
+   "steps": [
+    {
+     "operation": "other",
+     "target": "other",
+     "params": {
+      "kind": "award_most_rooms_bonus",
+      "points": 3,
+      "tied_share": true,
+      "scope": "all_players_with_most_rooms"
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "end_of_game",
+   "duration": "permanent",
+   "snapshot": "live_state",
+   "order": 1,
+   "decision_owner": "none"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "needs_resolution",
+  "unresolved_fields": [
+   "effects.1.award: the rule 'each player with the most rooms gets 3 bonus points' is a global scoring bonus to all tied players; no established gain_points target or predicate expresses 'all players tied for most rooms' (target enum only owner/left/right/all_other/selected/card/board/other)"
+  ],
+  "test_case_ids": [
+   "B136-9-rounds-left",
+   "B136-6-rounds-left",
+   "B136-scoring-pending"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "Part 1 (wood) uses A135/A136 exact table. Part 2 'most rooms' shared award has no established encoding → needs_resolution. Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

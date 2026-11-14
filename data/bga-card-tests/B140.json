@@ -1,0 +1,137 @@
+{
+ "schema_version": 1,
+ "card_id": "B140",
+ "cases": [
+  {
+   "id": "B140-sow",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B140"
+    ],
+    "phase": "work_phase"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "sow",
+      "player": "p1"
+     },
+     {
+      "action": "sow_goods",
+      "player": "p1",
+      "grain": 1
+     },
+     {
+      "action": "end_work_phase",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "food": 2
+     }
+    }
+   },
+   "notes": "Sow grain/vegetable in work phase -> 2 food at phase end"
+  },
+  {
+   "id": "B140-animal-move",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B140"
+    ],
+    "phase": "work_phase"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "move_animal",
+      "player": "p1",
+      "from": "pasture1",
+      "to": "pasture2"
+     },
+     {
+      "action": "end_work_phase",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {}
+    }
+   },
+   "notes": "Move existing animal between pastures -> no food (excluded)"
+  },
+  {
+   "id": "B140-none",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B140"
+    ],
+    "phase": "work_phase"
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "use_space",
+      "space": "fencing",
+      "player": "p1"
+     },
+     {
+      "action": "end_work_phase",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {}
+    }
+   },
+   "notes": "No farmyard placements -> no food"
+  },
+  {
+   "id": "B140-timing-pending",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B140"
+    ]
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "none"
+     }
+    ]
+   },
+   "expected": {
+    "note": "Condition 'new good placed on farmyard' not in established predicates; marked needs_resolution"
+   },
+   "notes": "Farmyard goods-placed predicate gap"
+  }
+ ]
+}

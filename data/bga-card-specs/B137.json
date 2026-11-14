@@ -1,0 +1,217 @@
+{
+ "schema_version": 1,
+ "card_id": "B137",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "卸売業者",
+  "name_en": "Wholesaler"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3120",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "on_play",
+   "conditions": [],
+   "steps": [
+    {
+     "operation": "other",
+     "target": "card",
+     "params": {
+      "kind": "stack_goods_on_card",
+      "goods": [
+       {
+        "good": "vegetable",
+        "amount": 1
+       },
+       {
+        "good": "wild_boar",
+        "amount": 1
+       },
+       {
+        "good": "stone",
+        "amount": 1
+       },
+       {
+        "good": "cattle",
+        "amount": 1
+       }
+      ]
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "once_per_play",
+   "duration": "instant",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "after_worker_space",
+   "conditions": [
+    {
+     "predicate": "round_space_in",
+     "params": {
+      "values": [
+       8
+      ]
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "vegetable",
+      "amount": 1,
+      "source": "card"
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_use",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 1,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "after_worker_space",
+   "conditions": [
+    {
+     "predicate": "round_space_in",
+     "params": {
+      "values": [
+       9
+      ]
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "wild_boar",
+      "amount": 1,
+      "source": "card"
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_use",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 2,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "after_worker_space",
+   "conditions": [
+    {
+     "predicate": "round_space_in",
+     "params": {
+      "values": [
+       10
+      ]
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "stone",
+      "amount": 1,
+      "source": "card"
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_use",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 3,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "after_worker_space",
+   "conditions": [
+    {
+     "predicate": "round_space_in",
+     "params": {
+      "values": [
+       11
+      ]
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "cattle",
+      "amount": 1,
+      "source": "card"
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_use",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 4,
+   "decision_owner": "none"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "needs_resolution",
+  "unresolved_fields": [
+   "effects.1-4.mapping: the wiki states 'the corresponding good' for rounds 8-11; the correspondence (positional by round vs. by space type) is not explicitly stated in the source — encoded as round-slot mapping 8→vegetable/9→wild_boar/10→stone/11→cattle based on the card's placement order, but this is an inference"
+  ],
+  "test_case_ids": [
+   "B137-r8",
+   "B137-r11",
+   "B137-other-round"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "The goods correspond to the round-space cards in round order 8-11 per the card's layout. Mapping ambiguity flagged. Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

@@ -1,0 +1,80 @@
+{
+ "schema_version": 1,
+ "card_id": "B129",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "隣り合わせた人",
+  "name_en": "Seatmate"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3128",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "passive",
+   "conditions": [],
+   "steps": [
+    {
+     "operation": "other",
+     "target": "owner",
+     "params": {
+      "kind": "ignore_occupation",
+      "round_space": 13,
+      "occupied_by_neighbors_only": true
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "always",
+   "duration": "permanent",
+   "snapshot": "live_state",
+   "order": 0,
+   "decision_owner": "none"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "needs_resolution",
+  "unresolved_fields": [
+   "effects.0.space_identity: the action space on round space 13 is determined by the deck order (Cultivation or FamilyGrowthNoRoom); no established vocabulary identifies a space by its round position for ignore_occupation",
+   "effects.0.occupancy_scope: the card exempts occupation by immediate left/right neighbors only; ignore_occupation precedent (A026/A028/B151) covers generic occupancy, not a neighbor-only scope"
+  ],
+  "test_case_ids": [
+   "B129-timing-pending"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "Round-space-13 identity is variable (Cultivation or FamilyGrowthNoRoom depending on shuffle); neighbor-only exemption has no established encoding. Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

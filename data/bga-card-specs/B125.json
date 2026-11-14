@@ -1,0 +1,231 @@
+{
+ "schema_version": 1,
+ "card_id": "B125",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "借地農夫",
+  "name_en": "Estate Worker"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "yes",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3132",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "on_play",
+   "conditions": [],
+   "steps": [
+    {
+     "operation": "other",
+     "target": "owner",
+     "params": {
+      "kind": "place_on_round_spaces",
+      "good": "wood",
+      "amount": 1,
+      "offsets": [
+       1
+      ]
+     }
+    },
+    {
+     "operation": "other",
+     "target": "owner",
+     "params": {
+      "kind": "place_on_round_spaces",
+      "good": "clay",
+      "amount": 1,
+      "offsets": [
+       2
+      ]
+     }
+    },
+    {
+     "operation": "other",
+     "target": "owner",
+     "params": {
+      "kind": "place_on_round_spaces",
+      "good": "reed",
+      "amount": 1,
+      "offsets": [
+       3
+      ]
+     }
+    },
+    {
+     "operation": "other",
+     "target": "owner",
+     "params": {
+      "kind": "place_on_round_spaces",
+      "good": "stone",
+      "amount": 1,
+      "offsets": [
+       4
+      ]
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "once_per_play",
+   "duration": "instant",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "round_start",
+   "conditions": [
+    {
+     "predicate": "round_space_has_placed_good",
+     "params": {
+      "good": "wood"
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "wood",
+      "amount": 1,
+      "source": "card"
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_round",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "round_start",
+   "conditions": [
+    {
+     "predicate": "round_space_has_placed_good",
+     "params": {
+      "good": "clay"
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "clay",
+      "amount": 1,
+      "source": "card"
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_round",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 1,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "round_start",
+   "conditions": [
+    {
+     "predicate": "round_space_has_placed_good",
+     "params": {
+      "good": "reed"
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "reed",
+      "amount": 1,
+      "source": "card"
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_round",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 2,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "round_start",
+   "conditions": [
+    {
+     "predicate": "round_space_has_placed_good",
+     "params": {
+      "good": "stone"
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "stone",
+      "amount": 1,
+      "source": "card"
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_round",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 3,
+   "decision_owner": "none"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "bga_checked",
+  "unresolved_fields": [],
+  "test_case_ids": [
+   "B125-sequence",
+   "B125-collect-wood",
+   "B125-collect-stone",
+   "B125-late-play"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "Place wood/clay/reed/stone on the next 4 round spaces in order (offsets 1-4). The round-start pickup follows the round-space rule (cf. C064/C065 notes). Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

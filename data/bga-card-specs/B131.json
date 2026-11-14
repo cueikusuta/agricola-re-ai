@@ -1,0 +1,88 @@
+{
+ "schema_version": 1,
+ "card_id": "B131",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "装備品揃え",
+  "name_en": "Equipper"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3126",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "after_worker_space",
+   "conditions": [
+    {
+     "predicate": "worker_space_used",
+     "params": {
+      "spaces": [
+       "forest",
+       "copse",
+       "grove"
+      ]
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "grant_action",
+     "target": "owner",
+     "params": {
+      "action": "minor_improvement"
+     }
+    }
+   ],
+   "optional": true,
+   "frequency": "every_use",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "owner"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "bga_checked",
+  "unresolved_fields": [],
+  "test_case_ids": [
+   "B131-forest",
+   "B131-declined",
+   "B131-other-space"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "Grants one Minor Improvement action after using a wood accumulation space (A096 precedent). The wiki notes the timing is debated and this grants the action rather than allowing a free play; modeled as grant_action. Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

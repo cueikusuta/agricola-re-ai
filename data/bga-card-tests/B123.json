@@ -1,0 +1,118 @@
+{
+ "schema_version": 1,
+ "card_id": "B123",
+ "cases": [
+  {
+   "id": "B123-normal",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "hand": [
+     "B123"
+    ],
+    "goods": {
+     "food": 1
+    },
+    "rooms": 3
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "play_card",
+      "card": "B123",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "accept",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "food": -1,
+      "stone": 3
+     }
+    }
+   },
+   "notes": "Play card, pay 1 food, have 3 rooms -> gain 3 stone"
+  },
+  {
+   "id": "B123-declined",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "hand": [
+     "B123"
+    ],
+    "goods": {
+     "food": 1
+    },
+    "rooms": 3
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "play_card",
+      "card": "B123",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "decline",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {}
+    }
+   },
+   "notes": "Play card, decline optional payment -> no change"
+  },
+  {
+   "id": "B123-rooms-2",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "hand": [
+     "B123"
+    ],
+    "goods": {
+     "food": 1
+    },
+    "rooms": 2
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "play_card",
+      "card": "B123",
+      "player": "p1"
+     },
+     {
+      "action": "choose",
+      "choice": "accept",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "goods_delta": {
+      "food": -1,
+      "stone": 2
+     }
+    }
+   },
+   "notes": "Play card with 2 rooms -> gain 2 stone"
+  }
+ ]
+}

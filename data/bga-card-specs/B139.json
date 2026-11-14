@@ -1,0 +1,139 @@
+{
+ "schema_version": 1,
+ "card_id": "B139",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "森林科学者",
+  "name_en": "Forest Scientist"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "weak",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3118",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "returning_home_phase",
+   "conditions": [
+    {
+     "predicate": "round_in",
+     "params": {
+      "values": [
+       1,
+       2,
+       3,
+       4
+      ]
+     }
+    },
+    {
+     "predicate": "board_wood_empty",
+     "params": {}
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "food",
+      "amount": 1
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_round",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "none"
+  },
+  {
+   "trigger": "returning_home_phase",
+   "conditions": [
+    {
+     "predicate": "round_in",
+     "params": {
+      "values": [
+       5,
+       6,
+       7,
+       8,
+       9,
+       10,
+       11,
+       12,
+       13,
+       14
+      ]
+     }
+    },
+    {
+     "predicate": "board_wood_empty",
+     "params": {}
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "food",
+      "amount": 2
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_round",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 1,
+   "decision_owner": "none"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "needs_resolution",
+  "unresolved_fields": [
+   "effects.0.condition: 'board_wood_empty' predicate (no wood on any accumulation space) has no established vocabulary; modeled with a novel predicate name 'board_wood_empty' and flagged"
+  ],
+  "test_case_ids": [
+   "B139-round3",
+   "B139-round5",
+   "B139-wood-remains",
+   "B139-timing-pending"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "Returning home phase trigger; board-wide wood-empty check not expressible with established predicates (C058 precedent for board-wide conditions). Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

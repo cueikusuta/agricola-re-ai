@@ -1,0 +1,111 @@
+{
+ "schema_version": 1,
+ "card_id": "B143",
+ "identity": {
+  "kind": "occupation",
+  "name_ja": "粘土守",
+  "name_en": "Clay Warden"
+ },
+ "bga": {
+  "listed": "yes",
+  "playable": "yes",
+  "ban_status": "none",
+  "base_2016": "no",
+  "eligibility": {
+   "2": "no",
+   "3": "yes",
+   "4": "yes"
+  },
+  "references": [
+   {
+    "url": "https://agricola.cloudfree.jp/?p=3114",
+    "language": "ja",
+    "checked_on": "2026-11-14",
+    "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+   },
+   {
+    "url": "https://agricola.cloudfree.jp/cardlist_en/",
+    "language": "en",
+    "checked_on": "2026-11-14",
+    "note": "English list page row used to cross-check the card id and name"
+   }
+  ]
+ },
+ "play": {
+  "action": "occupation",
+  "cost": [],
+  "prerequisites": [],
+  "printed_points": 0
+ },
+ "effects": [
+  {
+   "trigger": "after_worker_space",
+   "conditions": [
+    {
+     "predicate": "other_player_uses",
+     "params": {
+      "space": "hollow"
+     }
+    }
+   ],
+   "steps": [
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": "clay",
+      "amount": 1
+     }
+    },
+    {
+     "operation": "gain_resource",
+     "target": "owner",
+     "params": {
+      "good": {
+       "op": "custom",
+       "args": [
+        "player_count_table",
+        {
+         "3": "clay",
+         "4": "food"
+        }
+       ]
+      },
+      "amount": {
+       "op": "custom",
+       "args": [
+        "player_count_table",
+        {
+         "3": 1,
+         "4": 1
+        }
+       ]
+      }
+     }
+    }
+   ],
+   "optional": false,
+   "frequency": "every_use",
+   "duration": "permanent",
+   "snapshot": "after_event",
+   "order": 0,
+   "decision_owner": "none"
+  }
+ ],
+ "post_play": {
+  "destination": "played_area"
+ },
+ "review": {
+  "status": "bga_checked",
+  "unresolved_fields": [],
+  "test_case_ids": [
+   "B143-3p",
+   "B143-4p",
+   "B143-own-use"
+  ],
+  "checked_by": "BGA wiki cross-check (JA and EN pages)",
+  "checked_on": "2026-11-14",
+  "implementation_status": "not_started",
+  "notes": "Extra gain per player count via player_count_table (B102 precedent). 2p ineligible per ledger, so table omits key 2. Third-party BGA wiki check only; not official Lookout verification."
+ }
+}

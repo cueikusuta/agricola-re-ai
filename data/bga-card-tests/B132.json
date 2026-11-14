@@ -1,0 +1,99 @@
+{
+ "schema_version": 1,
+ "card_id": "B132",
+ "cases": [
+  {
+   "id": "B132-full-farmyard",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B132"
+    ],
+    "phase": "harvest",
+    "farmyard_full": true,
+    "vegetable_fields": 2
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "harvest",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "points_delta": 2
+    }
+   },
+   "notes": "Farmyard fully used, harvest 2 vegetables -> 2 bonus points"
+  },
+  {
+   "id": "B132-not-full",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B132"
+    ],
+    "phase": "harvest",
+    "farmyard_full": false,
+    "vegetable_fields": 2
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "harvest",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "points_delta": 0
+    }
+   },
+   "notes": "Farmyard not full -> no bonus"
+  },
+  {
+   "id": "B132-no-vegetable",
+   "scope": "effect_only",
+   "setup": {
+    "player": "p1",
+    "cards_in_play": [
+     "B132"
+    ],
+    "phase": "harvest",
+    "farmyard_full": true,
+    "vegetable_fields": 0
+   },
+   "action": {
+    "sequence": [
+     {
+      "action": "harvest",
+      "player": "p1"
+     },
+     {
+      "action": "resolve_effects",
+      "player": "p1"
+     }
+    ]
+   },
+   "expected": {
+    "p1": {
+     "points_delta": 0
+    }
+   },
+   "notes": "Farmyard full but no vegetables -> no bonus"
+  }
+ ]
+}
