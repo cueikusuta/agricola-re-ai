@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "card_id": "E160",
+  "cases": [
+    {
+      "id": "E160-other",
+      "scope": "effect_only",
+      "setup": {
+        "acting_player": "other"
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "owner_vegetable_delta": 1,
+        "acting_player_food_delta": 1
+      }
+    },
+    {
+      "id": "E160-owner",
+      "scope": "effect_only",
+      "setup": {
+        "acting_player": "owner"
+      },
+      "action": {
+        "use_space": "fishing"
+      },
+      "expected": {
+        "owner_vegetable_delta": 0,
+        "acting_player_food_delta": 0
+      }
+    }
+  ]
+}

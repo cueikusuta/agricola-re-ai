@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "card_id": "E165",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "熟練猟師",
+    "name_en": "Master Huntsman"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2588",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wild_boar",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When the card is played: gain 1 wild boar."
+    },
+    {
+      "trigger": "after_improvement",
+      "conditions": [
+        {
+          "predicate": "improvement_played_from_hand",
+          "params": {
+            "kind": "major",
+            "owner_only": true,
+            "via_major_or_minor_action": true
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wild_boar",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Each time the owner builds a major improvement: gain 1 wild boar."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.1.conditions: using improvement_played_from_hand with kind=major follows E018's pattern (kind=minor) and B103's precedent for 'kind: major' in declined_improvement; however 'builds a major improvement' via the Major Improvement action may not fully map to 'played from hand', so the condition may need a dedicated predicate 'improvement_is_major'"
+    ],
+    "test_case_ids": [
+      "E165-play",
+      "E165-major",
+      "E165-minor"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "On play and on each major improvement build: gain 1 wild boar. Status: needs_resolution due to the major-improvement condition encoding. Third-party BGA wiki cross-check only; not official Lookout verification."
+  }
+}

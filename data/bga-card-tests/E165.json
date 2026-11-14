@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "card_id": "E165",
+  "cases": [
+    {
+      "id": "E165-play",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E165"
+      },
+      "expected": {
+        "wild_boar_delta": 1
+      }
+    },
+    {
+      "id": "E165-major",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "build_major_improvement": true
+      },
+      "expected": {
+        "wild_boar_delta": 1
+      }
+    },
+    {
+      "id": "E165-minor",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play_minor_improvement": true
+      },
+      "expected": {
+        "wild_boar_delta": 0
+      },
+      "notes": "Minor improvements do not trigger the card"
+    }
+  ]
+}

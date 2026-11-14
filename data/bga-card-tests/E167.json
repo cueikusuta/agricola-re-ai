@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "card_id": "E167",
+  "cases": [
+    {
+      "id": "E167-play",
+      "scope": "effect_only",
+      "setup": {
+        "other_players": 1
+      },
+      "action": {
+        "play": "E167"
+      },
+      "expected": {
+        "owner_cattle_delta": 1
+      }
+    },
+    {
+      "id": "E167-other-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "acting_player": "other",
+        "choice": "sheep"
+      },
+      "action": {
+        "play": "E167"
+      },
+      "expected": {
+        "that_player_sheep_delta": 2
+      }
+    },
+    {
+      "id": "E167-other-food",
+      "scope": "effect_only",
+      "setup": {
+        "acting_player": "other",
+        "choice": "food"
+      },
+      "action": {
+        "play": "E167"
+      },
+      "expected": {
+        "that_player_food_delta": 2
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "E168",
+  "cases": [
+    {
+      "id": "E168-wood-clay",
+      "scope": "effect_only",
+      "setup": {
+        "unoccupied_wood_rooms": 1,
+        "unoccupied_clay_rooms": 1
+      },
+      "action": {
+        "round_start": true
+      },
+      "expected": {
+        "sheep_delta": 1,
+        "wild_boar_delta": 1
+      }
+    },
+    {
+      "id": "E168-stone",
+      "scope": "effect_only",
+      "setup": {
+        "unoccupied_stone_rooms": 1
+      },
+      "action": {
+        "round_start": true
+      },
+      "expected": {
+        "cattle_delta": 1
+      }
+    },
+    {
+      "id": "E168-none",
+      "scope": "effect_only",
+      "setup": {
+        "unoccupied_wood_rooms": 0,
+        "unoccupied_clay_rooms": 0,
+        "unoccupied_stone_rooms": 0
+      },
+      "action": {
+        "round_start": true
+      },
+      "expected": {
+        "animals_gained": 0
+      }
+    }
+  ]
+}

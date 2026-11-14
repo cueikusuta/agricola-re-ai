@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "card_id": "E154",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "辺境伯",
+    "name_en": "Margrave"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2599",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_renovation",
+      "conditions": [
+        {
+          "predicate": "house_is",
+          "params": {
+            "house": "stone"
+          }
+        },
+        {
+          "predicate": "any_player",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_occurrence",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Once the owner lives in a stone house, each renovation by any player (including the owner) gives 2 food."
+    },
+    {
+      "trigger": "end_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "amount": {
+              "op": "custom",
+              "args": [
+                "count",
+                "wood_or_clay_house_players"
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "end_of_game",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "At scoring: 1 bonus point per player living in a wood or clay house."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.conditions: the card reacts to renovations by every player ('あなたを含むプレイヤーが改築するたび'); after_renovation is documented for the owner's renovation only and no existing effect combines it with the any_player scope",
+      "effects.0.conditions: '石の家に住み次第' (only once living in a stone house) is modeled as a state condition; whether renovations before the owner reached a stone house grant food is not stated",
+      "effects.1.amount: '木の家かレンガの家のプレイヤー1人につき' needs a count source for players whose house is wood or clay (no established count source; own house is stone by the card's own condition)"
+    ],
+    "test_case_ids": [
+      "E154-renovation-food",
+      "E154-own-renovation",
+      "E154-scoring",
+      "E154-not-stone"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Once living in a stone house: 2 food each time any player renovates and 1 bonus point per player in a wood or clay house at scoring. Status: needs_resolution due to the any-player renovation scope and the wood/clay-house count source. Third-party BGA wiki cross-check only; not official Lookout verification."
+  }
+}

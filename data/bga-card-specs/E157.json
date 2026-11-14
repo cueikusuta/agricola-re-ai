@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "E157",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "使用権利人",
+    "name_en": "Usufructuary"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2596",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "occupation_count",
+          "params": {
+            "n": 0
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "custom",
+                  "args": [
+                    "count",
+                    "occupations_in_play_excluding_this"
+                  ]
+                },
+                7
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "If this card is the owner's first occupation: gain 1 food per other occupation already in play (by any player), maximum 7 (occupation_count n:0 precedent in prereqs B049/C023/E065)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.amount: the count source for 'all occupations in play by any player, excluding this card' is not established (nearest: own-only 'occupation' count; B099 uses 'own_occupations_after_this_card')",
+      "effects.0.conditions: 'first occupation' expressed as occupation_count n=0 evaluated before this card enters play; the predicate has precedent in prerequisites but its use as an effect condition with timing 'before this card' is not established"
+    ],
+    "test_case_ids": [
+      "E157-first",
+      "E157-cap",
+      "E157-not-first"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "If played as the first occupation: 1 food per other occupation in play by any player, maximum 7. Status: needs_resolution due to the all-players occupation count source and the effect-condition timing of the n=0 check. Third-party BGA wiki cross-check only; not official Lookout verification."
+  }
+}

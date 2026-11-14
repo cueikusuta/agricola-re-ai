@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "card_id": "E166",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "肉焼き名人",
+    "name_en": "Roastmaster"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2587",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "small_theater",
+              "fishing"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "food",
+                "amount": 1,
+                "source": "used_space"
+              }
+            ],
+            "receive": [
+              {
+                "good": "cattle",
+                "amount": 1
+              }
+            ],
+            "move_food_to": "other_space"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each time the owner uses Small Theater or Fishing: may move 1 food from that space onto the other space to gain 1 cattle."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.steps[0]: moving food from the used accumulation space onto the other accumulation space has no established encoding (A056 uses 'return_to': 'accumulation_space' where the given goods stay on the space; here the food moves between spaces); the exchange model with source=used_space + move_food_to=other_space is provisional",
+      "effects.0.conditions: the JA page names the accumulation space '小劇場' (small_theater per B155) while the EN list row says Traveling Players; whether both refer to the same space needs confirmation",
+      "effects.0: the legality when the used space holds no food is not stated by the source"
+    ],
+    "test_case_ids": [
+      "E166-theater",
+      "E166-fishing",
+      "E166-insufficient"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Using Small Theater or Fishing: may move 1 food to the other space for 1 cattle. Status: needs_resolution due to the inter-space food movement and the JA/EN space-name discrepancy. Third-party BGA wiki cross-check only; not official Lookout verification."
+  }
+}
