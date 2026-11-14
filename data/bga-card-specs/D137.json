@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "card_id": "D137",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "交易教師",
+    "name_en": "Trade Teacher"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2784",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_action_use",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "name": "lesson"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "building_material_choice",
+            "amount": 2,
+            "note": "Up to 2 different building materials per Lesson use. Grain/stone/sheep/boar cost 1 food each; cattle/vegetable cost 2 food each. Payment is from owner's supply."
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each time the Lesson action space is used, the owner may buy up to 2 different building materials. Materials: grain, stone, sheep, boar cost 1 food; cattle, vegetable cost 2 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params: building_material_choice and food cost mapping (grain/stone/sheep/boar=1 food, cattle/vegetable=2 food) need formal parameterization",
+      "effects[0].conditions: action_space_name predicate needs to be in vocabulary",
+      "effects[0].steps: simultaneous choice of up to 2 different materials needs clarification on whether multiple gains happen as one atomic step or sequential"
+    ],
+    "test_case_ids": [
+      "D137-lesson-buy-materials",
+      "D137-lesson-no-buy"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When Lesson action space is used, may buy up to 2 different building materials. Grain/stone/sheep/boar cost 1 food; cattle/vegetable cost 2 food. Strong ban. Effect formalization needs resolution."
+  }
+}

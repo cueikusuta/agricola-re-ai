@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "card_id": "D145",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "屋根点検者",
+    "name_en": "Roof Examiner"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2776",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "reed",
+            "amount": 2,
+            "note": "If owner has 1 major improvement, gain 2 reed"
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "reed",
+            "amount": 3,
+            "note": "If owner has 2 major improvements, gain 3 reed"
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "reed",
+            "amount": 4,
+            "note": "If owner has 3 major improvements, gain 4 reed"
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "reed",
+            "amount": 5,
+            "note": "If owner has 4 major improvements, gain 5 reed"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "On play, gain reed based on number of major improvements owned: 1 MI = 2 reed, 2 MI = 3 reed, 3 MI = 4 reed, 4 MI = 5 reed. Only one tier applies based on count."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps: conditional gain based on major improvement count needs formal parameterization - single step with conditional amount or multiple mutually exclusive steps",
+      "effects[0].steps: whether major improvements counting includes those just played this action"
+    ],
+    "test_case_ids": [
+      "D145-0-mi-0-reed",
+      "D145-1-mi-2-reed",
+      "D145-2-mi-3-reed",
+      "D145-3-mi-4-reed",
+      "D145-4-mi-5-reed"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: On play, gain reed based on major improvements: 1 MI=2, 2 MI=3, 3 MI=4, 4 MI=5 reed. Effect formalization needs resolution."
+  }
+}

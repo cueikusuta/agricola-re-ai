@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "D152",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "パトロン",
+    "name_en": "Patron"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2769",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play_occupation",
+      "conditions": [
+        {
+          "predicate": "occupation_played_after_this",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 2,
+            "note": "Gain 2 food before paying the occupation cost"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_occupation_played",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time you play an occupation AFTER this card, gain 2 food before paying that occupation's cost. Not eligible for 2-3 player games."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: on_play_occupation needs formalization - triggering when any occupation is played after this one",
+      "effects[0].conditions: occupation_played_after_this predicate needs formalization",
+      "effects[0].snapshot: before_event timing - gain food BEFORE paying the new occupation's cost",
+      "effects[0].notes: whether this applies to all subsequent occupations played by the owner, including those from hand or from other effects"
+    ],
+    "test_case_ids": [
+      "D152-play-occupation-after-gain-food",
+      "D152-play-occupation-before-no-effect",
+      "D152-play-minor-improvement-no-effect",
+      "D152-multiple-occupations-after"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When playing an occupation after this card, gain 2 food before paying that occupation's cost. Not eligible for 2-3 player games. Effect formalization needs resolution."
+  }
+}

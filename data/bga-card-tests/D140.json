@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "card_id": "D140",
+  "cases": [
+    {
+      "id": "D140-take-4-wood",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_spaces": {
+          "wood": 4
+        }
+      },
+      "action": {
+        "take_from_accumulation": {
+          "space": "wood",
+          "resources": { "wood": 4 }
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "wood": 4,
+          "food": 1
+        }
+      },
+      "notes": "Take 4 wood from accumulation. Gain 1 food (building material >= 4)."
+    },
+    {
+      "id": "D140-take-4-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_spaces": {
+          "sheep": 4
+        }
+      },
+      "action": {
+        "take_from_accumulation": {
+          "space": "sheep",
+          "resources": { "sheep": 4 }
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "sheep": 4,
+          "food": 1
+        }
+      },
+      "notes": "Take 4 sheep from accumulation. Gain 1 food (livestock >= 4)."
+    },
+    {
+      "id": "D140-take-3-wood",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_spaces": {
+          "wood": 3
+        }
+      },
+      "action": {
+        "take_from_accumulation": {
+          "space": "wood",
+          "resources": { "wood": 3 }
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "wood": 3
+        }
+      },
+      "notes": "Take only 3 wood (< 4). No food gained."
+    },
+    {
+      "id": "D140-take-mixed",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_spaces": {
+          "wood": 2,
+          "clay": 2
+        }
+      },
+      "action": {
+        "take_from_accumulation": {
+          "space": "clay_pit",
+          "resources": { "wood": 2, "clay": 2 }
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "wood": 2,
+          "clay": 2,
+          "food": 1
+        }
+      },
+      "notes": "Take 2 wood + 2 clay = 4 building materials total. Gain 1 food."
+    }
+  ]
+}

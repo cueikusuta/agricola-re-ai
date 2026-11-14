@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "card_id": "D139",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "議長",
+    "name_en": "Chairman"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2782",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_other_player_action",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "name": "meeting_place"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "other",
+          "params": {
+            "good": "food",
+            "amount": 1,
+            "note": "Target is the acting player who used Meeting Place"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When another player uses the Meeting Place action space, before they act: both that player and the Chairman owner gain 1 food. If the owner uses Meeting Place themselves, they gain 1 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: action_space_name predicate needs to be in vocabulary",
+      "effects[0].trigger: on_other_player_action timing - 'before they act' needs formal definition relative to action resolution",
+      "effects[0].steps: dual target (owner and acting_player) needs confirmation that both gains happen atomically"
+    ],
+    "test_case_ids": [
+      "D139-other-player-meeting",
+      "D139-owner-meeting",
+      "D139-other-action"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When another player uses Meeting Place, before they act, both gain 1 food. If owner uses Meeting Place, owner gains 1 food. Effect formalization needs resolution."
+  }
+}

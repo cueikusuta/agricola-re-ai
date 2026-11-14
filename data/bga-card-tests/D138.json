@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "card_id": "D138",
+  "cases": [
+    {
+      "id": "D138-sheep-1-gain",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_spaces": {
+          "sheep": 1
+        }
+      },
+      "action": {
+        "use_action_space": {
+          "name": "sheep_accumulation"
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "sheep": 1,
+          "food": 3,
+          "grain": 1
+        },
+        "accumulation_spaces": {
+          "sheep": 1
+        }
+      },
+      "notes": "Sheep accumulation has exactly 1 sheep. Gain 1 sheep from supply, 3 food, 1 grain. Original sheep remains."
+    },
+    {
+      "id": "D138-boar-1-gain",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_spaces": {
+          "boar": 1
+        }
+      },
+      "action": {
+        "use_action_space": {
+          "name": "boar_accumulation"
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "boar": 1,
+          "food": 3,
+          "grain": 1
+        },
+        "accumulation_spaces": {
+          "boar": 1
+        }
+      },
+      "notes": "Boar accumulation has exactly 1 boar. Gain 1 boar from supply, 3 food, 1 grain."
+    },
+    {
+      "id": "D138-cattle-1-gain",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_spaces": {
+          "cattle": 1
+        }
+      },
+      "action": {
+        "use_action_space": {
+          "name": "cattle_accumulation"
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "cattle": 1,
+          "food": 3,
+          "grain": 1
+        },
+        "accumulation_spaces": {
+          "cattle": 1
+        }
+      },
+      "notes": "Cattle accumulation has exactly 1 cattle. Gain 1 cattle from supply, 3 food, 1 grain."
+    },
+    {
+      "id": "D138-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "accumulation_spaces": {
+          "sheep": 2
+        }
+      },
+      "action": {
+        "use_action_space": {
+          "name": "sheep_accumulation"
+        }
+      },
+      "expected": {
+        "owner_resources": {},
+        "accumulation_spaces": {
+          "sheep": 2
+        }
+      },
+      "notes": "Sheep accumulation has 2 sheep, not exactly 1. Effect does not trigger."
+    }
+  ]
+}

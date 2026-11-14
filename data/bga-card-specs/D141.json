@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "card_id": "D141",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "種屋",
+    "name_en": "Seed Seller"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2780",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When played, immediately gain 1 grain."
+    },
+    {
+      "trigger": "on_action_use",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "name": "sow_and_or_bake_bread"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Each time the Sow action space is used, gain 1 additional grain."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[1].conditions: action_space_name predicate needs to be in vocabulary (Sow action space name)",
+      "effects[1].trigger: whether this is the 'Sow' or 'Sow and/or Bake Bread' action space"
+    ],
+    "test_case_ids": [
+      "D141-on-play-grain",
+      "D141-sow-action-grain",
+      "D141-other-action"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: On play, gain 1 grain. Each time Sow action is used, gain 1 additional grain. Effect formalization needs resolution."
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "card_id": "D151",
+  "cases": [
+    {
+      "id": "D151-small-theater-place-on-occupied",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "available_people": 1,
+        "action_spaces": {
+          "small_theater": { "occupied": false },
+          "day_laborer": { "occupied": true }
+        }
+      },
+      "action": {
+        "use_action_space": {
+          "name": "small_theater",
+          "spin_doctor_placement": {
+            "target_space": "day_laborer",
+            "occupied": true
+          }
+        }
+      },
+      "expected": {
+        "available_people": 0,
+        "action_spaces": {
+          "small_theater": { "occupied": true },
+          "day_laborer": { "occupied": true, "extra_person": true }
+        }
+      },
+      "notes": "Use Small Theater, then place person on occupied Day Laborer. Both spaces now have people."
+    },
+    {
+      "id": "D151-small-theater-place-on-free",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "available_people": 1,
+        "action_spaces": {
+          "small_theater": { "occupied": false },
+          "fishing": { "occupied": false }
+        }
+      },
+      "action": {
+        "use_action_space": {
+          "name": "small_theater",
+          "spin_doctor_placement": {
+            "target_space": "fishing",
+            "occupied": false
+          }
+        }
+      },
+      "expected": {
+        "available_people": 0,
+        "action_spaces": {
+          "small_theater": { "occupied": true },
+          "fishing": { "occupied": true }
+        }
+      },
+      "notes": "Use Small Theater, then place person on free Fishing. Both spaces now have people."
+    },
+    {
+      "id": "D151-small-theater-decline",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "available_people": 1,
+        "action_spaces": {
+          "small_theater": { "occupied": false }
+        }
+      },
+      "action": {
+        "use_action_space": {
+          "name": "small_theater",
+          "spin_doctor_placement": null
+        }
+      },
+      "expected": {
+        "available_people": 0,
+        "action_spaces": {
+          "small_theater": { "occupied": true }
+        }
+      },
+      "notes": "Use Small Theater, decline to place additional person. Only Small Theater occupied."
+    },
+    {
+      "id": "D151-other-action-no-effect",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "available_people": 1
+      },
+      "action": {
+        "use_action_space": {
+          "name": "day_laborer"
+        }
+      },
+      "expected": {
+        "available_people": 0
+      },
+      "notes": "Using Day Laborer, not Small Theater. No extra placement."
+    }
+  ]
+}

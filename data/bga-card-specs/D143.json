@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "card_id": "D143",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "木材裁断師",
+    "name_en": "Tree Cutter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2778",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_take_from_accumulation",
+      "conditions": [
+        {
+          "predicate": "accumulation_has_at_least_3_of_non_wood_resource",
+          "params": {
+            "resources": ["clay", "reed", "stone", "sheep", "boar", "cattle", "fish", "small_theater"]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When using an accumulation space that has 3+ of any single non-wood resource (clay, reed, stone, sheep, boar, cattle, fish, small theater), gain 1 wood. Food counts as a resource for this check."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: accumulation_has_at_least_3_of_non_wood_resource predicate needs formalization - checking if ANY single resource type has 3+",
+      "effects[0].trigger: on_take_from_accumulation needs to be in vocabulary",
+      "effects[0].notes: whether food counts as a resource for the 3+ check (wiki says yes: '食料は品物とみなす')"
+    ],
+    "test_case_ids": [
+      "D143-clay-3-gain-wood",
+      "D143-reed-3-gain-wood",
+      "D143-stone-3-gain-wood",
+      "D143-food-3-gain-wood",
+      "D143-clay-2-no-gain"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When taking from accumulation space with 3+ of any non-wood resource (clay/reed/stone/sheep/boar/cattle/fish/small_theater/food), gain 1 wood. Effect formalization needs resolution."
+  }
+}

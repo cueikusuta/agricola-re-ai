@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "card_id": "D150",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "信仰深い配偶者",
+    "name_en": "Godly Spouse"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2771",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_action_use",
+      "conditions": [
+        {
+          "predicate": "action_type",
+          "params": {
+            "type": "family_growth"
+          }
+        },
+        {
+          "predicate": "person_is_second_placed_this_round",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "which_person": "first_placed_this_round",
+            "note": "Return the first person placed this round back to home (available for reuse). Custom operation: return person to home."
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When using Family Growth with the 2nd person placed this round, return the 1st person placed this round back home. Effect triggers once per round. Not eligible for 2-3 player games."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: action_type and person_is_second_placed_this_round predicates need formalization",
+      "effects[0].steps[0].operation: return_person_to_home needs formal definition - returning a worker to home during action resolution",
+      "effects[0].frequency: once_per_round limit needs clarification on tracking",
+      "effects[0].notes: whether this works with Family Growth from any source (action space, card effect, etc.)"
+    ],
+    "test_case_ids": [
+      "D150-family-growth-2nd-person-returns-1st",
+      "D150-family-growth-1st-person-no-effect",
+      "D150-other-action-no-effect",
+      "D150-second-family-growth-same-round"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When using Family Growth with 2nd person this round, return 1st person home. Once per round. Not eligible for 2-3 player games. Effect formalization needs resolution."
+  }
+}

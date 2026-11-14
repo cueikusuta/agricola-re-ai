@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "card_id": "D138",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "動物好き",
+    "name_en": "Pet Lover"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2783",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_action_use",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "name": "animal_accumulation"
+          }
+        },
+        {
+          "predicate": "accumulation_space_has_exactly_one",
+          "params": {
+            "animal_type": ["sheep", "boar", "cattle"]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "same_animal_as_space",
+            "amount": 1,
+            "note": "Gain 1 animal of the same type that was on the accumulation space, from supply"
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 3
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When using an accumulation space with exactly 1 sheep/boar/cattle: leave the animal, gain 1 of that animal from supply, plus 3 food and 1 grain."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: action_space_name and accumulation_space_has_exactly_one predicates need to be in vocabulary",
+      "effects[0].steps[0].params: same_animal_as_space reference needs formalization",
+      "effects[0].conditions: whether this applies to ALL accumulation spaces with exactly 1 animal or specific named ones (Sheep 1, Boar 1, Cattle 1)"
+    ],
+    "test_case_ids": [
+      "D138-sheep-1-gain",
+      "D138-boar-1-gain",
+      "D138-cattle-1-gain",
+      "D138-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Cost 0, no prereqs, 0 VP. Effect: When using an accumulation space with exactly 1 sheep/boar/cattle, leave it and gain 1 from supply + 3 food + 1 grain. Effect formalization needs resolution."
+  }
+}

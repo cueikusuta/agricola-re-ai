@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "card_id": "D147",
+  "cases": [
+    {
+      "id": "D147-day-laborer-place-resources",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "current_round": 1
+      },
+      "action": {
+        "use_action_space": {
+          "name": "day_laborer"
+        }
+      },
+      "expected": {
+        "future_round_resources": {
+          "round_2": { "food": 1 },
+          "round_3": { "food": 1 },
+          "round_4": { "boar": 1 }
+        }
+      },
+      "notes": "Using Day Laborer in Round 1. Places 1 food on Round 2, 1 food on Round 3, 1 boar on Round 4 action spaces."
+    },
+    {
+      "id": "D147-other-action-no-effect",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {
+        "use_action_space": {
+          "name": "fishing"
+        }
+      },
+      "expected": {
+        "future_round_resources": {}
+      },
+      "notes": "Using Fishing, not Day Laborer. No future resources placed."
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "card_id": "D145",
+  "cases": [
+    {
+      "id": "D145-0-mi-0-reed",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "major_improvements": 0
+      },
+      "action": {
+        "play_card": {
+          "card_id": "D145"
+        }
+      },
+      "expected": {
+        "owner_resources": {}
+      },
+      "notes": "No major improvements. Gain 0 reed."
+    },
+    {
+      "id": "D145-1-mi-2-reed",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "major_improvements": 1
+      },
+      "action": {
+        "play_card": {
+          "card_id": "D145"
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "reed": 2
+        }
+      },
+      "notes": "1 major improvement. Gain 2 reed."
+    },
+    {
+      "id": "D145-2-mi-3-reed",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "major_improvements": 2
+      },
+      "action": {
+        "play_card": {
+          "card_id": "D145"
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "reed": 3
+        }
+      },
+      "notes": "2 major improvements. Gain 3 reed."
+    },
+    {
+      "id": "D145-3-mi-4-reed",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "major_improvements": 3
+      },
+      "action": {
+        "play_card": {
+          "card_id": "D145"
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "reed": 4
+        }
+      },
+      "notes": "3 major improvements. Gain 4 reed."
+    },
+    {
+      "id": "D145-4-mi-5-reed",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "major_improvements": 4
+      },
+      "action": {
+        "play_card": {
+          "card_id": "D145"
+        }
+      },
+      "expected": {
+        "owner_resources": {
+          "reed": 5
+        }
+      },
+      "notes": "4 major improvements. Gain 5 reed."
+    }
+  ]
+}

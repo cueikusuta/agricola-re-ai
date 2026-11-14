@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "card_id": "D148",
+  "cases": [
+    {
+      "id": "D148-two-adjacent-rooms-2-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "rooms": [
+          { "type": "wood", "position": [0, 0] },
+          { "type": "wood", "position": [1, 0] }
+        ]
+      },
+      "action": {
+        "count_sheep_capacity": {}
+      },
+      "expected": {
+        "extra_sheep_capacity": 2
+      },
+      "notes": "Two adjacent rooms. One gap between them = 2 sheep capacity."
+    },
+    {
+      "id": "D148-three-rooms-linear-4-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "rooms": [
+          { "type": "wood", "position": [0, 0] },
+          { "type": "clay", "position": [1, 0] },
+          { "type": "stone", "position": [2, 0] }
+        ]
+      },
+      "action": {
+        "count_sheep_capacity": {}
+      },
+      "expected": {
+        "extra_sheep_capacity": 4
+      },
+      "notes": "Three rooms in a line. Two gaps (0-1, 1-2) = 4 sheep capacity."
+    },
+    {
+      "id": "D148-four-rooms-square-8-sheep",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "rooms": [
+          { "type": "wood", "position": [0, 0] },
+          { "type": "clay", "position": [1, 0] },
+          { "type": "stone", "position": [0, 1] },
+          { "type": "reed", "position": [1, 1] }
+        ]
+      },
+      "action": {
+        "count_sheep_capacity": {}
+      },
+      "expected": {
+        "extra_sheep_capacity": 8
+      },
+      "notes": "Four rooms in 2x2 square. Four gaps (horizontal: 2, vertical: 2) = 8 sheep capacity."
+    },
+    {
+      "id": "D148-no-adjacent-rooms",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "rooms": [
+          { "type": "wood", "position": [0, 0] },
+          { "type": "clay", "position": [2, 0] }
+        ]
+      },
+      "action": {
+        "count_sheep_capacity": {}
+      },
+      "expected": {
+        "extra_sheep_capacity": 0
+      },
+      "notes": "Rooms not orthogonally adjacent (gap between). No extra capacity."
+    }
+  ]
+}

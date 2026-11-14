@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "card_id": "D149",
+  "cases": [
+    {
+      "id": "D149-other-player-quarry-choose-food",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "current_player": 2,
+        "players": [
+          { "food": 0, "stables": 0 },
+          { "food": 0, "stables": 0 }
+        ]
+      },
+      "action": {
+        "player_uses_action": {
+          "player": 2,
+          "action": "quarry",
+          "casual_worker_choice": "food"
+        }
+      },
+      "expected": {
+        "players": [
+          { "food": 1, "stables": 0 },
+          { "food": 0, "stables": 0 }
+        ]
+      },
+      "notes": "Player 2 uses Quarry. Player 1 (owner) chooses food. Gain 1 food."
+    },
+    {
+      "id": "D149-other-player-quarry-choose-stable",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "current_player": 2,
+        "players": [
+          { "food": 0, "stables": 0, "wood": 0 },
+          { "food": 0, "stables": 0 }
+        ]
+      },
+      "action": {
+        "player_uses_action": {
+          "player": 2,
+          "action": "quarry",
+          "casual_worker_choice": "stable"
+        }
+      },
+      "expected": {
+        "players": [
+          { "food": 0, "stables": 1, "wood": 0 },
+          { "food": 0, "stables": 0 }
+        ]
+      },
+      "notes": "Player 2 uses Quarry. Player 1 chooses stable. Build 1 stable without paying wood."
+    },
+    {
+      "id": "D149-other-player-quarry-decline",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "current_player": 2,
+        "players": [
+          { "food": 0, "stables": 0 },
+          { "food": 0, "stables": 0 }
+        ]
+      },
+      "action": {
+        "player_uses_action": {
+          "player": 2,
+          "action": "quarry",
+          "casual_worker_choice": "none"
+        }
+      },
+      "expected": {
+        "players": [
+          { "food": 0, "stables": 0 },
+          { "food": 0, "stables": 0 }
+        ]
+      },
+      "notes": "Player 2 uses Quarry. Player 1 declines both options. No effect."
+    },
+    {
+      "id": "D149-other-player-other-action",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "current_player": 2,
+        "players": [
+          { "food": 0, "stables": 0 },
+          { "food": 0, "stables": 0 }
+        ]
+      },
+      "action": {
+        "player_uses_action": {
+          "player": 2,
+          "action": "day_laborer"
+        }
+      },
+      "expected": {
+        "players": [
+          { "food": 0, "stables": 0 },
+          { "food": 0, "stables": 0 }
+        ]
+      },
+      "notes": "Player 2 uses Day Laborer, not Quarry. No effect."
+    }
+  ]
+}

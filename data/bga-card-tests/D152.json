@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "card_id": "D152",
+  "cases": [
+    {
+      "id": "D152-play-occupation-after-gain-food",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "patron_played_first": true,
+        "food": 0
+      },
+      "action": {
+        "play_card": {
+          "card_id": "D137",
+          "card_type": "occupation"
+        }
+      },
+      "expected": {
+        "food": 2
+      },
+      "notes": "Patron played first, then play another occupation (D137). Gain 2 food before paying D137 cost."
+    },
+    {
+      "id": "D152-play-occupation-before-no-effect",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": false,
+        "food": 0
+      },
+      "action": {
+        "play_card": {
+          "card_id": "D137",
+          "card_type": "occupation"
+        }
+      },
+      "expected": {
+        "food": 0
+      },
+      "notes": "Play occupation before Patron. No food gained (Patron not in play yet)."
+    },
+    {
+      "id": "D152-play-minor-improvement-no-effect",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "patron_played_first": true,
+        "food": 0
+      },
+      "action": {
+        "play_card": {
+          "card_id": "D001",
+          "card_type": "minor_improvement"
+        }
+      },
+      "expected": {
+        "food": 0
+      },
+      "notes": "Play minor improvement after Patron. Effect only triggers on occupations, not minor improvements."
+    },
+    {
+      "id": "D152-multiple-occupations-after",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "patron_played_first": true,
+        "food": 0
+      },
+      "action": {
+        "play_cards": [
+          { "card_id": "D137", "card_type": "occupation" },
+          { "card_id": "D138", "card_type": "occupation" },
+          { "card_id": "D139", "card_type": "occupation" }
+        ]
+      },
+      "expected": {
+        "food": 6
+      },
+      "notes": "Play 3 occupations after Patron. Gain 2 food each = 6 food total."
+    }
+  ]
+}
