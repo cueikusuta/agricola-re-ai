@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "card_id": "C146",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "工房の助手",
+    "name_en": "Workshop Assistant"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2943",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "place_resource_pairs_on_improvements",
+            "scope": "all_owned_improvements",
+            "pair_size": 2,
+            "building_resources_only": true,
+            "distinct_goods_within_pair": true,
+            "unique_pair_per_improvement": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "On play, place a pair of 2 different building resources on each of your improvements, a different pair per improvement (source of the pairs flagged in unresolved)."
+    },
+    {
+      "trigger": "after_renovation",
+      "conditions": [
+        {
+          "predicate": "other_player_only",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "move_resource_pair_to_supply",
+            "pairs": 1,
+            "from": "improvements"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Each time another player renovates you may move one placed pair to your supply (retrieval operation flagged in unresolved)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.resource_source: the wiki does not state whether the placed pairs come from the general supply or from the owner's own stock",
+      "effects.1.retrieval_op: moving a stored pair from an improvement to the owner's supply has no established operation; modeled descriptively"
+    ],
+    "test_case_ids": [
+      "C146-pairs-placed",
+      "C146-claim-pair",
+      "C146-modeling-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Place a unique pair of different building resources on each of your improvements. Each time another player renovates, you may move one such pair to your supply."
+  }
+}

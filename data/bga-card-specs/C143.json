@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "card_id": "C143",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "石買い付け人",
+    "name_en": "Stone Buyer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2946",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "food",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "stone",
+                "amount": 2
+              }
+            ],
+            "exactly": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When you play this card you may immediately buy exactly 2 stone for 1 food."
+    },
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "buy_stone",
+            "food_cost": 2,
+            "stone_amount": 1,
+            "once_per_round": true,
+            "starts_round_after_play": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_round",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "From the next round on, once per round you may buy 1 stone for 2 food (window within the round flagged in unresolved; same class as C009 purchase_window)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.1.purchase_window: the exact moment within each round when the 2-food stone purchase may happen is not stated by the wiki (same class as C009 Automatic Water Trough)"
+    ],
+    "test_case_ids": [
+      "C143-on-play",
+      "C143-roundly",
+      "C143-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "On play you can buy exactly 2 stone for 1 food; from the next round on, once per round, you can buy 1 stone for 2 food."
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "card_id": "C150",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "オウムブリーダー",
+    "name_en": "Parrot Breeder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2939",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "your_turn_in_work_phase",
+      "conditions": [
+        {
+          "predicate": "right_neighbor_last_used",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1,
+            "destination": "general_supply"
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "reuse_neighbor_used_space",
+            "neighbor": "right",
+            "allow_occupied": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_turn",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "On your turn you may pay 1 grain to the general supply to use the action space your right neighbor used on their just-ended turn (neighbor-restriction predicate and frequency limits flagged in unresolved)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.predicate: restricting the reusable space to the one the right neighbor just used has no established predicate (A130 reuse_second_person_space is unrestricted)",
+      "effects.0.frequency_limit: how often the reuse may happen (per placement, once per turn, once per round) is not stated by the wiki"
+    ],
+    "test_case_ids": [
+      "C150-normal",
+      "C150-wrong-neighbor",
+      "C150-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "On your turn, if you pay 1 grain to the general supply, you can use the same action space that the player to your right has just used on their turn."
+  }
+}

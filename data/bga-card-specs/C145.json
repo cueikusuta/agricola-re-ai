@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "card_id": "C145",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "森林評論家",
+    "name_en": "Forest Reviewer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2944",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "grove",
+              "forest"
+            ]
+          }
+        },
+        {
+          "predicate": "any_player",
+          "params": {}
+        },
+        {
+          "predicate": "other_of_pair_occupied",
+          "params": {
+            "spaces": [
+              "grove",
+              "forest"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "reed",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time any player (including you) uses the (previously unoccupied) Grove or Forest accumulation space while the other of the two is occupied, you gain 1 reed (relational pair condition flagged in unresolved)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.pair_condition: 'while the other of the two is occupied' needs a relational occupancy predicate tied to the used space; space_occupied (A141) is absolute conjunctive only and cannot express 'the other of the pair'"
+    ],
+    "test_case_ids": [
+      "C145-pair-condition",
+      "C145-other-unoccupied",
+      "C145-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Each time after any player (including you) uses the unoccupied Grove or Forest accumulation space while the other of the two is occupied, you get 1 reed."
+  }
+}

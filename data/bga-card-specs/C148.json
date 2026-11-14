@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "card_id": "C148",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "泥だらけの入居者",
+    "name_en": "Mud Wallower"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "no",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2941",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "is_cumulative_space",
+          "params": {
+            "any": true
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "stack_goods_on_card",
+            "good": "clay",
+            "amount_per_use": 1,
+            "source": "general_supply"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each time you use an accumulation space, place 1 clay from the general supply on this card (E051 stack_goods_on_card pattern; any-space generalization flagged in unresolved)."
+    },
+    {
+      "trigger": "card_clay_reaches",
+      "conditions": [
+        {
+          "predicate": "card_clay_at_least",
+          "params": {
+            "n": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "card",
+          "params": {
+            "give": [
+              {
+                "good": "clay",
+                "amount": 4,
+                "source": "card"
+              }
+            ],
+            "receive": [
+              {
+                "good": "wild_boar",
+                "amount": 1,
+                "destination": "card"
+              }
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_occurrence",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "You must immediately exchange 4 clay on this card for 1 wild boar held by this card (trigger name descriptive; threshold trigger flagged in unresolved)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.predicate: is_cumulative_space is generalized from the space-name/resource-scoped precedents (B092/B108) to any accumulation space; the generalized form has no bga_checked precedent",
+      "effects.1.trigger: the mandatory immediate exchange when clay on the card reaches 4 has no established trigger vocabulary (descriptive, same class as C070's descriptive harvest hook)"
+    ],
+    "test_case_ids": [
+      "C148-stack",
+      "C148-mandatory-exchange",
+      "C148-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Each time you use an accumulation space, place 1 clay from the general supply on this card; you must immediately exchange 4 clay on this card for 1 wild boar held by this card."
+  }
+}
