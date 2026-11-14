@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "card_id": "D123",
+  "cases": [
+    {
+      "id": "D123-build-wood-room-gain-brick",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D123"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D123: Each time you build a wood/brick room, gain 2 brick / 2 stone per room respectively."
+    },
+    {
+      "id": "D123-build-brick-room-gain-stone",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D123"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D123: Each time you build a wood/brick room, gain 2 brick / 2 stone per room respectively."
+    }
+  ]
+}

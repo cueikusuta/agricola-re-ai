@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "D129",
+  "cases": [
+    {
+      "id": "D129-harvest-stock-5-wood-build-stable",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D129"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D129: Each harvest when stock has 5+ wood: may discard wood down to 5 to take Build Stable or Build Wood Room action, paying normal cost."
+    },
+    {
+      "id": "D129-harvest-stock-5-wood-build-wood-room",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D129"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D129: Each harvest when stock has 5+ wood: may discard wood down to 5 to take Build Stable or Build Wood Room action, paying normal cost."
+    },
+    {
+      "id": "D129-discard-down-to-5",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D129"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D129: Each harvest when stock has 5+ wood: may discard wood down to 5 to take Build Stable or Build Wood Room action, paying normal cost."
+    }
+  ]
+}

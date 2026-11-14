@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "card_id": "D125",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "森林交易人",
+    "name_en": "Forest Trader"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2796",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "Each time you use a wood or brick accumulation space, you may buy exactly 1 building material. Wood/brick/reed cost 1 food; stone costs 2 food."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: modification of accumulation space action with purchase option needs integration with action resolution",
+      "effects: 'exactly 1 building material' choice and food cost by material type needs decision_owner clarification"
+    ],
+    "test_case_ids": [
+      "D125-wood-accumulation-buy-reed",
+      "D125-brick-accumulation-buy-stone"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. Ongoing: when using wood or brick accumulation space, may purchase 1 building material (wood/brick/reed: 1 food; stone: 2 food). Status: needs_resolution due to action modification formalization."
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "D130",
+  "cases": [
+    {
+      "id": "D130-did-not-use-meeting-place-build-room",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D130"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D130: At end of work phase if you didn't use Meeting Place action space: may take Build Room action without placing a person."
+    },
+    {
+      "id": "D130-used-meeting-place-no-effect",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D130"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D130: At end of work phase if you didn't use Meeting Place action space: may take Build Room action without placing a person."
+    },
+    {
+      "id": "D130-archway-interaction",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D130"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D130: At end of work phase if you didn't use Meeting Place action space: may take Build Room action without placing a person."
+    }
+  ]
+}

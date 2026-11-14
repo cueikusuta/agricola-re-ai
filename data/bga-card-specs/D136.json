@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "D136",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "家畜活動家",
+    "name_en": "Animal Activist"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2785",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "If 3/6/9 rounds remaining: immediately gain 2/3/4 wood. At scoring: player with most fenced stables gains 2 bonus points."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0]: on-play wood gain based on rounds remaining (3/6/9 -> 2/3/4) needs round-count predicate",
+      "effects[1]: scoring tiebreaker for 'most fenced stables' needs tie-resolution rule (max 4 stables possible)",
+      "effects[1]: wiki notes Pasture Master (牧場長) and Pickle Maker (ピクルス作り) can contest stables"
+    ],
+    "test_case_ids": [
+      "D136-on-play-9-rounds-remaining-gain-4-wood",
+      "D136-on-play-3-rounds-remaining-gain-2-wood",
+      "D136-scoring-most-fenced-stables-bonus"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. On play: if 3/6/9 rounds remain, gain 2/3/4 wood respectively. At scoring: player with most fenced stables gains 2 bonus VP. Max 4 stables possible. Status: needs_resolution due to round-count predicate and scoring tiebreaker."
+  }
+}

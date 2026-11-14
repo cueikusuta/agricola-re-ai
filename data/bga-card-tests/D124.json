@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "D124",
+  "cases": [
+    {
+      "id": "D124-exchange-wood-for-stone",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D124"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D124: Anytime: place 1 good from supply on this card to gain 1 stone. Each good placed must be different (food counts as a good)."
+    },
+    {
+      "id": "D124-exchange-food-for-stone",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D124"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D124: Anytime: place 1 good from supply on this card to gain 1 stone. Each good placed must be different (food counts as a good)."
+    },
+    {
+      "id": "D124-uniqueness-constraint",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D124"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D124: Anytime: place 1 good from supply on this card to gain 1 stone. Each good placed must be different (food counts as a good)."
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "D136",
+  "cases": [
+    {
+      "id": "D136-on-play-9-rounds-remaining-gain-4-wood",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D136"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D136: If 3/6/9 rounds remaining: immediately gain 2/3/4 wood. At scoring: player with most fenced stables gains 2 bonus points."
+    },
+    {
+      "id": "D136-on-play-3-rounds-remaining-gain-2-wood",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D136"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D136: If 3/6/9 rounds remaining: immediately gain 2/3/4 wood. At scoring: player with most fenced stables gains 2 bonus points."
+    },
+    {
+      "id": "D136-scoring-most-fenced-stables-bonus",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D136"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D136: If 3/6/9 rounds remaining: immediately gain 2/3/4 wood. At scoring: player with most fenced stables gains 2 bonus points."
+    }
+  ]
+}

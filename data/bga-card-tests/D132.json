@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "card_id": "D132",
+  "cases": [
+    {
+      "id": "D132-scoring-pay-food-negate-penalty",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D132"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D132: At scoring: for any number of unused farm spaces, pay 1 food per space; those spaces don't give negative points."
+    },
+    {
+      "id": "D132-scoring-choose-spaces",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D132"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D132: At scoring: for any number of unused farm spaces, pay 1 food per space; those spaces don't give negative points."
+    },
+    {
+      "id": "D132-village-chief-achievement",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D132"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D132: At scoring: for any number of unused farm spaces, pay 1 food per space; those spaces don't give negative points."
+    }
+  ]
+}

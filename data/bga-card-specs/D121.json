@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "card_id": "D121",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "左官",
+    "name_en": "Clay Plasterer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2800",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "ongoing",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "Renovation to brick house costs exactly 1 brick + 1 reed. Building a brick room costs 3 brick + 2 reed."
+          },
+          "notes": "Effect summary from BGA wiki; formalization pending"
+        }
+      ],
+      "optional": false,
+      "frequency": "continuous",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: cost replacement for renovation (brick house 1 brick+1 reed) needs formal discount_cost params",
+      "effects: cost replacement for building brick room (3 brick+2 reed) needs formal discount_cost params",
+      "effects: interaction with 'レンガの柱' (Brick Pillar) noted as not combining; needs clarification in engine"
+    ],
+    "test_case_ids": [
+      "D121-renovation-cost",
+      "D121-build-brick-room-cost"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "Occupation. Replaces renovation cost to brick house with 1 brick+1 reed; replaces brick room build cost with 3 brick+2 reed. Cost replacement so does not combine with Brick Pillar. Status: needs_resolution due to cost formalization gaps."
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "card_id": "D125",
+  "cases": [
+    {
+      "id": "D125-wood-accumulation-buy-reed",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D125"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D125: Each time you use a wood or brick accumulation space, you may buy exactly 1 building material. Wood/brick/reed cost 1 food; stone costs 2 food."
+    },
+    {
+      "id": "D125-brick-accumulation-buy-stone",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D125"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D125: Each time you use a wood or brick accumulation space, you may buy exactly 1 building material. Wood/brick/reed cost 1 food; stone costs 2 food."
+    }
+  ]
+}

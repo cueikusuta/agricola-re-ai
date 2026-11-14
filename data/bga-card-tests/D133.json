@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "card_id": "D133",
+  "cases": [
+    {
+      "id": "D133-feeding-phase-convert-wood-grain",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D133"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D133: During harvest feeding phase: may use this card to convert 1 wood + 1 grain into 1 bonus point + 2 food."
+    },
+    {
+      "id": "D133-optional-activation",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "D133"
+      },
+      "expected": {
+        "play_allowed": true
+      },
+      "notes": "Test case for D133: During harvest feeding phase: may use this card to convert 1 wood + 1 grain into 1 bonus point + 2 food."
+    }
+  ]
+}
