@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "card_id": "D159",
+  "cases": [
+    {
+      "id": "D159-reed-to-food",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {
+        "verify_effect": "D159-reed-to-food"
+      },
+      "expected": {
+        "effect_verified": true
+      },
+      "notes": "Test case for D159: D159-reed-to-food"
+    },
+    {
+      "id": "D159-other-player-block",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {
+        "verify_effect": "D159-other-player-block"
+      },
+      "expected": {
+        "effect_verified": true
+      },
+      "notes": "Test case for D159: D159-other-player-block"
+    }
+  ]
+}
