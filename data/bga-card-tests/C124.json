@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "C124",
+  "cases": [
+    {
+      "id": "C124-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C124"
+      },
+      "expected": {
+        "resources_gained": {}
+      },
+      "notes": "No immediate effect on play"
+    },
+    {
+      "id": "C124-harvest-1",
+      "scope": "effect_only",
+      "setup": {
+        "harvest_number": 1,
+        "resources": {
+          "food": 5
+        }
+      },
+      "action": {
+        "play": "C124",
+        "then_trigger_harvest_breeding": true,
+        "choose_pay_food_for_stone": true
+      },
+      "expected": {
+        "resources_spent": {
+          "food": 2
+        },
+        "resources_gained": {
+          "stone": 1
+        }
+      },
+      "notes": "1st harvest: pay 2 food to gain 1 stone"
+    },
+    {
+      "id": "C124-harvest-3",
+      "scope": "effect_only",
+      "setup": {
+        "harvest_number": 3,
+        "resources": {
+          "food": 5
+        }
+      },
+      "action": {
+        "play": "C124",
+        "then_trigger_harvest_breeding": true,
+        "choose_pay_food_for_stone": true
+      },
+      "expected": {
+        "resources_spent": {
+          "food": 3
+        },
+        "resources_gained": {
+          "stone": 1
+        }
+      },
+      "notes": "3rd harvest: pay 3 food to gain 1 stone"
+    },
+    {
+      "id": "C124-harvest-6",
+      "scope": "effect_only",
+      "setup": {
+        "harvest_number": 6,
+        "resources": {
+          "food": 3
+        }
+      },
+      "action": {
+        "play": "C124",
+        "then_trigger_harvest_breeding": true,
+        "choose_pay_food_for_stone": true
+      },
+      "expected": {
+        "resources_spent": {
+          "food": 1
+        },
+        "resources_gained": {
+          "stone": 1
+        }
+      },
+      "notes": "6th harvest: pay 1 food to gain 1 stone"
+    }
+  ]
+}

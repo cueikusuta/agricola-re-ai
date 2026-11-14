@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "C127",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "愛人",
+    "name_en": "Lover"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2962",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "family_growth_without_room",
+            "cost": {
+              "food": "rounds_remaining"
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "On play, pay food equal to rounds remaining, then Family Growth without needing a room"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact calculation of 'rounds remaining' (includes current round?)",
+      "effects: whether food payment is mandatory or can choose not to grow",
+      "effects: interaction with other family growth effects"
+    ],
+    "test_case_ids": [
+      "C127-normal",
+      "C127-early-game",
+      "C127-late-game"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "On play: pay food equal to number of rounds not yet started, then take Family Growth action without needing a room. Not available in 2-player games."
+  }
+}

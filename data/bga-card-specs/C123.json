@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "card_id": "C123",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "フリーメイソン",
+    "name_en": "Freemason"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2966",
+        "language": "ja",
+        "checked_on": "2026-11-14",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-14",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "house_type",
+          "params": {
+            "type": "clay",
+            "rooms": 2
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_phase",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At start of each Work Phase, if living in a 2-room clay house, gain 2 clay"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "house_type",
+          "params": {
+            "type": "stone",
+            "rooms": 2
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "stone",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "per_phase",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "At start of each Work Phase, if living in a 2-room stone house, gain 2 stone"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exact timing of 'start of Work Phase' (before or after placing people)",
+      "effects: whether both clay and stone house conditions can be met simultaneously",
+      "effects: whether renovation to 2-room clay/stone house triggers immediately"
+    ],
+    "test_case_ids": [
+      "C123-normal",
+      "C123-clay-house",
+      "C123-stone-house"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
+    "implementation_status": "not_started",
+    "notes": "While living in exactly 2-room clay house: gain 2 clay at start of each Work Phase. While in exactly 2-room stone house: gain 2 stone at start of each Work Phase."
+  }
+}

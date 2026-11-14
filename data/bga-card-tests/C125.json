@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "C125",
+  "cases": [
+    {
+      "id": "C125-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C125"
+      },
+      "expected": {
+        "resources_gained": {}
+      },
+      "notes": "No immediate effect on play"
+    },
+    {
+      "id": "C125-wood-accumulation",
+      "scope": "effect_only",
+      "setup": {
+        "resources": {
+          "wood": 0,
+          "clay": 2,
+          "reed": 1,
+          "stone": 0
+        }
+      },
+      "action": {
+        "play": "C125",
+        "then_start_work_phase": true,
+        "choose_accumulation_space": "wood"
+      },
+      "expected": {
+        "worker_placed_on": "wood_accumulation"
+      },
+      "notes": "With 0 wood, can place on wood accumulation space before Work Phase"
+    },
+    {
+      "id": "C125-clay-accumulation",
+      "scope": "effect_only",
+      "setup": {
+        "resources": {
+          "wood": 3,
+          "clay": 0,
+          "reed": 1,
+          "stone": 0
+        }
+      },
+      "action": {
+        "play": "C125",
+        "then_start_work_phase": true,
+        "choose_accumulation_space": "clay"
+      },
+      "expected": {
+        "worker_placed_on": "clay_accumulation"
+      },
+      "notes": "With 0 clay, can place on clay accumulation space before Work Phase"
+    }
+  ]
+}
