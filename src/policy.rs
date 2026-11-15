@@ -532,40 +532,36 @@ fn card_priority(
     let horizon = i64::from(15u8.saturating_sub(round)).min(5);
     for effect in &card.effects {
         value += match effect {
-            // Exact gains and discounted costs were simulated above.
-            CardEffect::OnPlayGain { .. }
-            | CardEffect::OnPlayGainPerStored { .. }
-            | CardEffect::OnPlayGainIfHouse { .. }
-            | CardEffect::Prerequisite { .. } => 0,
-            #[cfg(test)]
-            // Test-only probe; never part of a real evaluated pool.
-            CardEffect::PendingProbe { .. } => 0,
-            CardEffect::AfterWorkerGain { good, amount, .. }
-            | CardEffect::StartRoundGain { good, amount, .. }
-            | CardEffect::StartRoundGainIfFoodAtLeastRound { good, amount, .. }
-            // C116's wood-per-food-cost is occupation-cost dependent; the
-            // heuristic treats one grant per remaining round as an upper bound.
-            | CardEffect::AfterOccupationGainPerFoodCost { good, amount, .. } => {
-                card_good_value(*good) * i64::from(*amount) * horizon
-            }
-            CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
-            | CardEffect::HarvestFieldGain { good, amount, .. }
-            | CardEffect::AfterClayConstructionGain { good, amount }
-            // E111's halves fire only while the owner stays minor-free; the
-            // heuristic accepts the conditional gain optimistically.
-            | CardEffect::StartRoundGainIfNoMinorPlayed { good, amount, .. }
-            | CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount, .. } => {
-                card_good_value(*good) * i64::from(*amount) * horizon / 2
-            }
-            // A117: one grant per improvement already played, evaluated once
-            // at play time.
-            CardEffect::OnPlayGainPerImprovementPlayed { good, amount, .. } => {
-                card_good_value(*good) * i64::from(*amount)
-            }
-            CardEffect::Passive { .. } => horizon * 5,
-            CardEffect::EndGameBonus { .. } => 12,
-            CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
-        };
+                // Exact gains and discounted costs were simulated above.
+                CardEffect::OnPlayGain { .. }
+                | CardEffect::OnPlayGainPerStored { .. }
+                | CardEffect::OnPlayGainIfHouse { .. }
+                | CardEffect::OnPlayGainPerImprovementPlayed { .. }
+                | CardEffect::Prerequisite { .. } => 0,
+                #[cfg(test)]
+                // Test-only probe; never part of a real evaluated pool.
+                CardEffect::PendingProbe { .. } => 0,
+                CardEffect::AfterWorkerGain { good, amount, .. }
+                | CardEffect::StartRoundGain { good, amount, .. }
+                | CardEffect::StartRoundGainIfFoodAtLeastRound { good, amount, .. }
+                // C116's wood-per-food-cost is occupation-cost dependent; the
+                // heuristic treats one grant per remaining round as an upper bound.
+                | CardEffect::AfterOccupationGainPerFoodCost { good, amount, .. } => {
+                    card_good_value(*good) * i64::from(*amount) * horizon
+                }
+                CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
+                | CardEffect::HarvestFieldGain { good, amount, .. }
+                | CardEffect::AfterClayConstructionGain { good, amount }
+                // E111's halves fire only while the owner stays minor-free; the
+                // heuristic accepts the conditional gain optimistically.
+                | CardEffect::StartRoundGainIfNoMinorPlayed { good, amount, .. }
+                | CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount, .. } => {
+                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                }
+                CardEffect::Passive { .. } => horizon * 5,
+                CardEffect::EndGameBonus { .. } => 12,
+                CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
+            };
     }
     Some(value)
 }
