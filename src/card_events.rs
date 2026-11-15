@@ -55,6 +55,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterWorkerGainIfUsed { .. } => TriggerPhase::After,
         // Round start — After phase (happens after round begins)
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
+        CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
         // Clay construction purchase — After phase
         CardEffect::AfterClayConstructionGain { .. } => TriggerPhase::After,
         // Harvest/baking — After phase
@@ -443,6 +444,9 @@ fn resolve_phase_scan(
             // For effects that target other players (beneficiary != card_owner),
             // set the beneficiary in context. Default is card_owner.
             ctx.beneficiary = player;
+            // Read before the match: the handler arms re-borrow ctx mutably, so a
+            // copy of the round number is needed for round-conditioned effects.
+            let round_now = ctx.round;
 
             // Dispatch to handler
             let result = match effect {
@@ -494,6 +498,11 @@ fn resolve_phase_scan(
                     house,
                     rooms,
                 } => handle_start_round_gain(ctx, player, good, *amount, house, rooms)?,
+                CardEffect::StartRoundGainIfFoodAtLeastRound { good, amount } => {
+                    handle_start_round_gain_if_food_at_least_round(
+                        ctx, player, good, *amount, round_now,
+                    )?
+                }
                 CardEffect::AfterClayConstructionGain { good, amount } => {
                     handle_after_clay_construction_gain(ctx, player, good, *amount, trigger_data)?
                 }
@@ -619,7 +628,7 @@ fn effect_condition_holds(
     player: &Player,
     _actor: usize,
     used_spaces: &std::collections::BTreeSet<Space>,
-    _round: u8,
+    round: u8,
 ) -> bool {
     match effect {
         CardEffect::AfterWorkerGain { space, .. } => trigger.space == Some(*space),
@@ -632,6 +641,11 @@ fn effect_condition_holds(
             let house_ok = house.is_none_or(|h| player.house == h);
             let rooms_ok = rooms.is_none_or(|r| player.rooms() == usize::from(r));
             house_ok && rooms_ok
+        }
+        CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
+            // C111 小動物飼育員: the threshold is the current round number
+            // (e.g. 8+ food in round 8); the handler grants the gain.
+            player.supply.food >= u32::from(round)
         }
         CardEffect::AfterClayConstructionGain { .. } => {
             let Some(prev) = &trigger.previous_player else {
@@ -724,6 +738,9 @@ pub fn execute_chosen_triggers(
 
         ctx.card_owner = player;
         ctx.beneficiary = player;
+        // Read before the match: the handler arms re-borrow ctx mutably, so a
+        // copy of the round number is needed for round-conditioned effects.
+        let round_now = ctx.round;
 
         // Dispatch to handler
         let result = match effect {
@@ -775,6 +792,11 @@ pub fn execute_chosen_triggers(
                 house,
                 rooms,
             } => handle_start_round_gain(ctx, player, good, *amount, house, rooms)?,
+            CardEffect::StartRoundGainIfFoodAtLeastRound { good, amount } => {
+                handle_start_round_gain_if_food_at_least_round(
+                    ctx, player, good, *amount, round_now,
+                )?
+            }
             CardEffect::AfterClayConstructionGain { good, amount } => {
                 handle_after_clay_construction_gain(ctx, player, good, *amount, trigger_data)?
             }
@@ -1051,6 +1073,30 @@ fn handle_start_round_gain(
     Ok(EffectResult::Resolved)
 }
 
+/// C111 小動物飼育員: at the round-start trigger, grant the gain when the
+/// owner's food stock is at least the current round number (e.g. 8+ food in
+/// round 8). The condition itself was already checked by
+/// `effect_condition_holds`; re-checking here keeps the handler correct for
+/// every call site (execute_chosen_triggers included).
+fn handle_start_round_gain_if_food_at_least_round(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    good: &Good,
+    amount: u32,
+    round: u8,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    if p.supply.food >= u32::from(round) {
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
 fn handle_after_clay_construction_gain(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
@@ -1128,6 +1174,23 @@ fn handle_harvest_field_gain(
                 })
             };
             u32::from(has(Some(Crop::Grain)) && has(Some(Crop::Vegetable)) && has(None))
+        }
+        crate::cards::HarvestFieldRule::VegetablesHarvested => {
+            // Same definition as cards::vegetable_yield: the dispatcher runs
+            // before crops are removed, so growing vegetable fields equal the
+            // vegetables this field phase will yield (one per field).
+            p.farm
+                .iter()
+                .filter(|cell| {
+                    matches!(
+                        cell.tile,
+                        crate::model::Tile::Field {
+                            crop: Some(Crop::Vegetable),
+                            remaining: 1..,
+                        }
+                    )
+                })
+                .count() as u32
         }
     };
     let gain = multiplier
@@ -1850,6 +1913,25 @@ pub mod legacy {
                                     && has(Some(crate::model::Crop::Vegetable))
                                     && has(None),
                             )
+                        }
+                        crate::cards::HarvestFieldRule::VegetablesHarvested => {
+                            // Same definition as cards::vegetable_yield: the
+                            // dispatcher runs before crops are removed, so
+                            // growing vegetable fields equal the vegetables
+                            // this field phase will yield (one per field).
+                            player
+                                .farm
+                                .iter()
+                                .filter(|cell| {
+                                    matches!(
+                                        cell.tile,
+                                        crate::model::Tile::Field {
+                                            crop: Some(crate::model::Crop::Vegetable),
+                                            remaining: 1..,
+                                        }
+                                    )
+                                })
+                                .count() as u32
                         }
                     };
                     let gain = multiplier
@@ -3593,5 +3675,92 @@ mod tests {
             "each effect must fire exactly once"
         );
         assert_eq!(game.event_budget, 62, "two effects consume two budget");
+    }
+
+    /// C111 小動物飼育員 via the production round-start dispatcher: the
+    /// threshold compares food with the CURRENT round number.
+    #[test]
+    fn c111_round_start_food_threshold_uses_current_round() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let dispatch = |food: u32, round: u8| {
+            let mut c = Ctx::new();
+            c.players[0].played_cards = vec!["C111".into()];
+            c.players[0].supply.food = food;
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            dispatch_start_round(
+                &set,
+                &mut c.players,
+                &mut c.cards,
+                &mut market,
+                &mut well,
+                round,
+                &BTreeSet::new(),
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+            )
+            .unwrap();
+            c.players[0].supply.food
+        };
+        // Round 5: 4 food < 5 → no gain; 5 food >= 5 → +1.
+        assert_eq!(dispatch(4, 5), 4);
+        assert_eq!(dispatch(5, 5), 6);
+        // Round 8: 7 food < 8 → no gain; 8 food >= 8 → +1.
+        assert_eq!(dispatch(7, 8), 7);
+        assert_eq!(dispatch(8, 8), 9);
+        // The band set must not change the built-in A/B preset pool.
+        let preset = crate::cards::verified_basic_card_set(2).unwrap();
+        assert!(preset.definition("C111").is_none());
+    }
+
+    /// C106 じゃがいも収穫者 via the production harvest-field dispatcher:
+    /// 1 extra food per vegetable the field phase is about to yield.
+    #[test]
+    fn c106_harvest_field_food_per_growing_vegetable_field() {
+        use crate::model::{Crop, Tile};
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C106".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        c.players[0].farm[3].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 3,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 2,
+            "two growing vegetable fields must grant 2 food"
+        );
     }
 }

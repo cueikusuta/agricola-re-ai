@@ -85,6 +85,16 @@ pub enum CardEffect {
     AfterHarvestBakeGain {
         amount: u32,
     },
+    /// C111 小動物飼育員 (Small Animal Breeder): at each round start, if the
+    /// owner's food stock is at least the current round number, gain `amount`
+    /// of `good` (the printed card grants 1 food). The threshold is the round
+    /// number, so this is expressed as its own variant instead of widening the
+    /// serialized shape of `StartRoundGain` (existing saves and content hashes
+    /// must keep their exact bytes).
+    StartRoundGainIfFoodAtLeastRound {
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -107,6 +117,9 @@ impl CardEffect {
             CardEffect::Passive { .. } => "passive",
             CardEffect::AfterClayConstructionGain { .. } => "after_clay_construction_gain",
             CardEffect::AfterHarvestBakeGain { .. } => "after_harvest_bake_gain",
+            CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
+                "start_round_gain_if_food_at_least_round"
+            }
         }
     }
 }
@@ -127,8 +140,17 @@ pub enum PassiveRule {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HarvestFieldRule {
-    Animals { sheep_per: u32, cattle_per: u32 },
+    Animals {
+        sheep_per: u32,
+        cattle_per: u32,
+    },
     MixedFields,
+    /// C106 じゃがいも収穫者 (Potato Harvester): one multiplier step per
+    /// vegetable that the field phase is about to yield. The dispatcher runs
+    /// before crops are removed, and each planted vegetable field yields
+    /// exactly one good per harvest, so the count of vegetable fields with a
+    /// growing crop equals the vegetables gained this field phase.
+    VegetablesHarvested,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -247,6 +269,7 @@ impl CardSet {
                         CardEffect::OnPlayGainPerStored { amount, .. }
                         | CardEffect::OnPlayGainIfHouse { amount, .. }
                         | CardEffect::StartRoundGain { amount, .. }
+                        | CardEffect::StartRoundGainIfFoodAtLeastRound { amount, .. }
                         | CardEffect::HarvestFieldGain { amount, .. }
                         | CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | CardEffect::AfterClayConstructionGain { amount, .. }
@@ -1844,6 +1867,25 @@ pub fn start_round_rewards(set: &CardSet, player: &mut Player) -> Result<(), Str
     Ok(())
 }
 
+/// Vegetables the field phase is about to yield: one per planted vegetable
+/// field whose crop is still growing (each yields exactly one per harvest).
+/// Read pre-harvest state, before any crops are removed.
+fn vegetable_yield(player: &Player) -> u32 {
+    player
+        .farm
+        .iter()
+        .filter(|cell| {
+            matches!(
+                cell.tile,
+                Tile::Field {
+                    crop: Some(Crop::Vegetable),
+                    remaining: 1..,
+                }
+            )
+        })
+        .count() as u32
+}
+
 /// Called before taking crops from fields; livestock and field layouts still
 /// represent the state at the start of the field phase.
 pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), String> {
@@ -1866,6 +1908,7 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                         };
                         u32::from(has(Some(Crop::Grain)) && has(Some(Crop::Vegetable)) && has(None))
                     }
+                    HarvestFieldRule::VegetablesHarvested => vegetable_yield(player),
                 };
                 safe_gain(
                     player,
@@ -2433,6 +2476,230 @@ pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
         },
     ]
 }
+
+/// C-deck band 070-120 cards whose printed effects are fully expressible with
+/// the current typed effect vocabulary, sourced from the BGA Agricola card
+/// wiki (agricola.cloudfree.jp; card pages C076 p=3013, C106 p=2983,
+/// C111 p=2978, cross-checked against the English list).
+///
+/// These are deliberately kept OUT of `verified_basic_card_set`: that preset is
+/// the built-in A/B two-player pack (E/D/C-prefixed cards are filtered or never
+/// added), so adding band cards here must not change its pool size, its
+/// distribution digest, or any recorded replay hash.
+pub fn verified_band_c_cards() -> Vec<CardDefinition> {
+    fn card(
+        id: &str,
+        kind: CardKind,
+        cost: Vec<(Good, u32)>,
+        effects: Vec<CardEffect>,
+    ) -> CardDefinition {
+        CardDefinition {
+            use_limit: None,
+            id: id.to_owned(),
+            kind,
+            cost,
+            points: 0,
+            effects,
+        }
+    }
+    let minor = CardKind::MinorImprovement;
+    let occupation = CardKind::Occupation;
+    vec![
+        // C076 木材荷車 (Wood Cart): cost 3 wood, prerequisite 3 occupations
+        // played; each use of a wood accumulation space (森林/小森/林) grants
+        // 2 extra wood.
+        card(
+            "C076",
+            minor,
+            vec![(Good::Wood, 3)],
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(3),
+                },
+                CardEffect::AfterWorkerGain {
+                    space: Space::Forest,
+                    good: Good::Wood,
+                    amount: 2,
+                },
+                CardEffect::AfterWorkerGain {
+                    space: Space::Copse,
+                    good: Good::Wood,
+                    amount: 2,
+                },
+                CardEffect::AfterWorkerGain {
+                    space: Space::Grove,
+                    good: Good::Wood,
+                    amount: 2,
+                },
+            ],
+        ),
+        // C106 じゃがいも収穫者 (Potato Harvester): no cost; on play gain
+        // 3 food, and in each harvest field phase gain 1 extra food per
+        // vegetable taken from the fields.
+        card(
+            "C106",
+            occupation,
+            vec![],
+            vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 3,
+                },
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::VegetablesHarvested,
+                    good: Good::Food,
+                    amount: 1,
+                },
+            ],
+        ),
+        // C111 小動物飼育員 (Small Animal Breeder): no cost; at each round
+        // start, if food stock >= current round number, gain 1 food.
+        card(
+            "C111",
+            occupation,
+            vec![],
+            vec![CardEffect::StartRoundGainIfFoodAtLeastRound {
+                good: Good::Food,
+                amount: 1,
+            }],
+        ),
+    ]
+}
+#[cfg(test)]
+mod verified_band_c_tests {
+    use super::*;
+
+    fn set() -> CardSet {
+        CardSet {
+            definitions: verified_band_c_cards(),
+        }
+    }
+
+    fn field(crop: Option<Crop>, remaining: u8) -> Tile {
+        Tile::Field { crop, remaining }
+    }
+
+    #[test]
+    fn c076_requires_three_occupations_and_costs_three_wood() {
+        let mut set = set();
+        set.definitions.extend([
+            CardDefinition {
+                use_limit: None,
+                id: "occ1".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            },
+            CardDefinition {
+                use_limit: None,
+                id: "occ2".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            },
+            CardDefinition {
+                use_limit: None,
+                id: "occ3".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            },
+        ]);
+        let card = set.definition("C076").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 3)]);
+        assert_eq!(card.points, 0);
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 3;
+        assert!(!can_play(&set, card, &p, 0));
+        p.played_cards
+            .extend(["occ1".to_string(), "occ2".to_string(), "occ3".to_string()]);
+        assert!(can_play(&set, card, &p, 0));
+        // 支払えなければ出せない。
+        p.supply.wood = 2;
+        assert!(!can_play(&set, card, &p, 0));
+    }
+
+    #[test]
+    fn c076_gains_two_wood_on_each_wood_accumulation_space() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("C076".into());
+        after_worker(&set, &mut p, Space::Forest).unwrap();
+        assert_eq!(p.supply.wood, 2);
+        after_worker(&set, &mut p, Space::Copse).unwrap();
+        assert_eq!(p.supply.wood, 4);
+        after_worker(&set, &mut p, Space::Grove).unwrap();
+        assert_eq!(p.supply.wood, 6);
+        // 木材累積スペース以外では発動しない。
+        after_worker(&set, &mut p, Space::ClayPit).unwrap();
+        after_worker(&set, &mut p, Space::DayLaborer).unwrap();
+        assert_eq!(p.supply.wood, 6);
+        assert_eq!(p.supply.clay, 0);
+    }
+
+    #[test]
+    fn c106_gains_three_food_on_play_and_no_cost() {
+        let set = set();
+        let card = set.definition("C106").unwrap();
+        assert_eq!(card.kind, CardKind::Occupation);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+        let mut hand = vec!["C106".to_string()];
+        let mut p = Player::new(0, 0);
+        play(&set, &mut hand, &mut p, "C106", CardKind::Occupation, 0).unwrap();
+        assert_eq!(p.supply.food, 3);
+        assert_eq!(p.played_cards, vec!["C106"]);
+    }
+
+    #[test]
+    fn c106_food_per_vegetable_harvested_in_field_phase() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("C106".into());
+        // 野菜畑2（生育中）＋麦畑1 → 野菜2に対して食料2。
+        p.farm[1].tile = field(Some(Crop::Vegetable), 2);
+        p.farm[2].tile = field(Some(Crop::Vegetable), 1);
+        p.farm[3].tile = field(Some(Crop::Grain), 3);
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 2);
+        // 野菜畑が空なら追加食料なし。
+        let mut q = Player::new(0, 0);
+        q.played_cards.push("C106".into());
+        q.farm[1].tile = field(Some(Crop::Grain), 2);
+        q.farm[2].tile = field(None, 0);
+        harvest_field_rewards(&set, &mut q).unwrap();
+        assert_eq!(q.supply.food, 0);
+    }
+
+    #[test]
+    fn c111_has_no_cost_and_zero_points() {
+        let set = set();
+        let card = set.definition("C111").unwrap();
+        assert_eq!(card.kind, CardKind::Occupation);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+        let mut hand = vec!["C111".to_string()];
+        let mut p = Player::new(0, 0);
+        play(&set, &mut hand, &mut p, "C111", CardKind::Occupation, 0).unwrap();
+        assert_eq!(p.played_cards, vec!["C111"]);
+    }
+
+    #[test]
+    fn band_cards_are_absent_from_the_two_player_preset() {
+        let preset = verified_basic_card_set(2).unwrap();
+        for id in ["C076", "C106", "C111"] {
+            assert!(
+                preset.definition(id).is_none(),
+                "{id} must stay out of the A/B two-player preset"
+            );
+        }
+    }
+}
+
 pub fn verified_multiplayer_passive_cards(players: usize) -> Vec<CardDefinition> {
     if players < 3 {
         return vec![];
