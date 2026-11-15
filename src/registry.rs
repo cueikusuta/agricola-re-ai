@@ -281,6 +281,12 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
                 }
+                crate::cards::CardEffect::StartRoundGainIfNoMinorPlayed { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
+                    EventKind::Harvest
+                }
                 crate::cards::CardEffect::AfterOccupationGainPerFoodCost { .. } => {
                     EventKind::CardPlayed
                 }
@@ -369,6 +375,13 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::OnPlayGainIfHouse { amount, .. }
                         | crate::cards::CardEffect::StartRoundGain { amount, .. }
                         | crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound {
+                            amount,
+                            ..
+                        }
+                        | crate::cards::CardEffect::StartRoundGainIfNoMinorPlayed {
+                            amount, ..
+                        }
+                        | crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed {
                             amount,
                             ..
                         }
