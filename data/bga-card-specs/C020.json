@@ -20,13 +20,13 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3069",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "English list page row used to cross-check the card id and name"
       }
     ]
@@ -74,7 +74,7 @@
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "owner",
+      "decision_owner": "none",
       "notes": "Each time you use the Farmland or Cultivation accumulation space, plow 1 additional field."
     }
   ],
@@ -84,7 +84,7 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "play.prerequisites: the card may only be played in round 9 or later; no established predicate covers a play-round gate"
+      "play.prerequisites: round gate (round 9 or later) not expressible in current vocabulary; not enforced in prerequisites array"
     ],
     "test_case_ids": [
       "C020-normal",
@@ -92,8 +92,8 @@
       "C020-not-triggered"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Round 9+ play gate kept unresolved (no predicate). After play: plow 1 extra field on each Farmland/Cultivation use."
+    "notes": "Cost: 3 wood + 1 food. Prerequisite: playable only in round 9 or later (wiki: ラウンド9またはその後に出す). No established predicate for round gate. Effect: each time you use Farmland or Cultivation space, plow 1 additional field. Verified via BGA Wiki (wiki_literature - complex card with round-dependent play restriction). Source: https://agricola.cloudfree.jp/?p=3069 (ja, 2026-11-16). 条件：ラウンド9またはその後に出す。コスト：3木、1食料。効果：アクションスペース「農地」または「耕作」を使用するたび、畑1を追加で耕せる。プレイエリアに残る。"
   }
 }

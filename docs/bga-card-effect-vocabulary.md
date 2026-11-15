@@ -87,6 +87,7 @@
 | `disable_one_stable_pasture` | 厩つき牧場1つを使えなくする |
 | `require_empty_pasture` | `count`。空の牧場を維持する制約 |
 | `place_up_to_two_wood_on_card` | カード上に木材を置く |
+| `use_two_spaces_one_person` | `spaces`, `order`, `requires_both_unoccupied`。隣接する2つのスペースが両方未占有なら、1人の人物で順に両方を使用できる。C023 で使用。|
 
 ## 数量式（`amount` / `points` に入る式木）
 
@@ -254,3 +255,27 @@
 - `A095` および `A107`: `trigger=after_worker_space` の効果でも `snapshot=before_event` とし、**通常アクションで取り除く前の累積数**を判定。発動時の資源/食料は通常アクション完了後に増減。未公開・未来情報を参照しない。
 - `A111`: `after_room_construction` で各イベント1回だけ置く。複数イベントが同じラウンドに重なれば各マーカーを別々に記録し、`round_start` で**自分のカードが置いた全個数**を得る。他カード由来マーカーは保持する。
 - `A092` と `A103`: 不明点を推測実装しない。両者とも`review.status=needs_resolution`かつ`effects=null`でフェイルクローズ。定義された語彙は将来の設計候補である。
+## 2026-11-16追補：C帯 001-069 第1弾の追加語彙（Issue #225 / PR #323）
+
+### 新しいtrigger
+| trigger | 意味・参照時点 |
+|---|---|
+| `after_stable_built` | 自分の手番で厩を建設した直後。`stables_built_on_own_turn` と併用可。C056 で使用。 |
+
+### 新しいpredicate
+| predicate | パラメータ・評価 |
+|---|---|
+| `field_vegetable_stacked` | `min_stack`：畑に指定個数以上の野菜が重なっている（最上段が対象）。C057 で使用。 |
+| `cultivated_fields_at_least` | `n`：栽培中の畑が n 個以上。C018 で使用。 |
+
+### 新しい `operation:other` のkind
+| kind | params・意味 |
+|---|---|
+| `discard_field_goods_plow_one` | `requires_cultivated_fields, fields_to_clear, plow_amount`。指定畑の全品物を捨てて畑1を耕す。C018 で使用。 |
+| `buy_animal` | `animal[], food_cost{animal:amount}, requires_capacity`。家畜を食料で購入する権限。収容可能性を必須条件とする。C009 で使用。 |
+| `place_unplaced_person` | `amount, destination, immediately`。未配置の人物を即座に合法なスペースへ配置。C003 で使用。 |
+| `build_stable_alternate_cost` | `pay_good, pay_amount, once_per_build`。厩建設時に指定資源で代替支払い（1回の建設アクションで1棟まで）。C056 で使用。 |
+
+### 未解決・保留
+- `A071` と `C018` と `C057` の「いつでも（anytime）」トリガーは語彙未定義のため `needs_resolution` のまま。フリーアクションAPI（手番境界・連続実行・取消・再演ハッシュ）が定義されるまで実装禁止。
+- `C020` のラウンド依存プレイ制限（ラウンド9以降）、`C054` の厩返却コスト、柵支払い、after_field_phase トリガー、`C056` の last-stable 判定と per-build 代替支払い、`C003` の未配置人物前提、`C009` の購入時間窓は語彙外のため `needs_resolution` 保持。推測で確定しない。
