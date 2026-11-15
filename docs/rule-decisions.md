@@ -58,3 +58,27 @@
 1. **同一アクションでの非隣接な複数牧場**：現在 `build_pastures` は「新規牧場は既存牧場（または同じアクションの他の新規牧場）と辺で隣接すること」を要求する（`src/engine.rs` の "new pastures must be adjacent" / "new pasture is not adjacent to existing pasture"）。1アクションで離れた2つの牧場を作る操作は受理されない。`docs/design.md` の柵テスト項目に「隣接」とあるため、意図的な制約か実装上の都合かを公式ルール本文で確認する必要がある。影響：離れた牧場を作る人間操作がUIで拒否される。確認先：2016年改訂版ルールブック柵の項、付録 Fencing。
 2. **部屋数の上限**：`build_room` と `Game::validate` は部屋数の上限を持たず、得点も部屋数に比例する。公式コンポーネントの部屋コマ数が上限なら不変条件の追加が必要。確認先：ルールブック柵・部屋の項、Number of Components。
 3. **調理設備なしの野菜→食料**：`FreeAction::ConvertCrop` は調理設備がない場合も野菜1→食料1を許可する。暖炉・調理場の変換率（野菜1→2／3）は確認済みだが、設備なしの可否は未確認。確認先：付録 p.2。
+
+## 2026-11-16 ボーナス点の持ち場（基盤PR: `Game::bonus_points`）
+
+カードがプレイ時・ラウンド開始時・収穫時に得る「ボーナス点」（E098 神童、E101 はみだし者、
+E100 博物館の館長など）を、得点計算時に盤面から再計算できないため、どこに保持するかの設計判断。
+
+- **採用**: `Game.bonus_points: BonusPointLedger`（プレイヤーID → 発生元カードID → 累計点）を
+  bookkeeping 台帳として持つ。印刷点の合計を表す `Player.card_points`（`CardState::validate_card_points`
+  が不変条件を検査）には**加算しない**。`Player` の新フィールドにもしない（`Player` は
+  `PublicState` の中にあり、`LOG_VERSION=5` の `Game::state_hash` タプルに含まれるため、
+  追加すると既存の記録ハッシュと `tests/fixtures/v5/*` がすべて変わる）。
+- **永続化と整合性**: `state_hash` の7フィールドタプルは変更しない。台帳は `integrity_hash`
+  にのみ含め、空のときは旧タプルとバイト一致させて旧ビルドが発行したセーブの検証を通す
+  （`serde(skip_serializing_if)` により空台帳は保存JSONにも現れない）。
+- **公開情報**: カードのプレイとその効果は公開情報なので、`Observation.bonus_points` に
+  公開ミラーを持つ（未公開の手札・内部seedは含めない）。MCTSの `sample_game` もこのミラーを
+  引き継ぐ。
+- **得点への反映**: `score_with_cards_and_bonus` / `standings_with_cards_and_bonus` /
+  `Game::standings()` で `card_bonus` カテゴリに合算する。カテゴリ集合は従来と同一。
+- **検証**: `Game::validate` は「実在するプレイヤー」「そのプレイヤーが実際にプレイしたカード」
+  「1〜`MAX_STORED_BONUS_PER_CARD` 点」を検査する。
+- **残る制約（後続章で解消）**: 得点計算・順位計算は本PRで台帳を読むが、AIの評価関数
+  (`evaluation.rs`) は現時点で台帳を読まない。カード効果語彙（dispatcher/正本/legacy の
+  各経路）は次章のカード実装PRで追加する。

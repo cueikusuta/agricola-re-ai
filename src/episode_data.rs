@@ -22,7 +22,7 @@ use crate::cards::CardSet;
 use crate::draft::{DraftHistoryEvent, DraftMode, DraftObservation, DraftState};
 use crate::model::{Config, Event, Game, Observation};
 use crate::policy::{DetailPolicy, SpacePolicy};
-use crate::score::{standings_with_cards, Standings};
+use crate::score::{standings_with_cards_and_bonus, Standings};
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -148,7 +148,7 @@ impl EpisodeRecord {
         if meta.ai_versions.len() != game.public.players.len() {
             return Err("ai_versions must list one policy per seat".into());
         }
-        let standings = standings_with_cards(&game.public.players, &game.card_set);
+        let standings = game.standings();
         let credit = first_credit(&standings.rank);
         for turn in &mut turns {
             turn.reward = credit.get(turn.player).copied().unwrap_or(0.0);
@@ -267,7 +267,11 @@ impl EpisodeRecord {
         if game.public.round != self.rounds {
             return Err("recorded rounds does not match the replay".into());
         }
-        let standings = standings_with_cards(&game.public.players, &self.card_set);
+        let standings = standings_with_cards_and_bonus(
+            &game.public.players,
+            &self.card_set,
+            &game.bonus_points,
+        );
         if standings != self.standings {
             return Err("replay standings differ from the recorded standings".into());
         }

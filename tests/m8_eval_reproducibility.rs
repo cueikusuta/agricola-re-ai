@@ -13,7 +13,7 @@ use agricola_re_ai::cards::verified_basic_card_set;
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::model::{Config, Game};
 use agricola_re_ai::policy::{play_to_end, CardChoiceDetails, SimpleDetails};
-use agricola_re_ai::score::{standings, standings_with_cards};
+use agricola_re_ai::score::standings;
 
 /// Everything a comparison row needs, in a form that can be compared directly.
 #[derive(Debug, PartialEq, Eq)]
@@ -63,7 +63,7 @@ fn with_cards(players: usize, seed: u64) -> GameResult {
     let cards = verified_basic_card_set(players).expect("verified pool for this player count");
     let mut game = Game::with_cards(config.clone(), cards.clone()).expect("card game");
     play_to_end(&mut game, &EvaluationPolicy, &CardChoiceDetails).expect("card game finishes");
-    let standings = standings_with_cards(&game.public.players, &cards);
+    let standings = game.standings();
     let result = GameResult {
         final_hash: game.state_hash(),
         scores: standings.scores.iter().map(|score| score.total).collect(),

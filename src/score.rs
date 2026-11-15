@@ -149,6 +149,63 @@ pub fn standings_with_cards(players: &[Player], cards: &crate::cards::CardSet) -
         .iter()
         .map(|p| score_with_cards(p, cards))
         .collect::<Vec<_>>();
+    rank_scores(&scores, players)
+}
+
+/// Full public score including bonus points that were earned during play and
+/// stored in [`crate::model::BonusPointLedger`] (cards that pay points when
+/// played, at a round start or during a harvest).
+///
+/// The printed points of the played cards stay in the `cards` category; the
+/// event-earned points join the `card_bonus` category next to the end-game
+/// bonuses computed from the final farm, so the public category set of a scored
+/// game is unchanged.
+pub fn score_with_cards_and_bonus(
+    player: &Player,
+    cards: &crate::cards::CardSet,
+    stored_bonus: i32,
+) -> Score {
+    let mut result = score_with_cards(player, cards);
+    if stored_bonus == 0 {
+        return result;
+    }
+    *result
+        .categories
+        .entry("card_bonus".to_owned())
+        .or_insert(0) += stored_bonus;
+    result.total += stored_bonus;
+    result
+}
+
+pub fn standings_with_cards_and_bonus(
+    players: &[Player],
+    cards: &crate::cards::CardSet,
+    bonus_points: &crate::model::BonusPointLedger,
+) -> Standings {
+    let scores = players
+        .iter()
+        .map(|p| {
+            score_with_cards_and_bonus(
+                p,
+                cards,
+                crate::model::bonus_points_total(bonus_points, p.id),
+            )
+        })
+        .collect::<Vec<_>>();
+    rank_scores(&scores, players)
+}
+
+/// Standings for a whole game: printed card points, end-game card bonuses and
+/// the earned-bonus-point store. This is the scoring entry point every caller
+/// that holds a [`crate::model::Game`] should use, so a stored bonus can never
+/// be silently dropped from a result.
+impl crate::model::Game {
+    pub fn standings(&self) -> Standings {
+        standings_with_cards_and_bonus(&self.public.players, &self.card_set, &self.bonus_points)
+    }
+}
+
+fn rank_scores(scores: &[Score], players: &[Player]) -> Standings {
     let mut rank = vec![1; players.len()];
     for i in 0..players.len() {
         rank[i] = 1 + scores
@@ -160,5 +217,8 @@ pub fn standings_with_cards(players: &[Player], cards: &crate::cards::CardSet) -
             })
             .count();
     }
-    Standings { scores, rank }
+    Standings {
+        scores: scores.to_vec(),
+        rank,
+    }
 }
