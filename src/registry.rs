@@ -276,7 +276,10 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterWorkerGain { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::OnPlayGain { .. }
                 | crate::cards::CardEffect::OnPlayGainPerStored { .. }
-                | crate::cards::CardEffect::OnPlayGainIfHouse { .. } => EventKind::CardPlayed,
+                | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
+                | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. } => {
+                    EventKind::CardPlayed
+                }
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -384,6 +387,9 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed {
                             amount,
                             ..
+                        }
+                        | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed {
+                            amount, ..
                         }
                         | crate::cards::CardEffect::AfterOccupationGainPerFoodCost {
                             amount, ..
@@ -773,6 +779,9 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
     // E-deck band 070-120 typed effects (kept out of the A/B two-player
     // preset; see verified_band_e_cards).
     builder = add_cards_inner(builder, crate::cards::verified_band_e_cards(), &mut seen)?;
+    // A-deck band 070-120 typed effects (kept out of the A/B two-player
+    // preset; see verified_band_a_cards).
+    builder = add_cards_inner(builder, crate::cards::verified_band_a_cards(), &mut seen)?;
 
     builder.freeze()
 }
