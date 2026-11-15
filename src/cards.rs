@@ -95,6 +95,15 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// C116 調度品職人 (Furniture Maker): each time the owner plays an
+    /// occupation AFTER this card, gain `amount` of `good` per food paid as
+    /// that occupation's cost (printed cost + optional fee). Fired from the
+    /// play dispatcher's after-play scan; the legacy `cards::play` helper does
+    /// not re-scan earlier cards and therefore never fires it.
+    AfterOccupationGainPerFoodCost {
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -119,6 +128,9 @@ impl CardEffect {
             CardEffect::AfterHarvestBakeGain { .. } => "after_harvest_bake_gain",
             CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                 "start_round_gain_if_food_at_least_round"
+            }
+            CardEffect::AfterOccupationGainPerFoodCost { .. } => {
+                "after_occupation_gain_per_food_cost"
             }
         }
     }
@@ -270,6 +282,7 @@ impl CardSet {
                         | CardEffect::OnPlayGainIfHouse { amount, .. }
                         | CardEffect::StartRoundGain { amount, .. }
                         | CardEffect::StartRoundGainIfFoodAtLeastRound { amount, .. }
+                        | CardEffect::AfterOccupationGainPerFoodCost { amount, .. }
                         | CardEffect::HarvestFieldGain { amount, .. }
                         | CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | CardEffect::AfterClayConstructionGain { amount, .. }
@@ -2563,6 +2576,23 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         ),
+        // C116 調度品職人 (Furniture Maker): no cost; on play gain 1 wood, and
+        // each later occupation play grants 1 wood per food paid as its cost.
+        card(
+            "C116",
+            occupation,
+            vec![],
+            vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Wood,
+                    amount: 1,
+                },
+                CardEffect::AfterOccupationGainPerFoodCost {
+                    good: Good::Wood,
+                    amount: 1,
+                },
+            ],
+        ),
     ]
 }
 #[cfg(test)]
@@ -2689,9 +2719,23 @@ mod verified_band_c_tests {
     }
 
     #[test]
+    fn c116_on_play_gains_one_wood_and_is_playable_without_cost() {
+        let set = set();
+        let card = set.definition("C116").unwrap();
+        assert_eq!(card.kind, CardKind::Occupation);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+        let mut hand = vec!["C116".to_string()];
+        let mut p = Player::new(0, 0);
+        play(&set, &mut hand, &mut p, "C116", CardKind::Occupation, 0).unwrap();
+        assert_eq!(p.supply.wood, 1);
+        assert_eq!(p.played_cards, vec!["C116"]);
+    }
+
+    #[test]
     fn band_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["C076", "C106", "C111"] {
+        for id in ["C076", "C106", "C111", "C116"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"

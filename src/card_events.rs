@@ -56,6 +56,8 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // Round start — After phase (happens after round begins)
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
+        // Fired only by the play dispatcher's dedicated after-play scan.
+        CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
         // Clay construction purchase — After phase
         CardEffect::AfterClayConstructionGain { .. } => TriggerPhase::After,
         // Harvest/baking — After phase
@@ -450,6 +452,9 @@ fn resolve_phase_scan(
 
             // Dispatch to handler
             let result = match effect {
+                // Never fires via the generic phase scan (see
+                // effect_condition_holds); dispatch_play's after-play scan owns it.
+                CardEffect::AfterOccupationGainPerFoodCost { .. } => EffectResult::Resolved,
                 #[cfg(test)]
                 CardEffect::PendingProbe { options } => {
                     handle_pending_probe(ctx, player, card_id, options.clone(), trigger_data)?
@@ -647,6 +652,9 @@ fn effect_condition_holds(
             // (e.g. 8+ food in round 8); the handler grants the gain.
             player.supply.food >= u32::from(round)
         }
+        // C116 調度品職員 fires only from dispatch_play's dedicated after-play
+        // scan, never from the generic phase scan.
+        CardEffect::AfterOccupationGainPerFoodCost { .. } => false,
         CardEffect::AfterClayConstructionGain { .. } => {
             let Some(prev) = &trigger.previous_player else {
                 return false;
@@ -744,6 +752,9 @@ pub fn execute_chosen_triggers(
 
         // Dispatch to handler
         let result = match effect {
+            // Never fires via the generic phase scan (see
+            // effect_condition_holds); dispatch_play's after-play scan owns it.
+            CardEffect::AfterOccupationGainPerFoodCost { .. } => EffectResult::Resolved,
             #[cfg(test)]
             CardEffect::PendingProbe { options } => {
                 handle_pending_probe(ctx, player, &trigger.card_id, options.clone(), trigger_data)?
@@ -1222,6 +1233,7 @@ pub fn dispatch_play(
     card_set: &CardSet,
     player: usize,
     new_card_id: &str,
+    extra_food_paid: u32,
     cards: &mut crate::cards::CardState,
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
@@ -1299,8 +1311,56 @@ pub fn dispatch_play(
 
     // Phase 3: Core action (card is moved to played zone — handled by caller via move_card)
 
-    // Phase 4: After (no play-time after effects currently)
-    // NOTE: After phase is a no-op for OnPlay cards; no need to resolve for new card
+    // Phase 4: After — card-play dependent triggers owned by EARLIER played
+    // cards. The only such effect today is C116 調度品職人
+    // (`AfterOccupationGainPerFoodCost`): each time the owner plays an
+    // occupation after it, it grants wood per food paid as that occupation's
+    // cost (printed cost + the optional occupation fee). The new card is
+    // already last in `played_cards` (the caller ran the zone move), so the
+    // scan covers exactly the cards played "before this one".
+    if let Some(new_card) = card_set.definition(new_card_id) {
+        if new_card.kind == crate::cards::CardKind::Occupation {
+            let printed_food: u32 = new_card
+                .cost
+                .iter()
+                .filter(|(good, _)| *good == Good::Food)
+                .map(|(_, n)| *n)
+                .sum();
+            let food_paid = printed_food.saturating_add(extra_food_paid);
+            if food_paid > 0 {
+                let played = ctx.player.played_cards.clone();
+                let owned = played.len().saturating_sub(1); // exclude the new card
+                for id in &played[..owned] {
+                    let Some(card) = card_set.definition(id) else {
+                        continue;
+                    };
+                    for effect in &card.effects {
+                        let CardEffect::AfterOccupationGainPerFoodCost { good, amount } = effect
+                        else {
+                            continue;
+                        };
+                        consume_budget(ctx.event_budget)?;
+                        let limit = ctx
+                            .card_use_limits
+                            .get(id.as_str())
+                            .copied()
+                            .unwrap_or(u32::MAX);
+                        check_card_use(ctx.card_uses, id, limit)?;
+                        let total = amount
+                            .checked_mul(food_paid)
+                            .ok_or("occupation-play bonus overflow")?;
+                        let p = &mut ctx.player;
+                        let next = p
+                            .supply
+                            .get(*good)
+                            .checked_add(total)
+                            .ok_or("resource overflow")?;
+                        p.supply.set(*good, next);
+                    }
+                }
+            }
+        }
+    }
 
     Ok(())
 }
@@ -2835,6 +2895,7 @@ mod tests {
                 &set,
                 0,
                 "M1",
+                0,
                 ctx.cards,
                 ctx.players,
                 ctx.improvement_market,
@@ -3762,5 +3823,92 @@ mod tests {
             c.players[0].supply.food, 2,
             "two growing vegetable fields must grant 2 food"
         );
+    }
+
+    /// C116 調度品職人 via the production play dispatcher: each later
+    /// occupation play grants 1 wood per food paid as its occupation cost.
+    #[test]
+    fn c116_occupation_play_grants_wood_per_food_cost() {
+        let mut set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "occ_food2".into(),
+            kind: CardKind::Occupation,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![],
+        });
+        let mut c = Ctx::new();
+        // Zone move already applied by the caller: C116 first, new card last.
+        c.players[0].played_cards = vec!["C116".into(), "occ_food2".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        dispatch_play(
+            &set,
+            0,
+            "occ_food2",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 2,
+            "occupation food cost 2 must grant 2 wood via C116"
+        );
+        // Fee also counts as occupation cost.
+        c.players[0].played_cards = vec!["C116".into(), "C111".into()];
+        dispatch_play(
+            &set,
+            0,
+            "C111",
+            3,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(c.players[0].supply.wood, 5, "fee 3 + cost 0 -> 3 wood");
+        // Minor improvements and zero-cost occupations do not trigger it.
+        c.players[0].played_cards = vec!["C116".into(), "C106".into()];
+        dispatch_play(
+            &set,
+            0,
+            "C106",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(c.players[0].supply.wood, 5, "no food paid -> no gain");
     }
 }
