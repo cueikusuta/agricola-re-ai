@@ -48,6 +48,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::OnPlayGain { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerStored { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainIfHouse { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -479,6 +480,9 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
+                CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
+                    handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
+                }
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -679,6 +683,7 @@ fn effect_condition_holds(
         CardEffect::HarvestFieldGain { .. } => true,
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
+        CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
@@ -790,6 +795,9 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
+            CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
+                handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
+            }
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1016,6 +1024,35 @@ fn handle_on_play_gain_if_house(
             .ok_or("resource overflow")?;
         p.supply.set(*good, next);
     }
+    Ok(EffectResult::Resolved)
+}
+
+fn handle_on_play_gain_per_improvement_played(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let played = ctx.player.played_cards.clone();
+    let minor = played
+        .iter()
+        .filter(|id| {
+            ctx.card_set
+                .definition(id)
+                .is_some_and(|card| card.kind == crate::cards::CardKind::MinorImprovement)
+        })
+        .count() as u32;
+    let bonus = minor
+        .checked_add(ctx.player.improvements.len() as u32)
+        .and_then(|count| count.checked_mul(amount))
+        .ok_or("on-play card bonus overflow")?;
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(bonus)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
 }
 
@@ -1247,6 +1284,26 @@ fn handle_harvest_field_gain(
                 }
             }
             best
+        }
+        crate::cards::HarvestFieldRule::LastGrainTaken
+        | crate::cards::HarvestFieldRule::LastVegetableTaken => {
+            let crop = if rule == &crate::cards::HarvestFieldRule::LastGrainTaken {
+                Crop::Grain
+            } else {
+                Crop::Vegetable
+            };
+            p.farm
+                .iter()
+                .filter(|cell| {
+                    matches!(
+                        cell.tile,
+                        crate::model::Tile::Field {
+                            crop: Some(found),
+                            remaining: 1,
+                        } if found == crop
+                    )
+                })
+                .count() as u32
         }
     };
     let gain = multiplier
@@ -2095,6 +2152,27 @@ pub mod legacy {
                             }
                             best
                         }
+                        crate::cards::HarvestFieldRule::LastGrainTaken
+                        | crate::cards::HarvestFieldRule::LastVegetableTaken => {
+                            let crop = if rule == &crate::cards::HarvestFieldRule::LastGrainTaken {
+                                crate::model::Crop::Grain
+                            } else {
+                                crate::model::Crop::Vegetable
+                            };
+                            player
+                                .farm
+                                .iter()
+                                .filter(|cell| {
+                                    matches!(
+                                        cell.tile,
+                                        crate::model::Tile::Field {
+                                            crop: Some(found),
+                                            remaining: 1,
+                                        } if found == crop
+                                    )
+                                })
+                                .count() as u32
+                        }
                     };
                     let gain = multiplier
                         .checked_mul(*amount)
@@ -2216,6 +2294,19 @@ pub mod legacy {
                         .filter(|name| categories.get(**name).copied().unwrap_or(0) >= 4)
                         .count() as i32
                     }
+                    crate::cards::ScoreBonusRule::LargePastures => (player
+                        .pastures
+                        .iter()
+                        .filter(|pasture| pasture.cells.len() >= 3)
+                        .count()
+                        as i32)
+                        .saturating_mul(2),
+                    crate::cards::ScoreBonusRule::CookingImprovements => player
+                        .improvements
+                        .iter()
+                        .filter(|improvement| improvement.is_cooking())
+                        .count()
+                        as i32,
                 },
                 _ => 0,
             })

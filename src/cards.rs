@@ -120,6 +120,14 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// A117 木材調達人 (Wood Carrier): when playing this card, gain `amount`
+    /// of `good` per improvement already in front of the owner (base
+    /// improvements plus played minor-improvement cards; this card itself is
+    /// an occupation and never counts).
+    OnPlayGainPerImprovementPlayed {
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -153,6 +161,9 @@ impl CardEffect {
             }
             CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
                 "harvest_field_gain_if_no_minor_played"
+            }
+            CardEffect::OnPlayGainPerImprovementPlayed { .. } => {
+                "on_play_gain_per_improvement_played"
             }
         }
     }
@@ -196,6 +207,15 @@ pub enum HarvestFieldRule {
         thresholds: [u32; 4],
         amounts: [u32; 4],
     },
+    /// A106 液肥散布人 (Slurry Spreader): at the field phase, one multiplier
+    /// step per field whose LAST grain is taken this field phase (a growing
+    /// grain field yields exactly one per harvest, so fields with one
+    /// remaining crop become empty afterwards).
+    LastGrainTaken,
+    /// A106 液肥散布人 (Slurry Spreader): same as [`HarvestFieldRule::LastGrainTaken`]
+    /// for vegetables (the printed card pays 2 food per last grain and 1 per
+    /// last vegetable, hence two rule variants instead of one).
+    LastVegetableTaken,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -223,6 +243,13 @@ pub enum ScoreBonusRule {
     /// sheep, boar, cattle, fenced stables). Read from the canonical scoring
     /// table in `score.rs` so thresholds can never diverge.
     CategoriesAtMaxFour,
+    /// A099 放牧人 (Fellow Grazer): 2 bonus points per pasture covering at
+    /// least 3 farm cells, computed from the final farm state.
+    LargePastures,
+    /// A101 調理器具商 (Cookery Outfitter): 1 bonus point per cooking
+    /// improvement in front of the player (the engine's cooking
+    /// improvements are the fireplace/hearth set, see `Improvement::is_cooking`).
+    CookingImprovements,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -323,6 +350,7 @@ impl CardSet {
                         | CardEffect::AfterOccupationGainPerFoodCost { amount, .. }
                         | CardEffect::StartRoundGainIfNoMinorPlayed { amount, .. }
                         | CardEffect::HarvestFieldGainIfNoMinorPlayed { amount, .. }
+                        | CardEffect::OnPlayGainPerImprovementPlayed { amount, .. }
                         | CardEffect::HarvestFieldGain { amount, .. }
                         | CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | CardEffect::AfterClayConstructionGain { amount, .. }
@@ -705,6 +733,12 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
             } if player.house == *house && player.rooms() == usize::from(*rooms) => {
                 safe_gain(player, *good, *amount)?;
             }
+            CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
+                let bonus = improvement_count_in_front(set, player)
+                    .checked_mul(*amount)
+                    .ok_or("on-play card bonus overflow")?;
+                safe_gain(player, *good, bonus)?;
+            }
             CardEffect::Passive { rule } => match rule {
                 PassiveRule::PastureCapacity(n) => player.pasture_capacity_bonus += n,
                 PassiveRule::FenceWoodDiscount(n) => player.free_fence_wood += n,
@@ -929,6 +963,17 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                     .filter(|name| categories.get(**name).copied().unwrap_or(0) >= 4)
                     .count() as i32
                 }
+                ScoreBonusRule::LargePastures => (player
+                    .pastures
+                    .iter()
+                    .filter(|pasture| pasture.cells.len() >= 3)
+                    .count() as i32)
+                    .saturating_mul(2),
+                ScoreBonusRule::CookingImprovements => player
+                    .improvements
+                    .iter()
+                    .filter(|improvement| improvement.is_cooking())
+                    .count() as i32,
             },
             _ => 0,
         })
@@ -2010,6 +2055,26 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                         }
                         best
                     }
+                    HarvestFieldRule::LastGrainTaken | HarvestFieldRule::LastVegetableTaken => {
+                        let crop = if rule == &HarvestFieldRule::LastGrainTaken {
+                            Crop::Grain
+                        } else {
+                            Crop::Vegetable
+                        };
+                        player
+                            .farm
+                            .iter()
+                            .filter(|cell| {
+                                matches!(
+                                    cell.tile,
+                                    Tile::Field {
+                                        crop: Some(found),
+                                        remaining: 1,
+                                    } if found == crop
+                                )
+                            })
+                            .count() as u32
+                    }
                 };
                 safe_gain(
                     player,
@@ -2910,6 +2975,88 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
     ]
 }
 
+/// Improvements in front of a player: base improvements plus played
+/// minor-improvement cards (A117 木材調達人 condition).
+fn improvement_count_in_front(set: &CardSet, player: &Player) -> u32 {
+    let minor = player
+        .played_cards
+        .iter()
+        .filter(|id| {
+            set.definition(id)
+                .is_some_and(|card| card.kind == CardKind::MinorImprovement)
+        })
+        .count() as u32;
+    minor + player.improvements.len() as u32
+}
+
+/// A-deck band 070-120 cards whose printed effects are fully expressible with
+/// the current typed effect vocabulary (BGA Agricola card wiki; A099 p=3326,
+/// A101 p=3324, A106 p=3319, A117 p=3308). Kept out of the A/B two-player
+/// preset, same as the C/D/E band pools.
+pub fn verified_band_a_cards() -> Vec<CardDefinition> {
+    vec![
+        // A099 放牧人 (Fellow Grazer): 2 bonus points per pasture covering at
+        // least 3 farm cells at scoring time.
+        CardDefinition {
+            use_limit: None,
+            id: "A099".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::LargePastures,
+            }],
+        },
+        // A101 調理器具商 (Cookery Outfitter): 1 bonus point per cooking
+        // improvement at scoring time.
+        CardDefinition {
+            use_limit: None,
+            id: "A101".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::CookingImprovements,
+            }],
+        },
+        // A106 液肥散布人 (Slurry Spreader): per field whose last grain is
+        // harvested this field phase 2 food, per field whose last vegetable
+        // is harvested 1 food.
+        CardDefinition {
+            use_limit: None,
+            id: "A106".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::LastGrainTaken,
+                    good: Good::Food,
+                    amount: 2,
+                },
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::LastVegetableTaken,
+                    good: Good::Food,
+                    amount: 1,
+                },
+            ],
+        },
+        // A117 木材調達人 (Wood Carrier): 1 wood per improvement already in
+        // front of the owner when playing this card.
+        CardDefinition {
+            use_limit: None,
+            id: "A117".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGainPerImprovementPlayed {
+                good: Good::Wood,
+                amount: 1,
+            }],
+        },
+    ]
+}
+
 /// E-deck band 070-120 cards whose printed effects are fully expressible with
 /// the current typed effect vocabulary (BGA Agricola card wiki;
 /// E117 p=2636). Kept out of the A/B two-player preset, same as
@@ -3266,6 +3413,143 @@ mod verified_band_e_tests {
         after_worker(&set, &mut p, Space::Forest).unwrap();
         after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
         assert_eq!(p.supply.wood, 4);
+    }
+}
+#[cfg(test)]
+mod verified_band_a_tests {
+    use super::*;
+    use crate::model::{Improvement, Pasture};
+
+    #[test]
+    fn a099_two_points_per_large_pasture() {
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("A099".into());
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // 2マス牧場は対象外。
+        p.pastures.push(Pasture {
+            id: 1,
+            cells: vec![1, 2],
+            animal: None,
+            quantity: 0,
+        });
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // 3マス以上の牧場1つにつき2点。
+        p.pastures[0].cells.push(3);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        p.pastures.push(Pasture {
+            id: 2,
+            cells: vec![10, 11, 12, 13],
+            animal: None,
+            quantity: 0,
+        });
+        assert_eq!(end_game_bonus(&set, &p), 4);
+    }
+
+    #[test]
+    fn a101_one_point_per_cooking_improvement() {
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("A101".into());
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // かまど系は対象、窯やその他は対象外。
+        p.improvements.push(Improvement::Fireplace2);
+        p.improvements.push(Improvement::Hearth4);
+        p.improvements.push(Improvement::ClayOven);
+        p.improvements.push(Improvement::Well);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+    }
+
+    #[test]
+    fn a106_food_per_last_crop_harvested() {
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("A106".into());
+        // 最後の1つを収穫する畑がない場合は得ない。
+        p.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 0);
+        // 最後の小麦1畑→2、最後の野菜1畑→1。
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        p.farm[3].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 3);
+        // 残り1の小麦/野菜が無くなれば発動しない。
+        p.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        p.farm[3].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 5);
+    }
+
+    #[test]
+    fn a117_wood_per_improvement_in_front() {
+        let mut set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "minor1".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        });
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 5;
+        assert_eq!(improvement_count_in_front(&set, &p), 0);
+        p.played_cards.push("minor1".into());
+        p.improvements.push(Improvement::Well);
+        assert_eq!(improvement_count_in_front(&set, &p), 2);
+        play(
+            &set,
+            &mut vec!["A117".into()],
+            &mut p,
+            "A117",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        // 進歩2つにつき木2。
+        assert_eq!(p.supply.wood, 7);
+        // A117自体（職業）はカウントされない。
+        p.played_cards.push("A117".into());
+        assert_eq!(improvement_count_in_front(&set, &p), 2);
+    }
+
+    #[test]
+    fn band_a_cards_are_absent_from_the_two_player_preset() {
+        let preset = verified_basic_card_set(2).unwrap();
+        for id in ["A099", "A101", "A106", "A117"] {
+            assert!(
+                preset.definition(id).is_none(),
+                "{id} must stay out of the A/B two-player preset"
+            );
+        }
     }
 }
 
