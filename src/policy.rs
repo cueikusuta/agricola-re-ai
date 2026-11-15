@@ -550,7 +550,11 @@ fn card_priority(
             }
             CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
             | CardEffect::HarvestFieldGain { good, amount, .. }
-            | CardEffect::AfterClayConstructionGain { good, amount } => {
+            | CardEffect::AfterClayConstructionGain { good, amount }
+            // E111's halves fire only while the owner stays minor-free; the
+            // heuristic accepts the conditional gain optimistically.
+            | CardEffect::StartRoundGainIfNoMinorPlayed { good, amount, .. }
+            | CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount, .. } => {
                 card_good_value(*good) * i64::from(*amount) * horizon / 2
             }
             CardEffect::Passive { .. } => horizon * 5,

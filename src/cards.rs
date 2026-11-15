@@ -104,6 +104,22 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// E111 世捨て人 (Recluse), round-start half: at each round start, if the
+    /// owner has played no minor improvements, gain `amount` of `good`. The
+    /// condition needs a card-definition lookup, so the generic condition
+    /// scan reports it as triggerable and the handler performs the check.
+    StartRoundGainIfNoMinorPlayed {
+        good: Good,
+        amount: u32,
+    },
+    /// E111 世捨て人 (Recluse), harvest half: at the start of each harvest
+    /// (the field phase is the first step of the harvest), if the owner has
+    /// played no minor improvements, gain `amount` of `good`. Like the round
+    /// variant, the handler performs the definition-dependent check.
+    HarvestFieldGainIfNoMinorPlayed {
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -131,6 +147,12 @@ impl CardEffect {
             }
             CardEffect::AfterOccupationGainPerFoodCost { .. } => {
                 "after_occupation_gain_per_food_cost"
+            }
+            CardEffect::StartRoundGainIfNoMinorPlayed { .. } => {
+                "start_round_gain_if_no_minor_played"
+            }
+            CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
+                "harvest_field_gain_if_no_minor_played"
             }
         }
     }
@@ -167,6 +189,13 @@ pub enum HarvestFieldRule {
     /// with wheat at the start of the harvest (the field phase is the first
     /// step of the harvest, and no state changes between them), else 0.
     HasWheatField,
+    /// E107 土地調査士 (Land Surveyor): at the field phase, the amount paired
+    /// with the highest threshold the number of plowed field tiles reaches
+    /// (2/4/6/7 -> 1/2/3/4 food on the printed card), else 0.
+    FieldCountThresholds {
+        thresholds: [u32; 4],
+        amounts: [u32; 4],
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -292,6 +321,8 @@ impl CardSet {
                         | CardEffect::StartRoundGain { amount, .. }
                         | CardEffect::StartRoundGainIfFoodAtLeastRound { amount, .. }
                         | CardEffect::AfterOccupationGainPerFoodCost { amount, .. }
+                        | CardEffect::StartRoundGainIfNoMinorPlayed { amount, .. }
+                        | CardEffect::HarvestFieldGainIfNoMinorPlayed { amount, .. }
                         | CardEffect::HarvestFieldGain { amount, .. }
                         | CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | CardEffect::AfterClayConstructionGain { amount, .. }
@@ -1899,6 +1930,12 @@ pub fn start_round_rewards(set: &CardSet, player: &mut Player) -> Result<(), Str
                 {
                     safe_gain(player, *good, *amount)?;
                 }
+            } else if let CardEffect::StartRoundGainIfNoMinorPlayed { good, amount } = effect {
+                // E111 世捨て人, round-start half: the condition is checked
+                // here because it needs card definitions.
+                if no_minor_improvements_played(set, player) {
+                    safe_gain(player, *good, *amount)?;
+                }
             }
         }
     }
@@ -1956,6 +1993,23 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                             }
                         )
                     })),
+                    HarvestFieldRule::FieldCountThresholds {
+                        thresholds,
+                        amounts,
+                    } => {
+                        let fields = player
+                            .farm
+                            .iter()
+                            .filter(|cell| matches!(cell.tile, Tile::Field { .. }))
+                            .count() as u32;
+                        let mut best = 0;
+                        for (threshold, gained) in thresholds.iter().zip(amounts.iter()) {
+                            if fields >= *threshold {
+                                best = *gained;
+                            }
+                        }
+                        best
+                    }
                 };
                 safe_gain(
                     player,
@@ -1964,10 +2018,26 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                         .checked_mul(*amount)
                         .ok_or("harvest bonus overflow")?,
                 )?;
+            } else if let CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount } = effect {
+                // E111 世捨て人, harvest half: the condition is checked here
+                // because it needs card definitions.
+                if no_minor_improvements_played(set, player) {
+                    safe_gain(player, *good, *amount)?;
+                }
             }
         }
     }
     Ok(())
+}
+
+/// True when the player has played no minor improvements (E111 世捨て人
+/// condition). Improvements handed over by other players (cards not played by
+/// this player) do not appear in played_cards, so they are naturally excluded.
+fn no_minor_improvements_played(set: &CardSet, player: &Player) -> bool {
+    player.played_cards.iter().all(|id| {
+        set.definition(id)
+            .is_none_or(|card| card.kind != CardKind::MinorImprovement)
+    })
 }
 
 /// Work-phase rewards that depend on a different space already being occupied.
@@ -2845,18 +2915,95 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
 /// E117 p=2636). Kept out of the A/B two-player preset, same as
 /// [`verified_band_c_cards`] and [`verified_band_d_cards`].
 pub fn verified_band_e_cards() -> Vec<CardDefinition> {
-    vec![CardDefinition {
-        use_limit: None,
-        id: "E117".to_owned(),
-        kind: CardKind::Occupation,
-        cost: vec![],
-        points: 0,
-        effects: vec![CardEffect::HarvestFieldGain {
-            rule: HarvestFieldRule::HasWheatField,
-            good: Good::Wood,
-            amount: 2,
-        }],
-    }]
+    let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
+        space,
+        good,
+        amount,
+    };
+    vec![
+        CardDefinition {
+            use_limit: None,
+            id: "E117".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::HarvestFieldGain {
+                rule: HarvestFieldRule::HasWheatField,
+                good: Good::Wood,
+                amount: 2,
+            }],
+        },
+        // E107 土地調査士 (Land Surveyor): at the field phase, 2/4/6/7 or
+        // more plowed fields yield 1/2/3/4 food
+        // (agricola.cloudfree.jp ?p=2646).
+        CardDefinition {
+            use_limit: None,
+            id: "E107".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::HarvestFieldGain {
+                rule: HarvestFieldRule::FieldCountThresholds {
+                    thresholds: [2, 4, 6, 7],
+                    amounts: [1, 2, 3, 4],
+                },
+                good: Good::Food,
+                amount: 1,
+            }],
+        },
+        // E111 世捨て人 (Recluse): with no minor improvements played, 1 food
+        // at each round start and 1 wood at the start of each harvest
+        // (agricola.cloudfree.jp ?p=2642).
+        CardDefinition {
+            use_limit: None,
+            id: "E111".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::StartRoundGainIfNoMinorPlayed {
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::HarvestFieldGainIfNoMinorPlayed {
+                    good: Good::Wood,
+                    amount: 1,
+                },
+            ],
+        },
+        // E113 教母 (Godmother): 1 vegetable per family-growth action (the
+        // engine's family-growth spaces: with room, without room, and the
+        // modest 2p variant) (agricola.cloudfree.jp ?p=2640).
+        CardDefinition {
+            use_limit: None,
+            id: "E113".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                gain(Space::FamilyGrowthWithRoom, Good::Vegetable, 1),
+                gain(Space::FamilyGrowthNoRoom, Good::Vegetable, 1),
+                gain(Space::ModestFamilyGrowth, Good::Vegetable, 1),
+            ],
+        },
+        // E118 薪切り (Kindling Gatherer): 1 extra wood per food gain from an
+        // action space; the BGA wiki lists 日雇い/漁/小劇場/資材市場 as the
+        // trigger spaces (agricola.cloudfree.jp ?p=2635), same printed list
+        // style as A155.
+        CardDefinition {
+            use_limit: None,
+            id: "E118".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                gain(Space::DayLaborer, Good::Wood, 1),
+                gain(Space::Fishing, Good::Wood, 1),
+                gain(Space::TravelingPlayers, Good::Wood, 1),
+                gain(Space::ResourceMarket, Good::Wood, 1),
+            ],
+        },
+    ]
 }
 
 #[cfg(test)]
@@ -3003,7 +3150,122 @@ mod verified_band_e_tests {
         assert!(card.cost.is_empty());
         assert_eq!(card.points, 0);
         let preset = verified_basic_card_set(2).unwrap();
-        assert!(preset.definition("E117").is_none());
+        for id in ["E107", "E111", "E113", "E117", "E118"] {
+            assert!(
+                preset.definition(id).is_none(),
+                "{id} must stay out of the A/B two-player preset"
+            );
+        }
+    }
+
+    #[test]
+    fn e107_food_by_field_count_thresholds() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E107".into());
+        // 0〜1畑では得ない。
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 0);
+        p.farm[1].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 0);
+        // 2畑→1。
+        p.farm[2].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 1);
+        // 6畑→3（最高到達閾値の段階のみ）。
+        for cell in p.farm.iter_mut().take(7).skip(3) {
+            cell.tile = Tile::Field {
+                crop: None,
+                remaining: 0,
+            };
+        }
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 4);
+        // 7畑→4。
+        p.farm[7].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 8);
+    }
+
+    #[test]
+    fn e111_gains_only_while_no_minor_improvement_is_played() {
+        let mut set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "minor1".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        });
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E111".into());
+        start_round_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 1);
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.wood, 1);
+        // 小進歩を出した後は両方とも得られない。
+        p.played_cards.push("minor1".into());
+        start_round_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 1);
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.wood, 1);
+    }
+
+    #[test]
+    fn e113_vegetable_per_family_growth_space() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E113".into());
+        for space in [
+            Space::FamilyGrowthWithRoom,
+            Space::FamilyGrowthNoRoom,
+            Space::ModestFamilyGrowth,
+        ] {
+            after_worker(&set, &mut p, space).unwrap();
+        }
+        assert_eq!(p.supply.vegetable, 3);
+        // 増員以外のスペースでは得ない。
+        after_worker(&set, &mut p, Space::DayLaborer).unwrap();
+        assert_eq!(p.supply.vegetable, 3);
+    }
+
+    #[test]
+    fn e118_wood_per_food_gaining_action_space() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E118".into());
+        for space in [
+            Space::DayLaborer,
+            Space::Fishing,
+            Space::TravelingPlayers,
+            Space::ResourceMarket,
+        ] {
+            after_worker(&set, &mut p, space).unwrap();
+        }
+        assert_eq!(p.supply.wood, 4);
+        // 資材系スペースでは得ない。
+        after_worker(&set, &mut p, Space::Forest).unwrap();
+        after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
+        assert_eq!(p.supply.wood, 4);
     }
 }
 

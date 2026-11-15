@@ -56,6 +56,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // Round start — After phase (happens after round begins)
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
+        CardEffect::StartRoundGainIfNoMinorPlayed { .. } => TriggerPhase::After,
         // Fired only by the play dispatcher's dedicated after-play scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
         // Clay construction purchase — After phase
@@ -63,6 +64,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // Harvest/baking — After phase
         CardEffect::AfterHarvestBakeGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGain { .. } => TriggerPhase::After,
+        CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
         // End game scoring — After phase
         CardEffect::EndGameBonus { .. } => TriggerPhase::After,
     }
@@ -508,6 +510,12 @@ fn resolve_phase_scan(
                         ctx, player, good, *amount, round_now,
                     )?
                 }
+                CardEffect::StartRoundGainIfNoMinorPlayed { good, amount } => {
+                    handle_gain_if_no_minor_played(ctx, player, good, *amount)?
+                }
+                CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount } => {
+                    handle_gain_if_no_minor_played(ctx, player, good, *amount)?
+                }
                 CardEffect::AfterClayConstructionGain { good, amount } => {
                     handle_after_clay_construction_gain(ctx, player, good, *amount, trigger_data)?
                 }
@@ -652,6 +660,11 @@ fn effect_condition_holds(
             // (e.g. 8+ food in round 8); the handler grants the gain.
             player.supply.food >= u32::from(round)
         }
+        // E111 世捨て人: the no-minor-improvements condition needs card
+        // definitions, so the scan reports it as triggerable and the
+        // handler performs the check.
+        CardEffect::StartRoundGainIfNoMinorPlayed { .. } => true,
+        CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => true,
         // C116 調度品職員 fires only from dispatch_play's dedicated after-play
         // scan, never from the generic phase scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => false,
@@ -807,6 +820,12 @@ pub fn execute_chosen_triggers(
                 handle_start_round_gain_if_food_at_least_round(
                     ctx, player, good, *amount, round_now,
                 )?
+            }
+            CardEffect::StartRoundGainIfNoMinorPlayed { good, amount } => {
+                handle_gain_if_no_minor_played(ctx, player, good, *amount)?
+            }
+            CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount } => {
+                handle_gain_if_no_minor_played(ctx, player, good, *amount)?
             }
             CardEffect::AfterClayConstructionGain { good, amount } => {
                 handle_after_clay_construction_gain(ctx, player, good, *amount, trigger_data)?
@@ -1212,6 +1231,23 @@ fn handle_harvest_field_gain(
                 }
             )
         })),
+        crate::cards::HarvestFieldRule::FieldCountThresholds {
+            thresholds,
+            amounts,
+        } => {
+            let fields = p
+                .farm
+                .iter()
+                .filter(|cell| matches!(cell.tile, crate::model::Tile::Field { .. }))
+                .count() as u32;
+            let mut best = 0;
+            for (threshold, gained) in thresholds.iter().zip(amounts.iter()) {
+                if fields >= *threshold {
+                    best = *gained;
+                }
+            }
+            best
+        }
     };
     let gain = multiplier
         .checked_mul(amount)
@@ -1222,6 +1258,33 @@ fn handle_harvest_field_gain(
         .checked_add(gain)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// E111 世捨て人: shared gain logic for its round-start and harvest-start
+/// halves. The no-minor-improvements condition needs card definitions, so it
+/// is checked here rather than in the generic condition scan.
+fn handle_gain_if_no_minor_played(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let played = ctx.player.played_cards.clone();
+    let condition = played.iter().all(|id| {
+        ctx.card_set
+            .definition(id)
+            .is_none_or(|card| card.kind != crate::cards::CardKind::MinorImprovement)
+    });
+    if condition {
+        let p = &mut ctx.player;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
     Ok(EffectResult::Resolved)
 }
 
@@ -2012,6 +2075,25 @@ pub mod legacy {
                                     }
                                 )
                             }))
+                        }
+                        crate::cards::HarvestFieldRule::FieldCountThresholds {
+                            thresholds,
+                            amounts,
+                        } => {
+                            let fields = player
+                                .farm
+                                .iter()
+                                .filter(|cell| {
+                                    matches!(cell.tile, crate::model::Tile::Field { .. })
+                                })
+                                .count() as u32;
+                            let mut best = 0;
+                            for (threshold, gained) in thresholds.iter().zip(amounts.iter()) {
+                                if fields >= *threshold {
+                                    best = *gained;
+                                }
+                            }
+                            best
                         }
                     };
                     let gain = multiplier
