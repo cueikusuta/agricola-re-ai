@@ -36,12 +36,20 @@ TYPES = {
 }
 ELIGIBILITY = {"yes", "no", "unverified"}
 REVIEW_STATES = {"unverified", "reviewed-needs-official", "verified", "rejected"}
-SOURCES = {"secondary_catalog", "official_pdf", "official_print", "official_other"}
+# 2026-11-15: 新区分 wiki_verified / wiki_literature を追加
+SOURCES = {"secondary_catalog", "official_pdf", "official_print", "official_other", "wiki_verified", "wiki_literature"}
+OFFICIAL_SOURCES = {"official_pdf", "official_print", "official_other"}
+WIKI_SOURCES = {"wiki_verified", "wiki_literature"}
+# 検証カテゴリ（台帳スキーム拡張設計で追加予定。現行CSVには未実装のためオプショナル扱い）
+VERIFICATION_CATEGORIES = {"simple", "multiplayer_effect", "complex", "unresolved"}
+LITERATURE_RESOLUTIONS = {"resolved", "unresolved", "not_applicable"}
 AUDIT_FIELDS = (
     "card_id", "card_type_normalized", "eligible_at_2", "eligible_at_3",
     "eligible_at_4", "review_status", "reference_type",
     "primary_reference_id", "primary_reference_url", "source_language",
     "ruleset_version", "reviewed_by", "reviewed_on", "review_note",
+    # 以下はスキーム拡張設計で追加予定（現行では任意）
+    "verification_category", "source_summary_ja", "literature_resolution", "checklist_issue_url",
 )
 DEFAULT_SAMPLE_SIZE = 12
 # Records the independent review already flagged as risky (Issue #115).
@@ -126,6 +134,7 @@ def review_ledger(
     eligible: dict[str, dict[str, int]] = {
         str(n): {"occupation": 0, "minor_improvement": 0} for n in (2, 3, 4)
     }
+    verification_category_counts: Counter[str] = Counter()
     for row_number, row in enumerate(preliminary, 2):
         card_id = row.get("card_id", "")
         deck = row.get("deck", "")
@@ -143,6 +152,8 @@ def review_ledger(
             fail("structure", f"{card_id}: deck mismatch {deck!r}")
         if row.get("card_type") not in TYPES:
             fail("type", f"{card_id}: unrecognized preliminary card_type")
+        if not row.get("name_en", "").strip():
+            fail("structure", f"{card_id}: English display name missing")
         if not row.get("name_ja", "").strip():
             fail("structure", f"{card_id}: Japanese display name missing")
 
@@ -168,6 +179,21 @@ def review_ledger(
         reference_counts[reference] += 1
         if reference not in SOURCES:
             fail("provenance", f"{card_id}: unknown reference type {reference!r}")
+        # verification_category はスキーム拡張で追加予定。現行では存在すれば検証のみ
+        vcat = row.get("verification_category", "")
+        if vcat:
+            if vcat not in VERIFICATION_CATEGORIES:
+                fail("provenance", f"{card_id}: unknown verification_category {vcat!r}")
+            verification_category_counts[vcat] += 1
+            # カテゴリと reference_type の整合性チェック
+            if vcat == "simple" and reference not in {"wiki_verified"}:
+                fail("provenance", f"{card_id}: simple category requires wiki_verified reference")
+            if vcat == "multiplayer_effect" and reference not in {"official_print", "official_pdf", "official_other", "wiki_literature"}:
+                fail("provenance", f"{card_id}: multiplayer_effect category requires official or wiki_literature reference")
+            if vcat == "complex" and reference not in {"official_print", "official_pdf", "official_other", "wiki_literature"}:
+                fail("provenance", f"{card_id}: complex category requires official or wiki_literature reference")
+            if vcat == "unresolved" and status != "unverified":
+                fail("provenance", f"{card_id}: unresolved category must have unverified status")
         flags = {}
         for n in (2, 3, 4):
             key = f"eligible_at_{n}"
@@ -184,24 +210,28 @@ def review_ledger(
                 date.fromisoformat(reviewed)
             except ValueError:
                 fail("provenance", f"{card_id}: reviewed_on must be ISO date")
+        # source_summary_ja チェック
+        source_summary_ja = row.get("source_summary_ja", "")
+        if reference in {"wiki_verified", "wiki_literature"} and not source_summary_ja.strip():
+            fail("provenance", f"{card_id}: {reference} requires source_summary_ja")
         if status == "verified":
             if any(f == "unverified" for f in flags.values()):
                 fail(
                     "eligibility",
                     f"{card_id}: verified row has unverified player eligibility",
                 )
-            if reference not in {"official_pdf", "official_print", "official_other"}:
+            if reference not in OFFICIAL_SOURCES.union(WIKI_SOURCES):
                 fail(
                     "provenance",
-                    f"{card_id}: verified without official reference type",
+                    f"{card_id}: verified without official or wiki reference type",
                 )
             for field in ("primary_reference_id", "source_language", "reviewed_by", "reviewed_on"):
                 if not row.get(field, "").strip():
                     fail("provenance", f"{card_id}: verified without {field}")
-            if reference in {"official_pdf", "official_other"} and not row.get("primary_reference_url", ""):
+            if reference in {"official_pdf", "official_other", "wiki_verified", "wiki_literature"} and not row.get("primary_reference_url", ""):
                 fail(
                     "provenance",
-                    f"{card_id}: verified digital source needs URL",
+                    f"{card_id}: verified digital/wiki source needs URL",
                 )
             if not source.get("name_en", "").strip():
                 fail(
@@ -289,6 +319,7 @@ def review_ledger(
         "deck_counts": dict(sorted(deck_counts.items())),
         "review_status_counts": dict(sorted(verified_count.items())),
         "reference_type_counts": dict(sorted(reference_counts.items())),
+        "verification_category_counts": dict(sorted(verification_category_counts.items())),
         "structure_validation": {
             "ok": structural_errors == 0 and len(audit) == len(preliminary),
             "row_count": len(audit),
@@ -343,8 +374,16 @@ def main() -> int:
         preliminary = load_rows(args.preliminary)
         audit = load_rows(args.audit)
         missing_fields = set(AUDIT_FIELDS) - set(audit[0]) if audit else set(AUDIT_FIELDS)
-        if missing_fields:
-            raise ValueError(f"missing audit columns: {sorted(missing_fields)}")
+        # 新列はスキーム拡張で追加予定。現行では欠けていてもエラーにしない
+        required_fields = {
+            "card_id", "card_type_normalized", "eligible_at_2", "eligible_at_3",
+            "eligible_at_4", "review_status", "reference_type",
+            "primary_reference_id", "primary_reference_url", "source_language",
+            "ruleset_version", "reviewed_by", "reviewed_on", "review_note",
+        }
+        actually_missing = required_fields - set(audit[0]) if audit else required_fields
+        if actually_missing:
+            raise ValueError(f"missing audit columns: {sorted(actually_missing)}")
         report, errors = review_ledger(
             preliminary, audit, sample_size=args.sample_size
         )

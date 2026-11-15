@@ -33,11 +33,11 @@ class CardCatalogAuditTests(unittest.TestCase):
         self.assertEqual(result["verified_eligible_by_players"]["4"]["minor_improvement"], 0)
 
     def test_missing_official_source_is_rejected(self):
-        row = audit(review_status="verified", eligible_at_2="yes",
-                    eligible_at_3="yes", eligible_at_4="yes")
-        _, errors = review_ledger([prelim()], [row], require_full=False)
-        self.assertTrue(any("official reference" in message for message in errors))
-        self.assertTrue(any("primary_reference_id" in message for message in errors))
+            row = audit(review_status="verified", eligible_at_2="yes",
+                        eligible_at_3="yes", eligible_at_4="yes")
+            _, errors = review_ledger([prelim()], [row], require_full=False)
+            self.assertTrue(any("official or wiki reference" in message for message in errors))
+            self.assertTrue(any("primary_reference_id" in message for message in errors))
 
     def test_verified_official_record_counts_eligibility(self):
         row = audit(review_status="verified", reference_type="official_pdf",
