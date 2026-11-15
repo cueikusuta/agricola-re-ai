@@ -115,6 +115,7 @@ impl Game {
                     &mut self.public.players,
                     &mut self.public.improvement_market,
                     &mut self.delayed_well,
+                    &mut self.delayed_goods,
                     self.public.round,
                     &self.public.used,
                     &mut self.event_budget,

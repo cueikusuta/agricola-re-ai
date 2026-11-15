@@ -700,6 +700,7 @@ mod tests {
         let mut cards = crate::cards::CardState::default();
         let mut market = vec![];
         let mut well = std::collections::BTreeMap::new();
+        let mut delayed_goods = std::collections::BTreeMap::new();
         let mut uses = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
@@ -712,6 +713,7 @@ mod tests {
             &mut cards,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut budget,
@@ -742,6 +744,7 @@ mod tests {
             &mut cards,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut budget2,

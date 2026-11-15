@@ -277,6 +277,7 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::OnPlayGain { .. }
                 | crate::cards::CardEffect::OnPlayGainPerStored { .. }
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
+                | crate::cards::CardEffect::OnPlayScheduleRoundGain { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. } => {
                     EventKind::CardPlayed
                 }
@@ -394,6 +395,7 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterOccupationGainPerFoodCost {
                             amount, ..
                         }
+                        | crate::cards::CardEffect::OnPlayScheduleRoundGain { amount, .. }
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }

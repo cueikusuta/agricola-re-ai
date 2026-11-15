@@ -44,6 +44,7 @@
 ### 保留（基盤不足・要プレイヤー決定・文献/実装の未確定）と理由
 
 **[基盤不足] ラウンドスペースへの資材配置（最大の共通グループ、13枚以上）**
+第8章で C074/C077/C078/C079/C118 の5枚を実装済み（下記「章の記録」）。以下の一覧は残りの未処理分。
 「未プレイの偶数ラウンドのスペースに木1を置き、そのラウンドのはじめに得る」型。
 対象: C074 私有林, C077 粘土補給, C078 ヒキガエル, C079 石車, C118 木材集め,
 D078 葦の池, D106 ウイスキー蒸留者, D111 内装業者, D120 粘土配達人,
@@ -353,3 +354,74 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
   に分類完了。以後の作業は共通インフラ設計PR（別議題）または保留理由の解消後に限定する。
 - テスト: コード変更なし。fmt/clippy 合格、`cargo test --locked` **649 passed / 0 failed**
   （第6章と同一）。低リスクの文書変更のため独立再レビューは不要と判断する。
+
+### 第8章: C帯難易度1〜3の保留分 — ラウンド開始の資材予約（5枚）＋共通基盤
+- 処理対象: 保留リストの「ラウンドスペースへの資材配置」グループのうち C帯5枚。
+  C074 私有林, C077 粘土補給, C078 ヒキガエル, C079 石車, C118 木材集め。
+- 実装した共通基盤（**新規bookkeeping**）:
+  - `Game.delayed_goods: DelayedGoods = BTreeMap<u8, Vec<DelayedGood{player, good, amount}>>`。
+    「将来ラウンドのはじめに所有者が得る資材」を保持する台帳。`Game::start_round` が
+    新しいラウンドの開始時に該当エントリを取得してプレイヤーに付与し、そのエントリを
+    削除する（1回限り）。付与はラウンド開始カード効果のdispatchより前（既存の
+    delayed_wellの食料付与と同じ位置）で、順序は台帳順に固定。
+  - **state_hash の v5 タプルは不変**（この台帳は含めない）。`integrity_hash` には台帳が
+    非空のときだけ追記して含め、改竄・保存復元の整合性検査の対象にした（空のときは
+    ch.8以前と同じタプルなので、旧ビルドが発行した integrity_hash 付きセーブも検証が通る）。
+    `serde(skip_serializing_if = "BTreeMap::is_empty")` により、台帳が空の既存セーブは
+    バイト列が変わらない。
+  - `Observation.delayed_goods_schedule` に公開ミラーを追加（予約カードは公開プレイなので
+    全員が内容と時期を観測できる。well_food_schedule と同じ方針）。
+  - 基盤の配線: `DispatchContext` と6つのdispatcher（play/start_round/after_worker/
+    harvest_field/after_harvest_bake/after_clay_construction）に台帳を明示的に引き回し。
+    `Game::validate` にラウンド範囲（1〜14）・プレイヤーID・amount>0 の不変条件を追加。
+  - 新effect vocabulary: `CardEffect::OnPlayScheduleRoundGain { good, amount, schedule }` と
+    `RoundGainSchedule::{RemainingEvenRounds, NextRounds(n), CurrentPlus(offsets)}`。
+    dispatch_play の Before フェーズで予約を登録する（イベント予算・カード使用上限の
+    既存経路を通る）。
+- 実装したカード（型付き効果＋メタデータ＋テスト）:
+  - **C074 私有林**（小進歩，コスト2飯，前提 職業1，0点）: 未来の偶数ラウンド
+    （current+1以降の偶数、最大14）の開始時に木1。
+  - **C077 粘土補給**（小進歩，コスト1飯，0点）: 以後3ラウンド（current+1..=current+3、
+    最大14）の開始時に粘土1。
+  - **C078 ヒキガエル**（小進歩，コスト1飯，0点）: current+{5,7,9,11,13} の各ラウンド
+    （14超は捨てる）の開始時に葦1。
+  - **C079 石車**（小進歩，コスト2木，前提 職業2，0点）: 未来の偶数ラウンドの開始時に石1。
+  - **C118 木材集め**（職業，コストなし，0点）: 以後5ラウンドの開始時に木1。
+  - 典拠（自作要約のみ、原文転載なし）: agricola.cloudfree.jp 個別ページ ?p=3015（C074）,
+    3012（C077）, 3011（C078）, 3010（C079）, 2971（C118）、英語一覧 /cardlist_en/。
+- ルール解釈（文献で確定した点と、実装上の決め方）:
+  - 5枚とも「ラウンドスペースに置く」と書かれるが、**回収はそれらのラウンドの
+    はじめに所有者が行う**（ワーカー配置ではない）。よってラウンドスペース自体は
+    変更せず、ラウンド開始付与の台帳で表現した。
+  - C074/C079の「未プレイ（remaining）の偶数ラウンド」は、カードを出した時点で
+    現在ラウンドのはじめは過ぎているため **current+1 以降の偶数ラウンド** とした。
+  - C078は「現在のラウンド数に5,7,9,11,13を足す」ため、遅く出すと予約が0件になる
+    （例: ラウンド12では全て14超）。この縮退を仕様としてテストした。
+- 未対応（意図的）: legacy `cards::play` ヘルパは台帳を受け取らないため予約を登録しない
+  （C116と同じ。本番経路は engine → dispatch_play のみ）。
+- テスト（新規12件、`cargo test --locked` **661 passed / 0 failed**）:
+  - cards: ラウンド式（偶数/次N/オフセット/上限/遅延時の0件）と5枚のコスト・前提・効果。
+  - card_events: dispatch_play が各カードの正しいラウンド集合を予約し、予約の無い
+    カードでは台帳不変であること。
+  - m5_card_actions: 実プレイ（MeetingPlace + PlayMinor）→予約→公開観測ミラー→
+    event replay一致→save_json/load_json一致→state_hash非包含/integrity_hash包含。
+  - rule_regressions: start_round がラウンド開始時に付与して1回で消えること、
+    空台帳がシリアライズに現れない（旧セーブ互換）こと、空台帳では integrity_hash が
+    ch.8以前のタプルと一致すること。
+- 独立レビュー（別セッション、AGENTS.md #14）: レビュー時HEAD `a092eec`。実行検証は
+  fmt/clippy/test に加え、2人・4人（追加タイルON）の実プレイ、保存再演、validate 拒否、
+  文献照合まで独立に確認。判定 **approve with nits**（P0/P1 なし、P2 1件、P3 6件）。
+  - P2-1（`state_hash` が台帳を被覆しない）: v5タプルの純粋性を優先して**非包含の設計判断を維持**。
+    台帳は記録済みプレイイベントから再構成でき、保存復元の破損は `integrity_hash`、再演の
+    一致は専用テストで担保する。`state_hash` のdoc commentに理由を明記した（レビュー許容範囲）。
+  - P3-2: `Game::validate` を「現在ラウンドより後」だけ許可するよう強化し、回帰テスト追加。
+  - P3-3: `state_hash` の除外フィールド列挙に `delayed_goods` と理由を追記。
+  - P3-4: `EPISODE_SCHEMA_VERSION` は additive＋`serde(default)` のため据え置き、理由をdoc comment化。
+  - P3-5: `docs/rule-decisions.md` に2解釈（current除外、C078の14上限・0件縮退）を記録。
+  - P3-6: legacy `apply_on_play_effects` の無視理由を明示arm＋コメントで記録。
+  - P3-7: PR本文のHEAD・レビュー記録を更新（PRコメントにも記録）。
+  - P2/P3のみのため独立再レビューは不要（AGENTS.md #15）。最新HEADでfmt/clippy/test再実行済み。
+- 次にやること: C帯の残り（C083 若牛の家畜配置決定、C072 収穫＋進歩アクション付与、
+  C084/C095/C096等の任意効果・交換）。家畜配置の PendingDecision と、
+  任意効果の ChooseGain 実運用が次の共通基盤候補。
+

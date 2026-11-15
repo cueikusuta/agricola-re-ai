@@ -562,6 +562,13 @@ fn card_priority(
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount, .. } => {
                 card_good_value(*good) * i64::from(*amount)
             }
+            // C074/C077/C078/C079/C118: one grant per round the printed
+            // schedule still reaches from the current round.
+            CardEffect::OnPlayScheduleRoundGain { good, amount, schedule } => {
+                card_good_value(*good)
+                    * i64::from(*amount)
+                    * schedule.due_rounds(round).len() as i64
+            }
             CardEffect::Passive { .. } => horizon * 5,
             CardEffect::EndGameBonus { .. } => 12,
             CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,

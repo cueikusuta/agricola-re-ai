@@ -28,7 +28,10 @@ use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-/// On-disk version of one episode record. Bump when the JSON shape changes.
+/// On-disk version of one episode record. Bump when the JSON shape changes in a
+/// way that breaks older readers. Additive `Observation` fields declared with
+/// `#[serde(default)]` (for example the ch.8 `delayed_goods_schedule`) keep v1
+/// readers working, so they do not require a bump.
 pub const EPISODE_SCHEMA_VERSION: u32 = 1;
 /// Upper bound on recorded decisions in one game (14 rounds, four players).
 const MAX_RECORDED_TURNS: usize = 320;
