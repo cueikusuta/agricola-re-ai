@@ -1777,8 +1777,14 @@ mod verified_immediate_resource_tests {
  * Verified 2016 base A/B occupations expressible entirely through the worker
  * completion hook. Only effect logic and opaque card IDs are stored here.
  * This subset alone is not a full playable 7+7-card deal.
+ *
+ * The `players` argument is intentionally unused: the player-count-gated A/B
+ * cards that used to be appended here (A155 at 4+, B142 at 3+) now live in the
+ * band pools `verified_band_a_cards` / `verified_band_b_cards`, so this pool is
+ * player-count independent. The signature is kept so existing callers
+ * (`card_pool.rs`, `registry.rs`) do not have to change.
  */
-pub fn verified_worker_bonus_cards(players: usize) -> Vec<CardDefinition> {
+pub fn verified_worker_bonus_cards(_players: usize) -> Vec<CardDefinition> {
     fn occupation(id: &str, effects: Vec<CardEffect>) -> CardDefinition {
         CardDefinition {
             use_limit: None,
@@ -1796,7 +1802,7 @@ pub fn verified_worker_bonus_cards(players: usize) -> Vec<CardDefinition> {
             amount,
         }
     }
-    let mut cards = vec![
+    let cards = vec![
         occupation(
             "A116",
             [Space::Forest, Space::Copse, Space::Grove]
@@ -1825,21 +1831,6 @@ pub fn verified_worker_bonus_cards(players: usize) -> Vec<CardDefinition> {
             ],
         ),
     ];
-    if players >= 4 {
-        cards.push(occupation(
-            "A155",
-            vec![
-                gain(Space::TravelingPlayers, Good::Wood, 1),
-                gain(Space::TravelingPlayers, Good::Grain, 1),
-            ],
-        ));
-    }
-    if players >= 3 {
-        cards.push(occupation(
-            "B142",
-            vec![gain(Space::GrainSeeds, Good::Vegetable, 1)],
-        ));
-    }
     cards
 }
 
@@ -1869,12 +1860,10 @@ mod verified_worker_bonus_tests {
         let two = verified_worker_bonus_cards(2);
         let three = verified_worker_bonus_cards(3);
         let four = verified_worker_bonus_cards(4);
+        // Only A116, A119, A122 are in this pool now (no player-count gating)
         assert_eq!(two.len(), 3);
-        assert!(!two.iter().any(|c| c.id == "A155" || c.id == "B142"));
-        assert_eq!(three.len(), 4);
-        assert!(three.iter().any(|c| c.id == "B142"));
-        assert!(!three.iter().any(|c| c.id == "A155"));
-        assert_eq!(four.len(), 5);
+        assert_eq!(three.len(), 3);
+        assert_eq!(four.len(), 3);
     }
 
     #[test]
@@ -1900,21 +1889,6 @@ mod verified_worker_bonus_tests {
             ],
         );
         assert_eq!(player.supply.wood, 4);
-    }
-
-    #[test]
-    fn a155_grain_and_wood_from_traveling_players() {
-        let player = applied("A155", &[Space::TravelingPlayers, Space::Fishing]);
-        assert_eq!(player.supply.wood, 1);
-        assert_eq!(player.supply.grain, 1);
-        assert_eq!(player.supply.food, 0);
-    }
-
-    #[test]
-    fn b142_vegetable_from_grain_seeds_only() {
-        let player = applied("B142", &[Space::GrainSeeds, Space::Farmland]);
-        assert_eq!(player.supply.vegetable, 1);
-        assert_eq!(player.supply.grain, 0);
     }
 
     #[test]
@@ -2991,9 +2965,14 @@ fn improvement_count_in_front(set: &CardSet, player: &Player) -> u32 {
 
 /// A-deck band 070-120 cards whose printed effects are fully expressible with
 /// the current typed effect vocabulary (BGA Agricola card wiki; A099 p=3326,
-/// A101 p=3324, A106 p=3319, A117 p=3308). Kept out of the A/B two-player
+/// A101 p=3324, A106 p=3319, A117 p=3308, A155 p=3270). Kept out of the A/B two-player
 /// preset, same as the C/D/E band pools.
 pub fn verified_band_a_cards() -> Vec<CardDefinition> {
+    let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
+        space,
+        good,
+        amount,
+    };
     vec![
         // A099 放牧人 (Fellow Grazer): 2 bonus points per pasture covering at
         // least 3 farm cells at scoring time.
@@ -3054,7 +3033,271 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         },
+        // A155 奇術師 (Conjurer): after worker placed on traveling_players,
+        // gain 1 wood and 1 grain. Only available at 4 players.
+        CardDefinition {
+            use_limit: None,
+            id: "A155".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                gain(Space::TravelingPlayers, Good::Wood, 1),
+                gain(Space::TravelingPlayers, Good::Grain, 1),
+            ],
+        },
     ]
+}
+
+/// B-deck band 121-168 cards whose printed effects are fully expressible with
+/// the current typed effect vocabulary (BGA Agricola card wiki;
+/// B122 p=3135, B142 p=3207, B144 p=3113). Kept out of the A/B two-player
+/// preset, same as the C/D/E band pools.
+pub fn verified_band_b_cards() -> Vec<CardDefinition> {
+    let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
+        space,
+        good,
+        amount,
+    };
+    vec![
+        // B122 鉱物学者 (Mineralogist): clay accumulation spaces (clay_pit, hollow)
+        // grant 1 stone; stone accumulation spaces (western_quarry, eastern_quarry)
+        // grant 1 clay. Available at all player counts.
+        CardDefinition {
+            use_limit: None,
+            id: "B122".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                gain(Space::ClayPit, Good::Stone, 1),
+                gain(Space::Hollow, Good::Stone, 1),
+                gain(Space::WesternQuarry, Good::Clay, 1),
+                gain(Space::EasternQuarry, Good::Clay, 1),
+            ],
+        },
+        // B142 八百屋 (Greengrocer): grain_seeds grants 1 vegetable.
+        // Only available at 3+ players.
+        CardDefinition {
+            use_limit: None,
+            id: "B142".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                gain(Space::GrainSeeds, Good::Vegetable, 1),
+            ],
+        },
+        // B144 坑夫 (Collier): clay accumulation spaces (clay_pit, hollow) grant
+        // 1 wood; clay_pit additionally grants 1 reed.
+        // Only available at 3+ players.
+        CardDefinition {
+            use_limit: None,
+            id: "B144".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                gain(Space::ClayPit, Good::Wood, 1),
+                gain(Space::Hollow, Good::Wood, 1),
+                gain(Space::ClayPit, Good::Reed, 1),
+            ],
+        },
+    ]
+}
+
+/// Test module for verified_band_b_cards.
+#[cfg(test)]
+mod verified_band_b_tests {
+    use super::*;
+
+    fn applied(card_id: &str, spaces: &[Space], _players: usize) -> Player {
+        let definitions = verified_band_b_cards();
+        let mut player = Player::new(0, 0);
+        player.played_cards.push(card_id.to_string());
+        let set = CardSet { definitions };
+        for &space in spaces {
+            after_worker(&set, &mut player, space).unwrap();
+        }
+        player
+    }
+
+    #[test]
+    fn b122_stone_from_clay_spaces_clay_from_stone_spaces() {
+        // B122: clay_pit/hollow -> stone; western/eastern_quarry -> clay
+        let p = applied(
+            "B122",
+            &[
+                Space::ClayPit,
+                Space::Hollow,
+                Space::WesternQuarry,
+                Space::EasternQuarry,
+            ],
+            2,
+        );
+        assert_eq!(p.supply.stone, 2); // clay_pit + hollow
+        assert_eq!(p.supply.clay, 2); // western_quarry + eastern_quarry
+        assert_eq!(p.supply.wood, 0);
+        assert_eq!(p.supply.reed, 0);
+    }
+
+    #[test]
+    fn b122_not_triggered_by_other_spaces() {
+        let p = applied(
+            "B122",
+            &[
+                Space::Forest,
+                Space::ReedBank,
+                Space::Fishing,
+                Space::DayLaborer,
+            ],
+            2,
+        );
+        assert_eq!(p.supply.stone, 0);
+        assert_eq!(p.supply.clay, 0);
+    }
+
+    #[test]
+    fn b122_playable_at_all_player_counts() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let card = set.definition("B122").unwrap();
+        // No MinimumPlayers prerequisite, so playable at 2, 3, 4
+        for players in [2, 3, 4] {
+            let p = Player::new(0, 0);
+            assert!(
+                can_play(&set, card, &p, 0),
+                "B122 should be playable at {players} players"
+            );
+        }
+    }
+
+    #[test]
+    fn b142_vegetable_from_grain_seeds_only() {
+        let p = applied(
+            "B142",
+            &[Space::GrainSeeds, Space::Farmland, Space::GrainUtilization],
+            3,
+        );
+        assert_eq!(p.supply.vegetable, 1); // only grain_seeds triggers
+        assert_eq!(p.supply.grain, 0);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn b142_not_triggered_by_other_spaces() {
+        let p = applied(
+            "B142",
+            &[
+                Space::Forest,
+                Space::ClayPit,
+                Space::VegetableSeeds,
+                Space::Cultivation,
+            ],
+            3,
+        );
+        assert_eq!(p.supply.vegetable, 0);
+    }
+
+    #[test]
+    fn b142_requires_three_players() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let card = set.definition("B142").unwrap();
+        let has_min_players = card.effects.iter().any(|e| {
+            matches!(
+                e,
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3)
+                }
+            )
+        });
+        assert!(
+            has_min_players,
+            "B142 should have MinimumPlayers(3) prerequisite"
+        );
+        let p = Player::new(0, 0);
+        assert!(
+            can_play(&set, card, &p, 0),
+            "B142 should be playable via can_play"
+        );
+    }
+
+    #[test]
+    fn b144_not_triggered_by_other_spaces() {
+        let p = applied(
+            "B144",
+            &[
+                Space::Forest,
+                Space::WesternQuarry,
+                Space::ReedBank,
+                Space::Fishing,
+            ],
+            3,
+        );
+        assert_eq!(p.supply.wood, 0);
+        assert_eq!(p.supply.reed, 0);
+    }
+
+    #[test]
+    fn b144_wood_from_clay_spaces_reed_from_clay_pit() {
+        // B144: clay_pit/hollow -> wood; clay_pit -> reed
+        let p = applied("B144", &[Space::ClayPit, Space::Hollow, Space::ClayPit], 3);
+        assert_eq!(p.supply.wood, 3); // clay_pit + hollow + clay_pit
+        assert_eq!(p.supply.reed, 2); // clay_pit + clay_pit
+        assert_eq!(p.supply.clay, 0);
+        assert_eq!(p.supply.stone, 0);
+    }
+
+    #[test]
+    fn b144_requires_three_players() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let card = set.definition("B144").unwrap();
+        let has_min_players = card.effects.iter().any(|e| {
+            matches!(
+                e,
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3)
+                }
+            )
+        });
+        assert!(
+            has_min_players,
+            "B144 should have MinimumPlayers(3) prerequisite"
+        );
+        let p = Player::new(0, 0);
+        assert!(
+            can_play(&set, card, &p, 0),
+            "B144 should be playable via can_play"
+        );
+    }
+
+    #[test]
+    fn band_b_cards_are_absent_from_the_two_player_preset() {
+        let preset = verified_basic_card_set(2).unwrap();
+        // A155 sits in the A-deck band pool rather than the B-deck one, but it
+        // is covered here too: neither band pool may leak into the A/B
+        // two-player preset.
+        for id in ["B122", "B142", "B144", "A155"] {
+            assert!(
+                preset.definition(id).is_none(),
+                "{id} must stay out of the A/B two-player preset"
+            );
+        }
+    }
 }
 
 /// E-deck band 070-120 cards whose printed effects are fully expressible with
@@ -3544,12 +3787,69 @@ mod verified_band_a_tests {
     #[test]
     fn band_a_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["A099", "A101", "A106", "A117"] {
+        for id in ["A099", "A101", "A106", "A117", "A155"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
             );
         }
+    }
+
+    #[test]
+    fn a155_gains_wood_and_grain_on_traveling_players() {
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("A155".into());
+        after_worker(&set, &mut p, Space::TravelingPlayers).unwrap();
+        assert_eq!(p.supply.wood, 1);
+        assert_eq!(p.supply.grain, 1);
+        assert_eq!(p.supply.food, 0);
+        // Multiple uses accumulate.
+        after_worker(&set, &mut p, Space::TravelingPlayers).unwrap();
+        assert_eq!(p.supply.wood, 2);
+        assert_eq!(p.supply.grain, 2);
+    }
+
+    #[test]
+    fn a155_not_triggered_by_other_spaces() {
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("A155".into());
+        after_worker(&set, &mut p, Space::Forest).unwrap();
+        after_worker(&set, &mut p, Space::ClayPit).unwrap();
+        after_worker(&set, &mut p, Space::DayLaborer).unwrap();
+        assert_eq!(p.supply.wood, 0);
+        assert_eq!(p.supply.grain, 0);
+    }
+
+    #[test]
+    fn a155_requires_four_players() {
+        // Card has MinimumPlayers(4) prerequisite.
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        let card = set.definition("A155").unwrap();
+        let has_min_players = card.effects.iter().any(|e| {
+            matches!(
+                e,
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4)
+                }
+            )
+        });
+        assert!(
+            has_min_players,
+            "A155 should have MinimumPlayers(4) prerequisite"
+        );
+        let p = Player::new(0, 0);
+        assert!(
+            can_play(&set, card, &p, 0),
+            "A155 should be playable via can_play"
+        );
     }
 }
 
