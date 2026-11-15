@@ -163,6 +163,10 @@ pub enum HarvestFieldRule {
     /// exactly one good per harvest, so the count of vegetable fields with a
     /// growing crop equals the vegetables gained this field phase.
     VegetablesHarvested,
+    /// E117 パイプ喫煙家 (Pipe Smoker): 1 if at least one field is planted
+    /// with wheat at the start of the harvest (the field phase is the first
+    /// step of the harvest, and no state changes between them), else 0.
+    HasWheatField,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1943,6 +1947,15 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                         u32::from(has(Some(Crop::Grain)) && has(Some(Crop::Vegetable)) && has(None))
                     }
                     HarvestFieldRule::VegetablesHarvested => vegetable_yield(player),
+                    HarvestFieldRule::HasWheatField => u32::from(player.farm.iter().any(|cell| {
+                        matches!(
+                            cell.tile,
+                            Tile::Field {
+                                crop: Some(Crop::Grain),
+                                ..
+                            }
+                        )
+                    })),
                 };
                 safe_gain(
                     player,
@@ -2827,6 +2840,25 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
     ]
 }
 
+/// E-deck band 070-120 cards whose printed effects are fully expressible with
+/// the current typed effect vocabulary (BGA Agricola card wiki;
+/// E117 p=2636). Kept out of the A/B two-player preset, same as
+/// [`verified_band_c_cards`] and [`verified_band_d_cards`].
+pub fn verified_band_e_cards() -> Vec<CardDefinition> {
+    vec![CardDefinition {
+        use_limit: None,
+        id: "E117".to_owned(),
+        kind: CardKind::Occupation,
+        cost: vec![],
+        points: 0,
+        effects: vec![CardEffect::HarvestFieldGain {
+            rule: HarvestFieldRule::HasWheatField,
+            good: Good::Wood,
+            amount: 2,
+        }],
+    }]
+}
+
 #[cfg(test)]
 mod verified_band_d_tests {
     use super::*;
@@ -2922,6 +2954,56 @@ mod verified_band_d_tests {
                 "{id} must stay out of the A/B two-player preset"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod verified_band_e_tests {
+    use super::*;
+
+    #[test]
+    fn e117_wood_per_harvest_with_wheat_field() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E117".into());
+        // 小麦畑がなければ得ない。
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.wood, 0);
+        p.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.wood, 2);
+        // 野菜畑や空き畑では発動しない。
+        p.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.wood, 2);
+        // 複数の小麦畑でも1収穫につき1回（木2）。
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.wood, 4);
+    }
+
+    #[test]
+    fn e117_has_no_cost_and_is_absent_from_the_two_player_preset() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let card = set.definition("E117").unwrap();
+        assert_eq!(card.kind, CardKind::Occupation);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+        let preset = verified_basic_card_set(2).unwrap();
+        assert!(preset.definition("E117").is_none());
     }
 }
 
