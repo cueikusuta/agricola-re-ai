@@ -114,6 +114,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Cost: 1 reed. Printed points: 1. Prerequisite: must have a cooking improvement (wiki: 鍋の進歩 = fireplace or cooking hearth). Encoded as has_improvement kind=[fireplace, cooking_hearth]. Effect: for each new wild boar gained from an action space effect, gain 1 food. Per-boar granularity confirmed (wiki: 新しい猪ごとに). Source limited to pig_market space in model; source text says 'action space effect' generally. Verified via BGA Wiki (wiki_literature - predicate scope limitation). Source: https://agricola.cloudfree.jp/?p=3037 (ja, 2026-11-16). 条件：鍋の進歩（かまど/調理場）。コスト：1葦。勝利点：1。効果：アクションスペースの効果により得た新しい猪ごとに食料1も得る。プレイエリアに残る。"
+    "notes": "Cost: 1 reed. Printed points: 1. Prerequisite: must have a cooking improvement (wiki: 鍋の進歩 = fireplace or cooking hearth). Encoded as two separate has_improvement prerequisites (fireplace, cooking_hearth). Effect: for each new wild boar gained from an action space effect, gain 1 food. Per-boar granularity confirmed (wiki: 新しい猪ごとに). Source limited to pig_market space in model; source text says 'action space effect' generally. Verified via BGA Wiki (wiki_literature - predicate scope limitation). Source: https://agricola.cloudfree.jp/?p=3037 (ja, 2026-11-16). 条件：鍋の進歩（かまど/調理場）。コスト：1葦。勝利点：1。効果：アクションスペースの効果により得た新しい猪ごとに食料1も得る。プレイエリアに残る。"
   }
 }

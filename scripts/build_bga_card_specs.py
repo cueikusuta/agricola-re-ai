@@ -4137,27 +4137,27 @@ CARDS = {
             ],
         },
         "C052": {
-            "post": "played_area",
-            "effects": [
-                effect("after_worker_space",
-                       [gain("food", per(count("new_wild_boar_gained"), 1))],
-                       cond=[cond("worker_space_used", space="pig_market"),
-                             cond("any_player")],
-                       freq="every_use", dur="permanent",
-                       notes="For each new wild boar gained from the effect of an action space, also gain 1 food (modeled on the pig_market space; per-boar vs per-use granularity noted).")
-            ],
-            "notes": "Cost: 1 reed. Printed points: 1. Prerequisite: must have a cooking improvement (wiki: 鍋の進歩 = fireplace or cooking hearth). Encoded as has_improvement kind=[fireplace, cooking_hearth]. Effect: for each new wild boar gained from an action space effect, gain 1 food. Per-boar granularity confirmed (wiki: 新しい猪ごとに). Source limited to pig_market space in model; source text says 'action space effect' generally. Verified via BGA Wiki (wiki_literature - predicate scope limitation). Source: https://agricola.cloudfree.jp/?p=3037 (ja, 2026-11-16). 条件：鍋の進歩（かまど/調理場）。コスト：1葦。勝利点：1。効果：アクションスペースの効果により得た新しい猪ごとに食料1も得る。プレイエリアに残る。",
-            "tests": [
-                case("C052-normal", {"food": 0, "wild_boar": 0}, {"other_player_uses": "pig_market"},
-                     {"food_delta": 1}),
-                case("C052-two-boars", {"food": 0, "wild_boar": 0}, {"other_player_uses": "pig_market", "boars_gained": 2},
-                     {"food_delta": 2}),
-                case("C052-not-triggered", {"food": 0, "wild_boar": 0}, {"other_player_uses": "cattle_market"},
-                     {"food_delta": 0}),
-            ],
-            "status": "bga_checked",
-            "unresolved": [],
-        },
+                    "post": "played_area",
+                    "effects": [
+                        effect("after_worker_space",
+                               [gain("food", per(count("new_wild_boar_gained"), 1))],
+                               cond=[cond("worker_space_used", space="pig_market"),
+                                     cond("any_player")],
+                               freq="every_use", dur="permanent",
+                               notes="For each new wild boar gained from the effect of an action space, also gain 1 food (modeled on the pig_market space; per-boar vs per-use granularity noted).")
+                    ],
+                    "notes": "Cost: 1 reed. Printed points: 1. Prerequisite: must have a cooking improvement (wiki: 鍋の進歩 = fireplace or cooking hearth). Encoded as two separate has_improvement prerequisites (fireplace, cooking_hearth). Effect: for each new wild boar gained from an action space effect, gain 1 food. Per-boar granularity confirmed (wiki: 新しい猪ごとに). Source limited to pig_market space in model; source text says 'action space effect' generally. Verified via BGA Wiki (wiki_literature - predicate scope limitation). Source: https://agricola.cloudfree.jp/?p=3037 (ja, 2026-11-16). 条件：鍋の進歩（かまど/調理場）。コスト：1葦。勝利点：1。効果：アクションスペースの効果により得た新しい猪ごとに食料1も得る。プレイエリアに残る。",
+                    "tests": [
+                        case("C052-normal", {"food": 0, "wild_boar": 0}, {"other_player_uses": "pig_market"},
+                             {"food_delta": 1}),
+                        case("C052-two-boars", {"food": 0, "wild_boar": 0}, {"other_player_uses": "pig_market", "boars_gained": 2},
+                             {"food_delta": 2}),
+                        case("C052-not-triggered", {"food": 0, "wild_boar": 0}, {"other_player_uses": "cattle_market"},
+                             {"food_delta": 0}),
+                    ],
+                    "status": "bga_checked",
+                    "unresolved": [],
+                },
         "C053": {
             "post": "played_area",
             "effects": [
