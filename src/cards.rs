@@ -3057,6 +3057,59 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
     ]
 }
 
+/// B-deck band 121-168 cards whose printed effects are fully expressible with
+/// the current typed effect vocabulary (BGA Agricola card wiki; B122 p=3135,
+/// B144 p=3113). A `worker_space_used` condition naming a set of spaces is
+/// expanded into one [`CardEffect::AfterWorkerGain`] per space, the same idiom
+/// used by A116/A119 above: a worker placement uses exactly one space, so the
+/// split cannot double-fire. Kept out of the A/B two-player preset, same as
+/// [`verified_band_a_cards`] and the other band pools.
+pub fn verified_band_b_cards() -> Vec<CardDefinition> {
+    let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
+        space,
+        good,
+        amount,
+    };
+    let occupation = |id: &str, effects: Vec<CardEffect>| CardDefinition {
+        use_limit: None,
+        id: id.to_owned(),
+        kind: CardKind::Occupation,
+        cost: vec![],
+        points: 0,
+        effects,
+    };
+    vec![
+        // B122 鉱物学者 (Mineralogist): a clay accumulation space (clay pit or
+        // hollow) yields 1 stone, a stone accumulation space (western or
+        // eastern quarry) yields 1 clay.
+        occupation(
+            "B122",
+            [
+                (Space::ClayPit, Good::Stone),
+                (Space::Hollow, Good::Stone),
+                (Space::WesternQuarry, Good::Clay),
+                (Space::EasternQuarry, Good::Clay),
+            ]
+            .into_iter()
+            .map(|(space, good)| gain(space, good, 1))
+            .collect(),
+        ),
+        // B144 坑夫 (Clay Digger): a clay accumulation space (clay pit or
+        // hollow) yields 1 wood, and the clay pit additionally yields 1 reed.
+        occupation(
+            "B144",
+            [
+                (Space::ClayPit, Good::Wood),
+                (Space::Hollow, Good::Wood),
+                (Space::ClayPit, Good::Reed),
+            ]
+            .into_iter()
+            .map(|(space, good)| gain(space, good, 1))
+            .collect(),
+        ),
+    ]
+}
+
 /// E-deck band 070-120 cards whose printed effects are fully expressible with
 /// the current typed effect vocabulary (BGA Agricola card wiki;
 /// E117 p=2636). Kept out of the A/B two-player preset, same as
@@ -3548,6 +3601,107 @@ mod verified_band_a_tests {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod verified_band_b_tests {
+    use super::*;
+
+    /// Play `card_id` and fire the after-worker dispatch for a single space,
+    /// mirroring how the band pools are exercised elsewhere: one placement
+    /// uses exactly one space.
+    fn applied(card_id: &str, space: Space) -> Player {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut player = Player::new(0, 0);
+        player.played_cards.push(card_id.to_string());
+        after_worker(&set, &mut player, space).unwrap();
+        player
+    }
+
+    #[test]
+    fn b122_stone_from_clay_accumulation_spaces() {
+        for space in [Space::ClayPit, Space::Hollow] {
+            let p = applied("B122", space);
+            assert_eq!(p.supply.stone, 1, "{space:?} must yield 1 stone");
+            assert_eq!(p.supply.clay, 0, "{space:?} must not yield clay");
+            assert_eq!(p.supply.wood, 0, "{space:?} must not yield wood");
+        }
+    }
+
+    #[test]
+    fn b122_clay_from_stone_accumulation_spaces() {
+        for space in [Space::WesternQuarry, Space::EasternQuarry] {
+            let p = applied("B122", space);
+            assert_eq!(p.supply.clay, 1, "{space:?} must yield 1 clay");
+            assert_eq!(p.supply.stone, 0, "{space:?} must not yield stone");
+        }
+    }
+
+    #[test]
+    fn b122_other_spaces_gain_nothing() {
+        for space in [Space::Forest, Space::ReedBank, Space::Grove] {
+            let p = applied("B122", space);
+            assert_eq!(
+                (p.supply.clay, p.supply.reed, p.supply.stone, p.supply.wood),
+                (0, 0, 0, 0),
+                "{space:?} is not a clay or stone accumulation space"
+            );
+        }
+    }
+
+    #[test]
+    fn b144_wood_from_clay_accumulation_spaces() {
+        for space in [Space::ClayPit, Space::Hollow] {
+            let p = applied("B144", space);
+            assert_eq!(p.supply.wood, 1, "{space:?} must yield 1 wood");
+        }
+    }
+
+    #[test]
+    fn b144_reed_only_from_the_clay_pit() {
+        let pit = applied("B144", Space::ClayPit);
+        assert_eq!(pit.supply.wood, 1);
+        assert_eq!(pit.supply.reed, 1);
+        let hollow = applied("B144", Space::Hollow);
+        assert_eq!(hollow.supply.wood, 1);
+        assert_eq!(hollow.supply.reed, 0, "hollow must not yield reed");
+    }
+
+    #[test]
+    fn b144_other_spaces_gain_nothing() {
+        for space in [Space::WesternQuarry, Space::Forest] {
+            let p = applied("B144", space);
+            assert_eq!(
+                (p.supply.reed, p.supply.wood),
+                (0, 0),
+                "{space:?} is not a clay accumulation space"
+            );
+        }
+    }
+
+    #[test]
+    fn band_b_cards_are_absent_from_the_two_player_preset() {
+        let preset = verified_basic_card_set(2).unwrap();
+        for id in ["B122", "B144"] {
+            assert!(
+                preset.definition(id).is_none(),
+                "{id} must stay out of the A/B two-player preset"
+            );
+        }
+    }
+
+    #[test]
+    fn band_b_cards_are_reachable_in_the_default_registry() {
+        let registry = default_registry();
+        for id in ["B122", "B144"] {
+            assert!(
+                registry.card_id(id).is_some(),
+                "{id} must be registered so drafts and multiplayer sets can use it"
             );
         }
     }

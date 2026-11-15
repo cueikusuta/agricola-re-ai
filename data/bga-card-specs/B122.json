@@ -112,7 +112,7 @@
   ],
   "checked_by": "BGA wiki cross-check (JA and EN pages)",
   "checked_on": "2026-11-14",
-  "implementation_status": "not_started",
+  "implementation_status": "implemented",
   "notes": "Clay accumulation spaces = Clay Pit and Hollow (per A140); stone accumulation spaces = Western/Eastern Quarry. Third-party BGA wiki check only; not official Lookout verification."
  }
 }
