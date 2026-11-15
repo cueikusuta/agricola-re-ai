@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M10 A-1: inventory of the A-E card ledger, separate from official review.
+"""M10 A-1: inventory of the A-E card ledger, separate from official review (2026-11-15 policy update).
 
 The task asks for six things that are easy to conflate. This tool keeps them
 apart, and only answers the ones that can be answered without official
@@ -8,7 +8,7 @@ material:
 1. present in the ledger            -> counted here (840 rows).
 2. officially reviewed              -> NOT answered here; only
                                        docs/card-catalog-ae-audit.csv's
-                                       review_status can say, see #115/#141.
+                                       review_status can say, see #115/#141/#308.
 3. effect implemented in Rust       -> counted here, from the preliminary
                                        ledger's implementation_reference.
 4. distributed in a 4-player pool   -> NOT answered here; needs the verified

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that no blocked card was promoted to `verified` (#105 / #115).
+"""Check that no blocked card was promoted to `verified` (#105 / #115 / #308).
 
 `docs/card-verification-blockers.json` records, for the highest-risk cards, what
 is still unknown and which official source would resolve it. This script is the
