@@ -156,3 +156,55 @@ fn animal_market_cattle_requires_food_and_is_atomic() {
     g.apply(action).unwrap();
     assert_eq!(g.public.players[id].supply.food, 0);
 }
+
+#[test]
+fn delayed_round_goods_are_collected_at_round_start_and_only_once() {
+    use agricola_re_ai::model::DelayedGood;
+    let mut g = game(false);
+    let wood = g.public.players[0].supply.wood;
+    let food = g.public.players[1].supply.food;
+    // The next start_round opens round 4.
+    g.public.round = 3;
+    g.delayed_goods.insert(
+        4,
+        vec![
+            DelayedGood {
+                player: 0,
+                good: Good::Wood,
+                amount: 2,
+            },
+            DelayedGood {
+                player: 1,
+                good: Good::Food,
+                amount: 1,
+            },
+        ],
+    );
+
+    g.start_round();
+    assert_eq!(g.public.round, 4);
+    assert_eq!(g.public.players[0].supply.wood, wood + 2);
+    assert_eq!(g.public.players[1].supply.food, food + 1);
+    assert!(
+        g.delayed_goods.is_empty(),
+        "a collected reservation must be removed"
+    );
+
+    let wood_after = g.public.players[0].supply.wood;
+    g.start_round();
+    assert_eq!(g.public.round, 5);
+    assert_eq!(
+        g.public.players[0].supply.wood, wood_after,
+        "the reserved good is granted once, at its own round start"
+    );
+}
+
+#[test]
+fn empty_delayed_goods_ledger_is_skipped_in_serialization() {
+    let g = game(false);
+    let json = serde_json::to_string(&g).unwrap();
+    assert!(
+        !json.contains("delayed_goods"),
+        "pre-existing saves must keep their exact bytes"
+    );
+}

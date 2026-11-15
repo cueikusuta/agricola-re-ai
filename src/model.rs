@@ -30,6 +30,8 @@ where
 
 pub const FARM_CELLS: usize = 15;
 pub const HARVEST_ROUNDS: [u8; 6] = [4, 7, 9, 11, 13, 14];
+/// The game lasts exactly 14 rounds (2016 Lookout rules, round track).
+pub const LAST_ROUND: u8 = 14;
 pub const RULES_VERSION: &str = "agricola-revised-2016-beginner";
 pub const ENGINE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const LOG_VERSION: u32 = 5;
@@ -546,6 +548,24 @@ pub struct RngStreams {
     pub round: ChaCha8Rng,
     pub ai: ChaCha8Rng,
 }
+/// One good reserved for a future round by an on-play card effect
+/// (C074 私有林, C077 粘土補給, C078 ヒキガエル, C079 石車, C118 木材集め).
+///
+/// The printed cards say to put the good on the round spaces, but the owner
+/// collects it at the START of those rounds, so the engine keeps a small
+/// round -> goods ledger instead of modifying the round spaces. The scheduling
+/// card is played openly, so the ledger is public information and is mirrored
+/// into [`Observation::delayed_goods_schedule`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct DelayedGood {
+    pub player: usize,
+    pub good: Good,
+    pub amount: u32,
+}
+
+/// Round -> goods granted to their owner when that round starts.
+pub type DelayedGoods = BTreeMap<u8, Vec<DelayedGood>>;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Game {
     pub config: Config,
@@ -558,6 +578,12 @@ pub struct Game {
     /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
     #[serde(default)]
     pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
+    /// Goods reserved for future round starts (C074/C077/C078/C079/C118).
+    /// Excluded from the LOG_VERSION=5 `state_hash` tuple like the other
+    /// bookkeeping fields; covered by `integrity_hash` and mirrored into
+    /// `Observation` because the scheduling card is public.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub delayed_goods: DelayedGoods,
     #[serde(
         default,
         serialize_with = "serialize_arc",
@@ -662,6 +688,11 @@ pub struct Observation {
     /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
     /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
     pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
+    /// Public mirror of `Game::delayed_goods`: the on-play cards that reserve
+    /// goods for a future round start are played openly, so every player can
+    /// see which goods will be collected and when.
+    #[serde(default)]
+    pub delayed_goods_schedule: DelayedGoods,
 }
 impl Game {
     pub fn new(config: Config) -> Self {
@@ -792,6 +823,7 @@ impl Game {
             rng,
             delayed_well: BTreeMap::new(),
             well_food_schedule: BTreeMap::new(),
+            delayed_goods: BTreeMap::new(),
             card_set,
             cards,
             log,
@@ -826,6 +858,7 @@ impl Game {
             hand_counts: self.cards.hands.iter().map(Vec::len).collect(),
             card_definitions: self.card_set.definitions.clone(),
             well_food_schedule: self.well_food_schedule.clone(),
+            delayed_goods_schedule: self.delayed_goods.clone(),
         })
     }
     pub fn state_hash(&self) -> String {
@@ -865,6 +898,7 @@ impl Game {
         let data = serde_json::to_vec(&(
             self.state_hash(),
             &self.well_food_schedule,
+            &self.delayed_goods,
             &self.pending,
             self.event_budget,
             &self.card_uses,
@@ -886,6 +920,7 @@ impl Game {
             rng: self.rng.clone(),
             delayed_well: self.delayed_well.clone(),
             well_food_schedule: self.well_food_schedule.clone(),
+            delayed_goods: self.delayed_goods.clone(),
             card_set: self.card_set.clone(),
             cards: self.cards.clone(),
             log: GameLog {
@@ -925,6 +960,7 @@ impl Game {
         rng: RngStreams,
         delayed_well: BTreeMap<u8, Vec<usize>>,
         well_food_schedule: BTreeMap<u8, Vec<usize>>,
+        delayed_goods: DelayedGoods,
         card_set: Arc<CardSet>,
         cards: CardState,
         pending: Option<PendingDecision>,
@@ -943,6 +979,7 @@ impl Game {
             rng,
             delayed_well,
             well_food_schedule,
+            delayed_goods,
             card_set: card_set.clone(),
             cards,
             log: GameLog {
@@ -1102,6 +1139,16 @@ impl Game {
                 self.public.players[id].supply.food += 1
             }
         }
+        // C074/C077/C078/C079/C118: goods reserved for this round's start are
+        // collected now, before any round-start card trigger observes the
+        // supply. The order within this step is the ledger order.
+        if let Some(entries) = self.delayed_goods.remove(&self.public.round) {
+            for entry in entries {
+                self.public.players[entry.player]
+                    .supply
+                    .gain(entry.good, entry.amount);
+            }
+        }
         // Round-start triggers go through the phase dispatcher so the event
         // budget and per-card use limits apply here too. The budget is reset
         // for a new round: a round boundary is not part of one action's chain.
@@ -1114,6 +1161,7 @@ impl Game {
                 &mut self.cards,
                 &mut self.public.improvement_market,
                 &mut self.delayed_well,
+                &mut self.delayed_goods,
                 self.public.round,
                 &self.public.used,
                 &mut self.event_budget,
@@ -1154,6 +1202,19 @@ impl Game {
         }
         if p.revealed.len() + self.hidden_round_deck.len() != 14 {
             return Err("round deck corruption".into());
+        }
+        // C074/C077/C078/C079/C118 reservations: goods may sit on future
+        // rounds only, and every entry must address a real player.
+        for (&round, entries) in &self.delayed_goods {
+            if !(1..=LAST_ROUND).contains(&round) {
+                return Err("delayed goods round out of range".into());
+            }
+            if entries
+                .iter()
+                .any(|entry| entry.player >= p.players.len() || entry.amount == 0)
+            {
+                return Err("invalid delayed goods entry".into());
+            }
         }
         if p.work_quota.len() != p.players.len() || p.workers_placed.len() != p.players.len() {
             return Err("worker array mismatch".into());
@@ -1386,6 +1447,7 @@ impl Game {
         let mut players = next.public.players.clone();
         let mut improvement_market = next.public.improvement_market.clone();
         let mut delayed_well = next.delayed_well.clone();
+        let mut delayed_goods = next.delayed_goods.clone();
         let round = next.public.round;
         let used_spaces = next.public.used.clone();
         let mut event_budget = next.event_budget;
@@ -1424,6 +1486,7 @@ impl Game {
                             cards: &mut cards,
                             improvement_market: &mut improvement_market,
                             delayed_well: &mut delayed_well,
+                            delayed_goods: &mut delayed_goods,
                             round,
                             used_spaces: &used_spaces,
                             event_budget: &mut event_budget,
@@ -1530,6 +1593,7 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
+                        delayed_goods: &mut delayed_goods,
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -1623,6 +1687,7 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
+                        delayed_goods: &mut delayed_goods,
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -1717,6 +1782,7 @@ impl Game {
         next.cards = cards;
         next.public.improvement_market = improvement_market;
         next.delayed_well = delayed_well;
+        next.delayed_goods = delayed_goods;
         next.event_budget = event_budget;
         next.card_uses = card_uses;
         next.pending = pending; // Should remain None
@@ -1881,6 +1947,7 @@ impl Game {
                     cards: &mut self.cards,
                     improvement_market: &mut self.public.improvement_market,
                     delayed_well: &mut self.delayed_well,
+                    delayed_goods: &mut self.delayed_goods,
                     round: self.public.round,
                     used_spaces: &self.public.used,
                     event_budget: &mut self.event_budget,

@@ -10,8 +10,8 @@
 //! Each resolution site carries a comment citing the 2016 Lookout rulebook.
 //! Source: docs/bga-card-specification.md and existing repo citations.
 
-use crate::cards::{CardEffect, CardSet};
-use crate::model::{Animal, Crop, Good, House, Player, Space};
+use crate::cards::{CardEffect, CardSet, RoundGainSchedule};
+use crate::model::{Animal, Crop, DelayedGood, DelayedGoods, Good, House, Player, Space};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -49,6 +49,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::OnPlayGainPerStored { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainIfHouse { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayScheduleRoundGain { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -78,6 +79,9 @@ pub struct DispatchContext<'a> {
     pub cards: &'a mut crate::cards::CardState,
     pub improvement_market: &'a mut Vec<crate::model::Improvement>,
     pub delayed_well: &'a mut BTreeMap<u8, Vec<usize>>,
+    /// Goods reserved for future round starts (C074/C077/C078/C079/C118).
+    /// Public information: the scheduling card is played openly.
+    pub delayed_goods: &'a mut DelayedGoods,
     pub round: u8,
     pub used_spaces: &'a std::collections::BTreeSet<Space>,
     pub event_budget: &'a mut u32,
@@ -368,6 +372,7 @@ fn resolve_phase_scan(
             cards: ctx.cards,
             improvement_market: ctx.improvement_market,
             delayed_well: ctx.delayed_well,
+            delayed_goods: ctx.delayed_goods,
             round: ctx.round,
             used_spaces: ctx.used_spaces,
             event_budget: ctx.event_budget,
@@ -483,6 +488,11 @@ fn resolve_phase_scan(
                 CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                     handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
                 }
+                CardEffect::OnPlayScheduleRoundGain {
+                    good,
+                    amount,
+                    schedule,
+                } => handle_on_play_schedule_round_gain(ctx, player, good, *amount, schedule)?,
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -684,6 +694,9 @@ fn effect_condition_holds(
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
+        // C074/C077/C078/C079/C118 reserve goods through the round-start
+        // ledger; the play-time handler always applies them.
+        CardEffect::OnPlayScheduleRoundGain { .. } => true,
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
@@ -798,6 +811,11 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
             }
+            CardEffect::OnPlayScheduleRoundGain {
+                good,
+                amount,
+                schedule,
+            } => handle_on_play_schedule_round_gain(ctx, player, good, *amount, schedule)?,
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1053,6 +1071,32 @@ fn handle_on_play_gain_per_improvement_played(
         .checked_add(bonus)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// C074 私有林 / C077 粘土補給 / C078 ヒキガエル / C079 石車 / C118 木材集め:
+/// reserve `amount` of `good` for the card owner at the start of each round the
+/// printed schedule names. The collection itself happens in `Game::start_round`.
+fn handle_on_play_schedule_round_gain(
+    ctx: &mut DispatchContext<'_>,
+    player: usize,
+    good: &Good,
+    amount: u32,
+    schedule: &RoundGainSchedule,
+) -> Result<EffectResult, String> {
+    if amount == 0 {
+        return Ok(EffectResult::Resolved);
+    }
+    for round in schedule.due_rounds(ctx.round) {
+        ctx.delayed_goods
+            .entry(round)
+            .or_default()
+            .push(DelayedGood {
+                player,
+                good: *good,
+                amount,
+            });
+    }
     Ok(EffectResult::Resolved)
 }
 
@@ -1367,6 +1411,7 @@ pub fn dispatch_play(
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    delayed_goods: &mut DelayedGoods,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -1382,6 +1427,7 @@ pub fn dispatch_play(
         cards,
         improvement_market,
         delayed_well,
+        delayed_goods,
         round,
         used_spaces,
         event_budget,
@@ -1506,6 +1552,7 @@ pub fn dispatch_after_worker(
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    delayed_goods: &mut DelayedGoods,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -1522,6 +1569,7 @@ pub fn dispatch_after_worker(
         cards,
         improvement_market,
         delayed_well,
+        delayed_goods,
         round,
         used_spaces,
         event_budget,
@@ -1575,6 +1623,7 @@ pub fn dispatch_start_round(
     cards: &mut crate::cards::CardState,
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    delayed_goods: &mut DelayedGoods,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -1593,6 +1642,7 @@ pub fn dispatch_start_round(
             cards,
             improvement_market,
             delayed_well,
+            delayed_goods,
             round,
             used_spaces,
             event_budget,
@@ -1654,6 +1704,7 @@ pub fn dispatch_after_clay_construction(
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    delayed_goods: &mut DelayedGoods,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -1670,6 +1721,7 @@ pub fn dispatch_after_clay_construction(
         cards,
         improvement_market,
         delayed_well,
+        delayed_goods,
         round,
         used_spaces,
         event_budget,
@@ -1726,6 +1778,7 @@ pub fn dispatch_harvest_field(
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    delayed_goods: &mut DelayedGoods,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -1741,6 +1794,7 @@ pub fn dispatch_harvest_field(
         cards,
         improvement_market,
         delayed_well,
+        delayed_goods,
         round,
         used_spaces,
         event_budget,
@@ -1795,6 +1849,7 @@ pub fn dispatch_after_harvest_bake(
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    delayed_goods: &mut DelayedGoods,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -1818,6 +1873,7 @@ pub fn dispatch_after_harvest_bake(
         cards,
         improvement_market,
         delayed_well,
+        delayed_goods,
         round,
         used_spaces,
         event_budget,
@@ -2364,6 +2420,7 @@ mod tests {
         let (set, mut players, mut cards) = setup_game();
         let mut improvement_market = vec![];
         let mut delayed_well = std::collections::BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut event_budget = 64;
         let mut card_uses = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
@@ -2377,6 +2434,7 @@ mod tests {
             &mut players,
             &mut improvement_market,
             &mut delayed_well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut event_budget,
@@ -2412,6 +2470,7 @@ mod tests {
         let mut cards = crate::cards::CardState::default();
         let mut improvement_market = vec![];
         let mut delayed_well = std::collections::BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut event_budget = 64;
         let mut card_uses = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
@@ -2423,6 +2482,7 @@ mod tests {
             &mut cards,
             &mut improvement_market,
             &mut delayed_well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut event_budget,
@@ -2463,6 +2523,7 @@ mod tests {
         let mut cards = crate::cards::CardState::default();
         let mut improvement_market = vec![];
         let mut delayed_well = std::collections::BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut event_budget = 64;
         let mut card_uses = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
@@ -2474,6 +2535,7 @@ mod tests {
             &mut cards,
             &mut improvement_market,
             &mut delayed_well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut event_budget,
@@ -2609,6 +2671,7 @@ mod tests {
             c.players[0].played_cards = vec!["C1".into(), "C2".into(), "C3".into()];
             let mut market = vec![];
             let mut well = BTreeMap::new();
+            let mut delayed_goods = BTreeMap::new();
             let mut used = std::collections::BTreeSet::new();
             used.insert(Space::Lessons);
             let mut pending = None;
@@ -2620,6 +2683,7 @@ mod tests {
                 &mut c.players,
                 &mut market,
                 &mut well,
+                &mut delayed_goods,
                 1,
                 &used,
                 &mut c.budget,
@@ -2655,6 +2719,7 @@ mod tests {
         c.players[0].played_cards = legacy[0].played_cards.clone();
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut pending = None;
         dispatch_start_round(
             &set,
@@ -2662,6 +2727,7 @@ mod tests {
             &mut c.cards,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             2,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
@@ -2685,6 +2751,7 @@ mod tests {
         c.players[0].played_cards = vec!["C5".into()];
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut pending = None;
         dispatch_harvest_field(
             &set,
@@ -2693,6 +2760,7 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             8,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
@@ -2715,6 +2783,7 @@ mod tests {
         c2.players[0].played_cards = legacy2[0].played_cards.clone();
         let mut market2 = vec![];
         let mut well2 = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut pending2 = None;
         dispatch_after_harvest_bake(
             &set,
@@ -2723,6 +2792,7 @@ mod tests {
             &mut c2.players,
             &mut market2,
             &mut well2,
+            &mut delayed_goods,
             5,
             &std::collections::BTreeSet::new(),
             &mut c2.budget,
@@ -2755,6 +2825,7 @@ mod tests {
         c.players[0].house = crate::model::House::Stone;
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut pending = None;
         dispatch_after_clay_construction(
             &set,
@@ -2765,6 +2836,7 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
@@ -2793,6 +2865,7 @@ mod tests {
             c.players[0].played_cards = vec!["C4".into()];
             let mut market = vec![];
             let mut well = BTreeMap::new();
+            let mut delayed_goods = BTreeMap::new();
             let mut pending = None;
             dispatch_after_harvest_bake(
                 &set,
@@ -2801,6 +2874,7 @@ mod tests {
                 &mut c.players,
                 &mut market,
                 &mut well,
+                &mut delayed_goods,
                 round,
                 &std::collections::BTreeSet::new(),
                 &mut c.budget,
@@ -2861,6 +2935,7 @@ mod tests {
                 c.players[0].played_cards = vec!["C1".into(), "C2".into(), "C3".into()];
                 let mut market = vec![];
                 let mut well = BTreeMap::new();
+                let mut delayed_goods = BTreeMap::new();
                 let mut pending = None;
                 dispatch_after_worker(
                     &set,
@@ -2870,6 +2945,7 @@ mod tests {
                     &mut c.players,
                     &mut market,
                     &mut well,
+                    &mut delayed_goods,
                     1,
                     &used,
                     &mut c.budget,
@@ -2906,6 +2982,7 @@ mod tests {
             c.players[0].played_cards = chain;
             let mut market = vec![];
             let mut well = BTreeMap::new();
+            let mut delayed_goods = BTreeMap::new();
             let mut pending = None;
             dispatch_start_round(
                 &set,
@@ -2913,6 +2990,7 @@ mod tests {
                 &mut c.cards,
                 &mut market,
                 &mut well,
+                &mut delayed_goods,
                 round,
                 &std::collections::BTreeSet::new(),
                 &mut c.budget,
@@ -2963,6 +3041,7 @@ mod tests {
             c.players[0].pastures = legacy[0].pastures.clone();
             let mut market = vec![];
             let mut well = BTreeMap::new();
+            let mut delayed_goods = BTreeMap::new();
             let mut pending = None;
             dispatch_harvest_field(
                 &set,
@@ -2971,6 +3050,7 @@ mod tests {
                 &mut c.players,
                 &mut market,
                 &mut well,
+                &mut delayed_goods,
                 8,
                 &std::collections::BTreeSet::new(),
                 &mut c.budget,
@@ -3029,6 +3109,7 @@ mod tests {
         c.players[0].farm[8].tile = crate::model::Tile::Room;
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut pending = None;
         dispatch_after_clay_construction(
             &set,
@@ -3039,6 +3120,7 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
@@ -3082,6 +3164,7 @@ mod tests {
         let mut players = vec![Player::new(0, 0)];
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut uses = BTreeMap::new();
         let limits = BTreeMap::new();
         let mut budget = 64u32;
@@ -3111,6 +3194,7 @@ mod tests {
                 ctx.players,
                 ctx.improvement_market,
                 &mut well,
+                &mut delayed_goods,
                 1,
                 &std::collections::BTreeSet::new(),
                 &mut budget,
@@ -3157,6 +3241,7 @@ mod tests {
         c.players[0].played_cards = vec!["CHOICE_A".into()];
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut pending = None;
         let result = dispatch_start_round(
             &set,
@@ -3164,6 +3249,7 @@ mod tests {
             &mut c.cards,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
@@ -3226,6 +3312,7 @@ mod tests {
             &mut c.cards,
             &mut vec![],
             &mut BTreeMap::new(),
+            &mut BTreeMap::new(),
             1,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
@@ -3272,6 +3359,7 @@ mod tests {
         c.players[0].played_cards = vec!["CHOICE_CARD".into()];
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut used = BTreeSet::new();
         used.insert(Space::Forest);
         let mut pending = None;
@@ -3285,6 +3373,7 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &used,
             &mut c.budget,
@@ -3359,6 +3448,7 @@ mod tests {
         let mut cards = crate::cards::CardState::default();
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut uses = BTreeMap::new();
         let limits = BTreeMap::new();
         let mut budget = 64u32;
@@ -3374,6 +3464,7 @@ mod tests {
             &mut players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut budget,
@@ -3410,6 +3501,7 @@ mod tests {
             &mut players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut budget,
@@ -3459,6 +3551,7 @@ mod tests {
         let mut cards = crate::cards::CardState::default();
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut uses = BTreeMap::new();
         let limits = BTreeMap::new();
         let mut budget = 64u32;
@@ -3475,6 +3568,7 @@ mod tests {
             &mut players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &used_spaces,
             &mut budget,
@@ -3509,6 +3603,7 @@ mod tests {
             &mut players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &used_spaces,
             &mut budget,
@@ -3556,6 +3651,7 @@ mod tests {
         let mut cards = crate::cards::CardState::default();
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut uses = BTreeMap::new();
         let limits = BTreeMap::new();
         let mut budget = 64u32;
@@ -3567,6 +3663,7 @@ mod tests {
             &mut cards,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut budget,
@@ -3595,6 +3692,7 @@ mod tests {
             &mut cards,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             2,
             &std::collections::BTreeSet::new(),
             &mut budget,
@@ -3653,6 +3751,7 @@ mod tests {
         let mut cards = crate::cards::CardState::default();
         let mut improvement_market = vec![];
         let mut delayed_well = std::collections::BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut event_budget = 64u32;
         let mut card_uses = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
@@ -3668,6 +3767,7 @@ mod tests {
             &mut players,
             &mut improvement_market,
             &mut delayed_well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut event_budget,
@@ -3709,6 +3809,7 @@ mod tests {
             &mut players,
             &mut improvement_market,
             &mut delayed_well,
+            &mut delayed_goods,
             1,
             &std::collections::BTreeSet::new(),
             &mut event_budget,
@@ -3962,6 +4063,7 @@ mod tests {
             c.players[0].supply.food = food;
             let mut market = vec![];
             let mut well = BTreeMap::new();
+            let mut delayed_goods = BTreeMap::new();
             let mut pending = None;
             dispatch_start_round(
                 &set,
@@ -3969,6 +4071,7 @@ mod tests {
                 &mut c.cards,
                 &mut market,
                 &mut well,
+                &mut delayed_goods,
                 round,
                 &BTreeSet::new(),
                 &mut c.budget,
@@ -4014,6 +4117,7 @@ mod tests {
         };
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut pending = None;
         dispatch_harvest_field(
             &set,
@@ -4022,6 +4126,7 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             4,
             &BTreeSet::new(),
             &mut c.budget,
@@ -4056,6 +4161,7 @@ mod tests {
         c.players[0].played_cards = vec!["C116".into(), "occ_food2".into()];
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
         let mut pending = None;
         let mut budget = 64u32;
         let mut uses = BTreeMap::new();
@@ -4069,6 +4175,7 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &BTreeSet::new(),
             &mut budget,
@@ -4092,6 +4199,7 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &BTreeSet::new(),
             &mut budget,
@@ -4112,6 +4220,7 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
+            &mut delayed_goods,
             1,
             &BTreeSet::new(),
             &mut budget,
@@ -4121,5 +4230,100 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 5, "no food paid -> no gain");
+    }
+    fn scheduled_rounds(ledger: &DelayedGoods) -> Vec<u8> {
+        ledger.keys().copied().collect()
+    }
+
+    fn play_schedules(set: &CardSet, round: u8, played: &[&str], card: &str) -> DelayedGoods {
+        let mut c = Ctx::new();
+        c.players[0].played_cards = played.iter().map(|id| (*id).to_string()).collect();
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut delayed_goods = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_play(
+            set,
+            0,
+            card,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            &mut delayed_goods,
+            round,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        delayed_goods
+    }
+
+    #[test]
+    fn c074_reserves_wood_for_remaining_even_rounds_on_play() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let ledger = play_schedules(&set, 3, &["C118", "C074"], "C074");
+        assert_eq!(scheduled_rounds(&ledger), vec![4, 6, 8, 10, 12, 14]);
+        assert!(ledger.values().all(|entries| entries
+            == &vec![DelayedGood {
+                player: 0,
+                good: Good::Wood,
+                amount: 1,
+            }]));
+    }
+
+    #[test]
+    fn c077_and_c118_reserve_goods_for_the_next_three_and_five_rounds() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let clay = play_schedules(&set, 12, &["C077"], "C077");
+        assert_eq!(scheduled_rounds(&clay), vec![13, 14]);
+        assert_eq!(clay[&13][0].good, Good::Clay);
+
+        let wood = play_schedules(&set, 12, &["C118"], "C118");
+        assert_eq!(scheduled_rounds(&wood), vec![13, 14]);
+        assert_eq!(wood[&13][0].good, Good::Wood);
+    }
+
+    #[test]
+    fn c078_reserves_reed_on_the_rounds_offset_by_5_7_9_11_13() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let ledger = play_schedules(&set, 1, &["C078"], "C078");
+        assert_eq!(scheduled_rounds(&ledger), vec![6, 8, 10, 12, 14]);
+        assert_eq!(ledger[&6][0].good, Good::Reed);
+        // Too late for any offset to land inside the 14-round track.
+        let late = play_schedules(&set, 12, &["C078"], "C078");
+        assert!(late.is_empty());
+    }
+
+    #[test]
+    fn c079_reserves_stone_for_remaining_even_rounds_on_play() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let ledger = play_schedules(&set, 5, &["C116", "C118", "C079"], "C079");
+        assert_eq!(scheduled_rounds(&ledger), vec![6, 8, 10, 12, 14]);
+        assert_eq!(ledger[&6][0].good, Good::Stone);
+    }
+
+    #[test]
+    fn cards_without_a_round_gain_schedule_leave_the_ledger_untouched() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let ledger = play_schedules(&set, 1, &["C106"], "C106");
+        assert!(ledger.is_empty());
     }
 }

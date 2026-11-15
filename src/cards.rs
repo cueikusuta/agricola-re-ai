@@ -1,7 +1,7 @@
 //! Card-set metadata is supplied by callers; copyrighted card text is never bundled.
 //! This is a deliberately small deterministic effect vocabulary, not a claim that
 //! the full Agricola Revised deck has been implemented.
-use crate::model::{Animal, Crop, Good, House, Player, Space, Tile};
+use crate::model::{Animal, Crop, Good, House, Player, Space, Tile, LAST_ROUND};
 use crate::registry::{
     build_default_registry, card_set_from_pool, card_set_from_registry, CardId, CardPool,
     CardRegistry,
@@ -128,6 +128,16 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// C074 私有林 / C077 粘土補給 / C078 ヒキガエル / C079 石車 / C118 木材集め:
+    /// when this card is played, reserve `amount` of `good` for the owner at
+    /// the start of each round the schedule names. The ledger is applied by
+    /// `Game::start_round`; see [`RoundGainSchedule`] for the printed round
+    /// formulas.
+    OnPlayScheduleRoundGain {
+        good: Good,
+        amount: u32,
+        schedule: RoundGainSchedule,
+    },
 }
 
 impl CardEffect {
@@ -165,7 +175,50 @@ impl CardEffect {
             CardEffect::OnPlayGainPerImprovementPlayed { .. } => {
                 "on_play_gain_per_improvement_played"
             }
+            CardEffect::OnPlayScheduleRoundGain { .. } => "on_play_schedule_round_gain",
         }
+    }
+}
+
+/// Round formulas of the "place a good on future round spaces, collect it at
+/// the start of those rounds" cards. Rounds are capped by [`LAST_ROUND`], so a
+/// card played late simply schedules fewer (or no) collections.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoundGainSchedule {
+    /// C074 私有林 (Private Forest) / C079 石車 (Stone Cart): every remaining
+    /// even-numbered round. "Remaining" excludes the current round, whose
+    /// start has already passed when the card is played.
+    RemainingEvenRounds,
+    /// C077 粘土補給 (3 rounds) / C118 木材集め (5 rounds): the next `n`
+    /// rounds after the current one.
+    NextRounds(u8),
+    /// C078 ヒキガエル (Reed-Hatted Toad): the current round plus each offset
+    /// (the printed card uses 5, 7, 9, 11 and 13), capped at round 14.
+    CurrentPlus(Vec<u8>),
+}
+
+impl RoundGainSchedule {
+    /// The rounds whose start grants the reserved good, ascending and deduped.
+    pub fn due_rounds(&self, current_round: u8) -> Vec<u8> {
+        let mut rounds: Vec<u8> = match self {
+            RoundGainSchedule::RemainingEvenRounds => (current_round.saturating_add(1)
+                ..=LAST_ROUND)
+                .filter(|round| round % 2 == 0)
+                .collect(),
+            RoundGainSchedule::NextRounds(count) => {
+                let last = current_round.saturating_add(*count).min(LAST_ROUND);
+                (current_round.saturating_add(1)..=last).collect()
+            }
+            RoundGainSchedule::CurrentPlus(offsets) => offsets
+                .iter()
+                .map(|offset| current_round.saturating_add(*offset))
+                .filter(|round| *round <= LAST_ROUND)
+                .collect(),
+        };
+        rounds.sort_unstable();
+        rounds.dedup();
+        rounds
     }
 }
 
@@ -351,6 +404,7 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfNoMinorPlayed { amount, .. }
                         | CardEffect::HarvestFieldGainIfNoMinorPlayed { amount, .. }
                         | CardEffect::OnPlayGainPerImprovementPlayed { amount, .. }
+                        | CardEffect::OnPlayScheduleRoundGain { amount, .. }
                         | CardEffect::HarvestFieldGain { amount, .. }
                         | CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | CardEffect::AfterClayConstructionGain { amount, .. }
@@ -2762,6 +2816,77 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 },
             ],
         ),
+        // C074 私有林 (Private Forest): cost 2 food, 1 occupation played;
+        // reserve 1 wood at the start of every remaining even round.
+        card(
+            "C074",
+            minor,
+            vec![(Good::Food, 2)],
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(1),
+                },
+                CardEffect::OnPlayScheduleRoundGain {
+                    good: Good::Wood,
+                    amount: 1,
+                    schedule: RoundGainSchedule::RemainingEvenRounds,
+                },
+            ],
+        ),
+        // C077 粘土補給 (Clay Supply): cost 1 food; reserve 1 clay at the
+        // start of each of the next 3 rounds.
+        card(
+            "C077",
+            minor,
+            vec![(Good::Food, 1)],
+            vec![CardEffect::OnPlayScheduleRoundGain {
+                good: Good::Clay,
+                amount: 1,
+                schedule: RoundGainSchedule::NextRounds(3),
+            }],
+        ),
+        // C078 ヒキガエル (Reed-Hatted Toad): cost 1 food; reserve 1 reed at
+        // the start of the rounds reached by adding 5, 7, 9, 11 and 13 to
+        // the round it was played in.
+        card(
+            "C078",
+            minor,
+            vec![(Good::Food, 1)],
+            vec![CardEffect::OnPlayScheduleRoundGain {
+                good: Good::Reed,
+                amount: 1,
+                schedule: RoundGainSchedule::CurrentPlus(vec![5, 7, 9, 11, 13]),
+            }],
+        ),
+        // C079 石車 (Stone Cart): cost 2 wood, 2 occupations played; reserve
+        // 1 stone at the start of every remaining even round.
+        card(
+            "C079",
+            minor,
+            vec![(Good::Wood, 2)],
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(2),
+                },
+                CardEffect::OnPlayScheduleRoundGain {
+                    good: Good::Stone,
+                    amount: 1,
+                    schedule: RoundGainSchedule::RemainingEvenRounds,
+                },
+            ],
+        ),
+        // C118 木材集め (Wood Gathering): occupation, no cost; reserve 1 wood
+        // at the start of each of the next 5 rounds.
+        card(
+            "C118",
+            occupation,
+            vec![],
+            vec![CardEffect::OnPlayScheduleRoundGain {
+                good: Good::Wood,
+                amount: 1,
+                schedule: RoundGainSchedule::NextRounds(5),
+            }],
+        ),
     ]
 }
 #[cfg(test)]
@@ -2902,9 +3027,114 @@ mod verified_band_c_tests {
     }
 
     #[test]
+    fn round_gain_schedule_formulas_cover_the_printed_round_sets() {
+        use RoundGainSchedule::*;
+        assert_eq!(
+            RemainingEvenRounds.due_rounds(1),
+            vec![2, 4, 6, 8, 10, 12, 14]
+        );
+        assert_eq!(
+            RemainingEvenRounds.due_rounds(6),
+            vec![8, 10, 12, 14],
+            "the current round's start has already passed"
+        );
+        assert_eq!(RemainingEvenRounds.due_rounds(14), Vec::<u8>::new());
+        assert_eq!(NextRounds(3).due_rounds(1), vec![2, 3, 4]);
+        assert_eq!(
+            NextRounds(3).due_rounds(12),
+            vec![13, 14],
+            "the round track ends at 14"
+        );
+        assert_eq!(NextRounds(5).due_rounds(12), vec![13, 14]);
+        assert_eq!(NextRounds(0).due_rounds(4), Vec::<u8>::new());
+        // C078: current + 5/7/9/11/13, capped at round 14.
+        let toad = CurrentPlus(vec![5, 7, 9, 11, 13]);
+        assert_eq!(toad.due_rounds(1), vec![6, 8, 10, 12, 14]);
+        assert_eq!(toad.due_rounds(2), vec![7, 9, 11, 13]);
+        assert_eq!(toad.due_rounds(12), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn c074_c077_c078_c079_c118_definitions_match_the_printed_metadata() {
+        let set = set();
+        let c074 = set.definition("C074").unwrap();
+        assert_eq!(c074.kind, CardKind::MinorImprovement);
+        assert_eq!(c074.cost, vec![(Good::Food, 2)]);
+        assert_eq!(c074.points, 0);
+        assert!(matches!(
+            c074.effects.as_slice(),
+            [
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(1)
+                },
+                CardEffect::OnPlayScheduleRoundGain {
+                    good: Good::Wood,
+                    amount: 1,
+                    schedule: RoundGainSchedule::RemainingEvenRounds,
+                }
+            ]
+        ));
+
+        let c077 = set.definition("C077").unwrap();
+        assert_eq!(c077.kind, CardKind::MinorImprovement);
+        assert_eq!(c077.cost, vec![(Good::Food, 1)]);
+        assert!(matches!(
+            c077.effects.as_slice(),
+            [CardEffect::OnPlayScheduleRoundGain {
+                good: Good::Clay,
+                amount: 1,
+                schedule: RoundGainSchedule::NextRounds(3),
+            }]
+        ));
+
+        let c078 = set.definition("C078").unwrap();
+        assert_eq!(c078.kind, CardKind::MinorImprovement);
+        assert_eq!(c078.cost, vec![(Good::Food, 1)]);
+        assert!(matches!(
+            c078.effects.as_slice(),
+            [CardEffect::OnPlayScheduleRoundGain {
+                good: Good::Reed,
+                amount: 1,
+                schedule: RoundGainSchedule::CurrentPlus(offsets),
+            }] if offsets == &vec![5, 7, 9, 11, 13]
+        ));
+
+        let c079 = set.definition("C079").unwrap();
+        assert_eq!(c079.kind, CardKind::MinorImprovement);
+        assert_eq!(c079.cost, vec![(Good::Wood, 2)]);
+        assert!(matches!(
+            c079.effects.as_slice(),
+            [
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(2)
+                },
+                CardEffect::OnPlayScheduleRoundGain {
+                    good: Good::Stone,
+                    amount: 1,
+                    schedule: RoundGainSchedule::RemainingEvenRounds,
+                }
+            ]
+        ));
+
+        let c118 = set.definition("C118").unwrap();
+        assert_eq!(c118.kind, CardKind::Occupation);
+        assert!(c118.cost.is_empty());
+        assert!(matches!(
+            c118.effects.as_slice(),
+            [CardEffect::OnPlayScheduleRoundGain {
+                good: Good::Wood,
+                amount: 1,
+                schedule: RoundGainSchedule::NextRounds(5),
+            }]
+        ));
+    }
+
+    #[test]
     fn band_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["C076", "C106", "C111", "C116"] {
+        for id in [
+            "C074", "C076", "C077", "C078", "C079", "C106", "C111", "C116", "C118",
+        ] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
