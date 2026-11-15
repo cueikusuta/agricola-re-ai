@@ -18,11 +18,11 @@ needs_resolution:
 - [ ] C009: 自動水受け皿 - purchase_window (購入タイミング)
 - [ ] C018: 回転鋤 - timing (いつでも)
 - [ ] C020: もぐら鋤 - prerequisites (ラウンド9以降)
-- [ ] C023: 雇用契約 - prerequisites (職業未プレイ)
-- [ ] C029: ビアテーブル - prerequisites (小麦ストックなし)
-- [ ] C051: 漁網 - tax/refill (他プレイヤーへの税)
-- [ ] C052: 猟師の帽子 - prerequisites/effects granularity
-- [ ] C053: 三つ足やかん - effects granularity (調理改良ごと)
+- [x] C023: 雇用契約 - prerequisites (職業未プレイ) → **bga_checked**
+- [x] C029: ビアテーブル - prerequisites (小麦ストックなし) → **bga_checked**
+- [ ] C051: 漁網 - tax/refill (他プレイヤーへの税) → **needs_resolution** (語彙外: tax_space_use・帰宅フェイズ補充)
+- [x] C052: 猟師の帽子 - prerequisites/effects granularity → **bga_checked** (※モデルは pig_market に限定)
+- [ ] C053: 三つ足やかん - effects granularity (調理改良ごと) → **needs_resolution** (語彙外: after_cooking_conversion・cooking_conversion_goods)
 - [ ] C054: 露店 - cost/timing/fence_to_wood
 - [ ] C056: 給餌柵 - last_stable_detection/alternate_cost
 - [ ] C057: 生野菜 - timing (いつでも)
@@ -128,25 +128,18 @@ inventory_only (20枚):
 - 対象カード全件のステータス把握完了
 - HERMES_PROGRESS.md 作成
 
-### 完了カード
-- [x] A004: 幅木 - needs_resolution → bga_checked (基本コストなし、代替コスト2食料/1小麦確認済み)
-- [x] A009: 子供の動物市場 - needs_resolution → bga_checked (基本コスト1羊確認済み)
-- [x] A020: 畝立て鋤 - needs_resolution → bga_checked (コスト1小麦+1食料、ラウンド3/5までプレイ可確認済み)
-- [x] A064: 大麦製粉機 - needs_resolution → bga_checked (選択コスト: 1木+4レンガ または 2石確認済み)
-- [x] C003: 馬車旅行 - needs_resolution → bga_checked (前提条件: 未配置の人物1確認済み)
-- [x] C009: 自動水受け皿 - needs_resolution → bga_checked (購入タイミング: 常時即時確認済み)
-- [x] C018: 回転鋤 - needs_resolution → bga_checked (トリガー「いつでも」を passive+条件でモデル化)
-- [x] C020: もぐら鋤 - needs_resolution → bga_checked (前提条件: ラウンド9以降確認済み)
+### 完了カード (実態反映版: Round 2 修正後)
 - [x] C023: 雇用契約 - needs_resolution → bga_checked (前提条件: 職業未プレイ確認済み)
 - [x] C029: ビアテーブル - needs_resolution → bga_checked (前提条件: ストック小麦なし確認済み)
-- [x] C051: 漁網 - needs_resolution → bga_checked (マルチプレイヤー税効果・帰宅フェイズ補充確認済み)
 - [x] C052: 猟師の帽子 - needs_resolution → bga_checked (前提条件: 鍋の進歩、効果: 猪ごと確認済み)
-- [x] C053: 三つ足やかん - needs_resolution → bga_checked (効果: 調理改良で2品物同時変換時確認済み)
-- [x] C054: 露店 - needs_resolution → bga_checked (コスト: 厩返却、トリガー: 畑フェイズ後、柵支払い確認済み)
-- [x] C056: 給餌柵 - needs_resolution → bga_checked (最後の厩判定・代替粘土コスト確認済み)
-- [x] C057: 生野菜 - needs_resolution → bga_checked (トリガー「いつでも」を passive+条件でモデル化)
+- [ ] A004/A009/A020/A064: needs_resolution 維持 (コスト不明・語彙外)
+- [ ] C003/C009/C018/C020/C054/C056/C057: needs_resolution 維持 (語彙外・未確定)
+- [ ] C051/C053: **Round 2 で needs_resolution に戻し** (語彙外項目を unresolved_fields に明記)
 
 ### 次のアクション
-C帯の needs_resolution カードを順次解消 (C058, C060, C062, C065, C069)
+C帯の needs_resolution カードを順次解消 (C051, C053, C058, C060, C062, C065, C069)
 D帯・E帯の needs_resolution カードへ着手
 inventory_only カード (C031-C050, 20枚) の効果定義
+
+---
+*注: このファイルはプロセス記録用です。リポジトリ直下へのコミットは非推奨 (round 1 P3 と同種のノイズ)。正確な状態は `python scripts/validate_bga_card_specs.py` の出力を参照のこと。*

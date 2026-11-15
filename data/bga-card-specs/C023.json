@@ -20,13 +20,13 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3066",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "English list page row used to cross-check the card id and name"
       }
     ]
@@ -69,23 +69,23 @@
       "snapshot": "live_state",
       "order": 0,
       "decision_owner": "none",
-      "notes": "With Day Laborer and the adjacent Lessons both unoccupied, one of your people may use both spaces in this order; both then count as occupied."
+      "notes": "With Day Laborer and adjacent Lessons both unoccupied, one person may use both spaces in order; both then count as occupied."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-      "status": "bga_checked",
-      "unresolved_fields": [],
-      "test_case_ids": [
-        "C023-normal",
-        "C023-lessons-taken",
-        "C023-prerequisite"
-      ],
-      "checked_by": "AI source comparison",
-      "checked_on": "2026-11-16",
-      "implementation_status": "not_started",
-      "notes": "Cost: free. Prerequisite: must not have played any occupation (wiki: 職業を出していない). Encoded as occupation_count n=0. Effect: when Day Laborer and adjacent Lessons are both unoccupied, one person may use both spaces in order; both count as occupied. Verified via BGA Wiki (wiki_verified - simple card with established occupation_count predicate). Source: https://agricola.cloudfree.jp/?p=3066 (ja, 2026-11-16). 条件：職業を出していない。コスト：なし。効果：アクションスペース「日雇い労働者」とその隣の「授業」が両方とも未占有の場合、人物1人で両方をこの順で使用できる。プレイエリアに残る。"
-    }
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C023-normal",
+      "C023-lessons-taken",
+      "C023-prerequisite"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Cost: free. Prerequisite: must not have played any occupation (wiki: 職業を出していない). Encoded as occupation_count n=0. Effect: when Day Laborer and adjacent Lessons are both unoccupied, one person may use both spaces in order; both count as occupied. Verified via BGA Wiki (wiki_verified - simple card with established occupation_count predicate). Source: https://agricola.cloudfree.jp/?p=3066 (ja, 2026-11-16). 条件：職業を出していない。コスト：なし。効果：アクションスペース「日雇い労働者」とその隣の「授業」が両方とも未占有の場合、人物1人で両方をこの順で使用できる。プレイエリアに残る。"
+  }
 }

@@ -86,7 +86,8 @@
 | `place_reed_for_point` | `max`。葦を置いて得点（上限あり） |
 | `disable_one_stable_pasture` | 厩つき牧場1つを使えなくする |
 | `require_empty_pasture` | `count`。空の牧場を維持する制約 |
-| `place_up_to_two_wood_on_card` | カード上に木材を置く |
+|| `place_up_to_two_wood_on_card` | カード上に木材を置く ||
+|| `use_two_spaces_one_person` | `spaces`, `order`, `requires_both_unoccupied`。隣接する2つのスペースが両方未占有なら、1人の人物で順に両方を使用できる。C023 で使用。|
 
 ## 数量式（`amount` / `points` に入る式木）
 

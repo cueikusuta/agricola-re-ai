@@ -20,13 +20,13 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3060",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "English list page row used to cross-check the card id and name"
       }
     ]
@@ -75,9 +75,8 @@
           "target": "owner",
           "params": {
             "good": "food",
-            "amount": 0,
-            "to": "all_other_players",
-            "amount_each": 1
+            "amount": 1,
+            "target": "all_other_players"
           }
         }
       ],
@@ -94,17 +93,17 @@
     "destination": "played_area"
   },
   "review": {
-      "status": "bga_checked",
-      "unresolved_fields": [],
-      "test_case_ids": [
-        "C029-normal",
-        "C029-declined",
-        "C029-no-grain",
-        "C029-prerequisite"
-      ],
-      "checked_by": "AI source comparison",
-      "checked_on": "2026-11-16",
-      "implementation_status": "not_started",
-      "notes": "Cost: 2 wood. Prerequisite: no grain in stock (wiki: ストックに小麦なし). Encoded as resource_count grain n=0. Effect: each harvest field phase end, optionally pay 1 grain for 2 bonus points; each other player gains 1 food. Verified via BGA Wiki (wiki_verified - simple card with established resource_count predicate). Source: https://agricola.cloudfree.jp/?p=3060 (ja, 2026-11-16). 条件：ストックに小麦なし。コスト：2木。効果：各収穫の畑フェイズ終了時、ストックから小麦1を支払ってボーナス2点を得られる。他のプレイヤーはそれぞれ食料1を得る。プレイエリアに残る。"
-    }
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C029-normal",
+      "C029-declined",
+      "C029-no-grain",
+      "C029-prerequisite"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Cost: 2 wood. Prerequisite: no grain in stock (wiki: ストックに小麦なし). Encoded as resource_count grain n=0. Effect: each harvest field phase end, optionally pay 1 grain for 2 bonus points; each other player gains 1 food. Verified via BGA Wiki (wiki_verified - simple card with established resource_count predicate). Source: https://agricola.cloudfree.jp/?p=3060 (ja, 2026-11-16). 条件：ストックに小麦なし。コスト：2木。効果：各収穫の畑フェイズ終了時、ストックから小麦1を支払ってボーナス2点を得られる。他のプレイヤーはそれぞれ食料1を得る。プレイエリアに残る。"
+  }
 }

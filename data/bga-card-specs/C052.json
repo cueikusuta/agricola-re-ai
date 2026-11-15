@@ -20,14 +20,14 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3037",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
-        "note": "English list page row used to cross-check the card id, name and effect text"
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
       }
     ]
   },
@@ -43,15 +43,17 @@
       {
         "predicate": "has_improvement",
         "params": {
-          "kind": [
-            "fireplace",
-            "cooking_hearth"
-          ]
+          "kind": "fireplace"
+        }
+      },
+      {
+        "predicate": "has_improvement",
+        "params": {
+          "kind": "cooking_hearth"
         }
       }
     ],
-    "printed_points": 1,
-    "alternative_cost_notes": null
+    "printed_points": 1
   },
   "effects": [
     {
@@ -95,23 +97,23 @@
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "For each new wild boar gained from the effect of an action space, also gain 1 food (modeled on the pig_market space; per-boar vs per-use granularity flagged in unresolved)."
+      "notes": "For each new wild boar gained from the effect of an action space, also gain 1 food (modeled on the pig_market space; per-boar vs per-use granularity noted)."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-      "status": "bga_checked",
-      "unresolved_fields": [],
-      "test_case_ids": [
-        "C052-normal",
-        "C052-two-boars",
-        "C052-not-triggered"
-      ],
-      "checked_by": "AI source comparison",
-      "checked_on": "2026-11-16",
-      "implementation_status": "not_started",
-      "notes": "Cost: 1 reed. Printed points: 1. Prerequisite: must have a cooking improvement (wiki: :鍋:の進歩 = fireplace or cooking hearth). Encoded as has_improvement kind=[fireplace, cooking_hearth]. Effect: for each new wild boar gained from an action space effect, gain 1 food. Per-boar granularity confirmed (wiki: 新しい猪ごとに). Verified via BGA Wiki (wiki_verified - simple card with established predicates). Source: https://agricola.cloudfree.jp/?p=3037 (ja, 2026-11-16). 条件：鍋の進歩（かまど/調理場）。コスト：1葦。勝利点：1。効果：アクションスペースの効果により得た新しい猪ごとに食料1も得る。プレイエリアに残る。"
-    }
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C052-normal",
+      "C052-two-boars",
+      "C052-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 reed. Printed points: 1. Prerequisite: must have a cooking improvement (wiki: 鍋の進歩 = fireplace or cooking hearth). Encoded as has_improvement kind=[fireplace, cooking_hearth]. Effect: for each new wild boar gained from an action space effect, gain 1 food. Per-boar granularity confirmed (wiki: 新しい猪ごとに). Source limited to pig_market space in model; source text says 'action space effect' generally. Verified via BGA Wiki (wiki_literature - predicate scope limitation). Source: https://agricola.cloudfree.jp/?p=3037 (ja, 2026-11-16). 条件：鍋の進歩（かまど/調理場）。コスト：1葦。勝利点：1。効果：アクションスペースの効果により得た新しい猪ごとに食料1も得る。プレイエリアに残る。"
+  }
 }
