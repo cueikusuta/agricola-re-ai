@@ -1001,6 +1001,102 @@ class ComparisonDesignTests(unittest.TestCase):
         self.assertAlmostEqual(saturation["max_first_credit_pct"], 50.0)
 
 
+class ArmSummaryTests(unittest.TestCase):
+    """B1: the report carries a per-arm (per AI) summary.
+
+    A run already prints ``candidate_*`` and ``baseline_*`` fields, but an
+    ablation has to know which prefix belongs to which AI. ``arm_summary``
+    names each arm by id *and* by the policy it played, so the same run can be
+    read arm by arm without external knowledge of the arm ordering.
+    """
+
+    def test_each_arm_names_its_own_policy_and_counts(self):
+        report = run(fixture())
+        summary = report["arm_summary"]
+        self.assertEqual(set(summary), {"candidate", "baseline"})
+        candidate = summary["candidate"]
+        baseline = summary["baseline"]
+        self.assertEqual(candidate["arm_id"], "candidate")
+        self.assertEqual(candidate["focus_policy"], "eval")
+        self.assertEqual(baseline["arm_id"], "baseline")
+        self.assertEqual(baseline["focus_policy"], "random")
+        self.assertEqual(candidate["games"], 12)
+        self.assertEqual(baseline["games"], 12)
+        self.assertEqual(candidate["seed_blocks"], 3)
+        self.assertEqual(candidate["first_place_credit"], 1.0)
+        self.assertEqual(baseline["first_place_credit"], 0.0)
+        self.assertEqual(candidate["first_place_credit_pct"], 100.0)
+        self.assertEqual(baseline["expected_rank"], 2.0)
+        self.assertEqual(baseline["solo_first_count"], 0)
+        self.assertEqual(candidate["solo_first_count"], 12)
+        self.assertEqual(candidate["decisions"], 840)
+        self.assertEqual(candidate["focus_decisions"], 360)
+        self.assertEqual(len(candidate["first_credit_by_seat"]), 4)
+        self.assertIn("arm_summary", report["arm_summary_note"])
+
+    def test_arm_summary_agrees_with_the_flat_prefixed_fields(self):
+        """The new summary must not drift from the existing flat fields."""
+        report = run(fixture())
+        for arm in ("candidate", "baseline"):
+            summary = report["arm_summary"][arm]
+            with self.subTest(arm=arm):
+                self.assertAlmostEqual(
+                    summary["first_place_credit"], report[f"{arm}_first_credit"]
+                )
+                self.assertAlmostEqual(
+                    summary["first_place_credit_pct"],
+                    report[f"{arm}_first_credit_pct"],
+                )
+                self.assertAlmostEqual(
+                    summary["expected_rank"], report[f"{arm}_expected_rank"]
+                )
+                self.assertAlmostEqual(
+                    summary["score_margin"], report[f"{arm}_score_margin"]
+                )
+                self.assertAlmostEqual(
+                    summary["solo_first_rate"], report[f"{arm}_solo_first_rate"]
+                )
+                self.assertAlmostEqual(
+                    summary["first_reach_rate"],
+                    report[f"{arm}_first_reach_rate"],
+                )
+                self.assertAlmostEqual(
+                    summary["tied_first_game_rate"],
+                    report[f"{arm}_tied_first_game_rate"],
+                )
+                self.assertEqual(
+                    summary["first_credit_by_seat"],
+                    report[f"{arm}_first_credit_by_seat"],
+                )
+                self.assertGreater(summary["wall_seconds"], 0)
+                self.assertAlmostEqual(
+                    summary["games_per_second"],
+                    summary["games"] / summary["wall_seconds"],
+                )
+        self.assertAlmostEqual(
+            report["arm_summary"]["candidate"]["wall_seconds"]
+            + report["arm_summary"]["baseline"]["wall_seconds"],
+            report["total_cpu_seconds"],
+        )
+
+    def test_a_tied_first_is_credited_to_each_tied_arm(self):
+        rows = fixture(blocks=1)
+        for row in rows:
+            row["scores_by_seat"] = [20] * 4
+            row["ranks_by_seat"] = [1] * 4
+            row["first_place_credit"] = 0.25
+            row["expected_rank_observation"] = 1
+            row["score_margin"] = 0.0
+        report = run(rows, blocks=1)
+        for arm in ("candidate", "baseline"):
+            summary = report["arm_summary"][arm]
+            with self.subTest(arm=arm):
+                self.assertEqual(summary["first_place_credit"], 0.25)
+                self.assertEqual(summary["first_reach_rate"], 1.0)
+                self.assertEqual(summary["solo_first_rate"], 0.0)
+                self.assertEqual(summary["tied_first_game_rate"], 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()
 if __name__ == "__main__":

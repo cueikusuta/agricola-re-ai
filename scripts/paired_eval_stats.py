@@ -600,6 +600,59 @@ def validate_and_report(
         ]
         for arm in ("candidate", "baseline")
     }
+
+    # B1: one self-describing summary per arm, so a reader (or a downstream
+    # ablation report) does not have to know which of the ``candidate_*`` /
+    # ``baseline_*`` prefixes belongs to which AI. Every number below is
+    # derived from the already-validated rows; nothing is re-sampled, and the
+    # JSONL row format is untouched.
+    def arm_summary(arm: str) -> dict:
+        games = values[arm]
+        focus_decisions = sum(g["focus_decisions"] for g in games)
+        wall_seconds = sum(g["total_wall_ms"] for g in games) / 1000.0
+        breakdown = first_place_breakdown(games)
+        credit = statistics.mean(g["first_place_credit"] for g in games)
+        return {
+            "arm_id": arm,
+            "focus_policy": candidate if arm == "candidate" else baseline,
+            "games": len(games),
+            "seed_blocks": blocks,
+            "first_place_credit": credit,
+            "first_place_credit_pct": credit * 100,
+            "solo_first_count": sum(
+                1
+                for g in games
+                if g["expected_rank_observation"] == 1
+                and g["ranks_by_seat"].count(1) == 1
+            ),
+            "solo_first_rate": breakdown["solo_first_rate"],
+            "first_reach_rate": breakdown["first_reach_rate"],
+            "tied_first_game_rate": breakdown["tied_first_game_rate"],
+            "expected_rank": statistics.mean(
+                g["expected_rank_observation"] for g in games
+            ),
+            "score_margin": statistics.mean(g["score_margin"] for g in games),
+            "first_credit_by_seat": by_seat[arm],
+            "decisions": sum(g["decisions"] for g in games),
+            "focus_decisions": focus_decisions,
+            "timeout_rate": sum(g["timeout_count"] for g in games)
+            / focus_decisions,
+            "measured_timeout_rate": sum(
+                g["focus_timeout_count"] for g in games
+            )
+            / focus_decisions,
+            "fallback_rate": sum(g["fallback_count"] for g in games)
+            / focus_decisions,
+            "mcts_simulations_completed": sum(
+                g["mcts_simulations_completed"] for g in games
+            ),
+            "max_focus_decision_ms": max(
+                g["focus_max_decision_ms"] for g in games
+            ),
+            "wall_seconds": wall_seconds,
+            "games_per_second": len(games) / wall_seconds,
+        }
+
     # The denominator is summed per-game elapsed wall time (not measured OS
     # CPU time), appropriate for the serial-run throughput approximation.
     # Keep the historical `total_cpu_seconds` key for report compatibility.
@@ -618,6 +671,16 @@ def validate_and_report(
         "baseline": baseline,
         "opponent": opponent,
         **puct_config_ids,
+        "arm_summary": {
+            arm: arm_summary(arm) for arm in ("candidate", "baseline")
+        },
+        "arm_summary_note": (
+            "arm_summary maps each arm_id to that arm's own numbers and names "
+            "the policy it played, so an ablation can read arms without "
+            "knowing which candidate_*/baseline_* prefix is which. The values "
+            "are the same validated rows as the flat fields above; the JSONL "
+            "row format is unchanged."
+        ),
         "comparison_design": {
             "head_to_head": head_to_head,
             "candidate_opponent_policies": candidate_opponents,
