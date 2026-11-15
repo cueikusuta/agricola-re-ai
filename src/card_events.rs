@@ -2096,6 +2096,24 @@ pub mod legacy {
                                 .count() as i32
                         })
                     }
+                    crate::cards::ScoreBonusRule::CategoriesAtMaxFour => {
+                        // Same rule as cards.rs: canonical category values from
+                        // score.rs; count categories that reached their 4-point max.
+                        let categories = &crate::score::score(player).categories;
+                        [
+                            "fields",
+                            "pastures",
+                            "grain",
+                            "vegetables",
+                            "sheep",
+                            "boar",
+                            "cattle",
+                            "fenced_stables",
+                        ]
+                        .iter()
+                        .filter(|name| categories.get(**name).copied().unwrap_or(0) >= 4)
+                        .count() as i32
+                    }
                 },
                 _ => 0,
             })
