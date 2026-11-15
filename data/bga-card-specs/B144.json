@@ -109,7 +109,7 @@
   ],
   "checked_by": "BGA wiki cross-check (JA and EN pages)",
   "checked_on": "2026-11-14",
-  "implementation_status": "implemented",
+  "implementation_status": "not_started",
   "notes": "Matches A140 [clay_pit,hollow] pattern. Hollow is a clay accumulation space (3/4p only). Third-party BGA wiki check only; not official Lookout verification."
  }
 }
