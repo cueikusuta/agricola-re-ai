@@ -1203,6 +1203,15 @@ fn handle_harvest_field_gain(
                 })
                 .count() as u32
         }
+        crate::cards::HarvestFieldRule::HasWheatField => u32::from(p.farm.iter().any(|cell| {
+            matches!(
+                cell.tile,
+                crate::model::Tile::Field {
+                    crop: Some(Crop::Grain),
+                    ..
+                }
+            )
+        })),
     };
     let gain = multiplier
         .checked_mul(amount)
@@ -1992,6 +2001,17 @@ pub mod legacy {
                                     )
                                 })
                                 .count() as u32
+                        }
+                        crate::cards::HarvestFieldRule::HasWheatField => {
+                            u32::from(player.farm.iter().any(|cell| {
+                                matches!(
+                                    cell.tile,
+                                    crate::model::Tile::Field {
+                                        crop: Some(crate::model::Crop::Grain),
+                                        ..
+                                    }
+                                )
+                            }))
                         }
                     };
                     let gain = multiplier
