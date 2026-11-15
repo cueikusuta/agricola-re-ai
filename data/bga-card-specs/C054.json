@@ -20,75 +20,79 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3035",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
-        "note": "English list page row used to cross-check the card id, name and effect text"
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
       }
     ]
   },
   "play": {
-      "action": "minor_improvement",
-      "cost": [],
-      "prerequisites": [],
-      "printed_points": 0,
-      "alternative_cost_notes": "Cost: return 1 stable from your supply (あなたのサプライの厩ひとつ). Stable return not expressible in standard cost vocabulary; cost=[] with this note."
-    },
+    "action": "minor_improvement",
+    "cost": null,
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": "あなたのサプライの厩ひとつ"
+  },
   "effects": [
-      {
-        "trigger": "harvest_feeding",
-        "conditions": [],
-        "steps": [
-          {
-            "operation": "exchange",
-            "target": "owner",
-            "params": {
-              "give": [
-                {
-                  "good": "grain",
-                  "amount": 1
-                },
-                {
-                  "good": "wood",
-                  "amount": 1
-                }
-              ],
-              "receive": [
-                {
-                  "good": "food",
-                  "amount": 5
-                }
-              ]
-            }
+    {
+      "trigger": "harvest_feeding",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "grain",
+                "amount": 1
+              },
+              {
+                "good": "wood",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 5
+              }
+            ]
           }
-        ],
-        "optional": true,
-        "frequency": "every_harvest",
-        "duration": "permanent",
-        "snapshot": "after_event",
-        "order": 0,
-        "decision_owner": "owner",
-        "notes": "After the field phase of each harvest (wiki: 各収穫の畑フェイズの後), exchange 1 grain + 1 fence from your supply for 5 food. Trigger 'after_field_phase' not in vocabulary; modeled as harvest_feeding. Fence payment modeled as wood:1 from supply (fences not spendable in engine)."
-      }
-    ],
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "After the field phase of each harvest (wiki: 各収穫の畑フェイズの後), exchange 1 grain + 1 fence from your supply for 5 food. Trigger 'after_field_phase' not in vocabulary; modeled as harvest_feeding. Fence payment modeled as wood:1 from supply (fences not spendable in engine)."
+    }
+  ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-      "status": "bga_checked",
-      "unresolved_fields": [],
-      "test_case_ids": [
-        "C054-normal",
-        "C054-declined",
-        "C054-not-enough"
-      ],
-      "checked_by": "AI source comparison",
-      "checked_on": "2026-11-16",
-      "implementation_status": "not_started",
-      "notes": "Cost: return 1 stable from supply (wiki: あなたのサプライの厩ひとつ). Cost not expressible in standard vocabulary; cost=null with note. Printed points: 0 (base ledger). Effect: after each harvest's field phase (wiki: 各収穫の畑フェイズの後), optionally exchange 1 grain + 1 fence (from supply) for 5 food. Trigger after_field_phase not in vocabulary; modeled as harvest_feeding. Fence payment modeled as wood:1 from supply (fences not spendable in engine). Verified via BGA Wiki (wiki_literature - complex card with stable cost, after_field_phase trigger, fence payment). Source: https://agricola.cloudfree.jp/?p=3035 (ja, 2026-11-16). 条件なし。コスト：自分のサプライの厩1。勝利点：0。効果：各収穫の畑フェイズの後、小麦1と柵1（両方とも自分のストックから）を食料5と交換できる。プレイエリアに残る。"
-    }
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: stable return (厩ひとつ) not expressible in standard cost vocabulary",
+      "effects[0].trigger: 'after_field_phase' (各収穫の畑フェイズの後) not in vocabulary; modeled as harvest_feeding",
+      "effects[0].steps[0].params.give: fence payment (柵1) not spendable in engine; modeled as wood:1"
+    ],
+    "test_case_ids": [
+      "C054-normal",
+      "C054-declined",
+      "C054-not-enough"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Cost: return 1 stable from supply (wiki: あなたのサプライの厩ひとつ). Cost not expressible in standard vocabulary; cost=null with note. Printed points: 0 (base ledger). Effect: after each harvest's field phase (wiki: 各収穫の畑フェイズの後), optionally exchange 1 grain + 1 fence (from supply) for 5 food. Trigger after_field_phase not in vocabulary; modeled as harvest_feeding. Fence payment modeled as wood:1 from supply (fences not spendable in engine). Verified via BGA Wiki (wiki_literature - complex card with stable cost, after_field_phase trigger, fence payment). Source: https://agricola.cloudfree.jp/?p=3035 (ja, 2026-11-16). 条件なし。コスト：自分のサプライの厩1。勝利点：0。効果：各収穫の畑フェイズの後、小麦1と柵1（両方とも自分のストックから）を食料5と交換できる。プレイエリアに残る。"
+  }
 }

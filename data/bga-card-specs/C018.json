@@ -20,13 +20,13 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3071",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "English list page row used to cross-check the card id and name"
       }
     ]
@@ -43,51 +43,53 @@
     "printed_points": 0
   },
   "effects": [
-      {
-        "trigger": "passive",
-        "conditions": [
-          {
-            "predicate": "cultivated_fields_at_least",
-            "params": {
-              "n": 3
-            }
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "cultivated_fields_at_least",
+          "params": {
+            "n": 3
           }
-        ],
-        "steps": [
-          {
-            "operation": "other",
-            "target": "owner",
-            "params": {
-              "kind": "discard_field_goods_plow_one",
-              "requires_cultivated_fields": 3,
-              "fields_to_clear": 1,
-              "plow_amount": 1
-            }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "discard_field_goods_plow_one",
+            "requires_cultivated_fields": 3,
+            "fields_to_clear": 1,
+            "plow_amount": 1
           }
-        ],
-        "optional": true,
-        "frequency": "every_use",
-        "duration": "permanent",
-        "snapshot": "live_state",
-        "order": 0,
-        "decision_owner": "owner",
-        "notes": "At any time (wiki: いつでも) with at least 3 cultivated fields: discard all goods on one field and plow 1 field. Trigger 'anytime' not in vocabulary; modeled as passive with cultivated_fields_at_least condition."
-      }
-    ],
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At any time (wiki: いつでも) with at least 3 cultivated fields: discard all goods on one field and plow 1 field. Trigger 'anytime' not in vocabulary; modeled as passive with cultivated_fields_at_least condition."
+    }
+  ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-      "status": "bga_checked",
-      "unresolved_fields": [],
-      "test_case_ids": [
-        "C018-normal",
-        "C018-boundary",
-        "C018-timing-pending"
-      ],
-      "checked_by": "AI source comparison",
-      "checked_on": "2026-11-16",
-      "implementation_status": "not_started",
-      "notes": "Cost: 2 wood. Passive effect (wiki: いつでも - any time): with 3+ cultivated fields, discard all goods on one field and plow 1 field. Trigger 'anytime' not in vocabulary; modeled as passive with cultivated_fields_at_least condition. Verified via BGA Wiki (wiki_literature - complex card with anytime trigger). Source: https://agricola.cloudfree.jp/?p=3071 (ja, 2026-11-16). 条件なし。コスト：2木。効果：いつでも、栽培中の畑が3つ以上あれば、そのうちの1つの畑の品物を全て捨てて、畑1を耕せる。プレイエリアに残る。"
-    }
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: 'anytime' (いつでも) trigger not in vocabulary; free-action API for hand-boundary, consecutive execution, cancellation, replay hash undefined"
+    ],
+    "test_case_ids": [
+      "C018-normal",
+      "C018-boundary",
+      "C018-timing-pending"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Cost: 2 wood. Passive effect (wiki: いつでも - any time): with 3+ cultivated fields, discard all goods on one field and plow 1 field. Trigger 'anytime' not in vocabulary; modeled as passive with cultivated_fields_at_least condition. Verified via BGA Wiki (wiki_literature - complex card with anytime trigger). Source: https://agricola.cloudfree.jp/?p=3071 (ja, 2026-11-16). 条件なし。コスト：2木。効果：いつでも、栽培中の畑が3つ以上あれば、そのうちの1つの畑の品物を全て捨てて、畑1を耕せる。プレイエリアに残る。"
+  }
 }

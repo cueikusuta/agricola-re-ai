@@ -32,21 +32,12 @@
     ]
   },
   "play": {
-      "action": "minor_improvement",
-      "cost": [
-        {
-          "good": "wood",
-          "amount": 1
-        },
-        {
-          "good": "clay",
-          "amount": 4
-        }
-      ],
-      "prerequisites": [],
-      "printed_points": 1,
-      "alternative_cost_notes": "Choice cost: either 1 wood + 4 clay, OR 2 stone. Wiki shows '1 木,4 レンガ/2 石'. Choice cost not expressible in current vocabulary; first option used as base."
-    },
+    "action": "minor_improvement",
+    "cost": null,
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": "1 木,4 レンガ/2 石"
+  },
   "effects": [
     {
       "trigger": "harvest_field_phase",
@@ -84,15 +75,17 @@
     "destination": "played_area"
   },
   "review": {
-      "status": "bga_checked",
-      "unresolved_fields": [],
-      "test_case_ids": [
-        "A064-normal",
-        "A064-zero"
-      ],
-      "checked_by": "AI source comparison",
-      "checked_on": "2026-11-16",
-      "implementation_status": "not_started",
-      "notes": "Cost: choice of (1 wood + 4 clay) OR (2 stone). Printed points: 1. Field phase: 1 food per grain field harvested; stays in play area. Verified via BGA Wiki (wiki_literature - complex card with choice cost). Source: https://agricola.cloudfree.jp/?p=3361 (ja, 2026-11-16). 条件なし。コスト：1木+4レンガ または 2石。勝利点：1。効果：毎収穫の畑フェイズに収穫した小麦畑1つにつき食料1を得る。プレイエリアに残る。"
-    }
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: the wiki shows only alternative costs (1 wood + 4 clay / 2 stone); the base resource cost is not stated"
+    ],
+    "test_case_ids": [
+      "A064-normal",
+      "A064-zero"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Field phase: 1 food per grain field harvested."
+  }
 }

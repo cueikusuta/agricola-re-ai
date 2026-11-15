@@ -2404,8 +2404,200 @@ CARDS = {
             case("A003-few-cards", {"hand_occupations": 2}, {"play": "A003"},
                  {"occupations_sampled": 2}),
         ],
-    },
-    "A004": {
+            },
+            "C003": {
+                "post": "left_neighbor_hand",
+                "effects": [
+                    effect("on_play",
+                           [special("place_unplaced_person", amount=1, destination="work_phase", immediately=True)],
+                           optional=False, freq="once_per_play", dur="instant",
+                           notes="When played during the work phase, immediately place another one of your unplaced people.")
+                ],
+                "notes": "Cost: free. Prerequisite: must have at least 1 unplaced person (wiki: 未配置の人物1). Played in work phase: immediately place another unplaced person; card goes to left neighbour's hand. No established predicate for unplaced-person prerequisite; enforced in effect step. Verified via BGA Wiki (wiki_literature - complex card with unplaced-person prerequisite). Source: https://agricola.cloudfree.jp/?p=3086 (ja, 2026-11-16). 条件：未配置の人物1。コスト：なし。効果：労働フェイズ中に出したら、すぐに他の人物1人を配置する。左隣の手札へ移動。",
+                "tests": [
+                    case("C003-normal", {"phase": "work", "unplaced_persons": 1, "persons": 3}, {"play": "C003"},
+                         {"extra_person_placed": True, "unplaced_persons": 0}),
+                    case("C003-not-in-work-phase", {"phase": "not_work", "unplaced_persons": 1}, {"play": "C003"},
+                         {"extra_person_placed": False},
+                         notes="Played outside the work phase the placement does not happen."),
+                    case("C003-cost", {"food": 0, "wood": 0, "clay": 0, "stone": 0, "reed": 0}, {"play": "C003"},
+                         {"playable_without_resources": True},
+                         notes="The card has no resource cost; it is playable with an empty stock."),
+                    case("C003-pass-left", {"hand_before": 1}, {"play": "C003"},
+                         {"post_play": "left_neighbor_hand"}),
+                ],
+                "status": "needs_resolution",
+                "unresolved": [
+                    "play.prerequisites: unplaced-person requirement (未配置の人物1) not expressible in current vocabulary",
+                    "effects[0].params.requires_unplaced_person: not in vocabulary"
+                ],
+            },
+            "C009": {
+                "post": "left_neighbor_hand",
+                "effects": [
+                    effect("passive",
+                           [special("buy_animal",
+                                   animal=["sheep", "wild_boar", "cattle"],
+                                   food_cost={"sheep": 0, "wild_boar": 1, "cattle": 2},
+                                   requires_capacity=True)],
+                           optional=True, freq="always", dur="permanent", snap="live_state",
+                           notes="When you have capacity for animals, you may buy sheep (0 food), wild boar (1 food), or cattle (2 food). Timing window not specified in source.")
+                ],
+                "notes": "Cost: 1 wood. Passive effect: when you have capacity for animals, you may buy sheep/wild boar/cattle for 0/1/2 food. Purchase window not specified in source (wiki: すぐに). Pass left. Verified via BGA Wiki (wiki_literature - complex card with continuous purchase window). Source: https://agricola.cloudfree.jp/?p=3080 (ja, 2026-11-16). 条件なし。コスト：1木。効果：動物を飼うことができる場合、すぐに羊/猪/牛を食料0/1/2で購入できる。左隣の手札へ移動。",
+                "tests": [
+                    case("C009-buy-sheep", {"animal_capacity": {"sheep": 1}, "food": 0}, {"buy_animal": "sheep"},
+                         {"sheep_delta": 1, "food_delta": 0}),
+                    case("C009-buy-boar", {"animal_capacity": {"wild_boar": 1}, "food": 1}, {"buy_animal": "wild_boar"},
+                         {"wild_boar_delta": 1, "food_delta": -1}),
+                    case("C009-no-capacity", {"animal_capacity": {"sheep": 0}, "food": 5}, {"buy_animal": "sheep"},
+                         {"sheep_delta": 0},
+                         notes="Without capacity the animal cannot be bought."),
+                    case("C009-no-food-boar", {"animal_capacity": {"wild_boar": 1}, "food": 0}, {"buy_animal": "wild_boar"},
+                         {"wild_boar_delta": 0, "food_delta": 0},
+                         notes="1 food is required for a boar; 0 food blocks the purchase."),
+                ],
+                "status": "needs_resolution",
+                "unresolved": [
+                    "effects[0].trigger: purchase window (いつ/すぐに) not specified in source; 'any time' claim unsupported"
+                ],
+            },
+            "C018": {
+                "post": "played_area",
+                "effects": [
+                    effect("passive",
+                           [special("discard_field_goods_plow_one", requires_cultivated_fields=3, fields_to_clear=1, plow_amount=1)],
+                           cond=[cond("cultivated_fields_at_least", n=3)],
+                           optional=True, freq="every_use", dur="permanent", snap="live_state",
+                           notes="At any time (wiki: いつでも) with at least 3 cultivated fields: discard all goods on one field and plow 1 field. Trigger 'anytime' not in vocabulary; modeled as passive with cultivated_fields_at_least condition.")
+                ],
+                "notes": "Cost: 2 wood. Passive effect (wiki: いつでも - any time): with 3+ cultivated fields, discard all goods on one field and plow 1 field. Trigger 'anytime' not in vocabulary; modeled as passive with cultivated_fields_at_least condition. Verified via BGA Wiki (wiki_literature - complex card with anytime trigger). Source: https://agricola.cloudfree.jp/?p=3071 (ja, 2026-11-16). 条件なし。コスト：2木。効果：いつでも、栽培中の畑が3つ以上あれば、そのうちの1つの畑の品物を全て捨てて、畑1を耕せる。プレイエリアに残る。",
+                "tests": [
+                    case("C018-normal", {"cultivated_fields": 3, "field_goods": [{"field": 0, "good": "grain", "amount": 2}], "empty_spaces": 1}, {"discard_field": 0, "plow": 1},
+                         {"fields_plowed": 1, "grain_removed": 2}),
+                    case("C018-boundary", {"cultivated_fields": 2}, {"discard_field": 0, "plow": 1},
+                         {"effect_allowed": False},
+                         notes="With fewer than 3 cultivated fields the effect may not be used."),
+                    case("C018-timing-pending", {"window": "between_worker_placements"}, {"use_anytime_effect": True},
+                         {"review_status": "needs_resolution", "automatic_effect_execution_allowed": False},
+                         notes="Block execution until the anytime free-action API is specified."),
+                ],
+                "status": "needs_resolution",
+                "unresolved": [
+                    "effects[0].trigger: 'anytime' (いつでも) trigger not in vocabulary; free-action API for hand-boundary, consecutive execution, cancellation, replay hash undefined"
+                ],
+            },
+            "C020": {
+                "post": "played_area",
+                "effects": [
+                    effect("after_worker_space",
+                           [plow(1)],
+                           cond=[cond("worker_space_used", spaces=["farmland", "cultivation"])],
+                           optional=True, freq="every_use", dur="permanent", snap="after_event",
+                           notes="Each time you use the Farmland or Cultivation accumulation space, plow 1 additional field.")
+                ],
+                "notes": "Cost: 3 wood + 1 food. Prerequisite: playable only in round 9 or later (wiki: ラウンド9またはその後に出す). No established predicate for round gate. Effect: each time you use Farmland or Cultivation space, plow 1 additional field. Verified via BGA Wiki (wiki_literature - complex card with round-dependent play restriction). Source: https://agricola.cloudfree.jp/?p=3069 (ja, 2026-11-16). 条件：ラウンド9またはその後に出す。コスト：3木、1食料。効果：アクションスペース「農地」または「耕作」を使用するたび、畑1を追加で耕せる。プレイエリアに残る。",
+                "tests": [
+                    case("C020-normal", {"empty_spaces": 3}, {"use_space": "farmland", "plow_extra": 1},
+                         {"fields_delta": 1}),
+                    case("C020-cultivation", {"grain": 2, "fields_available": 2}, {"use_space": "cultivation", "plow_extra": 1},
+                         {"fields_delta": 1}),
+                    case("C020-not-triggered", {"empty_spaces": 3}, {"use_space": "forest"},
+                         {"fields_delta": 0}),
+                ],
+                "status": "needs_resolution",
+                "unresolved": [
+                    "play.prerequisites: round gate (round 9 or later) not expressible in current vocabulary; not enforced in prerequisites array"
+                ],
+            },
+            "C054": {
+                "post": "played_area",
+                "effects": [
+                    effect("harvest_feeding",
+                           [exchange(give=[{"good": "grain", "amount": 1}, {"good": "wood", "amount": 1}],
+                                     receive=[{"good": "food", "amount": 5}])],
+                           optional=True, freq="every_harvest", dur="permanent", snap="after_event",
+                           notes="After the field phase of each harvest (wiki: 各収穫の畑フェイズの後), exchange 1 grain + 1 fence from your supply for 5 food. Trigger 'after_field_phase' not in vocabulary; modeled as harvest_feeding. Fence payment modeled as wood:1 from supply (fences not spendable in engine).")
+                ],
+                "notes": "Cost: return 1 stable from supply (wiki: あなたのサプライの厩ひとつ). Cost not expressible in standard vocabulary; cost=null with note. Printed points: 0 (base ledger). Effect: after each harvest's field phase (wiki: 各収穫の畑フェイズの後), optionally exchange 1 grain + 1 fence (from supply) for 5 food. Trigger after_field_phase not in vocabulary; modeled as harvest_feeding. Fence payment modeled as wood:1 from supply (fences not spendable in engine). Verified via BGA Wiki (wiki_literature - complex card with stable cost, after_field_phase trigger, fence payment). Source: https://agricola.cloudfree.jp/?p=3035 (ja, 2026-11-16). 条件なし。コスト：自分のサプライの厩1。勝利点：0。効果：各収穫の畑フェイズの後、小麦1と柵1（両方とも自分のストックから）を食料5と交換できる。プレイエリアに残る。",
+                "tests": [
+                    case("C054-normal", {"grain": 2, "wood": 2, "food": 0}, {"run_harvest": True, "use_card": True},
+                         {"food_delta": 5, "grain_delta": -1, "wood_delta": -1}),
+                    case("C054-declined", {"grain": 2, "wood": 2, "food": 0}, {"run_harvest": True, "use_card": False},
+                         {"food_delta": 0}),
+                    case("C054-not-enough", {"grain": 0, "wood": 2}, {"run_harvest": True, "use_card": True},
+                         {"food_delta": 0}),
+                ],
+                "status": "needs_resolution",
+                "unresolved": [
+                    "play.cost: stable return (厩ひとつ) not expressible in standard cost vocabulary",
+                    "effects[0].trigger: 'after_field_phase' (各収穫の畑フェイズの後) not in vocabulary; modeled as harvest_feeding",
+                    "effects[0].steps[0].params.give: fence payment (柵1) not spendable in engine; modeled as wood:1"
+                ],
+            },
+            "C056": {
+                "post": "played_area",
+                "effects": [
+                    effect("after_stable_built",
+                           [gain("food", 1)],
+                           optional=False, freq="every_use", dur="permanent", snap="after_event",
+                           notes="For each newly built stable gain 1 food; for the last one gain 3 food instead (provisional: encoded as +1 per build with the final-build bonus left to the predicate flagged in unresolved)."),
+                    effect("passive",
+                           [special("build_stable_alternate_cost", pay_good="clay", pay_amount=1, once_per_build=True)],
+                           optional=False, freq="always", dur="permanent", snap="live_state", order=1,
+                           notes="Each time you build stables you may build exactly 1 of them for 1 clay instead of 1 wood.")
+                ],
+                "notes": "Cost: 1 wood. Printed points: 0. Effect 1: each time you build a stable, gain 1 food; if it's the last stable (no farmyard space remains for another / last in game), gain 3 food instead. 'Last stable' predicate not in vocabulary; threshold table on stable count used as provisional encoding. Effect 2: each time you build stables, you may build exactly 1 stable for 1 clay instead of wood. Per-build alternative payment not in established discount vocabulary; modeled as build_stable_alternate_cost. Verified via BGA Wiki (wiki_literature - complex card with last-stable detection and per-build alternate cost). Source: https://agricola.cloudfree.jp/?p=3033 (ja, 2026-11-16). 条件なし。コスト：1木。勝利点：0。効果：新たに厩1を建設するたび、食料1を得る。それが最後の厩なら代わりに食料3を得る。厩を建設するたび、ちょうど厩1を木材の代わりに粘土1で建設できる。プレイエリアに残る。",
+                "tests": [
+                    case("C056-normal", {"food": 0, "stables": 1}, {"build_stables": 1},
+                         {"food_delta": 1, "stables_delta": 1}),
+                    case("C056-clay-build", {"clay": 1, "wood": 0, "stables": 0}, {"build_stables": 1, "pay": "clay"},
+                         {"stables_delta": 1, "clay_delta": -1}),
+                    case("C056-clay-limited", {"clay": 3, "wood": 3, "stables": 0}, {"build_stables": 2, "pay": "clay"},
+                         {"stables_delta": 2, "clay_delta": -1, "wood_delta": -1},
+                         notes="Exactly 1 stable per build action may use the clay alternative."),
+                    case("C056-timing-pending", {"stables": 4, "farmyard_space_left": 0}, {"build_stables": 1},
+                         {"review_status": "needs_resolution"},
+                         notes="Fail-closed: 'last stable' cannot be detected with the established predicates."),
+                ],
+                "status": "needs_resolution",
+                "unresolved": [
+                    "effects[0].params: 'last stable' detection (no farmyard space remains / last in game) not in vocabulary",
+                    "effects[1].params.kind: 'build_stable_alternate_cost' per-build alternative payment not in established vocabulary"
+                ],
+            },
+            "C057": {
+                "post": "played_area",
+                "effects": [
+                    effect("on_play",
+                           [exchange(give=[{"good": "food", "amount": 3}],
+                                     receive=[{"good": "vegetable", "amount": 1}])],
+                           optional=True, freq="once_per_play", dur="instant",
+                           notes="When you play this card you may immediately buy exactly 1 vegetable for 3 food."),
+                    effect("passive",
+                           [exchange(give=[{"good": "vegetable", "amount": 1}],
+                                     receive=[{"good": "food", "amount": 4}])],
+                           cond=[cond("field_vegetable_stacked", min_stack=2)],
+                           optional=True, freq="every_use", dur="permanent", snap="after_event", order=1,
+                           notes="At any time (wiki: いつでも), discard the top vegetable of a stack of 2+ vegetables in a field to gain 4 food. Trigger 'anytime' not in vocabulary; modeled as passive with field_vegetable_stacked condition.")
+                ],
+                "notes": "Cost: free. Printed points: 0. Effect 1 (on play): immediately buy exactly 1 vegetable for 3 food. Effect 2 (passive, wiki: いつでも): discard top vegetable of a field stack of 2+ vegetables for 4 food. Trigger 'anytime' not in vocabulary; modeled as passive with field_vegetable_stacked condition. Verified via BGA Wiki (wiki_literature - complex card with anytime trigger). Source: https://agricola.cloudfree.jp/?p=3032 (ja, 2026-11-16). 条件なし。コスト：なし。勝利点：0。効果：このカードを出したとき、すぐにちょうど野菜1を食料3で購入できる。いつでも畑にある2つ以上重なっている野菜の一番上の野菜を捨てて食料4を得る。プレイエリアに残る。",
+                "tests": [
+                    case("C057-buy", {"food": 3, "vegetable": 0}, {"play": "C057", "buy": True},
+                         {"food_delta": -3, "vegetable_delta": 1}),
+                    case("C057-decline-buy", {"food": 3, "vegetable": 0}, {"play": "C057", "buy": False},
+                         {"food_delta": 0, "vegetable_delta": 0}),
+                    case("C057-cook", {"stacked_vegetables": 2, "food": 0}, {"use_card": True},
+                         {"food_delta": 4, "stacked_vegetables": 1}),
+                    case("C057-timing-pending", {"stacked_vegetables": 2}, {"use_card": True},
+                         {"review_status": "needs_resolution"},
+                         notes="Fail-closed: いつでも cannot run under the established trigger vocabulary."),
+                ],
+                "status": "needs_resolution",
+                "unresolved": [
+                    "effects[1].trigger: 'anytime' (いつでも) trigger not in vocabulary; free-action API for hand-boundary, consecutive execution, cancellation, replay hash undefined"
+                ],
+            },
+            "A004": {
         "post": "left_neighbor_hand",
         "effects": [
             effect("on_play", [gain("wood", per(count("room"), 1)),
