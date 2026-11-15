@@ -231,3 +231,42 @@ fn empty_delayed_goods_ledger_keeps_the_pre_ch8_integrity_stamp() {
         "an empty ledger must not change the legacy integrity stamp"
     );
 }
+
+#[test]
+fn delayed_goods_on_the_current_or_past_round_are_invalid() {
+    use agricola_re_ai::model::DelayedGood;
+    let mut g = game(false);
+    let current = g.public.round;
+    g.delayed_goods.insert(
+        current,
+        vec![DelayedGood {
+            player: 0,
+            good: Good::Wood,
+            amount: 1,
+        }],
+    );
+    assert!(
+        g.validate().is_err(),
+        "a reservation is consumed before the round's effects, so the current round is not future"
+    );
+    g.delayed_goods.clear();
+    g.delayed_goods.insert(
+        15,
+        vec![DelayedGood {
+            player: 0,
+            good: Good::Wood,
+            amount: 1,
+        }],
+    );
+    assert!(g.validate().is_err(), "round 15 is outside the track");
+    g.delayed_goods.clear();
+    g.delayed_goods.insert(
+        current + 1,
+        vec![DelayedGood {
+            player: 0,
+            good: Good::Wood,
+            amount: 1,
+        }],
+    );
+    assert!(g.validate().is_ok(), "a future reservation is valid");
+}

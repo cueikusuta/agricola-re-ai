@@ -865,9 +865,16 @@ impl Game {
         // Event log is intentionally omitted; this is the full game state, including hidden cards and RNG.
         // LOG_VERSION=5 compatibility: the hash tuple MUST stay identical to the
         // v5 format (7 fields, tests/fixtures/v5/*). New bookkeeping fields
-        // (well_food_schedule, pending, event_budget, card_uses, next_decision_id)
-        // are serialized into saves via serde defaults, but are deliberately
-        // EXCLUDED from the hash so legacy v5 fixtures keep verifying.
+        // (well_food_schedule, delayed_goods, pending, event_budget, card_uses,
+        // card_use_limits, next_decision_id) are serialized into saves via serde
+        // defaults, but are deliberately EXCLUDED from the hash so legacy v5
+        // fixtures keep verifying.
+        //
+        // delayed_goods (C074/C077/C078/C079/C118) is intentionally excluded for
+        // the same v5 reason. It is fully derived from the recorded play events,
+        // covered by integrity_hash for save/load corruption, and its replay
+        // determinism is asserted by dedicated tests; including it here would
+        // make the v5 tuple depend on whether the ledger is empty.
         // well_food_schedule mirrors delayed_well (Finding A) and pending
         // decisions are excluded from the hash; their integrity is enforced by
         // PendingDecision::state_hash_before checks in the resume path instead.
@@ -1211,10 +1218,12 @@ impl Game {
         if p.revealed.len() + self.hidden_round_deck.len() != 14 {
             return Err("round deck corruption".into());
         }
-        // C074/C077/C078/C079/C118 reservations: goods may sit on future
-        // rounds only, and every entry must address a real player.
+        // C074/C077/C078/C079/C118 reservations: `start_round` consumes a
+        // round's entry before any effect runs, so a live ledger may only name
+        // rounds AFTER the current one, and every entry must address a real
+        // player with a positive amount.
         for (&round, entries) in &self.delayed_goods {
-            if !(1..=LAST_ROUND).contains(&round) {
+            if round <= p.round || round > LAST_ROUND {
                 return Err("delayed goods round out of range".into());
             }
             if entries

@@ -805,6 +805,10 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
             },
+            // C074/C077/C078/C079/C118 reserve goods through Game::delayed_goods,
+            // which this player-only legacy helper cannot reach. The engine path
+            // (dispatch_play) owns the reservation, same as C116's after-play scan.
+            CardEffect::OnPlayScheduleRoundGain { .. } => {}
             _ => {}
         }
     }

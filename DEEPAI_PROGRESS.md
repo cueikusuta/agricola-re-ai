@@ -399,7 +399,7 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
     （例: ラウンド12では全て14超）。この縮退を仕様としてテストした。
 - 未対応（意図的）: legacy `cards::play` ヘルパは台帳を受け取らないため予約を登録しない
   （C116と同じ。本番経路は engine → dispatch_play のみ）。
-- テスト（新規11件、`cargo test --locked` **660 passed / 0 failed**）:
+- テスト（新規12件、`cargo test --locked` **661 passed / 0 failed**）:
   - cards: ラウンド式（偶数/次N/オフセット/上限/遅延時の0件）と5枚のコスト・前提・効果。
   - card_events: dispatch_play が各カードの正しいラウンド集合を予約し、予約の無い
     カードでは台帳不変であること。
@@ -408,6 +408,19 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
   - rule_regressions: start_round がラウンド開始時に付与して1回で消えること、
     空台帳がシリアライズに現れない（旧セーブ互換）こと、空台帳では integrity_hash が
     ch.8以前のタプルと一致すること。
+- 独立レビュー（別セッション、AGENTS.md #14）: レビュー時HEAD `a092eec`。実行検証は
+  fmt/clippy/test に加え、2人・4人（追加タイルON）の実プレイ、保存再演、validate 拒否、
+  文献照合まで独立に確認。判定 **approve with nits**（P0/P1 なし、P2 1件、P3 6件）。
+  - P2-1（`state_hash` が台帳を被覆しない）: v5タプルの純粋性を優先して**非包含の設計判断を維持**。
+    台帳は記録済みプレイイベントから再構成でき、保存復元の破損は `integrity_hash`、再演の
+    一致は専用テストで担保する。`state_hash` のdoc commentに理由を明記した（レビュー許容範囲）。
+  - P3-2: `Game::validate` を「現在ラウンドより後」だけ許可するよう強化し、回帰テスト追加。
+  - P3-3: `state_hash` の除外フィールド列挙に `delayed_goods` と理由を追記。
+  - P3-4: `EPISODE_SCHEMA_VERSION` は additive＋`serde(default)` のため据え置き、理由をdoc comment化。
+  - P3-5: `docs/rule-decisions.md` に2解釈（current除外、C078の14上限・0件縮退）を記録。
+  - P3-6: legacy `apply_on_play_effects` の無視理由を明示arm＋コメントで記録。
+  - P3-7: PR本文のHEAD・レビュー記録を更新（PRコメントにも記録）。
+  - P2/P3のみのため独立再レビューは不要（AGENTS.md #15）。最新HEADでfmt/clippy/test再実行済み。
 - 次にやること: C帯の残り（C083 若牛の家畜配置決定、C072 収穫＋進歩アクション付与、
   C084/C095/C096等の任意効果・交換）。家畜配置の PendingDecision と、
   任意効果の ChooseGain 実運用が次の共通基盤候補。
