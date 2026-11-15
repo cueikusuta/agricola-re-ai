@@ -396,6 +396,23 @@ impl RoundCard {
         }
     }
 }
+
+/// Stage (1..=6) that contains `round` (1..=14), per the 2016 revised round
+/// layout: rounds 1-4 / 5-7 / 8-9 / 10-11 / 12-13 / 14. This is the round-count
+/// view of [`RoundCard::stage`]: the deck reveals 4/3/2/2/2/1 cards per stage,
+/// so the stage of the current round follows from the round number alone. Cards
+/// such as E101 はみだし者 whose award counts "stages that have not started yet"
+/// need this without access to the game object.
+pub fn stage_of_round(round: u8) -> u8 {
+    match round {
+        1..=4 => 1,
+        5..=7 => 2,
+        8..=9 => 3,
+        10..=11 => 4,
+        12..=13 => 5,
+        _ => 6,
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Space {

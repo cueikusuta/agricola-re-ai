@@ -128,6 +128,36 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// E098 神童 (Prodigy): if this card is the owner's FIRST occupation, store
+    /// `points` bonus points per improvement in front of the owner at this
+    /// moment (base improvements plus played minor improvements). Later
+    /// improvements never count, so the award is fixed at play time and lives
+    /// in `Game::bonus_points` (see `crate::model::BonusPointLedger`).
+    OnPlayBonusPointsPerImprovementIfFirstOccupation {
+        points: u32,
+    },
+    /// E101 はみだし者 (Outsider): when this card is played, store `points`
+    /// bonus points per stage that has not started yet (`6 - current stage`).
+    OnPlayBonusPointsPerUnstartedStage {
+        points: u32,
+    },
+    /// E101 はみだし者 (Outsider): once this card is played its owner may not
+    /// play any further occupation for the rest of the game. Declarative marker
+    /// only (no runtime gain); `cards::can_play` enforces it, which also covers
+    /// the engine's legal-action list and hints because they all route through
+    /// `can_play`.
+    BlockFurtherOccupations,
+}
+
+/// Bookkeeping that a card play writes outside `Player`.
+///
+/// Event-earned bonus points cannot live on `Player` (inside the frozen v5
+/// `state_hash` tuple, see `crate::model::BonusPointLedger`), so the play paths
+/// receive this context explicitly. `round` is needed by effects whose award
+/// depends on the current stage (E101).
+pub struct PlayBonusContext<'a> {
+    pub round: u8,
+    pub ledger: &'a mut crate::model::BonusPointLedger,
 }
 
 impl CardEffect {
@@ -165,6 +195,13 @@ impl CardEffect {
             CardEffect::OnPlayGainPerImprovementPlayed { .. } => {
                 "on_play_gain_per_improvement_played"
             }
+            CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { .. } => {
+                "on_play_bonus_points_per_improvement_if_first_occupation"
+            }
+            CardEffect::OnPlayBonusPointsPerUnstartedStage { .. } => {
+                "on_play_bonus_points_per_unstarted_stage"
+            }
+            CardEffect::BlockFurtherOccupations => "block_further_occupations",
         }
     }
 }
@@ -340,7 +377,8 @@ impl CardSet {
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
-                        | CardEffect::Passive { .. } => 1,
+                        | CardEffect::Passive { .. }
+                        | CardEffect::BlockFurtherOccupations => 1,
                         #[cfg(test)]
                         CardEffect::PendingProbe { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
@@ -351,6 +389,10 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfNoMinorPlayed { amount, .. }
                         | CardEffect::HarvestFieldGainIfNoMinorPlayed { amount, .. }
                         | CardEffect::OnPlayGainPerImprovementPlayed { amount, .. }
+                        | CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation {
+                            points: amount,
+                        }
+                        | CardEffect::OnPlayBonusPointsPerUnstartedStage { points: amount }
                         | CardEffect::HarvestFieldGain { amount, .. }
                         | CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | CardEffect::AfterClayConstructionGain { amount, .. }
@@ -622,6 +664,12 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
     if !affordable(card, player, extra_food) {
         return false;
     }
+    // E101 はみだし者 bans every later occupation for its owner. Enforcing it
+    // here covers every entry point: cards::play, the engine's play validation
+    // (play_validate_pay), the legal-space list and the detail hints.
+    if card.kind == CardKind::Occupation && occupations_blocked(set, player) {
+        return false;
+    }
     let occupations = occupation_count(set, player);
     card.effects.iter().all(|effect| {
         let CardEffect::Prerequisite { rule } = effect else { return true; };
@@ -637,6 +685,18 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
     })
 }
 
+/// True when one of `player`'s played cards forbids any further occupation
+/// (E101 はみだし者, "you may not play any more occupations this game").
+pub fn occupations_blocked(set: &CardSet, player: &Player) -> bool {
+    player.played_cards.iter().any(|id| {
+        set.definition(id).is_some_and(|card| {
+            card.effects
+                .iter()
+                .any(|effect| matches!(effect, CardEffect::BlockFurtherOccupations))
+        })
+    })
+}
+
 fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String> {
     let next = player
         .supply
@@ -647,10 +707,40 @@ fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String>
     Ok(())
 }
 
+/// Unit-test shorthand for [`play`] that only cares about the Player-visible
+/// outcome: round 1 and a throwaway ledger. Tests that need the stored bonus
+/// points call [`play`] with an explicit context instead.
+#[cfg(test)]
+pub(crate) fn play_in_test(
+    set: &CardSet,
+    hand: &mut Vec<String>,
+    player: &mut Player,
+    id: &str,
+    kind: CardKind,
+    extra_food: u32,
+) -> Result<(), String> {
+    play(
+        set,
+        hand,
+        player,
+        id,
+        kind,
+        extra_food,
+        &mut PlayBonusContext {
+            round: 1,
+            ledger: &mut crate::model::BonusPointLedger::new(),
+        },
+    )
+}
+
 /// Execute one prevalidated card play; the containing Game transaction provides rollback.
 /// This function validates the play, pays costs, applies on-play effects (Before phase),
 /// moves the card from hand to played, and updates card_points.
 /// This is the canonical public API used by evaluation, policy, and unit tests.
+///
+/// `bonus` carries the current round and the ledger that receives event-earned
+/// bonus points. Callers that only need a hypothetical projection (AI value
+/// estimates) pass a scratch ledger; the game paths pass `Game::bonus_points`.
 pub fn play(
     set: &CardSet,
     hand: &mut Vec<String>,
@@ -658,6 +748,7 @@ pub fn play(
     id: &str,
     kind: CardKind,
     extra_food: u32,
+    bonus: &mut PlayBonusContext<'_>,
 ) -> Result<(), String> {
     let card = set.definition(id).ok_or("unknown card")?;
     if card.kind != kind || !hand.iter().any(|x| x == id) {
@@ -670,7 +761,7 @@ pub fn play(
         player.supply.pay(good, amount)?;
     }
     // Apply on-play (Before phase) effects
-    apply_on_play_effects(set, player, id)?;
+    apply_on_play_effects(set, player, id, bonus)?;
     // Move card from hand to played via the single canonical implementation
     crate::card_zones::hand_to_played(hand, player, id).map_err(|e| e.to_string())?;
     // Update card points
@@ -706,8 +797,15 @@ pub(crate) fn play_validate_pay(
 }
 
 /// Apply on-play (Before phase) effects for a card that has been moved to played.
-/// Called by the event dispatcher after the card is in the played zone.
-pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Result<(), String> {
+/// Called by the event dispatcher after the card is in the played zone, and by
+/// [`play`] (which calls it just before the zone move, hence the explicit
+/// "played area including this card" slice for stored bonus points).
+pub fn apply_on_play_effects(
+    set: &CardSet,
+    player: &mut Player,
+    id: &str,
+    bonus: &mut PlayBonusContext<'_>,
+) -> Result<(), String> {
     let card = set.definition(id).ok_or("unknown card")?;
     for effect in &card.effects {
         match effect {
@@ -751,10 +849,112 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
             },
+            // Stored bonus points need the round and the ledger, so they are
+            // written once after the loop by the same canonical function the
+            // dispatcher and the legacy mirror call.
+            CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { .. }
+            | CardEffect::OnPlayBonusPointsPerUnstartedStage { .. } => {}
+            // Declarative play restriction, enforced by `can_play`.
+            CardEffect::BlockFurtherOccupations => {}
             _ => {}
         }
     }
+    let mut played_including_this = player.played_cards.clone();
+    played_including_this.push(id.to_owned());
+    store_on_play_bonus_points(
+        set,
+        player,
+        id,
+        &played_including_this,
+        bonus.round,
+        bonus.ledger,
+    )?;
     Ok(())
+}
+
+/// Canonical computation of one play-time bonus-point effect (正本).
+///
+/// Every path (this module's [`play`], the dispatcher's play-time block and the
+/// legacy mirror in `card_events::legacy`) calls this function, so a card can
+/// never award different points depending on which path resolved it.
+///
+/// `played_cards` is the owner's played area INCLUDING the card that was just
+/// played: [`play`] applies on-play effects before its zone move, so the caller
+/// must add the new card explicitly.
+pub fn on_play_bonus_points(
+    effect: &CardEffect,
+    set: &CardSet,
+    player: &Player,
+    played_cards: &[String],
+    round: u8,
+) -> i32 {
+    match effect {
+        CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { points } => {
+            // "If this is your first occupation": the new card is the only
+            // occupation in the played area at this moment.
+            let occupations = played_cards
+                .iter()
+                .filter(|id| {
+                    set.definition(id)
+                        .is_some_and(|card| card.kind == CardKind::Occupation)
+                })
+                .count();
+            if occupations != 1 {
+                return 0;
+            }
+            let improvements = improvement_count_in_front_of(set, player, played_cards);
+            i32::try_from(i64::from(improvements) * i64::from(*points)).unwrap_or(i32::MAX)
+        }
+        CardEffect::OnPlayBonusPointsPerUnstartedStage { points } => {
+            let unstarted = 6u8.saturating_sub(crate::model::stage_of_round(round));
+            i32::try_from(i64::from(unstarted) * i64::from(*points)).unwrap_or(i32::MAX)
+        }
+        _ => 0,
+    }
+}
+
+/// Store every play-time bonus award of `card_id` into `ledger` (正本).
+///
+/// `player` must own `card_id`; `Game::validate` re-checks that citation. Zero
+/// awards leave no entry behind.
+pub fn store_on_play_bonus_points(
+    set: &CardSet,
+    player: &Player,
+    card_id: &str,
+    played_cards: &[String],
+    round: u8,
+    ledger: &mut crate::model::BonusPointLedger,
+) -> Result<(), String> {
+    let Some(card) = set.definition(card_id) else {
+        return Ok(());
+    };
+    let mut total = 0i32;
+    for effect in &card.effects {
+        total = total
+            .checked_add(on_play_bonus_points(
+                effect,
+                set,
+                player,
+                played_cards,
+                round,
+            ))
+            .ok_or("on-play bonus point overflow")?;
+    }
+    crate::model::add_bonus_points(ledger, player.id, card_id, total)
+}
+
+/// True when `card_id` declares any play-time bonus-point effect (used by the
+/// dispatcher to consume one event-budget unit, mirroring a resolving effect).
+pub fn has_on_play_bonus_effect(set: &CardSet, card_id: &str) -> bool {
+    set.definition(card_id).is_some_and(|card| {
+        card.effects.iter().any(|effect| {
+            matches!(
+                effect,
+                CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { .. }
+                    | CardEffect::OnPlayBonusPointsPerUnstartedStage { .. }
+            )
+        })
+    })
 }
 
 /// Update card_points after a card is successfully played.
@@ -1519,7 +1719,7 @@ mod verified_minor_worker_tests {
         assert_eq!(card.points, 0);
         let mut p = Player::new(0, 0);
         let mut hand = vec!["A121".to_string()];
-        play(&set, &mut hand, &mut p, "A121", CardKind::Occupation, 0).unwrap();
+        play_in_test(&set, &mut hand, &mut p, "A121", CardKind::Occupation, 0).unwrap();
         assert_eq!(p.supply.clay, 1);
         assert_eq!(p.played_cards, vec!["A121"]);
     }
@@ -1661,7 +1861,7 @@ mod verified_immediate_resource_tests {
         };
         let mut hand = vec![id.to_string()];
         let kind = set.definition(id).unwrap().kind;
-        play(&set, &mut hand, player, id, kind, 0)
+        play_in_test(&set, &mut hand, player, id, kind, 0)
     }
 
     #[test]
@@ -2369,7 +2569,7 @@ mod passive_cards_tests {
         };
         let mut hand = vec![id.into()];
         let kind = set.definition(id).unwrap().kind;
-        play(&set, &mut hand, p, id, kind, 0).unwrap();
+        play_in_test(&set, &mut hand, p, id, kind, 0).unwrap();
     }
     #[test]
     fn a012_pasture_extra_two_including_stable() {
@@ -2403,7 +2603,7 @@ mod passive_cards_tests {
             points: 0,
             effects: vec![],
         });
-        play(
+        play_in_test(
             &set,
             &mut vec!["sample".into()],
             &mut p,
@@ -2600,7 +2800,7 @@ mod simple_occupation_tests {
             definitions: verified_simple_occupations(2),
         };
         let mut p = Player::new(0, 0);
-        play(
+        play_in_test(
             &set,
             &mut vec!["B102".into()],
             &mut p,
@@ -2849,7 +3049,7 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut hand = vec!["C106".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "C106", CardKind::Occupation, 0).unwrap();
+        play_in_test(&set, &mut hand, &mut p, "C106", CardKind::Occupation, 0).unwrap();
         assert_eq!(p.supply.food, 3);
         assert_eq!(p.played_cards, vec!["C106"]);
     }
@@ -2883,7 +3083,7 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut hand = vec!["C111".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "C111", CardKind::Occupation, 0).unwrap();
+        play_in_test(&set, &mut hand, &mut p, "C111", CardKind::Occupation, 0).unwrap();
         assert_eq!(p.played_cards, vec!["C111"]);
     }
 
@@ -2896,7 +3096,7 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut hand = vec!["C116".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "C116", CardKind::Occupation, 0).unwrap();
+        play_in_test(&set, &mut hand, &mut p, "C116", CardKind::Occupation, 0).unwrap();
         assert_eq!(p.supply.wood, 1);
         assert_eq!(p.played_cards, vec!["C116"]);
     }
@@ -2978,8 +3178,13 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
 /// Improvements in front of a player: base improvements plus played
 /// minor-improvement cards (A117 木材調達人 condition).
 fn improvement_count_in_front(set: &CardSet, player: &Player) -> u32 {
-    let minor = player
-        .played_cards
+    improvement_count_in_front_of(set, player, &player.played_cards)
+}
+
+/// Improvements in front of `player` when `played_cards` is its played area:
+/// base (major) improvements plus played minor-improvement cards.
+fn improvement_count_in_front_of(set: &CardSet, player: &Player, played_cards: &[String]) -> u32 {
+    let minor = played_cards
         .iter()
         .filter(|id| {
             set.definition(id)
@@ -3150,6 +3355,33 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 gain(Space::ResourceMarket, Good::Wood, 1),
             ],
         },
+        // E098 神童 (Prodigy): if this is the first occupation, 1 bonus point
+        // per improvement in front of the owner at play time; later
+        // improvements never count (agricola.cloudfree.jp ?p=2655).
+        CardDefinition {
+            use_limit: None,
+            id: "E098".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { points: 1 },
+            ],
+        },
+        // E101 はみだし者 (Outsider): 1 bonus point per stage that has not
+        // started yet, then no further occupation for the rest of the game
+        // (agricola.cloudfree.jp ?p=2652).
+        CardDefinition {
+            use_limit: None,
+            id: "E101".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayBonusPointsPerUnstartedStage { points: 1 },
+                CardEffect::BlockFurtherOccupations,
+            ],
+        },
     ]
 }
 
@@ -3194,7 +3426,7 @@ mod verified_band_d_tests {
         let set = set();
         let mut hand = vec!["D109".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "D109", CardKind::Occupation, 0).unwrap();
+        play_in_test(&set, &mut hand, &mut p, "D109", CardKind::Occupation, 0).unwrap();
         assert_eq!(p.supply.wood, 1);
         for space in [
             Space::GrainSeeds,
@@ -3414,6 +3646,123 @@ mod verified_band_e_tests {
         after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
         assert_eq!(p.supply.wood, 4);
     }
+    fn bonus_ledger() -> crate::model::BonusPointLedger {
+        crate::model::BonusPointLedger::new()
+    }
+
+    #[test]
+    fn e098_first_occupation_counts_improvements_in_front_once() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut ledger = bonus_ledger();
+        let mut hand = vec!["E098".to_string()];
+        let mut p = Player::new(0, 0);
+        p.improvements = vec![crate::model::Improvement::Fireplace2];
+        p.played_cards.push("B001".into());
+        // B001 is not in this set, so only the base improvement counts.
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "E098",
+            CardKind::Occupation,
+            0,
+            &mut PlayBonusContext {
+                round: 1,
+                ledger: &mut ledger,
+            },
+        )
+        .unwrap();
+        assert_eq!(crate::model::bonus_points_total(&ledger, 0), 1);
+
+        // A later improvement does not add points: the award was fixed at play.
+        p.improvements.push(crate::model::Improvement::Joinery);
+        assert_eq!(crate::model::bonus_points_total(&ledger, 0), 1);
+    }
+
+    #[test]
+    fn e098_pays_nothing_when_it_is_not_the_first_occupation() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut ledger = bonus_ledger();
+        let mut hand = vec!["E098".to_string()];
+        let mut p = Player::new(0, 0);
+        p.improvements = vec![crate::model::Improvement::Fireplace2];
+        // Any occupation already in the played area (E117 grants nothing here).
+        p.played_cards.push("E117".into());
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "E098",
+            CardKind::Occupation,
+            0,
+            &mut PlayBonusContext {
+                round: 12,
+                ledger: &mut ledger,
+            },
+        )
+        .unwrap();
+        assert_eq!(crate::model::bonus_points_total(&ledger, 0), 0);
+    }
+
+    #[test]
+    fn e101_one_point_per_unstarted_stage() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        for (round, expected) in [
+            (1u8, 5i32),
+            (4, 5),
+            (5, 4),
+            (8, 3),
+            (10, 2),
+            (12, 1),
+            (14, 0),
+        ] {
+            let mut ledger = bonus_ledger();
+            let mut hand = vec!["E101".to_string()];
+            let mut p = Player::new(0, 0);
+            p.supply.food = 5;
+            play(
+                &set,
+                &mut hand,
+                &mut p,
+                "E101",
+                CardKind::Occupation,
+                0,
+                &mut PlayBonusContext {
+                    round,
+                    ledger: &mut ledger,
+                },
+            )
+            .unwrap();
+            assert_eq!(
+                crate::model::bonus_points_total(&ledger, 0),
+                expected,
+                "round {round}"
+            );
+            // After this card no occupation may be played any more.
+            assert!(occupations_blocked(&set, &p));
+            let other = CardDefinition {
+                use_limit: None,
+                id: "E111".to_owned(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            };
+            assert!(!can_play(&set, &other, &p, 0));
+        }
+    }
+
+    #[test]
+    fn stage_of_round_covers_all_fourteen_rounds() {
+        let stages: Vec<u8> = (1..=14).map(crate::model::stage_of_round).collect();
+        assert_eq!(stages, vec![1, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 5, 6]);
+    }
 }
 #[cfg(test)]
 mod verified_band_a_tests {
@@ -3525,7 +3874,7 @@ mod verified_band_a_tests {
         p.played_cards.push("minor1".into());
         p.improvements.push(Improvement::Well);
         assert_eq!(improvement_count_in_front(&set, &p), 2);
-        play(
+        play_in_test(
             &set,
             &mut vec!["A117".into()],
             &mut p,
@@ -3584,7 +3933,7 @@ mod m6_extra_passive_tests {
         let mut p = Player::new(0, 0);
         p.supply.wood = 3;
         p.supply.food = 3;
-        play(
+        play_in_test(
             &set,
             &mut vec!["B010".into()],
             &mut p,
@@ -3603,7 +3952,7 @@ mod m6_extra_passive_tests {
             definitions: verified_multiplayer_passive_cards(3),
         };
         let mut p = Player::new(0, 0);
-        play(
+        play_in_test(
             &set,
             &mut vec!["A143".into()],
             &mut p,
@@ -3666,7 +4015,7 @@ mod a063_baking_tests {
         player.supply.wood = 2;
         player.supply.stone = 2;
         let mut hand = vec!["A063".into()];
-        play(
+        play_in_test(
             &set,
             &mut hand,
             &mut player,
