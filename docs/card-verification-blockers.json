@@ -16,225 +16,140 @@
     ]
   },
   "cards": [
-    {
-      "card_id": "A005",
-      "known": {
-        "card_type": "minor_improvement",
-        "in_base_2016": true,
-        "implementation": "コード内に定義あり（配布対象要照合）",
-        "difficulty_preliminary": 5,
-        "name_ja": "粘土積み場",
-        "name_en": "Clay Embankment",
-        "cost": "1 food",
-        "effect": "手元にあるレンガ2つにつき、すぐにレンガ1を得る。このカードは自分の前に置かず、左隣のプレイヤーの手札に入れる。",
-        "effect_en": "You immediately get 1 clay for every 2 clay you already have in your supply. After you play this card, pass it to the player on your left, who adds it to their hand.",
-        "player_eligibility": "1-5 players",
-        "verification_category": "multiplayer_effect",
-        "source_summary_ja": "BGAアグリコラカード情報wiki (agricola.cloudfree.jp) にてカード効果と左隣への受け渡し（移動系カード）を確認。公式ルールの「移動系カード（Travelling cards）」カテゴリに該当し、他プレイヤーへの影響を含む。",
-        "literature_resolution": "BGA Wikiで効果と分類が確定。他プレイヤー関与（左隣への手札移動）のため権限マップ権限2（AI自己照合）適用。台帳実装との差異は「現行実装との差異」として記録。",
-        "next_action": "権限2：AI自己照合で照合済み。台帳CSVのverification_categoryをmultiplayer_effectに、source_summary_jaを更新し、配布適格（eligible_at_2/3/4）を確認の上で配布プールに投入可能。",
-        "checklist_issue_url": ""
-      },
-      "unknown": [],
-      "needed_source": "BGA Wiki (https://agricola.cloudfree.jp/a005/) - 左隣プレイヤーへの手札移動効果を確認",
-      "blocker": "解消済み：BGA Wikiで効果と分類（移動系カード）を確認。他プレイヤー関与のため権限2適用。",
-      "verification_category": "multiplayer_effect",
-      "source_summary_ja": "BGAアグリコラカード情報wikiにて確認。コスト1食料、効果は「手持ちのレンガ2個につきレンガ1個獲得、その後左隣のプレイヤーの手札に渡す」。移動系カード（Travelling card）として他プレイヤーに影響するため、権限マップ権限2（AI自己照合）で照合済み。",
-      "literature_resolution": "BGA Wikiで効果と分類が確定。権限2適用。",
-      "checklist_issue_url": ""
-    },
-    {
-      "card_id": "D159",
-      "known": {
-        "card_type": "occupation",
-        "in_base_2016": false,
-        "implementation": "未実装または未照合",
-        "name_ja": "葦瓜商人",
-        "name_en": "Reed Gourd Merchant",
-        "player_eligibility": "4+ players",
-        "effect": "いつでも、葦1を食料3と交換できる。ただし、他のプレイヤーがそれを望む場合、そのプレイヤーに葦を食料2で売らなければならない。複数のプレイヤーが望む場合、そのうちの1人を選ぶ。",
-        "effect_en": "At any time, you can exchange 1 Reed for 3 Food. However, if another player wants to do so, you must sell the reed to that player in exchange for 2 food. If multiple players want it, you pick one of them.",
-        "verification_category": "multiplayer_effect",
-        "source_summary_ja": "NamuWiki（アグリコラ 改訂版 Dデッキ 職業(4人以上)）にてカード名「葦瓜商人」（Reed Gourd Merchant）と効果を確認。他プレイヤーが介入する効果（葦の売却強制・選択権）を含む。",
-        "literature_resolution": "NamuWikiで名称と効果が確定。他プレイヤー関与のため権限マップ権限2（AI自己照合）適用。name_en空欄は「Reed Gourd Merchant」で確定。",
-        "next_action": "権限2：AI自己照合で照合済み。台帳のname_enを「Reed Gourd Merchant」に更新し、verification_categoryをmultiplayer_effectに、人数適格（4+）を反映。配布プール投入可能。",
-        "checklist_issue_url": ""
-      },
-      "unknown": [],
-      "needed_source": "NamuWiki (https://en.namu.wiki/w/アグリコラ(ボードゲーム)/改訂版/Dデッキ/職業(4人以上)) - D159 葦瓜商人 (Reed Gourd Merchant) の名称・効果",
-      "blocker": "解消済み：NamuWikiで名称（Reed Gourd Merchant）と効果を確認。他プレイヤー関与（葦の売却強制・選択）のため権限2適用。",
-      "verification_category": "multiplayer_effect",
-      "source_summary_ja": "NamuWikiにて確認。D159「葦瓜商人」（Reed Gourd Merchant）、4人以上用職業。効果は「いつでも葦1を食料3と交換可能。他プレイヤーが希望すれば食料2でそのプレイヤーに売らなければならず、複数希望時は選択可能」。他プレイヤー関与の効果のため権限2（AI自己照合）で照合済み。",
-      "literature_resolution": "NamuWikiで名称と効果が確定。権限2適用。",
-      "checklist_issue_url": ""
-    },
-    {
-      "card_id": "A060",
-      "known": {
-        "card_type": "multi_type",
-        "in_base_2016": false,
-        "implementation": "未実装または未照合",
-        "name_ja": "東洋かまど",
-        "name_en": "Oriental Fireplace",
-        "cost": "かまどまたは調理場を返す",
-        "cost_en": "Return a Fireplace or Cooking Hearth",
-        "effect": "いつでも：野菜1→食料4、羊1→食料3、牛1→食料5。「パンを焼く」アクション：小麦1→食料2",
-        "effect_en": "At any time: Vegetable → 4 Food; Sheep → 3 Food; Cattle → 5 Food. \"Bake Bread\" action: Grain → 2 Food",
-        "vp": 1,
+      {
+        "card_id": "A060",
+        "known": {
+          "card_type": "multi_type",
+          "in_base_2016": false,
+          "implementation": "未実装または未照合",
+          "name_ja": "東洋かまど",
+          "name_en": "Oriental Fireplace",
+          "cost": "かまどまたは調理場を返す",
+          "cost_en": "Return a Fireplace or Cooking Hearth",
+          "effect": "いつでも：野菜1→食料4、羊1→食料3、牛1→食料5。「パンを焼く」アクション：小麦1→食料2",
+          "effect_en": "At any time: Vegetable → 4 Food; Sheep → 3 Food; Cattle → 5 Food. \"Bake Bread\" action: Grain → 2 Food",
+          "vp": 1,
+          "verification_category": "complex",
+          "source_summary_ja": "BGAアグリコラカード情報wikiおよびFC2 Wiki（agricoladatabase.wiki.fc2.com）にて確認。小さい進歩（小進歩）でありながら大きい進歩（大進歩）の機能を持ち、Grzegorz Kobiela（ルール責任者）の裁定で「小さい進歩かつ大きい進歩」とみなされる公式ルール上の複合カード。コストは既存のかまど/調理場を返却。",
+          "literature_resolution": "BGA WikiとFC2 Wikiでカード効果と複合分類（小進歩かつ大進歩）を確認。ただし公式ルールブック付録での複合カードの枚数カウント規則（職業/小進歩のどちらとして数えるか）は未確認。権限3（文献調査）継続。",
+          "next_action": "権限3：公式ルール付録またはLookout Games公式FAQで複合カードの配布枚数カウント規則を確認するまで照合保留。現時点ではカード効果・分類は文献で判明しているが、配布集計への影響（カウント方法）が未確定。",
+          "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
+        },
+        "unknown": [
+          "複合カードとしての公式の配布枚数カウント規則（職業/小進歩のどちらとして数えるか、あるいは両方として数えるか）",
+          "公式の人数適格（2/3/4人）"
+        ],
+        "needed_source": "2016改訂版公式ルールブック付録、またはLookout Games公式FAQ（複合カードの扱い・枚数カウント規則）",
+        "blocker": "カード効果と複合分類（小進歩かつ大進歩）は文献で確認済み。しかし公式の配布枚数カウント規則（職業/小進歩のどちらに数えるか）が未確定のため、配布プールには入れられない（fail-closed維持）。",
         "verification_category": "complex",
-        "source_summary_ja": "BGAアグリコラカード情報wikiおよびFC2 Wiki（agricoladatabase.wiki.fc2.com）にて確認。小さい進歩（小進歩）でありながら大きい進歩（大進歩）の機能を持ち、Grzegorz Kobiela（ルール責任者）の裁定で「小さい進歩かつ大きい進歩」とみなされる公式ルール上の複合カード。コストは既存のかまど/調理場を返却。",
-        "literature_resolution": "BGA WikiとFC2 Wikiでカード効果と複合分類（小進歩かつ大進歩）を確認。ただし公式ルールブック付録での複合カードの枚数カウント規則（職業/小進歩のどちらとして数えるか）は未確認。権限3（文献調査）継続。",
-        "next_action": "権限3：公式ルール付録またはLookout Games公式FAQで複合カードの配布枚数カウント規則を確認するまで照合保留。現時点ではカード効果・分類は文献で判明しているが、配布集計への影響（カウント方法）が未確定。",
+        "source_summary_ja": "BGA WikiとFC2 Wikiで確認。A060「東洋かまど」（Oriental Fireplace）、小進歩かつ大進歩の複合カード（Grzegorz Kobiela裁定）。コスト：かまど/調理場返却。効果：変換効果（野菜→食料4、羊→3、牛→5、焼く：小麦→2）、1VP。複合カードの配布カウント規則が公式未確認のため権限3継続。",
+        "literature_resolution": "カード効果・分類は文献で判明。配布カウント規則のみ未確定。",
         "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
       },
-      "unknown": [
-        "複合カードとしての公式の配布枚数カウント規則（職業/小進歩のどちらとして数えるか、あるいは両方として数えるか）",
-        "公式の人数適格（2/3/4人）"
-      ],
-      "needed_source": "2016改訂版公式ルールブック付録、またはLookout Games公式FAQ（複合カードの扱い・枚数カウント規則）",
-      "blocker": "カード効果と複合分類（小進歩かつ大進歩）は文献で確認済み。しかし公式の配布枚数カウント規則（職業/小進歩のどちらに数えるか）が未確定のため、配布プールには入れられない（fail-closed維持）。",
-      "verification_category": "complex",
-      "source_summary_ja": "BGA WikiとFC2 Wikiで確認。A060「東洋かまど」（Oriental Fireplace）、小進歩かつ大進歩の複合カード（Grzegorz Kobiela裁定）。コスト：かまど/調理場返却。効果：変換効果（野菜→食料4、羊→3、牛→5、焼く：小麦→2）、1VP。複合カードの配布カウント規則が公式未確認のため権限3継続。",
-      "literature_resolution": "カード効果・分類は文献で判明。配布カウント規則のみ未確定。",
-      "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
-    },
-    {
-      "card_id": "D025",
-      "known": {
+      {
         "card_id": "D025",
-        "card_type": "multi_type",
-        "in_base_2016": false,
-        "implementation": "未実装または未照合",
-        "name_ja": "不明",
-        "name_en": "Unknown",
+        "known": {
+          "card_id": "D025",
+          "card_type": "multi_type",
+          "in_base_2016": false,
+          "implementation": "未実装または未照合",
+          "name_ja": "不明",
+          "name_en": "Unknown",
+          "verification_category": "unresolved",
+          "source_summary_ja": "BGAアグリコラカード情報wikiのDデッキ小進歩リスト（D001-D084）にD025が存在しない（D024→D026で欠番）。公式カードリスト（Lookout Games配布の完全リストPDF）やEric Hoのカードデータベースでの確認が必要。",
+          "literature_resolution": "BGA Wikiで欠番確認。公式完全リストやカードデータベースでD025の存在・名称・効果・分類を確認するまで未解決。権限4（チェックリスト提出）対象。",
+          "next_action": "権限4：文献（BGA Wiki、非公式Compendium）で見つからない。公式印刷カードまたはLookout Games公式カード完全リスト（PDF）での目視確認が必要。人間チェックリストとしてGitHubに提出。",
+          "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
+        },
+        "unknown": [
+          "カードの存在そのもの（欠番の可能性）",
+          "名称（日英）",
+          "カード種別（小進歩/職業/複合）",
+          "公式の人数適格",
+          "コスト・効果・発動時点"
+        ],
+        "needed_source": "2016改訂版の印刷カード（デッキD・D025）、Lookout Games公式カード完全リストPDF (agricola-cards-completelist-v7.pdf)、Eric Ho's Agricola Card Database",
+        "blocker": "BGA WikiでD025が欠番（未実装）であることを確認。公式一次資料での存在確認と全情報の取得が必要。文献調査（権限3）では解決せず、権限4（人間チェックリスト）へ。",
         "verification_category": "unresolved",
-        "source_summary_ja": "BGAアグリコラカード情報wikiのDデッキ小進歩リスト（D001-D084）にD025が存在しない（D024→D026で欠番）。公式カードリスト（Lookout Games配布の完全リストPDF）やEric Hoのカードデータベースでの確認が必要。",
-        "literature_resolution": "BGA Wikiで欠番確認。公式完全リストやカードデータベースでD025の存在・名称・効果・分類を確認するまで未解決。権限4（チェックリスト提出）対象。",
-        "next_action": "権限4：文献（BGA Wiki、非公式Compendium）で見つからない。公式印刷カードまたはLookout Games公式カード完全リスト（PDF）での目視確認が必要。人間チェックリストとしてGitHubに提出。",
+        "source_summary_ja": "BGA WikiのDデッキ小進歩一覧（D001-D084）でD025が欠落（D024次がD026）。非公式CompendiumでもD025の記載なし。公式印刷カードまたはLookout Games公式完全リストでの確認が必須。",
+        "literature_resolution": "文献調査では解決せず。公式一次資料での確認待ち。",
         "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
       },
-      "unknown": [
-        "カードの存在そのもの（欠番の可能性）",
-        "名称（日英）",
-        "カード種別（小進歩/職業/複合）",
-        "公式の人数適格",
-        "コスト・効果・発動時点"
-      ],
-      "needed_source": "2016改訂版の印刷カード（デッキD・D025）、Lookout Games公式カード完全リストPDF (agricola-cards-completelist-v7.pdf)、Eric Ho's Agricola Card Database",
-      "blocker": "BGA WikiでD025が欠番（未実装）であることを確認。公式一次資料での存在確認と全情報の取得が必要。文献調査（権限3）では解決せず、権限4（人間チェックリスト）へ。",
-      "verification_category": "unresolved",
-      "source_summary_ja": "BGA WikiのDデッキ小進歩一覧（D001-D084）でD025が欠落（D024次がD026）。非公式CompendiumでもD025の記載なし。公式印刷カードまたはLookout Games公式完全リストでの確認が必須。",
-      "literature_resolution": "文献調査では解決せず。公式一次資料での確認待ち。",
-      "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
-    },
-    {
-      "card_id": "D059",
-      "known": {
+      {
         "card_id": "D059",
-        "card_type": "multi_type",
-        "in_base_2016": false,
-        "implementation": "未実装または未照合",
-        "name_ja": "掘り土窯",
-        "name_en": "Earth Oven",
-        "cost": "不明（BGA Wikiにコスト記載なし）",
-        "effect": "いつでも：野菜1→食料3、羊1→食料2、猪1→食料3、牛1→食料3。「パンを焼く」アクション：小麦1→食料2",
-        "effect_en": "At any time: Vegetable → 3 Food; Sheep → 2 Food; Wild boar → 3 Food; Cattle → 3 Food. \"Bake Bread\" action: Grain → 2 Food",
+        "known": {
+          "card_id": "D059",
+          "card_type": "multi_type",
+          "in_base_2016": false,
+          "implementation": "未実装または未照合",
+          "name_ja": "掘り土窯",
+          "name_en": "Earth Oven",
+          "cost": "不明（BGA Wikiにコスト記載なし）",
+          "effect": "いつでも：野菜1→食料3、羊1→食料2、猪1→食料3、牛1→食料3。「パンを焼く」アクション：小麦1→食料2",
+          "effect_en": "At any time: Vegetable → 3 Food; Sheep → 2 Food; Wild boar → 3 Food; Cattle → 3 Food. \"Bake Bread\" action: Grain → 2 Food",
+          "verification_category": "complex",
+          "source_summary_ja": "BGAアグリコラカード情報wikiにて確認。小進歩（D059、番号は小進歩範囲001-084）ながら大進歩の「かまど」類似の変換効果を持つ。公式に「複合カード（小進歩かつ大進歩）」と分類されるか、あるいは単なる小進歩で効果が大進歩類似なだけか、ルール付録での扱いが未確認。",
+          "literature_resolution": "BGA Wikiでカード効果は判明。しかしA060同様、複合カードとしての公式分類・配布カウント規則が未確認。権限3（文献調査）継続。コスト情報もBGA Wikiに未記載で要確認。",
+          "next_action": "権限3：公式ルール付録またはLookout Games公式FAQで、このカードが「複合カード」として扱われるか、通常の小進歩として扱われるか、配布枚数カウント規則を確認するまで照合保留。コスト情報も公式資料で確認必要。",
+          "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
+        },
+        "unknown": [
+          "コスト（BGA Wiki未記載）",
+          "複合カードとしての公式分類の有無（A060のように「小進歩かつ大進歩」とみなされるか）",
+          "公式の配布枚数カウント規則",
+          "公式の人数適格（2/3/4人）"
+        ],
+        "needed_source": "2016改訂版公式ルールブック付録、Lookout Games公式FAQ、印刷カード（デッキD・D059）",
+        "blocker": "効果はBGA Wikiで確認済みだが、コスト不明・複合カード分類未確認・配布カウント規則未確認のため権限3継続。",
         "verification_category": "complex",
-        "source_summary_ja": "BGAアグリコラカード情報wikiにて確認。小進歩（D059、番号は小進歩範囲001-084）ながら大進歩の「かまど」類似の変換効果を持つ。公式に「複合カード（小進歩かつ大進歩）」と分類されるか、あるいは単なる小進歩で効果が大進歩類似なだけか、ルール付録での扱いが未確認。",
-        "literature_resolution": "BGA Wikiでカード効果は判明。しかしA060同様、複合カードとしての公式分類・配布カウント規則が未確認。権限3（文献調査）継続。コスト情報もBGA Wikiに未記載で要確認。",
-        "next_action": "権限3：公式ルール付録またはLookout Games公式FAQで、このカードが「複合カード」として扱われるか、通常の小進歩として扱われるか、配布枚数カウント規則を確認するまで照合保留。コスト情報も公式資料で確認必要。",
+        "source_summary_ja": "BGA Wikiで確認。D059「掘り土窯」（Earth Oven）。小進歩番号ながら大進歩「かまど」類似の変換効果（野菜→3、羊→2、猪→3、牛→3、焼く：小麦→2）。コスト未記載。A060と同様に複合カード扱いか通常小進歩か公式未確認。",
+        "literature_resolution": "効果判明。コスト・分類・カウント規則は未確定。",
         "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
       },
-      "unknown": [
-        "コスト（BGA Wiki未記載）",
-        "複合カードとしての公式分類の有無（A060のように「小進歩かつ大進歩」とみなされるか）",
-        "公式の配布枚数カウント規則",
-        "公式の人数適格（2/3/4人）"
-      ],
-      "needed_source": "2016改訂版公式ルールブック付録、Lookout Games公式FAQ、印刷カード（デッキD・D059）",
-      "blocker": "効果はBGA Wikiで確認済みだが、コスト不明・複合カード分類未確認・配布カウント規則未確認のため権限3継続。",
-      "verification_category": "complex",
-      "source_summary_ja": "BGA Wikiで確認。D059「掘り土窯」（Earth Oven）。小進歩番号ながら大進歩「かまど」類似の変換効果（野菜→3、羊→2、猪→3、牛→3、焼く：小麦→2）。コスト未記載。A060と同様に複合カード扱いか通常小進歩か公式未確認。",
-      "literature_resolution": "効果判明。コスト・分類・カウント規則は未確定。",
-      "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
-    },
-    {
-      "card_id": "D060",
-      "known": {
+      {
         "card_id": "D060",
-        "card_type": "multi_type",
-        "in_base_2016": false,
-        "implementation": "未実装または未照合",
-        "name_ja": "大製陶所",
-        "name_en": "Large Pottery",
-        "cost": "不明（BGA Wikiにコスト記載なし）",
-        "effect": "いつでも：粘土1→食料2。得点計算：粘土3/5/6/7→ボーナス1/2/3/4点",
-        "effect_en": "At any time: Clay → 2 Food. Scoring: 3/5/6/7 Clay → 1/2/3/4 bonus points",
+        "known": {
+          "card_id": "D060",
+          "card_type": "multi_type",
+          "in_base_2016": false,
+          "implementation": "未実装または未照合",
+          "name_ja": "大製陶所",
+          "name_en": "Large Pottery",
+          "cost": "不明（BGA Wikiにコスト記載なし）",
+          "effect": "いつでも：粘土1→食料2。得点計算：粘土3/5/6/7→ボーナス1/2/3/4点",
+          "effect_en": "At any time: Clay → 2 Food. Scoring: 3/5/6/7 Clay → 1/2/3/4 bonus points",
+          "verification_category": "complex",
+          "source_summary_ja": "BGAアグリコラカード情報wikiにて確認。小進歩（D060）ながら大進歩「製陶所」類似の変換・得点効果を持つ。公式に「複合カード」と分類されるか、通常の小進歩か、ルール付録での扱いが未確認。",
+          "literature_resolution": "BGA Wikiでカード効果は判明。しかしA060/D059同様、複合カードとしての公式分類・配布カウント規則が未確認。コスト情報もBGA Wikiに未記載。権限3（文献調査）継続。",
+          "next_action": "権限3：公式ルール付録またはLookout Games公式FAQで、このカードが「複合カード」として扱われるか、通常の小進歩として扱われるか、配布枚数カウント規則を確認するまで照合保留。コスト情報も公式資料で確認必要。",
+          "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
+        },
+        "unknown": [
+          "コスト（BGA Wiki未記載）",
+          "複合カードとしての公式分類の有無",
+          "公式の配布枚数カウント規則",
+          "公式の人数適格（2/3/4人）"
+        ],
+        "needed_source": "2016改訂版公式ルールブック付録、Lookout Games公式FAQ、印刷カード（デッキD・D060）",
+        "blocker": "効果はBGA Wikiで確認済みだが、コスト不明・複合カード分類未確認・配布カウント規則未確認のため権限3継続。",
         "verification_category": "complex",
-        "source_summary_ja": "BGAアグリコラカード情報wikiにて確認。小進歩（D060）ながら大進歩「製陶所」類似の変換・得点効果を持つ。公式に「複合カード」と分類されるか、通常の小進歩か、ルール付録での扱いが未確認。",
-        "literature_resolution": "BGA Wikiでカード効果は判明。しかしA060/D059同様、複合カードとしての公式分類・配布カウント規則が未確認。コスト情報もBGA Wikiに未記載。権限3（文献調査）継続。",
-        "next_action": "権限3：公式ルール付録またはLookout Games公式FAQで、このカードが「複合カード」として扱われるか、通常の小進歩として扱われるか、配布枚数カウント規則を確認するまで照合保留。コスト情報も公式資料で確認必要。",
+        "source_summary_ja": "BGA Wikiで確認。D060「大製陶所」（Large Pottery）。小進歩番号ながら大進歩「製陶所」類似の効果（粘土→食料2、得点時に粘土数でボーナス）。コスト未記載。複合カード扱いか通常小進歩か公式未確認。",
+        "literature_resolution": "効果判明。コスト・分類・カウント規則は未確定。",
         "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
-      },
-      "unknown": [
-        "コスト（BGA Wiki未記載）",
-        "複合カードとしての公式分類の有無",
-        "公式の配布枚数カウント規則",
-        "公式の人数適格（2/3/4人）"
-      ],
-      "needed_source": "2016改訂版公式ルールブック付録、Lookout Games公式FAQ、印刷カード（デッキD・D060）",
-      "blocker": "効果はBGA Wikiで確認済みだが、コスト不明・複合カード分類未確認・配布カウント規則未確認のため権限3継続。",
-      "verification_category": "complex",
-      "source_summary_ja": "BGA Wikiで確認。D060「大製陶所」（Large Pottery）。小進歩番号ながら大進歩「製陶所」類似の効果（粘土→食料2、得点時に粘土数でボーナス）。コスト未記載。複合カード扱いか通常小進歩か公式未確認。",
-      "literature_resolution": "効果判明。コスト・分類・カウント規則は未確定。",
-      "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/319"
-    },
-    {
-      "card_id": "A055",
-      "known": {
-        "card_id": "A055",
-        "card_type": "minor_improvement",
-        "in_base_2016": true,
-        "implementation": "Issue #91 で議論中",
-        "name_ja": "物置",
-        "name_en": "Junk Room",
-        "cost": "1 wood, 1 clay (両方必要)",
-        "cost_en": "1 wood, 1 clay",
-        "effect": "このカードを出したときも含め、進歩を出すたびに、その後すぐに食料1を得る。",
-        "effect_en": "Each time after you build an improvement, including this one, you get 1 food.",
-        "verification_category": "complex",
-        "source_summary_ja": "BGAアグリコラカード情報wikiおよびReedStoneFood Compendium (reedstonefood.com) で確認。コスト表記「1W 1C」は「木材1かつ粘土1（両方必要）」を意味し、選択肢ではない（スラッシュ表記「1W/1C」の場合のみ選択式）。効果は「進歩を出すたび（このカード含む）に食料1獲得」。Issue #91の「1 wood / 1 clay」表記の曖昧さは、公式表記「1W 1C」により両方必要と確定。",
-        "literature_resolution": "BGA WikiとReedStoneFood Compendiumでコスト「1W 1C（両方必要）」と効果が確定。Issue #91の懸念（選択か両方か）は公式表記で解決。権限3（文献調査）で照合済み。Issue #91に回答コメントして照合済み化可能。",
-        "next_action": "権限3：文献でコスト・効果が確定。Issue #91に「コストは木材1かつ粘土1の両方必要（選択ではない）、効果は進歩プレイ毎に食料1獲得」として回答コメントし、照合済みとして台帳更新。配布プール投入可能。",
-        "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/91"
-      },
-      "unknown": [],
-      "needed_source": "BGA Wiki (https://agricola.cloudfree.jp/a055/), ReedStoneFood Compendium (https://www.reedstonefood.com/agricola/compendium)",
-      "blocker": "解消済み：BGA WikiとReedStoneFood Compendiumでコスト「1 wood, 1 clay（両方必要）」と効果を確認。Issue #91の曖昧さは公式表記で解決。",
-      "verification_category": "complex",
-      "source_summary_ja": "BGA WikiとReedStoneFood Compendiumで確認。A055「物置」（Junk Room）、コスト「1W 1C」（木材1かつ粘土1、両方必要／選択ではない）。効果：進歩を出すたび（このカード含む）に食料1獲得。Issue #91の「1 wood / 1 clay」表記の曖昧さは公式のスペース区切り表記「1W 1C」により両方必要と確定。スラッシュ「1W/1C」の場合のみ選択式。",
-      "literature_resolution": "BGA WikiとReedStoneFood Compendiumでコスト・効果が確定。Issue #91回答済みで照合済み化可能。",
-      "checklist_issue_url": "https://github.com/cueikusuta/agricola-re-ai/issues/91"
-    }
-  ],
+      }
+    ],
   "related_open_rule_questions": [
-    {
-      "issue": 91,
-      "topic": "A055 の支払い資源と改善後効果の適用範囲",
-      "status": "解決済み（文献で確定）",
-      "action": "BGA WikiとReedStoneFood Compendiumでコスト「1 wood, 1 clay（両方必要）」と効果「進歩プレイ毎に食料1」を確認。Issue #91に回答コメントしてクローズ可能。"
-    },
-    {
-      "issue": "multi_type_counting",
-      "topic": "複合カード（A060, D059, D060等）の配布枚数カウント規則（職業/小進歩のどちらとして数えるか）",
-      "status": "未確定",
-      "action": "公式ルールブック付録またはLookout Games公式FAQでの確認が必要。確認まで当該カードは配布プールに入れない（fail-closed維持）。"
-    },
-    {
-      "issue": "D025_existence",
-      "topic": "D025の存在確認（BGA Wikiで欠番）",
-      "status": "未確定",
-      "action": "Lookout Games公式カード完全リストPDFまたは印刷カードでの目視確認が必要。人間チェックリストとして提出。"
-    }
-  ]
-}
+      {
+        "issue": "multi_type_counting",
+        "topic": "複合カード（A060, D059, D060等）の配布枚数カウント規則（職業/小進歩のどちらとして数えるか）",
+        "status": "未確定",
+        "action": "公式ルールブック付録またはLookout Games公式FAQでの確認が必要。確認まで当該カードは配布プールに入れない（fail-closed維持）。"
+      },
+      {
+        "issue": "D025_existence",
+        "topic": "D025の存在確認（BGA Wikiで欠番）",
+        "status": "未確定",
+        "action": "Lookout Games公式カード完全リストPDFまたは印刷カードでの目視確認が必要。人間チェックリストとして提出。"
+      }
+    ]
+  }
