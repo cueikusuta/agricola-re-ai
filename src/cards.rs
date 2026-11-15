@@ -2977,7 +2977,7 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
 
 /// Improvements in front of a player: base improvements plus played
 /// minor-improvement cards (A117 木材調達人 condition).
-fn improvement_count_in_front(set: &CardSet, player: &Player) -> u32 {
+pub fn improvement_count_in_front(set: &CardSet, player: &Player) -> u32 {
     let minor = player
         .played_cards
         .iter()

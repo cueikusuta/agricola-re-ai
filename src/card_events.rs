@@ -1033,18 +1033,9 @@ fn handle_on_play_gain_per_improvement_played(
     good: &Good,
     amount: u32,
 ) -> Result<EffectResult, String> {
-    let played = ctx.player.played_cards.clone();
-    let minor = played
-        .iter()
-        .filter(|id| {
-            ctx.card_set
-                .definition(id)
-                .is_some_and(|card| card.kind == crate::cards::CardKind::MinorImprovement)
-        })
-        .count() as u32;
-    let bonus = minor
-        .checked_add(ctx.player.improvements.len() as u32)
-        .and_then(|count| count.checked_mul(amount))
+    let count = crate::cards::improvement_count_in_front(ctx.card_set, ctx.player);
+    let bonus = count
+        .checked_mul(amount)
         .ok_or("on-play card bonus overflow")?;
     let p = &mut ctx.player;
     let next = p
@@ -1926,6 +1917,18 @@ pub mod legacy {
                         .ok_or("resource overflow")?;
                     player.supply.set(*good, next);
                 }
+                CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
+                    let count = crate::cards::improvement_count_in_front(set, player);
+                    let bonus = count
+                        .checked_mul(*amount)
+                        .ok_or("on-play card bonus overflow")?;
+                    let next = player
+                        .supply
+                        .get(*good)
+                        .checked_add(bonus)
+                        .ok_or("resource overflow")?;
+                    player.supply.set(*good, next);
+                }
                 CardEffect::Passive { rule } => match rule {
                     crate::cards::PassiveRule::PastureCapacity(n) => {
                         player.pasture_capacity_bonus += n
@@ -2317,8 +2320,8 @@ pub mod legacy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cards::{CardDefinition, CardKind, CardSet};
-    use crate::model::{Good, Player, Space};
+    use crate::cards::{verified_band_a_cards, CardDefinition, CardKind, CardSet};
+    use crate::model::{Crop, Good, Improvement, Player, Space, Tile};
     use crate::pending::Transition;
     use std::collections::BTreeSet;
 
@@ -4121,5 +4124,352 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 5, "no food paid -> no gain");
+    }
+
+    /// Dispatcher play path for A117 木材調達人: verifies that the dispatcher
+    /// route grants 1 wood per improvement in front (base improvements +
+    /// played minor improvements), and does NOT count occupations.
+    #[test]
+    fn dispatch_play_a117_wood_per_improvement_in_front() {
+        // Add a minor improvement card for testing
+        let set = CardSet {
+            definitions: {
+                let mut defs = verified_band_a_cards();
+                defs.push(CardDefinition {
+                    use_limit: None,
+                    id: "minor1".into(),
+                    kind: CardKind::MinorImprovement,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                });
+                defs
+            },
+        };
+
+        // Case 1: no improvements -> 0 wood
+        let mut c = Ctx::new();
+        c.players[0].supply.wood = 5;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        dispatch_play(
+            &set,
+            0,
+            "A117",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(c.players[0].supply.wood, 5, "no improvements -> 0 wood");
+
+        // Case 2: one minor improvement + one base improvement -> 2 wood
+        let mut c = Ctx::new();
+        c.players[0].supply.wood = 5;
+        c.players[0].played_cards.push("minor1".into());
+        c.players[0].improvements.push(Improvement::Well);
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        dispatch_play(
+            &set,
+            0,
+            "A117",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(c.players[0].supply.wood, 7, "1 minor + 1 base -> 2 wood");
+
+        // Case 3: occupation in front should NOT be counted
+        let mut c = Ctx::new();
+        c.players[0].supply.wood = 5;
+        c.players[0].played_cards.push("minor1".into());
+        c.players[0].improvements.push(Improvement::Well);
+        c.players[0].played_cards.push("A099".into()); // occupation
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        dispatch_play(
+            &set,
+            0,
+            "A117",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 7,
+            "occupation A099 must NOT count -> still 2 wood"
+        );
+    }
+
+    /// Dispatcher play path for A106 液肥散布人: verifies that the dispatcher
+    /// route correctly triggers harvest field rewards for fields with remaining==1.
+    #[test]
+    fn dispatch_play_a106_harvest_field_last_crop() {
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+
+        // Case 1: field with remaining==1 grain -> 2 food
+        let mut c = Ctx::new();
+        c.players[0].played_cards.push("A106".into());
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            8, // harvest round
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(c.players[0].supply.food, 2, "last grain field -> 2 food");
+
+        // Case 2: field with remaining==1 vegetable -> 1 food
+        let mut c = Ctx::new();
+        c.players[0].played_cards.push("A106".into());
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            8,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 1,
+            "last vegetable field -> 1 food"
+        );
+
+        // Case 3: field with remaining > 1 -> 0 food
+        let mut c = Ctx::new();
+        c.players[0].played_cards.push("A106".into());
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            8,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(c.players[0].supply.food, 0, "remaining > 1 -> 0 food");
+    }
+
+    /// Equivalence test: the three paths (legacy cards::play, dispatcher
+    /// dispatch_play, legacy module apply_on_play_effects_legacy) must produce
+    /// identical wood gains for A117.
+    #[test]
+    fn equivalence_a117_three_paths_match() {
+        let set = CardSet {
+            definitions: {
+                let mut defs = verified_band_a_cards();
+                defs.push(CardDefinition {
+                    use_limit: None,
+                    id: "minor1".into(),
+                    kind: CardKind::MinorImprovement,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                });
+                defs.push(CardDefinition {
+                    use_limit: None,
+                    id: "minor2".into(),
+                    kind: CardKind::MinorImprovement,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                });
+                defs
+            },
+        };
+
+        // Setup: 2 minor improvements + 1 base improvement = 3 improvements
+        let base_player = {
+            let mut p = Player::new(0, 0);
+            p.supply.wood = 10;
+            p.played_cards = vec!["minor1".into(), "minor2".into()];
+            p.improvements.push(Improvement::Well);
+            p
+        };
+
+        // Path 1: legacy cards::play
+        let mut legacy_hand = vec!["A117".to_string()];
+        let mut legacy = base_player.clone();
+        crate::cards::play(
+            &set,
+            &mut legacy_hand,
+            &mut legacy,
+            "A117",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        let legacy_wood = legacy.supply.wood;
+
+        // Path 2: dispatcher (play_validate_pay + play_from_hand + dispatch_play)
+        let mut cards = crate::cards::CardState {
+            hands: vec![vec!["A117".to_string()]],
+            undealt: vec![],
+        };
+        let mut players = vec![base_player.clone()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        {
+            let mut ctx = crate::card_zones::CardMoveCtx {
+                cards: &mut cards,
+                players: &mut players,
+                improvement_market: &mut market,
+            };
+            crate::cards::play_validate_pay(
+                &set,
+                &mut ctx.cards.hands[0],
+                &mut ctx.players[0],
+                "A117",
+                CardKind::Occupation,
+                0,
+            )
+            .unwrap();
+            crate::card_zones::play_from_hand(&mut ctx, 0, "A117").unwrap();
+            dispatch_play(
+                &set,
+                0,
+                "A117",
+                0,
+                ctx.cards,
+                ctx.players,
+                ctx.improvement_market,
+                &mut well,
+                1,
+                &BTreeSet::new(),
+                &mut budget,
+                &mut uses,
+                &limits,
+                &mut pending,
+            )
+            .unwrap();
+            let card = set.definition("A117").unwrap();
+            crate::cards::update_card_points_on_play(&mut ctx.players[0], card.points).unwrap();
+        }
+        let dispatcher_wood = players[0].supply.wood;
+
+        // Path 3: legacy module apply_on_play_effects_legacy
+        let mut legacy3_hand = vec!["A117".to_string()];
+        let mut legacy3 = base_player.clone();
+        legacy::apply_on_play_effects_legacy(
+            &set,
+            &mut legacy3_hand,
+            &mut legacy3,
+            "A117",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        let legacy_mod_wood = legacy3.supply.wood;
+
+        assert_eq!(
+            legacy_wood, dispatcher_wood,
+            "legacy cards::play vs dispatcher: {legacy_wood} vs {dispatcher_wood}"
+        );
+        assert_eq!(
+            legacy_wood, legacy_mod_wood,
+            "legacy cards::play vs legacy module: {legacy_wood} vs {legacy_mod_wood}"
+        );
+        assert_eq!(
+            dispatcher_wood, legacy_mod_wood,
+            "dispatcher vs legacy module: {dispatcher_wood} vs {legacy_mod_wood}"
+        );
+        // Expected: 10 + 3 = 13
+        assert_eq!(legacy_wood, 13, "expected 3 wood from 3 improvements");
     }
 }
