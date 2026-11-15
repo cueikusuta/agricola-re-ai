@@ -185,6 +185,11 @@ pub enum ScoreBonusRule {
     ImprovementCount,
     SparePastureCapacity,
     LaterOccupations,
+    /// D100 君主 (Sovereign): 1 bonus point per scoring category that has
+    /// reached its maximum of 4 points (fields, pastures, grain, vegetables,
+    /// sheep, boar, cattle, fenced stables). Read from the canonical scoring
+    /// table in `score.rs` so thresholds can never diverge.
+    CategoriesAtMaxFour,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -872,6 +877,22 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                             })
                             .count() as i32
                     })
+                }
+                ScoreBonusRule::CategoriesAtMaxFour => {
+                    let categories = &crate::score::score(player).categories;
+                    [
+                        "fields",
+                        "pastures",
+                        "grain",
+                        "vegetables",
+                        "sheep",
+                        "boar",
+                        "cattle",
+                        "fenced_stables",
+                    ]
+                    .iter()
+                    .filter(|name| categories.get(**name).copied().unwrap_or(0) >= 4)
+                    .count() as i32
                 }
             },
             _ => 0,
@@ -2736,6 +2757,166 @@ mod verified_band_c_tests {
     fn band_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
         for id in ["C076", "C106", "C111", "C116"] {
+            assert!(
+                preset.definition(id).is_none(),
+                "{id} must stay out of the A/B two-player preset"
+            );
+        }
+    }
+}
+
+/// D-deck band 070-120 cards whose printed effects are fully expressible with
+/// the current typed effect vocabulary (BGA Agricola card wiki;
+/// D100 p=2821, D105 p=2816, D109 p=2812). Kept out of the A/B two-player
+/// preset, same as [`verified_band_c_cards`].
+pub fn verified_band_d_cards() -> Vec<CardDefinition> {
+    fn card(id: &str, kind: CardKind, effects: Vec<CardEffect>) -> CardDefinition {
+        CardDefinition {
+            use_limit: None,
+            id: id.to_owned(),
+            kind,
+            cost: vec![],
+            points: 0,
+            effects,
+        }
+    }
+    let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
+        space,
+        good,
+        amount,
+    };
+    vec![
+        // D100 君主 (Sovereign): no cost; at scoring, 1 bonus point per scoring
+        // category that has reached its maximum of 4 points (fenced stables
+        // included).
+        card(
+            "D100",
+            CardKind::Occupation,
+            vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::CategoriesAtMaxFour,
+            }],
+        ),
+        // D105 彫刻家 (Sculptor): no cost; each use of a clay accumulation
+        // space grants 1 food, each use of a stone accumulation space grants
+        // 1 grain.
+        card(
+            "D105",
+            CardKind::Occupation,
+            vec![
+                gain(Space::ClayPit, Good::Food, 1),
+                gain(Space::WesternQuarry, Good::Grain, 1),
+                gain(Space::EasternQuarry, Good::Grain, 1),
+            ],
+        ),
+        // D109 種まきの達人 (Sow Master): no cost; on play gain 1 wood, and
+        // each use of an action space with the sow action (grain seeds,
+        // vegetable seeds, cultivation) grants 2 food.
+        card(
+            "D109",
+            CardKind::Occupation,
+            vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Wood,
+                    amount: 1,
+                },
+                gain(Space::GrainSeeds, Good::Food, 2),
+                gain(Space::VegetableSeeds, Good::Food, 2),
+                gain(Space::Cultivation, Good::Food, 2),
+            ],
+        ),
+    ]
+}
+
+#[cfg(test)]
+mod verified_band_d_tests {
+    use super::*;
+
+    fn set() -> CardSet {
+        CardSet {
+            definitions: verified_band_d_cards(),
+        }
+    }
+
+    fn applied(id: &str, spaces: &[Space]) -> Player {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push(id.to_string());
+        for &space in spaces {
+            after_worker(&set, &mut p, space).unwrap();
+        }
+        p
+    }
+
+    #[test]
+    fn d105_food_per_clay_and_grain_per_stone_accumulations() {
+        let p = applied(
+            "D105",
+            &[
+                Space::ClayPit,
+                Space::ClayPit,
+                Space::WesternQuarry,
+                Space::EasternQuarry,
+                Space::Forest,
+            ],
+        );
+        assert_eq!(p.supply.food, 2);
+        assert_eq!(p.supply.grain, 2);
+    }
+
+    #[test]
+    fn d109_wood_on_play_and_food_per_sow_space() {
+        let set = set();
+        let mut hand = vec!["D109".to_string()];
+        let mut p = Player::new(0, 0);
+        play(&set, &mut hand, &mut p, "D109", CardKind::Occupation, 0).unwrap();
+        assert_eq!(p.supply.wood, 1);
+        for space in [
+            Space::GrainSeeds,
+            Space::VegetableSeeds,
+            Space::Cultivation,
+            Space::Farmland,
+        ] {
+            after_worker(&set, &mut p, space).unwrap();
+        }
+        assert_eq!(p.supply.food, 6, "three sow spaces -> 3 x 2 food");
+    }
+
+    #[test]
+    fn d100_bonus_point_per_category_at_max_four() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D100".into());
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // fields 5 (=4 pts), pastures 4 (=4 pts), fenced stable x4 (=4 pts),
+        // grain 8 (=4 pts) -> 4 categories.
+        for i in 1..=5 {
+            p.farm[i].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            };
+        }
+        for i in 0..4 {
+            p.pastures.push(crate::model::Pasture {
+                id: i,
+                cells: vec![10, 11],
+                animal: None,
+                quantity: 0,
+            });
+        }
+        for i in 10..=13 {
+            p.farm[i].stable = true;
+            p.farm[i].tile = Tile::Pasture { id: (10 + i) as u8 };
+        }
+        for _ in 0..8 {
+            p.supply.grain += 1;
+        }
+        assert_eq!(end_game_bonus(&set, &p), 4);
+    }
+
+    #[test]
+    fn band_d_cards_are_absent_from_the_two_player_preset() {
+        let preset = verified_basic_card_set(2).unwrap();
+        for id in ["D100", "D105", "D109"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"

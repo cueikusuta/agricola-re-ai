@@ -754,6 +754,9 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
     // C-deck band 070-120 typed effects (kept out of the A/B two-player
     // preset; see verified_band_c_cards).
     builder = add_cards_inner(builder, crate::cards::verified_band_c_cards(), &mut seen)?;
+    // D-deck band 070-120 typed effects (kept out of the A/B two-player
+    // preset; see verified_band_d_cards).
+    builder = add_cards_inner(builder, crate::cards::verified_band_d_cards(), &mut seen)?;
 
     builder.freeze()
 }
