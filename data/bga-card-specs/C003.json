@@ -32,11 +32,12 @@
     ]
   },
   "play": {
-    "action": "minor_improvement",
-    "cost": [],
-    "prerequisites": [],
-    "printed_points": 0
-  },
+      "action": "minor_improvement",
+      "cost": [],
+      "prerequisites": [],
+      "printed_points": 0,
+      "alternative_cost_notes": "Prerequisite: must have at least 1 unplaced person (未配置の人物1). No established predicate for unplaced-person requirement; enforced in effect step via requires_unplaced_person flag."
+    },
   "effects": [
     {
       "trigger": "on_play",
@@ -66,19 +67,17 @@
     "destination": "left_neighbor_hand"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "play.prerequisites: ledger lists 未配置の人物1 (one unplaced person still unplaced); no established predicate covers an unplaced-person requirement"
-    ],
-    "test_case_ids": [
-      "C003-normal",
-      "C003-not-in-work-phase",
-      "C003-cost",
-      "C003-pass-left"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "Played in the work phase: immediately place another unplaced person; the card then goes to the left neighbour's hand. Prerequisite recorded in unresolved_fields (no predicate for unplaced person)."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "C003-normal",
+        "C003-not-in-work-phase",
+        "C003-cost",
+        "C003-pass-left"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-16",
+      "implementation_status": "not_started",
+      "notes": "Cost: free. Prerequisite: must have at least 1 unplaced person (wiki: 未配置の人物1). Played in work phase: immediately place another unplaced person; card goes to left neighbour's hand. No established predicate for unplaced-person prerequisite; enforced in effect step. Verified via BGA Wiki (wiki_literature - complex card with unplaced-person prerequisite). Source: https://agricola.cloudfree.jp/?p=3086 (ja, 2026-11-16). 条件：未配置の人物1。コスト：なし。効果：労働フェイズ中に出したら、すぐに他の人物1人を配置する。左隣の手札へ移動。"
+    }
 }

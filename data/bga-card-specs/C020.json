@@ -32,20 +32,21 @@
     ]
   },
   "play": {
-    "action": "minor_improvement",
-    "cost": [
-      {
-        "good": "wood",
-        "amount": 3
-      },
-      {
-        "good": "food",
-        "amount": 1
-      }
-    ],
-    "prerequisites": [],
-    "printed_points": 0
-  },
+      "action": "minor_improvement",
+      "cost": [
+        {
+          "good": "wood",
+          "amount": 3
+        },
+        {
+          "good": "food",
+          "amount": 1
+        }
+      ],
+      "prerequisites": [],
+      "printed_points": 0,
+      "alternative_cost_notes": "Prerequisite: may only be played in round 9 or later (wiki: ラウンド9またはその後に出す). No established predicate for play-round gate; not enforced in prerequisites array."
+    },
   "effects": [
     {
       "trigger": "after_worker_space",
@@ -82,18 +83,16 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "play.prerequisites: the card may only be played in round 9 or later; no established predicate covers a play-round gate"
-    ],
-    "test_case_ids": [
-      "C020-normal",
-      "C020-cultivation",
-      "C020-not-triggered"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "Round 9+ play gate kept unresolved (no predicate). After play: plow 1 extra field on each Farmland/Cultivation use."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "C020-normal",
+        "C020-cultivation",
+        "C020-not-triggered"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-16",
+      "implementation_status": "not_started",
+      "notes": "Cost: 3 wood + 1 food. Prerequisite: playable only in round 9 or later (wiki: ラウンド9またはその後に出す). No established predicate for round gate. Effect: each time you use Farmland or Cultivation space, plow 1 additional field. Verified via BGA Wiki (wiki_literature - complex card with round-dependent play restriction). Source: https://agricola.cloudfree.jp/?p=3069 (ja, 2026-11-16). 条件：ラウンド9またはその後に出す。コスト：3木、1食料。効果：アクションスペース「農地」または「耕作」を使用するたび、畑1を追加で耕せる。プレイエリアに残る。"
+    }
 }

@@ -93,20 +93,17 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "effects.0.last_stable_detection: the wiki grants 3 food instead of 1 for the final newly built stable; 'last stable' (no farmyard space remains for another stable / last one built in the game) has no established predicate — threshold table keyed on stable count used as a provisional encoding and flagged",
-      "effects.1.alternate_cost: building exactly 1 stable for 1 clay instead of wood each time you build stables; a per-build alternative payment is offered by no established discount vocabulary"
-    ],
-    "test_case_ids": [
-      "C056-normal",
-      "C056-clay-build",
-      "C056-clay-limited",
-      "C056-timing-pending"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "For each new stable you build, gain 1 food (3 food for your last one). Each time you build stables, you may build exactly 1 stable for 1 clay instead of wood."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "C056-normal",
+        "C056-clay-build",
+        "C056-clay-limited",
+        "C056-timing-pending"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-16",
+      "implementation_status": "not_started",
+      "notes": "Cost: 1 wood. Printed points: 0. Effect 1: each time you build a stable, gain 1 food; if it's the last stable (no farmyard space remains for another / last in game), gain 3 food instead. 'Last stable' predicate not in vocabulary; threshold table on stable count used as provisional encoding. Effect 2: each time you build stables, you may build exactly 1 stable for 1 clay instead of wood. Per-build alternative payment not in established discount vocabulary; modeled as build_stable_alternate_cost. Verified via BGA Wiki (wiki_literature - complex card with last-stable detection and per-build alternate cost). Source: https://agricola.cloudfree.jp/?p=3033 (ja, 2026-11-16). 条件なし。コスト：1木。勝利点：0。効果：新たに厩1を建設するたび、食料1を得る。それが最後の厩なら代わりに食料3を得る。厩を建設するたび、ちょうど厩1を木材の代わりに粘土1で建設できる。プレイエリアに残る。"
+    }
 }

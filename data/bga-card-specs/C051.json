@@ -84,20 +84,17 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "effects.0.tax: the wiki requires other players to pay the owner 1 food before using the Fishing accumulation space; no established step vocabulary expresses a tax another player must pay to the owner",
-      "effects.0.refill: the wiki places 2 food on Fishing in that round's returning-home phase conditioned on the tax having been paid; the returning-home-phase placement shares no established trigger with the after_worker_space tax"
-    ],
-    "test_case_ids": [
-      "C051-normal",
-      "C051-refill",
-      "C051-not-triggered",
-      "C051-timing-pending"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "Other players must pay you 1 food before using the Fishing accumulation space; when paid, place 2 food on Fishing in that round's returning-home phase."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "C051-normal",
+        "C051-refill",
+        "C051-not-triggered",
+        "C051-timing-pending"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-16",
+      "implementation_status": "not_started",
+      "notes": "Cost: 1 reed. Printed points: 1. Effect: Other players must pay owner 1 food before using Fishing accumulation space; if paid, 2 food is placed on Fishing in that round's returning-home phase. Multiplayer tax mechanic and returning-home-phase refill not in established vocabulary; modeled with after_worker_space trigger and tax_space_use operation (wiki_literature). Verified via BGA Wiki. Source: https://agricola.cloudfree.jp/?p=3038 (ja, 2026-11-16). 条件なし。コスト：1葦。勝利点：1。効果：他のプレイヤーは累積スペース「漁」を使用するたび、その前にあなたに食料1を支払わなければならない。支払った場合、そのラウンドの帰宅フェイズに漁に食料2が置かれる。プレイエリアに残る。"
+    }
 }

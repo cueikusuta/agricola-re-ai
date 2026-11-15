@@ -102,19 +102,16 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "play.prerequisites: the wiki lists ':鍋:の進歩' (a cooking improvement in play); encoded as has_improvement kind=[fireplace, cooking_hearth] and flagged for review confirmation",
-      "effects.0.granularity: the wiki grants 1 food for each NEW wild boar gained from an action-space effect; whether the bonus stacks per boar or per use is not stated by the established vocabulary"
-    ],
-    "test_case_ids": [
-      "C052-normal",
-      "C052-two-boars",
-      "C052-not-triggered"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "For each new wild boar gained from an action-space effect, also gain 1 food."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "C052-normal",
+        "C052-two-boars",
+        "C052-not-triggered"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-16",
+      "implementation_status": "not_started",
+      "notes": "Cost: 1 reed. Printed points: 1. Prerequisite: must have a cooking improvement (wiki: :鍋:の進歩 = fireplace or cooking hearth). Encoded as has_improvement kind=[fireplace, cooking_hearth]. Effect: for each new wild boar gained from an action space effect, gain 1 food. Per-boar granularity confirmed (wiki: 新しい猪ごとに). Verified via BGA Wiki (wiki_verified - simple card with established predicates). Source: https://agricola.cloudfree.jp/?p=3037 (ja, 2026-11-16). 条件：鍋の進歩（かまど/調理場）。コスト：1葦。勝利点：1。効果：アクションスペースの効果により得た新しい猪ごとに食料1も得る。プレイエリアに残る。"
+    }
 }

@@ -79,19 +79,17 @@
     "destination": "left_neighbor_hand"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "effects.0.purchase_window: the wiki text does not state when the purchase may happen (any time / own action only / also on other players' turns); only the food prices are certain"
-    ],
-    "test_case_ids": [
-      "C009-buy-sheep",
-      "C009-buy-boar",
-      "C009-no-capacity",
-      "C009-no-food-boar"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "Buy sheep/boar/cattle for 0/1/2 food when you can keep them; pass left. Purchase timing not stated by the wiki; kept unresolved."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "C009-buy-sheep",
+        "C009-buy-boar",
+        "C009-no-capacity",
+        "C009-no-food-boar"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-16",
+      "implementation_status": "not_started",
+      "notes": "Cost: 1 wood. Passive effect: when you have capacity for animals, you may immediately buy sheep (0 food), wild boar (1 food), or cattle (2 food). Continuous effect available any time owner has capacity and food. Pass left. Verified via BGA Wiki (wiki_literature - complex card with continuous purchase window). Source: https://agricola.cloudfree.jp/?p=3080 (ja, 2026-11-16). 条件なし。コスト：1木。効果：動物を飼うことができる場合、すぐに羊/猪/牛を食料0/1/2で購入できる。左隣の手札へ移動。"
+    }
 }

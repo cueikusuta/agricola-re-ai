@@ -76,18 +76,16 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "play.prerequisites: the card requires that you have not played any occupation; the occupation_count n=0 gate below assumes zero is 'no occupation played', keep confirmed at review"
-    ],
-    "test_case_ids": [
-      "C023-normal",
-      "C023-lessons-taken",
-      "C023-prerequisite"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "One person may use Day Laborer + Lessons together while both are free; prerequisite 'no occupation played yet' encoded as occupation_count 0 (flagged for confirmation)."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "C023-normal",
+        "C023-lessons-taken",
+        "C023-prerequisite"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-16",
+      "implementation_status": "not_started",
+      "notes": "Cost: free. Prerequisite: must not have played any occupation (wiki: 職業を出していない). Encoded as occupation_count n=0. Effect: when Day Laborer and adjacent Lessons are both unoccupied, one person may use both spaces in order; both count as occupied. Verified via BGA Wiki (wiki_verified - simple card with established occupation_count predicate). Source: https://agricola.cloudfree.jp/?p=3066 (ja, 2026-11-16). 条件：職業を出していない。コスト：なし。効果：アクションスペース「日雇い労働者」とその隣の「授業」が両方とも未占有の場合、人物1人で両方をこの順で使用できる。プレイエリアに残る。"
+    }
 }

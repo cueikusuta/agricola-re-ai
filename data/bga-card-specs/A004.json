@@ -32,12 +32,12 @@
     ]
   },
   "play": {
-    "action": "minor_improvement",
-    "cost": null,
-    "prerequisites": [],
-    "printed_points": 0,
-    "alternative_cost_notes": "2 飯/1 小麦"
-  },
+      "action": "minor_improvement",
+      "cost": [],
+      "prerequisites": [],
+      "printed_points": 0,
+      "alternative_cost_notes": "2 飯/1 小麦"
+    },
   "effects": [
     {
       "trigger": "on_play",
@@ -88,17 +88,15 @@
     "destination": "left_neighbor_hand"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "play.cost: the wiki shows only alternative costs (2 food / 1 grain); the base resource cost is not stated"
-    ],
-    "test_case_ids": [
-      "A004-normal",
-      "A004-no-bonus"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
-    "notes": "Gain 1 wood per room; if rooms exceed people, gain 1 extra wood; pass left."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "A004-normal",
+        "A004-no-bonus"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-16",
+      "implementation_status": "not_started",
+      "notes": "Gain 1 wood per room; if rooms exceed people, gain 1 extra wood; pass left. Base cost: none (free). Alternative costs: 2 food or 1 grain. Verified via BGA Wiki (wiki_verified). Source: https://agricola.cloudfree.jp/?p=3421 (ja, 2026-11-16). コスト欄に「ー」とあり基本コストなし。代替コストとして「2 飯/1 小麦」。効果：部屋1つにつき木材1を即座に獲得。人物より部屋が多ければ追加で木材1獲得。左隣の手札へ移動。"
+    }
 }
