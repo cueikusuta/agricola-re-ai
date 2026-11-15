@@ -112,7 +112,7 @@ fn c077_play_reserves_clay_and_the_ledger_survives_save_and_replay() {
 
     let mut definitions = verified_band_c_cards();
     let mut hands = vec![vec![], vec![]];
-    for seat in 0..2 {
+    for (seat, hand) in hands.iter_mut().enumerate() {
         for i in 0..7 {
             let occupation = format!("occ_{seat}_{i}");
             definitions.push(CardDefinition {
@@ -123,7 +123,7 @@ fn c077_play_reserves_clay_and_the_ledger_survives_save_and_replay() {
                 points: 0,
                 effects: vec![],
             });
-            hands[seat].push(occupation);
+            hand.push(occupation);
         }
         for i in 0..7 {
             let minor = format!("minor_{seat}_{i}");
@@ -135,7 +135,7 @@ fn c077_play_reserves_clay_and_the_ledger_survives_save_and_replay() {
                 points: 0,
                 effects: vec![],
             });
-            hands[seat].push(minor);
+            hand.push(minor);
         }
     }
     // Seat 0 starts with C077 instead of one filler minor.
