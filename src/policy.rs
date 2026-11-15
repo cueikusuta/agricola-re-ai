@@ -542,7 +542,10 @@ fn card_priority(
             CardEffect::PendingProbe { .. } => 0,
             CardEffect::AfterWorkerGain { good, amount, .. }
             | CardEffect::StartRoundGain { good, amount, .. }
-            | CardEffect::StartRoundGainIfFoodAtLeastRound { good, amount, .. } => {
+            | CardEffect::StartRoundGainIfFoodAtLeastRound { good, amount, .. }
+            // C116's wood-per-food-cost is occupation-cost dependent; the
+            // heuristic treats one grant per remaining round as an upper bound.
+            | CardEffect::AfterOccupationGainPerFoodCost { good, amount, .. } => {
                 card_good_value(*good) * i64::from(*amount) * horizon
             }
             CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
