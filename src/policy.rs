@@ -541,7 +541,8 @@ fn card_priority(
             // Test-only probe; never part of a real evaluated pool.
             CardEffect::PendingProbe { .. } => 0,
             CardEffect::AfterWorkerGain { good, amount, .. }
-            | CardEffect::StartRoundGain { good, amount, .. } => {
+            | CardEffect::StartRoundGain { good, amount, .. }
+            | CardEffect::StartRoundGainIfFoodAtLeastRound { good, amount, .. } => {
                 card_good_value(*good) * i64::from(*amount) * horizon
             }
             CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
