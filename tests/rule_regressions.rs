@@ -208,3 +208,26 @@ fn empty_delayed_goods_ledger_is_skipped_in_serialization() {
         "pre-existing saves must keep their exact bytes"
     );
 }
+
+#[test]
+fn empty_delayed_goods_ledger_keeps_the_pre_ch8_integrity_stamp() {
+    // Saves written before C074/C077/C078/C079/C118 existed must keep loading:
+    // while the ledger is empty the integrity tuple is byte-for-byte the old one.
+    use sha2::{Digest, Sha256};
+    let g = game(false);
+    let legacy = serde_json::to_vec(&(
+        g.state_hash(),
+        &g.well_food_schedule,
+        &g.pending,
+        g.event_budget,
+        &g.card_uses,
+        &g.card_use_limits,
+        g.next_decision_id,
+    ))
+    .unwrap();
+    assert_eq!(
+        g.integrity_hash(),
+        format!("{:x}", Sha256::digest(&legacy)),
+        "an empty ledger must not change the legacy integrity stamp"
+    );
+}

@@ -895,10 +895,9 @@ impl Game {
     /// byte-for-byte (Issue #266 acceptance: "PendingDecision save/restore/resume
     /// with a consistent state hash").
     pub fn integrity_hash(&self) -> String {
-        let data = serde_json::to_vec(&(
+        let mut data = serde_json::to_vec(&(
             self.state_hash(),
             &self.well_food_schedule,
-            &self.delayed_goods,
             &self.pending,
             self.event_budget,
             &self.card_uses,
@@ -906,6 +905,15 @@ impl Game {
             self.next_decision_id,
         ))
         .expect("integrity serialization");
+        // C074/C077/C078/C079/C118 reservations were added after the original
+        // integrity tuple. Appending the ledger only while it is non-empty keeps
+        // every pre-existing save's stamp verifiable (no pre-existing game can
+        // carry a reservation), while still covering new reservations.
+        if !self.delayed_goods.is_empty() {
+            data.extend_from_slice(
+                &serde_json::to_vec(&self.delayed_goods).expect("ledger serialization"),
+            );
+        }
         format!("{:x}", Sha256::digest(&data))
     }
 

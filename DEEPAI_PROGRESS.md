@@ -364,9 +364,11 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
     新しいラウンドの開始時に該当エントリを取得してプレイヤーに付与し、そのエントリを
     削除する（1回限り）。付与はラウンド開始カード効果のdispatchより前（既存の
     delayed_wellの食料付与と同じ位置）で、順序は台帳順に固定。
-  - **state_hash の v5 タプルは不変**（この台帳は含めない）。`integrity_hash` には含め、
-    改竄・保存復元の整合性検査の対象にした。`serde(skip_serializing_if = "BTreeMap::is_empty")`
-    により、台帳が空の既存セーブはバイト列が変わらない。
+  - **state_hash の v5 タプルは不変**（この台帳は含めない）。`integrity_hash` には台帳が
+    非空のときだけ追記して含め、改竄・保存復元の整合性検査の対象にした（空のときは
+    ch.8以前と同じタプルなので、旧ビルドが発行した integrity_hash 付きセーブも検証が通る）。
+    `serde(skip_serializing_if = "BTreeMap::is_empty")` により、台帳が空の既存セーブは
+    バイト列が変わらない。
   - `Observation.delayed_goods_schedule` に公開ミラーを追加（予約カードは公開プレイなので
     全員が内容と時期を観測できる。well_food_schedule と同じ方針）。
   - 基盤の配線: `DispatchContext` と6つのdispatcher（play/start_round/after_worker/
@@ -397,14 +399,15 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
     （例: ラウンド12では全て14超）。この縮退を仕様としてテストした。
 - 未対応（意図的）: legacy `cards::play` ヘルパは台帳を受け取らないため予約を登録しない
   （C116と同じ。本番経路は engine → dispatch_play のみ）。
-- テスト（新規10件、`cargo test --locked` **659 passed / 0 failed**）:
+- テスト（新規11件、`cargo test --locked` **660 passed / 0 failed**）:
   - cards: ラウンド式（偶数/次N/オフセット/上限/遅延時の0件）と5枚のコスト・前提・効果。
   - card_events: dispatch_play が各カードの正しいラウンド集合を予約し、予約の無い
     カードでは台帳不変であること。
   - m5_card_actions: 実プレイ（MeetingPlace + PlayMinor）→予約→公開観測ミラー→
     event replay一致→save_json/load_json一致→state_hash非包含/integrity_hash包含。
   - rule_regressions: start_round がラウンド開始時に付与して1回で消えること、
-    空台帳がシリアライズに現れない（旧セーブ互換）こと。
+    空台帳がシリアライズに現れない（旧セーブ互換）こと、空台帳では integrity_hash が
+    ch.8以前のタプルと一致すること。
 - 次にやること: C帯の残り（C083 若牛の家畜配置決定、C072 収穫＋進歩アクション付与、
   C084/C095/C096等の任意効果・交換）。家畜配置の PendingDecision と、
   任意効果の ChooseGain 実運用が次の共通基盤候補。
