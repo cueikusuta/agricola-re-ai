@@ -37,45 +37,15 @@
     "prerequisites": [],
     "printed_points": 0
   },
-  "effects": [
-    {
-      "trigger": "on_play",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "wood",
-            "amount": {
-              "op": "per",
-              "args": [
-                {
-                  "op": "count",
-                  "args": [
-                    "person_on_accumulation_space"
-                  ]
-                },
-                1
-              ]
-            }
-          }
-        }
-      ],
-      "optional": false,
-      "frequency": "once_per_play",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none"
-    }
-  ],
+  "effects": null,
   "post_play": {
     "destination": "left_neighbor_hand"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "person_on_accumulation_space の累積スペース別人数が PublicState に露出していない"
+    ],
     "test_case_ids": [
       "B004-normal",
       "B004-zero"
@@ -83,6 +53,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Gain 1 wood per own person standing on accumulation spaces."
+    "notes": "Gain 1 wood per own person standing on accumulation spaces. Held as needs_resolution: DispatchContext exposes used_spaces but not the number of people on accumulation spaces, so the effect cannot be computed from public state; held per docs/bga-card-effect-vocabulary.md rule 5 (no dummy no-op registration), decision deferred to a separate Issue."
   }
 }

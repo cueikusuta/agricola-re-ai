@@ -570,7 +570,7 @@ fn card_priority(
                     let avg_count: i64 = match count_kind {
                         crate::cards::CountKind::Occupations => 2, // ~2 occupations mid-game
                         crate::cards::CountKind::ClayRooms => 1, // ~1 clay room after upgrade
-                        crate::cards::CountKind::MajorImprovements => 1,
+                        crate::cards::CountKind::Improvements => 3, // ~3 improvements (base + 2 minor)
                         crate::cards::CountKind::FamilyMembers => 3, // ~3 family members
                         crate::cards::CountKind::MajorImprovementsBottomRow => 1,
                         crate::cards::CountKind::SownFields => 2, // ~2 sown fields

@@ -475,6 +475,14 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
   `第2章（C帯）` と `第2章（A/B帯）` が併存するため、見出しに系列を付けて区別する。
   章別ファイル分割は別カードで検討する提案として残す。
 
+### 第3章（A/B帯）: OnPlayGainPerCount 拡張 — C004/C005/D005/B006/B007 5枚実装・B004 保留
+- 対象: `data/bga-card-specs` の C004 筆記板 / C005 改修 / D005 畑の粘土 / B006 採石場見学 / B007 賃金（Issue #235 B帯のうち OnPlayGainPerCount 系）。base は origin/main `7b49b22`（PR #320/#325 後の main）。
+- 実装内容: `src/cards.rs` の `verified_band_b_cards()`（main 側既定義、B122/B142/B144）へ B006/B007 を追記（重複定義を解消）、`verified_band_c_cards()` へ C004/C005、`verified_band_d_cards()` へ D005 を追加。効果は新規 CardEffect `OnPlayGainPerCount { count_kind, good, amount }` と `CountKind`（Occupations/ClayRooms/Improvements/FamilyMembers/MajorImprovementsBottomRow/SownFields）で表現。集計ロジックを `src/card_events.rs::handle_on_play_gain_per_count` と `src/cards.rs` の `clay_room_count`/`sown_field_count`/`major_improvements_bottom_row`/`improvement_count_in_front`/`occupation_count` に単一化。B004 薪の山は `workers_on_accumulation_spaces()` = family-2 が推計値で spec を満たさず、PublicState に累積スペース別人数が露出していないためプールから外し `needs_resolution` 保留（語彙ルール5：無効果ダミー登録しない）。
+- cost/prerequisite 修正（spec JSON 正本）: C004 food1、C005 food1、D005 food1、B006 food2 + MinimumOccupations(1)、B007 コスト0。いずれも従前実装と不一致だった6枚を修正。
+- テスト結果: `tests/ch03_onplay_per_count.rs` 新規 19 件（各カード 正系/不発/境界、B006 前提未達不発、build_default_registry 到達可能性、card_events dispatcher 経路での supply 増減）全通過。`cargo test` 全群 green（RC=0）、`cargo fmt --check` / `cargo clippy --all-targets` 警告0。
+- 曖昧なルール: C005 `count[improvement]` は「プレイ済み小進歩＋所有大進歩」（`improvement_count_in_front`、A117 先行）と解釈；spec notes の "major improvement owned" と語彙の `improvement` との齟齬は未解決のままPR本文に記載。B007 bottom row 集合 {Joinery, Pottery, Basketry} は2016 Revised 供給ボードの最下行と解釈；構成は repo 内 spec データからは導出できず、公式ボード照合を別Issueに委ねる。
+- 公式典拠: 各 spec JSON の `bga.references`（agricola.cloudfree.jp 個別ページ：C004 p=3085, C005 p=3084, D005 p=2916, B006 p=3251, B007 p=3250, B004 p=3253；cardlist_en 相互照合）。第三者 BGA ウィキ起こしのデータ契約であり、official verification とは区別。
+
 ### 第7章: 難易度4〜5（B帯を除く46枚）の全件保留記録
 - B帯は課題Bの担当範囲のため本件では触らない。
 - 効果文を全件取得（agricola.cloudfree.jp 個別ページ＋英語一覧）し、現在の型付き効果語彙で

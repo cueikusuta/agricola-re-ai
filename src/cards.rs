@@ -187,8 +187,6 @@ pub enum CountKind {
     ClayRooms,
     /// Number of improvements in front of the player (base + played minor improvements).
     Improvements,
-    /// Number of workers on accumulation spaces (any accumulation space).
-    WorkersOnAccumulationSpaces,
     /// Total family members (workers).
     FamilyMembers,
     /// Number of major improvements in the bottom row (printed major improvements the player owns).
@@ -636,7 +634,7 @@ pub fn affordable(card: &CardDefinition, player: &Player, extra_food: u32) -> bo
         .all(|(&good, &amount)| player.supply.get(good) >= amount)
 }
 
-fn occupation_count(set: &CardSet, player: &Player) -> usize {
+pub(crate) fn occupation_count(set: &CardSet, player: &Player) -> usize {
     player
         .played_cards
         .iter()
@@ -648,7 +646,7 @@ fn occupation_count(set: &CardSet, player: &Player) -> usize {
 }
 
 /// Count clay rooms (rooms in clay or stone house).
-fn clay_room_count(player: &Player) -> usize {
+pub(crate) fn clay_room_count(player: &Player) -> usize {
     if matches!(player.house, House::Clay | House::Stone) {
         player.rooms()
     } else {
@@ -656,21 +654,17 @@ fn clay_room_count(player: &Player) -> usize {
     }
 }
 
-/// Count workers on accumulation spaces.
-/// This checks the public accumulations for the player's workers.
-/// Note: This is a simplified version - in a real game this would need access to
-/// the PublicState to see which spaces have workers. For on-play effects,
-/// we approximate by counting total family members minus 2 (base workers).
-/// TODO: This needs proper integration with the game state for accurate counting.
-fn workers_on_accumulation_spaces(player: &Player) -> usize {
-    // Simplified: family members represent potential workers on spaces.
-    // In the actual game, this would check the public.used spaces.
-    // For now, we use family - 2 (base workers not on spaces).
-    player.family.saturating_sub(2) as usize
-}
-
-/// Count major improvements in the bottom row (printed major improvements the player owns).
-fn major_improvements_bottom_row(player: &Player) -> usize {
+/// Count major improvements in the bottom row of the major-improvement supply board.
+///
+/// The 2016 Revised supply board lays major improvements out in rows by cost;
+/// its bottom row holds exactly the three good-conversion improvements:
+/// Joinery, Pottery and Basketry. `major_improvement_bottom_row` in
+/// `docs/bga-card-effect-vocabulary.md` names this count source; the member
+/// set is pinned by the B007 / D030 test contracts (B007-normal: bottom row 2
+/// -> food_delta 4). This composition is not derivable from repo-internal spec
+/// data alone, so it should be confirmed against the official board before
+/// shipping (noted as an open rule question in PR t_b954c21d).
+pub(crate) fn major_improvements_bottom_row(player: &Player) -> usize {
     player
         .improvements
         .iter()
@@ -684,7 +678,7 @@ fn major_improvements_bottom_row(player: &Player) -> usize {
 }
 
 /// Count sown fields (fields with a crop planted).
-fn sown_field_count(player: &Player) -> usize {
+pub(crate) fn sown_field_count(player: &Player) -> usize {
     player
         .farm
         .iter()
@@ -822,9 +816,6 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                     CountKind::Occupations => occupation_count(set, player) as u32,
                     CountKind::ClayRooms => clay_room_count(player) as u32,
                     CountKind::Improvements => improvement_count_in_front(set, player),
-                    CountKind::WorkersOnAccumulationSpaces => {
-                        workers_on_accumulation_spaces(player) as u32
-                    }
                     CountKind::FamilyMembers => player.family as u32,
                     CountKind::MajorImprovementsBottomRow => {
                         major_improvements_bottom_row(player) as u32
@@ -2833,22 +2824,22 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 },
             ],
         ),
-        // C004 筆記板 (Slate Board): cost 1 wood; on play gain 1 wood per occupation played.
+        // C004 筆記板 (Slate Board): cost 1 food; on play gain 1 wood per occupation played.
         card(
             "C004",
             minor,
-            vec![(Good::Wood, 1)],
+            vec![(Good::Food, 1)],
             vec![CardEffect::OnPlayGainPerCount {
                 count_kind: CountKind::Occupations,
                 good: Good::Wood,
                 amount: 1,
             }],
         ),
-        // C005 改修 (Renovation): cost 2 clay; on play gain 1 clay per clay room + 1 clay per improvement.
+        // C005 改修 (Renovation): cost 1 food; on play gain 1 clay per clay room + 1 clay per improvement.
         card(
             "C005",
             minor,
-            vec![(Good::Clay, 2)],
+            vec![(Good::Food, 1)],
             vec![
                 CardEffect::OnPlayGainPerCount {
                     count_kind: CountKind::ClayRooms,
@@ -3018,12 +3009,17 @@ mod verified_band_c_tests {
 /// D100 p=2821, D105 p=2816, D109 p=2812). Kept out of the A/B two-player
 /// preset, same as [`verified_band_c_cards`].
 pub fn verified_band_d_cards() -> Vec<CardDefinition> {
-    fn card(id: &str, kind: CardKind, effects: Vec<CardEffect>) -> CardDefinition {
+    fn card(
+        id: &str,
+        kind: CardKind,
+        cost: Vec<(Good, u32)>,
+        effects: Vec<CardEffect>,
+    ) -> CardDefinition {
         CardDefinition {
             use_limit: None,
             id: id.to_owned(),
             kind,
-            cost: vec![],
+            cost,
             points: 0,
             effects,
         }
@@ -3040,6 +3036,7 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
         card(
             "D100",
             CardKind::Occupation,
+            vec![],
             vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::CategoriesAtMaxFour,
             }],
@@ -3050,6 +3047,7 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
         card(
             "D105",
             CardKind::Occupation,
+            vec![],
             vec![
                 gain(Space::ClayPit, Good::Food, 1),
                 gain(Space::WesternQuarry, Good::Grain, 1),
@@ -3062,6 +3060,7 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
         card(
             "D109",
             CardKind::Occupation,
+            vec![],
             vec![
                 CardEffect::OnPlayGain {
                     good: Good::Wood,
@@ -3072,10 +3071,11 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 gain(Space::Cultivation, Good::Food, 2),
             ],
         ),
-        // D005 畑の粘土 (Clay from Fields): on play gain 1 clay per sown field.
+        // D005 畑の粘土 (Clay from Fields): cost 1 food; on play gain 1 clay per sown field.
         card(
             "D005",
             CardKind::MinorImprovement,
+            vec![(Good::Food, 1)],
             vec![CardEffect::OnPlayGainPerCount {
                 count_kind: CountKind::SownFields,
                 good: Good::Clay,
@@ -3246,6 +3246,45 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 gain(Space::ClayPit, Good::Wood, 1),
                 gain(Space::Hollow, Good::Wood, 1),
                 gain(Space::ClayPit, Good::Reed, 1),
+            ],
+        },
+        // B006 採石場見学 (Excursion to the Quarry): cost 2 food; prerequisite:
+        // at least 1 occupation played; on play gain 1 stone per family member.
+        CardDefinition {
+            use_limit: None,
+            id: "B006".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(1),
+                },
+                CardEffect::OnPlayGainPerCount {
+                    count_kind: CountKind::FamilyMembers,
+                    good: Good::Stone,
+                    amount: 1,
+                },
+            ],
+        },
+        // B007 賃金 (Wages): cost 0 (free); on play gain 2 food + 1 food per
+        // major improvement in the bottom row (Joinery / Pottery / Basketry).
+        CardDefinition {
+            use_limit: None,
+            id: "B007".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 2,
+                },
+                CardEffect::OnPlayGainPerCount {
+                    count_kind: CountKind::MajorImprovementsBottomRow,
+                    good: Good::Food,
+                    amount: 1,
+                },
             ],
         },
     ]
@@ -3529,69 +3568,6 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 gain(Space::ResourceMarket, Good::Wood, 1),
             ],
         },
-    ]
-}
-
-/// B-deck band 001-168 cards whose printed effects are fully expressible with
-/// the current typed effect vocabulary (BGA Agricola card wiki).
-/// Kept out of the A/B two-player preset, same as the other band pools.
-pub fn verified_band_b_cards() -> Vec<CardDefinition> {
-    fn card(
-        id: &str,
-        kind: CardKind,
-        cost: Vec<(Good, u32)>,
-        effects: Vec<CardEffect>,
-    ) -> CardDefinition {
-        CardDefinition {
-            use_limit: None,
-            id: id.to_owned(),
-            kind,
-            cost,
-            points: 0,
-            effects,
-        }
-    }
-    let minor = CardKind::MinorImprovement;
-    vec![
-        // B004 薪の山 (Firewood Pile): cost 1 wood; on play gain 1 wood per worker on accumulation space.
-        card(
-            "B004",
-            minor,
-            vec![(Good::Wood, 1)],
-            vec![CardEffect::OnPlayGainPerCount {
-                count_kind: CountKind::WorkersOnAccumulationSpaces,
-                good: Good::Wood,
-                amount: 1,
-            }],
-        ),
-        // B006 採石場見学 (Quarry Visit): cost 1 food; on play gain 1 stone per family member.
-        card(
-            "B006",
-            minor,
-            vec![(Good::Food, 1)],
-            vec![CardEffect::OnPlayGainPerCount {
-                count_kind: CountKind::FamilyMembers,
-                good: Good::Stone,
-                amount: 1,
-            }],
-        ),
-        // B007 賃金 (Wages): cost 1 wood; on play gain 2 food + 1 food per major improvement in bottom row.
-        card(
-            "B007",
-            minor,
-            vec![(Good::Wood, 1)],
-            vec![
-                CardEffect::OnPlayGain {
-                    good: Good::Food,
-                    amount: 2,
-                },
-                CardEffect::OnPlayGainPerCount {
-                    count_kind: CountKind::MajorImprovementsBottomRow,
-                    good: Good::Food,
-                    amount: 1,
-                },
-            ],
-        ),
     ]
 }
 

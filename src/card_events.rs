@@ -1068,64 +1068,17 @@ fn handle_on_play_gain_per_count(
 ) -> Result<EffectResult, String> {
     let count = match count_kind {
         crate::cards::CountKind::Occupations => {
-            let played = ctx.player.played_cards.clone();
-            played
-                .iter()
-                .filter(|id| {
-                    ctx.card_set
-                        .definition(id)
-                        .is_some_and(|card| card.kind == crate::cards::CardKind::Occupation)
-                })
-                .count() as u32
+            crate::cards::occupation_count(ctx.card_set, ctx.player) as u32
         }
-        crate::cards::CountKind::ClayRooms => {
-            if matches!(
-                ctx.player.house,
-                crate::model::House::Clay | crate::model::House::Stone
-            ) {
-                ctx.player.rooms() as u32
-            } else {
-                0
-            }
-        }
+        crate::cards::CountKind::ClayRooms => crate::cards::clay_room_count(ctx.player) as u32,
         crate::cards::CountKind::Improvements => {
-            let played = ctx.player.played_cards.clone();
-            let minor = played
-                .iter()
-                .filter(|id| {
-                    ctx.card_set
-                        .definition(id)
-                        .is_some_and(|card| card.kind == crate::cards::CardKind::MinorImprovement)
-                })
-                .count() as u32;
-            minor
-                .checked_add(ctx.player.improvements.len() as u32)
-                .unwrap_or(0)
-        }
-        crate::cards::CountKind::WorkersOnAccumulationSpaces => {
-            // Simplified: family members minus base 2 workers
-            ctx.player.family.saturating_sub(2) as u32
+            crate::cards::improvement_count_in_front(ctx.card_set, ctx.player)
         }
         crate::cards::CountKind::FamilyMembers => ctx.player.family as u32,
-        crate::cards::CountKind::MajorImprovementsBottomRow => ctx
-            .player
-            .improvements
-            .iter()
-            .filter(|imp| {
-                matches!(
-                    imp,
-                    crate::model::Improvement::Joinery
-                        | crate::model::Improvement::Pottery
-                        | crate::model::Improvement::Basketry
-                )
-            })
-            .count() as u32,
-        crate::cards::CountKind::SownFields => ctx
-            .player
-            .farm
-            .iter()
-            .filter(|cell| matches!(cell.tile, crate::model::Tile::Field { crop: Some(_), .. }))
-            .count() as u32,
+        crate::cards::CountKind::MajorImprovementsBottomRow => {
+            crate::cards::major_improvements_bottom_row(ctx.player) as u32
+        }
+        crate::cards::CountKind::SownFields => crate::cards::sown_field_count(ctx.player) as u32,
     };
     let bonus = count
         .checked_mul(amount)
