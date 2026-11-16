@@ -133,7 +133,7 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
 - 次にやること: 第2章（C帯 難易度3: C071, C073, C075, C080, C081, C082, C085, C086,
   C090, C091, C092, C093 …）で C116（職業コスト連動）等の可否を含めて進める。
 
-### 第2章: C帯 難易度3（残り21枚）＋ C116
+### 第2章（C帯）: 難易度3（残り21枚）＋ C116
 - 処理対象: C071, C073, C075, C080, C081, C082, C085, C086, C090, C091, C092,
   C093, C097, C098, C100, C101, C102, C103, C112, C114, C116, C117, C120（難易度3）。
   C111 は第1章で処理済み。難易度4（C070, C073, C080, C087, C089, C094, C099, C119）
@@ -311,6 +311,169 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
   ただし大部分は基盤（プレイヤー決定、カード上収容、アクション付与、ボーナス点の持ち場）
   が必要なため、次章は「基盤を要する保留カード」の共通インフラ設計（別PR）を優先し、
   個別実装は可能なものだけ行う方針。
+
+### 第2章（A/B帯）: A121〜168 / B121〜168 帯 — 帯内96枚の分類完了（実装11枚 / 保留85枚）
+- 対象: Issue #227（A/C/D/E 121〜168）と Issue #235（B 001〜168）の帯のうち、
+  A121〜A168 と B121〜B168 の96枚（各48枚）。
+- 着手時の未実装確認（カード本文に挙げられた5枚）:
+  - **B077 粘土層の窪地 / B095 / B098 は main 上で実装済み**。`src/cards.rs` の
+    既存pool定義とテスト（`b077_requires_three_occupations_and_grants_clay`、
+    `b098_only_sufficiently_spare_and_occupied_pastures`、
+    `b095_major_stone_discount`）と `data/bga-card-specs/*.json` の
+    `review.implementation_status="implemented"` を確認した。→ 本PRでは触らない。
+  - **A128 岸辺の建築士**: spec の効果は「他プレイヤーが Reed Bank を使ったとき、
+    任意で clay 1 または stone 2 を軽減して部屋を建設」。既存語彙には
+    `operation=other / kind=build_room_with_discount`・任意選択・他者使用条件を
+    表す variant がない → 保留。
+  - **A162 森の監督者**: spec の効果は「Reed Bank と Clay Pit を1スペースに合体させ、
+    合体スペースを使うと clay 2 + wood 3」。合体後のスペースが `Space` に存在せず、
+    盤面スペースの合体機構自体が未実装 → 保留。
+  - 代替候補の **A129 放浪者**（`use_other_space_with_same_person`）と
+    **B151 小百姓**（`ignore_occupation`）も新規 variant が必要 → 保留
+    （カード本文の「語彙拡張最小」指示に従う）。
+- **B122 鉱物学者 / B144 坑夫** の実装帰属: **第1章 PR #322 の担当**。本 PR の base
+  `65f2c2b` に PR #322 の実装は無く、本 PR 側で重複実装（`src/cards.rs` /
+  `src/registry.rs` / テスト8件 / spec の `implementation_status`）を削除したため、
+  本 PR の差分は `DEEPAI_PROGRESS.md` のみ（`git diff --stat 65f2c2b 3256e4d` で確認）。
+  PR #322 は本 PR の検証中に `main` へマージ済み（merge commit `5fba360`、
+  2026-11-16T19:06:20Z）。
+- 「実装」の基準: **Rust コード上の型付き効果実装**（`src/cards.rs` の pool 登録＋
+  `registry.rs` 登録＋テスト）の存在を指す。spec の `implementation_status` は
+  これに追従する（逆ではない）が、実測では **A121 / A122 / B122 / B144 の spec は
+  `not_started` のまま**で、`main` の pool に実装とテストがあるのに spec が追従して
+  いない。本分類は spec ではなく Rust 実装の有無で数える（spec 追従は別作業）。
+- 帯内分類（96枚）: **実装11枚 / 保留85枚**。
+  - 実装11枚の帰属（検証時 `origin/main` = `5fba360` の実測）:
+    - **A155 / B142 は `main` の既存実装**。本 PR の base `65f2c2b` では
+      `verified_worker_bonus_cards()` が A155 を `players >= 4`、B142 を `players >= 3` で
+      定義し、テスト `a155_gains_wood_and_grain_on_traveling_players` /
+      `a155_requires_four_players` / `b142_vegetable_from_grain_seeds_only` を持っていた。
+      PR #322 のマージ後（`5fba360`）は A155 が `verified_band_a_cards()`
+      （`src/cards.rs:2970`）、B142 が `verified_band_b_cards()`（同 3059）へ移り、
+      `verified_worker_bonus_cards()` は人数非依存（`_players`）になっている。
+      **未マージ PR #322 だけに帰属するカードではない。**
+    - **B122 / B144 は第1章 PR #322 の実装**。`main`（`5fba360`）の
+      `verified_band_b_cards()` に `CardEffect::Prerequisite { rule:
+      CardRequirement::MinimumPlayers(3) }` 付きで定義される（B144 は 3/4人用、
+      B122 は前提なし＝2人用も可）。
+    - 残り7枚（A121, A122, A125, A133, A143, B121, B126）は `main` の既存実装
+      （`src/cards.rs` の pool 登録＋テスト）。
+  - 保留85枚の阻害要因カテゴリ別枚数（複数要因がある場合は優先順で代表を決める）:
+    - ①効果フェイズ（trigger）に対応する型付き効果がない: 31枚
+    - ②カスタム機構（operation=other の kind）: 25枚
+    - ③既存 variant にない操作（operation）: 17枚
+    - ④動的な量・参照式（count/per/table/min 等）: 7枚
+    - ⑤既存 variant にない条件（predicate）: 3枚
+    - ⑥終局得点が EndGameBonus（ScoreBonusRule）で表現できない: 2枚
+- 保留85枚の一覧（ID 名前: そのカードに該当する阻害要因タグ。本節が台帳本体で、
+  A121〜A168 / B121〜B168 の96枚すべてを全件列挙して維持する）:
+  - **①効果フェイズ（trigger）に対応する型付き効果がない**
+    - A123 梁打ち: phase=after_room_construction
+    - A124 石材研磨師: phase=before_worker_space
+    - A126 熟練職人: phase=before_worker_space
+    - A127 間借り人: phase=round_end / op=modify_capacity
+    - A131 工芸指南: phase=after_improvement
+    - A132 居酒屋の店主: phase=before_sow
+    - A141 カブ農家: phase=round_end
+    - A145 綱作り: phase=after_harvest
+    - A148 綿羊飼い: phase=harvest_feeding / op=modify_capacity
+    - A153 豚持ち: phase=after_animal_acquisition
+    - A154 主計官: phase=before_sow
+    - A165 猪飼い: phase=round_end
+    - A166 草干し: phase=harvest_end
+    - A167 種畜買い付け人: phase=after_stable_construction
+    - B124 整地人: phase=after_fence_build
+    - B134 名家録の編纂者: phase=after_renovation
+    - B138 森の守護者: phase=before_worker_space
+    - B139 森林科学者: phase=returning_home_phase
+    - B140 農場労働者: phase=after_work_phase
+    - B145 柴結び: phase=after_event
+    - B153 寮長: phase=final_scoring
+    - B154 羊持ち: phase=after_animal_acquisition
+    - B155 Art Teacher(美術教師): phase=pay_occupation_cost
+    - B157 塩作り: phase=anytime
+    - B158 森林地区管理: phase=end_of_work_phase
+    - B159 農家の大将: phase=other_player_action
+    - B160 飲み屋の亭主: phase=end_of_work_phase
+    - B161 軟弱者: phase=your_turn_in_work_phase
+    - B162 伐採人: phase=store_from_cumulative_space
+    - B165 獲物調達人: phase=before_harvest
+    - B168 牧畜の達人: phase=renovate
+  - **②カスタム機構（operation=other の kind）**
+    - A128 岸辺の建築士: kind=build_room_with_discount / op=other / optional=true / dynamic=参照式 / predicate=other_player_only
+    - A129 放浪者: kind=use_other_space_with_same_person / op=other / optional=true
+    - A130 ママっ子: kind=reuse_second_person_space / op=other
+    - A137 川辺の羊飼い: kind=take_from_other_accumulation / op=other / optional=true
+    - A142 紐編み: kind=choice / op=other / optional=true / dynamic=参照式 / predicate=any_player+reed_taken_at_least
+    - A144 係争物取り扱い人: kind=place_rewards_on_card / op=other / dynamic=参照式
+    - A150 舞台の裏方: kind=choice / op=other / optional=true / dynamic=参照式 / predicate=other_player_only
+    - A151 吟遊楽人: kind=copy_unused_round_card_effect / op=other / predicate=round_space_in+round_space_unused
+    - A156 買い付け人: kind=gain_from_other_supply / op=other+spend_resource / optional=true / predicate=other_player_uses
+    - A162 森の監督者: kind=combine_reed_bank_and_clay_pit / op=other
+    - B125 借地農夫: kind=place_on_round_spaces / op=other / dynamic=参照式 / predicate=round_space_has_placed_good
+    - B129 隣り合わせた人: kind=ignore_occupation / op=other
+    - B130 汎農: kind=use_other_space_with_same_person / op=other+spend_resource / optional=true / dynamic=参照式
+    - B137 卸売業者: kind=stack_goods_on_card / op=other / dynamic=参照式 / predicate=round_space_in
+    - B141 畑の世話人: kind=choice / kind=count_as_field / op=other / optional=true / dynamic=参照式
+    - B146 イリュージョニスト: kind=choice / op=other / optional=true / dynamic=参照式
+    - B147 緑衣の狩人: kind=choice / op=other / optional=true / dynamic=参照式
+    - B149 屋外飼育人: kind=remove_stables / op=build_stable+other+spend_resource
+    - B150 大規模農家: kind=choice / op=other / optional=true / dynamic=参照式
+    - B151 小百姓: kind=ignore_occupation / op=other / predicate=house_is+room_count
+    - B152 駆け出し画家: kind=choice / op=other / optional=true / dynamic=参照式
+    - B156 倉庫番: kind=choice / op=other / optional=true / dynamic=参照式
+    - B164 羊使い: kind=place_sheep_on_future_rounds / op=other / dynamic=参照式
+    - B166 牛飼いの女: kind=choice / op=other / optional=true / dynamic=参照式
+    - B167 厩舎長: kind=choice / op=other / optional=true / dynamic=参照式
+  - **③既存 variant にない操作（operation）**
+    - A138 もり打ち: op=spend_resource / optional=true / dynamic=参照式
+    - A139 窪地のみはり: op=grant_action
+    - A147 家畜追い: op=spend_resource / optional=true / dynamic=参照式
+    - A149 塗装美術家: op=grant_action
+    - A152 夜学生: op=grant_action+spend_resource / optional=true / predicate=lessons_used_by_fewer_players
+    - A158 台所の芸術家: op=exchange / optional=true / dynamic=参照式 / predicate=other_player_uses
+    - A159 海の指物師: op=spend_resource / optional=true / predicate=other_player_uses
+    - A160 リュート奏者: op=exchange / optional=true / dynamic=参照式 / predicate=other_player_only
+    - A164 柴刈り: op=exchange / optional=true / dynamic=参照式
+    - A168 動物訓練士: op=spend_resource / optional=true / dynamic=参照式
+    - B123 屋根付け: op=exchange+spend_resource / optional=true / dynamic=参照式
+    - B127 女たらし: op=grant_action+spend_resource / optional=true / predicate=round_in
+    - B128 配管工: op=discount_cost+grant_action / optional=true
+    - B131 装備品揃え: op=grant_action / optional=true
+    - B132 地主: op=gain_points / dynamic=参照式 / predicate=farmyard_all_used
+    - B135 栄養士: op=exchange / optional=true / dynamic=参照式
+    - B148 ペット仲買人: op=modify_capacity
+  - **④動的な量・参照式（count/per/table/min 等）**
+    - A135 家畜官: dynamic=参照式 / scoring=点数の式が動的（per/count 等）
+    - A136 監督官: dynamic=参照式 / scoring=点数の式が動的（per/count 等）
+    - A140 ショベル運搬人: dynamic=参照式
+    - A146 倉庫管理係: dynamic=参照式 / predicate=food_taken_in
+    - A163 熟練建築家: dynamic=参照式
+    - B136 執事: dynamic=参照式 / scoring=得点フェイズで資源獲得: other
+    - B143 粘土守: dynamic=参照式 / predicate=other_player_uses
+  - **⑤既存 variant にない条件（predicate）**
+    - A157 ボヘミアン: predicate=lessons_occupants_at_least
+    - A161 菜園の世話人: predicate=same_good_already_taken_this_work_phase
+    - B163 牧師: predicate=only_owner_with_two_room_house
+  - **⑥終局得点が EndGameBonus（ScoreBonusRule）で表現できない**
+    - A134 満載畜産家: scoring=点数の式が動的（per/count 等）
+    - B133 村の農婦: scoring=得点フェイズで資源獲得: gain_resource
+- 判定方法: `data/bga-card-specs/*.json` の効果（trigger / conditions / steps）を
+  現在の `CardEffect` variant 群と `ScoreBonusRule` / `PassiveRule` /
+  `CardRequirement` に突き合わせた機械的な一次分類。優先順は
+  フェイズ → 機構 → 操作 → 任意 → 量式 → 条件 → 得点規則 → 軽減規則で代表を決め、
+  各カードには該当する全タグを付記する。実装可否の一次判定であり、公式ルール解釈の
+  確定ではない（公式照合は `data/bga-card-base-ledger.csv` の担当）。
+- テスト: コード変更なし。`cargo fmt --check` と
+  `cargo clippy --all-targets --all-features --locked -- -D warnings` 合格、
+  `cargo test --locked` **649 passed / 0 failed**（第6章・第7章と同一）。
+- 以後: 残り85枚は前章と同じく共通基盤（プレイヤー決定・任意効果、アクション付与、
+  カード上への収置、ラウンド相対スケジュール、建設・家畜イベントフック）の設計後に着手する。
+- **ホットスポット対応**: 本節は `### 第6章` と `### 第7章` の間に挿入しており、
+  PR #321（第8章を EOF に追記）とのマージ競合を回避する。並びは章番号順ではない
+  （本節は A/B 帯の系列で、第1〜5章の C/D/E 系列とは別系列）。同一文書に
+  `第2章（C帯）` と `第2章（A/B帯）` が併存するため、見出しに系列を付けて区別する。
+  章別ファイル分割は別カードで検討する提案として残す。
 
 ### 第7章: 難易度4〜5（B帯を除く46枚）の全件保留記録
 - B帯は課題Bの担当範囲のため本件では触らない。
