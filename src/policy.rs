@@ -558,11 +558,27 @@ fn card_priority(
                 card_good_value(*good) * i64::from(*amount) * horizon / 2
             }
             // A117: one grant per improvement already played, evaluated once
-            // at play time.
-            CardEffect::OnPlayGainPerImprovementPlayed { good, amount, .. } => {
-                card_good_value(*good) * i64::from(*amount)
-            }
-            CardEffect::Passive { .. } => horizon * 5,
+                        // at play time.
+                        CardEffect::OnPlayGainPerImprovementPlayed { good, amount, .. } => {
+                            card_good_value(*good) * i64::from(*amount)
+                        }
+                        // OnPlayGainPerCount: estimate based on typical counts at play time.
+                        // Use a heuristic average count per kind.
+                        CardEffect::OnPlayGainPerCount {
+                            count_kind, good, amount, ..
+                        } => {
+                            let avg_count: i64 = match count_kind {
+                                crate::cards::CountKind::Occupations => 2,       // ~2 occupations by mid-game
+                                crate::cards::CountKind::ClayRooms => 1,         // ~1 clay room if upgraded
+                                crate::cards::CountKind::Improvements => 3,      // ~3 improvements (base + 2 minor)
+                                crate::cards::CountKind::WorkersOnAccumulationSpaces => 1,
+                                crate::cards::CountKind::FamilyMembers => 3,     // ~3 family members
+                                crate::cards::CountKind::MajorImprovementsBottomRow => 1,
+                                crate::cards::CountKind::SownFields => 2,        // ~2 sown fields
+                            };
+                            card_good_value(*good) * i64::from(*amount) * avg_count
+                        }
+                        CardEffect::Passive { .. } => horizon * 5,
             CardEffect::EndGameBonus { .. } => 12,
             CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
         };
