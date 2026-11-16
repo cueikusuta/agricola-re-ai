@@ -4633,7 +4633,8 @@ mod tests {
         };
         let mut c = Ctx::new();
         c.players[0].played_cards = vec!["B118".into()];
-        // B118 requires 2 rooms, which we don't set up, so it shouldn't fire
+        // B118 requires 2 rooms; Player::new() gives 2 rooms by default.
+        // The only reason it doesn't fire here is the event_kind check (RoundStart vs WorkerPlaced).
         c.players[0].supply.wood = 10;
         let mut market = vec![];
         let mut well = BTreeMap::new();
@@ -4657,10 +4658,10 @@ mod tests {
             false,
         )
         .unwrap();
-        // B118 requires 2 rooms to fire, so it shouldn't fire here
+        // B118 has 2 rooms by default; the event_kind check prevents firing.
         assert_eq!(
             c.players[0].supply.wood, 10,
-            "B118 StartRoundGain must not fire on after_worker (needs 2 rooms)"
+            "B118 StartRoundGain must not fire on after_worker (event_kind check)"
         );
     }
 
@@ -4669,7 +4670,7 @@ mod tests {
     #[test]
     fn b107_start_round_gain_does_not_fire_on_after_worker() {
         let set = CardSet {
-            definitions: crate::cards::verified_worker_bonus_cards(3), // B107 is in worker_bonus_cards for 3p
+            definitions: crate::cards::verified_simple_occupations(3), // B107 is in simple_occupations
         };
         let mut c = Ctx::new();
         c.players[0].played_cards = vec!["B107".into()];
@@ -4762,7 +4763,19 @@ mod tests {
         };
         let mut c = Ctx::new();
         c.players[0].played_cards = vec!["B061".into()];
-        // B061 needs MixedFields (grain + vegetable + fallow) - just test it doesn't fire
+        // B061 needs MixedFields (grain + vegetable + fallow) - set up so mutation would fire
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        c.players[0].farm[3].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut used = std::collections::BTreeSet::new();
@@ -4800,6 +4813,15 @@ mod tests {
         };
         let mut c = Ctx::new();
         c.players[0].played_cards = vec!["A106".into()];
+        // A106 needs LastGrainTaken (grain field with remaining 1) and/or LastVegetableTaken (veg field with remaining 1)
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut used = std::collections::BTreeSet::new();
@@ -4837,6 +4859,15 @@ mod tests {
         };
         let mut c = Ctx::new();
         c.players[0].played_cards = vec!["E107".into()];
+        // E107 needs 2+ plowed fields (FieldCountThresholds: 2->1 food) - set up so mutation would fire
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut used = std::collections::BTreeSet::new();
@@ -4875,6 +4906,8 @@ mod tests {
         let mut c = Ctx::new();
         c.players[0].played_cards = vec!["E111".into()];
         // E111 condition: no minor improvements played - satisfied in this test
+        // E111 also has HarvestFieldGainIfNoMinorPlayed giving wood - check both food and wood
+        c.players[0].supply.wood = 0;
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut used = std::collections::BTreeSet::new();
@@ -4901,6 +4934,10 @@ mod tests {
             c.players[0].supply.food, 0,
             "E111 StartRoundGainIfNoMinorPlayed must not fire on after_worker"
         );
+        assert_eq!(
+            c.players[0].supply.wood, 0,
+            "E111 HarvestFieldGainIfNoMinorPlayed must not fire on after_worker"
+        );
     }
 
     /// Reproduction test for PR #326 P0: E117 HarvestFieldGain should NOT fire on
@@ -4912,6 +4949,11 @@ mod tests {
         };
         let mut c = Ctx::new();
         c.players[0].played_cards = vec!["E117".into()];
+        // E117 needs a wheat (grain) field (HasWheatField) - set up so mutation would fire
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut used = std::collections::BTreeSet::new();
