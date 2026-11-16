@@ -18,7 +18,7 @@
 - 成果物: `FREEBBUFF_REVIEW_2.md`、`result-freebuff.md` の第2弾節。**コード変更なし**。
 - 結果: P0 1件（G-1, F-1 の継続・A106 の新露出）、P1 3件（G-2 決定化が予約台帳を落とす /
   G-3 #328 が #327 の検証修正を含まない / G-4 A帯の dispatcher・legacy テスト0件）、
-  P2 4件、P3 6件。
+  P2 4件、P3 5件。
 - 再測: #321 = 661 passed、#327 = 661 passed、#328 = 666 passed。#317 は main 上で緑。
 - 変異テスト18件: 17件検出、1件未検出（A099 の legacy 複製）。
 - 次の作業（別 Issue / 別 PR）:
@@ -26,4 +26,4 @@
   2. G-2 `mcts::sample_game` に `delayed_goods` の引き継ぎを追加。
   3. G-3 #328 を #327 の最新 HEAD に rebase し、増分検証の台帳検査を有効化。
   4. G-4 A 帯4枚の dispatcher / legacy テスト追加。
-  5. G-14 C074 の文献照合（ページ再取得）。
+  5. P2/P3（A106 判定の集約、評価 projection、validate の上限など）は次回以降。
