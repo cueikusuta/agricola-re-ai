@@ -3304,6 +3304,9 @@ mod verified_band_b_tests {
 /// the current typed effect vocabulary (BGA Agricola card wiki;
 /// E117 p=2636). Kept out of the A/B two-player preset, same as
 /// [`verified_band_c_cards`] and [`verified_band_d_cards`].
+///
+/// E007 (ライ麦パン / Pumpernickel) and E008 (農産物直売所 / Farmers Market)
+/// from band 001-069 are also included here since they use only `OnPlayGain`.
 pub fn verified_band_e_cards() -> Vec<CardDefinition> {
     let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
         space,
@@ -3311,6 +3314,31 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
         amount,
     };
     vec![
+        // E007 ライ麦パン (Pumpernickel): on_play gain 4 food, cost 1 grain.
+        CardDefinition {
+            use_limit: None,
+            id: "E007".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Grain, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 4,
+            }],
+        },
+        // E008 農産物直売所 (Farmers Market): on_play gain 1 vegetable, cost 2 food.
+        CardDefinition {
+            use_limit: None,
+            id: "E008".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Vegetable,
+                amount: 1,
+            }],
+        },
+        // E117 パイプ喫煙家 (Pipe Smoker): harvest gain 2 wood if wheat field present.
         CardDefinition {
             use_limit: None,
             id: "E117".to_owned(),
@@ -3540,7 +3568,7 @@ mod verified_band_e_tests {
         assert!(card.cost.is_empty());
         assert_eq!(card.points, 0);
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["E107", "E111", "E113", "E117", "E118"] {
+        for id in ["E007", "E008", "E107", "E111", "E113", "E117", "E118"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
