@@ -1239,6 +1239,9 @@ impl Game {
                 &mut self.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
+                // E100 博物館の館長 stores its round-start bonus points in the
+                // bookkeeping ledger, which is not part of `Player`.
+                &mut self.bonus_points,
             )
             // Before this change the same failure was a panic here; keeping the
             // expect would turn a rules error into a crash, so record it as a

@@ -178,6 +178,22 @@ impl Game {
         for (player, plan) in self.public.players.iter_mut().zip(breeding) {
             plan.apply(player)?;
         }
+        // End of the harvest: the field, feeding and breeding phases are done
+        // and the round has not advanced yet. Event-time bonus points that fire
+        // "at the end of each harvest" (E099 無関心な親) resolve here. The budget
+        // is reset because this is its own effect chain, not part of the final
+        // worker action's chain (same rule as the field phase above).
+        if self.card_set.enabled() {
+            self.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
+            crate::card_events::dispatch_harvest_end(
+                &self.card_set,
+                &mut self.public.players,
+                &mut self.event_budget,
+                &mut self.card_uses,
+                &self.card_use_limits,
+                &mut self.bonus_points,
+            )?;
+        }
         Ok(())
     }
 }

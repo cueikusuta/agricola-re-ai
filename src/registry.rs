@@ -287,6 +287,12 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::StartRoundGainIfNoMinorPlayed { .. } => {
                     EventKind::RoundStart
                 }
+                crate::cards::CardEffect::StartRoundBonusPointsIfStockHasOneOf { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::HarvestEndBonusPointsIfStoneHouse { .. } => {
+                    EventKind::Harvest
+                }
                 crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
                     EventKind::Harvest
                 }
@@ -397,6 +403,13 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
+                        | crate::cards::CardEffect::HarvestEndBonusPointsIfStoneHouse {
+                            points: amount,
+                        }
+                        | crate::cards::CardEffect::StartRoundBonusPointsIfStockHasOneOf {
+                            points: amount,
+                            ..
+                        }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount } => *amount,
                     };
                     amount == 0 || amount > 30

@@ -66,6 +66,12 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterHarvestBakeGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
+        // E099/E100 store bonus points at a harvest end / round start. Their
+        // awards are written by the dedicated blocks in this module (the
+        // ledger is not part of `Player`), so the generic scan reports them as
+        // non-triggerable through `effect_condition_holds`.
+        CardEffect::HarvestEndBonusPointsIfStoneHouse { .. } => TriggerPhase::After,
+        CardEffect::StartRoundBonusPointsIfStockHasOneOf { .. } => TriggerPhase::After,
         // End game scoring — After phase
         CardEffect::EndGameBonus { .. } => TriggerPhase::After,
     }
@@ -458,6 +464,12 @@ fn resolve_phase_scan(
                 // Never fires via the generic phase scan (see
                 // effect_condition_holds); dispatch_play's after-play scan owns it.
                 CardEffect::AfterOccupationGainPerFoodCost { .. } => EffectResult::Resolved,
+                // E099/E100 store bonus points in the bookkeeping ledger, which
+                // the generic handler cannot reach; their dedicated blocks
+                // (dispatch_harvest_end / dispatch_start_round) own them and
+                // effect_condition_holds reports them as non-triggerable.
+                CardEffect::HarvestEndBonusPointsIfStoneHouse { .. }
+                | CardEffect::StartRoundBonusPointsIfStockHasOneOf { .. } => EffectResult::Resolved,
                 #[cfg(test)]
                 CardEffect::PendingProbe { options } => {
                     handle_pending_probe(ctx, player, card_id, options.clone(), trigger_data)?
@@ -681,6 +693,10 @@ fn effect_condition_holds(
         }
         CardEffect::AfterHarvestBakeGain { .. } => trigger.baked,
         CardEffect::HarvestFieldGain { .. } => true,
+        // Awarded by the dedicated event-time blocks in this module, never by
+        // the generic scan (same pattern as C116's dedicated after-play scan).
+        CardEffect::HarvestEndBonusPointsIfStoneHouse { .. } => false,
+        CardEffect::StartRoundBonusPointsIfStockHasOneOf { .. } => false,
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
@@ -773,6 +789,10 @@ pub fn execute_chosen_triggers(
             // Never fires via the generic phase scan (see
             // effect_condition_holds); dispatch_play's after-play scan owns it.
             CardEffect::AfterOccupationGainPerFoodCost { .. } => EffectResult::Resolved,
+            // Same for E099/E100: their ledgers are awarded by the dedicated
+            // event-time blocks, never by a phase scan.
+            CardEffect::HarvestEndBonusPointsIfStoneHouse { .. }
+            | CardEffect::StartRoundBonusPointsIfStockHasOneOf { .. } => EffectResult::Resolved,
             #[cfg(test)]
             CardEffect::PendingProbe { options } => {
                 handle_pending_probe(ctx, player, &trigger.card_id, options.clone(), trigger_data)?
@@ -1567,6 +1587,67 @@ pub fn dispatch_after_worker(
     )
 }
 
+/// Award every event-time bonus-point effect `player` owns at `site` (E099/E100).
+///
+/// The award lives outside `Player` (see `crate::model::BonusPointLedger`), so
+/// it cannot be written by the generic handler signature. Each resolving
+/// effect still consumes one event-budget unit and respects the per-card use
+/// limit, exactly like a normal handler, and the arithmetic comes from the
+/// canonical `cards::store_event_bonus_points` that the legacy mirrors also
+/// call.
+fn award_event_bonus_points(
+    card_set: &CardSet,
+    player: &Player,
+    site: crate::cards::BonusEventSite,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    bonus_points: &mut crate::model::BonusPointLedger,
+) -> Result<(), String> {
+    for card_id in player.played_cards.clone() {
+        if !crate::cards::has_event_bonus_effect(card_set, &card_id, site) {
+            continue;
+        }
+        consume_budget(event_budget)?;
+        let limit = card_use_limits.get(&card_id).copied().unwrap_or(u32::MAX);
+        check_card_use(card_uses, &card_id, limit)?;
+        crate::cards::store_event_bonus_points(card_set, player, &card_id, site, bonus_points)?;
+    }
+    Ok(())
+}
+
+/// Dispatch the end of a harvest: after the breeding phase and before the next
+/// round begins (2016 Lookout: the harvest is field phase -> feeding phase ->
+/// breeding phase, and the round only advances afterwards).
+///
+/// Only event-time bonus points exist at this site today (E099 無関心な親), so
+/// the dispatcher is a dedicated block rather than a phase scan: the generic
+/// scan reports these effects as non-triggerable because the ledger is not part
+/// of `Player`. The award is unconditional once it triggers, so the active
+/// player's ordering freedom (2016 Lookout p.8) cannot change the result.
+#[allow(clippy::too_many_arguments)] // threads the same storages as the other dispatchers
+pub fn dispatch_harvest_end(
+    card_set: &CardSet,
+    players: &mut [Player],
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    bonus_points: &mut crate::model::BonusPointLedger,
+) -> Result<(), String> {
+    for player in players.iter() {
+        award_event_bonus_points(
+            card_set,
+            player,
+            crate::cards::BonusEventSite::HarvestEnd,
+            event_budget,
+            card_uses,
+            card_use_limits,
+            bonus_points,
+        )?;
+    }
+    Ok(())
+}
+
 /// Dispatch StartRound phase for all players at round start.
 #[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_start_round(
@@ -1581,6 +1662,7 @@ pub fn dispatch_start_round(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    bonus_points: &mut crate::model::BonusPointLedger,
 ) -> Result<Transition, String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
@@ -1634,6 +1716,23 @@ pub fn dispatch_start_round(
         )? {
             return Ok(Transition::Paused(p));
         }
+    }
+    // Event-time bonus points (E100 博物館の館長) resolve once per round start,
+    // which is the beginning of the work phase: the round's accumulation has
+    // already been placed on the action spaces and no worker has moved yet
+    // (model::Game::start_round order). Every seat's phase scan runs first, so
+    // the award sees the same post-trigger state for all players and cannot
+    // depend on seat order.
+    for player in players.iter() {
+        award_event_bonus_points(
+            card_set,
+            player,
+            crate::cards::BonusEventSite::StartRound,
+            event_budget,
+            card_uses,
+            card_use_limits,
+            bonus_points,
+        )?;
     }
     Ok(Transition::Completed)
 }
@@ -2014,7 +2113,11 @@ pub mod legacy {
     }
 
     /// Legacy start_round_rewards.
-    pub fn start_round_rewards_legacy(set: &CardSet, player: &mut Player) -> Result<(), String> {
+    pub fn start_round_rewards_legacy(
+        set: &CardSet,
+        player: &mut Player,
+        bonus_points: &mut crate::model::BonusPointLedger,
+    ) -> Result<(), String> {
         for id in player.played_cards.clone() {
             let card = set.definition(&id).ok_or("unknown played card")?;
             for effect in &card.effects {
@@ -2036,6 +2139,46 @@ pub mod legacy {
                         player.supply.set(*good, next);
                     }
                 }
+            }
+            // Event-time bonus points use the same canonical store as the
+            // dispatcher (E100 博物館の館長).
+            if crate::cards::has_event_bonus_effect(
+                set,
+                &id,
+                crate::cards::BonusEventSite::StartRound,
+            ) {
+                crate::cards::store_event_bonus_points(
+                    set,
+                    player,
+                    &id,
+                    crate::cards::BonusEventSite::StartRound,
+                    bonus_points,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Legacy harvest_end_rewards (after the breeding phase).
+    pub fn harvest_end_rewards_legacy(
+        set: &CardSet,
+        player: &mut Player,
+        bonus_points: &mut crate::model::BonusPointLedger,
+    ) -> Result<(), String> {
+        for id in player.played_cards.clone() {
+            set.definition(&id).ok_or("unknown played card")?;
+            if crate::cards::has_event_bonus_effect(
+                set,
+                &id,
+                crate::cards::BonusEventSite::HarvestEnd,
+            ) {
+                crate::cards::store_event_bonus_points(
+                    set,
+                    player,
+                    &id,
+                    crate::cards::BonusEventSite::HarvestEnd,
+                    bonus_points,
+                )?;
             }
         }
         Ok(())
@@ -2429,6 +2572,7 @@ mod tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &mut Default::default(),
         )
         .unwrap();
 
@@ -2480,6 +2624,7 @@ mod tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &mut Default::default(),
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("budget exhausted"));
@@ -2649,7 +2794,7 @@ mod tests {
         let set = equivalence_pool();
         let mut legacy = [Player::new(0, 0)];
         legacy[0].played_cards = vec!["C1".into(), "C4".into(), "C6".into(), "C6".into()];
-        crate::cards::start_round_rewards(&set, &mut legacy[0]).unwrap();
+        crate::cards::start_round_rewards(&set, &mut legacy[0], &mut Default::default()).unwrap();
 
         let mut c = Ctx::new();
         c.players[0].played_cards = legacy[0].played_cards.clone();
@@ -2668,6 +2813,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &mut Default::default(),
         )
         .unwrap();
         assert_eq!(legacy[0].supply.food, c.players[0].supply.food);
@@ -2900,7 +3046,8 @@ mod tests {
             let chain = vec!["C6".to_string(), "C1".to_string(), "C6".to_string()];
             let mut legacy = [Player::new(0, 0)];
             legacy[0].played_cards = chain.clone();
-            crate::cards::start_round_rewards(&set, &mut legacy[0]).unwrap();
+            crate::cards::start_round_rewards(&set, &mut legacy[0], &mut Default::default())
+                .unwrap();
 
             let mut c = Ctx::new();
             c.players[0].played_cards = chain;
@@ -2919,6 +3066,7 @@ mod tests {
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
+                &mut Default::default(),
             )
             .unwrap();
             assert_eq!(
@@ -2927,6 +3075,165 @@ mod tests {
             );
             assert_eq!(legacy[0].supply.wood, c.players[0].supply.wood);
         }
+    }
+
+    /// Event-time bonus points (E099 at the harvest end, E100 at the round
+    /// start) must award the same ledger from all three paths: the cards.rs
+    /// canonical helpers, the legacy mirror, and the dispatchers. The loop
+    /// covers every house material and the stock-list boundary (empty, food
+    /// only, one listed good, several listed goods).
+    #[test]
+    fn equivalence_event_bonus_points_across_all_three_paths() {
+        use crate::model::{bonus_points_total, BonusPointLedger};
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards()
+                .into_iter()
+                .filter(|card| card.id == "E099" || card.id == "E100")
+                .collect(),
+        };
+        let stocks: [Vec<Good>; 4] = [
+            vec![],
+            vec![Good::Food],
+            vec![Good::Wood],
+            vec![Good::Wood, Good::Reed, Good::Grain],
+        ];
+        for house in [House::Wood, House::Clay, House::Stone] {
+            for stock in &stocks {
+                let build = || {
+                    let mut p = Player::new(0, 0);
+                    p.house = house;
+                    p.played_cards = vec!["E099".to_string(), "E100".to_string()];
+                    for good in stock {
+                        p.supply.set(*good, 1);
+                    }
+                    p
+                };
+                let listed_good = stock.iter().any(|good| {
+                    matches!(
+                        good,
+                        Good::Wood
+                            | Good::Clay
+                            | Good::Reed
+                            | Good::Stone
+                            | Good::Grain
+                            | Good::Vegetable
+                    )
+                });
+                let expected = i32::from(house == House::Stone) + i32::from(listed_good);
+
+                // 正本: the cards.rs helpers the production paths delegate to.
+                let mut canonical = build();
+                let mut canonical_ledger = BonusPointLedger::new();
+                crate::cards::harvest_end_rewards(&set, &mut canonical, &mut canonical_ledger)
+                    .unwrap();
+                crate::cards::start_round_rewards(&set, &mut canonical, &mut canonical_ledger)
+                    .unwrap();
+
+                // Legacy mirror.
+                let mut legacy = build();
+                let mut legacy_ledger = BonusPointLedger::new();
+                super::legacy::harvest_end_rewards_legacy(&set, &mut legacy, &mut legacy_ledger)
+                    .unwrap();
+                super::legacy::start_round_rewards_legacy(&set, &mut legacy, &mut legacy_ledger)
+                    .unwrap();
+
+                // Dispatchers: harvest end, then the round start that follows it.
+                let mut players = vec![build()];
+                let mut cards = crate::cards::CardState::default();
+                let mut market = vec![];
+                let mut well = BTreeMap::new();
+                let mut pending = None;
+                let mut budget = 64u32;
+                let mut uses = BTreeMap::new();
+                let limits = BTreeMap::new();
+                let mut ledger = BonusPointLedger::new();
+                dispatch_harvest_end(
+                    &set,
+                    &mut players,
+                    &mut budget,
+                    &mut uses,
+                    &limits,
+                    &mut ledger,
+                )
+                .unwrap();
+                dispatch_start_round(
+                    &set,
+                    &mut players,
+                    &mut cards,
+                    &mut market,
+                    &mut well,
+                    2,
+                    &std::collections::BTreeSet::new(),
+                    &mut budget,
+                    &mut uses,
+                    &limits,
+                    &mut pending,
+                    &mut ledger,
+                )
+                .unwrap();
+
+                assert_eq!(
+                    bonus_points_total(&canonical_ledger, 0),
+                    expected,
+                    "house {house:?} stock {stock:?}"
+                );
+                assert_eq!(legacy_ledger, canonical_ledger, "legacy mirror diverged");
+                assert_eq!(ledger, canonical_ledger, "dispatcher diverged");
+                // Each pass charges one budget unit per card that declares an
+                // effect at that site, whether or not its condition paid out
+                // (E099 at the harvest end, E100 at the round start).
+                assert_eq!(budget, 64 - 2);
+            }
+        }
+    }
+
+    /// Event-time bonus points are site-exclusive: a harvest-end pass never
+    /// awards E100 and a round-start pass never awards E099, and each pass
+    /// respects the per-card use limit.
+    #[test]
+    fn event_bonus_points_stay_at_their_own_site() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards()
+                .into_iter()
+                .filter(|card| card.id == "E099" || card.id == "E100")
+                .collect(),
+        };
+        let mut players = vec![Player::new(0, 0)];
+        players[0].house = House::Stone;
+        players[0].played_cards = vec!["E099".to_string(), "E100".to_string()];
+        players[0].supply.set(Good::Wood, 1);
+        let mut ledger = crate::model::BonusPointLedger::new();
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::from([("E099".to_string(), 1u32)]);
+
+        dispatch_harvest_end(
+            &set,
+            &mut players,
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut ledger,
+        )
+        .unwrap();
+        assert_eq!(
+            ledger.get(&0).and_then(|cards| cards.get("E100")),
+            None,
+            "a harvest-end pass must not pay the round-start card"
+        );
+
+        // Second harvest-end pass: the use limit is reached, so nothing is
+        // awarded and the failure is reported instead of a silent double pay.
+        let err = dispatch_harvest_end(
+            &set,
+            &mut players,
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut ledger,
+        )
+        .unwrap_err();
+        assert!(err.contains("use limit"), "got: {err}");
     }
 
     /// Harvest-field equivalence with real animal counts, so the Animals
@@ -3170,6 +3477,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &mut Default::default(),
         );
         // With a single PendingProbe effect, the chain pauses on that effect.
         assert!(
@@ -3232,6 +3540,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending_none(),
+            &mut Default::default(),
         )
         .unwrap_err();
         assert!(err.contains("use limit"), "got: {err}");
@@ -3573,6 +3882,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut Default::default(),
         )
         .unwrap();
 
@@ -3601,6 +3911,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut Default::default(),
         )
         .unwrap();
 
@@ -3975,6 +4286,7 @@ mod tests {
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
+                &mut Default::default(),
             )
             .unwrap();
             c.players[0].supply.food

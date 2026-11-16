@@ -76,6 +76,14 @@ fn preset_content_hash_and_game_state_hashes_are_unchanged() {
     // Recorded on origin/main (65f2c2b) before the store existed. The store is
     // bookkeeping: it must not touch the frozen v5 state-hash tuple, the dealt
     // A/B preset, or a full-game replay hash.
+    //
+    // The carded game's FINAL integrity hash moved once with the E099 chapter:
+    // `integrity_hash` covers the residual `event_budget`, and the harvest end
+    // now opens its own effect chain (resetting the budget, exactly like the
+    // field phase does) so a card's "end of each harvest" award cannot be
+    // starved by effects that already ran in the field phase. Both initial
+    // hashes, both state hashes and the cardless final integrity hash are
+    // unchanged, and an empty store still adds nothing to the tuple.
     let preset = verified_basic_card_set(2).unwrap();
     assert_eq!(preset.definitions.len(), 35);
     assert_eq!(
@@ -102,7 +110,7 @@ fn preset_content_hash_and_game_state_hashes_are_unchanged() {
             "f9f6677e2a03fdc225afd15b7a2a4e6b2f5f648af7a496ae60a88080088cd4ab",
             64,
             "83f69f8998455d726eb622152ff1782a00e99c39af3b385fc2d8feea78809212",
-            "5f1216ecbcfa1fa8cd46f9ba2b1d658c55d479274eaf0d6b176055e3071ed85e",
+            "a985ca610df1cb2ba2e170a88ae2c091f7d8f847aa4ce48492807ba73e2f321f",
         ),
     ] {
         let config = Config {
