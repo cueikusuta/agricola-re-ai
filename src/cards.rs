@@ -3641,7 +3641,7 @@ mod verified_band_e_tests {
         assert!(e100.cost.is_empty());
         assert_eq!(e100.points, 0, "the printed points stay 0");
         let effect = &e100.effects[0];
-        let mut p = Player::new(0, 0);
+        let p = Player::new(0, 0);
         assert_eq!(
             event_bonus_points(BonusEventSite::StartRound, effect, &p),
             0
