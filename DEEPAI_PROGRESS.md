@@ -404,3 +404,83 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
 `https://agricola.cloudfree.jp/cardlist/` と各カード個別ページ（E098 `?p=2655`、
 E099 `?p=2654`、E100 `?p=2653`、E101 `?p=2652`、C098 `?p=2991`、C099 `?p=2990`、
 D099 `?p=2822`、A100 `?p=3325`）。原文の転載はせず、上表は自分の言葉の要約。
+
+### 基盤後 第2章: イベント時ボーナス点 E099 無関心な親 / E100 博物館の館長（ブランチ `feat/deepai-bonus-cards-02`）
+
+- 起点: `origin/feat/deepai-bonus-point-store`（#327 の最新HEAD `308ce83`。
+  Hermes のレビュー修正コミットを含む）。#327 も #328 も open のため、指示どおり基盤ブランチ起点。
+  章1（#328）のコードは取り込まない（PR本文に明記）。
+- 追加した効果語彙（`CardEffect`）:
+  - `HarvestEndBonusPointsIfStoneHouse { points }`（E099）
+  - `StartRoundBonusPointsIfStockHasOneOf { goods, points }`（E100。対象は木/レンガ/葦/石/小麦/野菜。
+    食料と家畜は対象外）
+- 正本: `cards::event_bonus_points(site, effect, player)` と
+  `cards::store_event_bonus_points(...)`。イベント種別は `cards::BonusEventSite`
+  { StartRound, HarvestEnd } で表し、**あるイベントの点数が別イベントへ漏れない**ことを
+  site 込みの match で保証する。dispatcher 専用ブロックと legacy ミラーの両方が同じ関数を呼ぶ。
+- 新しいイベント地点（収穫終了）: `card_events::dispatch_harvest_end` を追加し、
+  `harvest::Game::harvest` で畑→給餌→繁殖の**後**（ラウンドが進む前）に呼ぶ。
+  このチェーン用にイベント予算をリセットする（畑フェイズと同じ扱い）。
+  理由: 畑フェイズの予算残りに左右されて「正当な効果が予算切れで失敗する」のを避ける。
+- E100 のタイミング: `model::Game::start_round` は「ラウンド番号を進め、山からラウンドカードを
+  公開し、累積資材を置き、井戸の遅延食料を配ってから」ラウンド開始トリガーを dispatch する。
+  これは公式手順の「準備フェイズ終了直後＝労働フェイズ開始」と一致するため、
+  既存のラウンド開始フックをそのまま使う（新規フック不要）。
+- dispatcher: `dispatch_start_round` に台帳引数を追加し、汎用スキャンの後に
+  専用ブロックで E100 を1回だけ記帳（イベント予算・カード使用上限を通す）。
+  汎用スキャンは `effect_condition_holds` が false を返すため二重発火しない
+  （章1の play-time ボーナスと同じ方式）。`dispatch_harvest_end` も同じ専用ブロック方式。
+- legacy ミラー: `cards::start_round_rewards` と
+  `card_events::legacy::start_round_rewards_legacy` に台帳引数を追加し、
+  `cards::harvest_end_rewards` / `card_events::legacy::harvest_end_rewards_legacy` を新設。
+- 配線: `registry.rs`（イベント索引: StartRound→RoundStart、HarvestEnd→Harvest。
+  効果量の構造検証）、`cards.rs`（`CardSet::validate` の効果量検証）、
+  `policy.rs`（条件付きなので horizon 分の控えめな加点）。
+- カード定義: `verified_band_e_cards()` に E099/E100 を追加（A/B 2人用プリセット35枚は不変）。
+- テスト（11件追加、`cargo test --locked` **672 passed / 0 failed**、基準 661）:
+  - `cards.rs` 4件: E099 の家の条件と site 分離、E100 の6資材と食料/家畜除外、
+    0点時に台帳へ空エントリを作らないこと、`start_round_rewards` の記帳。
+  - `card_events.rs` 2件: **3経路一致**（cards.rs 正本／legacy ミラー／dispatcher）を
+    家3種×在庫4種で照合し、台帳とイベント予算消費が一致すること。site 相互漏れが無く、
+    カード使用上限に達したら二重支給せずエラーになること。
+  - `tests/bonus_cards_e099_e100.rs` 5件: 実エンジンで E099 第4・第7収穫の各+1点、
+    木の家では0点、E100 のラウンド開始+1点（保存復元・改竄拒否・得点カテゴリ込み）、
+    食料だけでは0点、A/Bプリセット非混入。
+  - `tests/bonus_point_store.rs`: 固定ハッシュのうちカード有り対戦の**最終** `integrity_hash`
+    のみ更新（収穫終了でイベント予算をリセットするようになったため。予算は `integrity_hash`
+    の対象）。初期ハッシュ・`state_hash`・カード無しの最終値・空台帳の非出現は不変であることを
+    コメントとアサーションで維持。
+- 保留（今回見送った4枚と、必要な基盤）:
+  - **A100 後見人**: 帰宅フェイズのフックが無い。加えて「自分の人物が累積スペースから
+    戻る」人数を数えるには「どのプレイヤーが今ラウンドどのスペースに置いたか」の記録が要るが、
+    `PublicState` は `used: BTreeSet<Space>` しか持たない。任意支払いもラウンド境界をまたぐ
+    PendingDecision になるが、`start_round` は「保留中の決定をラウンドに持ち越さない」契約
+    （`debug_assert`）なので、帰宅フェイズで一時停止できる設計変更が前提。
+    文献（`?p=3325`）: 各ラウンドの帰宅フェイズに、累積スペースから3人以上戻すときに
+    食料1で1点。リポジトリ内 spec `data/bga-card-specs/A100.json` は frequency=every_round
+    としており「3人ごとに繰り返し」ではなくラウンド1回の解釈。この点は追加確認候補。
+  - **C098 サイコロ彫り**: プレイ時に木1を得る部分は実装可能だが、本題の
+    「各収穫の畑フェイズに木1＋食料1→1点（任意）」は収穫中の PendingDecision が必要。
+    現行の収穫は `harvest()` 内で畑→給餌→繁殖を一気に解決し、途中で停止・再開する
+    契約が無い（PostWork の pause は労働アクション後のチェーンのみ）。
+    文献（`?p=2991`）: 出すと木1、以後の各収穫の畑フェイズで木1＋食料1を1点に交換可。
+  - **C099 ガーデンデザイナー**: 得点計算開始時のプレイヤー決定が前提。現行の得点は
+    `score.rs` が純関数で、意思決定を挟む得点フェイズが無い。
+    文献（`?p=2990`）: 得点計算開始時に空き畑へ好きな数の食料を置き、
+    食料1/4/7の畑1つにつき1/2/3点。
+  - **D099 土器作り**: 「ラウンド4までにプレイした」記録（`CardState` にプレイ時ラウンドが
+    無い）と、最後の収穫後という収穫終了地点での任意支払い（C098 と同じ停止契約の不在）が必要。
+    文献（`?p=2822`）: ラウンド4までにプレイしていれば、最後の収穫の後に
+    レンガ1で1点を人物数まで得てよい。
+- 次にやること: 上記4枚を解放する共通基盤（収穫・帰宅フェイズで停止/再開できる
+  イベント地点、プレイ時ラウンドの記録、得点フェイズの意思決定）を別 Issue/PR として設計する。
+  個別カードの実装はその基盤後に回す。B帯は担当外（課題B）なので触らない。
+
+## 現在地（2026-11-17 更新）
+
+- 作業clone: `C:/Users/agent/work/deepai/wt-bonus-points`（ブランチ
+  `feat/deepai-bonus-cards-02`、`origin/feat/deepai-bonus-point-store` @ `308ce83` 起点）。
+  親clone（`feat/match-clock-core`）と `wt-cards-070-120`（#321）、`feat/deepai-bonus-cards-01`
+  （#328）には触れていない。
+- テスト基準: 起点で `cargo test --locked` 661 passed / 0 failed、現在 672 passed / 0 failed。
+- 章1（#328）と章2（本ブランチ）はどちらも #327 を base にした独立PR。マージ順に注意。
