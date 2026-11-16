@@ -122,10 +122,13 @@ impl RegisteredCard {
 }
 
 /// Event kind for static trigger indexing (minimal set for Step 1).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum EventKind {
     /// Worker placed on a space
+    #[default]
     WorkerPlaced,
     /// Card played from hand
     CardPlayed,

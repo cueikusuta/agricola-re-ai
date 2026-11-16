@@ -1440,6 +1440,7 @@ impl Game {
                             baked: true,
                             previous_player: None,
                             used_spaces: used_spaces.clone(),
+                            event_kind: crate::registry::EventKind::Bake,
                         };
                         // After phase. If THIS is the paused step and the pause
                         // was in the After phase (a resolved ChooseTriggerOrder,
@@ -1546,6 +1547,7 @@ impl Game {
                         baked: false,
                         previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
+                        event_kind: crate::registry::EventKind::ClayConstruction,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -1639,6 +1641,7 @@ impl Game {
                         baked: false,
                         previous_player: None,
                         used_spaces: used_spaces.clone(),
+                        event_kind: crate::registry::EventKind::WorkerPlaced,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
