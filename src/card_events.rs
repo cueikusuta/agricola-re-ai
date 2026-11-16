@@ -49,6 +49,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::OnPlayGainPerStored { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainIfHouse { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayGainPerCount { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -483,6 +484,11 @@ fn resolve_phase_scan(
                 CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                     handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
                 }
+                CardEffect::OnPlayGainPerCount {
+                    count_kind,
+                    good,
+                    amount,
+                } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -684,6 +690,7 @@ fn effect_condition_holds(
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
+        CardEffect::OnPlayGainPerCount { .. } => true,
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
@@ -798,6 +805,11 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
             }
+            CardEffect::OnPlayGainPerCount {
+                count_kind,
+                good,
+                amount,
+            } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1034,6 +1046,87 @@ fn handle_on_play_gain_per_improvement_played(
     amount: u32,
 ) -> Result<EffectResult, String> {
     let count = crate::cards::improvement_count_in_front(ctx.card_set, ctx.player);
+    let bonus = count
+        .checked_mul(amount)
+        .ok_or("on-play card bonus overflow")?;
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(bonus)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+fn handle_on_play_gain_per_count(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    count_kind: &crate::cards::CountKind,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let count = match count_kind {
+        crate::cards::CountKind::Occupations => {
+            let played = ctx.player.played_cards.clone();
+            played
+                .iter()
+                .filter(|id| {
+                    ctx.card_set
+                        .definition(id)
+                        .is_some_and(|card| card.kind == crate::cards::CardKind::Occupation)
+                })
+                .count() as u32
+        }
+        crate::cards::CountKind::ClayRooms => {
+            if matches!(
+                ctx.player.house,
+                crate::model::House::Clay | crate::model::House::Stone
+            ) {
+                ctx.player.rooms() as u32
+            } else {
+                0
+            }
+        }
+        crate::cards::CountKind::Improvements => {
+            let played = ctx.player.played_cards.clone();
+            let minor = played
+                .iter()
+                .filter(|id| {
+                    ctx.card_set
+                        .definition(id)
+                        .is_some_and(|card| card.kind == crate::cards::CardKind::MinorImprovement)
+                })
+                .count() as u32;
+            minor
+                .checked_add(ctx.player.improvements.len() as u32)
+                .unwrap_or(0)
+        }
+        crate::cards::CountKind::WorkersOnAccumulationSpaces => {
+            // Simplified: family members minus base 2 workers
+            ctx.player.family.saturating_sub(2) as u32
+        }
+        crate::cards::CountKind::FamilyMembers => ctx.player.family as u32,
+        crate::cards::CountKind::MajorImprovementsBottomRow => ctx
+            .player
+            .improvements
+            .iter()
+            .filter(|imp| {
+                matches!(
+                    imp,
+                    crate::model::Improvement::Joinery
+                        | crate::model::Improvement::Pottery
+                        | crate::model::Improvement::Basketry
+                )
+            })
+            .count() as u32,
+        crate::cards::CountKind::SownFields => ctx
+            .player
+            .farm
+            .iter()
+            .filter(|cell| matches!(cell.tile, crate::model::Tile::Field { crop: Some(_), .. }))
+            .count() as u32,
+    };
     let bonus = count
         .checked_mul(amount)
         .ok_or("on-play card bonus overflow")?;
