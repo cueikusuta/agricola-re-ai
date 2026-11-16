@@ -420,14 +420,30 @@ CARDS = {
         ],
     },
     "A055": {
-        "post": "played_area",
-        "effects": [
-            effect("after_improvement", [gain("food", 1)],
-                   freq="every_use", dur="permanent",
-                   notes="includes playing this card"),
-        ],
-        "notes": "Each improvement built, including this card, gives 1 food.",
-        "tests": [
+            "post": "played_area",
+            "effects": [
+                effect("after_improvement", [gain("food", 1)],
+                       freq="every_use", dur="permanent",
+                       notes="includes playing this card"),
+            ],
+            "status": "partial",
+            "unresolved": [
+                "bga.eligibility",
+                "play.cost",
+                "play.prerequisites",
+                "play.printed_points",
+                "effects.0.engine_mapping",
+            ],
+            "notes": "Cost and effect from secondary sources (BGA Wiki, ReedStoneFood Compendium) only. Official printed card confirmation needed for cost '1W 1C' (both required vs. choice), effect scope, and printed points. Issue #91 discusses payment resources and improved effect scope; not officially resolved. Cannot enter distribution pool until player eligibility confirmed (fail-closed).",
+            "extra_references": [
+                {
+                    "url": "https://www.reedstonefood.com/agricola/compendium",
+                    "language": "en",
+                    "checked_on": "2026-11-09",
+                    "note": "ReedStoneFood Compendium (secondary source); confirms cost '1W 1C' (both wood and clay required) and effect '1 food per improvement played'",
+                },
+            ],
+            "tests": [
             case("A055-normal", {"food": 0}, {"play": "A055"}, {"food_delta": 1}),
             case("A055-other-improvement", {"food": 0}, {"play_improvement": "B037"},
                  {"food_delta": 1}),
@@ -4219,7 +4235,7 @@ def build_spec(row: dict) -> dict:
         "implementation_status": "not_started",
         "notes": entry["notes"],
     }
-    return {
+    spec = {
         "schema_version": 1,
         "card_id": card_id,
         "identity": {
@@ -4250,13 +4266,14 @@ def build_spec(row: dict) -> dict:
                     "checked_on": CHECKED_ON,
                     "note": "English list page row used to cross-check the card id and name",
                 },
-            ],
+            ] + entry.get("extra_references", []),
         },
         "play": play,
         "effects": entry["effects"],
         "post_play": {"destination": entry["post"]},
         "review": review,
     }
+    return spec
 
 
 def build_tests(row: dict) -> dict:
