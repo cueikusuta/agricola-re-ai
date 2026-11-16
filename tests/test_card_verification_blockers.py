@@ -8,7 +8,7 @@ from pathlib import Path
 from scripts.card_verification_blockers import check, load_ledger, load_preliminary, summary
 
 REPOSITORY = Path(__file__).resolve().parent.parent
-REQUIRED_BLOCKERS = ("A060", "D025", "D059", "D060")
+REQUIRED_BLOCKERS = ("A005", "D159", "A060", "D025", "D059", "D060")
 
 
 def row(card_id, *, status="unverified", at4="unverified"):
