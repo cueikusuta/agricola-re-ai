@@ -1555,6 +1555,7 @@ impl Game {
                             &mut self.card_uses,
                             &self.card_use_limits,
                             &mut self.pending,
+                            &mut self.bonus_points,
                         )?;
                         // Update card points
                         let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1624,6 +1625,7 @@ impl Game {
                     &mut self.card_uses,
                     &self.card_use_limits,
                     &mut self.pending,
+                    &mut self.bonus_points,
                 )?;
                 // Update card points
                 let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1728,6 +1730,7 @@ impl Game {
                             &mut self.card_uses,
                             &self.card_use_limits,
                             &mut self.pending,
+                            &mut self.bonus_points,
                         )?;
                         // Update card points
                         let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1818,6 +1821,7 @@ impl Game {
                         &mut self.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
+                        &mut self.bonus_points,
                     )?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -3245,13 +3249,13 @@ mod stable_building_rule_tests {
 #[cfg(test)]
 mod m6_passive_engine_tests {
     use super::*;
-    use crate::cards::{play, verified_passive_cards, CardSet};
+    use crate::cards::{play_in_test, verified_passive_cards, CardSet};
     fn activate(id: &str, p: &mut Player) {
         let set = CardSet {
             definitions: verified_passive_cards(),
         };
         let mut hand = vec![id.into()];
-        play(&set, &mut hand, p, id, set.definition(id).unwrap().kind, 0).unwrap();
+        play_in_test(&set, &mut hand, p, id, set.definition(id).unwrap().kind, 0).unwrap();
     }
     #[test]
     fn a012_capacity_with_stable() {
@@ -3322,7 +3326,8 @@ mod m6_passive_engine_tests {
 mod m6_extra_passive_engine_tests {
     use super::*;
     use crate::cards::{
-        play, verified_extra_simple_cards, verified_multiplayer_passive_cards, CardKind, CardSet,
+        play_in_test, verified_extra_simple_cards, verified_multiplayer_passive_cards, CardKind,
+        CardSet,
     };
     #[test]
     fn b010_enables_family_growth_without_physical_room() {
@@ -3333,7 +3338,7 @@ mod m6_extra_passive_engine_tests {
         p.supply.wood = 3;
         p.supply.food = 3;
         assert!(grow(&mut p.clone(), true).is_err());
-        play(
+        play_in_test(
             &set,
             &mut vec!["B010".into()],
             &mut p,
@@ -3352,7 +3357,7 @@ mod m6_extra_passive_engine_tests {
             definitions: verified_multiplayer_passive_cards(3),
         };
         let mut p = Player::new(0, 0);
-        play(
+        play_in_test(
             &set,
             &mut vec!["A143".into()],
             &mut p,

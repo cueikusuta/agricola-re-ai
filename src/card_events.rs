@@ -49,6 +49,12 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::OnPlayGainPerStored { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainIfHouse { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
+        // Play-time stored bonus points (E098/E101) are awarded once by
+        // dispatch_play's play-time block, never by the generic scan.
+        CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayBonusPointsPerUnstartedStage { .. } => TriggerPhase::Before,
+        // Declarative play restriction, enforced by cards::can_play.
+        CardEffect::BlockFurtherOccupations => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -483,6 +489,12 @@ fn resolve_phase_scan(
                 CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                     handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
                 }
+                // Play-time stored bonus points and the E101 play restriction
+                // are handled by dispatch_play's play-time block and
+                // cards::can_play; the generic scan never fires them.
+                CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { .. }
+                | CardEffect::OnPlayBonusPointsPerUnstartedStage { .. }
+                | CardEffect::BlockFurtherOccupations => EffectResult::Resolved,
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -684,6 +696,11 @@ fn effect_condition_holds(
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
+        // Awarded by dispatch_play's play-time block / cards::play, not by the
+        // generic phase scan (same pattern as AfterOccupationGainPerFoodCost).
+        CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { .. } => false,
+        CardEffect::OnPlayBonusPointsPerUnstartedStage { .. } => false,
+        CardEffect::BlockFurtherOccupations => false,
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
@@ -798,6 +815,11 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
             }
+            // Same as above: owned by dispatch_play's play-time block /
+            // cards::can_play, never by the generic scan.
+            CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { .. }
+            | CardEffect::OnPlayBonusPointsPerUnstartedStage { .. }
+            | CardEffect::BlockFurtherOccupations => EffectResult::Resolved,
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1373,6 +1395,7 @@ pub fn dispatch_play(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    bonus_points: &mut crate::model::BonusPointLedger,
 ) -> Result<(), String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
@@ -1436,6 +1459,32 @@ pub fn dispatch_play(
              work executor"
                 .into(),
         );
+    }
+
+    // Phase 2b: play-time stored bonus points (E098 神童 / E101 はみだし者).
+    // The award is fixed at the moment of play, so it is written once here from
+    // the same canonical function (`cards::store_on_play_bonus_points`) that the
+    // cards.rs path and the legacy mirror use. The generic phase scan never
+    // fires these effects (`effect_condition_holds` returns false), so there is
+    // no double count. The new card is already last in `played_cards`, which is
+    // exactly the "played area including this card" view the calculation wants.
+    if crate::cards::has_on_play_bonus_effect(card_set, new_card_id) {
+        consume_budget(ctx.event_budget)?;
+        let limit = ctx
+            .card_use_limits
+            .get(new_card_id)
+            .copied()
+            .unwrap_or(u32::MAX);
+        check_card_use(ctx.card_uses, new_card_id, limit)?;
+        let played = ctx.player.played_cards.clone();
+        crate::cards::store_on_play_bonus_points(
+            card_set,
+            ctx.player,
+            new_card_id,
+            &played,
+            round,
+            bonus_points,
+        )?;
     }
 
     // Phase 3: Core action (card is moved to played zone — handled by caller via move_card)
@@ -1877,6 +1926,10 @@ pub mod legacy {
     /// `kind`/`extra_food` are accepted to mirror the legacy `cards::play`
     /// signature used by the equivalence tests; the legacy effect loop never
     /// read them (cost payment happened before it in cards::play).
+    ///
+    /// `bonus` mirrors the current cards.rs signature: play-time stored bonus
+    /// points are written through the same canonical function, so this path and
+    /// the dispatcher path can never disagree.
     pub fn apply_on_play_effects_legacy(
         set: &CardSet,
         hand: &mut Vec<String>,
@@ -1884,6 +1937,7 @@ pub mod legacy {
         id: &str,
         _kind: crate::cards::CardKind,
         _extra_food: u32,
+        bonus: &mut crate::cards::PlayBonusContext<'_>,
     ) -> Result<(), String> {
         // This mirrors the original cards::play effect loop (Before phase effects)
         let card = set.definition(id).ok_or("unknown card")?;
@@ -1944,12 +1998,28 @@ pub mod legacy {
                     crate::cards::PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                     crate::cards::PassiveRule::HousingSpace(n) => player.extra_housing += n,
                 },
+                // Stored bonus points are written after the loop (they need the
+                // round and the ledger); the play restriction is enforced by
+                // cards::can_play.
+                CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { .. }
+                | CardEffect::OnPlayBonusPointsPerUnstartedStage { .. }
+                | CardEffect::BlockFurtherOccupations => {}
                 _ => {}
             }
         }
         // Move card from hand to played (caller does this via move_card now)
         hand.retain(|x| x != id);
         player.played_cards.push(id.to_string());
+        // The card is in the played area now, matching cards::play's
+        // "played area including this card" view.
+        crate::cards::store_on_play_bonus_points(
+            set,
+            player,
+            id,
+            &player.played_cards.clone(),
+            bonus.round,
+            bonus.ledger,
+        )?;
         Ok(())
     }
 
@@ -3064,6 +3134,7 @@ mod tests {
         let set = equivalence_pool();
         let mut legacy_hand = vec!["M1".to_string()];
         let mut legacy = [Player::new(0, 0)];
+        let mut legacy_ledger = crate::model::BonusPointLedger::new();
         crate::cards::play(
             &set,
             &mut legacy_hand,
@@ -3071,6 +3142,10 @@ mod tests {
             "M1",
             CardKind::MinorImprovement,
             0,
+            &mut crate::cards::PlayBonusContext {
+                round: 1,
+                ledger: &mut legacy_ledger,
+            },
         )
         .unwrap();
 
@@ -3086,6 +3161,7 @@ mod tests {
         let limits = BTreeMap::new();
         let mut budget = 64u32;
         let mut pending = None;
+        let mut bonus_ledger = crate::model::BonusPointLedger::new();
         {
             let mut ctx = crate::card_zones::CardMoveCtx {
                 cards: &mut cards,
@@ -3117,6 +3193,7 @@ mod tests {
                 &mut uses,
                 &limits,
                 &mut pending,
+                &mut bonus_ledger,
             )
             .unwrap();
             let card = set.definition("M1").unwrap();
@@ -3133,6 +3210,142 @@ mod tests {
             "zone move must match legacy retain+push"
         );
         assert_eq!(legacy[0].card_points, players[0].card_points);
+    }
+
+    /// E098/E101 store their bonus points at play time. The same logical state
+    /// must yield the same ledger (and the same Player) through the canonical
+    /// cards.rs path, the legacy mirror and the dispatcher.
+    #[test]
+    fn equivalence_play_time_bonus_points_across_all_three_paths() {
+        use crate::model::{bonus_points_total, BonusPointLedger, Improvement};
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        for (card, round, played_before) in [
+            ("E098", 1u8, Vec::<String>::new()),
+            ("E098", 6, vec!["E117".to_string()]),
+            ("E101", 1, vec![]),
+            ("E101", 9, vec!["E117".to_string()]),
+        ] {
+            let build = || {
+                let mut p = Player::new(0, 0);
+                p.supply.food = 5;
+                p.improvements = vec![Improvement::Fireplace2, Improvement::Joinery];
+                p.played_cards = played_before.clone();
+                p
+            };
+
+            // 正本: cards.rs (effects resolve before the zone move)
+            let mut canonical = build();
+            let mut canonical_ledger = BonusPointLedger::new();
+            let mut hand = vec![card.to_string()];
+            crate::cards::play(
+                &set,
+                &mut hand,
+                &mut canonical,
+                card,
+                CardKind::Occupation,
+                0,
+                &mut crate::cards::PlayBonusContext {
+                    round,
+                    ledger: &mut canonical_ledger,
+                },
+            )
+            .unwrap();
+
+            // legacy mirror (applies effects, then performs the zone move)
+            let mut legacy = build();
+            let mut legacy_hand = vec![card.to_string()];
+            let mut legacy_ledger = BonusPointLedger::new();
+            super::legacy::apply_on_play_effects_legacy(
+                &set,
+                &mut legacy_hand,
+                &mut legacy,
+                card,
+                CardKind::Occupation,
+                0,
+                &mut crate::cards::PlayBonusContext {
+                    round,
+                    ledger: &mut legacy_ledger,
+                },
+            )
+            .unwrap();
+
+            // dispatcher: the caller performs the zone move first
+            let mut c = Ctx::new();
+            c.players[0] = build();
+            c.players[0].played_cards.push(card.to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            let mut dispatcher_ledger = BonusPointLedger::new();
+            dispatch_play(
+                &set,
+                0,
+                card,
+                0,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                round,
+                &BTreeSet::new(),
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut dispatcher_ledger,
+            )
+            .unwrap();
+
+            assert_eq!(
+                canonical_ledger, legacy_ledger,
+                "{card} round {round}: cards.rs and legacy ledgers diverged"
+            );
+            assert_eq!(
+                canonical_ledger, dispatcher_ledger,
+                "{card} round {round}: cards.rs and dispatcher ledgers diverged"
+            );
+            assert_eq!(
+                canonical.supply, legacy.supply,
+                "{card} round {round}: cards.rs and legacy supplies diverged"
+            );
+            assert_eq!(
+                canonical.supply, c.players[0].supply,
+                "{card} round {round}: cards.rs and dispatcher supplies diverged"
+            );
+            assert_eq!(
+                canonical.played_cards, c.players[0].played_cards,
+                "{card} round {round}: played area diverged"
+            );
+            assert_eq!(
+                canonical.card_points, c.players[0].card_points,
+                "printed card points must not absorb stored bonus points"
+            );
+            // The award matches the canonical calculation on both sides.
+            let expected: i32 = set
+                .definition(card)
+                .unwrap()
+                .effects
+                .iter()
+                .map(|effect| {
+                    crate::cards::on_play_bonus_points(
+                        effect,
+                        &set,
+                        &canonical,
+                        &canonical.played_cards,
+                        round,
+                    )
+                })
+                .sum();
+            assert_eq!(bonus_points_total(&canonical_ledger, 0), expected);
+            if card == "E101" {
+                assert!(
+                    crate::cards::occupations_blocked(&set, &c.players[0]),
+                    "E101 must end occupation play in every path"
+                );
+            }
+        }
     }
 
     /// The Interrupt phase must be reachable: a handler that needs a decision
@@ -4057,6 +4270,7 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut pending = None;
+        let mut bonus_ledger = crate::model::BonusPointLedger::new();
         let mut budget = 64u32;
         let mut uses = BTreeMap::new();
         let limits = BTreeMap::new();
@@ -4075,6 +4289,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut bonus_ledger,
         )
         .unwrap();
         assert_eq!(
@@ -4098,6 +4313,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut bonus_ledger,
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 5, "fee 3 + cost 0 -> 3 wood");
@@ -4118,6 +4334,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut bonus_ledger,
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 5, "no food paid -> no gain");

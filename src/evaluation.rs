@@ -425,7 +425,15 @@ fn project_play_card(
         definitions: obs.card_definitions.clone(),
     };
     let mut hand = obs.hand.clone();
-    crate::cards::play(&set, &mut hand, player, id, kind, fee).ok()?;
+    // Projection only: the stored bonus points of a hypothetical play stay in a
+    // scratch ledger. They are public end-of-game points, not supplies, and the
+    // terminal standings (which MCTS reads) use the real `Game::standings`.
+    let mut ledger = crate::model::BonusPointLedger::new();
+    let mut bonus = crate::cards::PlayBonusContext {
+        round: obs.public.round,
+        ledger: &mut ledger,
+    };
+    crate::cards::play(&set, &mut hand, player, id, kind, fee, &mut bonus).ok()?;
     Some(())
 }
 

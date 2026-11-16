@@ -299,8 +299,15 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation {
+                    ..
+                }
+                | crate::cards::CardEffect::OnPlayBonusPointsPerUnstartedStage { .. } => {
+                    EventKind::CardPlayed
+                }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
+                | crate::cards::CardEffect::BlockFurtherOccupations
                 | crate::cards::CardEffect::EndGameBonus { .. } => continue,
                 #[cfg(test)]
                 crate::cards::CardEffect::PendingProbe { .. } => continue,
@@ -371,7 +378,8 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         crate::cards::CardEffect::EndGameBonus { .. }
                         | crate::cards::CardEffect::Prerequisite { .. }
-                        | crate::cards::CardEffect::Passive { .. } => 1,
+                        | crate::cards::CardEffect::Passive { .. }
+                        | crate::cards::CardEffect::BlockFurtherOccupations => 1,
                         #[cfg(test)]
                         crate::cards::CardEffect::PendingProbe { .. } => 1,
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
@@ -390,6 +398,12 @@ impl CardRegistryBuilder {
                         }
                         | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed {
                             amount, ..
+                        }
+                        | crate::cards::CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation {
+                            points: amount,
+                        }
+                        | crate::cards::CardEffect::OnPlayBonusPointsPerUnstartedStage {
+                            points: amount,
                         }
                         | crate::cards::CardEffect::AfterOccupationGainPerFoodCost {
                             amount, ..

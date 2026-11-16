@@ -515,7 +515,15 @@ fn card_priority(
     use crate::cards::CardEffect;
     let mut after = player.clone();
     let mut hand = vec![card.id.clone()];
-    crate::cards::play(set, &mut hand, &mut after, &card.id, card.kind, fee).ok()?;
+    let mut ledger = crate::model::BonusPointLedger::new();
+    let mut bonus = crate::cards::PlayBonusContext {
+        round,
+        ledger: &mut ledger,
+    };
+    crate::cards::play(
+        set, &mut hand, &mut after, &card.id, card.kind, fee, &mut bonus,
+    )
+    .ok()?;
     let mut value = i64::from(after.card_points - player.card_points) * 6;
     for good in [
         Good::Food,
@@ -562,6 +570,23 @@ fn card_priority(
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount, .. } => {
                 card_good_value(*good) * i64::from(*amount)
             }
+            // E098/E101: event-earned bonus points are worth the same as any
+            // other point in the heuristic (printed points count 6 each above).
+            // The canonical function evaluates the exact play-time award, so
+            // the estimate matches what the engine stores.
+            CardEffect::OnPlayBonusPointsPerImprovementIfFirstOccupation { .. }
+            | CardEffect::OnPlayBonusPointsPerUnstartedStage { .. } => {
+                i64::from(crate::cards::on_play_bonus_points(
+                    effect,
+                    set,
+                    &after,
+                    &after.played_cards,
+                    round,
+                )) * 6
+            }
+            // A play restriction has no immediate point value; penalize it so
+            // the heuristic does not overrate a card that ends occupation play.
+            CardEffect::BlockFurtherOccupations => -horizon * 4,
             CardEffect::Passive { .. } => horizon * 5,
             CardEffect::EndGameBonus { .. } => 12,
             CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,

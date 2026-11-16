@@ -404,3 +404,40 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
 `https://agricola.cloudfree.jp/cardlist/` と各カード個別ページ（E098 `?p=2655`、
 E099 `?p=2654`、E100 `?p=2653`、E101 `?p=2652`、C098 `?p=2991`、C099 `?p=2990`、
 D099 `?p=2822`、A100 `?p=3325`）。原文の転載はせず、上表は自分の言葉の要約。
+
+### 基盤後 第1章: ボーナス点の持ち場で解放されるカード E098 神童 / E101 はみだし者（ブランチ `feat/deepai-bonus-cards-01`）
+
+- 追加した効果語彙（`CardEffect`）:
+  - `OnPlayBonusPointsPerImprovementIfFirstOccupation { points }`（E098）
+  - `OnPlayBonusPointsPerUnstartedStage { points }`（E101）
+  - `BlockFurtherOccupations`（E101 の以後職業禁止。宣言のみで、`cards::can_play` が強制）
+- 正本: `cards::on_play_bonus_points`（1効果の点数計算）と
+  `cards::store_on_play_bonus_points`（台帳への記録）。**cards.rs 正本・dispatcher・legacy の
+  3経路が同じ関数を呼ぶ**ため、経路間で点数が食い違い得ない。
+- dispatcher: `dispatch_play` に `bonus_points` を渡し、Before フェーズ解決後に
+  play-time ボーナスを1回だけ記帳（イベント予算・カード使用上限の既存経路を通す）。
+  generic scan 側は `effect_condition_holds` が false を返すため二重発火しない。
+- 正本 `cards::play` / `apply_on_play_effects` と legacy は `PlayBonusContext { round, ledger }`
+  を受け取る形に変更（仮想評価の evaluation/policy は捨て台詞の台帳を渡す）。
+  テスト用に `#[cfg(test)] play_in_test` を用意。
+- E101 の職業禁止: `cards::can_play` で `occupations_blocked` を検査。engine の
+  `play_validate_pay`・`legal_spaces`・`hints`・legacy `cards::play` はすべて `can_play` を
+  通るため、候補列挙と実行の両方で一貫して禁止される。
+- カード定義: `verified_band_e_cards()` に E098/E101 を追加（A/B 2人用プリセット35枚は不変）。
+- 評価: `policy.rs::card_priority` は canonical 計算でボーナス点を価値に換算し、
+  E101 の禁止は残りラウンド分の減点として扱う（評価関数本体の台帳読み込みは継続課題）。
+- テスト（9件追加、`cargo test --locked` **666 passed / 0 failed**）:
+  - cards: E098 の初回職業条件・進歩数の数え方・2枚目以降0点、E101 のラウンド別点数
+    （1/4→5, 5→4, 8→3, 10→2, 12→1, 14→0）と職業禁止、`stage_of_round` の全14ラウンド。
+  - card_events: **3経路一致テスト**（同じ論理状態を `cards::play`／legacy／`dispatch_play`
+    で実行し、台帳・供給・プレイ済みカード・印刷点が一致することを E098/E101・複数ラウンドで確認）。
+  - tests/bonus_cards_e098_e101.rs: 実エンジンで MeetingPlace+小進歩→Lessons で E098（1点）、
+    次ラウンドに E101（5点）→合計6点が `card_bonus` に入り `cards`(印刷点) は0のまま、
+    保存復元・改竄拒否、E101 後の職業禁止（次ラウンドの `legal_spaces` から Lessons が消え、
+    直接操作も拒否）、E098 が2枚目の職業なら0点、A/Bプリセット非混入。
+- 追加フックが要るため今回見送ったカード（基盤の次に必要なもの）:
+  - E100 博物館の館長 → 労働フェイズ開始時フック（ラウンド開始効果とは別のタイミング）
+  - E099 無関心な親 → 収穫終了時フック
+  - A100 後見人 → 帰宅フェイズフック＋任意の食料支払い
+  - C098 サイコロ彫り / C099 ガーデンデザイナー / D099 土器作り → 任意交換・得点時選択・
+    プレイラウンド記録（いずれもプレイヤー決定基盤）
