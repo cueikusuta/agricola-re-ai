@@ -51,8 +51,8 @@ impl Node {
 
 /// Creates a plausible full state from *only* public information.
 /// The remaining round cards are sampled independently within each stage.
-/// This is a rollout approximation: past Well purchase times are not part
-/// of Observation, so pending Well rewards cannot be reconstructed.
+/// This is a rollout approximation: well_food_schedule (public mirror of delayed_well,
+/// added in PR #265) IS part of Observation and IS reconstructed here.
 /// Rebuild the hidden card partition from the observing player's information.
 /// Unknown cards are shuffled separately by kind; opponent cards are never copied
 /// from the real Game, even when the caller has a reference to that Game.
@@ -144,6 +144,12 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     .ok()?;
     game.public = obs.public.clone();
     game.cards = cards;
+    // Restore well schedules from Observation (PR #265 added well_food_schedule to Observation).
+    // Both delayed_well and well_food_schedule are kept in sync in the real engine
+    // (engine.rs buy_improvement updates both), so we mirror the observation's
+    // well_food_schedule into both maps for accurate determinization.
+    game.well_food_schedule = obs.well_food_schedule.clone();
+    game.delayed_well = obs.well_food_schedule.clone();
     let mut deck = Vec::new();
     for stage in 1..=6 {
         let mut remaining = RoundCard::ALL
@@ -1030,6 +1036,79 @@ mod tests {
         assert_eq!(
             digest, "a024ed2ee08bad2a70262613afa86f07d89686e4f28cb17c0a6415d700104e99",
             "sample_game distribution changed — update this test only if intentional"
+        );
+    }
+
+    /// Reproduction test for the well_food_schedule loss bug.
+    /// Observation includes well_food_schedule (PR #265) but sample_game was not restoring it.
+    #[test]
+    fn well_food_schedule_preserved_in_sample_game() {
+        use crate::cards::verified_basic_card_set;
+        use crate::mcts::sample_game;
+        use crate::model::{Config, Game};
+        use rand_chacha::ChaCha8Rng;
+
+        // Create a game with cards
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                seed: 42,
+                ..Config::default()
+            },
+            set,
+        )
+        .unwrap();
+
+        // Manually add a well purchase to delayed_well and well_food_schedule
+        // Round 3 purchase -> food at rounds 4-8 (5 rounds of food)
+        for r in 4..=8 {
+            game.delayed_well.entry(r).or_default().push(0);
+            game.well_food_schedule.entry(r).or_default().push(0);
+        }
+
+        // Get observation (includes well_food_schedule)
+        let obs = game.observation(0).unwrap();
+
+        // Sample game from observation
+        let mut rng = ChaCha8Rng::seed_from_u64(0xCAFE_BABE_DEAD_BEEF);
+        let sampled = sample_game(&obs, &mut rng).expect("sample_game must succeed");
+
+        // well_food_schedule must be preserved (comes from Observation)
+        assert_eq!(
+            sampled.well_food_schedule, obs.well_food_schedule,
+            "well_food_schedule should be preserved in sample_game"
+        );
+
+        // delayed_well must also be preserved (used by start_round for food distribution)
+        assert_eq!(
+            sampled.delayed_well, game.delayed_well,
+            "delayed_well should be preserved in sample_game"
+        );
+
+        // Test start_round food distribution in original game
+        let mut food_before = game.public.players[0].supply.food;
+        // Advance to round 4
+        while game.public.round < 4 {
+            game.start_round();
+        }
+        let food_after_orig = game.public.players[0].supply.food;
+        assert_eq!(
+            food_after_orig - food_before,
+            1,
+            "Original game should receive 1 food at round 4"
+        );
+
+        // Test start_round food distribution in sampled game
+        let mut sampled_game = sampled;
+        food_before = sampled_game.public.players[0].supply.food;
+        while sampled_game.public.round < 4 {
+            sampled_game.start_round();
+        }
+        let food_after_sampled = sampled_game.public.players[0].supply.food;
+        assert_eq!(
+            food_after_sampled - food_before,
+            1,
+            "Sampled game should also receive 1 food at round 4"
         );
     }
 }
