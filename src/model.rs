@@ -1154,10 +1154,17 @@ impl Game {
             if actual != expected {
                 return Err("saved game bookkeeping integrity mismatch".into());
             }
-        } else if result.pending.is_some() {
-            // A legacy save can never carry a pending decision; if one shows up
-            // the file was tampered with.
-            return Err("legacy save must not carry a pending decision".into());
+        } else {
+            // Legacy save (no integrity_hash): must not carry a pending decision
+            // (pre-Step3 games never paused mid-action) and must not carry a
+            // non-empty bonus_points ledger (the store was introduced with the
+            // integrity stamp, so any stamped save without the stamp is tampered).
+            if result.pending.is_some() {
+                return Err("legacy save must not carry a pending decision".into());
+            }
+            if !result.bonus_points.is_empty() {
+                return Err("legacy save must not carry a non-empty bonus point store".into());
+            }
         }
         Ok(result)
     }
