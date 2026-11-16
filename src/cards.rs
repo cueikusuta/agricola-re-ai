@@ -128,6 +128,25 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// E099 無関心な親 (Uncaring Parents): at the end of each harvest, if the
+    /// owner lives in a stone house, store `points` bonus points.
+    ///
+    /// Earned bonus points cannot live on `Player` (they are bookkeeping in
+    /// `Game::bonus_points`, see `crate::model::BonusPointLedger`), so this
+    /// effect is awarded by `card_events::dispatch_harvest_end`'s dedicated
+    /// block and never by the generic phase scan.
+    HarvestEndBonusPointsIfStoneHouse {
+        points: u32,
+    },
+    /// E100 博物館の館長 (Museum Caretaker): at the start of each work phase
+    /// (the round-start trigger point, after that round's accumulation), if the
+    /// owner's stock holds at least one item of `goods`, store `points` bonus
+    /// points. Awarded by `card_events::dispatch_start_round`'s dedicated
+    /// block, never by the generic phase scan.
+    StartRoundBonusPointsIfStockHasOneOf {
+        goods: Vec<Good>,
+        points: u32,
+    },
 }
 
 impl CardEffect {
@@ -165,8 +184,27 @@ impl CardEffect {
             CardEffect::OnPlayGainPerImprovementPlayed { .. } => {
                 "on_play_gain_per_improvement_played"
             }
+            CardEffect::HarvestEndBonusPointsIfStoneHouse { .. } => {
+                "harvest_end_bonus_points_if_stone_house"
+            }
+            CardEffect::StartRoundBonusPointsIfStockHasOneOf { .. } => {
+                "start_round_bonus_points_if_stock_has_one_of"
+            }
         }
     }
+}
+
+/// Event sites whose bonus-point awards are stored by the dispatcher's
+/// dedicated blocks (the ledger is not part of `Player`, so it cannot be
+/// reached from the generic effect handler signature).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BonusEventSite {
+    /// Round start = the beginning of the work phase (the round's
+    /// accumulation already happened, no worker has been placed yet).
+    StartRound,
+    /// The end of a harvest: after the breeding phase and before the next
+    /// round begins.
+    HarvestEnd,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -354,6 +392,10 @@ impl CardSet {
                         | CardEffect::HarvestFieldGain { amount, .. }
                         | CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | CardEffect::AfterClayConstructionGain { amount, .. }
+                        | CardEffect::HarvestEndBonusPointsIfStoneHouse { points: amount }
+                        | CardEffect::StartRoundBonusPointsIfStockHasOneOf {
+                            points: amount, ..
+                        }
                         | CardEffect::AfterHarvestBakeGain { amount } => *amount,
                     };
                     amount == 0 || amount > 30
@@ -1957,9 +1999,90 @@ mod verified_worker_bonus_tests {
     }
 }
 
+/// True when `effect` is a bonus-point effect of `site`, regardless of whether
+/// its condition currently holds. Site membership lives here only, so the award
+/// computation and the dispatcher's budget consumption cannot drift apart.
+fn event_bonus_effect_matches_site(site: BonusEventSite, effect: &CardEffect) -> bool {
+    matches!(
+        (site, effect),
+        (
+            BonusEventSite::StartRound,
+            CardEffect::StartRoundBonusPointsIfStockHasOneOf { .. }
+        ) | (
+            BonusEventSite::HarvestEnd,
+            CardEffect::HarvestEndBonusPointsIfStoneHouse { .. }
+        )
+    )
+}
+
+/// Canonical computation of one event-time bonus-point effect (正本).
+///
+/// The dispatcher's dedicated blocks and the legacy mirrors all call this
+/// function, so a card can never award different points depending on which
+/// path resolved it. `site` selects which event is being resolved: an effect
+/// only pays out at its own site, so a harvest-end award can never leak into a
+/// round start (or the other way round).
+pub fn event_bonus_points(site: BonusEventSite, effect: &CardEffect, player: &Player) -> i32 {
+    if !event_bonus_effect_matches_site(site, effect) {
+        return 0;
+    }
+    let points = match effect {
+        CardEffect::StartRoundBonusPointsIfStockHasOneOf { goods, points }
+            if goods.iter().any(|good| player.supply.get(*good) > 0) =>
+        {
+            *points
+        }
+        CardEffect::HarvestEndBonusPointsIfStoneHouse { points }
+            if player.house == House::Stone =>
+        {
+            *points
+        }
+        _ => 0,
+    };
+    i32::try_from(points).unwrap_or(i32::MAX)
+}
+
+/// Store every event-time bonus award of `card_id` at `site` into `ledger` (正本).
+///
+/// Zero awards leave no entry behind, so a conditional card that did not
+/// trigger keeps the ledger (and the serialized save) unchanged.
+pub fn store_event_bonus_points(
+    set: &CardSet,
+    player: &Player,
+    card_id: &str,
+    site: BonusEventSite,
+    ledger: &mut crate::model::BonusPointLedger,
+) -> Result<(), String> {
+    let Some(card) = set.definition(card_id) else {
+        return Ok(());
+    };
+    let mut total = 0i32;
+    for effect in &card.effects {
+        total = total
+            .checked_add(event_bonus_points(site, effect, player))
+            .ok_or("event bonus point overflow")?;
+    }
+    crate::model::add_bonus_points(ledger, player.id, card_id, total)
+}
+
+/// True when `card_id` declares an event-time bonus-point effect for `site`.
+/// The dispatcher uses it to consume one event-budget unit per resolving
+/// effect, mirroring a normal handler.
+pub fn has_event_bonus_effect(set: &CardSet, card_id: &str, site: BonusEventSite) -> bool {
+    set.definition(card_id).is_some_and(|card| {
+        card.effects
+            .iter()
+            .any(|effect| event_bonus_effect_matches_site(site, effect))
+    })
+}
+
 /// Deterministic public start-of-round rewards. Evaluates the owner's state
 /// when the round begins, not when the card was originally played.
-pub fn start_round_rewards(set: &CardSet, player: &mut Player) -> Result<(), String> {
+pub fn start_round_rewards(
+    set: &CardSet,
+    player: &mut Player,
+    bonus_points: &mut crate::model::BonusPointLedger,
+) -> Result<(), String> {
     for id in player.played_cards.clone() {
         let card = set.definition(&id).ok_or("unknown played card")?;
         for effect in &card.effects {
@@ -1982,6 +2105,28 @@ pub fn start_round_rewards(set: &CardSet, player: &mut Player) -> Result<(), Str
                     safe_gain(player, *good, *amount)?;
                 }
             }
+        }
+        // Event-time bonus points (E100 博物館の館長) go through the same
+        // canonical store the dispatcher uses.
+        if has_event_bonus_effect(set, &id, BonusEventSite::StartRound) {
+            store_event_bonus_points(set, player, &id, BonusEventSite::StartRound, bonus_points)?;
+        }
+    }
+    Ok(())
+}
+
+/// Deterministic end-of-harvest rewards: after the breeding phase, before the
+/// next round begins. Only event-time bonus points exist here today
+/// (E099 無関心な親), and they are stored through the canonical function the
+/// dispatcher also calls.
+pub fn harvest_end_rewards(
+    set: &CardSet,
+    player: &mut Player,
+    bonus_points: &mut crate::model::BonusPointLedger,
+) -> Result<(), String> {
+    for id in player.played_cards.clone() {
+        if has_event_bonus_effect(set, &id, BonusEventSite::HarvestEnd) {
+            store_event_bonus_points(set, player, &id, BonusEventSite::HarvestEnd, bonus_points)?;
         }
     }
     Ok(())
@@ -2241,10 +2386,10 @@ mod round_and_harvest_card_tests {
     fn b057_works_only_in_wooden_house() {
         let mut p = Player::new(0, 0);
         p.played_cards.push("B057".into());
-        start_round_rewards(&set(), &mut p).unwrap();
+        start_round_rewards(&set(), &mut p, &mut Default::default()).unwrap();
         assert_eq!(p.supply.food, 1);
         p.house = House::Clay;
-        start_round_rewards(&set(), &mut p).unwrap();
+        start_round_rewards(&set(), &mut p, &mut Default::default()).unwrap();
         assert_eq!(p.supply.food, 1);
     }
     #[test]
@@ -2287,10 +2432,10 @@ mod round_and_harvest_card_tests {
     fn b118_requires_exactly_two_physical_rooms() {
         let mut p = Player::new(0, 0);
         p.played_cards.push("B118".into());
-        start_round_rewards(&set(), &mut p).unwrap();
+        start_round_rewards(&set(), &mut p, &mut Default::default()).unwrap();
         assert_eq!(p.supply.wood, 1);
         p.farm[1].tile = Tile::Room;
-        start_round_rewards(&set(), &mut p).unwrap();
+        start_round_rewards(&set(), &mut p, &mut Default::default()).unwrap();
         assert_eq!(p.supply.wood, 1);
     }
 }
@@ -2588,10 +2733,10 @@ mod simple_occupation_tests {
         };
         let mut p = Player::new(0, 0);
         p.played_cards.push("B107".into());
-        start_round_rewards(&set, &mut p).unwrap();
+        start_round_rewards(&set, &mut p, &mut Default::default()).unwrap();
         assert_eq!(p.supply.food, 0);
         p.house = House::Stone;
-        start_round_rewards(&set, &mut p).unwrap();
+        start_round_rewards(&set, &mut p, &mut Default::default()).unwrap();
         assert_eq!(p.supply.food, 3);
     }
     #[test]
@@ -3150,6 +3295,40 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 gain(Space::ResourceMarket, Good::Wood, 1),
             ],
         },
+        // E099 無関心な親 (Uncaring Parents): at the end of each harvest, if
+        // the owner lives in a stone house, 1 bonus point
+        // (agricola.cloudfree.jp ?p=2654). Earned points go to the
+        // bookkeeping ledger, not to the printed card points.
+        CardDefinition {
+            use_limit: None,
+            id: "E099".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::HarvestEndBonusPointsIfStoneHouse { points: 1 }],
+        },
+        // E100 博物館の館長 (Museum Caretaker): at the start of each work
+        // phase, 1 bonus point if the owner's stock holds at least one wood,
+        // clay, reed, stone, grain or vegetable (animals and food do not
+        // count) (agricola.cloudfree.jp ?p=2653).
+        CardDefinition {
+            use_limit: None,
+            id: "E100".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::StartRoundBonusPointsIfStockHasOneOf {
+                goods: vec![
+                    Good::Wood,
+                    Good::Clay,
+                    Good::Reed,
+                    Good::Stone,
+                    Good::Grain,
+                    Good::Vegetable,
+                ],
+                points: 1,
+            }],
+        },
     ]
 }
 
@@ -3361,13 +3540,13 @@ mod verified_band_e_tests {
         });
         let mut p = Player::new(0, 0);
         p.played_cards.push("E111".into());
-        start_round_rewards(&set, &mut p).unwrap();
+        start_round_rewards(&set, &mut p, &mut Default::default()).unwrap();
         assert_eq!(p.supply.food, 1);
         harvest_field_rewards(&set, &mut p).unwrap();
         assert_eq!(p.supply.wood, 1);
         // 小進歩を出した後は両方とも得られない。
         p.played_cards.push("minor1".into());
-        start_round_rewards(&set, &mut p).unwrap();
+        start_round_rewards(&set, &mut p, &mut Default::default()).unwrap();
         assert_eq!(p.supply.food, 1);
         harvest_field_rewards(&set, &mut p).unwrap();
         assert_eq!(p.supply.wood, 1);
@@ -3413,6 +3592,121 @@ mod verified_band_e_tests {
         after_worker(&set, &mut p, Space::Forest).unwrap();
         after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
         assert_eq!(p.supply.wood, 4);
+    }
+
+    fn event_set() -> CardSet {
+        CardSet {
+            definitions: verified_band_e_cards(),
+        }
+    }
+
+    #[test]
+    fn e099_points_only_at_the_harvest_end_and_only_in_a_stone_house() {
+        let set = event_set();
+        let e099 = set.definition("E099").expect("E099 exists");
+        assert_eq!(e099.kind, CardKind::Occupation);
+        assert!(e099.cost.is_empty());
+        assert_eq!(e099.points, 0, "the printed points stay 0");
+        let effect = &e099.effects[0];
+        let mut p = Player::new(0, 0);
+        for (house, expected) in [(House::Wood, 0), (House::Clay, 0), (House::Stone, 1)] {
+            p.house = house;
+            assert_eq!(
+                event_bonus_points(BonusEventSite::HarvestEnd, effect, &p),
+                expected
+            );
+            // ボーナス点は収穫終了でのみ発生する（ラウンド開始では0）。
+            assert_eq!(
+                event_bonus_points(BonusEventSite::StartRound, effect, &p),
+                0
+            );
+        }
+        assert!(has_event_bonus_effect(
+            &set,
+            "E099",
+            BonusEventSite::HarvestEnd
+        ));
+        assert!(!has_event_bonus_effect(
+            &set,
+            "E099",
+            BonusEventSite::StartRound
+        ));
+    }
+
+    #[test]
+    fn e100_counts_six_goods_but_not_food_or_animals() {
+        let set = event_set();
+        let e100 = set.definition("E100").expect("E100 exists");
+        assert_eq!(e100.kind, CardKind::Occupation);
+        assert!(e100.cost.is_empty());
+        assert_eq!(e100.points, 0, "the printed points stay 0");
+        let effect = &e100.effects[0];
+        let mut p = Player::new(0, 0);
+        assert_eq!(
+            event_bonus_points(BonusEventSite::StartRound, effect, &p),
+            0
+        );
+        for good in [
+            Good::Wood,
+            Good::Clay,
+            Good::Reed,
+            Good::Stone,
+            Good::Grain,
+            Good::Vegetable,
+        ] {
+            let mut q = Player::new(0, 0);
+            q.supply.set(good, 1);
+            assert_eq!(
+                event_bonus_points(BonusEventSite::StartRound, effect, &q),
+                1,
+                "{good:?} alone must trigger E100"
+            );
+        }
+        // 食料と家畜は対象外。
+        let mut food_only = Player::new(0, 0);
+        food_only.supply.set(Good::Food, 9);
+        assert_eq!(
+            event_bonus_points(BonusEventSite::StartRound, effect, &food_only),
+            0
+        );
+        assert_eq!(
+            event_bonus_points(BonusEventSite::HarvestEnd, effect, &p),
+            0
+        );
+    }
+
+    #[test]
+    fn event_bonus_store_keeps_zero_awards_out_of_the_ledger() {
+        let set = event_set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E099".into());
+        p.house = House::Clay;
+        let mut ledger = crate::model::BonusPointLedger::new();
+        harvest_end_rewards(&set, &mut p, &mut ledger).unwrap();
+        assert!(
+            ledger.is_empty(),
+            "a failed condition must not add an entry"
+        );
+        p.house = House::Stone;
+        harvest_end_rewards(&set, &mut p, &mut ledger).unwrap();
+        harvest_end_rewards(&set, &mut p, &mut ledger).unwrap();
+        assert_eq!(crate::model::bonus_points_total(&ledger, 0), 2);
+        // 印刷点には加算しない。
+        assert_eq!(p.card_points, 0);
+    }
+
+    #[test]
+    fn start_round_rewards_store_e100_points() {
+        let set = event_set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E100".into());
+        let mut ledger = crate::model::BonusPointLedger::new();
+        start_round_rewards(&set, &mut p, &mut ledger).unwrap();
+        assert!(ledger.is_empty(), "an empty stock earns nothing");
+        p.supply.set(Good::Reed, 1);
+        start_round_rewards(&set, &mut p, &mut ledger).unwrap();
+        start_round_rewards(&set, &mut p, &mut ledger).unwrap();
+        assert_eq!(crate::model::bonus_points_total(&ledger, 0), 2);
     }
 }
 #[cfg(test)]

@@ -557,6 +557,14 @@ fn card_priority(
             | CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount, .. } => {
                 card_good_value(*good) * i64::from(*amount) * horizon / 2
             }
+            // E099/E100 pay bonus points instead of goods: one point per
+            // remaining event at most (the horizon caps it), deliberately
+            // below a printed card point (6x) because the condition may never
+            // hold in a given game.
+            CardEffect::HarvestEndBonusPointsIfStoneHouse { points }
+            | CardEffect::StartRoundBonusPointsIfStockHasOneOf { points, .. } => {
+                i64::from(*points) * horizon
+            }
             // A117: one grant per improvement already played, evaluated once
             // at play time.
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount, .. } => {
