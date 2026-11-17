@@ -44,4 +44,23 @@
 - 成果物: `docs/layer1-2-card-survey.md`。Rust・仕様 JSON・テストは変更していない。
 - PR #355 を作成（base は #354 のブランチ）。マージしない。
 
-### 第3部: ボーナス点 残り4枚の解放条件（ブランチ `research/deepai-bonus-remaining-unblock`）— 未着手
+### 第3部: ボーナス点 残り4枚の解放条件（ブランチ `research/deepai-bonus-remaining-unblock`）— **完了（PR 作成のみ）**
+
+- 基準: `research/deepai-layer1-2-survey`（PR #355）の Head。第2部の `PROGRESS.md` /
+  `result-deepai.md` を継承し、PR の base は #355 のブランチに置く（スタック）。
+- 対象: C098 サイコロ彫り / C099 ガーデンデザイナー / D099 土器作り / A100 後見人。
+- 成果物: `docs/bonus-remaining-unblock.md`。Rust・仕様 JSON・テストは変更していない。
+- **G0（ボーナス台帳の一本化）は赤**。`feat/deepai-bonus-point-store` の HEAD `1caa250` は
+  `cargo test --locked --no-run` が **E0061 20件**で失敗（2026-11-17 再確認）。#332 は
+  古い base `308ce83` の上にあり CONFLICTING。まず #327 のテスト修正 → #332/#328 の rebase
+  が必要。
+- 4枚の本体は台帳ではなく、次の位相・決定基盤:
+  - G1 収穫トランザクション（C098, D099）
+  - G2 最終収穫後フェイズ（D099）
+  - G3 得点フェイズの意思決定（C099）
+  - G4 帰宅フェイズ＋プレイヤー別使用スペース（A100）
+- E100 の H-1（OR/AND）は #332 を止めるが、4枚は E100 に依存しない。台帳 → 4枚 →
+  E099/E100 の分離を推奨。
+- 人間確認 H3-1〜H3-5: C098 の1収穫回数、A100 の累積スペース定義、C099 のカード畑、
+  C099 の 2/3/5/6、E100 の H-1 と #332 分離。
+- PR は作成のみ。マージしない。
