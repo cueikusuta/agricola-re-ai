@@ -375,3 +375,12 @@ PR #344 / Issue #345 が文献で解消した2件は、本稿でも確定済み�
 - 既存の設計記録: `docs/rule-decisions.md` のボーナス点の持ち場（#327）、
   `DEEPAI_PROGRESS.md` 第3章（#344）。
 - 原文・画像・PDF はリポジトリに含めない。本文は自分の言葉の要約のみ。
+
+## 8. 本稿の検証
+
+- `git worktree add --detach ../agri-b327 1caa250`
+- `CARGO_TARGET_DIR=/tmp/agri-b327-target cargo test --locked --no-run`
+  - 結果: `error: could not compile ... due to 20 previous errors`（E0061）。
+  - `cards::play` の `bonus_points` 引数がテスト側の呼び出しに足りない。
+- 一時 worktree と一時 target は削除済み。リポジトリの作業ツリーには残していない。
+- 2026-11-17 時点の #332 の merge-base は `308ce83`。`git merge-base origin/feat/deepai-bonus-point-store origin/feat/deepai-bonus-cards-02` で確認。
