@@ -24,7 +24,7 @@ use crate::cards::CardSet;
 use crate::engine::{Action, FreeAction};
 use crate::harvest::{HarvestDetailPolicy, SimpleHarvestDetails};
 use crate::model::{Config, Event, Game, Observation, Space};
-use crate::score::{standings_with_cards, Standings};
+use crate::score::Standings;
 use serde::Serialize;
 
 /// A reproducible game owned by a **trusted** coordinator.
@@ -213,7 +213,7 @@ impl Episode {
         if !self.is_terminal() {
             return None;
         }
-        let standings = standings_with_cards(&self.game.public.players, &self.game.card_set);
+        let standings = self.game.standings();
         Some(EpisodeResult {
             rounds: self.game.public.round,
             first_credit: first_credit(&standings.rank),

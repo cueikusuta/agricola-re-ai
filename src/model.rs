@@ -541,6 +541,61 @@ pub struct PublicState {
     pub additional_action_space_enabled: bool,
     pub finished: bool,
 }
+/// Per-player store of bonus points that a card awards at a specific moment
+/// (when it is played, at a round start, during a harvest) rather than
+/// recomputing them from the final farm at scoring time.
+///
+/// Why this is not part of `Player`:
+/// * `Player.card_points` is the cached sum of the PRINTED points of the cards
+///   in the played area, and `CardState::validate_card_points` enforces exactly
+///   that invariant. Event-earned bonus points must never be folded into it.
+/// * A new `Player` field would enter `PublicState`, which is part of the frozen
+///   `LOG_VERSION=5` `Game::state_hash` tuple, so every recorded hash (and the
+///   v5 fixtures) would change.
+///
+/// The store therefore lives on `Game` as bookkeeping: it is excluded from
+/// `state_hash`, covered by `integrity_hash`, and skipped when serializing while
+/// empty, so pre-existing saves stay byte-identical.
+///
+/// Outer key: player id. Inner key: the played card that earned the points.
+pub type BonusPointLedger = BTreeMap<usize, BTreeMap<String, i32>>;
+
+/// Bonus points `player` has stored in the ledger (0 when absent).
+pub fn bonus_points_total(ledger: &BonusPointLedger, player: usize) -> i32 {
+    ledger
+        .get(&player)
+        .map(|cards| cards.values().copied().sum())
+        .unwrap_or(0)
+}
+
+/// Record `points` bonus points that `card_id` earned for `player`.
+///
+/// This is pure bookkeeping: the caller (a card effect handler) decides the
+/// timing, and `Game::validate` later checks that the credited card is actually
+/// in that player's played area. A zero award is a no-op so a conditional card
+/// never leaves an empty entry behind.
+pub fn add_bonus_points(
+    ledger: &mut BonusPointLedger,
+    player: usize,
+    card_id: &str,
+    points: i32,
+) -> Result<(), String> {
+    if points == 0 {
+        return Ok(());
+    }
+    if points < 0 {
+        return Err("stored bonus points must not be negative".into());
+    }
+    let entry = ledger
+        .entry(player)
+        .or_default()
+        .entry(card_id.to_owned())
+        .or_insert(0);
+    let next = entry.checked_add(points).ok_or("bonus point overflow")?;
+    *entry = next;
+    Ok(())
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RngStreams {
     pub round: ChaCha8Rng,
@@ -596,10 +651,22 @@ pub struct Game {
     /// Next decision ID for PendingDecision.
     #[serde(default)]
     pub next_decision_id: u64,
+    /// Event-earned bonus points (see [`BonusPointLedger`]). Bookkeeping only:
+    /// kept out of the frozen v5 `state_hash` tuple, covered by
+    /// `integrity_hash`, and omitted from the serialized form while empty so
+    /// older saves round-trip byte-for-byte.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub bonus_points: BonusPointLedger,
 }
 
 /// Maximum effect resolutions inside one action's effect chain (loop guard).
 pub const DEFAULT_EVENT_BUDGET: u32 = 64;
+
+/// Sanity bound for the bonus points a single card may store. No implemented
+/// card awards more than one per round/harvest (at most 14), so the bound only
+/// rejects a corrupted or hand-edited save instead of letting it inflate the
+/// final score by an arbitrary amount.
+pub const MAX_STORED_BONUS_PER_CARD: i32 = 60;
 
 pub fn default_event_budget() -> u32 {
     DEFAULT_EVENT_BUDGET
@@ -662,6 +729,11 @@ pub struct Observation {
     /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
     /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
     pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
+    /// Public mirror of [`Game::bonus_points`] for determinization and for the
+    /// AI's value estimate. Card plays and their effects are public, so the
+    /// stored totals leak nothing hidden (never an opponent hand or the seed).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub bonus_points: BonusPointLedger,
 }
 impl Game {
     pub fn new(config: Config) -> Self {
@@ -801,6 +873,7 @@ impl Game {
             card_uses: BTreeMap::new(),
             card_use_limits: Default::default(),
             next_decision_id: 0,
+            bonus_points: BTreeMap::new(),
         };
         // Per-card use limits are card data (`CardDefinition::use_limit`), so
         // the engine reads them from the set instead of a hard-coded table.
@@ -826,15 +899,34 @@ impl Game {
             hand_counts: self.cards.hands.iter().map(Vec::len).collect(),
             card_definitions: self.card_set.definitions.clone(),
             well_food_schedule: self.well_food_schedule.clone(),
+            bonus_points: self.bonus_points.clone(),
         })
     }
+    /// Bonus points this player has earned from card effects so far (see
+    /// [`BonusPointLedger`]).
+    pub fn stored_bonus_points(&self, player: usize) -> i32 {
+        bonus_points_total(&self.bonus_points, player)
+    }
+
+    /// Record bonus points earned by `card_id` for `player`. The caller (a card
+    /// effect handler) owns the timing; `Game::validate` checks afterwards that
+    /// the credited card really is in that player's played area.
+    pub fn grant_bonus_points(
+        &mut self,
+        player: usize,
+        card_id: &str,
+        points: i32,
+    ) -> Result<(), String> {
+        add_bonus_points(&mut self.bonus_points, player, card_id, points)
+    }
+
     pub fn state_hash(&self) -> String {
         // Event log is intentionally omitted; this is the full game state, including hidden cards and RNG.
         // LOG_VERSION=5 compatibility: the hash tuple MUST stay identical to the
         // v5 format (7 fields, tests/fixtures/v5/*). New bookkeeping fields
-        // (well_food_schedule, pending, event_budget, card_uses, next_decision_id)
-        // are serialized into saves via serde defaults, but are deliberately
-        // EXCLUDED from the hash so legacy v5 fixtures keep verifying.
+        // (well_food_schedule, pending, event_budget, card_uses, next_decision_id,
+        // bonus_points) are serialized into saves via serde defaults, but are
+        // deliberately EXCLUDED from the hash so legacy v5 fixtures keep verifying.
         // well_food_schedule mirrors delayed_well (Finding A) and pending
         // decisions are excluded from the hash; their integrity is enforced by
         // PendingDecision::state_hash_before checks in the resume path instead.
@@ -853,8 +945,9 @@ impl Game {
 
     /// Full integrity hash covering the whole `Game`, including the Step 3
     /// bookkeeping fields (`well_food_schedule`, `pending`, `event_budget`,
-    /// `card_uses`, `next_decision_id`) that `state_hash` deliberately omits for
-    /// LOG_VERSION=5 compatibility.
+    /// `card_uses`, `next_decision_id`) and the earned-bonus-point store
+    /// (`bonus_points`) that `state_hash` deliberately omits for LOG_VERSION=5
+    /// compatibility.
     ///
     /// Use this for save/restore/resume integrity checks on NEW saves:
     /// `state_hash` keeps the v5 replay contract, while `integrity_hash` proves
@@ -862,7 +955,7 @@ impl Game {
     /// byte-for-byte (Issue #266 acceptance: "PendingDecision save/restore/resume
     /// with a consistent state hash").
     pub fn integrity_hash(&self) -> String {
-        let data = serde_json::to_vec(&(
+        let base = serde_json::to_vec(&(
             self.state_hash(),
             &self.well_food_schedule,
             &self.pending,
@@ -872,6 +965,22 @@ impl Game {
             self.next_decision_id,
         ))
         .expect("integrity serialization");
+        // The bonus-point store is appended only while it holds something. A
+        // game that never earns event-time points therefore hashes exactly the
+        // pre-store tuple, so saves stamped by the previous build still verify
+        // (the same compatibility rule the empty `bonus_points` serde skip uses).
+        let data = if self.bonus_points.is_empty() {
+            base
+        } else {
+            let mut data = base;
+            // Domain separator: the ledger cannot be confused with a suffix of
+            // the base tuple's JSON.
+            data.extend_from_slice(b"\0bonus_points\0");
+            data.extend_from_slice(
+                &serde_json::to_vec(&self.bonus_points).expect("bonus point serialization"),
+            );
+            data
+        };
         format!("{:x}", Sha256::digest(&data))
     }
 
@@ -910,6 +1019,7 @@ impl Game {
             card_uses: self.card_uses.clone(),
             card_use_limits: self.card_use_limits.clone(),
             next_decision_id: self.next_decision_id,
+            bonus_points: self.bonus_points.clone(),
         }
     }
     /// Create a search-only position from pre-sampled components.
@@ -932,6 +1042,7 @@ impl Game {
         card_uses: BTreeMap<String, u32>,
         card_use_limits: BTreeMap<String, u32>,
         next_decision_id: u64,
+        bonus_points: BonusPointLedger,
     ) -> Self {
         let start_player = public.start_player;
         let round_seed = config.seed ^ 0x38DB_3BE3_DF45_3FAF;
@@ -967,6 +1078,7 @@ impl Game {
             card_uses,
             card_use_limits,
             next_decision_id,
+            bonus_points,
         }
     }
     pub fn save_json(&self) -> Result<String, String> {
@@ -1042,10 +1154,17 @@ impl Game {
             if actual != expected {
                 return Err("saved game bookkeeping integrity mismatch".into());
             }
-        } else if result.pending.is_some() {
-            // A legacy save can never carry a pending decision; if one shows up
-            // the file was tampered with.
-            return Err("legacy save must not carry a pending decision".into());
+        } else {
+            // Legacy save (no integrity_hash): must not carry a pending decision
+            // (pre-Step3 games never paused mid-action) and must not carry a
+            // non-empty bonus_points ledger (the store was introduced with the
+            // integrity stamp, so any stamped save without the stamp is tampered).
+            if result.pending.is_some() {
+                return Err("legacy save must not carry a pending decision".into());
+            }
+            if !result.bonus_points.is_empty() {
+                return Err("legacy save must not carry a non-empty bonus point store".into());
+            }
         }
         Ok(result)
     }
@@ -1178,6 +1297,23 @@ impl Game {
         }
         for (i, player) in p.players.iter().enumerate() {
             validate_player_state(&p.work_quota, &p.workers_placed, i, player)?;
+        }
+        // Earned-bonus-point store: every entry must belong to a player in this
+        // game and to a card that player actually has in their played area, and
+        // the amount must be a plausible non-negative bonus. Without this the
+        // ledger could credit points to a seat that never played the card.
+        for (&owner, cards) in &self.bonus_points {
+            let Some(player) = p.players.get(owner) else {
+                return Err("bonus point store names an unknown player".into());
+            };
+            for (card_id, points) in cards {
+                if !(1..=MAX_STORED_BONUS_PER_CARD).contains(points) {
+                    return Err("stored bonus points outside the accepted range".into());
+                }
+                if !player.played_cards.iter().any(|id| id == card_id) {
+                    return Err("stored bonus points for a card that is not played".into());
+                }
+            }
         }
         if !self.config.additional_action_space_enabled
             && p.used.iter().any(|s| s.additional_for(self.config.players))

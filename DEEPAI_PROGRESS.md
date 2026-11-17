@@ -516,3 +516,54 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
   に分類完了。以後の作業は共通インフラ設計PR（別議題）または保留理由の解消後に限定する。
 - テスト: コード変更なし。fmt/clippy 合格、`cargo test --locked` **649 passed / 0 failed**
   （第6章と同一）。低リスクの文書変更のため独立再レビューは不要と判断する。
+
+## 現在地（2026-11-16 更新）
+
+- 作業clone: `C:/Users/agent/work/deepai/wt-bonus-points`（worktree。
+  `origin/main` @ `65f2c2b` から分岐）。前セッションの `wt-cards-070-120`
+  （`feat/deepai-cards-c070-120-08`、PR #321）と親cloneの
+  `feat/match-clock-core`（PR #292）には触れていない。
+- テスト基準: origin/main で `cargo test --locked` **649 passed / 0 failed**。
+- 今回は「ボーナス点の持ち場」基盤 → それで解放されるカードの章、の順に進める。
+
+### 基盤: ボーナス点の持ち場（ブランチ `feat/deepai-bonus-point-store`）
+
+- 追加: `src/model.rs` の `BonusPointLedger`（プレイヤーID → カードID → 累計点）と
+  `Game.bonus_points`、`add_bonus_points` / `bonus_points_total`、
+  `Game::grant_bonus_points` / `Game::stored_bonus_points`。
+- `state_hash` の v5 タプルは不変（台帳を含めない）。`integrity_hash` には台帳が非空のときだけ
+  domain separator 付きで追記。空台帳では旧ビルドの `integrity_hash` と完全一致することを
+  固定値テストで確認した。
+- `Observation.bonus_points` に公開ミラーを追加（`serde(default, skip_serializing_if)`）。
+  `mcts::sample_game` はこのミラーを引き継ぐ。
+- 得点: `score_with_cards_and_bonus` / `standings_with_cards_and_bonus` / `Game::standings()`。
+  `api.rs` / `web.rs` / `benchmark.rs` / `episode_data.rs` / `mcts.rs` / `mcts_puct.rs` /
+  `bin/paired_eval.rs` の順位計算を `Game::standings()` 経由に統一（台帳の取りこぼし防止）。
+- 検証: `Game::validate` に台帳の不変条件（実在プレイヤー・自分のプレイ済みカード・1〜60点）。
+- テスト: `tests/bonus_point_store.rs` 8件。
+  - A/B 2人用プリセット35枚の `content_hash` 固定値不変（`e62c95c7…`）
+  - 固定シード対戦（2人/4人、カード有無）の初期・最終 `state_hash` と `integrity_hash`、
+    イベント数が既存ビルドと一致
+  - v5 フィクスチャのロード・保存往復で空台帳がJSONに現れない
+  - 台帳の加算・検証拒否・保存復元・改竄検出・順位反映・観測ミラー
+- 副次: 評価関数（`evaluation.rs`）は台帳をまだ読まない（AI価値推定の改善は次章以降の課題）。
+
+### 基盤後に解放されるカードの分類（A/C/D/E 070〜120 の「ボーナス点」12枚）
+
+| カード | 効果（文献要約） | 基盤だけで実装できるか |
+|---|---|---|
+| E098 神童 | 最初の職業なら、その時点の進歩1つにつき1点 | **可**（プレイ時点で確定） |
+| E101 はみだし者 | プレイ時、未開始ステージ1つにつき1点＋以後職業禁止 | **可**（プレイ時点＋プレイ制限） |
+| E100 博物館の館長 | 各労働フェイズ開始時に資材/作物1つ以上→1点 | 労働フェイズ開始フックが別途必要 |
+| E099 無関心な親 | 各収穫の終わりに石の家→1点 | 収穫終了フックが別途必要 |
+| A100 後見人 | 帰宅フェイズに累積スペースから3人以上戻すごと、飯1で1点 | 帰宅フェイズフック＋任意支払いが必要 |
+| C098 サイコロ彫り | 各収穫の畑フェイズに木1＋飯1→1点（任意） | 任意交換（プレイヤー決定）が必要 |
+| C099 ガーデンデザイナー | 得点計算開始時に空き畑へ飯を置き1/4/7→1/2/3点 | 得点時のプレイヤー決定が必要 |
+| D099 土器作り | ラウンド4までにプレイ＋最後の収穫後にレンガ1で1点（人物数まで） | プレイラウンド記録＋任意支払いが必要 |
+| A098/A101/D100 | 得点計算時に盤面から算出（実装済み） | 台帳不要（`EndGameBonus`） |
+| C100/C101/D101/D107 | 他のフック（出ラウンド・毎ラウンド・使用時）が必要 | 台帳だけでは不可 |
+
+典拠: BGAアグリコラカード情報wiki（agricola.cloudfree.jp）のカード一覧
+`https://agricola.cloudfree.jp/cardlist/` と各カード個別ページ（E098 `?p=2655`、
+E099 `?p=2654`、E100 `?p=2653`、E101 `?p=2652`、C098 `?p=2991`、C099 `?p=2990`、
+D099 `?p=2822`、A100 `?p=3325`）。原文の転載はせず、上表は自分の言葉の要約。

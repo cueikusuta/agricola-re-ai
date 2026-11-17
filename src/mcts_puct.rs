@@ -22,7 +22,6 @@ use crate::evaluation::{action_value_with_details, evaluate_player, WeightedEval
 use crate::mcts::{rollout, sample_game, MctsOutcome, SearchLimit, SearchMode};
 use crate::model::{Game, Observation, Space};
 use crate::policy::{weight, DetailPolicy, SimpleDetails, SpacePolicy};
-use crate::score::standings_with_cards;
 use rand_chacha::ChaCha8Rng;
 use std::collections::BTreeMap;
 use std::time::Instant;
@@ -163,7 +162,7 @@ fn heuristic_credit(game: &Game, temperature: f64) -> Vec<f64> {
 
 /// Terminal outcome credit: `1/k` for a tie of `k` first places, else 0.
 fn terminal_credit(game: &Game) -> Vec<f64> {
-    let ranks = standings_with_cards(&game.public.players, &game.card_set);
+    let ranks = game.standings();
     let top_count = ranks.rank.iter().filter(|&&rank| rank == 1).count() as f64;
     ranks
         .rank

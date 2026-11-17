@@ -19,10 +19,10 @@
 //! either shown unchanged, or downgrades the verdict to `Unsure` so the full
 //! validator arbitrates. A `Pass` is never reachable from a post state that
 //! `validate_full` rejects. This includes `post.cards`, `post.card_set`,
-//! `post.delayed_well`, and `post.public.active_player` which are all fully
-//! verified or downgraded to `Unsure`. The internal RNG state (`post.rng`) is
-//! explicitly excluded from incremental checks and is only validated by
-//! `validate_full` (if at all) — documented here per review P1-A.
+//! `post.delayed_well`, `post.bonus_points`, and `post.public.active_player`
+//! which are all fully verified or downgraded to `Unsure`. The internal RNG
+//! state (`post.rng`) is explicitly excluded from incremental checks and is
+//! only validated by `validate_full` (if at all) — documented here per review P1-A.
 
 use crate::engine::expected_active_player;
 use crate::model::{Game, Tile};
@@ -420,6 +420,16 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
     if post.delayed_well != pre.delayed_well {
         return Verdict::Unsure;
     }
+    // 15. post.bonus_points: the earned-bonus-point ledger. A work move can
+    //     grant bonus points via card effects (e.g., OnPlayGain, StartRoundGain).
+    //     The full validator checks that every entry belongs to a played card.
+    //     If the ledger changed, we cannot cheaply prove the delta is legal
+    //     (requires re-running card effects), so downgrade to Unsure→full.
+    //     This preserves the soundness contract: Pass only when every delta
+    //     is proven legal; any unverified component forces the full validator.
+    if post.bonus_points != pre.bonus_points {
+        return Verdict::Unsure;
+    }
     Verdict::Pass
 }
 
@@ -690,6 +700,13 @@ pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
     // 15. post.delayed_well: Well purchase not possible in free action, but downgrade.
     if post.delayed_well != pre.delayed_well {
         return Verdict::Unsure;
+    }
+    // 16. post.bonus_points: free actions do not trigger card effects that
+    //     grant bonus points (engine.rs execute_free has no cards::play calls
+    //     and no card effect dispatch), so the ledger must be unchanged.
+    //     If it changed, that's a definite violation we can catch with Fail.
+    if post.bonus_points != pre.bonus_points {
+        return Verdict::Fail("bonus_points changed in free action".into());
     }
     Verdict::Pass
 }
@@ -1700,5 +1717,152 @@ mod tests {
                     && post.public.workers_placed != post.public.work_quota
             })
             .expect("no plain mid-round move sampled")
+    }
+
+    /// P1 reproduction: validate_incremental must NOT Pass when bonus_points
+    /// are tampered on an unplayed card. The full validator rejects this, so
+    /// the incremental layer must either Fail (detect the delta) or return
+    /// Unsure (fallback to full). It must never return Pass.
+    #[test]
+    fn tampered_bonus_points_on_unplayed_card_declines_incremental() {
+        // Use a cards-enabled game to get a mid-round transition with a real
+        // player who has cards in hand.
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 101,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xBADF00D);
+        let mut game = game;
+        // Drive to a mid-round state where actor has cards in hand.
+        for _ in 0..6 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            game.apply(action).unwrap();
+        }
+        let pre = game.clone();
+        let actor = pre.public.active_player;
+        // Apply ONE real work move to get a genuine pre/post pair.
+        let id = game.public.active_player;
+        let obs = game.observation(id).unwrap();
+        let legal = game.legal_spaces();
+        let space = RandomPolicy
+            .select(&obs, &legal, &mut rng)
+            .expect("legal space");
+        let action = CardChoiceDetails
+            .produce(&obs, space)
+            .expect("legal detail");
+        game.apply(action).unwrap();
+        let mut post = game.clone();
+
+        // Tamper: add bonus points for a card the actor does NOT have in played_cards.
+        // Pick a card from actor's hand (unplayed) and credit it.
+        let unplayed_card = post.cards.hands[actor]
+            .iter()
+            .find(|id| !post.public.players[actor].played_cards.contains(*id))
+            .cloned()
+            .expect("actor must have at least one unplayed card");
+        post.bonus_points
+            .entry(actor)
+            .or_default()
+            .insert(unplayed_card, 2);
+
+        // Full validation must reject (bonus points for unplayed card).
+        assert!(
+            validate_full(&post).is_err(),
+            "full validation must reject bonus points for unplayed card"
+        );
+
+        // Incremental validation must NOT return Pass.
+        let verdict = validate_incremental(&post, &pre);
+        assert_ne!(
+                verdict,
+                Verdict::Pass,
+                "incremental must not Pass when bonus_points are tampered on unplayed card (got {verdict:?})"
+            );
+        // The fallback wrapper must also reject.
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// P1 reproduction: validate_free_action must NOT Pass when bonus_points
+    /// are tampered on an unplayed card.
+    #[test]
+    fn tampered_bonus_points_on_unplayed_card_declines_free_action() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 103,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xBADF00D2);
+        let mut game = game;
+        // Drive to a state where free actions are available.
+        for _ in 0..8 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            game.apply(action).unwrap();
+        }
+        let pre = game.clone();
+        let actor = pre.public.active_player;
+        // Apply a free action (DiscardGood) to get a genuine free-action transition.
+        let mut post = pre.clone();
+        post.public.players[actor].supply.food = 3;
+        post.apply_free(
+            actor,
+            FreeAction::DiscardGood {
+                good: crate::model::Good::Food,
+                quantity: 1,
+            },
+        )
+        .expect("free action must apply");
+
+        // Tamper: add bonus points for a card the actor does NOT have in played_cards.
+        let unplayed_card = post.cards.hands[actor]
+            .iter()
+            .find(|id| !post.public.players[actor].played_cards.contains(*id))
+            .cloned()
+            .expect("actor must have at least one unplayed card");
+        post.bonus_points
+            .entry(actor)
+            .or_default()
+            .insert(unplayed_card, 2);
+
+        // Full validation must reject.
+        assert!(
+            validate_full(&post).is_err(),
+            "full validation must reject bonus points for unplayed card"
+        );
+
+        // Free action validation must NOT return Pass.
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert_ne!(
+            verdict,
+            Verdict::Pass,
+            "free action validation must not Pass when bonus_points are tampered (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
     }
 }

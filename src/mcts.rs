@@ -5,7 +5,6 @@ use crate::cards::{CardKind, CardSet, CardState};
 use crate::evaluation::{DetailAwareEvaluationPolicy, WeightedEvaluationPolicy};
 use crate::model::{Config, Game, Observation, RoundCard, Space};
 use crate::policy::{CardChoiceDetails, DetailPolicy, GreedyPolicy, SpacePolicy};
-use crate::score::standings_with_cards;
 use rand::{seq::SliceRandom, Rng};
 use rand_chacha::ChaCha8Rng;
 use std::collections::{BTreeMap, BTreeSet};
@@ -144,6 +143,11 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     .ok()?;
     game.public = obs.public.clone();
     game.cards = cards;
+    // The earned-bonus-point store is public (it only credits cards the owner
+    // already played), so the determinization copies the observed mirror
+    // instead of starting empty: a search position must keep the points that
+    // were earned before the sample point.
+    game.bonus_points = obs.bonus_points.clone();
     let mut deck = Vec::new();
     for stage in 1..=6 {
         let mut remaining = RoundCard::ALL
@@ -503,7 +507,7 @@ impl MctsPolicy {
                 Err(_) => continue,
             }
             simulations_completed += 1;
-            let ranks = standings_with_cards(&game.public.players, &game.card_set);
+            let ranks = game.standings();
             let top_count = ranks.rank.iter().filter(|&&rank| rank == 1).count() as f64;
             for &index in &path {
                 let node = &mut nodes[index];

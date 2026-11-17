@@ -14,7 +14,6 @@ use crate::evaluation::{DetailAwareEvaluationPolicy, WeightedEvaluationPolicy};
 use crate::mcts::MctsPolicy;
 use crate::model::{Config, Game, Observation, Space};
 use crate::policy::{CardChoiceDetails, DetailPolicy, SimpleDetails, SpacePolicy};
-use crate::score::standings_with_cards;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use serde_json::{json, Value};
@@ -230,7 +229,7 @@ impl Session {
             "fence_hints": fence_hints,
             "feeding_hints": feeding_hints,
             "breeding_hints": breeding_hints,
-            "standings": standings_with_cards(&self.game.public.players, &self.game.card_set),
+            "standings": self.game.standings(),
             "last_actions": self.game.log.events.iter().rev().take(5).map(|e| json!({
                 "player": e.player,
                 "kind": &e.kind,

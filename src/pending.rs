@@ -836,6 +836,93 @@ mod tests {
         );
     }
 
+    /// P2 reproduction: a legacy save (no integrity_hash) with a non-empty
+    /// bonus_points ledger must be REJECTED. The tampered case is a stamped
+    /// save where a played card's bonus points are changed from 2 to 4 and
+    /// the integrity_hash is stripped — this must not load as a legacy save.
+    #[test]
+    fn tampered_bonus_points_without_integrity_hash_is_rejected() {
+        // Create a game with cards, play a card, grant it bonus points, save.
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 200,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+        )
+        .expect("card game");
+        let seat = game.public.active_player;
+        // Find an occupation in the actor's hand to play.
+        let card_id = game.cards.hands[seat]
+            .iter()
+            .find(|id| {
+                set.definition(id)
+                    .map(|c| c.kind == crate::cards::CardKind::Occupation)
+                    .unwrap_or(false)
+            })
+            .cloned()
+            .expect("the active seat holds an occupation");
+        game.apply(crate::engine::Action {
+            space: crate::model::Space::Lessons,
+            detail: crate::engine::Detail::PlayOccupation {
+                card_id: card_id.clone(),
+            },
+        })
+        .unwrap();
+        assert!(game.public.players[seat].played_cards.contains(&card_id));
+        // Grant 2 bonus points.
+        game.grant_bonus_points(seat, &card_id, 2).unwrap();
+        assert_eq!(game.stored_bonus_points(seat), 2);
+
+        // Save with integrity stamp.
+        let saved = game.save_json().unwrap();
+        assert!(saved.contains("integrity_hash"));
+        assert!(saved.contains("bonus_points"));
+
+        // Parse and tamper: change bonus points from 2 to 4, remove integrity_hash.
+        let mut value: serde_json::Value = serde_json::from_str(&saved).unwrap();
+        // The bonus_points structure: { "player_id": { "card_id": points } }
+        value["bonus_points"][seat.to_string()][&card_id] = serde_json::json!(4);
+        value["log"]
+            .as_object_mut()
+            .unwrap()
+            .remove("integrity_hash");
+        let tampered = serde_json::to_string(&value).unwrap();
+
+        // This must be REJECTED (not accepted as a legacy save).
+        let err = Game::load_json(&tampered).unwrap_err();
+        assert!(
+            err.contains("bookkeeping integrity") || err.contains("legacy save must not carry"),
+            "tampered bonus_points without integrity_hash must be rejected, got: {err}"
+        );
+    }
+
+    /// P2 regression: a legitimate legacy save with EMPTY bonus_points must
+    /// still load (the v5 fixtures have no bonus_points). This ensures we
+    /// don't break backward compatibility.
+    #[test]
+    fn legacy_save_with_empty_bonus_points_still_loads() {
+        // The v5 fixtures have no bonus_points field and no integrity_hash.
+        for fixture in [
+            include_str!("../tests/fixtures/v5/cardless_2p_seed7_r3.json"),
+            include_str!("../tests/fixtures/v5/cards_2p_seed7_r3.json"),
+        ] {
+            let game = Game::load_json(fixture).unwrap();
+            assert!(game.bonus_points.is_empty());
+            let saved = game.save_json().unwrap();
+            assert!(
+                !saved.contains("bonus_points"),
+                "an empty store must not appear in the serialized save"
+            );
+            assert_eq!(
+                Game::load_json(&saved).unwrap().state_hash(),
+                game.state_hash()
+            );
+        }
+    }
+
     /// The event budget bounds one action's chain and is replenished for the
     /// next action, so it cannot starve a long game.
     #[test]

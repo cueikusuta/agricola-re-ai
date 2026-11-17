@@ -28,7 +28,7 @@ use agricola_re_ai::policy::{
     play_to_end_with_budget, BudgetedDecisions, CardChoiceDetails, DetailPolicy, GreedyPolicy,
     RandomPolicy, SimpleDetails, SpacePolicy,
 };
-use agricola_re_ai::score::{standings, standings_with_cards};
+use agricola_re_ai::score::standings;
 use agricola_re_ai::{Config, Game, Observation};
 use rand_chacha::ChaCha8Rng;
 use serde_json::json;
@@ -1068,7 +1068,7 @@ fn run(options: &Options) -> Result<(), String> {
                     return Err(format!("seed {seed}: game did not finish"));
                 }
                 let summary = if card_set.enabled() {
-                    standings_with_cards(&game.public.players, &game.card_set)
+                    game.standings()
                 } else {
                     standings(&game.public.players)
                 };
