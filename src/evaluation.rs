@@ -157,12 +157,12 @@ pub enum EvaluationVariant {
 
 /// A transparent, deterministic heuristic. It depends on public data only;
 /// its units are heuristic utility, not victory probabilities.
-pub fn evaluate_player(p: &Player, round: u8) -> Evaluation {
-    evaluate_player_with(p, round, EvaluationVariant::Baseline)
+pub fn evaluate_player(p: &Player, round: u8, bonus_points: i32) -> Evaluation {
+    evaluate_player_with(p, round, bonus_points, EvaluationVariant::Baseline)
 }
 
 /// Same heuristic with an explicit feature variant (see [`EvaluationVariant`]).
-pub fn evaluate_player_with(p: &Player, round: u8, variant: EvaluationVariant) -> Evaluation {
+pub fn evaluate_player_with(p: &Player, round: u8, bonus_points: i32, variant: EvaluationVariant) -> Evaluation {
     let remaining = (15u8.saturating_sub(round)) as f64;
     let next_harvest = HARVEST_ROUNDS
         .iter()
@@ -260,13 +260,14 @@ pub fn evaluate_player_with(p: &Player, round: u8, variant: EvaluationVariant) -
     };
     let vegetables = marginal(p.supply.vegetable, 1, first_vegetable, 2.0);
     let resources = wood + reed + clay + stone + grain + vegetables;
-    Evaluation {
-        scoring: f64::from(score(p).total) * 3.0,
-        food_safety: safety,
-        family_growth: growing,
-        housing,
-        farm,
-        resources,
+        let scoring = f64::from(score(p).total) * 3.0 + f64::from(bonus_points) * 3.0;
+        Evaluation {
+            scoring,
+            food_safety: safety,
+            family_growth: growing,
+            housing,
+            farm,
+            resources,
     }
 }
 
@@ -274,7 +275,7 @@ pub fn evaluate_observation(obs: &Observation, player_id: usize) -> Option<Evalu
     obs.public
         .players
         .get(player_id)
-        .map(|p| evaluate_player(p, obs.public.round))
+        .map(|p| evaluate_player(p, obs.public.round, crate::model::bonus_points_total(&obs.bonus_points, p.id)))
 }
 
 fn add_accumulation(obs: &Observation, p: &mut Player, space: Space) {
@@ -422,11 +423,12 @@ fn project_play_card(
     fee: u32,
 ) -> Option<()> {
     let set = crate::cards::CardSet {
-        definitions: obs.card_definitions.clone(),
-    };
-    let mut hand = obs.hand.clone();
-    crate::cards::play(&set, &mut hand, player, id, kind, fee).ok()?;
-    Some(())
+            definitions: obs.card_definitions.clone(),
+        };
+        let mut hand = obs.hand.clone();
+        let mut bonus_points = crate::model::BonusPointLedger::new();
+        crate::cards::play(&set, &mut hand, player, id, kind, fee, &mut bonus_points).ok()?;
+        Some(())
 }
 
 /// Approximate only the immediate *public* effects of an action.
@@ -688,7 +690,8 @@ pub fn action_value_with_details_variant(
     variant: EvaluationVariant,
 ) -> Option<f64> {
     let current = obs.public.players.get(obs.player_id)?;
-    let before = evaluate_player_with(current, obs.public.round, variant).total();
+    let bonus_points = crate::model::bonus_points_total(&obs.bonus_points, current.id);
+    let before = evaluate_player_with(current, obs.public.round, bonus_points, variant).total();
     let card_bonus_before = crate::cards::end_game_bonus_for_definitions(
         &obs.card_definitions,
         obs.public.players.get(obs.player_id)?,
@@ -712,7 +715,8 @@ fn action_value_with_baseline(
 ) -> Option<f64> {
     let action = details.produce(obs, space)?;
     let after = project_action(obs, &action)?;
-    let mut value = evaluate_player_with(&after, obs.public.round, variant).total() - before;
+    let bonus_points = crate::model::bonus_points_total(&obs.bonus_points, after.id);
+    let mut value = evaluate_player_with(&after, obs.public.round, bonus_points, variant).total() - before;
     // Card end-game bonuses are intentionally not included in score(Player)
     // because their value depends on the public, externally defined card set.
     // They contribute 3 utility units per point, just like score(Player).
@@ -803,8 +807,8 @@ mod projection_tests {
             p.supply.food = 0;
         });
         let player = obs.public.players[obs.player_id].clone();
-        let baseline = evaluate_player_with(&player, 10, EvaluationVariant::Baseline);
-        let buffered = evaluate_player_with(&player, 10, EvaluationVariant::FoodBuffer);
+        let baseline = evaluate_player_with(&player, 10, 0, EvaluationVariant::Baseline);
+        let buffered = evaluate_player_with(&player, 10, 0, EvaluationVariant::FoodBuffer);
         assert!(baseline.food_safety > buffered.food_safety);
         // A player with plenty of food must not be penalised relatively more for
         // the buffer than for the shortage; the buffer only shifts the threshold.
@@ -813,8 +817,8 @@ mod projection_tests {
             p.supply.food = 20;
         });
         let safe_player = safe.public.players[safe.player_id].clone();
-        let safe_baseline = evaluate_player_with(&safe_player, 2, EvaluationVariant::Baseline);
-        let safe_buffered = evaluate_player_with(&safe_player, 2, EvaluationVariant::FoodBuffer);
+        let safe_baseline = evaluate_player_with(&safe_player, 2, 0, EvaluationVariant::Baseline);
+        let safe_buffered = evaluate_player_with(&safe_player, 2, 0, EvaluationVariant::FoodBuffer);
         assert!((safe_baseline.food_safety - safe_buffered.food_safety).abs() < 1.0);
     }
 
@@ -827,9 +831,9 @@ mod projection_tests {
             p.improvements.push(Improvement::Fireplace2);
         });
         let cook_player = can_cook.public.players[can_cook.player_id].clone();
-        let cond = evaluate_player_with(&cook_player, 5, EvaluationVariant::VegetableConditional);
+        let cond = evaluate_player_with(&cook_player, 5, 0, EvaluationVariant::VegetableConditional);
         let unconditional =
-            evaluate_player_with(&cook_player, 5, EvaluationVariant::VegetableFirst);
+            evaluate_player_with(&cook_player, 5, 0, EvaluationVariant::VegetableFirst);
         assert!((cond.resources - unconditional.resources).abs() < 1e-9);
 
         let tight = observed(|p| {
@@ -837,9 +841,9 @@ mod projection_tests {
             p.supply.food = 0;
         });
         let tight_player = tight.public.players[tight.player_id].clone();
-        let tight_baseline = evaluate_player_with(&tight_player, 10, EvaluationVariant::Baseline);
+        let tight_baseline = evaluate_player_with(&tight_player, 10, 0, EvaluationVariant::Baseline);
         let tight_cond =
-            evaluate_player_with(&tight_player, 10, EvaluationVariant::VegetableConditional);
+            evaluate_player_with(&tight_player, 10, 0, EvaluationVariant::VegetableConditional);
         assert!((tight_baseline.resources - tight_cond.resources).abs() < 1e-9);
     }
 
@@ -858,8 +862,8 @@ mod projection_tests {
             }
         });
         let player = obs.public.players[obs.player_id].clone();
-        let baseline = evaluate_player_with(&player, 3, EvaluationVariant::Baseline);
-        let variant = evaluate_player_with(&player, 3, EvaluationVariant::GrowthRoomPriority);
+        let baseline = evaluate_player_with(&player, 3, 0, EvaluationVariant::Baseline);
+        let variant = evaluate_player_with(&player, 3, 0, EvaluationVariant::GrowthRoomPriority);
         assert!(variant.housing > baseline.housing);
         assert!(variant.family_growth >= baseline.family_growth);
     }
@@ -1101,9 +1105,9 @@ mod projection_tests {
     #[test]
     fn food_safety_includes_edible_grain_and_next_field_harvest() {
         let mut p = Player::new(0, 0);
-        let starting = evaluate_player(&p, 14).food_safety;
+        let starting = evaluate_player(&p, 14, 0).food_safety;
         p.supply.grain = 4;
-        let grain_safe = evaluate_player(&p, 14).food_safety;
+        let grain_safe = evaluate_player(&p, 14, 0).food_safety;
         assert!(grain_safe > starting);
         p.supply.grain = 0;
         for cell in [1, 2, 3, 4] {
@@ -1112,12 +1116,12 @@ mod projection_tests {
                 remaining: 2,
             };
         }
-        assert_eq!(evaluate_player(&p, 14).food_safety, grain_safe);
+        assert_eq!(evaluate_player(&p, 14, 0).food_safety, grain_safe);
 
         let mut vegetables = Player::new(0, 0);
         vegetables.improvements.push(Improvement::Hearth4);
         vegetables.supply.vegetable = 2;
-        assert!(evaluate_player(&vegetables, 14).food_safety > starting);
+        assert!(evaluate_player(&vegetables, 14, 0).food_safety > starting);
     }
 
     #[test]
@@ -1125,8 +1129,8 @@ mod projection_tests {
         let base = Player::new(0, 4);
         let mut improved = base.clone();
         improved.improvements.push(Improvement::Well);
-        let early_gain = evaluate_player(&improved, 3).total() - evaluate_player(&base, 3).total();
-        let late_gain = evaluate_player(&improved, 14).total() - evaluate_player(&base, 14).total();
+        let early_gain = evaluate_player(&improved, 3, 0).total() - evaluate_player(&base, 3, 0).total();
+        let late_gain = evaluate_player(&improved, 14, 0).total() - evaluate_player(&base, 14, 0).total();
         assert!(early_gain > late_gain + 10.0);
     }
 
@@ -1201,9 +1205,14 @@ impl WeightedEvaluationPolicy {
         let mut candidates = Vec::new();
         // State-only terms do not depend on the candidate action, so they are
         // evaluated once per decision instead of once per legal space.
+        let bonus_points = crate::model::bonus_points_total(
+            &obs.bonus_points,
+            obs.player_id,
+        );
         let before = evaluate_player_with(
             obs.public.players.get(obs.player_id)?,
             obs.public.round,
+            bonus_points,
             variant,
         )
         .total();

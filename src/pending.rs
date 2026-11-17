@@ -706,6 +706,7 @@ mod tests {
         let mut budget = 64u32;
 
         // Budget generous: all five instances resolve and each is counted.
+        let mut bonus_points = crate::model::BonusPointLedger::new();
         dispatch_start_round(
             &set,
             &mut players,
@@ -718,6 +719,7 @@ mod tests {
             &mut uses,
             &card_use_limits,
             &mut pending,
+            &mut bonus_points,
         )
         .unwrap();
         assert_eq!(players[0].supply.food, 5);
@@ -736,6 +738,7 @@ mod tests {
         let mut uses2 = std::collections::BTreeMap::new();
         let mut budget2 = 2u32;
         let mut pending2 = None;
+        let mut bonus_points2 = crate::model::BonusPointLedger::new();
         let err = dispatch_start_round(
             &set,
             &mut players2,
@@ -748,6 +751,7 @@ mod tests {
             &mut uses2,
             &card_use_limits,
             &mut pending2,
+            &mut bonus_points2,
         )
         .unwrap_err();
         assert!(err.contains("budget exhausted"), "got: {err}");

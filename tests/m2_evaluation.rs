@@ -14,9 +14,9 @@ use rand_chacha::ChaCha8Rng;
 #[test]
 fn food_safety_rewards_covering_a_shortage() {
     let mut p = Player::new(0, 0);
-    let starving = evaluate_player(&p, 14);
+    let starving = evaluate_player(&p, 14, 0);
     p.supply.gain(Good::Food, 4);
-    let fed = evaluate_player(&p, 14);
+    let fed = evaluate_player(&p, 14, 0);
     assert!(fed.food_safety > starving.food_safety);
     assert!(fed.total() > starving.total());
 }
@@ -26,8 +26,8 @@ fn growth_is_more_valuable_earlier() {
     let p = Player::new(0, 4);
     let mut grown = p.clone();
     grown.family += 1;
-    let early = evaluate_player(&grown, 2).family_growth - evaluate_player(&p, 2).family_growth;
-    let late = evaluate_player(&grown, 14).family_growth - evaluate_player(&p, 14).family_growth;
+    let early = evaluate_player(&grown, 2, 0).family_growth - evaluate_player(&p, 2, 0).family_growth;
+    let late = evaluate_player(&grown, 14, 0).family_growth - evaluate_player(&p, 14, 0).family_growth;
     assert!(early > late);
     assert_eq!(early, 36.0);
     assert_eq!(late, 0.0);

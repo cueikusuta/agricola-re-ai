@@ -568,6 +568,18 @@ pub fn bonus_points_total(ledger: &BonusPointLedger, player: usize) -> i32 {
         .unwrap_or(0)
 }
 
+/// Drop empty inner maps from the earned-bonus-point ledger.
+///
+/// A deserialized save can carry `{ player: {} }` (an owner key with no card
+/// entries) even though `add_bonus_points` never creates one: an empty owner
+/// map changes `integrity_hash` while the state is semantically identical to
+/// the empty ledger. Normalizing at save time removes that incoherence, so
+/// `save → load` is byte-stable and the integrity hash of a save equals the
+/// integrity hash of the same game with an empty ledger.
+fn normalize_bonus_points(ledger: &mut BonusPointLedger) {
+    ledger.retain(|_, cards| !cards.is_empty());
+}
+
 /// Record `points` bonus points that `card_id` earned for `player`.
 ///
 /// This is pure bookkeeping: the caller (a card effect handler) decides the
@@ -922,11 +934,11 @@ impl Game {
 
     pub fn state_hash(&self) -> String {
         // Event log is intentionally omitted; this is the full game state, including hidden cards and RNG.
-        // LOG_VERSION=5 compatibility: the hash tuple MUST stay identical to the
+        // LOG_VERSION=5 compatibility: the base tuple stays identical to the
         // v5 format (7 fields, tests/fixtures/v5/*). New bookkeeping fields
-        // (well_food_schedule, pending, event_budget, card_uses, next_decision_id,
-        // bonus_points) are serialized into saves via serde defaults, but are
-        // deliberately EXCLUDED from the hash so legacy v5 fixtures keep verifying.
+        // (well_food_schedule, pending, event_budget, card_uses, next_decision_id)
+        // are serialized into saves via serde defaults and stay excluded from
+        // the hash so legacy v5 fixtures keep verifying.
         // well_food_schedule mirrors delayed_well (Finding A) and pending
         // decisions are excluded from the hash; their integrity is enforced by
         // PendingDecision::state_hash_before checks in the resume path instead.
@@ -940,6 +952,23 @@ impl Game {
             &self.cards,
         ))
         .expect("state serialization");
+        // The earned-bonus-point ledger is appended only while it holds
+        // something, with a domain separator so it cannot be confused with a
+        // suffix of the base tuple's JSON. An empty ledger therefore hashes
+        // exactly the pre-store tuple (legacy v5 fixtures and every game that
+        // never earns event-time points stay byte-identical), while any change
+        // to a stored amount — including a tampered one inside an event-log
+        // replay — changes this hash and is detected.
+        let data = if self.bonus_points.is_empty() {
+            data
+        } else {
+            let mut data = data;
+            data.extend_from_slice(b"\0bonus_points\0");
+            data.extend_from_slice(
+                &serde_json::to_vec(&self.bonus_points).expect("bonus point serialization"),
+            );
+            data
+        };
         format!("{:x}", Sha256::digest(&data))
     }
 
@@ -1086,7 +1115,13 @@ impl Game {
         // so load_json can reject a tampered PendingDecision / use ledger /
         // event budget even though state_hash() predates those fields.
         let mut stamped = self.clone();
-        stamped.log.integrity_hash = Some(self.integrity_hash());
+        // Normalize the bonus-point ledger before hashing/saving: a
+        // deserialized save could carry `{ player: {} }` (empty inner map),
+        // which changes the integrity hash while the state is semantically
+        // identical to an empty ledger. Dropping empty inner maps at save time
+        // makes save→load byte-stable (design audit P1-3, hash).
+        normalize_bonus_points(&mut stamped.bonus_points);
+        stamped.log.integrity_hash = Some(stamped.integrity_hash());
         serde_json::to_string_pretty(&stamped).map_err(|e| e.to_string())
     }
     pub fn load_json(text: &str) -> Result<Self, String> {
@@ -1239,6 +1274,7 @@ impl Game {
                 &mut self.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
+                &mut self.bonus_points,
             )
             // Before this change the same failure was a panic here; keeping the
             // expect would turn a rules error into a crash, so record it as a
@@ -1528,6 +1564,7 @@ impl Game {
         let mut card_uses = next.card_uses.clone();
         let card_use_limits = next.card_use_limits.clone();
         let mut pending = next.pending.clone(); // Should be None after resolution
+        let mut bonus_points = next.bonus_points.clone();
 
         // Determine which steps remain to run based on where we paused.
         let steps = [
@@ -1566,6 +1603,7 @@ impl Game {
                             card_uses: &mut card_uses,
                             card_use_limits: &card_use_limits,
                             pending: &mut pending,
+                            bonus_points: &mut bonus_points,
                             actor: player,
                             card_owner: player,
                             beneficiary: player,
@@ -1672,6 +1710,7 @@ impl Game {
                         card_uses: &mut card_uses,
                         card_use_limits: &card_use_limits,
                         pending: &mut pending,
+                        bonus_points: &mut bonus_points,
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
@@ -1765,6 +1804,7 @@ impl Game {
                         card_uses: &mut card_uses,
                         card_use_limits: &card_use_limits,
                         pending: &mut pending,
+                        bonus_points: &mut bonus_points,
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
@@ -2023,6 +2063,7 @@ impl Game {
                     card_uses: &mut self.card_uses,
                     card_use_limits: &self.card_use_limits,
                     pending: &mut self.pending,
+                    bonus_points: &mut self.bonus_points,
                     actor: pending.player,
                     card_owner,
                     beneficiary: card_owner,

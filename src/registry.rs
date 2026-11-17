@@ -275,11 +275,12 @@ impl CardRegistryBuilder {
             let kind = match effect {
                 crate::cards::CardEffect::AfterWorkerGain { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::OnPlayGain { .. }
-                | crate::cards::CardEffect::OnPlayGainPerStored { .. }
-                | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
-                | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. } => {
-                    EventKind::CardPlayed
-                }
+                                | crate::cards::CardEffect::OnPlayGainPerStored { .. }
+                                | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
+                                | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
+                                | crate::cards::CardEffect::OnPlayBonusPoints { .. } => {
+                                    EventKind::CardPlayed
+                                }
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -370,8 +371,9 @@ impl CardRegistryBuilder {
                         crate::cards::CardEffect::OnPlayGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         crate::cards::CardEffect::EndGameBonus { .. }
-                        | crate::cards::CardEffect::Prerequisite { .. }
-                        | crate::cards::CardEffect::Passive { .. } => 1,
+                                                | crate::cards::CardEffect::Prerequisite { .. }
+                                                | crate::cards::CardEffect::Passive { .. }
+                                                | crate::cards::CardEffect::OnPlayBonusPoints { .. } => 1,
                         #[cfg(test)]
                         crate::cards::CardEffect::PendingProbe { .. } => 1,
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }

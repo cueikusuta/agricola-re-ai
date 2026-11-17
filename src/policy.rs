@@ -508,15 +508,16 @@ fn card_good_value(good: Good) -> i64 {
 fn card_priority(
     set: &crate::cards::CardSet,
     card: &crate::cards::CardDefinition,
-    player: &Player,
-    fee: u32,
-    round: u8,
-) -> Option<i64> {
-    use crate::cards::CardEffect;
-    let mut after = player.clone();
-    let mut hand = vec![card.id.clone()];
-    crate::cards::play(set, &mut hand, &mut after, &card.id, card.kind, fee).ok()?;
-    let mut value = i64::from(after.card_points - player.card_points) * 6;
+        player: &Player,
+        fee: u32,
+        round: u8,
+    ) -> Option<i64> {
+        use crate::cards::CardEffect;
+        let mut after = player.clone();
+        let mut hand = vec![card.id.clone()];
+        let mut bonus_points = crate::model::BonusPointLedger::new();
+        crate::cards::play(set, &mut hand, &mut after, &card.id, card.kind, fee, &mut bonus_points).ok()?;
+        let mut value = i64::from(after.card_points - player.card_points) * 6;
     for good in [
         Good::Food,
         Good::Wood,
@@ -563,9 +564,10 @@ fn card_priority(
                 card_good_value(*good) * i64::from(*amount)
             }
             CardEffect::Passive { .. } => horizon * 5,
-            CardEffect::EndGameBonus { .. } => 12,
-            CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
-        };
+                        CardEffect::EndGameBonus { .. } => 12,
+                        CardEffect::OnPlayBonusPoints { .. } => 12,
+                        CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
+                    };
     }
     Some(value)
 }

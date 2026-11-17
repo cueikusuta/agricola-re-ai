@@ -394,23 +394,24 @@ impl Game {
             return Ok((Transition::Completed, None));
         }
         // Bake trigger: only when this action actually baked bread, matching
-        // cards::after_harvest_baking's own gate (round >= 2, harvest round).
-        if is_bake_bread_detail(&action.detail) {
-            let result = crate::card_events::dispatch_after_harvest_bake(
-                &self.card_set,
-                player,
-                &mut self.cards,
-                &mut self.public.players,
-                &mut self.public.improvement_market,
-                &mut self.delayed_well,
-                self.public.round,
-                &self.public.used,
-                &mut self.event_budget,
-                &mut self.card_uses,
-                &self.card_use_limits,
-                &mut self.pending,
-                allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
-            )?;
+                // cards::after_harvest_baking's own gate (round >= 2, harvest round).
+                if is_bake_bread_detail(&action.detail) {
+                    let result = crate::card_events::dispatch_after_harvest_bake(
+                        &self.card_set,
+                        player,
+                        &mut self.cards,
+                        &mut self.public.players,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        self.public.round,
+                        &self.public.used,
+                        &mut self.event_budget,
+                        &mut self.card_uses,
+                        &self.card_use_limits,
+                        &mut self.pending,
+                        &mut self.bonus_points,
+                        allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
+                    )?;
             if let Transition::Paused(_) = result {
                 return Ok((result, Some(crate::pending::ChainStep::AfterHarvestBake)));
             }
@@ -423,23 +424,24 @@ impl Game {
         } else {
             None
         };
-        let result = crate::card_events::dispatch_after_clay_construction(
-            &self.card_set,
-            player,
-            previous,
-            bought,
-            &mut self.cards,
-            &mut self.public.players,
-            &mut self.public.improvement_market,
-            &mut self.delayed_well,
-            self.public.round,
-            &self.public.used,
-            &mut self.event_budget,
-            &mut self.card_uses,
-            &self.card_use_limits,
-            &mut self.pending,
-            allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
-        )?;
+                let result = crate::card_events::dispatch_after_clay_construction(
+                    &self.card_set,
+                    player,
+                    previous,
+                    bought,
+                    &mut self.cards,
+                    &mut self.public.players,
+                    &mut self.public.improvement_market,
+                    &mut self.delayed_well,
+                    self.public.round,
+                    &self.public.used,
+                    &mut self.event_budget,
+                    &mut self.card_uses,
+                    &self.card_use_limits,
+                    &mut self.pending,
+                    &mut self.bonus_points,
+                    allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
+                )?;
         if let Transition::Paused(_) = result {
             return Ok((
                 result,
@@ -447,23 +449,24 @@ impl Game {
             ));
         }
         // Worker trigger: AfterWorkerGain and AfterWorkerGainIfUsed, in the
-        // active player's played_cards order.
-        let result = crate::card_events::dispatch_after_worker(
-            &self.card_set,
-            player,
-            action.space,
-            &mut self.cards,
-            &mut self.public.players,
-            &mut self.public.improvement_market,
-            &mut self.delayed_well,
-            self.public.round,
-            &self.public.used,
-            &mut self.event_budget,
-            &mut self.card_uses,
-            &self.card_use_limits,
-            &mut self.pending,
-            allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
-        )?;
+                // active player's played_cards order.
+                let result = crate::card_events::dispatch_after_worker(
+                    &self.card_set,
+                    player,
+                    action.space,
+                    &mut self.cards,
+                    &mut self.public.players,
+                    &mut self.public.improvement_market,
+                    &mut self.delayed_well,
+                    self.public.round,
+                    &self.public.used,
+                    &mut self.event_budget,
+                    &mut self.card_uses,
+                    &self.card_use_limits,
+                    &mut self.pending,
+                    &mut self.bonus_points,
+                    allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
+                )?;
         if let Transition::Paused(_) = result {
             return Ok((result, Some(crate::pending::ChainStep::AfterWorker)));
         }
@@ -1540,22 +1543,23 @@ impl Game {
                         };
                         play_from_hand(&mut ctx, id, card_id)?;
                         // Dispatch Replace/Before phases for the new card only
-                        dispatch_play(
-                            &self.card_set,
-                            id,
-                            card_id,
-                            0,
-                            &mut self.cards,
-                            &mut self.public.players,
-                            &mut self.public.improvement_market,
-                            &mut self.delayed_well,
-                            self.public.round,
-                            &self.public.used,
-                            &mut self.event_budget,
-                            &mut self.card_uses,
-                            &self.card_use_limits,
-                            &mut self.pending,
-                        )?;
+                                                dispatch_play(
+                                                    &self.card_set,
+                                                    id,
+                                                    card_id,
+                                                    0,
+                                                    &mut self.cards,
+                                                    &mut self.public.players,
+                                                    &mut self.public.improvement_market,
+                                                    &mut self.delayed_well,
+                                                    self.public.round,
+                                                    &self.public.used,
+                                                    &mut self.event_budget,
+                                                    &mut self.card_uses,
+                                                    &self.card_use_limits,
+                                                    &mut self.pending,
+                                                    &mut self.bonus_points,
+                                                )?;
                         // Update card points
                         let card = self.card_set.definition(card_id).ok_or("unknown card")?;
                         crate::cards::update_card_points_on_play(
@@ -1609,22 +1613,23 @@ impl Game {
                 };
                 play_from_hand(&mut ctx, id, card_id)?;
                 // Dispatch Replace/Before phases for the new card only
-                dispatch_play(
-                    &self.card_set,
-                    id,
-                    card_id,
-                    fee,
-                    &mut self.cards,
-                    &mut self.public.players,
-                    &mut self.public.improvement_market,
-                    &mut self.delayed_well,
-                    self.public.round,
-                    &self.public.used,
-                    &mut self.event_budget,
-                    &mut self.card_uses,
-                    &self.card_use_limits,
-                    &mut self.pending,
-                )?;
+                                dispatch_play(
+                                    &self.card_set,
+                                    id,
+                                    card_id,
+                                    fee,
+                                    &mut self.cards,
+                                    &mut self.public.players,
+                                    &mut self.public.improvement_market,
+                                    &mut self.delayed_well,
+                                    self.public.round,
+                                    &self.public.used,
+                                    &mut self.event_budget,
+                                    &mut self.card_uses,
+                                    &self.card_use_limits,
+                                    &mut self.pending,
+                                    &mut self.bonus_points,
+                                )?;
                 // Update card points
                 let card = self.card_set.definition(card_id).ok_or("unknown card")?;
                 crate::cards::update_card_points_on_play(
@@ -1713,22 +1718,23 @@ impl Game {
                         };
                         play_from_hand(&mut ctx, id, card_id)?;
                         // Dispatch Replace/Before phases
-                        dispatch_play(
-                            &self.card_set,
-                            id,
-                            card_id,
-                            0,
-                            &mut self.cards,
-                            &mut self.public.players,
-                            &mut self.public.improvement_market,
-                            &mut self.delayed_well,
-                            self.public.round,
-                            &self.public.used,
-                            &mut self.event_budget,
-                            &mut self.card_uses,
-                            &self.card_use_limits,
-                            &mut self.pending,
-                        )?;
+                                                dispatch_play(
+                                                    &self.card_set,
+                                                    id,
+                                                    card_id,
+                                                    0,
+                                                    &mut self.cards,
+                                                    &mut self.public.players,
+                                                    &mut self.public.improvement_market,
+                                                    &mut self.delayed_well,
+                                                    self.public.round,
+                                                    &self.public.used,
+                                                    &mut self.event_budget,
+                                                    &mut self.card_uses,
+                                                    &self.card_use_limits,
+                                                    &mut self.pending,
+                                                    &mut self.bonus_points,
+                                                )?;
                         // Update card points
                         let card = self.card_set.definition(card_id).ok_or("unknown card")?;
                         crate::cards::update_card_points_on_play(
@@ -1803,22 +1809,23 @@ impl Game {
                     };
                     play_from_hand(&mut ctx, id, card_id)?;
                     // Dispatch Replace/Before phases
-                    dispatch_play(
-                        &self.card_set,
-                        id,
-                        card_id,
-                        0,
-                        &mut self.cards,
-                        &mut self.public.players,
-                        &mut self.public.improvement_market,
-                        &mut self.delayed_well,
-                        self.public.round,
-                        &self.public.used,
-                        &mut self.event_budget,
-                        &mut self.card_uses,
-                        &self.card_use_limits,
-                        &mut self.pending,
-                    )?;
+                                            dispatch_play(
+                                                &self.card_set,
+                                                id,
+                                                card_id,
+                                                0,
+                                                &mut self.cards,
+                                                &mut self.public.players,
+                                                &mut self.public.improvement_market,
+                                                &mut self.delayed_well,
+                                                self.public.round,
+                                                &self.public.used,
+                                                &mut self.event_budget,
+                                                &mut self.card_uses,
+                                                &self.card_use_limits,
+                                                &mut self.pending,
+                                                &mut self.bonus_points,
+                                            )?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
                     crate::cards::update_card_points_on_play(
@@ -3349,18 +3356,20 @@ mod m6_extra_passive_engine_tests {
     #[test]
     fn a143_discount_on_major_and_renovation() {
         let set = CardSet {
-            definitions: verified_multiplayer_passive_cards(3),
-        };
-        let mut p = Player::new(0, 0);
-        play(
-            &set,
-            &mut vec!["A143".into()],
-            &mut p,
-            "A143",
-            CardKind::Occupation,
-            0,
-        )
-        .unwrap();
+                    definitions: verified_multiplayer_passive_cards(3),
+                };
+                let mut p = Player::new(0, 0);
+                let mut bonus_points = crate::model::BonusPointLedger::new();
+                play(
+                    &set,
+                    &mut vec!["A143".into()],
+                    &mut p,
+                    "A143",
+                    CardKind::Occupation,
+                    0,
+                    &mut bonus_points,
+                )
+                .unwrap();
         assert!(major_cost(&p, Improvement::Well).contains(&(Good::Stone, 2)));
         p.house = House::Clay;
         p.supply.reed = 1;

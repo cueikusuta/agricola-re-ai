@@ -128,6 +128,12 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// On-play bonus points that are stored in the earned-bonus-point ledger
+    /// (separate from printed card points). These points are awarded when the
+    /// card is played and go into `Game::bonus_points` for the card owner.
+    OnPlayBonusPoints {
+        points: u32,
+    },
 }
 
 impl CardEffect {
@@ -165,6 +171,7 @@ impl CardEffect {
             CardEffect::OnPlayGainPerImprovementPlayed { .. } => {
                 "on_play_gain_per_improvement_played"
             }
+            CardEffect::OnPlayBonusPoints { .. } => "on_play_bonus_points",
         }
     }
 }
@@ -340,7 +347,8 @@ impl CardSet {
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
-                        | CardEffect::Passive { .. } => 1,
+                        | CardEffect::Passive { .. }
+                        | CardEffect::OnPlayBonusPoints { .. } => 1,
                         #[cfg(test)]
                         CardEffect::PendingProbe { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
@@ -658,6 +666,7 @@ pub fn play(
     id: &str,
     kind: CardKind,
     extra_food: u32,
+    bonus_points: &mut crate::model::BonusPointLedger,
 ) -> Result<(), String> {
     let card = set.definition(id).ok_or("unknown card")?;
     if card.kind != kind || !hand.iter().any(|x| x == id) {
@@ -670,7 +679,7 @@ pub fn play(
         player.supply.pay(good, amount)?;
     }
     // Apply on-play (Before phase) effects
-    apply_on_play_effects(set, player, id)?;
+    apply_on_play_effects(set, player, id, bonus_points)?;
     // Move card from hand to played via the single canonical implementation
     crate::card_zones::hand_to_played(hand, player, id).map_err(|e| e.to_string())?;
     // Update card points
@@ -707,7 +716,12 @@ pub(crate) fn play_validate_pay(
 
 /// Apply on-play (Before phase) effects for a card that has been moved to played.
 /// Called by the event dispatcher after the card is in the played zone.
-pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Result<(), String> {
+pub fn apply_on_play_effects(
+    set: &CardSet,
+    player: &mut Player,
+    id: &str,
+    bonus_points: &mut crate::model::BonusPointLedger,
+) -> Result<(), String> {
     let card = set.definition(id).ok_or("unknown card")?;
     for effect in &card.effects {
         match effect {
@@ -735,9 +749,23 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
             }
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 let bonus = improvement_count_in_front(set, player)
-                    .checked_mul(*amount)
-                    .ok_or("on-play card bonus overflow")?;
-                safe_gain(player, *good, bonus)?;
+                                    .checked_mul(*amount)
+                                    .ok_or("on-play card bonus overflow")?;
+                                safe_gain(player, *good, bonus)?;
+                            }
+            CardEffect::OnPlayBonusPoints { points } => {
+                bonus_points
+                    .entry(player.id)
+                    .or_default()
+                    .entry(id.to_owned())
+                    .or_insert(0);
+                *bonus_points
+                    .get_mut(&player.id)
+                    .unwrap()
+                    .get_mut(id)
+                    .unwrap() = bonus_points[&player.id][id]
+                    .checked_add(*points as i32)
+                    .ok_or("bonus point overflow")?;
             }
             CardEffect::Passive { rule } => match rule {
                 PassiveRule::PastureCapacity(n) => player.pasture_capacity_bonus += n,

@@ -108,22 +108,23 @@ impl Game {
             // Route the harvest trigger through the dispatcher so the event
             // budget and per-card use limits apply.
             if carded {
-                crate::card_events::dispatch_harvest_field(
-                    &self.card_set,
-                    p,
-                    &mut self.cards,
-                    &mut self.public.players,
-                    &mut self.public.improvement_market,
-                    &mut self.delayed_well,
-                    self.public.round,
-                    &self.public.used,
-                    &mut self.event_budget,
-                    &mut self.card_uses,
-                    &self.card_use_limits,
-                    &mut self.pending,
-                )
-                .expect("validated card field-phase reward");
-            }
+                            crate::card_events::dispatch_harvest_field(
+                                &self.card_set,
+                                p,
+                                &mut self.cards,
+                                &mut self.public.players,
+                                &mut self.public.improvement_market,
+                                &mut self.delayed_well,
+                                self.public.round,
+                                &self.public.used,
+                                &mut self.event_budget,
+                                &mut self.card_uses,
+                                &self.card_use_limits,
+                                &mut self.pending,
+                                &mut self.bonus_points,
+                            )
+                            .expect("validated card field-phase reward");
+                        }
             let p = &mut self.public.players[p];
             for cell in &mut p.farm {
                 if let Tile::Field {

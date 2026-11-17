@@ -59,16 +59,18 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfNoMinorPlayed { .. } => TriggerPhase::After,
         // Fired only by the play dispatcher's dedicated after-play scan.
-        CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
-        // Clay construction purchase — After phase
-        CardEffect::AfterClayConstructionGain { .. } => TriggerPhase::After,
-        // Harvest/baking — After phase
-        CardEffect::AfterHarvestBakeGain { .. } => TriggerPhase::After,
-        CardEffect::HarvestFieldGain { .. } => TriggerPhase::After,
-        CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
-        // End game scoring — After phase
-        CardEffect::EndGameBonus { .. } => TriggerPhase::After,
-    }
+                CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
+                // Clay construction purchase — After phase
+                CardEffect::AfterClayConstructionGain { .. } => TriggerPhase::After,
+                // Harvest/baking — After phase
+                CardEffect::AfterHarvestBakeGain { .. } => TriggerPhase::After,
+                CardEffect::HarvestFieldGain { .. } => TriggerPhase::After,
+                CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
+                // End game scoring — After phase
+                CardEffect::EndGameBonus { .. } => TriggerPhase::After,
+                // On-play bonus points — Before phase (instantaneous at play time)
+                CardEffect::OnPlayBonusPoints { .. } => TriggerPhase::Before,
+            }
 }
 
 /// Context passed to effect handlers during dispatch.
@@ -83,9 +85,12 @@ pub struct DispatchContext<'a> {
     pub event_budget: &'a mut u32,
     pub card_uses: &'a mut BTreeMap<String, u32>,
     /// Declared per-card limits. Absent card = no per-period limit.
-    pub card_use_limits: &'a BTreeMap<String, u32>,
-    pub pending: &'a mut Option<PendingDecision>,
-    /// The player taking the action (actor). For worker placement, this is
+        pub card_use_limits: &'a BTreeMap<String, u32>,
+        pub pending: &'a mut Option<PendingDecision>,
+        /// The earned-bonus-point ledger. Card effects that grant stored bonus
+        /// points write to this ledger via `grant_bonus_points`-compatible logic.
+        pub bonus_points: &'a mut crate::model::BonusPointLedger,
+        /// The player taking the action (actor). For worker placement, this is
     /// the player who placed the worker. For round start, it's the start player.
     pub actor: usize,
     /// The player who owns the card being resolved (card owner).
@@ -363,21 +368,22 @@ fn resolve_phase_scan(
 
         // Build dispatch context for the card owner
         let mut exec_ctx = DispatchContext {
-            card_set: ctx.card_set,
-            player: ctx.player,
-            cards: ctx.cards,
-            improvement_market: ctx.improvement_market,
-            delayed_well: ctx.delayed_well,
-            round: ctx.round,
-            used_spaces: ctx.used_spaces,
-            event_budget: ctx.event_budget,
-            card_uses: ctx.card_uses,
-            card_use_limits: ctx.card_use_limits,
-            pending: ctx.pending,
-            actor: ctx.actor,
-            card_owner: player,
-            beneficiary: player,
-        };
+                    card_set: ctx.card_set,
+                    player: ctx.player,
+                    cards: ctx.cards,
+                    improvement_market: ctx.improvement_market,
+                    delayed_well: ctx.delayed_well,
+                    round: ctx.round,
+                    used_spaces: ctx.used_spaces,
+                    event_budget: ctx.event_budget,
+                    card_uses: ctx.card_uses,
+                    card_use_limits: ctx.card_use_limits,
+                    pending: ctx.pending,
+                    bonus_points: ctx.bonus_points,
+                    actor: ctx.actor,
+                    card_owner: player,
+                    beneficiary: player,
+                };
 
         // Execute in chosen order (play order)
         execute_chosen_triggers(
@@ -480,11 +486,14 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
-                CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
-                    handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
-                }
-                CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
-                CardEffect::AfterWorkerGain {
+                                                CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
+                                                    handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
+                                                }
+                                                CardEffect::OnPlayBonusPoints { points } => {
+                                                    handle_on_play_bonus_points(ctx, player, card_id, *points)?
+                                                }
+                                                CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
+                                CardEffect::AfterWorkerGain {
                     space,
                     good,
                     amount,
@@ -690,6 +699,7 @@ fn effect_condition_holds(
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
+        CardEffect::OnPlayBonusPoints { .. } => true,
         #[cfg(test)]
         CardEffect::PendingProbe { .. } => true,
     }
@@ -795,11 +805,14 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
-            CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
-                handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
-            }
-            CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
-            CardEffect::AfterWorkerGain {
+                                            CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
+                                                handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
+                                            }
+                                            CardEffect::OnPlayBonusPoints { points } => {
+                                                handle_on_play_bonus_points(ctx, player, &trigger.card_id, *points)?
+                                            }
+                                            CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
+                            CardEffect::AfterWorkerGain {
                 space,
                 good,
                 amount,
@@ -1054,9 +1067,28 @@ fn handle_on_play_gain_per_improvement_played(
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
-}
+    }
 
-fn handle_passive(
+    fn handle_on_play_bonus_points(
+        ctx: &mut DispatchContext<'_>,
+        _player: usize,
+        card_id: &str,
+        points: u32,
+    ) -> Result<EffectResult, String> {
+            // Grant bonus points to the beneficiary (card owner by default)
+            // using the game's grant_bonus_points method via the bonus_points field in context
+            let points_i32 = points as i32;
+            let entry = ctx
+                .bonus_points
+                .entry(ctx.beneficiary)
+                .or_default()
+                .entry(card_id.to_owned())
+                .or_insert(0);
+            *entry = entry.checked_add(points_i32).ok_or("bonus point overflow")?;
+            Ok(EffectResult::Resolved)
+        }
+
+    fn handle_passive(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
     rule: &crate::cards::PassiveRule,
@@ -1373,6 +1405,7 @@ pub fn dispatch_play(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    bonus_points: &mut crate::model::BonusPointLedger,
 ) -> Result<(), String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
@@ -1388,6 +1421,7 @@ pub fn dispatch_play(
         card_uses,
         card_use_limits,
         pending,
+        bonus_points,
         actor: player,
         card_owner: player,
         beneficiary: player,
@@ -1501,37 +1535,39 @@ pub fn dispatch_play(
 pub fn dispatch_after_worker(
     card_set: &CardSet,
     player: usize,
-    space: Space,
-    cards: &mut crate::cards::CardState,
-    players: &mut [Player],
-    improvement_market: &mut Vec<crate::model::Improvement>,
-    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
-    round: u8,
-    used_spaces: &std::collections::BTreeSet<Space>,
-    event_budget: &mut u32,
-    card_uses: &mut BTreeMap<String, u32>,
-    card_use_limits: &BTreeMap<String, u32>,
-    pending: &mut Option<PendingDecision>,
-    allow_choose_trigger_order_pause: bool,
-) -> Result<Transition, String> {
-    // Clone players for all_players parameter to avoid borrow checker issues
-    let all_players = players.to_vec();
-    let mut ctx = DispatchContext {
-        card_set,
-        player: &mut players[player],
-        cards,
-        improvement_market,
-        delayed_well,
-        round,
-        used_spaces,
-        event_budget,
-        card_uses,
-        card_use_limits,
-        pending,
-        actor: player,
-        card_owner: player,
-        beneficiary: player,
-    };
+        space: Space,
+        cards: &mut crate::cards::CardState,
+        players: &mut [Player],
+        improvement_market: &mut Vec<crate::model::Improvement>,
+        delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+        round: u8,
+        used_spaces: &std::collections::BTreeSet<Space>,
+        event_budget: &mut u32,
+        card_uses: &mut BTreeMap<String, u32>,
+        card_use_limits: &BTreeMap<String, u32>,
+        pending: &mut Option<PendingDecision>,
+        bonus_points: &mut crate::model::BonusPointLedger,
+        allow_choose_trigger_order_pause: bool,
+    ) -> Result<Transition, String> {
+        // Clone players for all_players parameter to avoid borrow checker issues
+        let all_players = players.to_vec();
+        let mut ctx = DispatchContext {
+            card_set,
+            player: &mut players[player],
+            cards,
+            improvement_market,
+            delayed_well,
+            round,
+            used_spaces,
+            event_budget,
+            card_uses,
+            card_use_limits,
+            pending,
+            bonus_points,
+            actor: player,
+            card_owner: player,
+            beneficiary: player,
+        };
 
     let trigger = PhaseTriggerData {
         space: Some(space),
@@ -1581,6 +1617,7 @@ pub fn dispatch_start_round(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    bonus_points: &mut crate::model::BonusPointLedger,
 ) -> Result<Transition, String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
@@ -1599,6 +1636,7 @@ pub fn dispatch_start_round(
             card_uses,
             card_use_limits,
             pending,
+            bonus_points,
             actor,
             card_owner: player,
             beneficiary: player,
@@ -1660,6 +1698,7 @@ pub fn dispatch_after_clay_construction(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    bonus_points: &mut crate::model::BonusPointLedger,
     allow_choose_trigger_order_pause: bool,
 ) -> Result<Transition, String> {
     // Clone players for all_players parameter to avoid borrow checker issues
@@ -1676,6 +1715,7 @@ pub fn dispatch_after_clay_construction(
         card_uses,
         card_use_limits,
         pending,
+        bonus_points,
         actor: player,
         card_owner: player,
         beneficiary: player,
@@ -1732,6 +1772,7 @@ pub fn dispatch_harvest_field(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    bonus_points: &mut crate::model::BonusPointLedger,
 ) -> Result<Transition, String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
@@ -1747,6 +1788,7 @@ pub fn dispatch_harvest_field(
         card_uses,
         card_use_limits,
         pending,
+        bonus_points,
         actor: player,
         card_owner: player,
         beneficiary: player,
@@ -1801,6 +1843,7 @@ pub fn dispatch_after_harvest_bake(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    bonus_points: &mut crate::model::BonusPointLedger,
     allow_choose_trigger_order_pause: bool,
 ) -> Result<Transition, String> {
     // Same gate as the legacy cards::after_harvest_baking: a bake bonus only
@@ -1824,6 +1867,7 @@ pub fn dispatch_after_harvest_bake(
         card_uses,
         card_use_limits,
         pending,
+        bonus_points,
         actor: player,
         card_owner: player,
         beneficiary: player,
@@ -1884,6 +1928,7 @@ pub mod legacy {
         id: &str,
         _kind: crate::cards::CardKind,
         _extra_food: u32,
+        bonus_points: &mut crate::model::BonusPointLedger,
     ) -> Result<(), String> {
         // This mirrors the original cards::play effect loop (Before phase effects)
         let card = set.definition(id).ok_or("unknown card")?;
@@ -1925,6 +1970,18 @@ pub mod legacy {
                         .checked_add(*amount)
                         .ok_or("resource overflow")?;
                     player.supply.set(*good, next);
+                }
+                CardEffect::OnPlayBonusPoints { points } => {
+                    bonus_points
+                        .entry(player.id)
+                        .or_default()
+                        .entry(id.to_owned())
+                        .or_insert(0);
+                    *bonus_points
+                        .get_mut(&player.id)
+                        .unwrap()
+                        .get_mut(id)
+                        .unwrap() = bonus_points[&player.id][id].checked_add(*points as i32).ok_or("bonus point overflow")?;
                 }
                 CardEffect::Passive { rule } => match rule {
                     crate::cards::PassiveRule::PastureCapacity(n) => {
@@ -2368,6 +2425,7 @@ mod tests {
         let mut card_uses = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
 
         dispatch_after_worker(
             &set,
@@ -2383,6 +2441,7 @@ mod tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &mut bonus_points,
             false, // test: not post-work chain
         )
         .unwrap();
@@ -2416,6 +2475,7 @@ mod tests {
         let mut card_uses = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
 
         dispatch_start_round(
             &set,
@@ -2429,6 +2489,7 @@ mod tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &mut bonus_points,
         )
         .unwrap();
 
@@ -2467,6 +2528,7 @@ mod tests {
         let mut card_uses = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
 
         let result = dispatch_start_round(
             &set,
@@ -2480,6 +2542,7 @@ mod tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &mut bonus_points,
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("budget exhausted"));
@@ -2612,6 +2675,7 @@ mod tests {
             let mut used = std::collections::BTreeSet::new();
             used.insert(Space::Lessons);
             let mut pending = None;
+            let mut bonus_points = crate::model::BonusPointLedger::new();
             dispatch_after_worker(
                 &set,
                 0,
@@ -2626,6 +2690,7 @@ mod tests {
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
+                &mut bonus_points,
                 false, // test: not post-work chain
             )
             .unwrap();
@@ -2656,6 +2721,7 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
         dispatch_start_round(
             &set,
             &mut c.players,
@@ -2668,6 +2734,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &mut bonus_points,
         )
         .unwrap();
         assert_eq!(legacy[0].supply.food, c.players[0].supply.food);
@@ -2686,6 +2753,7 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
         dispatch_harvest_field(
             &set,
             0,
@@ -2699,6 +2767,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &mut bonus_points,
         )
         .unwrap();
         assert_eq!(
@@ -2716,6 +2785,7 @@ mod tests {
         let mut market2 = vec![];
         let mut well2 = BTreeMap::new();
         let mut pending2 = None;
+        let mut bonus_points2 = crate::model::BonusPointLedger::new();
         dispatch_after_harvest_bake(
             &set,
             0,
@@ -2729,6 +2799,7 @@ mod tests {
             &mut c2.uses,
             &c2.limits,
             &mut pending2,
+            &mut bonus_points2,
             false, // test: not post-work chain
         )
         .unwrap();
@@ -2756,6 +2827,7 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
         dispatch_after_clay_construction(
             &set,
             0,
@@ -2771,6 +2843,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &mut bonus_points,
             false, // test: not post-work chain
         )
         .unwrap();
@@ -2794,6 +2867,7 @@ mod tests {
             let mut market = vec![];
             let mut well = BTreeMap::new();
             let mut pending = None;
+            let mut bonus_points = crate::model::BonusPointLedger::new();
             dispatch_after_harvest_bake(
                 &set,
                 0,
@@ -2807,6 +2881,7 @@ mod tests {
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
+                &mut bonus_points,
                 false, // test: not post-work chain
             )
             .unwrap();
@@ -2862,6 +2937,7 @@ mod tests {
                 let mut market = vec![];
                 let mut well = BTreeMap::new();
                 let mut pending = None;
+                let mut bonus_points = crate::model::BonusPointLedger::new();
                 dispatch_after_worker(
                     &set,
                     0,
@@ -2876,6 +2952,7 @@ mod tests {
                     &mut c.uses,
                     &c.limits,
                     &mut pending,
+                    &mut bonus_points,
                     false, // test: not post-work chain
                 )
                 .unwrap();
@@ -2907,6 +2984,7 @@ mod tests {
             let mut market = vec![];
             let mut well = BTreeMap::new();
             let mut pending = None;
+            let mut bonus_points = crate::model::BonusPointLedger::new();
             dispatch_start_round(
                 &set,
                 &mut c.players,
@@ -2919,6 +2997,7 @@ mod tests {
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
+                &mut bonus_points,
             )
             .unwrap();
             assert_eq!(
@@ -2964,6 +3043,7 @@ mod tests {
             let mut market = vec![];
             let mut well = BTreeMap::new();
             let mut pending = None;
+            let mut bonus_points = crate::model::BonusPointLedger::new();
             dispatch_harvest_field(
                 &set,
                 0,
@@ -2977,6 +3057,7 @@ mod tests {
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
+                &mut bonus_points,
             )
             .unwrap();
             assert_eq!(
@@ -3030,6 +3111,7 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
         dispatch_after_clay_construction(
             &set,
             0,
@@ -3045,6 +3127,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &mut bonus_points,
             false, // test: not post-work chain
         )
         .unwrap();
@@ -3064,6 +3147,7 @@ mod tests {
         let set = equivalence_pool();
         let mut legacy_hand = vec!["M1".to_string()];
         let mut legacy = [Player::new(0, 0)];
+        let mut bonus_points = crate::model::BonusPointLedger::new();
         crate::cards::play(
             &set,
             &mut legacy_hand,
@@ -3071,6 +3155,7 @@ mod tests {
             "M1",
             CardKind::MinorImprovement,
             0,
+            &mut bonus_points,
         )
         .unwrap();
 
@@ -3102,6 +3187,7 @@ mod tests {
             )
             .unwrap();
             crate::card_zones::play_from_hand(&mut ctx, 0, "M1").unwrap();
+            let mut bonus_points = crate::model::BonusPointLedger::new();
             dispatch_play(
                 &set,
                 0,
@@ -3117,6 +3203,7 @@ mod tests {
                 &mut uses,
                 &limits,
                 &mut pending,
+                &mut bonus_points,
             )
             .unwrap();
             let card = set.definition("M1").unwrap();
@@ -3158,6 +3245,7 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
         let result = dispatch_start_round(
             &set,
             &mut c.players,
@@ -3170,6 +3258,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &mut bonus_points,
         );
         // With a single PendingProbe effect, the chain pauses on that effect.
         assert!(
@@ -3219,7 +3308,7 @@ mod tests {
         let mut c = Ctx::new();
         c.players[0].played_cards = vec!["ONCE".into(), "ONCE".into()];
         c.limits.insert("ONCE".into(), 1);
-
+        let mut bonus_points = crate::model::BonusPointLedger::new();
         let err = dispatch_start_round(
             &set,
             &mut c.players,
@@ -3232,6 +3321,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending_none(),
+            &mut bonus_points,
         )
         .unwrap_err();
         assert!(err.contains("use limit"), "got: {err}");
@@ -3275,6 +3365,7 @@ mod tests {
         let mut used = BTreeSet::new();
         used.insert(Space::Forest);
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
 
         // Execute a worker action on Forest - this should trigger the interrupt
         let result = dispatch_after_worker(
@@ -3291,6 +3382,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &mut bonus_points,
             false, // test: not post-work chain
         );
 
@@ -3363,6 +3455,7 @@ mod tests {
         let limits = BTreeMap::new();
         let mut budget = 64u32;
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
 
         // Activate Forest (NOT Fishing) - the Fishing-only effect should NOT fire
         // and should NOT consume budget or card use
@@ -3380,6 +3473,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut bonus_points,
             false, // test: not post-work chain
         )
         .unwrap();
@@ -3402,6 +3496,7 @@ mod tests {
         );
 
         // Now activate Fishing - the effect SHOULD fire
+        let mut bonus_points = crate::model::BonusPointLedger::new();
         dispatch_after_worker(
             &set,
             0,
@@ -3416,6 +3511,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut bonus_points,
             false, // test: not post-work chain
         )
         .unwrap();
@@ -3463,6 +3559,7 @@ mod tests {
         let limits = BTreeMap::new();
         let mut budget = 64u32;
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
 
         // Activate Forest but Lessons NOT used - effect should NOT fire
         let mut used_spaces = std::collections::BTreeSet::new();
@@ -3481,6 +3578,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut bonus_points,
             false, // test: not post-work chain
         )
         .unwrap();
@@ -3515,6 +3613,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut bonus_points,
             false, // test: not post-work chain
         )
         .unwrap();
@@ -3560,6 +3659,7 @@ mod tests {
         let limits = BTreeMap::new();
         let mut budget = 64u32;
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
 
         dispatch_start_round(
             &set,
@@ -3573,6 +3673,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut bonus_points,
         )
         .unwrap();
 
@@ -3589,6 +3690,7 @@ mod tests {
 
         // Upgrade to Stone house - effect SHOULD fire
         players[0].house = House::Stone;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
         dispatch_start_round(
             &set,
             &mut players,
@@ -3601,6 +3703,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &mut bonus_points,
         )
         .unwrap();
 
@@ -3657,6 +3760,7 @@ mod tests {
         let mut card_uses = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
+        let mut bonus_points = crate::model::BonusPointLedger::new();
 
         // --- Test 1: Activate Forest (NOT Fishing) ---
         // The Fishing-only effects should NOT fire and should NOT consume budget or card use
@@ -3674,6 +3778,7 @@ mod tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &mut bonus_points,
             false, // test: not post-work chain
         )
         .unwrap();
@@ -3715,6 +3820,7 @@ mod tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &mut bonus_points,
             false, // test: not post-work chain
         )
         .unwrap();

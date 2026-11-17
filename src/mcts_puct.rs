@@ -143,7 +143,10 @@ fn heuristic_credit(game: &Game, temperature: f64) -> Vec<f64> {
         .public
         .players
         .iter()
-        .map(|player| evaluate_player(player, game.public.round).total())
+        .map(|player| {
+            let bonus = crate::model::bonus_points_total(&game.bonus_points, player.id);
+            evaluate_player(player, game.public.round, bonus).total()
+        })
         .collect();
     let max = evaluations
         .iter()

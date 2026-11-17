@@ -144,12 +144,19 @@ pub fn score_with_cards(player: &Player, cards: &crate::cards::CardSet) -> Score
     result
 }
 
-pub fn standings_with_cards(players: &[Player], cards: &crate::cards::CardSet) -> Standings {
-    let scores = players
-        .iter()
-        .map(|p| score_with_cards(p, cards))
-        .collect::<Vec<_>>();
-    rank_scores(&scores, players)
+/// Full public score when a declared implemented card set is in use.
+/// The ordinary cardless score remains byte-for-byte compatible with M1-M4.
+/// Ledger-aware unified entry: printed card points, end-game card bonuses and
+/// the earned-bonus-point ledger are all included, so this entry and
+/// [`crate::model::Game::standings`] always produce the same ranking. The
+/// ledger must be supplied explicitly: a scoring entry point can never
+/// silently drop stored bonus points (design audit P1-3, score entry).
+pub fn standings_with_cards(
+    players: &[Player],
+    cards: &crate::cards::CardSet,
+    bonus_points: &crate::model::BonusPointLedger,
+) -> Standings {
+    standings_with_cards_and_bonus(players, cards, bonus_points)
 }
 
 /// Full public score including bonus points that were earned during play and
