@@ -13,6 +13,7 @@
 use crate::cards::{CardEffect, CardSet};
 use crate::model::{Animal, Crop, Good, House, Player, Space};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
+use crate::registry::EventKind;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -356,6 +357,7 @@ fn resolve_phase_scan(
             baked: trigger_data.baked,
             previous_player: trigger_data.previous_player.clone(),
             used_spaces: trigger_data.used_spaces.clone(),
+            event_kind: trigger_data.event_kind,
         };
 
         // Collect all players for snapshot
@@ -634,6 +636,9 @@ pub struct PhaseTriggerData {
     pub previous_player: Option<Player>,
     /// Used spaces in the current round (for AfterWorkerGainIfUsed).
     pub used_spaces: std::collections::BTreeSet<Space>,
+    /// The event kind that triggered this dispatch (for site-specific effects).
+    #[serde(default)]
+    pub event_kind: EventKind,
 }
 
 /// Check if an effect's trigger condition holds, without consuming budget or card uses.
@@ -648,39 +653,51 @@ fn effect_condition_holds(
     round: u8,
 ) -> bool {
     match effect {
-        CardEffect::AfterWorkerGain { space, .. } => trigger.space == Some(*space),
+        CardEffect::AfterWorkerGain { space, .. } => {
+            trigger.event_kind == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
         CardEffect::AfterWorkerGainIfUsed {
             space,
             required_space,
             ..
-        } => trigger.space == Some(*space) && used_spaces.contains(required_space),
+        } => {
+            trigger.event_kind == EventKind::WorkerPlaced
+                && trigger.space == Some(*space)
+                && used_spaces.contains(required_space)
+        }
         CardEffect::StartRoundGain { house, rooms, .. } => {
-            let house_ok = house.is_none_or(|h| player.house == h);
-            let rooms_ok = rooms.is_none_or(|r| player.rooms() == usize::from(r));
-            house_ok && rooms_ok
+            trigger.event_kind == EventKind::RoundStart && {
+                let house_ok = house.is_none_or(|h| player.house == h);
+                let rooms_ok = rooms.is_none_or(|r| player.rooms() == usize::from(r));
+                house_ok && rooms_ok
+            }
         }
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
-            // C111 小動物飼育員: the threshold is the current round number
-            // (e.g. 8+ food in round 8); the handler grants the gain.
-            player.supply.food >= u32::from(round)
+            trigger.event_kind == EventKind::RoundStart && player.supply.food >= u32::from(round)
         }
         // E111 世捨て人: the no-minor-improvements condition needs card
         // definitions, so the scan reports it as triggerable and the
         // handler performs the check.
-        CardEffect::StartRoundGainIfNoMinorPlayed { .. } => true,
-        CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => true,
+        CardEffect::StartRoundGainIfNoMinorPlayed { .. } => {
+            trigger.event_kind == EventKind::RoundStart
+        }
+        CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
+            trigger.event_kind == EventKind::Harvest
+        }
         // C116 調度品職員 fires only from dispatch_play's dedicated after-play
         // scan, never from the generic phase scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => false,
         CardEffect::AfterClayConstructionGain { .. } => {
-            let Some(prev) = &trigger.previous_player else {
-                return false;
-            };
-            (prev.house == House::Clay && player.rooms() > prev.rooms())
-                || (prev.house == House::Clay && player.house == House::Stone)
+            trigger.event_kind == EventKind::ClayConstruction
+                && trigger.previous_player.as_ref().is_some_and(|prev| {
+                    (prev.house == House::Clay && player.rooms() > prev.rooms())
+                        || (prev.house == House::Clay && player.house == House::Stone)
+                })
         }
-        CardEffect::AfterHarvestBakeGain { .. } => trigger.baked,
-        CardEffect::HarvestFieldGain { .. } => true,
+        CardEffect::AfterHarvestBakeGain { .. } => {
+            trigger.event_kind == EventKind::Bake && trigger.baked
+        }
+        CardEffect::HarvestFieldGain { .. } => trigger.event_kind == EventKind::Harvest,
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
@@ -1390,6 +1407,7 @@ pub fn dispatch_play(
         baked: false,
         previous_player: None,
         used_spaces: std::collections::BTreeSet::new(),
+        event_kind: EventKind::CardPlayed,
     };
 
     // Phase 1: Replace (prerequisites) - ONLY for the new card
@@ -1530,6 +1548,7 @@ pub fn dispatch_after_worker(
         baked: false,
         previous_player: None,
         used_spaces: used_spaces.clone(),
+        event_kind: EventKind::WorkerPlaced,
     };
 
     // AfterWorkerGain and AfterWorkerGainIfUsed are After phase. A pause here
@@ -1601,6 +1620,7 @@ pub fn dispatch_start_round(
             baked: false,
             previous_player: None,
             used_spaces: used_spaces.clone(),
+            event_kind: EventKind::RoundStart,
         };
 
         resolve_phase(
@@ -1678,6 +1698,7 @@ pub fn dispatch_after_clay_construction(
         baked: false,
         previous_player: Some(previous.clone()),
         used_spaces: used_spaces.clone(),
+        event_kind: EventKind::ClayConstruction,
     };
 
     // After phase first: a ChooseTriggerOrder pause (Issue #270) must reach
@@ -1749,6 +1770,7 @@ pub fn dispatch_harvest_field(
         baked: false,
         previous_player: None,
         used_spaces: used_spaces.clone(),
+        event_kind: EventKind::Harvest,
     };
 
     resolve_phase(
@@ -1826,6 +1848,7 @@ pub fn dispatch_after_harvest_bake(
         baked: true,
         previous_player: None,
         used_spaces: used_spaces.clone(),
+        event_kind: EventKind::Bake,
     };
 
     // After phase first: a ChooseTriggerOrder pause (Issue #270) must reach
@@ -2321,7 +2344,7 @@ pub mod legacy {
 mod tests {
     use super::*;
     use crate::cards::{verified_band_a_cards, CardDefinition, CardKind, CardSet};
-    use crate::model::{Crop, Good, Improvement, Player, Space, Tile};
+    use crate::model::{Animal, Crop, Good, Improvement, Pasture, Player, Space, Tile};
     use crate::pending::Transition;
     use std::collections::BTreeSet;
 
@@ -4471,5 +4494,1657 @@ mod tests {
         );
         // Expected: 10 + 3 = 13
         assert_eq!(legacy_wood, 13, "expected 3 wood from 3 improvements");
+    }
+
+    /// Reproduction test for PR #326 P0: HarvestFieldGain should NOT fire on
+    /// dispatch_after_worker. C106 has HarvestFieldGain (VegetablesHarvested).
+    #[test]
+    fn c106_harvest_field_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C106".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        // C106 has HarvestFieldGain (VegetablesHarvested) which should ONLY fire
+        // on harvest field phase, NOT on worker completion.
+        // If the bug exists, this will incorrectly gain 2 food.
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "C106 HarvestFieldGain must not fire on after_worker"
+        );
+    }
+
+    /// Reproduction test for PR #326 P0: StartRoundGain should NOT fire on
+    /// dispatch_after_worker. B057 has StartRoundGain (Food+1 when Wood house).
+    #[test]
+    fn b057_start_round_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B057".into()];
+        c.players[0].house = House::Wood;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        // B057 has StartRoundGain which should ONLY fire on round start, NOT on
+        // worker completion. If the bug exists, this will incorrectly gain 1 food.
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B057 StartRoundGain must not fire on after_worker"
+        );
+    }
+
+    /// Reproduction test for PR #326 P0: C111 StartRoundGainIfFoodAtLeastRound
+    /// should NOT fire on dispatch_after_worker.
+    #[test]
+    fn c111_start_round_gain_if_food_at_least_round_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C111".into()];
+        c.players[0].supply.food = 10; // >= round (4)
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        // C111 has StartRoundGainIfFoodAtLeastRound which should ONLY fire on
+        // round start, NOT on worker completion.
+        assert_eq!(
+            c.players[0].supply.food, 10,
+            "C111 StartRoundGainIfFoodAtLeastRound must not fire on after_worker"
+        );
+    }
+
+    /// Reproduction test for PR #326 P0: B118 StartRoundGain should NOT fire on
+    /// dispatch_after_worker.
+    #[test]
+    fn b118_start_round_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B118".into()];
+        // B118 requires 2 rooms; Player::new() gives 2 rooms by default.
+        // The only reason it doesn't fire here is the event_kind check (RoundStart vs WorkerPlaced).
+        c.players[0].supply.wood = 10;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        // B118 has 2 rooms by default; the event_kind check prevents firing.
+        assert_eq!(
+            c.players[0].supply.wood, 10,
+            "B118 StartRoundGain must not fire on after_worker (event_kind check)"
+        );
+    }
+
+    /// Reproduction test for PR #326 P0: B107 StartRoundGain should NOT fire on
+    /// dispatch_after_worker.
+    #[test]
+    fn b107_start_round_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_simple_occupations(3), // B107 is in simple_occupations
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B107".into()];
+        c.players[0].house = House::Stone; // B107 requires Stone house
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B107 StartRoundGain must not fire on after_worker"
+        );
+    }
+
+    /// Reproduction test for PR #326 P0: B050 HarvestFieldGain should NOT fire on
+    /// dispatch_after_worker.
+    #[test]
+    fn b050_harvest_field_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B050".into()];
+        c.players[0].pastures.push(Pasture {
+            id: 0,
+            cells: vec![2, 3, 4, 5, 6],
+            animal: Some(Animal::Sheep),
+            quantity: 6,
+        });
+        c.players[0].pastures.push(Pasture {
+            id: 1,
+            cells: vec![7, 8],
+            animal: Some(Animal::Cattle),
+            quantity: 3,
+        });
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        // B050 has HarvestFieldGain (Animals) which should ONLY fire on harvest
+        // field phase, NOT on worker completion.
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B050 HarvestFieldGain must not fire on after_worker"
+        );
+    }
+
+    /// Reproduction test for PR #326 P0: B061 HarvestFieldGain should NOT fire on
+    /// dispatch_after_worker.
+    #[test]
+    fn b061_harvest_field_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B061".into()];
+        // B061 needs MixedFields (grain + vegetable + fallow) - set up so mutation would fire
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        c.players[0].farm[3].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B061 HarvestFieldGain must not fire on after_worker"
+        );
+    }
+
+    /// Reproduction test for PR #326 P0: A106 HarvestFieldGain should NOT fire on
+    /// dispatch_after_worker.
+    #[test]
+    fn a106_harvest_field_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_a_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["A106".into()];
+        // A106 needs LastGrainTaken (grain field with remaining 1) and/or LastVegetableTaken (veg field with remaining 1)
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "A106 HarvestFieldGain must not fire on after_worker"
+        );
+    }
+
+    /// Reproduction test for PR #326 P0: E107 HarvestFieldGain should NOT fire on
+    /// dispatch_after_worker.
+    #[test]
+    fn e107_harvest_field_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E107".into()];
+        // E107 needs 2+ plowed fields (FieldCountThresholds: 2->1 food) - set up so mutation would fire
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "E107 HarvestFieldGain must not fire on after_worker"
+        );
+    }
+
+    /// Reproduction test for PR #326 P0: E111 StartRoundGainIfNoMinorPlayed should NOT
+    /// fire on dispatch_after_worker.
+    #[test]
+    fn e111_start_round_gain_if_no_minor_played_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E111".into()];
+        // E111 condition: no minor improvements played - satisfied in this test
+        // E111 also has HarvestFieldGainIfNoMinorPlayed giving wood - check both food and wood
+        c.players[0].supply.wood = 0;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "E111 StartRoundGainIfNoMinorPlayed must not fire on after_worker"
+        );
+        assert_eq!(
+            c.players[0].supply.wood, 0,
+            "E111 HarvestFieldGainIfNoMinorPlayed must not fire on after_worker"
+        );
+    }
+
+    /// Reproduction test for PR #326 P0: E117 HarvestFieldGain should NOT fire on
+    /// dispatch_after_worker.
+    #[test]
+    fn e117_harvest_field_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E117".into()];
+        // E117 needs a wheat (grain) field (HasWheatField) - set up so mutation would fire
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 0,
+            "E117 HarvestFieldGain must not fire on after_worker"
+        );
+    }
+
+    /// Test that the correct effects DO fire on their proper dispatchers.
+    /// C106 should fire on harvest field phase.
+    #[test]
+    fn c106_harvest_field_gain_fires_on_harvest_field() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C106".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        // C106 has HarvestFieldGain (VegetablesHarvested) - should fire on harvest field
+        assert_eq!(
+            c.players[0].supply.food, 2,
+            "C106 HarvestFieldGain must fire on harvest field phase"
+        );
+    }
+
+    /// Test that B057 fires on round start.
+    #[test]
+    fn b057_start_round_gain_fires_on_start_round() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B057".into()];
+        c.players[0].house = House::Wood;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_start_round(
+            &set,
+            &mut c.players,
+            &mut c.cards,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 1,
+            "B057 StartRoundGain must fire on start_round"
+        );
+    }
+
+    /// Test that B050 fires on harvest field phase.
+    #[test]
+    fn b050_harvest_field_gain_fires_on_harvest_field() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B050".into()];
+        // 6 sheep = 2 food (per 3), 3 cattle = 1 food (per 2) -> total 3 food
+        c.players[0].pastures.push(Pasture {
+            id: 0,
+            cells: vec![2, 3, 4, 5, 6],
+            animal: Some(Animal::Sheep),
+            quantity: 6,
+        });
+        c.players[0].pastures.push(Pasture {
+            id: 1,
+            cells: vec![7, 8],
+            animal: Some(Animal::Cattle),
+            quantity: 3,
+        });
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+                    c.players[0].supply.food, 3,
+                    "B050 HarvestFieldGain (Animals) must fire on harvest field phase: 6 sheep + 3 cattle = 3 food"
+                );
+    }
+
+    /// Test that B061 fires on harvest field phase.
+    #[test]
+    fn b061_harvest_field_gain_fires_on_harvest_field() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B061".into()];
+        // B061 needs MixedFields: grain + vegetable + fallow
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        c.players[0].farm[3].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 3,
+            "B061 HarvestFieldGain (MixedFields) must fire on harvest field phase"
+        );
+    }
+
+    /// Test that B118 fires on round start.
+    #[test]
+    fn b118_start_round_gain_fires_on_start_round() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B118".into()];
+        // B118 needs exactly 2 rooms - Player::new() gives 2 rooms by default
+        c.players[0].supply.wood = 10;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_start_round(
+            &set,
+            &mut c.players,
+            &mut c.cards,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 11,
+            "B118 StartRoundGain must fire on start_round (exactly 2 rooms)"
+        );
+    }
+
+    /// Test that C111 fires on round start (food >= round).
+    #[test]
+    fn c111_start_round_gain_fires_on_start_round() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C111".into()];
+        c.players[0].supply.food = 10; // >= round (4)
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_start_round(
+            &set,
+            &mut c.players,
+            &mut c.cards,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 11,
+            "C111 StartRoundGainIfFoodAtLeastRound must fire on start_round"
+        );
+    }
+
+    /// Test that E107 fires on harvest field phase.
+    #[test]
+    fn e107_harvest_field_gain_fires_on_harvest_field() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E107".into()];
+        // E107: 4 plowed fields -> 2 food (thresholds: 2->1, 4->2, 6->3, 7->4)
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[3].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        c.players[0].farm[4].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+                    c.players[0].supply.food, 2,
+                    "E107 HarvestFieldGain (FieldCountThresholds) must fire on harvest field phase: 4 fields -> 2 food"
+                );
+    }
+
+    /// Test that E111 fires on round start (food, no minor played).
+    #[test]
+    fn e111_start_round_gain_fires_on_start_round() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E111".into()];
+        // E111: no minor improvements played -> 1 food at round start
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_start_round(
+            &set,
+            &mut c.players,
+            &mut c.cards,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 1,
+            "E111 StartRoundGainIfNoMinorPlayed must fire on start_round"
+        );
+    }
+
+    /// Test that E111 fires on harvest field phase (wood, no minor played).
+    #[test]
+    fn e111_harvest_field_gain_fires_on_harvest_field() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E111".into()];
+        c.players[0].supply.wood = 0;
+        // E111: no minor improvements played -> 1 wood at harvest field phase
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 1,
+            "E111 HarvestFieldGainIfNoMinorPlayed must fire on harvest field phase"
+        );
+    }
+
+    /// Test that E117 fires on harvest field phase.
+    #[test]
+    fn e117_harvest_field_gain_fires_on_harvest_field() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E117".into()];
+        // E117: at least 1 grain (wheat) field -> 2 wood
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 2,
+            "E117 HarvestFieldGain (HasWheatField) must fire on harvest field phase"
+        );
+    }
+
+    // =====================================================================
+    // Negative tests: cards must NOT fire on WRONG dispatch sites
+    // (clay_construction, after_harvest_bake)
+    // =====================================================================
+
+    /// B050 must not fire on after_clay_construction.
+    #[test]
+    fn b050_harvest_field_gain_does_not_fire_on_after_clay_construction() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B050".into()];
+        c.players[0].pastures.push(Pasture {
+            id: 0,
+            cells: vec![2, 3, 4, 5, 6],
+            animal: Some(Animal::Sheep),
+            quantity: 6,
+        });
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &c.players[0].clone(), // previous player
+            Some(crate::model::Improvement::Fireplace2),
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B050 must not fire on after_clay_construction"
+        );
+    }
+
+    /// B050 must not fire on after_harvest_bake.
+    #[test]
+    fn b050_harvest_field_gain_does_not_fire_on_after_harvest_bake() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B050".into()];
+        c.players[0].pastures.push(Pasture {
+            id: 0,
+            cells: vec![2, 3, 4, 5, 6],
+            animal: Some(Animal::Sheep),
+            quantity: 6,
+        });
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B050 must not fire on after_harvest_bake"
+        );
+    }
+
+    /// B057 must not fire on after_clay_construction.
+    #[test]
+    fn b057_start_round_gain_does_not_fire_on_after_clay_construction() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B057".into()];
+        c.players[0].house = House::Wood;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &c.players[0].clone(),
+            Some(crate::model::Improvement::Fireplace2),
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B057 must not fire on after_clay_construction"
+        );
+    }
+
+    /// B057 must not fire on after_harvest_bake.
+    #[test]
+    fn b057_start_round_gain_does_not_fire_on_after_harvest_bake() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B057".into()];
+        c.players[0].house = House::Wood;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B057 must not fire on after_harvest_bake"
+        );
+    }
+
+    /// B061 must not fire on after_clay_construction.
+    #[test]
+    fn b061_harvest_field_gain_does_not_fire_on_after_clay_construction() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B061".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        c.players[0].farm[3].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &c.players[0].clone(),
+            Some(crate::model::Improvement::Fireplace2),
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B061 must not fire on after_clay_construction"
+        );
+    }
+
+    /// B061 must not fire on after_harvest_bake.
+    #[test]
+    fn b061_harvest_field_gain_does_not_fire_on_after_harvest_bake() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B061".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        c.players[0].farm[3].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B061 must not fire on after_harvest_bake"
+        );
+    }
+
+    /// B118 must not fire on after_clay_construction.
+    #[test]
+    fn b118_start_round_gain_does_not_fire_on_after_clay_construction() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B118".into()];
+        c.players[0].supply.wood = 10;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &c.players[0].clone(),
+            Some(crate::model::Improvement::Fireplace2),
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 10,
+            "B118 must not fire on after_clay_construction"
+        );
+    }
+
+    /// B118 must not fire on after_harvest_bake.
+    #[test]
+    fn b118_start_round_gain_does_not_fire_on_after_harvest_bake() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B118".into()];
+        c.players[0].supply.wood = 10;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 10,
+            "B118 must not fire on after_harvest_bake"
+        );
+    }
+
+    /// C106 must not fire on after_clay_construction.
+    #[test]
+    fn c106_harvest_field_gain_does_not_fire_on_after_clay_construction() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C106".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &c.players[0].clone(),
+            Some(crate::model::Improvement::Fireplace2),
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "C106 must not fire on after_clay_construction"
+        );
+    }
+
+    /// C106 must not fire on after_harvest_bake.
+    #[test]
+    fn c106_harvest_field_gain_does_not_fire_on_after_harvest_bake() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C106".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "C106 must not fire on after_harvest_bake"
+        );
+    }
+
+    /// C111 must not fire on after_clay_construction.
+    #[test]
+    fn c111_start_round_gain_does_not_fire_on_after_clay_construction() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C111".into()];
+        c.players[0].supply.food = 10;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &c.players[0].clone(),
+            Some(crate::model::Improvement::Fireplace2),
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 10,
+            "C111 must not fire on after_clay_construction"
+        );
+    }
+
+    /// C111 must not fire on after_harvest_bake.
+    #[test]
+    fn c111_start_round_gain_does_not_fire_on_after_harvest_bake() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C111".into()];
+        c.players[0].supply.food = 10;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 10,
+            "C111 must not fire on after_harvest_bake"
+        );
+    }
+
+    /// E107 must not fire on after_clay_construction.
+    #[test]
+    fn e107_harvest_field_gain_does_not_fire_on_after_clay_construction() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E107".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[3].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        c.players[0].farm[4].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &c.players[0].clone(),
+            Some(crate::model::Improvement::Fireplace2),
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "E107 must not fire on after_clay_construction"
+        );
+    }
+
+    /// E107 must not fire on after_harvest_bake.
+    #[test]
+    fn e107_harvest_field_gain_does_not_fire_on_after_harvest_bake() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E107".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[3].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        c.players[0].farm[4].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "E107 must not fire on after_harvest_bake"
+        );
+    }
+
+    /// E111 must not fire on after_clay_construction (food).
+    #[test]
+    fn e111_start_round_gain_does_not_fire_on_after_clay_construction() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E111".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &c.players[0].clone(),
+            Some(crate::model::Improvement::Fireplace2),
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "E111 must not fire on after_clay_construction (food)"
+        );
+    }
+
+    /// E111 must not fire on after_harvest_bake (food).
+    #[test]
+    fn e111_start_round_gain_does_not_fire_on_after_harvest_bake() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E111".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "E111 must not fire on after_harvest_bake (food)"
+        );
+    }
+
+    /// E111 must not fire on after_clay_construction (wood).
+    #[test]
+    fn e111_harvest_field_gain_does_not_fire_on_after_clay_construction() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E111".into()];
+        c.players[0].supply.wood = 0;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &c.players[0].clone(),
+            Some(crate::model::Improvement::Fireplace2),
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 0,
+            "E111 must not fire on after_clay_construction (wood)"
+        );
+    }
+
+    /// E111 must not fire on after_harvest_bake (wood).
+    #[test]
+    fn e111_harvest_field_gain_does_not_fire_on_after_harvest_bake() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E111".into()];
+        c.players[0].supply.wood = 0;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 0,
+            "E111 must not fire on after_harvest_bake (wood)"
+        );
+    }
+
+    /// E117 must not fire on after_clay_construction.
+    #[test]
+    fn e117_harvest_field_gain_does_not_fire_on_after_clay_construction() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E117".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_clay_construction(
+            &set,
+            0,
+            &c.players[0].clone(),
+            Some(crate::model::Improvement::Fireplace2),
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 0,
+            "E117 must not fire on after_clay_construction"
+        );
+    }
+
+    /// E117 must not fire on after_harvest_bake.
+    #[test]
+    fn e117_harvest_field_gain_does_not_fire_on_after_harvest_bake() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_e_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["E117".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_bake(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 0,
+            "E117 must not fire on after_harvest_bake"
+        );
     }
 }

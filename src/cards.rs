@@ -3482,6 +3482,104 @@ mod verified_band_d_tests {
         assert_eq!(end_game_bonus(&set, &p), 4);
     }
 
+    /// Test for D100 3-point boundary: categories at exactly 3 points should NOT
+    /// count towards the bonus. This ensures a mutation of the threshold from 4 to 3
+    /// would be detected.
+    #[test]
+    fn d100_three_point_categories_do_not_count() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D100".into());
+
+        // Test fields boundary: 4 fields = 3 pts, 5 fields = 4 pts
+        for i in 1..=4 {
+            p.farm[i].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            };
+        }
+        assert_eq!(
+            end_game_bonus(&set, &p),
+            0,
+            "D100 should give 0 bonus with 4 fields (3 pts)"
+        );
+        p.farm[5].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        assert_eq!(
+            end_game_bonus(&set, &p),
+            1,
+            "D100 should give 1 bonus with 5 fields (4 pts)"
+        );
+
+        // Reset and test pastures boundary: 3 pastures = 3 pts, 4 pastures = 4 pts
+        let mut p2 = Player::new(0, 0);
+        p2.played_cards.push("D100".into());
+        for i in 0..3 {
+            p2.pastures.push(crate::model::Pasture {
+                id: i,
+                cells: vec![(10 + i * 2) as usize, (11 + i * 2) as usize],
+                animal: None,
+                quantity: 0,
+            });
+        }
+        assert_eq!(
+            end_game_bonus(&set, &p2),
+            0,
+            "D100 should give 0 bonus with 3 pastures (3 pts)"
+        );
+        p2.pastures.push(crate::model::Pasture {
+            id: 3,
+            cells: vec![16, 17],
+            animal: None,
+            quantity: 0,
+        });
+        assert_eq!(
+            end_game_bonus(&set, &p2),
+            1,
+            "D100 should give 1 bonus with 4 pastures (4 pts)"
+        );
+
+        // Reset and test grain boundary: 6 grain = 3 pts, 8 grain = 4 pts
+        let mut p3 = Player::new(0, 0);
+        p3.played_cards.push("D100".into());
+        for _ in 0..6 {
+            p3.supply.grain += 1;
+        }
+        assert_eq!(
+            end_game_bonus(&set, &p3),
+            0,
+            "D100 should give 0 bonus with 6 grain (3 pts)"
+        );
+        p3.supply.grain += 2; // Now 8 grain = 4 pts
+        assert_eq!(
+            end_game_bonus(&set, &p3),
+            1,
+            "D100 should give 1 bonus with 8 grain (4 pts)"
+        );
+
+        // Reset and test fenced_stables boundary: 3 fenced stables = 3 pts, 4 = 4 pts
+        let mut p4 = Player::new(0, 0);
+        p4.played_cards.push("D100".into());
+        for i in 10..=12 {
+            p4.farm[i].stable = true;
+            p4.farm[i].tile = Tile::Pasture { id: (10 + i) as u8 };
+        }
+        assert_eq!(
+            end_game_bonus(&set, &p4),
+            0,
+            "D100 should give 0 bonus with 3 fenced stables (3 pts)"
+        );
+        p4.farm[13].stable = true;
+        p4.farm[13].tile = Tile::Pasture { id: 23 };
+        assert_eq!(
+            end_game_bonus(&set, &p4),
+            1,
+            "D100 should give 1 bonus with 4 fenced stables (4 pts)"
+        );
+    }
+
     #[test]
     fn band_d_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
