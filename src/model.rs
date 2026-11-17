@@ -1107,15 +1107,20 @@ impl Game {
                 *self.public.animal_accumulations.entry(space).or_default() += 1
             }
         }
-        if let Some(recipients) = self.delayed_well.remove(&self.public.round) {
-            for id in recipients {
-                self.public.players[id].supply.food += 1
-            }
-            // Maintain the mirror invariant: well_food_schedule mirrors delayed_well.
-            // When delayed_well entries are consumed, remove the corresponding
-            // well_food_schedule entry for the same round (P1-4).
-            self.well_food_schedule.remove(&self.public.round);
+        // Consume any delayed well for this round and grant the food. The
+        // schedule mirror entry is removed UNCONDITIONALLY: delayed_well is the
+        // source of truth, but a legacy save can carry a well_food_schedule
+        // entry whose delayed_well entry is already gone, and dropping the
+        // grant inside `if let` left such orphan schedule entries behind
+        // forever (P1-4 + PR #341 review P3).
+        for id in self
+            .delayed_well
+            .remove(&self.public.round)
+            .unwrap_or_default()
+        {
+            self.public.players[id].supply.food += 1;
         }
+        self.well_food_schedule.remove(&self.public.round);
         // Round-start triggers go through the phase dispatcher so the event
         // budget and per-card use limits apply here too. The budget is reset
         // for a new round: a round boundary is not part of one action's chain.

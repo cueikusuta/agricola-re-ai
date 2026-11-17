@@ -101,38 +101,128 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
     // Standard game: 7 cards per kind per player initially.
     const INITIAL_HAND_PER_KIND: usize = 7;
 
-    for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
-        let mut pool = set
-            .definitions
-            .iter()
-            .filter(|c| c.kind == kind)
-            .map(|c| c.id.clone())
-            .filter(|id| !known.contains(id))
-            .collect::<Vec<_>>();
-        pool.shuffle(rng);
-        for (i, hand) in hands.iter_mut().enumerate() {
-            if i == obs.player_id {
-                continue; // observer's hand already fixed
+    // Compute per-kind hand sizes for each player from hand_counts (source of truth).
+    // hand_counts[i] = total cards in player i's hand (public information).
+    // We know played cards per kind from public state.
+    // For the observer, we know the exact hand composition from obs.hand.
+    // For opponents, we infer per-kind counts:
+    //   expected_per_kind = INITIAL_HAND_PER_KIND.saturating_sub(played_per_kind)
+    // If sum(expected) == hand_counts[i], use expected.
+    // If sum(expected) < hand_counts[i], distribute extra cards to kinds with remaining pool.
+    // If sum(expected) > hand_counts[i], contradiction -> return None.
+    //
+    // This handles non-standard states (draft variants, card draw effects) while
+    // preserving the standard 7+7 deal as the baseline.
+
+    // First, compute played cards per kind for each player.
+    let mut played_per_kind = vec![[0usize; 2]; players]; // [Occupation, MinorImprovement]
+    for (i, player) in obs.public.players.iter().enumerate() {
+        for id in &player.played_cards {
+            if let Some(def) = set.definition(id) {
+                match def.kind {
+                    CardKind::Occupation => played_per_kind[i][0] += 1,
+                    CardKind::MinorImprovement => played_per_kind[i][1] += 1,
+                }
             }
-            let played = obs.public.players[i]
-                .played_cards
-                .iter()
-                .filter(|id| set.definition(id).is_some_and(|c| c.kind == kind))
-                .count();
-            // Per-kind hand size follows the game rule: initial 7 minus played of this kind.
-            // If played >= 7, the hand is empty for this kind (invalid observations return None).
-            let required = INITIAL_HAND_PER_KIND.checked_sub(played)?;
-            if pool.len() < required {
-                return None;
-            }
-            hand.extend(pool.drain(..required));
         }
-        undealt.extend(pool);
     }
 
+    // For the observer, compute actual hand composition from obs.hand.
+    let mut observer_hand_per_kind = [0usize; 2];
+    for id in &obs.hand {
+        if let Some(def) = set.definition(id) {
+            match def.kind {
+                CardKind::Occupation => observer_hand_per_kind[0] += 1,
+                CardKind::MinorImprovement => observer_hand_per_kind[1] += 1,
+            }
+        }
+    }
+
+    // Build one shared pool per kind (unknown cards not in the known set).
+    let mut pool_occ = set
+        .definitions
+        .iter()
+        .filter(|c| c.kind == CardKind::Occupation)
+        .map(|c| c.id.clone())
+        .filter(|id| !known.contains(id))
+        .collect::<Vec<_>>();
+    let mut pool_minor = set
+        .definitions
+        .iter()
+        .filter(|c| c.kind == CardKind::MinorImprovement)
+        .map(|c| c.id.clone())
+        .filter(|id| !known.contains(id))
+        .collect::<Vec<_>>();
+    pool_occ.shuffle(rng);
+    pool_minor.shuffle(rng);
+
+    // Assign cards to each player's hand per kind.
+    for i in 0..players {
+        if i == obs.player_id {
+            // Observer's hand is already fixed (exact cards known).
+            // Just verify the kind counts match hand_counts.
+            let total_known = observer_hand_per_kind[0] + observer_hand_per_kind[1];
+            if total_known != obs.hand_counts[i] {
+                return None;
+            }
+            continue;
+        }
+
+        let total_hand = obs.hand_counts[i];
+        let played_occ = played_per_kind[i][0];
+        let played_minor = played_per_kind[i][1];
+
+        // Expected hand per kind from standard deal (7 per kind) minus played.
+        let expected_occ = INITIAL_HAND_PER_KIND.saturating_sub(played_occ);
+        let expected_minor = INITIAL_HAND_PER_KIND.saturating_sub(played_minor);
+        let expected_total = expected_occ + expected_minor;
+
+        let (target_occ, target_minor) = if expected_total == total_hand {
+            (expected_occ, expected_minor)
+        } else if expected_total < total_hand {
+            // Extra cards beyond standard deal (e.g., from card draw effects).
+            // Distribute extra cards proportionally to kinds with remaining pool capacity.
+            let extra = total_hand - expected_total;
+            let mut occ = expected_occ;
+            let mut minor = expected_minor;
+            // Prefer distributing to kinds that still have cards in the pool.
+            let occ_capacity = pool_occ.len().saturating_sub(occ);
+            let minor_capacity = pool_minor.len().saturating_sub(minor);
+            if occ_capacity > 0 && minor_capacity > 0 {
+                // Distribute proportionally to capacity.
+                let total_cap = occ_capacity + minor_capacity;
+                let add_occ = (extra * occ_capacity / total_cap).min(occ_capacity);
+                let add_minor = extra - add_occ;
+                occ += add_occ;
+                minor += add_minor.min(minor_capacity);
+            } else if occ_capacity > 0 {
+                occ += extra.min(occ_capacity);
+            } else if minor_capacity > 0 {
+                minor += extra.min(minor_capacity);
+            } else {
+                // No pool capacity for extra cards -> contradiction.
+                return None;
+            }
+            (occ, minor)
+        } else {
+            // expected_total > total_hand: played more cards than initially dealt for this kind.
+            // This is a contradiction unless cards were removed from hand by some effect.
+            // We treat it as irreconcilable.
+            return None;
+        };
+
+        if pool_occ.len() < target_occ || pool_minor.len() < target_minor {
+            return None;
+        }
+        hands[i].extend(pool_occ.drain(..target_occ));
+        hands[i].extend(pool_minor.drain(..target_minor));
+    }
+
+    undealt.extend(pool_occ);
+    undealt.extend(pool_minor);
+
     // Validate that the constructed hands match the observed total hand counts.
-    // This catches observations where the total hand size deviates from the standard
-    // 7+7 deal (e.g., draft variants or corrupted states).
+    // (Observer already validated above; opponents constructed to match.)
     for (i, hand) in hands.iter().enumerate().take(players) {
         if hand.len() != obs.hand_counts[i] {
             return None;
@@ -185,9 +275,18 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
 
     // card_uses and card_use_limits from observation (P2-3).
     // card_uses tracks per-card use counts in the current round (public info).
-    // card_use_limits is derived from CardDefinition::use_limit.
+    // card_use_limits is DERIVED from the card definitions (CardDefinition::use_limit),
+    // not copied from the observation: obs.card_use_limits is a convenience mirror
+    // (#[serde(default)] => {} for pre-mirror saves), while card_definitions is
+    // always complete. Deriving here means a save/restore that dropped the mirror
+    // still reconstructs a Game with correct per-round limits, matching how
+    // Game::from_card_state builds card_use_limits at startup.
     let card_uses = obs.card_uses.clone();
-    let card_use_limits = obs.card_use_limits.clone();
+    let card_use_limits = obs
+        .card_definitions
+        .iter()
+        .filter_map(|card| card.use_limit.map(|limit| (card.id.clone(), limit)))
+        .collect();
 
     // Search positions are hypothetical: skip state hashing and event logging.
     let config = Config {
@@ -1095,27 +1194,29 @@ mod tests {
         );
     }
 
-    /// Acceptance test: sample_game reconstructs a game whose Observation matches
-    /// the original for various in-progress game states.
+    /// Compare two observations for public-information equality (shared by the
+    /// sample_game acceptance tests below).
+    fn obs_eq_public(a: &Observation, b: &Observation) {
+        assert_eq!(a.player_id, b.player_id);
+        assert_eq!(a.public, b.public);
+        assert_eq!(a.hand, b.hand);
+        assert_eq!(a.hand_counts, b.hand_counts);
+        assert_eq!(a.card_definitions, b.card_definitions);
+        assert_eq!(a.well_food_schedule, b.well_food_schedule);
+        assert_eq!(a.card_uses, b.card_uses);
+        assert_eq!(a.card_use_limits, b.card_use_limits);
+    }
+
+    /// Acceptance (c) + roundtrip: sample_game reconstructs a game whose
+    /// Observation matches the original across several seeds and in-progress
+    /// rounds. The loop really plays cards (Lessons -> PlayOccupation), so the
+    /// reconstructed states include non-empty `played_cards`.
     #[test]
     fn sample_game_reconstructs_observation_roundtrip() {
-        use crate::cards::{verified_basic_card_set, CardDefinition, CardKind, CardSet};
+        use crate::cards::verified_basic_card_set;
         use crate::engine::{Action, Detail};
-        use crate::model::{Config, Game, Space};
         use rand::SeedableRng;
         use rand_chacha::ChaCha8Rng;
-
-        // Helper to compare two observations for public information equality.
-        fn obs_eq_public(a: &crate::model::Observation, b: &crate::model::Observation) {
-            assert_eq!(a.player_id, b.player_id);
-            assert_eq!(a.public, b.public);
-            assert_eq!(a.hand, b.hand);
-            assert_eq!(a.hand_counts, b.hand_counts);
-            assert_eq!(a.card_definitions, b.card_definitions);
-            assert_eq!(a.well_food_schedule, b.well_food_schedule);
-            assert_eq!(a.card_uses, b.card_uses);
-            assert_eq!(a.card_use_limits, b.card_use_limits);
-        }
 
         // Test multiple seeds and multiple rounds.
         for seed in [1, 42, 99, 123, 456] {
@@ -1127,6 +1228,7 @@ mod tests {
                 verified_basic_card_set(2).unwrap(),
             )
             .unwrap();
+            let mut played_cards_seen = false;
 
             // Play a few rounds to create in-progress states.
             for round in 1..=5 {
@@ -1137,35 +1239,269 @@ mod tests {
                 let sampled = sample_game(&obs, &mut rng).expect("sample_game must succeed");
                 let reconstructed_obs = sampled.observation(acting).unwrap();
                 obs_eq_public(&obs, &reconstructed_obs);
+                if obs
+                    .public
+                    .players
+                    .iter()
+                    .any(|p| !p.played_cards.is_empty())
+                {
+                    played_cards_seen = true;
+                }
 
-                // Take a legal action to advance the game.
+                // Take a legal action to advance the game. Prefer really playing
+                // a cost-free occupation at Lessons so `played_cards` grows;
+                // otherwise fall back to DayLaborer or the first legal space.
                 let legal = game.legal_spaces();
                 if legal.is_empty() {
                     break;
                 }
-                // Use a simple action (DayLaborer if available, otherwise first legal).
-                let action_space = legal
-                    .iter()
-                    .find(|&&s| s == Space::DayLaborer)
-                    .copied()
-                    .unwrap_or(legal[0]);
-                let action = Action {
-                    space: action_space,
-                    detail: Detail::None,
-                };
-                if game.apply(action).is_err() {
-                    break;
+                let mut applied = false;
+                if legal.contains(&Space::Lessons) {
+                    let playable = obs.hand.iter().find(|id| {
+                        game.card_set
+                            .definition(id)
+                            .is_some_and(|c| c.kind == CardKind::Occupation && c.cost.is_empty())
+                    });
+                    if let Some(card_id) = playable {
+                        let play = Action {
+                            space: Space::Lessons,
+                            detail: Detail::PlayOccupation {
+                                card_id: card_id.clone(),
+                            },
+                        };
+                        if game.apply(play).is_ok() {
+                            applied = true;
+                        }
+                    }
+                }
+                if !applied {
+                    // A card-specific refusal (cost/prerequisite) must not end
+                    // the loop: fall back to a plain legal action.
+                    let space = legal
+                        .iter()
+                        .find(|&&s| s == Space::DayLaborer)
+                        .copied()
+                        .unwrap_or(legal[0]);
+                    if game
+                        .apply(Action {
+                            space,
+                            detail: Detail::None,
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
                 }
             }
+            assert!(
+                played_cards_seen,
+                "seed {seed}: the loop must reach a state with played cards"
+            );
         }
+    }
+
+    /// Acceptance (a): a hand that grew beyond the standard `14 - played` count
+    /// (an undealt card moved into a hand through [`CardZone::Hand`]) must
+    /// reconstruct, because `hand_counts` is the information source, not a
+    /// fixed 7 per kind. The previous fixed-7 reconstruction returned `None`
+    /// for exactly this state.
+    #[test]
+    fn sample_game_restores_a_hand_larger_than_the_standard_deal() {
+        use crate::card_zones::{move_card, validate_card_partition, CardMoveCtx, CardZone};
+        use crate::cards::verified_basic_card_set;
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
+
+        let mut game = Game::with_cards(
+            Config {
+                seed: 8,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+
+        // Move one undealt occupation into player 1's hand. This is the engine's
+        // own hand mutation (`hands[player].push` via move_card), so the running
+        // invariants hold while hand_counts[1] leaves the standard 7+7 deal.
+        let acquired = game
+            .cards
+            .undealt
+            .iter()
+            .find(|id| {
+                game.card_set
+                    .definition(id)
+                    .is_some_and(|c| c.kind == CardKind::Occupation)
+            })
+            .cloned()
+            .expect("the verified pool keeps undealt occupations");
+        {
+            let mut ctx = CardMoveCtx {
+                cards: &mut game.cards,
+                players: &mut game.public.players,
+                improvement_market: &mut game.public.improvement_market,
+            };
+            move_card(
+                &mut ctx,
+                &acquired,
+                CardZone::Undealt,
+                CardZone::Hand { player: 1 },
+            )
+            .unwrap();
+        }
+        validate_card_partition(&game.card_set, &game.cards, &game.public.players).unwrap();
+
+        let obs = game.observation(0).unwrap();
+        assert_eq!(obs.hand_counts[1], 15, "the hand grew beyond 14 - played");
+        assert_eq!(obs.public.players[1].played_cards.len(), 0);
+
+        let mut rng = ChaCha8Rng::seed_from_u64(0xABCD_1234);
+        let sampled = sample_game(&obs, &mut rng).expect("a grown hand must reconstruct");
+        let reconstructed = sampled.observation(0).unwrap();
+        obs_eq_public(&obs, &reconstructed);
+        assert_eq!(
+            sampled.cards.hands.iter().map(Vec::len).collect::<Vec<_>>(),
+            obs.hand_counts,
+            "the sampled hands must match the observed hand counts"
+        );
+        // The sampled position only owes the running invariants: the 7+7 count
+        // is a setup property this legitimately-acquired card breaks.
+        validate_card_partition(&sampled.card_set, &sampled.cards, &sampled.public.players)
+            .unwrap();
+    }
+
+    /// Acceptance (b): a state with eight played occupations in front of one
+    /// player (played > 7 for a single kind) must sample instead of being
+    /// discarded, and the policy must turn it into completed simulations. The
+    /// previous `checked_sub(7 - played)` reconstruction returned `None` here,
+    /// which made `MctsPolicy` throw away every simulation.
+    #[test]
+    fn sample_game_survives_many_played_cards_and_the_policy_simulates() {
+        use crate::card_zones::{move_card, validate_card_partition, CardMoveCtx, CardZone};
+        use crate::cards::verified_basic_card_set;
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
+
+        let mut game = Game::with_cards(
+            Config {
+                seed: 7,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+
+        // Give the opponent an eighth occupation from the undealt pool, then
+        // move all eight occupations from their hand to their played area —
+        // a public state the engine can reach (play + acquisition), where
+        // played(Occupation) = 8 exceeds the fixed 7.
+        let eighth = game
+            .cards
+            .undealt
+            .iter()
+            .find(|id| {
+                game.card_set
+                    .definition(id)
+                    .is_some_and(|c| c.kind == CardKind::Occupation)
+            })
+            .cloned()
+            .expect("the verified pool keeps undealt occupations");
+        {
+            let mut ctx = CardMoveCtx {
+                cards: &mut game.cards,
+                players: &mut game.public.players,
+                improvement_market: &mut game.public.improvement_market,
+            };
+            move_card(
+                &mut ctx,
+                &eighth,
+                CardZone::Undealt,
+                CardZone::Hand { player: 1 },
+            )
+            .unwrap();
+        }
+        // Now the opponent's hand holds eight occupations: move them all to the
+        // played area through the canonical zone API.
+        let played: Vec<String> = game.cards.hands[1]
+            .iter()
+            .filter(|id| {
+                game.card_set
+                    .definition(id)
+                    .is_some_and(|c| c.kind == CardKind::Occupation)
+            })
+            .cloned()
+            .collect();
+        {
+            let mut ctx = CardMoveCtx {
+                cards: &mut game.cards,
+                players: &mut game.public.players,
+                improvement_market: &mut game.public.improvement_market,
+            };
+            for id in &played {
+                move_card(
+                    &mut ctx,
+                    id,
+                    CardZone::Hand { player: 1 },
+                    CardZone::Played { player: 1 },
+                )
+                .unwrap();
+            }
+        }
+        // Keep the card-points cache consistent with the direct zone move.
+        let points: i32 = played
+            .iter()
+            .filter_map(|id| game.card_set.definition(id))
+            .map(|c| c.points)
+            .sum();
+        game.public.players[1].card_points = points;
+        validate_card_partition(&game.card_set, &game.cards, &game.public.players).unwrap();
+
+        let obs = game.observation(0).unwrap();
+        assert_eq!(
+            played.len(),
+            8,
+            "the opponent really played eight occupations"
+        );
+        assert_eq!(obs.hand_counts[1], 7, "hand = 14 + 1 acquired - 8 played");
+        assert_eq!(
+            obs.public.players[1]
+                .played_cards
+                .iter()
+                .filter(|id| game
+                    .card_set
+                    .definition(id)
+                    .is_some_and(|c| c.kind == CardKind::Occupation))
+                .count(),
+            8
+        );
+
+        let mut rng = ChaCha8Rng::seed_from_u64(0x0F0F_0F0F);
+        let sampled = sample_game(&obs, &mut rng)
+            .expect("a state with played > 7 must sample, not return None");
+        obs_eq_public(&obs, &sampled.observation(0).unwrap());
+        validate_card_partition(&sampled.card_set, &sampled.cards, &sampled.public.players)
+            .unwrap();
+
+        // The policy must convert this state into simulations instead of the
+        // simulations_completed = 0 fallback.
+        let legal = game.legal_spaces();
+        let policy = MctsPolicy {
+            simulations: 6,
+            tree_depth: 2,
+        };
+        let (_space, outcome) = policy
+            .select_with_limit(&obs, &legal, &mut rng, SearchLimit::Simulations(6))
+            .expect("the policy must select a legal move");
+        assert!(
+            outcome.simulations_completed > 0,
+            "played >= 8 must feed the search instead of discarding every simulation"
+        );
     }
 
     /// Test with well reservations (delayed_well / well_food_schedule).
     #[test]
     fn sample_game_reconstructs_well_reservations() {
         use crate::cards::verified_basic_card_set;
-        use crate::engine::{Action, Detail};
-        use crate::model::{Config, Game, Improvement, Space};
         use rand::SeedableRng;
         use rand_chacha::ChaCha8Rng;
 
@@ -1178,16 +1514,10 @@ mod tests {
         )
         .unwrap();
 
-        // Advance to a round where Well can be purchased (any round).
-        // Purchase Well for player 0.
-        let acting = game.public.active_player;
-        // Find a player with enough resources for Well (1 wood, 3 stone).
-        // Give them resources via test setup - use a simpler approach: just test
-        // that well_food_schedule is preserved in roundtrip.
-        // Since we can't easily purchase Well in a test without complex setup,
-        // we directly verify that if well_food_schedule is present, it's preserved.
-
-        // Manually add a well reservation to test the mirror logic.
+        // Install a reservation for round 3 in the exact shape a real Well
+        // purchase produces (both maps written together, one recipient). A full
+        // purchase path needs resource setup that is irrelevant to what this
+        // test pins: sample_game must carry the schedule across the rebuild.
         game.delayed_well.entry(3).or_default().push(0);
         game.well_food_schedule.entry(3).or_default().push(0);
 
@@ -1203,45 +1533,124 @@ mod tests {
         assert_eq!(sampled.well_food_schedule, game.well_food_schedule);
     }
 
-    /// Test with card_use_limits (synthetic card with use_limit).
+    /// Acceptance (e): a synthetic `use_limit` card that is really played and
+    /// really used this round (card_uses non-empty and exactly at its limit)
+    /// must reconstruct with identical card_uses and limits. The sampled game's
+    /// card_use_limits is derived from the card definitions, not copied from
+    /// the observation mirror.
     #[test]
     fn sample_game_reconstructs_card_use_limits() {
-        use crate::cards::{verified_basic_card_set, CardDefinition, CardKind, CardSet};
-        use crate::model::{Config, Game};
+        use crate::cards::{verified_basic_card_set, CardDefinition, CardEffect, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::Good;
         use rand::SeedableRng;
         use rand_chacha::ChaCha8Rng;
 
-        // Create a card set with a synthetic card that has use_limit.
+        // Synthetic card: fires on DayLaborer, at most once per round.
         let mut definitions = verified_basic_card_set(2).unwrap().definitions;
         definitions.push(CardDefinition {
             id: "TEST_LIMITED".into(),
             kind: CardKind::Occupation,
             cost: vec![],
             points: 0,
-            effects: vec![],
+            effects: vec![CardEffect::AfterWorkerGain {
+                space: Space::DayLaborer,
+                good: Good::Wood,
+                amount: 1,
+            }],
             use_limit: Some(1),
         });
         let card_set = CardSet { definitions };
 
-        let game = Game::with_cards(
+        // Explicit hands put TEST_LIMITED in player 0's hand and make them the
+        // start player, so the real engine play path is exercised.
+        let mut occupations: Vec<String> = card_set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::Occupation && c.id != "TEST_LIMITED")
+            .map(|c| c.id.clone())
+            .collect();
+        let minors: Vec<String> = card_set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::MinorImprovement)
+            .map(|c| c.id.clone())
+            .collect();
+        let first_hand = [
+            vec!["TEST_LIMITED".to_string()],
+            occupations.drain(..6).collect(),
+            minors[..7].to_vec(),
+        ]
+        .concat();
+        let second_hand = [occupations.drain(..7).collect(), minors[7..14].to_vec()].concat();
+        let mut game = Game::with_cards_and_hands_with_start_player(
             Config {
                 seed: 88,
                 ..Config::default()
             },
             card_set,
+            vec![first_hand, second_hand],
+            0,
         )
         .unwrap();
 
+        // Round 1: play the limited card, let player 1 take a different space
+        // (a space is usable once per round, so player 0 must not take
+        // DayLaborer for them), then trigger the card once on DayLaborer. The
+        // use ledger is still inside round 1, so card_uses is non-empty and
+        // exactly at the declared limit.
+        game.apply(Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation {
+                card_id: "TEST_LIMITED".into(),
+            },
+        })
+        .unwrap();
+        game.apply(Action {
+            space: Space::GrainSeeds,
+            detail: Detail::None,
+        })
+        .unwrap();
+        game.apply(Action {
+            space: Space::DayLaborer,
+            detail: Detail::None,
+        })
+        .unwrap();
+
         let obs = game.observation(0).unwrap();
-        assert!(obs.card_use_limits.contains_key("TEST_LIMITED"));
-        assert_eq!(obs.card_use_limits["TEST_LIMITED"], 1);
+        assert_eq!(
+            obs.card_uses.get("TEST_LIMITED"),
+            Some(&1),
+            "the card was really used once this round"
+        );
+        assert_eq!(obs.card_use_limits.get("TEST_LIMITED"), Some(&1));
 
         let mut rng = ChaCha8Rng::seed_from_u64(0xBEEF_CAFE);
         let sampled = sample_game(&obs, &mut rng).expect("sample_game must succeed");
         let reconstructed_obs = sampled.observation(0).unwrap();
 
-        assert_eq!(reconstructed_obs.card_use_limits, obs.card_use_limits);
-        assert_eq!(sampled.card_use_limits, game.card_use_limits);
+        obs_eq_public(&obs, &reconstructed_obs);
+        assert_eq!(sampled.card_uses, game.card_uses);
+        assert_eq!(
+            sampled.card_use_limits, game.card_use_limits,
+            "limits must derive from the card definitions identically"
+        );
+        sampled.validate().unwrap();
+
+        // P2-A: the mirror is a convenience copy behind `#[serde(default)]`, so
+        // a pre-mirror save yields an empty Observation mirror while the
+        // definitions still declare the limit. Deriving from card_definitions
+        // must still rebuild a Game with the declared limits.
+        let mut stripped = obs.clone();
+        stripped.card_use_limits.clear();
+        let mut rng2 = ChaCha8Rng::seed_from_u64(0xCAFE_0001);
+        let sampled_stripped =
+            sample_game(&stripped, &mut rng2).expect("a mirror-less observation must sample");
+        assert_eq!(
+            sampled_stripped.card_use_limits.get("TEST_LIMITED"),
+            Some(&1),
+            "limits must come from CardDefinition::use_limit, not the observation mirror"
+        );
     }
 
     /// Test that start_round transition preserves public rewards for well and
@@ -1249,7 +1658,8 @@ mod tests {
     #[test]
     fn start_round_preserves_well_and_card_limits() {
         use crate::cards::verified_basic_card_set;
-        use crate::model::{Config, Game};
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
 
         let mut game = Game::with_cards(
             Config {
@@ -1287,5 +1697,52 @@ mod tests {
 
         // card_use_limits should persist unchanged.
         assert_eq!(game.card_use_limits, card_use_limits_before);
+
+        // Acceptance (d) + round boundary: the post-start_round state round-trips
+        // through sample_game — supply, public state and every Observation field
+        // (well mirror consumed, card_uses cleared, limits intact) must match.
+        let obs = game.observation(0).unwrap();
+        assert!(obs.well_food_schedule.is_empty());
+        let mut rng = ChaCha8Rng::seed_from_u64(0x5EED_0002);
+        let sampled =
+            sample_game(&obs, &mut rng).expect("the post-start_round state must reconstruct");
+        obs_eq_public(&obs, &sampled.observation(0).unwrap());
+        assert_eq!(sampled.public.players[0].supply.food, 2 + 1);
+        sampled.validate().unwrap();
+    }
+
+    /// P3 invariant: a legacy save can carry a well_food_schedule entry whose
+    /// delayed_well entry is already gone. start_round must still drop the
+    /// schedule entry for the consumed round instead of feeding the orphan
+    /// mirror forever, while a real paired reservation still grants its food.
+    #[test]
+    fn start_round_drops_an_orphan_well_schedule_entry() {
+        use crate::cards::verified_basic_card_set;
+
+        let mut game = Game::with_cards(
+            Config {
+                seed: 101,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+        // Orphan: schedule entry without a delayed_well twin (legacy save shape).
+        game.well_food_schedule.entry(2).or_default().push(1);
+
+        game.start_round();
+        assert_eq!(game.public.round, 2);
+        assert!(
+            !game.well_food_schedule.contains_key(&2),
+            "the orphan schedule entry must be dropped unconditionally"
+        );
+        assert!(
+            !game.delayed_well.contains_key(&2),
+            "nothing may appear in delayed_well for a schedule-only entry"
+        );
+        // No grant may have fired from the orphan: both players keep their
+        // initial food (start player 2, other 3).
+        assert_eq!(game.public.players[0].supply.food, 2);
+        assert_eq!(game.public.players[1].supply.food, 3);
     }
 }
