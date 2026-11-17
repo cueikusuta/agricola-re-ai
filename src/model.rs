@@ -611,7 +611,7 @@ pub struct Game {
     #[serde(default = "default_event_budget")]
     pub event_budget: u32,
     /// Per-card use tracking for effects with limits (e.g., once per round).
-    /// Key: card ID, Value: use count in the current period. Cleared at each
+    /// Key: "card_id:EventKind", Value: use count in the current period. Cleared at each
     /// round boundary, matching the "once per round" period used by the cards.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub card_uses: BTreeMap<String, u32>,

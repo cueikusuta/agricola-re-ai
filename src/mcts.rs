@@ -8,6 +8,8 @@ use crate::model::{
     Space,
 };
 use crate::policy::{CardChoiceDetails, DetailPolicy, GreedyPolicy, SpacePolicy};
+#[cfg(test)]
+use crate::registry::EventKind;
 use crate::score::standings_with_cards;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -1619,7 +1621,8 @@ mod tests {
 
         let obs = game.observation(0).unwrap();
         assert_eq!(
-            obs.card_uses.get("TEST_LIMITED"),
+            obs.card_uses
+                .get(&format!("TEST_LIMITED:{:?}", EventKind::WorkerPlaced)),
             Some(&1),
             "the card was really used once this round"
         );
@@ -1675,7 +1678,8 @@ mod tests {
         game.well_food_schedule.entry(2).or_default().push(0);
 
         // Set up some card_uses (simulating a card was used this round).
-        game.card_uses.insert("TEST_CARD".into(), 1);
+        game.card_uses
+            .insert(format!("TEST_CARD:{:?}", EventKind::RoundStart), 1);
 
         // Save card_use_limits before start_round.
         let card_use_limits_before = game.card_use_limits.clone();
