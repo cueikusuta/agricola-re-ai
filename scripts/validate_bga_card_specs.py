@@ -232,16 +232,23 @@ def run() -> int:
             play = item["play"]
             if play["printed_points"] is not None and str(play["printed_points"]) != base_row["printed_points"]:
                 raise ValueError("printed_points differs from the base ledger")
-            if play["cost"] is not None and base_row["cost"] not in ("none", "unknown"):
-                base_cost = sorted(
-                    part.split(":")[0] + ":" + part.split(":")[1]
-                    for part in base_row["cost"].split(";")
-                )
-                spec_cost = sorted(
-                    f"{entry['good']}:{entry['amount']}" for entry in play["cost"]
-                )
-                if base_cost != spec_cost:
-                    raise ValueError("cost differs from the base ledger")
+            if play["cost"] is not None:
+                if base_row["cost"] == "none":
+                    # Free card: spec cost must be empty list
+                    if play["cost"] != []:
+                        raise ValueError("cost differs from the base ledger")
+                elif base_row["cost"] != "unknown":
+                    # Paid card: compare costs as before
+                    base_cost = sorted(
+                        part.split(":")[0] + ":" + part.split(":")[1]
+                        for part in base_row["cost"].split(";")
+                    )
+                    spec_cost = sorted(
+                        f"{entry['good']}:{entry['amount']}" for entry in play["cost"]
+                    )
+                    if base_cost != spec_cost:
+                        raise ValueError("cost differs from the base ledger")
+            # base_row["cost"] == "unknown": skip validation (preserve existing behavior)
             review = item["review"]
             status = review["status"]
             if status not in STATUSES:
