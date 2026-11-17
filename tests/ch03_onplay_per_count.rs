@@ -654,3 +654,226 @@ fn b007_dispatcher_route_bottom_row_2_food_delta_4() {
         "dispatcher: bottom row 2 -> food_delta 4"
     );
 }
+
+// ---------------- cost / prerequisite regression pins (Round 2, P1-2) ----------------
+
+fn real_defs() -> Vec<CardDefinition> {
+    let mut defs = agricola_re_ai::cards::verified_band_c_cards();
+    defs.extend(agricola_re_ai::cards::verified_band_d_cards());
+    defs.extend(agricola_re_ai::cards::verified_band_b_cards());
+    defs
+}
+
+fn real_card<'a>(defs: &'a [CardDefinition], id: &str) -> &'a CardDefinition {
+    defs.iter()
+        .find(|d| d.id == id)
+        .unwrap_or_else(|| panic!("{id} must exist in the verified band cards"))
+}
+
+fn player_with_food(food: u32) -> Player {
+    let mut player = Player::new(0, 0);
+    player.supply.food = food;
+    player
+}
+
+fn good_name(good: Good) -> &'static str {
+    match good {
+        Good::Wood => "wood",
+        Good::Clay => "clay",
+        Good::Reed => "reed",
+        Good::Stone => "stone",
+        Good::Food => "food",
+        Good::Grain => "grain",
+        Good::Vegetable => "vegetable",
+    }
+}
+
+#[test]
+fn c004_cost_food_1_pinned() {
+    let defs = real_defs();
+    let set = new_set(defs.clone());
+    let card = real_card(&defs, "C004");
+    assert_eq!(card.cost, vec![(Good::Food, 1)], "C004 cost must be food 1");
+    let mut player = player_with_food(1);
+    assert!(can_play(&set, card, &player, 0), "food 1 -> C004 playable");
+    player.supply.food = 0;
+    assert!(
+        !can_play(&set, card, &player, 0),
+        "food 0 -> C004 unplayable"
+    );
+}
+
+#[test]
+fn c005_cost_food_1_pinned() {
+    let defs = real_defs();
+    let set = new_set(defs.clone());
+    let card = real_card(&defs, "C005");
+    assert_eq!(card.cost, vec![(Good::Food, 1)], "C005 cost must be food 1");
+    let mut player = player_with_food(1);
+    assert!(can_play(&set, card, &player, 0), "food 1 -> C005 playable");
+    player.supply.food = 0;
+    assert!(
+        !can_play(&set, card, &player, 0),
+        "food 0 -> C005 unplayable"
+    );
+}
+
+#[test]
+fn d005_cost_food_1_pinned() {
+    let defs = real_defs();
+    let set = new_set(defs.clone());
+    let card = real_card(&defs, "D005");
+    assert_eq!(card.cost, vec![(Good::Food, 1)], "D005 cost must be food 1");
+    let mut player = player_with_food(1);
+    assert!(can_play(&set, card, &player, 0), "food 1 -> D005 playable");
+    player.supply.food = 0;
+    assert!(
+        !can_play(&set, card, &player, 0),
+        "food 0 -> D005 unplayable"
+    );
+}
+
+#[test]
+fn b006_cost_and_prerequisite_pinned() {
+    let defs = real_defs();
+    let mut with_occ = defs.clone();
+    with_occ.push(occ_def("occ1"));
+    let set = new_set(with_occ);
+    let card = real_card(&defs, "B006");
+    assert_eq!(card.cost, vec![(Good::Food, 2)], "B006 cost must be food 2");
+    assert!(
+        card.effects.iter().any(|e| matches!(
+            e,
+            CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumOccupations(1)
+            }
+        )),
+        "B006 must carry MinimumOccupations(1)"
+    );
+
+    let mut player = player_with_food(2);
+    // cost met, prerequisite unmet -> cannot play
+    assert!(
+        !can_play(&set, card, &player, 0),
+        "0 occupations -> B006 unplayable"
+    );
+    // prerequisite met, cost unmet -> cannot play
+    player.played_cards.push("occ1".into());
+    player.supply.food = 1;
+    assert!(
+        !can_play(&set, card, &player, 0),
+        "food 1 -> B006 unplayable (cost 2)"
+    );
+    // both met -> playable
+    player.supply.food = 2;
+    assert!(
+        can_play(&set, card, &player, 0),
+        "food 2 + 1 occupation -> B006 playable"
+    );
+}
+
+#[test]
+fn b007_cost_zero_pinned() {
+    let defs = real_defs();
+    let set = new_set(defs.clone());
+    let card = real_card(&defs, "B007");
+    assert_eq!(card.cost, vec![], "B007 cost must be free");
+    let player = player_with_food(0);
+    assert!(
+        can_play(&set, card, &player, 0),
+        "food 0 -> B007 playable (cost 0)"
+    );
+}
+
+#[test]
+fn spec_cost_prereq_parity_with_verified_cards() {
+    let defs = real_defs();
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    for id in ["C004", "C005", "D005", "B006", "B007"] {
+        let path = root
+            .join("data")
+            .join("bga-card-specs")
+            .join(format!("{id}.json"));
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let spec: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let card = real_card(&defs, id);
+
+        let mut spec_cost: Vec<(String, u64)> = spec["play"]["cost"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{id} spec cost must be an array"))
+            .iter()
+            .map(|e| {
+                (
+                    e["good"].as_str().unwrap().to_string(),
+                    e["amount"].as_u64().unwrap(),
+                )
+            })
+            .collect();
+        spec_cost.sort();
+        let mut impl_cost: Vec<(String, u64)> = card
+            .cost
+            .iter()
+            .map(|(good, amount)| (good_name(*good).to_string(), u64::from(*amount)))
+            .collect();
+        impl_cost.sort();
+        assert_eq!(
+            impl_cost, spec_cost,
+            "{id}: cost parity spec vs implementation"
+        );
+
+        let prerequisites = spec["play"]["prerequisites"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{id} spec prerequisites must be an array"));
+        if id == "B006" {
+            assert_eq!(prerequisites.len(), 1, "B006: exactly one prerequisite");
+            assert_eq!(
+                prerequisites[0]["predicate"].as_str().unwrap(),
+                "occupation_count"
+            );
+            assert_eq!(prerequisites[0]["params"]["n"].as_u64().unwrap(), 1);
+            assert!(card.effects.iter().any(|e| matches!(
+                e,
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(1)
+                }
+            )));
+        } else {
+            assert!(
+                prerequisites.is_empty(),
+                "{id}: spec must have no prerequisites"
+            );
+            assert!(
+                !card
+                    .effects
+                    .iter()
+                    .any(|e| matches!(e, CardEffect::Prerequisite { .. })),
+                "{id}: implementation must carry no prerequisite"
+            );
+        }
+    }
+}
+
+#[test]
+fn b004_absent_from_verified_cards_and_spec_held_needs_resolution() {
+    let defs = real_defs();
+    assert!(
+        defs.iter().all(|d| d.id != "B004"),
+        "B004 must not be in the verified band cards (needs_resolution)"
+    );
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("data")
+        .join("bga-card-specs")
+        .join("B004.json");
+    let text = std::fs::read_to_string(&path).unwrap();
+    let spec: serde_json::Value = serde_json::from_str(&text).unwrap();
+    assert!(spec["effects"].is_null(), "B004 spec effects must be null");
+    assert_eq!(
+        spec["review"]["status"].as_str().unwrap(),
+        "needs_resolution"
+    );
+    assert_eq!(
+        spec["review"]["implementation_status"].as_str().unwrap(),
+        "not_started"
+    );
+}

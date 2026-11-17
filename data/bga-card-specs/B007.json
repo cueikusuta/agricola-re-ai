@@ -82,8 +82,10 @@
     "destination": "left_neighbor_hand"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "partial",
+    "unresolved_fields": [
+      "major_improvement_bottom_row の対象構成（Joinery / Pottery / Basketry の3種のみか、他の大進歩（Fireplace/Hearth/ClayOven/StoneOven/Well 等）を含むか）がリポジトリ内 spec データからは導出できない。公式ゲームボード照合が必要（AGENTS §3・人間決定待ち、Issue #348）"
+    ],
     "test_case_ids": [
       "B007-normal",
       "B007-zero"
