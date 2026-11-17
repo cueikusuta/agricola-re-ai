@@ -165,5 +165,5 @@ M7 #335 C004 cost → 2赤、M8 #340 C116 自己発動 → **ブランチのみ�
 
 - 差分は `docs/`・`PROGRESS.md`・`result-deepai.md` のみ。コード変更なし。
 - #327 の E0061 20件は一時 worktree（detached `1caa250`）で再現し、worktree は削除済み。
-- PR は作成のみ。マージしない。
+- PR #356 を作成（base は #355 のブランチ）。マージしない。
 
