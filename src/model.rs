@@ -1433,6 +1433,7 @@ impl Game {
                             actor: player,
                             card_owner: player,
                             beneficiary: player,
+                            play_food_paid: 0,
                         };
                         let trigger = crate::card_events::PhaseTriggerData {
                             space: None,
@@ -1539,6 +1540,7 @@ impl Game {
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
+                        play_food_paid: 0,
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: None,
@@ -1632,6 +1634,7 @@ impl Game {
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
+                        play_food_paid: 0,
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: Some(completion.action.space),
@@ -1890,6 +1893,7 @@ impl Game {
                     actor: pending.player,
                     card_owner,
                     beneficiary: card_owner,
+                    play_food_paid: 0,
                 };
 
                 // Execute in chosen order

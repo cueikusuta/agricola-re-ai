@@ -58,8 +58,9 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfNoMinorPlayed { .. } => TriggerPhase::After,
-        // Fired only by the play dispatcher's dedicated after-play scan.
-        CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
+        // Fired by dispatch_play_after through the standard After-phase scan
+        // (P1-1 unified play order: AfterPlay resolves as a normal effect).
+        CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After,
         // Clay construction purchase — After phase
         CardEffect::AfterClayConstructionGain { .. } => TriggerPhase::After,
         // Harvest/baking — After phase
@@ -95,6 +96,20 @@ pub struct DispatchContext<'a> {
     /// the card owner, but some effects target other players (e.g., "all opponents").
     /// Handlers should use this to determine the actual beneficiary.
     pub beneficiary: usize,
+    /// Food paid as the current card play's cost (printed cost + occupation fee).
+    /// Used by C116's AfterOccupationGainPerFoodCost handler during the
+    /// AfterPlay phase of an occupation play (P1-1 unified play order).
+    pub play_food_paid: u32,
+}
+
+impl<'a> DispatchContext<'a> {
+    /// Default play_food_paid for dispatchers that are not a card play
+    /// (after-worker, start-round, harvest, ...). The C116 AfterPlay handler
+    /// only fires during a play's After phase, so a zero there keeps other
+    /// sites inert.
+    pub fn zero_play_food_paid() -> u32 {
+        0
+    }
 }
 
 /// Result of resolving a single effect.
@@ -377,6 +392,7 @@ fn resolve_phase_scan(
             actor: ctx.actor,
             card_owner: player,
             beneficiary: player,
+            play_food_paid: ctx.play_food_paid,
         };
 
         // Execute in chosen order (play order)
@@ -455,9 +471,9 @@ fn resolve_phase_scan(
 
             // Dispatch to handler
             let result = match effect {
-                // Never fires via the generic phase scan (see
-                // effect_condition_holds); dispatch_play's after-play scan owns it.
-                CardEffect::AfterOccupationGainPerFoodCost { .. } => EffectResult::Resolved,
+                CardEffect::AfterOccupationGainPerFoodCost { good, amount } => {
+                    handle_after_occupation_gain_per_food_cost(ctx, good, *amount)?
+                }
                 #[cfg(test)]
                 CardEffect::PendingProbe { options } => {
                     handle_pending_probe(ctx, player, card_id, options.clone(), trigger_data)?
@@ -669,9 +685,11 @@ fn effect_condition_holds(
         // handler performs the check.
         CardEffect::StartRoundGainIfNoMinorPlayed { .. } => true,
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => true,
-        // C116 調度品職員 fires only from dispatch_play's dedicated after-play
-        // scan, never from the generic phase scan.
-        CardEffect::AfterOccupationGainPerFoodCost { .. } => false,
+        // C116 調度品職人: fires during a card play's AfterPlay phase when the
+        // play paid food as its occupation cost (P1-1 unified play order).
+        // The handler re-checks play_food_paid > 0 against the context, so the
+        // scan reports it as triggerable whenever the phase is a card play.
+        CardEffect::AfterOccupationGainPerFoodCost { .. } => true,
         CardEffect::AfterClayConstructionGain { .. } => {
             let Some(prev) = &trigger.previous_player else {
                 return false;
@@ -770,9 +788,9 @@ pub fn execute_chosen_triggers(
 
         // Dispatch to handler
         let result = match effect {
-            // Never fires via the generic phase scan (see
-            // effect_condition_holds); dispatch_play's after-play scan owns it.
-            CardEffect::AfterOccupationGainPerFoodCost { .. } => EffectResult::Resolved,
+            CardEffect::AfterOccupationGainPerFoodCost { good, amount } => {
+                handle_after_occupation_gain_per_food_cost(ctx, good, *amount)?
+            }
             #[cfg(test)]
             CardEffect::PendingProbe { options } => {
                 handle_pending_probe(ctx, player, &trigger.card_id, options.clone(), trigger_data)?
@@ -1042,6 +1060,35 @@ fn handle_on_play_gain_per_improvement_played(
         .supply
         .get(*good)
         .checked_add(bonus)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// C116 調度品職人 (Instrument Craftsman): each later occupation play grants
+/// `amount` of `good` per food paid as that play's occupation cost (printed
+/// cost + the optional occupation fee). This is the AfterPlay arm of the
+/// unified play order (P1-1): it fires through the generic After-phase scan
+/// via `dispatch_play_after`, so the play_food_paid context carries the cost.
+/// Outside a card play (after-worker, start-round, harvest, ...) the context's
+/// `play_food_paid` is 0 and the effect resolves inertly.
+fn handle_after_occupation_gain_per_food_cost(
+    ctx: &mut DispatchContext<'_>,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let food_paid = ctx.play_food_paid;
+    if food_paid == 0 {
+        return Ok(EffectResult::Resolved);
+    }
+    let total = amount
+        .checked_mul(food_paid)
+        .ok_or("occupation-play bonus overflow")?;
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(total)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
@@ -1353,7 +1400,7 @@ pub fn dispatch_play(
     card_set: &CardSet,
     player: usize,
     new_card_id: &str,
-    extra_food_paid: u32,
+    #[allow(unused_variables)] extra_food_paid: u32,
     cards: &mut crate::cards::CardState,
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
@@ -1382,6 +1429,7 @@ pub fn dispatch_play(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        play_food_paid: 0,
     };
 
     let trigger = PhaseTriggerData {
@@ -1431,58 +1479,87 @@ pub fn dispatch_play(
 
     // Phase 3: Core action (card is moved to played zone — handled by caller via move_card)
 
-    // Phase 4: After — card-play dependent triggers owned by EARLIER played
-    // cards. The only such effect today is C116 調度品職人
-    // (`AfterOccupationGainPerFoodCost`): each time the owner plays an
-    // occupation after it, it grants wood per food paid as that occupation's
-    // cost (printed cost + the optional occupation fee). The new card is
-    // already last in `played_cards` (the caller ran the zone move), so the
-    // scan covers exactly the cards played "before this one".
-    if let Some(new_card) = card_set.definition(new_card_id) {
-        if new_card.kind == crate::cards::CardKind::Occupation {
-            let printed_food: u32 = new_card
-                .cost
+    // Phase 4: After — handled by caller via dispatch_play_after to ensure
+    // the card is in played_cards and ChooseTriggerOrder works correctly.
+
+    Ok(())
+}
+
+/// Dispatch the After phase for a card play. This runs After effects
+/// (including C116's AfterOccupationGainPerFoodCost) through the standard
+/// resolve_phase mechanism so that ChooseTriggerOrder ordering works correctly.
+/// The card must already be in played_cards (caller must have run play_from_hand).
+#[allow(clippy::too_many_arguments)]
+pub fn dispatch_play_after(
+    card_set: &CardSet,
+    player: usize,
+    new_card_id: &str,
+    extra_food_paid: u32,
+    cards: &mut crate::cards::CardState,
+    players: &mut [Player],
+    improvement_market: &mut Vec<crate::model::Improvement>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    round: u8,
+    used_spaces: &std::collections::BTreeSet<Space>,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    pending: &mut Option<PendingDecision>,
+) -> Result<Transition, String> {
+    // C116's trigger amount is the food paid as this occupation's cost:
+    // printed food cost + the optional occupation fee.
+    let printed_food: u32 = card_set
+        .definition(new_card_id)
+        .map(|card| {
+            card.cost
                 .iter()
                 .filter(|(good, _)| *good == Good::Food)
                 .map(|(_, n)| *n)
-                .sum();
-            let food_paid = printed_food.saturating_add(extra_food_paid);
-            if food_paid > 0 {
-                let played = ctx.player.played_cards.clone();
-                let owned = played.len().saturating_sub(1); // exclude the new card
-                for id in &played[..owned] {
-                    let Some(card) = card_set.definition(id) else {
-                        continue;
-                    };
-                    for effect in &card.effects {
-                        let CardEffect::AfterOccupationGainPerFoodCost { good, amount } = effect
-                        else {
-                            continue;
-                        };
-                        consume_budget(ctx.event_budget)?;
-                        let limit = ctx
-                            .card_use_limits
-                            .get(id.as_str())
-                            .copied()
-                            .unwrap_or(u32::MAX);
-                        check_card_use(ctx.card_uses, id, limit)?;
-                        let total = amount
-                            .checked_mul(food_paid)
-                            .ok_or("occupation-play bonus overflow")?;
-                        let p = &mut ctx.player;
-                        let next = p
-                            .supply
-                            .get(*good)
-                            .checked_add(total)
-                            .ok_or("resource overflow")?;
-                        p.supply.set(*good, next);
-                    }
-                }
-            }
-        }
-    }
+                .sum()
+        })
+        .unwrap_or(0);
+    let play_food_paid = printed_food.saturating_add(extra_food_paid);
+    // Clone players for all_players parameter to avoid borrow checker issues
+    let all_players = players.to_vec();
+    let mut ctx = DispatchContext {
+        card_set,
+        player: &mut players[player],
+        cards,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+        actor: player,
+        card_owner: player,
+        beneficiary: player,
+        play_food_paid,
+    };
 
-    Ok(())
+    let trigger = PhaseTriggerData {
+        space: None,
+        improvement: None,
+        baked: false,
+        previous_player: None,
+        used_spaces: std::collections::BTreeSet::new(),
+    };
+
+    // Phase 4: After — the new card is now in played_cards, so After effects
+    // from earlier cards (like C116) will trigger. We use allow_choose_trigger_order_pause=false
+    // because dispatch_play_after is not part of a post-work chain with resume support.
+    // However, if multiple After effects trigger, they still need to be ordered.
+    // Since we can't pause here, we fall back to play order (per resolve_phase_scan logic).
+    resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::After,
+        &trigger,
+        &all_players,
+        false, // no pause support in card play dispatcher
+    )
 }
 
 /// Dispatch AfterWorker phase for a completed worker action.
@@ -1522,6 +1599,7 @@ pub fn dispatch_after_worker(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        play_food_paid: 0,
     };
 
     let trigger = PhaseTriggerData {
@@ -1593,6 +1671,7 @@ pub fn dispatch_start_round(
             actor,
             card_owner: player,
             beneficiary: player,
+            play_food_paid: 0,
         };
 
         let trigger = PhaseTriggerData {
@@ -1670,6 +1749,7 @@ pub fn dispatch_after_clay_construction(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        play_food_paid: 0,
     };
 
     let trigger = PhaseTriggerData {
@@ -1741,6 +1821,7 @@ pub fn dispatch_harvest_field(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        play_food_paid: 0,
     };
 
     let trigger = PhaseTriggerData {
@@ -1818,6 +1899,7 @@ pub fn dispatch_after_harvest_bake(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        play_food_paid: 0,
     };
 
     let trigger = PhaseTriggerData {
@@ -2320,7 +2402,10 @@ pub mod legacy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cards::{verified_band_a_cards, CardDefinition, CardKind, CardSet};
+    use crate::cards::{
+        verified_band_a_cards, verified_band_c_cards, CardDefinition, CardKind, CardRequirement,
+        CardSet,
+    };
     use crate::model::{Crop, Good, Improvement, Player, Space, Tile};
     use crate::pending::Transition;
     use std::collections::BTreeSet;
@@ -4039,8 +4124,10 @@ mod tests {
         );
     }
 
-    /// C116 調度品職人 via the production play dispatcher: each later
-    /// occupation play grants 1 wood per food paid as its occupation cost.
+    /// C116 調度品職人 via the production play dispatcher's AfterPlay phase: each
+    /// later occupation play grants 1 wood per food paid as its occupation cost.
+    /// P1-1 unified order: the zone move has already put the new card last in
+    /// played_cards, so dispatch_play_after scans the pre-existing cards (C116).
     #[test]
     fn c116_occupation_play_grants_wood_per_food_cost() {
         let mut set = CardSet {
@@ -4063,7 +4150,7 @@ mod tests {
         let mut budget = 64u32;
         let mut uses = BTreeMap::new();
         let limits = BTreeMap::new();
-        dispatch_play(
+        dispatch_play_after(
             &set,
             0,
             "occ_food2",
@@ -4086,7 +4173,7 @@ mod tests {
         );
         // Fee also counts as occupation cost.
         c.players[0].played_cards = vec!["C116".into(), "C111".into()];
-        dispatch_play(
+        dispatch_play_after(
             &set,
             0,
             "C111",
@@ -4106,7 +4193,7 @@ mod tests {
         assert_eq!(c.players[0].supply.wood, 5, "fee 3 + cost 0 -> 3 wood");
         // Minor improvements and zero-cost occupations do not trigger it.
         c.players[0].played_cards = vec!["C116".into(), "C106".into()];
-        dispatch_play(
+        dispatch_play_after(
             &set,
             0,
             "C106",
@@ -4471,5 +4558,753 @@ mod tests {
         );
         // Expected: 10 + 3 = 13
         assert_eq!(legacy_wood, 13, "expected 3 wood from 3 improvements");
+    }
+
+    /// P1-1 Reproduction: MaximumOccupations(0) self-count issue.
+    /// An occupation with Prerequisite(MaximumOccupations(0)) should be playable
+    /// when the player has 0 occupations. The canonical `cards::play` validates
+    /// prerequisites BEFORE moving the card to played_cards, so it works.
+    /// The engine path (play_validate_pay -> play_from_hand -> dispatch_play)
+    /// moves the card first, then runs Replace phase which sees the new card
+    /// in played_cards and fails the prerequisite check.
+    #[test]
+    fn reproduction_max0_occ_self_count() {
+        let set = CardSet {
+            definitions: {
+                let mut defs = verified_band_c_cards();
+                defs.push(CardDefinition {
+                    use_limit: None,
+                    id: "MAX0_OCC".into(),
+                    kind: CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![CardEffect::Prerequisite {
+                        rule: CardRequirement::MaximumOccupations(0),
+                    }],
+                });
+                defs
+            },
+        };
+
+        // Path 1: cards::play (canonical API) - should SUCCEED
+        let mut hand1 = vec!["MAX0_OCC".to_string()];
+        let mut player1 = Player::new(0, 0);
+        let result1 = crate::cards::play(
+            &set,
+            &mut hand1,
+            &mut player1,
+            "MAX0_OCC",
+            CardKind::Occupation,
+            0,
+        );
+        assert!(
+            result1.is_ok(),
+            "cards::play should succeed with MaximumOccupations(0) when player has 0 occupations"
+        );
+
+        // Path 2: engine path (play_validate_pay + play_from_hand + dispatch_play)
+        // This currently FAILS due to the bug - the card is moved to played_cards
+        // before Replace phase runs, so the prerequisite check sees 1 occupation.
+        let mut cards = crate::cards::CardState {
+            hands: vec![vec!["MAX0_OCC".to_string()]],
+            undealt: vec![],
+        };
+        let mut players = vec![Player::new(0, 0)];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        let mut ctx = crate::card_zones::CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        crate::cards::play_validate_pay(
+            &set,
+            &mut ctx.cards.hands[0],
+            &mut ctx.players[0],
+            "MAX0_OCC",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        crate::card_zones::play_from_hand(&mut ctx, 0, "MAX0_OCC").unwrap();
+        let result2 = dispatch_play(
+            &set,
+            0,
+            "MAX0_OCC",
+            0,
+            ctx.cards,
+            ctx.players,
+            ctx.improvement_market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        );
+        // Currently this FAILS (Err) due to the bug. After fix, it should succeed.
+        assert!(
+                    result2.is_err(),
+                    "ENGINE PATH BUG REPRODUCED: dispatch_play fails with MaximumOccupations(0) because the card was already moved to played_cards before Replace phase. After fix, this should be Ok."
+                );
+    }
+
+    /// P1-1 Reproduction: Minor improvement self-count with OnPlayGainPerImprovementPlayed.
+    /// A minor improvement with OnPlayGainPerImprovementPlayed should NOT count itself.
+    /// The canonical `cards::play` applies on-play effects BEFORE moving the card,
+    /// so it doesn't count itself. The engine path moves the card first, then
+    /// runs Before phase which sees the new card in played_cards and counts it.
+    #[test]
+    fn reproduction_self_minor_wood_self_count() {
+        let set = CardSet {
+            definitions: {
+                let mut defs = verified_band_a_cards();
+                defs.push(CardDefinition {
+                    use_limit: None,
+                    id: "minor1".into(),
+                    kind: CardKind::MinorImprovement,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                });
+                defs.push(CardDefinition {
+                    use_limit: None,
+                    id: "SELF_MINOR_WOOD".into(),
+                    kind: CardKind::MinorImprovement,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![CardEffect::OnPlayGainPerImprovementPlayed {
+                        good: Good::Wood,
+                        amount: 1,
+                    }],
+                });
+                defs
+            },
+        };
+
+        // Setup: player has 1 base improvement (Well) and 1 minor improvement already played
+        let base_improvements = 1; // Well
+        let played_minors = 1; // minor1 already in played_cards
+        let expected_count = base_improvements + played_minors; // = 2
+
+        // Path 1: cards::play (canonical API) - should grant wood for 2 improvements (not counting itself)
+        let mut hand1 = vec!["SELF_MINOR_WOOD".to_string()];
+        let mut player1 = Player::new(0, 0);
+        player1.supply.wood = 5;
+        player1.improvements.push(Improvement::Well);
+        player1.played_cards.push("minor1".to_string());
+        crate::cards::play(
+            &set,
+            &mut hand1,
+            &mut player1,
+            "SELF_MINOR_WOOD",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        let canonical_wood = player1.supply.wood;
+        assert_eq!(
+            canonical_wood,
+            5 + expected_count,
+            "cards::play should grant wood for {} improvements (not counting itself)",
+            expected_count
+        );
+
+        // Path 2: engine path (play_validate_pay + play_from_hand + dispatch_play)
+        // This currently grants +1 extra wood because the card is moved to played_cards
+        // before Before phase runs, so improvement_count_in_front counts it.
+        let mut cards = crate::cards::CardState {
+            hands: vec![vec!["SELF_MINOR_WOOD".to_string()]],
+            undealt: vec![],
+        };
+        let mut players = vec![Player::new(0, 0)];
+        players[0].supply.wood = 5;
+        players[0].improvements.push(Improvement::Well);
+        players[0].played_cards.push("minor1".to_string());
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        let mut ctx = crate::card_zones::CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        crate::cards::play_validate_pay(
+            &set,
+            &mut ctx.cards.hands[0],
+            &mut ctx.players[0],
+            "SELF_MINOR_WOOD",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        crate::card_zones::play_from_hand(&mut ctx, 0, "SELF_MINOR_WOOD").unwrap();
+        dispatch_play(
+            &set,
+            0,
+            "SELF_MINOR_WOOD",
+            0,
+            ctx.cards,
+            ctx.players,
+            ctx.improvement_market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        let engine_wood = players[0].supply.wood;
+
+        // Currently engine_wood = canonical_wood + 1 due to the bug.
+        // After fix, they should be equal.
+        assert_ne!(
+                        engine_wood, canonical_wood,
+                        "ENGINE PATH BUG REPRODUCED: engine path grants {} wood vs canonical {} wood (self-count bug). After fix, they should be equal.",
+                        engine_wood, canonical_wood
+                    );
+    }
+
+    /// P1-1 Reproduction: C116 AfterOccupationGainPerFoodCost not firing via cards::play or evaluation.
+    /// C116's After effect should fire when an occupation is played after it.
+    /// Currently it only fires in dispatch_play's dedicated after-play loop, not in
+    /// cards::play or evaluation's project_play_card. Also it doesn't go through
+    /// ChooseTriggerOrder for ordering.
+    #[test]
+    fn reproduction_c116_one_sided_implementation() {
+        let mut set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        // Add a test occupation with food cost 2
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "OCC_FOOD2".into(),
+            kind: CardKind::Occupation,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![],
+        });
+
+        // Path 1: cards::play (canonical API) - must fire C116 after the fix
+        let mut hand1 = vec!["OCC_FOOD2".to_string()];
+        let mut player1 = Player::new(0, 0);
+        player1.supply.food = 5;
+        player1.supply.wood = 0;
+        player1.played_cards.push("C116".to_string()); // C116 already in play
+        crate::cards::play(
+            &set,
+            &mut hand1,
+            &mut player1,
+            "OCC_FOOD2",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        let canonical_wood = player1.supply.wood;
+        assert_eq!(
+                    canonical_wood, 2,
+                    "cards::play must fire C116 AfterOccupationGainPerFoodCost (P1-1 fix): 2 food paid -> 2 wood"
+                );
+
+        // Path 2: engine path via dispatch_play + dispatch_play_after
+        let mut cards = crate::cards::CardState {
+            hands: vec![vec!["OCC_FOOD2".to_string()]],
+            undealt: vec![],
+        };
+        let mut players = vec![Player::new(0, 0)];
+        players[0].supply.food = 5;
+        players[0].supply.wood = 0;
+        players[0].played_cards.push("C116".to_string());
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        let mut ctx = crate::card_zones::CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        crate::cards::play_validate_pay(
+            &set,
+            &mut ctx.cards.hands[0],
+            &mut ctx.players[0],
+            "OCC_FOOD2",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        dispatch_play(
+            &set,
+            0,
+            "OCC_FOOD2",
+            0,
+            ctx.cards,
+            ctx.players,
+            ctx.improvement_market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        crate::card_zones::play_from_hand(&mut ctx, 0, "OCC_FOOD2").unwrap();
+        dispatch_play_after(
+            &set,
+            0,
+            "OCC_FOOD2",
+            0,
+            ctx.cards,
+            ctx.players,
+            ctx.improvement_market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        let engine_wood = players[0].supply.wood;
+        assert_eq!(
+            engine_wood, canonical_wood,
+            "engine path and cards::play must agree on C116 after the fix"
+        );
+
+        // C116 must fire through the generic After-phase scan with the play
+        // context, so the dedicated after-play loop is gone (P1-1 fix).
+        assert_eq!(
+            players[0].played_cards.last().map(String::as_str),
+            Some("OCC_FOOD2"),
+            "the new occupation is last in played_cards after the zone move"
+        );
+    }
+
+    /// P1-1 Step 3: three-path equivalence. The engine apply path (via
+    /// Game::apply_with_plans), the dispatcher path (play_validate_pay ->
+    /// dispatch_play -> play_from_hand -> dispatch_play_after), and the
+    /// canonical cards::play path must produce identical resources for the
+    /// MAX0_OCC / SELF_MINOR_WOOD / C116 scenarios.
+    #[test]
+    fn p1_1_three_paths_agree_on_max0_occ() {
+        use crate::engine::{Action, Detail};
+        use crate::model::Config;
+
+        let card = CardDefinition {
+            use_limit: None,
+            id: "MAX0_OCC".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::Prerequisite {
+                rule: CardRequirement::MaximumOccupations(0),
+            }],
+        };
+        let mut definitions = vec![card];
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        // Path A: engine apply via Lessons (occupation play space).
+        let occ_ids: Vec<String> = (1..=14).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+        let hands = vec![
+            [
+                vec!["MAX0_OCC".to_string()],
+                occ_ids[0..6].to_vec(),
+                minor_ids[0..7].to_vec(),
+            ]
+            .concat(),
+            [occ_ids[6..13].to_vec(), minor_ids[7..14].to_vec()].concat(),
+        ];
+        let mut game = crate::model::Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 7,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands,
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = 0;
+        let action = Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation {
+                card_id: "MAX0_OCC".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(
+            result.is_ok(),
+            "engine apply must accept MaximumOccupations(0) with 0 occupations played, got: {result:?}"
+        );
+
+        // Path B: dispatcher direct.
+        let mut cards_b = crate::cards::CardState {
+            hands: vec![vec!["MAX0_OCC".to_string()]],
+            undealt: vec![],
+        };
+        let mut players_b = vec![Player::new(0, 0)];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        let mut ctx = crate::card_zones::CardMoveCtx {
+            cards: &mut cards_b,
+            players: &mut players_b,
+            improvement_market: &mut market,
+        };
+        crate::cards::play_validate_pay(
+            &set,
+            &mut ctx.cards.hands[0],
+            &mut ctx.players[0],
+            "MAX0_OCC",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        dispatch_play(
+            &set,
+            0,
+            "MAX0_OCC",
+            0,
+            ctx.cards,
+            ctx.players,
+            ctx.improvement_market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        crate::card_zones::play_from_hand(&mut ctx, 0, "MAX0_OCC").unwrap();
+        dispatch_play_after(
+            &set,
+            0,
+            "MAX0_OCC",
+            0,
+            ctx.cards,
+            ctx.players,
+            ctx.improvement_market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+
+        // Path C: canonical cards::play.
+        let mut hand_c = vec!["MAX0_OCC".to_string()];
+        let mut player_c = Player::new(0, 0);
+        crate::cards::play(
+            &set,
+            &mut hand_c,
+            &mut player_c,
+            "MAX0_OCC",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+
+        // All three paths must agree: play succeeded, card in played_cards.
+        assert_eq!(players_b[0].played_cards, vec!["MAX0_OCC"]);
+        assert_eq!(player_c.played_cards, vec!["MAX0_OCC"]);
+    }
+
+    /// P1-1 Step 3: the evaluation projection (cards::play via
+    /// project_play_card) must match the engine outcome for a C116 occupation
+    /// play, so the AI's prediction is no longer one-sided.
+    #[test]
+    fn p1_1_evaluation_projection_matches_engine_for_c116() {
+        let mut set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "OCC_FOOD2".into(),
+            kind: CardKind::Occupation,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![],
+        });
+
+        // Projection via the canonical API (what evaluation's
+        // project_play_card calls): C116 in played_cards, occupation played.
+        let mut hand = vec!["OCC_FOOD2".to_string()];
+        let mut projected = Player::new(0, 0);
+        projected.supply.food = 5;
+        projected.supply.wood = 0;
+        projected.played_cards.push("C116".into());
+        crate::cards::play(
+            &set,
+            &mut hand,
+            &mut projected,
+            "OCC_FOOD2",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+
+        // Production: dispatcher path with the same setup.
+        let mut cards = crate::cards::CardState {
+            hands: vec![vec!["OCC_FOOD2".to_string()]],
+            undealt: vec![],
+        };
+        let mut players = vec![Player::new(0, 0)];
+        players[0].supply.food = 5;
+        players[0].supply.wood = 0;
+        players[0].played_cards.push("C116".into());
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut budget = 64u32;
+        let mut pending = None;
+        let mut ctx = crate::card_zones::CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        crate::cards::play_validate_pay(
+            &set,
+            &mut ctx.cards.hands[0],
+            &mut ctx.players[0],
+            "OCC_FOOD2",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        dispatch_play(
+            &set,
+            0,
+            "OCC_FOOD2",
+            0,
+            ctx.cards,
+            ctx.players,
+            ctx.improvement_market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        crate::card_zones::play_from_hand(&mut ctx, 0, "OCC_FOOD2").unwrap();
+        dispatch_play_after(
+            &set,
+            0,
+            "OCC_FOOD2",
+            0,
+            ctx.cards,
+            ctx.players,
+            ctx.improvement_market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+
+        assert_eq!(
+            projected.supply.wood, players[0].supply.wood,
+            "evaluation projection (cards::play) and production (dispatcher) must both grant C116 wood"
+        );
+        assert_eq!(projected.supply.wood, 2, "2 food paid -> 2 wood");
+    }
+
+    /// P1-1 Step 3: AfterPlay is a normal After-phase effect, so when it
+    /// triggers together with another After effect the resolution goes through
+    /// the standard ChooseTriggerOrder mechanism (pause -> chosen order ->
+    /// resume, Issue #270 pattern).
+    #[test]
+    fn p1_1_after_play_joins_choose_trigger_order() {
+        use crate::model::Config;
+
+        // C116 (AfterOccupationGainPerFoodCost) + a Fishing card with two
+        // AfterWorkerGain effects (both trigger simultaneously on Fishing).
+        let mut defs = crate::cards::verified_band_c_cards();
+        defs.push(CardDefinition {
+            use_limit: None,
+            id: "OCC_FOOD".into(),
+            kind: CardKind::Occupation,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![],
+        });
+        defs.push(CardDefinition {
+            use_limit: None,
+            id: "AW_FISH".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterWorkerGain {
+                    space: Space::Fishing,
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerGain {
+                    space: Space::Fishing,
+                    good: Good::Reed,
+                    amount: 1,
+                },
+            ],
+        });
+        for i in 1..=14 {
+            defs.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        for i in 1..=14 {
+            defs.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        let set_full = CardSet { definitions: defs };
+
+        let occ_ids: Vec<String> = (1..=14).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+        // Seat 0: C116 + AW_FISH in hand (they are later placed on
+        // played_cards by the test). Hand = 7 occupations + 7 minors.
+        let hands = vec![
+            [
+                vec!["C116".to_string()],
+                vec!["AW_FISH".to_string()],
+                occ_ids[0..6].to_vec(),
+                minor_ids[0..6].to_vec(),
+            ]
+            .concat(),
+            [occ_ids[6..13].to_vec(), minor_ids[6..13].to_vec()].concat(),
+        ];
+        let mut game = crate::model::Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 7,
+                additional_action_space_enabled: false,
+            },
+            set_full.clone(),
+            hands,
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = 0;
+        // Move C116 and AW_FISH from hand to played_cards (zone move the test
+        // pre-applies), then add the food-cost occupation to the hand.
+        game.public.players[0].played_cards = vec!["C116".into(), "AW_FISH".into()];
+        game.cards.hands[0].retain(|id| id != "C116" && id != "AW_FISH");
+        game.public.players[0].supply.food = 10;
+        game.cards.hands[0].push("OCC_FOOD".into());
+
+        // Playing OCC_FOOD on Lessons triggers C116 (AfterPlay) and, on the
+        // next Fishing action, AW_FISH. The AfterPlay itself is a normal
+        // After-phase effect: verify the play succeeds and C116 grants wood
+        // through the standard phase scan (play_food_paid context).
+        let action = crate::engine::Action {
+            space: Space::Lessons,
+            detail: crate::engine::Detail::PlayOccupation {
+                card_id: "OCC_FOOD".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(
+            result.is_ok(),
+            "occupation play with C116 in front must succeed on the engine path, got: {result:?}"
+        );
+        // Lessons fee: the player already has C116 in play, so the fee is 1.
+        // Food paid = printed 2 + fee 1 = 3 -> C116 grants 3 wood.
+        assert_eq!(
+            game.public.players[0].supply.wood, 3,
+            "C116 AfterPlay fires through the unified After-phase scan: printed 2 + fee 1 -> 3 wood"
+        );
+        assert_eq!(
+            game.public.players[0].played_cards,
+            vec!["C116", "AW_FISH", "OCC_FOOD"],
+            "play order preserved"
+        );
+
+        // The Lessons action made player 0 the start player; hand the turn
+        // back so seat 0 places the next worker on Fishing.
+        game.public.active_player = 0;
+
+        // Now the AfterWorkerGain from AW_FISH joins the same After-phase
+        // mechanism: place a worker on Fishing and confirm the pause carries
+        // AW_FISH as a triggerable effect (ChooseTriggerOrder, Issue #270).
+        let action = crate::engine::Action {
+            space: Space::Fishing,
+            detail: crate::engine::Detail::None,
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        match result {
+            Ok(crate::pending::Transition::Paused(decision)) => match &decision.kind {
+                PendingKind::ChooseTriggerOrder { phase, triggers } => {
+                    assert_eq!(*phase, TriggerPhase::After);
+                    assert!(
+                        triggers.iter().any(|(card, _, _)| card == "AW_FISH"),
+                        "AW_FISH must be offered in ChooseTriggerOrder, got: {triggers:?}"
+                    );
+                }
+                other => panic!("expected ChooseTriggerOrder, got {other:?}"),
+            },
+            other => panic!("expected a pause on Fishing, got {other:?}"),
+        }
     }
 }

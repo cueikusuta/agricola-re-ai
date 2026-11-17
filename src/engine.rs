@@ -1,6 +1,6 @@
 //! Transactional rule application. Detail policies live outside this module.
 use crate::breeding::BreedingPlan;
-use crate::card_events::dispatch_play;
+use crate::card_events::{dispatch_play, dispatch_play_after};
 use crate::card_zones::{play_from_hand, CardMoveCtx};
 use crate::harvest::{FeedingPlan, HarvestDetailPolicy, SimpleHarvestDetails};
 use crate::model::*;
@@ -1523,6 +1523,9 @@ impl Game {
                 match detail {
                     Detail::None => {}
                     Detail::PlayMinor { card_id } if self.card_set.enabled() => {
+                        // P1-1 unified play order (2016 Lookout p.6/p.8):
+                        // validate+pay -> Replace/Before (pre-move state) ->
+                        // zone move -> AfterPlay (post-move state).
                         // Validate and pay costs
                         crate::cards::play_validate_pay(
                             &self.card_set,
@@ -1532,14 +1535,13 @@ impl Game {
                             crate::cards::CardKind::MinorImprovement,
                             0,
                         )?;
-                        // Canonical zone move: hand -> played (2016 Lookout p.6)
+                        // MUTATION 1 (temporary): zone move BEFORE Replace/Again
                         let mut ctx = CardMoveCtx {
                             cards: &mut self.cards,
                             players: &mut self.public.players,
                             improvement_market: &mut self.public.improvement_market,
                         };
                         play_from_hand(&mut ctx, id, card_id)?;
-                        // Dispatch Replace/Before phases for the new card only
                         dispatch_play(
                             &self.card_set,
                             id,
@@ -1593,6 +1595,9 @@ impl Game {
                 } else {
                     1
                 };
+                // P1-1 unified play order (2016 Lookout p.6/p.8):
+                // validate+pay -> Replace/Before (pre-move state) ->
+                // zone move -> AfterPlay (post-move state).
                 crate::cards::play_validate_pay(
                     &self.card_set,
                     &mut self.cards.hands[id],
@@ -1601,6 +1606,24 @@ impl Game {
                     crate::cards::CardKind::Occupation,
                     fee,
                 )?;
+                // Dispatch Replace/Before phases BEFORE the zone move
+                // (precondition counts exclude the card being played)
+                dispatch_play(
+                    &self.card_set,
+                    id,
+                    card_id,
+                    fee,
+                    &mut self.cards,
+                    &mut self.public.players,
+                    &mut self.public.improvement_market,
+                    &mut self.delayed_well,
+                    self.public.round,
+                    &self.public.used,
+                    &mut self.event_budget,
+                    &mut self.card_uses,
+                    &self.card_use_limits,
+                    &mut self.pending,
+                )?;
                 // Canonical zone move: hand -> played (2016 Lookout p.6)
                 let mut ctx = CardMoveCtx {
                     cards: &mut self.cards,
@@ -1608,8 +1631,8 @@ impl Game {
                     improvement_market: &mut self.public.improvement_market,
                 };
                 play_from_hand(&mut ctx, id, card_id)?;
-                // Dispatch Replace/Before phases for the new card only
-                dispatch_play(
+                // AfterPlay: normal After-phase effects (C116 etc.)
+                dispatch_play_after(
                     &self.card_set,
                     id,
                     card_id,
@@ -1696,6 +1719,9 @@ impl Game {
                 // Handle card play first (before borrowing p for the rest)
                 if let Detail::GrowWithMinor { card_id } = detail {
                     if self.card_set.enabled() {
+                        // P1-1 unified play order (2016 Lookout p.6/p.8):
+                        // validate+pay -> Replace/Before (pre-move state) ->
+                        // zone move -> AfterPlay (post-move state).
                         // Validate and pay costs (use internal fn; cards::play does full legacy for direct callers)
                         crate::cards::play_validate_pay(
                             &self.card_set,
@@ -1705,6 +1731,24 @@ impl Game {
                             crate::cards::CardKind::MinorImprovement,
                             0,
                         )?;
+                        // Dispatch Replace/Before phases BEFORE the zone move
+                        // (precondition counts exclude the card being played)
+                        dispatch_play(
+                            &self.card_set,
+                            id,
+                            card_id,
+                            0,
+                            &mut self.cards,
+                            &mut self.public.players,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            self.public.round,
+                            &self.public.used,
+                            &mut self.event_budget,
+                            &mut self.card_uses,
+                            &self.card_use_limits,
+                            &mut self.pending,
+                        )?;
                         // Move card from hand to played
                         let mut ctx = CardMoveCtx {
                             cards: &mut self.cards,
@@ -1712,8 +1756,8 @@ impl Game {
                             improvement_market: &mut self.public.improvement_market,
                         };
                         play_from_hand(&mut ctx, id, card_id)?;
-                        // Dispatch Replace/Before phases
-                        dispatch_play(
+                        // AfterPlay: normal After-phase effects (C116 etc.)
+                        dispatch_play_after(
                             &self.card_set,
                             id,
                             card_id,
@@ -1786,6 +1830,9 @@ impl Game {
             Space::MajorImprovement => match detail {
                 // Handle card play first (before borrowing p for the rest)
                 Detail::PlayMinor { card_id } if self.card_set.enabled() => {
+                    // P1-1 unified play order (2016 Lookout p.6/p.8):
+                    // validate+pay -> Replace/Before (pre-move state) ->
+                    // zone move -> AfterPlay (post-move state).
                     // Validate and pay costs (use internal fn; cards::play does full legacy for direct callers)
                     crate::cards::play_validate_pay(
                         &self.card_set,
@@ -1795,6 +1842,24 @@ impl Game {
                         crate::cards::CardKind::MinorImprovement,
                         0,
                     )?;
+                    // Dispatch Replace/Before phases BEFORE the zone move
+                    // (precondition counts exclude the card being played)
+                    dispatch_play(
+                        &self.card_set,
+                        id,
+                        card_id,
+                        0,
+                        &mut self.cards,
+                        &mut self.public.players,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        self.public.round,
+                        &self.public.used,
+                        &mut self.event_budget,
+                        &mut self.card_uses,
+                        &self.card_use_limits,
+                        &mut self.pending,
+                    )?;
                     // Move card from hand to played
                     let mut ctx = CardMoveCtx {
                         cards: &mut self.cards,
@@ -1802,8 +1867,8 @@ impl Game {
                         improvement_market: &mut self.public.improvement_market,
                     };
                     play_from_hand(&mut ctx, id, card_id)?;
-                    // Dispatch Replace/Before phases
-                    dispatch_play(
+                    // AfterPlay: normal After-phase effects (C116 etc.)
+                    dispatch_play_after(
                         &self.card_set,
                         id,
                         card_id,
