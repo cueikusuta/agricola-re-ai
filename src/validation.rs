@@ -22,7 +22,17 @@
 //! `post.delayed_well`, and `post.public.active_player` which are all fully
 //! verified or downgraded to `Unsure`. The internal RNG state (`post.rng`) is
 //! explicitly excluded from incremental checks and is only validated by
-//! `validate_full` (if at all) — documented here per review P1-A.
+//! `validate_full` (if at all) — documented here per review P1-A. The same
+//! axiomatic exclusion covers `log` (including `GameLog::initial_state_hash`):
+//! both are history-borne state whose legitimacy cannot be decided from a
+//! single transition, so their defense line is `Game::integrity_hash`
+//! (stamped on save, verified in `load_json`) and the replay chain — the
+//! incremental layer must not fabricate delta rules for them. The Step 3
+//! bookkeeping fields that `state_hash` omits for v5 compatibility
+//! (`well_food_schedule`, `pending`, `event_budget`, `card_uses`,
+//! `card_use_limits`, `next_decision_id`, `record_events`) are covered by
+//! checks 11b and 15–21 below: provable deltas are enforced, unprovable ones
+//! decline to `Unsure`.
 
 use crate::engine::expected_active_player;
 use crate::model::{Game, Tile};
@@ -275,6 +285,20 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
     if post.public.accumulations.len() > pre.public.accumulations.len() {
         return Verdict::Unsure;
     }
+    // 11b. Animal accumulations, same rule as `accumulations` (parity with
+    //      validate_free_action check 11): the animal markets (Sheep/Pig/Cattle)
+    //      accumulate only at round start and a work move can only take from
+    //      them (the take action removes the key when the market empties), so
+    //      unseen growth or unknown keys decline to the full validator.
+    for (space, post_n) in &post.public.animal_accumulations {
+        match pre.public.animal_accumulations.get(space) {
+            Some(pre_n) if post_n <= pre_n => {}
+            _ => return Verdict::Unsure,
+        }
+    }
+    if post.public.animal_accumulations.len() > pre.public.animal_accumulations.len() {
+        return Verdict::Unsure;
+    }
     // 12. post.cards: mid-round checks.
     //     - hands.len() must equal player count (full validator rejects otherwise).
     if post.cards.hands.len() != n {
@@ -447,6 +471,75 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
     //     Downgrade to Unsure→full (soundness: Fail only for proven violations).
     if post.delayed_well != pre.delayed_well {
         return Verdict::Unsure;
+    }
+    // 15. post.well_food_schedule: public mirror of delayed_well (Finding A).
+    //     The only mid-round writer is the Well purchase, which writes
+    //     delayed_well in the same step, so a legitimate work move that touches
+    //     the mirror always trips check 14 first. A mirror change without a
+    //     delayed_well change is therefore not producible by any work move —
+    //     decline to the full validator instead of guessing.
+    if post.well_food_schedule != pre.well_food_schedule {
+        return Verdict::Unsure;
+    }
+    // 16. post.pending: a committed work move that pauses never reaches this
+    //     validator (apply commits the paused state directly), and the resume
+    //     path enters with the decision already cleared, so both sides are None
+    //     here. Any pending drift is a suspended-decision tamper this cheap
+    //     layer cannot prove — the full validator, PendingDecision::
+    //     state_hash_before (resolve path) and integrity_hash (save/load)
+    //     arbitrate it.
+    if post.pending != pre.pending {
+        return Verdict::Unsure;
+    }
+    // 17. post.event_budget: replenished to DEFAULT_EVENT_BUDGET at the start
+    //     of every committed action and only ever spent downward
+    //     (consume_budget), so a value above the cap cannot be produced by any
+    //     transition. The exact remaining budget is not provable (legit chains
+    //     consume freely, like player supplies) and is left to the full
+    //     validator, which enforces the same cap.
+    if post.event_budget > crate::model::DEFAULT_EVENT_BUDGET {
+        return Verdict::Fail("event_budget above replenish cap".into());
+    }
+    // 18. post.card_uses: the per-round use ledger only grows mid-round —
+    //     check_card_use increments entries and start_round clears the map at
+    //     round boundaries (round advance already returned Unsure at check 2).
+    //     A decreased or vanished count would re-open a card's use budget.
+    //     New keys and growth are legitimate (a card firing for the first time
+    //     this round) and cannot be distinguished from tampering here, so they
+    //     stay with the full validator's ledger checks.
+    for (id, pre_n) in &pre.card_uses {
+        match post.card_uses.get(id) {
+            Some(post_n) if post_n >= pre_n => {}
+            _ => return Verdict::Unsure,
+        }
+    }
+    // 19. post.card_use_limits: derived from CardDefinition::use_limit at game
+    //     construction and never written again; with card_set pointer-identical
+    //     (checked above), any drift is tampering.
+    //     Deliberately NOT compared here (axiomatic, cross-cutting audit 4/4):
+    //     `rng` and `log` (including GameLog::initial_state_hash) are
+    //     history-borne state whose legitimacy cannot be decided from a single
+    //     transition — fabricating a delta rule would be unsound. Their defense
+    //     line is integrity_hash (stamped on save, verified in load_json) and
+    //     the replay chain, not this layer.
+    if post.card_use_limits != pre.card_use_limits {
+        return Verdict::Fail("card_use_limits mutated mid-game".into());
+    }
+    // 20. post.next_decision_id: the counter only advances when a pause is
+    //     committed (apply's Paused branch), and that path never reaches this
+    //     validator — the pause bypasses it and the resume enters with the
+    //     decision cleared. Any drift on a validated transition is therefore
+    //     unprovable; integrity_hash additionally pins the counter on save.
+    if post.next_decision_id != pre.next_decision_id {
+        return Verdict::Unsure;
+    }
+    // 21. post.record_events: serde-skipped search flag; no apply/apply_free
+    //     path writes it, so a flip between pre and post is not producible by
+    //     any committed transition. It is excluded from saves by #[serde(skip)]
+    //     and reconstructed as true on load, so integrity_hash covers
+    //     everything durable.
+    if post.record_events != pre.record_events {
+        return Verdict::Fail("record_events flipped mid-transition".into());
     }
     Verdict::Pass
 }
@@ -1826,5 +1919,280 @@ mod tests {
         // Forest is a regular space (BASE). The added space in mid_round_pair
         // should already be valid, so just verify Pass.
         assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+    }
+
+    // ---- Cross-cutting audit 4/4: state-element tampering must not pass ----
+
+    /// Audit element 1: a `well_food_schedule` change without the paired
+    /// `delayed_well` change (check 14) is not producible by any work move —
+    /// the only mid-round writer is the Well purchase, which writes both.
+    #[test]
+    fn tampered_well_food_schedule_without_delayed_well_declines() {
+        let (pre, mut post) = mid_round_pair();
+        let actor = pre.public.active_player;
+        post.well_food_schedule
+            .entry(5)
+            .or_default()
+            .push(actor % pre.public.players.len());
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+    }
+
+    /// Audit element 2: a suspended decision appearing out of nowhere cannot
+    /// Pass. Paused states are committed outside this validator and the resume
+    /// enters with the decision cleared, so pending drift is unprovable here.
+    #[test]
+    fn tampered_pending_decision_declines() {
+        let (pre, mut post) = mid_round_pair();
+        post.pending = Some(crate::pending::PendingDecision::new(
+            pre.next_decision_id,
+            pre.public.active_player,
+            crate::pending::PendingKind::ChooseGain {
+                source_card: "A001".into(),
+                options: vec![crate::pending::GainOption {
+                    good: crate::model::Good::Food,
+                    amount: 1,
+                }],
+            },
+            post.state_hash(),
+            serde_json::json!({}),
+        ));
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+    }
+
+    /// Audit element 3: the event budget is replenished to
+    /// DEFAULT_EVENT_BUDGET at every committed action and only spent downward,
+    /// so a post value above the cap is a definite Fail (and the full
+    /// validator must reject the same state).
+    #[test]
+    fn tampered_event_budget_above_cap_fails() {
+        let (pre, mut post) = mid_round_pair();
+        post.event_budget = crate::model::DEFAULT_EVENT_BUDGET + 1;
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+        assert!(validate_full(&post).is_err());
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// Audit element 4: decreasing (or dropping) a per-round use count would
+    /// re-open a card's use budget — a work move can only grow the ledger.
+    #[test]
+    fn tampered_card_uses_decrease_declines() {
+        let (mut pre, mut post) = mid_round_pair();
+        pre.card_uses.insert("A001".into(), 2);
+        post.card_uses.insert("A001".into(), 1);
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        // Growth, however, is what legitimate first-use looks like and must
+        // keep the fast path: only the increase is present, so Pass.
+        let (mut pre, mut post) = mid_round_pair();
+        pre.card_uses.insert("A001".into(), 1);
+        post.card_uses.insert("A001".into(), 3);
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+    }
+
+    /// Audit element 5: `card_use_limits` is derived from the card
+    /// definitions at construction and never written again; with card_set
+    /// pointer-identical, any drift is tampering (definite Fail, full rejects).
+    #[test]
+    fn tampered_card_use_limits_declines_and_full_rejects() {
+        let (pre, mut post) = mid_round_pair();
+        post.card_use_limits.insert("A001".into(), 1);
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+        assert!(validate_full(&post).is_err());
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// Audit element 6: the decision counter only advances at pause commit,
+    /// which never reaches this validator — drift is unprovable here.
+    #[test]
+    fn tampered_next_decision_id_declines() {
+        let (pre, mut post) = mid_round_pair();
+        post.next_decision_id += 1;
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+    }
+
+    /// Audit element 7/8 (axiomatic, deliberately NOT checked): `rng` and
+    /// `log.initial_state_hash` are history-borne state. No single transition
+    /// can prove a delta rule for them, so the incremental layer fabricates
+    /// no judgment — the test pins that documented boundary instead of a
+    /// check. Their defense lines are `Game::integrity_hash` (stamped by
+    /// `save_json`, verified in `load_json`) for the durable bookkeeping,
+    /// `load_json`'s recomputed `initial_state_hash` comparison, and the
+    /// event-chain replay — not this layer.
+    #[test]
+    fn rng_and_log_initial_hash_stay_outside_incremental_scope_by_design() {
+        let (pre, mut post) = mid_round_pair();
+        post.rng.round = ChaCha8Rng::seed_from_u64(0xD06);
+        post.log.initial_state_hash = "tampered".into();
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+        assert_eq!(validate_full(&post), Ok(()));
+    }
+
+    /// Audit element 9: `record_events` is a serde-skipped search flag no
+    /// apply path writes; a flip between pre and post is a definite Fail.
+    #[test]
+    fn tampered_record_events_flip_fails() {
+        let (pre, mut post) = mid_round_pair();
+        post.record_events = !pre.record_events;
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+    }
+
+    /// Audit element 10: animal accumulations obey the same monotone rule as
+    /// `accumulations` mid-round (parity with validate_free_action check 11):
+    /// they grow only at round start and a work move can only take from them.
+    #[test]
+    fn tampered_animal_accumulations_growth_declines() {
+        let (pre, mut post) = mid_round_pair();
+        // A new key (growth of an existing key exercises the same `_` arm).
+        post.public.animal_accumulations.insert(Space::Forest, 1);
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        // Growth of an existing entry must also decline.
+        let (mut pre, mut post) = mid_round_pair();
+        pre.public
+            .animal_accumulations
+            .insert(Space::SheepMarket, 1);
+        post.public
+            .animal_accumulations
+            .insert(Space::SheepMarket, 2);
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        // Taking (decrease/removal) stays legal — the take action removes the
+        // key when the market empties.
+        post.public.animal_accumulations.remove(&Space::SheepMarket);
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+    }
+
+    /// Full validation must reject a use-ledger entry for a card nobody has
+    /// played and a count above the card's declared per-round limit.
+    #[test]
+    fn full_rejects_card_use_ledger_drift() {
+        use crate::cards::CardKind;
+        // The verified basic set has no use-limited card, so declare a
+        // per-round limit of 1 on one occupation; `with_cards` derives
+        // `card_use_limits` from the modified definitions.
+        let mut set = crate::cards::verified_basic_card_set(2).expect("verified set");
+        let limited_id = set
+            .definitions
+            .iter()
+            .find(|c| c.kind == CardKind::Occupation)
+            .expect("set has occupations")
+            .id
+            .clone();
+        for card in set.definitions.iter_mut() {
+            if card.id == limited_id {
+                card.use_limit = Some(1);
+            }
+        }
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 71,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        // Move the limited card from a hand onto its owner's table: the
+        // location partition stays intact and card_points tracks the move,
+        // so the ledger entry below is the only plausible state change.
+        let owner = (0..game.cards.hands.len())
+            .find(|&i| game.cards.hands[i].iter().any(|id| *id == limited_id))
+            .expect("dealt card sits in some hand");
+        let points = game
+            .card_set
+            .definition(&limited_id)
+            .expect("definition")
+            .points;
+        let hand = &mut game.cards.hands[owner];
+        let pos = hand
+            .iter()
+            .position(|id| *id == limited_id)
+            .expect("in hand");
+        hand.remove(pos);
+        game.public.players[owner]
+            .played_cards
+            .push(limited_id.clone());
+        game.public.players[owner].card_points += points;
+        assert_eq!(validate_full(&game), Ok(()));
+        // Over the declared limit: definite Err.
+        let mut over = game.clone();
+        over.card_uses.insert(limited_id.clone(), 2);
+        assert_eq!(
+            validate_full(&over),
+            Err("card use count exceeds its per-round limit".into())
+        );
+        // Entry for an unplayed card: definite Err.
+        let unplayed_id = game.cards.hands[0][0].clone();
+        let mut unplayed = game.clone();
+        unplayed.card_uses.insert(unplayed_id, 1);
+        assert_eq!(
+            validate_full(&unplayed),
+            Err("card use ledger entry for an unplayed card".into())
+        );
+        // Limits disagreeing with the card definitions: definite Err.
+        let mut drifted = game.clone();
+        drifted.card_use_limits.insert("NOT_A_CARD".into(), 3);
+        assert_eq!(
+            validate_full(&drifted),
+            Err("card use limits disagree with card definitions".into())
+        );
+    }
+
+    /// Full validation must reject well schedules that name impossible rounds
+    /// or unknown players (the round-start payout would index out of bounds),
+    /// while a plausible future-round entry stays accepted.
+    #[test]
+    fn full_rejects_well_schedule_out_of_range_entries() {
+        let game = cardless(2, 61);
+        assert_eq!(validate_full(&game), Ok(()));
+        let mut bad_player = game.clone();
+        bad_player.delayed_well.insert(3, vec![99]);
+        assert_eq!(
+            validate_full(&bad_player),
+            Err("delayed well schedule names an unknown player".into())
+        );
+        let mut bad_round = game.clone();
+        bad_round.well_food_schedule.insert(15, vec![0]);
+        assert_eq!(
+            validate_full(&bad_round),
+            Err("delayed well schedule round out of range".into())
+        );
+        // A well entry for a future round with a real player index is legal.
+        let mut plausible = game.clone();
+        plausible.delayed_well.insert(5, vec![1]);
+        plausible.well_food_schedule.insert(5, vec![1]);
+        assert_eq!(validate_full(&plausible), Ok(()));
+    }
+
+    /// Full validation must reject animal accumulations keyed by a space that
+    /// never accumulates animals. (A key whose market card is not currently
+    /// revealed stays accepted: engine states always correlate the two, but
+    /// directly constructed test states legitimately re-swap revealed cards,
+    /// so the correlation is not an invariant of every accepted state.)
+    #[test]
+    fn full_rejects_animal_accumulation_for_non_market_space() {
+        let game = cardless(2, 67);
+        let mut not_a_market = game.clone();
+        not_a_market
+            .public
+            .animal_accumulations
+            .insert(Space::Forest, 1);
+        assert_eq!(
+            validate_full(&not_a_market),
+            Err("animal accumulation for a non-market space".into())
+        );
+        // An animal-market key is in the decidable domain even mid-test swaps.
+        let mut market_key = game.clone();
+        market_key
+            .public
+            .animal_accumulations
+            .insert(Space::SheepMarket, 1);
+        assert_eq!(validate_full(&market_key), Ok(()));
     }
 }

@@ -1267,6 +1267,90 @@ impl Game {
         if all_cards != RoundCard::ALL.into_iter().collect() {
             return Err("round deck contains duplicate or missing cards".into());
         }
+        // Bookkeeping integrity (cross-cutting audit 4/4). `state_hash`
+        // deliberately omits the Step 3 bookkeeping fields for v5 fixture
+        // compatibility, but the fields that CAN be decided from this state
+        // alone are still bound here. Fields whose legitimacy is history-borne
+        // — `rng`, `log` (including `GameLog::initial_state_hash` and the
+        // event chain), and `pending` (its `state_hash_before` is verified in
+        // the resolve path) — are deliberately NOT checked in this validator:
+        // no same-state invariant can decide them, so their defense lines are
+        // `integrity_hash` (stamped by `save_json`, verified in `load_json`)
+        // and the replay chain, not fabricated checks here.
+        // event_budget is replenished to DEFAULT_EVENT_BUDGET at the start of
+        // every committed action and only ever spent downward, so a value
+        // above the cap cannot be produced by any legitimate history.
+        if self.event_budget > DEFAULT_EVENT_BUDGET {
+            return Err("event budget above replenish cap".into());
+        }
+        // card_use_limits is card data derived deterministically from the
+        // card definitions at construction and never written again.
+        let derived_limits: BTreeMap<String, u32> = self
+            .card_set
+            .definitions
+            .iter()
+            .filter_map(|card| card.use_limit.map(|limit| (card.id.clone(), limit)))
+            .collect();
+        if self.card_use_limits != derived_limits {
+            return Err("card use limits disagree with card definitions".into());
+        }
+        // The use ledger records effect resolutions of played cards; counts
+        // can never exceed the declared per-round limit of a limited card.
+        // (Entries for unlimited cards have no cap, and the ledger is cleared
+        // at each round start, so only these two bounds are decidable here;
+        // mid-round decreases are the incremental validator's concern.)
+        let played: BTreeSet<&str> = p
+            .players
+            .iter()
+            .flat_map(|player| player.played_cards.iter().map(String::as_str))
+            .collect();
+        for (id, count) in &self.card_uses {
+            if !played.contains(id.as_str()) {
+                return Err("card use ledger entry for an unplayed card".into());
+            }
+            if let Some(limit) = self.card_use_limits.get(id) {
+                if count > limit {
+                    return Err("card use count exceeds its per-round limit".into());
+                }
+            }
+        }
+        // Well schedules name rounds 1..=14 and real player indices; the
+        // round-start payout indexes `players` with these ids, so an
+        // out-of-range entry would be a panic disguised as state. The mirror
+        // correspondence between `well_food_schedule` and `delayed_well` is
+        // deliberately NOT enforced: legacy saves may carry orphan schedule
+        // entries whose delayed_well entry is already gone (P1-4), and both
+        // maps are covered by integrity_hash on save/load.
+        for (round, ids) in self
+            .delayed_well
+            .iter()
+            .chain(self.well_food_schedule.iter())
+        {
+            if !(1..=14).contains(round) {
+                return Err("delayed well schedule round out of range".into());
+            }
+            if ids.iter().any(|&id| id >= p.players.len()) {
+                return Err("delayed well schedule names an unknown player".into());
+            }
+        }
+        // Only the three animal markets ever accumulate animals, so any other
+        // key is tampering. (Matched inline rather than via round_for_space,
+        // which panics on non-market spaces — a tampered key must be an Err,
+        // not a panic.) The stronger "key's card is currently revealed"
+        // correlation is deliberately NOT enforced here: engine states always
+        // satisfy it (accumulation entries appear at the reveal round and
+        // revealed only grows), but directly constructed states legitimately
+        // re-swap revealed cards (tests/farm_animals.rs reveal_fencing), so it
+        // is not an invariant of every accepted state. Mid-round growth is the
+        // incremental validator's check 11b instead.
+        for space in self.public.animal_accumulations.keys() {
+            if !matches!(
+                space,
+                Space::SheepMarket | Space::PigMarket | Space::CattleMarket
+            ) {
+                return Err("animal accumulation for a non-market space".into());
+            }
+        }
         Ok(())
     }
 
