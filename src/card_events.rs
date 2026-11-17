@@ -1110,6 +1110,40 @@ fn handle_on_play_gain_per_count(
     Ok(EffectResult::Resolved)
 }
 
+fn handle_on_play_gain_per_count(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    count_kind: &crate::cards::CountKind,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let count = match count_kind {
+        crate::cards::CountKind::Occupations => {
+            crate::cards::occupation_count(ctx.card_set, ctx.player) as u32
+        }
+        crate::cards::CountKind::ClayRooms => crate::cards::clay_room_count(ctx.player) as u32,
+        crate::cards::CountKind::Improvements => {
+            crate::cards::improvement_count_in_front(ctx.card_set, ctx.player)
+        }
+        crate::cards::CountKind::FamilyMembers => ctx.player.family as u32,
+        crate::cards::CountKind::MajorImprovementsBottomRow => {
+            crate::cards::major_improvements_bottom_row(ctx.card_set, ctx.player) as u32
+        }
+        crate::cards::CountKind::SownFields => crate::cards::sown_field_count(ctx.player) as u32,
+    };
+    let bonus = count
+        .checked_mul(amount)
+        .ok_or("on-play card bonus overflow")?;
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(bonus)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
 fn handle_passive(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
