@@ -662,6 +662,14 @@ pub struct Observation {
     /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
     /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
     pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
+    /// Per-card use tracking for the current round (public information).
+    /// Card plays are public actions, so use counts do not leak hidden information.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub card_uses: BTreeMap<String, u32>,
+    /// Declared per-card use limits (card ID -> max resolutions per round).
+    /// Derived from CardDefinition::use_limit; included to avoid recomputation.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub card_use_limits: BTreeMap<String, u32>,
 }
 impl Game {
     pub fn new(config: Config) -> Self {
@@ -826,6 +834,8 @@ impl Game {
             hand_counts: self.cards.hands.iter().map(Vec::len).collect(),
             card_definitions: self.card_set.definitions.clone(),
             well_food_schedule: self.well_food_schedule.clone(),
+            card_uses: self.card_uses.clone(),
+            card_use_limits: self.card_use_limits.clone(),
         })
     }
     pub fn state_hash(&self) -> String {
@@ -1101,6 +1111,10 @@ impl Game {
             for id in recipients {
                 self.public.players[id].supply.food += 1
             }
+            // Maintain the mirror invariant: well_food_schedule mirrors delayed_well.
+            // When delayed_well entries are consumed, remove the corresponding
+            // well_food_schedule entry for the same round (P1-4).
+            self.well_food_schedule.remove(&self.public.round);
         }
         // Round-start triggers go through the phase dispatcher so the event
         // budget and per-card use limits apply here too. The budget is reset

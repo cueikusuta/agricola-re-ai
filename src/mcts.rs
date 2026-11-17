@@ -3,12 +3,16 @@
 //! each simulation. No Game reference (or hidden RNG) enters SpacePolicy.
 use crate::cards::{CardKind, CardSet, CardState};
 use crate::evaluation::{DetailAwareEvaluationPolicy, WeightedEvaluationPolicy};
-use crate::model::{Config, Game, Observation, RoundCard, Space};
+use crate::model::{
+    default_event_budget, validate_search_public, Config, Game, Observation, RngStreams, RoundCard,
+    Space,
+};
 use crate::policy::{CardChoiceDetails, DetailPolicy, GreedyPolicy, SpacePolicy};
 use crate::score::standings_with_cards;
-use rand::{seq::SliceRandom, Rng};
+use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 use std::time::Instant;
 
 /// Win probability comes first; only empirically equivalent win rates
@@ -93,6 +97,10 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
     let mut hands = vec![Vec::new(); players];
     hands[obs.player_id] = obs.hand.clone();
     let mut undealt = Vec::new();
+
+    // Standard game: 7 cards per kind per player initially.
+    const INITIAL_HAND_PER_KIND: usize = 7;
+
     for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
         let mut pool = set
             .definitions
@@ -111,7 +119,9 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
                 .iter()
                 .filter(|id| set.definition(id).is_some_and(|c| c.kind == kind))
                 .count();
-            let required = 7usize.checked_sub(played)?;
+            // Per-kind hand size follows the game rule: initial 7 minus played of this kind.
+            // If played >= 7, the hand is empty for this kind (invalid observations return None).
+            let required = INITIAL_HAND_PER_KIND.checked_sub(played)?;
             if pool.len() < required {
                 return None;
             }
@@ -119,6 +129,16 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
         }
         undealt.extend(pool);
     }
+
+    // Validate that the constructed hands match the observed total hand counts.
+    // This catches observations where the total hand size deviates from the standard
+    // 7+7 deal (e.g., draft variants or corrupted states).
+    for (i, hand) in hands.iter().enumerate().take(players) {
+        if hand.len() != obs.hand_counts[i] {
+            return None;
+        }
+    }
+
     let cards = CardState { hands, undealt };
     // Use validate_in_game for in-game states (location partition + card score only)
     cards.validate_in_game(&set, &obs.public.players).ok()?;
@@ -133,17 +153,8 @@ fn sample_private_cards(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<(Card
 pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     let seed: u64 = rng.gen();
     let (set, cards) = sample_private_cards(obs, rng)?;
-    let mut game = Game::with_cards(
-        Config {
-            seed,
-            additional_action_space_enabled: obs.public.additional_action_space_enabled,
-            players: obs.public.players.len(),
-        },
-        set,
-    )
-    .ok()?;
-    game.public = obs.public.clone();
-    game.cards = cards;
+
+    // Build the hidden round deck: all unrevealed cards, shuffled by stage.
     let mut deck = Vec::new();
     for stage in 1..=6 {
         let mut remaining = RoundCard::ALL
@@ -155,10 +166,61 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
         deck.extend(remaining);
     }
     deck.reverse(); // Game::start_round pops the next card from the end.
-    game.hidden_round_deck = deck;
+
+    // Create RngStreams from the sampled seed (matching Game::from_card_state derivation).
+    let round_seed = seed ^ 0x38DB_3BE3_DF45_3FAF;
+    let action_seed = seed ^ 0x6A09_E667_F3BC_C909;
+    let rng_streams = RngStreams {
+        round: ChaCha8Rng::seed_from_u64(round_seed),
+        ai: ChaCha8Rng::seed_from_u64(action_seed),
+    };
+
+    // CardSet from observation's card definitions.
+    let card_set = Arc::new(set);
+
+    // well_food_schedule from observation (added in PR #265).
+    // delayed_well mirrors well_food_schedule; use the same data for both.
+    let well_food_schedule = obs.well_food_schedule.clone();
+    let delayed_well = well_food_schedule.clone();
+
+    // card_uses and card_use_limits from observation (P2-3).
+    // card_uses tracks per-card use counts in the current round (public info).
+    // card_use_limits is derived from CardDefinition::use_limit.
+    let card_uses = obs.card_uses.clone();
+    let card_use_limits = obs.card_use_limits.clone();
+
     // Search positions are hypothetical: skip state hashing and event logging.
-    game.record_events = false;
-    game.validate().ok()?;
+    let config = Config {
+        seed,
+        additional_action_space_enabled: obs.public.additional_action_space_enabled,
+        players: obs.public.players.len(),
+    };
+
+    let game = Game::search_from_parts(
+        config,
+        obs.public.clone(),
+        deck,
+        rng_streams,
+        delayed_well,
+        well_food_schedule,
+        card_set,
+        cards,
+        None,                   // pending
+        default_event_budget(), // event_budget
+        card_uses,
+        card_use_limits,
+        0, // next_decision_id
+    );
+
+    // Validate the constructed position (public invariants only, no private validate).
+    validate_search_public(
+        &game.public,
+        game.config.players,
+        game.config.additional_action_space_enabled,
+        game.card_set.enabled(),
+    )
+    .ok()?;
+
     Some(game)
 }
 
@@ -1031,5 +1093,199 @@ mod tests {
             digest, "a024ed2ee08bad2a70262613afa86f07d89686e4f28cb17c0a6415d700104e99",
             "sample_game distribution changed — update this test only if intentional"
         );
+    }
+
+    /// Acceptance test: sample_game reconstructs a game whose Observation matches
+    /// the original for various in-progress game states.
+    #[test]
+    fn sample_game_reconstructs_observation_roundtrip() {
+        use crate::cards::{verified_basic_card_set, CardDefinition, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Space};
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
+
+        // Helper to compare two observations for public information equality.
+        fn obs_eq_public(a: &crate::model::Observation, b: &crate::model::Observation) {
+            assert_eq!(a.player_id, b.player_id);
+            assert_eq!(a.public, b.public);
+            assert_eq!(a.hand, b.hand);
+            assert_eq!(a.hand_counts, b.hand_counts);
+            assert_eq!(a.card_definitions, b.card_definitions);
+            assert_eq!(a.well_food_schedule, b.well_food_schedule);
+            assert_eq!(a.card_uses, b.card_uses);
+            assert_eq!(a.card_use_limits, b.card_use_limits);
+        }
+
+        // Test multiple seeds and multiple rounds.
+        for seed in [1, 42, 99, 123, 456] {
+            let mut game = Game::with_cards(
+                Config {
+                    seed,
+                    ..Config::default()
+                },
+                verified_basic_card_set(2).unwrap(),
+            )
+            .unwrap();
+
+            // Play a few rounds to create in-progress states.
+            for round in 1..=5 {
+                // Get observation for current player and test roundtrip.
+                let acting = game.public.active_player;
+                let obs = game.observation(acting).unwrap();
+                let mut rng = ChaCha8Rng::seed_from_u64(seed * 1000 + round);
+                let sampled = sample_game(&obs, &mut rng).expect("sample_game must succeed");
+                let reconstructed_obs = sampled.observation(acting).unwrap();
+                obs_eq_public(&obs, &reconstructed_obs);
+
+                // Take a legal action to advance the game.
+                let legal = game.legal_spaces();
+                if legal.is_empty() {
+                    break;
+                }
+                // Use a simple action (DayLaborer if available, otherwise first legal).
+                let action_space = legal
+                    .iter()
+                    .find(|&&s| s == Space::DayLaborer)
+                    .copied()
+                    .unwrap_or(legal[0]);
+                let action = Action {
+                    space: action_space,
+                    detail: Detail::None,
+                };
+                if game.apply(action).is_err() {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Test with well reservations (delayed_well / well_food_schedule).
+    #[test]
+    fn sample_game_reconstructs_well_reservations() {
+        use crate::cards::verified_basic_card_set;
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Improvement, Space};
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
+
+        let mut game = Game::with_cards(
+            Config {
+                seed: 77,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+
+        // Advance to a round where Well can be purchased (any round).
+        // Purchase Well for player 0.
+        let acting = game.public.active_player;
+        // Find a player with enough resources for Well (1 wood, 3 stone).
+        // Give them resources via test setup - use a simpler approach: just test
+        // that well_food_schedule is preserved in roundtrip.
+        // Since we can't easily purchase Well in a test without complex setup,
+        // we directly verify that if well_food_schedule is present, it's preserved.
+
+        // Manually add a well reservation to test the mirror logic.
+        game.delayed_well.entry(3).or_default().push(0);
+        game.well_food_schedule.entry(3).or_default().push(0);
+
+        let obs = game.observation(0).unwrap();
+        assert!(obs.well_food_schedule.contains_key(&3));
+
+        let mut rng = ChaCha8Rng::seed_from_u64(0xDEAD_BEEF);
+        let sampled = sample_game(&obs, &mut rng).expect("sample_game must succeed");
+        let reconstructed_obs = sampled.observation(0).unwrap();
+
+        assert_eq!(reconstructed_obs.well_food_schedule, obs.well_food_schedule);
+        assert_eq!(sampled.delayed_well, game.delayed_well);
+        assert_eq!(sampled.well_food_schedule, game.well_food_schedule);
+    }
+
+    /// Test with card_use_limits (synthetic card with use_limit).
+    #[test]
+    fn sample_game_reconstructs_card_use_limits() {
+        use crate::cards::{verified_basic_card_set, CardDefinition, CardKind, CardSet};
+        use crate::model::{Config, Game};
+        use rand::SeedableRng;
+        use rand_chacha::ChaCha8Rng;
+
+        // Create a card set with a synthetic card that has use_limit.
+        let mut definitions = verified_basic_card_set(2).unwrap().definitions;
+        definitions.push(CardDefinition {
+            id: "TEST_LIMITED".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+            use_limit: Some(1),
+        });
+        let card_set = CardSet { definitions };
+
+        let game = Game::with_cards(
+            Config {
+                seed: 88,
+                ..Config::default()
+            },
+            card_set,
+        )
+        .unwrap();
+
+        let obs = game.observation(0).unwrap();
+        assert!(obs.card_use_limits.contains_key("TEST_LIMITED"));
+        assert_eq!(obs.card_use_limits["TEST_LIMITED"], 1);
+
+        let mut rng = ChaCha8Rng::seed_from_u64(0xBEEF_CAFE);
+        let sampled = sample_game(&obs, &mut rng).expect("sample_game must succeed");
+        let reconstructed_obs = sampled.observation(0).unwrap();
+
+        assert_eq!(reconstructed_obs.card_use_limits, obs.card_use_limits);
+        assert_eq!(sampled.card_use_limits, game.card_use_limits);
+    }
+
+    /// Test that start_round transition preserves public rewards for well and
+    /// limited cards (card_uses cleared, well_food_schedule mirror maintained).
+    #[test]
+    fn start_round_preserves_well_and_card_limits() {
+        use crate::cards::verified_basic_card_set;
+        use crate::model::{Config, Game};
+
+        let mut game = Game::with_cards(
+            Config {
+                seed: 99,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+
+        // Set up well reservation for round 2.
+        game.delayed_well.entry(2).or_default().push(0);
+        game.well_food_schedule.entry(2).or_default().push(0);
+
+        // Set up some card_uses (simulating a card was used this round).
+        game.card_uses.insert("TEST_CARD".into(), 1);
+
+        // Save card_use_limits before start_round.
+        let card_use_limits_before = game.card_use_limits.clone();
+
+        // Advance to round 2.
+        game.start_round();
+        assert_eq!(game.public.round, 2);
+
+        // Well food should have been granted.
+        // Player 0 is start player with 2 initial food + 1 from well = 3.
+        assert_eq!(game.public.players[0].supply.food, 2 + 1);
+
+        // delayed_well and well_food_schedule for round 2 should be consumed.
+        assert!(!game.delayed_well.contains_key(&2));
+        assert!(!game.well_food_schedule.contains_key(&2));
+
+        // card_uses should be cleared at round boundary.
+        assert!(game.card_uses.is_empty());
+
+        // card_use_limits should persist unchanged.
+        assert_eq!(game.card_use_limits, card_use_limits_before);
     }
 }
