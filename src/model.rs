@@ -915,7 +915,7 @@ impl Game {
             .iter()
             .filter_map(|card| card.use_limit.map(|limit| (card.id.clone(), limit)))
             .collect();
-        result.start_round();
+        result.start_round()?;
         result.log.initial_state_hash = result.state_hash();
         result.log.initial_public_state = Some(result.public.clone());
         Ok(result)
@@ -1151,7 +1151,7 @@ impl Game {
         }
         Ok(result)
     }
-    pub fn start_round(&mut self) {
+    pub fn start_round(&mut self) -> Result<(), String> {
         self.public.round += 1;
         let card = self.hidden_round_deck.pop().expect("14 rounds only");
         self.public.revealed.push(card);
@@ -1162,10 +1162,9 @@ impl Game {
         // A decision cannot span a round boundary: no production effect pauses
         // the round-start trigger, and carrying a stale decision into a new
         // round would make its `state_hash_before` meaningless.
-        debug_assert!(
-            self.pending.is_none(),
-            "a pending decision must be resolved before the next round starts"
-        );
+        if !self.pending.is_none() {
+            return Err("pending decision must be resolved before round start".into());
+        }
         self.pending = None;
         self.public.start_player = self.public.start_player.min(self.public.players.len() - 1);
         self.public.active_player = self.public.start_player;
@@ -1240,6 +1239,7 @@ impl Game {
                 Transition::Completed
             });
         }
+        Ok(())
     }
     pub fn validate(&self) -> Result<(), String> {
         let p = &self.public;
@@ -1578,8 +1578,57 @@ impl Game {
                             )?
                         };
                         if let Transition::Paused(p) = after_transition {
-                            // Should not happen: the decision was just resolved.
-                            return Err(format!("unexpected pause during resume: {p:?}"));
+                            // A second pause during resume: commit the partially-resumed
+                            // state and return Transition::Paused instead of erroring out.
+                            next.public.players = players;
+                            next.cards = cards;
+                            next.public.improvement_market = improvement_market;
+                            next.delayed_well = delayed_well;
+                            next.event_budget = event_budget;
+                            next.card_uses = card_uses;
+                            let after_pos = p
+                                .context
+                                .get("card_index")
+                                .and_then(|v| v.as_u64())
+                                .zip(p.context.get("effect_index").and_then(|v| v.as_u64()))
+                                .map(|(ci, ei)| crate::pending::ChainPosition {
+                                    card_index: ci as usize,
+                                    effect_index: ei as usize,
+                                })
+                                .unwrap_or(crate::pending::ChainPosition {
+                                    card_index: 0,
+                                    effect_index: 0,
+                                });
+                            let phase = p
+                                .context
+                                .get("phase")
+                                .and_then(|v| v.as_str())
+                                .map(|s| match s {
+                                    "After" => crate::card_events::TriggerPhase::After,
+                                    _ => crate::card_events::TriggerPhase::Interrupt,
+                                })
+                                .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+                            let new_resume = crate::pending::PostWorkResume {
+                                step,
+                                phase,
+                                after: after_pos,
+                            };
+                            let continuation = crate::pending::Continuation::PostWork {
+                                player,
+                                resume: new_resume,
+                                completion: Box::new(completion),
+                            };
+                            let new_pending = crate::pending::PendingDecision {
+                                id: p.id,
+                                player,
+                                kind: p.kind.clone(),
+                                state_hash_before: p.state_hash_before.clone(),
+                                context: p.context.clone(),
+                                continuation,
+                            };
+                            next.pending = Some(new_pending.clone());
+                            *self = next;
+                            return Ok(Transition::Paused(Box::new(new_pending)));
                         }
                         // Interrupt phase (resume only for an Interrupt-phase pause).
                         let transition = if let Some(after) = after {
@@ -1615,8 +1664,57 @@ impl Game {
                             )?
                         };
                         if let Transition::Paused(p) = transition {
-                            // Should not happen: the decision was just resolved.
-                            return Err(format!("unexpected pause during resume: {p:?}"));
+                            // A second pause during resume: commit the partially-resumed
+                            // state and return Transition::Paused instead of erroring out.
+                            next.public.players = players;
+                            next.cards = cards;
+                            next.public.improvement_market = improvement_market;
+                            next.delayed_well = delayed_well;
+                            next.event_budget = event_budget;
+                            next.card_uses = card_uses;
+                            let after_pos = p
+                                .context
+                                .get("card_index")
+                                .and_then(|v| v.as_u64())
+                                .zip(p.context.get("effect_index").and_then(|v| v.as_u64()))
+                                .map(|(ci, ei)| crate::pending::ChainPosition {
+                                    card_index: ci as usize,
+                                    effect_index: ei as usize,
+                                })
+                                .unwrap_or(crate::pending::ChainPosition {
+                                    card_index: 0,
+                                    effect_index: 0,
+                                });
+                            let phase = p
+                                .context
+                                .get("phase")
+                                .and_then(|v| v.as_str())
+                                .map(|s| match s {
+                                    "After" => crate::card_events::TriggerPhase::After,
+                                    _ => crate::card_events::TriggerPhase::Interrupt,
+                                })
+                                .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+                            let new_resume = crate::pending::PostWorkResume {
+                                step,
+                                phase,
+                                after: after_pos,
+                            };
+                            let continuation = crate::pending::Continuation::PostWork {
+                                player,
+                                resume: new_resume,
+                                completion: Box::new(completion),
+                            };
+                            let new_pending = crate::pending::PendingDecision {
+                                id: p.id,
+                                player,
+                                kind: p.kind.clone(),
+                                state_hash_before: p.state_hash_before.clone(),
+                                context: p.context.clone(),
+                                continuation,
+                            };
+                            next.pending = Some(new_pending.clone());
+                            *self = next;
+                            return Ok(Transition::Paused(Box::new(new_pending)));
                         }
                     }
                 }
@@ -1682,7 +1780,57 @@ impl Game {
                         )?
                     };
                     if let Transition::Paused(p) = after_transition {
-                        return Err(format!("unexpected pause during resume: {p:?}"));
+                        // A second pause during resume: commit the partially-resumed
+                        // state and return Transition::Paused instead of erroring out.
+                        next.public.players = players;
+                        next.cards = cards;
+                        next.public.improvement_market = improvement_market;
+                        next.delayed_well = delayed_well;
+                        next.event_budget = event_budget;
+                        next.card_uses = card_uses;
+                        let after_pos = p
+                            .context
+                            .get("card_index")
+                            .and_then(|v| v.as_u64())
+                            .zip(p.context.get("effect_index").and_then(|v| v.as_u64()))
+                            .map(|(ci, ei)| crate::pending::ChainPosition {
+                                card_index: ci as usize,
+                                effect_index: ei as usize,
+                            })
+                            .unwrap_or(crate::pending::ChainPosition {
+                                card_index: 0,
+                                effect_index: 0,
+                            });
+                        let phase = p
+                            .context
+                            .get("phase")
+                            .and_then(|v| v.as_str())
+                            .map(|s| match s {
+                                "After" => crate::card_events::TriggerPhase::After,
+                                _ => crate::card_events::TriggerPhase::Interrupt,
+                            })
+                            .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+                        let new_resume = crate::pending::PostWorkResume {
+                            step,
+                            phase,
+                            after: after_pos,
+                        };
+                        let continuation = crate::pending::Continuation::PostWork {
+                            player,
+                            resume: new_resume,
+                            completion: Box::new(completion),
+                        };
+                        let new_pending = crate::pending::PendingDecision {
+                            id: p.id,
+                            player,
+                            kind: p.kind.clone(),
+                            state_hash_before: p.state_hash_before.clone(),
+                            context: p.context.clone(),
+                            continuation,
+                        };
+                        next.pending = Some(new_pending.clone());
+                        *self = next;
+                        return Ok(Transition::Paused(Box::new(new_pending)));
                     }
                     // Interrupt phase (resume only for an Interrupt-phase pause).
                     let transition = if let Some(after) = after {
@@ -1776,7 +1924,57 @@ impl Game {
                         )?
                     };
                     if let Transition::Paused(p) = after_transition {
-                        return Err(format!("unexpected pause during resume: {p:?}"));
+                        // A second pause during resume: commit the partially-resumed
+                        // state and return Transition::Paused instead of erroring out.
+                        next.public.players = players;
+                        next.cards = cards;
+                        next.public.improvement_market = improvement_market;
+                        next.delayed_well = delayed_well;
+                        next.event_budget = event_budget;
+                        next.card_uses = card_uses;
+                        let after_pos = p
+                            .context
+                            .get("card_index")
+                            .and_then(|v| v.as_u64())
+                            .zip(p.context.get("effect_index").and_then(|v| v.as_u64()))
+                            .map(|(ci, ei)| crate::pending::ChainPosition {
+                                card_index: ci as usize,
+                                effect_index: ei as usize,
+                            })
+                            .unwrap_or(crate::pending::ChainPosition {
+                                card_index: 0,
+                                effect_index: 0,
+                            });
+                        let phase = p
+                            .context
+                            .get("phase")
+                            .and_then(|v| v.as_str())
+                            .map(|s| match s {
+                                "After" => crate::card_events::TriggerPhase::After,
+                                _ => crate::card_events::TriggerPhase::Interrupt,
+                            })
+                            .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+                        let new_resume = crate::pending::PostWorkResume {
+                            step,
+                            phase,
+                            after: after_pos,
+                        };
+                        let continuation = crate::pending::Continuation::PostWork {
+                            player,
+                            resume: new_resume,
+                            completion: Box::new(completion),
+                        };
+                        let new_pending = crate::pending::PendingDecision {
+                            id: p.id,
+                            player,
+                            kind: p.kind.clone(),
+                            state_hash_before: p.state_hash_before.clone(),
+                            context: p.context.clone(),
+                            continuation,
+                        };
+                        next.pending = Some(new_pending.clone());
+                        *self = next;
+                        return Ok(Transition::Paused(Box::new(new_pending)));
                     }
                     // Interrupt phase (resume only for an Interrupt-phase pause).
                     let transition = if let Some(after) = after {
@@ -1834,7 +2032,7 @@ impl Game {
                 value
             } else {
                 let mut preview = next.clone();
-                preview.harvest_fields();
+                preview.harvest_fields()?;
                 (0..preview.public.players.len())
                     .map(|id| policy.plan_feeding(&preview.observation(id).expect("valid player")))
                     .collect::<Vec<_>>()
@@ -1851,7 +2049,7 @@ impl Game {
         };
         let breeding_plans = if will_harvest {
             let mut preview = next.clone();
-            preview.harvest_fields();
+            preview.harvest_fields()?;
             preview.feed_after_fields(harvest_plans.as_deref().expect("feeding plans"))?;
             let plans = if let Some(value) = completion.breeding_plans {
                 value
@@ -2008,19 +2206,6 @@ impl Game {
                     chosen_order,
                     &triggerable,
                 )?;
-
-                if self.record_events {
-                    self.log.events.push(crate::model::Event {
-                        player: Some(pending.player),
-                        kind: "pending_resolution".into(),
-                        payload: serde_json::json!({
-                            "phase": format!("{:?}", phase),
-                            "chosen_order": chosen_order,
-                        }),
-                        before: pending.state_hash_before.clone(),
-                        after: self.state_hash(),
-                    });
-                }
                 Ok(())
             }
             (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => {

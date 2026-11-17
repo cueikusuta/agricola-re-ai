@@ -994,7 +994,7 @@ impl Game {
                 value
             } else {
                 let mut preview = next.clone();
-                preview.harvest_fields();
+                preview.harvest_fields()?;
                 (0..preview.public.players.len())
                     .map(|id| policy.plan_feeding(&preview.observation(id).expect("valid player")))
                     .collect::<Vec<_>>()
@@ -1011,7 +1011,7 @@ impl Game {
         };
         let breeding_plans = if will_harvest {
             let mut preview = next.clone();
-            preview.harvest_fields();
+            preview.harvest_fields()?;
             preview.feed_after_fields(harvest_plans.as_deref().expect("feeding plans"))?;
             let plans = if let Some(value) = forced_breeding {
                 value
@@ -1083,7 +1083,7 @@ impl Game {
         }
         next.public.used.insert(action.space);
         next.public.workers_placed[id] += 1;
-        next.harvest_fields();
+        next.harvest_fields()?;
         if let Some(plans) = feeding {
             next.feed_after_fields(plans)?;
         }
@@ -1489,7 +1489,7 @@ impl Game {
         if self.public.round == 14 {
             self.public.finished = true
         } else {
-            self.start_round()
+            self.start_round()?;
         }
         Ok(())
     }
@@ -3894,7 +3894,7 @@ mod audit_p2_1_exhaustive_tests {
                 game.pending = None;
             }
             game.public.round = 1;
-            game.start_round();
+            game.start_round().expect("start_round must succeed");
 
             // Test 3: Drive harvest_fields (tests HarvestFieldGain effects)
             // Play the card first if it's a passive/harvest card
@@ -3934,7 +3934,7 @@ mod audit_p2_1_exhaustive_tests {
                 *crop = Some(Crop::Grain);
                 *remaining = 1;
             }
-            game.harvest_fields();
+            game.harvest_fields().expect("harvest_fields must succeed");
         }
 
         println!(
