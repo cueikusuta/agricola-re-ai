@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - name: BGA card spec contract (chapter gate: errors must be [])
+      - name: "BGA card spec contract (chapter gate: errors must be empty)"
         run: python3 scripts/validate_bga_card_specs.py
       - name: Blocked-card register stays fail closed
         run: python3 scripts/card_verification_blockers.py
