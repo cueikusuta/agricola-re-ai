@@ -1716,12 +1716,11 @@ impl Game {
                 if space == Space::ModestFamilyGrowth && self.public.round < 5 {
                     return Err("modest family growth is only available from round 5".into());
                 }
-                // Handle card play first (before borrowing p for the rest)
+                // P1-1 unified play order (2016 Lookout p.6/p.8) with family growth first:
+                // grow (2016: family growth first) -> validate+pay -> Replace/Before (pre-move) ->
+                // zone move -> AfterPlay (post-move).
                 if let Detail::GrowWithMinor { card_id } = detail {
                     if self.card_set.enabled() {
-                        // P1-1 unified play order (2016 Lookout p.6/p.8):
-                        // validate+pay -> Replace/Before (pre-move state) ->
-                        // zone move -> AfterPlay (post-move state).
                         // Validate and pay costs (use internal fn; cards::play does full legacy for direct callers)
                         crate::cards::play_validate_pay(
                             &self.card_set,
@@ -1783,13 +1782,60 @@ impl Game {
                 }
                 // Now handle the rest of the action
                 let p = &mut self.public.players[id];
-                match detail {
-                    Detail::None => grow(p, true)?,
-                    Detail::GrowWithMinor { .. } => {} // Already handled above
-                    _ => return Err("invalid growth details".into()),
+                // Family growth condition check BEFORE card play (2016 Lookout rules:
+                // "family growth first, then minor improvement").
+                // The card's own housing space (e.g., B010) must NOT count for this action's room check.
+                grow(p, true)?;
+                // Now handle card play if GrowWithMinor
+                if let Detail::GrowWithMinor { card_id } = detail {
+                    if !self.card_set.enabled() {
+                        return Err("card set not enabled for GrowWithMinor".into());
+                    }
+                    // Validate and pay costs
+                    crate::cards::play_validate_pay(
+                        &self.card_set,
+                        &mut self.cards.hands[id],
+                        &mut self.public.players[id],
+                        card_id,
+                        crate::cards::CardKind::MinorImprovement,
+                        0,
+                    )?;
+                    // Move card from hand to played
+                    let mut ctx = CardMoveCtx {
+                        cards: &mut self.cards,
+                        players: &mut self.public.players,
+                        improvement_market: &mut self.public.improvement_market,
+                    };
+                    play_from_hand(&mut ctx, id, card_id)?;
+                    // Dispatch Replace/Before phases
+                    dispatch_play(
+                        &self.card_set,
+                        id,
+                        card_id,
+                        0,
+                        &mut self.cards,
+                        &mut self.public.players,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        self.public.round,
+                        &self.public.used,
+                        &mut self.event_budget,
+                        &mut self.card_uses,
+                        &self.card_use_limits,
+                        &mut self.pending,
+                    )?;
+                    // Update card points
+                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                    crate::cards::update_card_points_on_play(
+                        &mut self.public.players[id],
+                        card.points,
+                    )?;
+                } else if !matches!(detail, Detail::None) {
+                    return Err("invalid growth details".into());
                 }
             }
             Space::FamilyGrowthNoRoom => {
+                let p = &mut self.public.players[id];
                 require_none(detail)?;
                 grow(p, false)?;
             }
@@ -3436,6 +3482,375 @@ mod m6_extra_passive_engine_tests {
     }
 }
 
+#[cfg(test)]
+mod grow_with_minor_regression_tests {
+    use super::*;
+    use crate::cards::{play, verified_basic_card_set, CardKind};
+    use crate::model::{Config, RoundCard, Space};
+
+    fn setup_game_with_fgwr() -> (Game, usize) {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(Config::default(), set).unwrap();
+        game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
+        game.public.round = 1;
+        game.public.players[0].farm[1].tile = Tile::Room;
+        (game, 0)
+    }
+
+    fn setup_game_with_modest() -> (Game, usize) {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 123,
+                additional_action_space_enabled: true,
+            },
+            set,
+        )
+        .unwrap();
+        game.public.round = 1;
+        game.public.players[0].farm[1].tile = Tile::Room;
+        (game, 0)
+    }
+
+    fn add_b010_to_hand(game: &mut Game) {
+        game.cards.hands[0].push("B010".to_string());
+        game.cards.undealt.retain(|id| id != "B010");
+    }
+
+    fn give_b010_resources(player: &mut Player) {
+        player.supply.wood = 3;
+        player.supply.food = 3;
+    }
+
+    #[test]
+    fn grow_with_minor_family_grows_and_card_plays() {
+        let (mut game, pid) = setup_game_with_fgwr();
+        add_b010_to_hand(&mut game);
+        give_b010_resources(&mut game.public.players[pid]);
+        let initial_family = game.public.players[pid].family;
+        let initial_newborns = game.public.players[pid].newborns;
+        let action = Action {
+            space: Space::FamilyGrowthWithRoom,
+            detail: Detail::GrowWithMinor {
+                card_id: "B010".into(),
+            },
+        };
+        let result = game.apply(action);
+        assert!(result.is_ok(), "apply should succeed: {:?}", result);
+        assert_eq!(
+            game.public.players[pid].family,
+            initial_family + 1,
+            "family should grow 2 to 3"
+        );
+        assert_eq!(
+            game.public.players[pid].newborns,
+            initial_newborns + 1,
+            "newborns should increase"
+        );
+        assert!(
+            game.public.players[pid]
+                .played_cards
+                .contains(&"B010".to_string()),
+            "B010 should be played"
+        );
+    }
+
+    #[test]
+    fn grow_with_minor_err_no_room() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(Config::default(), set).unwrap();
+        game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
+        game.public.round = 1;
+        add_b010_to_hand(&mut game);
+        give_b010_resources(&mut game.public.players[0]);
+        let action = Action {
+            space: Space::FamilyGrowthWithRoom,
+            detail: Detail::GrowWithMinor {
+                card_id: "B010".into(),
+            },
+        };
+        let result = game.apply(action);
+        assert!(result.is_err(), "should fail with no room: {:?}", result);
+        assert_eq!(result.unwrap_err(), "family growth not permitted");
+        assert!(
+            !game.public.used.contains(&Space::FamilyGrowthWithRoom),
+            "worker not consumed on Err"
+        );
+    }
+
+    #[test]
+    fn grow_with_minor_err_family_five() {
+        let (mut game, pid) = setup_game_with_fgwr();
+        game.public.players[pid].family = 5;
+        add_b010_to_hand(&mut game);
+        give_b010_resources(&mut game.public.players[pid]);
+        let action = Action {
+            space: Space::FamilyGrowthWithRoom,
+            detail: Detail::GrowWithMinor {
+                card_id: "B010".into(),
+            },
+        };
+        let result = game.apply(action);
+        assert!(result.is_err(), "should fail at family 5: {:?}", result);
+        assert_eq!(result.unwrap_err(), "family growth not permitted");
+        assert!(!game.public.used.contains(&Space::FamilyGrowthWithRoom));
+    }
+
+    #[test]
+    fn grow_with_minor_err_card_set_disabled() {
+        let mut game = Game::new(Config::default());
+        game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
+        game.public.round = 1;
+        game.public.players[0].farm[1].tile = Tile::Room;
+        game.cards.hands[0].push("B010".to_string());
+        give_b010_resources(&mut game.public.players[0]);
+        let action = Action {
+            space: Space::FamilyGrowthWithRoom,
+            detail: Detail::GrowWithMinor {
+                card_id: "B010".into(),
+            },
+        };
+        let result = game.apply(action);
+        assert!(
+            result.is_err(),
+            "should fail with disabled card set: {:?}",
+            result
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            "card set not enabled for GrowWithMinor"
+        );
+        assert!(!game.public.used.contains(&Space::FamilyGrowthWithRoom));
+    }
+
+    #[test]
+    fn grow_with_minor_err_unknown_card() {
+        let (mut game, pid) = setup_game_with_fgwr();
+        give_b010_resources(&mut game.public.players[pid]);
+        let action = Action {
+            space: Space::FamilyGrowthWithRoom,
+            detail: Detail::GrowWithMinor {
+                card_id: "NONEXISTENT".into(),
+            },
+        };
+        let result = game.apply(action);
+        assert!(
+            result.is_err(),
+            "should fail with unknown card: {:?}",
+            result
+        );
+        assert!(!game.public.used.contains(&Space::FamilyGrowthWithRoom));
+    }
+
+    #[test]
+    fn grow_with_minor_err_validate_action_matches() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(Config::default(), set).unwrap();
+        game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
+        game.public.round = 1;
+        add_b010_to_hand(&mut game);
+        give_b010_resources(&mut game.public.players[0]);
+        let action = Action {
+            space: Space::FamilyGrowthWithRoom,
+            detail: Detail::GrowWithMinor {
+                card_id: "B010".into(),
+            },
+        };
+        let result = game.validate_action(&action);
+        assert!(
+            result.is_err(),
+            "validate_action should also reject no-room case"
+        );
+        assert_eq!(result.unwrap_err(), "family growth not permitted");
+    }
+
+    #[test]
+    fn grow_with_minor_b010_order_card_played_same_action_no_room() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(Config::default(), set).unwrap();
+        game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
+        game.public.round = 1;
+        add_b010_to_hand(&mut game);
+        give_b010_resources(&mut game.public.players[0]);
+        let action = Action {
+            space: Space::FamilyGrowthWithRoom,
+            detail: Detail::GrowWithMinor {
+                card_id: "B010".into(),
+            },
+        };
+        let result = game.apply(action);
+        assert!(
+            result.is_err(),
+            "B010 played same action should not provide room: {:?}",
+            result
+        );
+        assert_eq!(result.unwrap_err(), "family growth not permitted");
+        assert!(!game.public.used.contains(&Space::FamilyGrowthWithRoom));
+    }
+
+    #[test]
+    fn grow_with_minor_b010_order_preplayed_allows_growth() {
+        // (c) PREVIOUSLY played B010 DOES provide room (existing behavior preserved)
+        // Use verified_basic_card_set which has the full 14 cards per player (7 occupations + 7 minors)
+        // Find a seed where B010 is in player 0's hand
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = None;
+        for seed in 1..1000 {
+            let config = Config {
+                players: 2,
+                seed,
+                additional_action_space_enabled: false,
+            };
+            let g = Game::with_cards(config, set.clone()).unwrap();
+            if g.cards.hands[0].contains(&"B010".to_string()) {
+                game = Some(g);
+                break;
+            }
+        }
+        let mut game = game.expect("failed to find seed with B010 in player 0 hand");
+        game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
+        game.public.round = 1;
+        // Give player 0 resources to play B010 (wood3, food3)
+        game.public.players[0].supply.wood = 3;
+        game.public.players[0].supply.food = 3;
+        // Pre-play B010 using the play function directly on the player
+        // play() will validate and remove the card from the hand
+        let mut hand = game.cards.hands[0].clone();
+        play(
+            &set,
+            &mut hand,
+            &mut game.public.players[0],
+            "B010",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        game.cards.hands[0] = hand;
+        game.public.players[0].supply.wood = 3;
+        game.public.players[0].supply.food = 3;
+        // Now use a DIFFERENT minor (A063) for GrowWithMinor
+        // A063 is in verified_extra_simple_cards which is part of verified_basic_card_set
+        // Add A063 to hand if not already there
+        if !game.cards.hands[0].contains(&"A063".to_string()) {
+            if let Some(idx) = game.cards.undealt.iter().position(|id| id == "A063") {
+                game.cards.hands[0].push(game.cards.undealt.remove(idx));
+            } else {
+                game.cards.hands[0].push("A063".to_string());
+            }
+        }
+        game.public.players[0].supply.stone = 2; // A063 costs wood2 stone2
+
+        let action = Action {
+            space: Space::FamilyGrowthWithRoom,
+            detail: Detail::GrowWithMinor {
+                card_id: "A063".into(),
+            },
+        };
+        let result = game.apply(action);
+
+        assert!(
+            result.is_ok(),
+            "pre-played B010 should allow growth: {:?}",
+            result
+        );
+        assert_eq!(game.public.players[0].family, 3, "family should grow to 3");
+        assert_eq!(game.public.players[0].newborns, 1);
+        assert!(game.public.players[0]
+            .played_cards
+            .contains(&"A063".to_string()));
+    }
+
+    #[test]
+    fn modest_family_growth_round_gate_still_works() {
+        let (mut game, pid) = setup_game_with_modest();
+        game.public.round = 4;
+        add_b010_to_hand(&mut game);
+        give_b010_resources(&mut game.public.players[pid]);
+        let action = Action {
+            space: Space::ModestFamilyGrowth,
+            detail: Detail::GrowWithMinor {
+                card_id: "B010".into(),
+            },
+        };
+        let result = game.apply(action);
+        assert!(
+            result.is_err(),
+            "ModestFamilyGrowth before round 5 should fail: {:?}",
+            result
+        );
+        assert_eq!(
+            result.unwrap_err(),
+            "modest family growth is only available from round 5"
+        );
+        assert!(!game.public.used.contains(&Space::ModestFamilyGrowth));
+    }
+
+    #[test]
+    fn modest_family_growth_round_5_works() {
+        let (mut game, pid) = setup_game_with_modest();
+        game.public.round = 5;
+        add_b010_to_hand(&mut game);
+        give_b010_resources(&mut game.public.players[pid]);
+        let action = Action {
+            space: Space::ModestFamilyGrowth,
+            detail: Detail::GrowWithMinor {
+                card_id: "B010".into(),
+            },
+        };
+        let result = game.apply(action);
+        assert!(
+            result.is_ok(),
+            "ModestFamilyGrowth at round 5 should succeed: {:?}",
+            result
+        );
+        assert_eq!(game.public.players[pid].family, 3);
+        assert!(game.public.players[pid]
+            .played_cards
+            .contains(&"B010".to_string()));
+    }
+
+    #[test]
+    fn detail_none_still_works() {
+        let (mut game, pid) = setup_game_with_fgwr();
+        let action = Action {
+            space: Space::FamilyGrowthWithRoom,
+            detail: Detail::None,
+        };
+        let result = game.apply(action);
+        assert!(
+            result.is_ok(),
+            "Detail::None should still work: {:?}",
+            result
+        );
+        assert_eq!(game.public.players[pid].family, 3);
+        assert_eq!(game.public.players[pid].newborns, 1);
+        assert!(
+            game.public.players[pid].played_cards.is_empty(),
+            "no card should be played"
+        );
+    }
+
+    #[test]
+    fn family_growth_no_room_unaffected() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(Config::default(), set).unwrap();
+        game.public.revealed.push(RoundCard::FamilyGrowthNoRoom);
+        game.public.round = 1;
+        let action = Action {
+            space: Space::FamilyGrowthNoRoom,
+            detail: Detail::None,
+        };
+        let result = game.apply(action);
+        assert!(
+            result.is_ok(),
+            "FamilyGrowthNoRoom should work: {:?}",
+            result
+        );
+        assert_eq!(game.public.players[0].family, 3);
+        assert_eq!(game.public.players[0].newborns, 1);
+    }
+}
 #[cfg(test)]
 mod m6_bake_detection_tests {
     use super::*;
