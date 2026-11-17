@@ -612,11 +612,15 @@ CARDS = {
         ],
     },
     "B004": {
+        # Held as needs_resolution: accumulation-space headcount is not
+        # exposed in PublicState; decision deferred to Issue #347.
         "post": "left_neighbor_hand",
-        "effects": [
-            effect("on_play", [gain("wood", per(count("person_on_accumulation_space"), 1))]),
+        "effects": None,
+        "status": "needs_resolution",
+        "unresolved": [
+            "person_on_accumulation_space の累積スペース別人数が PublicState に露出していない（Issue #347）"
         ],
-        "notes": "Gain 1 wood per own person standing on accumulation spaces.",
+        "notes": "Gain 1 wood per own person standing on accumulation spaces. Held as needs_resolution: DispatchContext exposes used_spaces but not the number of people on accumulation spaces, so the effect cannot be computed from public state; held per docs/bga-card-effect-vocabulary.md rule 5 (no dummy no-op registration), decision deferred to Issue #347.",
         "tests": [
             case("B004-normal", {"people_on_accumulation_spaces": 2}, {"play": "B004"},
                  {"wood_delta": 2}),
@@ -645,6 +649,7 @@ CARDS = {
         "post": "left_neighbor_hand",
         "effects": [effect("on_play", [gain("stone", per(count("person"), 1))])],
         "notes": "Gain 1 stone per person in the owner's supply.",
+        "implementation_status": "tested",
         "tests": [
             case("B006-normal", {"people": 3}, {"play": "B006"}, {"stone_delta": 3}),
             case("B006-boundary", {"people": 2}, {"play": "B006"}, {"stone_delta": 2}),
@@ -657,6 +662,11 @@ CARDS = {
                                gain("food", per(count("major_improvement_bottom_row"), 1))]),
         ],
         "notes": "Gain 2 food plus 1 food per major improvement taken from the bottom row.",
+        "implementation_status": "tested",
+        "status": "partial",
+        "unresolved": [
+            "major_improvement_bottom_row の対象構成（Joinery / Pottery / Basketry の3種のみか、他の大進歩（Fireplace/Hearth/ClayOven/StoneOven/Well 等）を含むか）がリポジトリ内 spec データからは導出できない。公式ゲームボード照合が必要（AGENTS §3・人間決定待ち、Issue #348）"
+        ],
         "tests": [
             case("B007-normal", {"major_bottom_row": 2}, {"play": "B007"}, {"food_delta": 4}),
             case("B007-zero", {"major_bottom_row": 0}, {"play": "B007"}, {"food_delta": 2}),
@@ -866,6 +876,7 @@ CARDS = {
         "post": "left_neighbor_hand",
         "effects": [effect("on_play", [gain("wood", per(count("occupation"), 1))])],
         "notes": "Gain 1 wood for each occupation already in front of the owner.",
+        "implementation_status": "tested",
         "tests": [
             case("C004-normal", {"occupations_played": 3}, {"play": "C004"},
                  {"wood_delta": 3}),
@@ -1176,6 +1187,11 @@ CARDS = {
                                gain("clay", per(count("improvement"), 1))]),
         ],
         "notes": "Gain 1 clay per clay room and 1 clay per major improvement owned; pass left.",
+        "implementation_status": "tested",
+        "status": "partial",
+        "unresolved": [
+            "count[improvement] の語義が spec notes「1 clay per major improvement owned」と実装（improvement_count_in_front = プレイ済み小進歩カード + 所有大進歩、A117 木材調達人 先行）で不一致。語義確定まで実装は improvement_count_in_front に固定（AGENTS §3・人間決定待ち、Issue #349）"
+        ],
         "tests": [
             case("C005-normal", {"clay_rooms": 2, "major_improvements": 1},
                  {"play": "C005"}, {"clay_delta": 3}),
@@ -1318,6 +1334,7 @@ CARDS = {
         "post": "left_neighbor_hand",
         "effects": [effect("on_play", [gain("clay", per(count("sown_field"), 1))])],
         "notes": "Gain 1 clay per planted field; pass left.",
+        "implementation_status": "tested",
         "tests": [
             case("D005-normal", {"sown_fields": 2}, {"play": "D005"}, {"clay_delta": 2}),
             case("D005-zero", {"sown_fields": 0}, {"play": "D005"}, {"clay_delta": 0}),
@@ -4232,7 +4249,7 @@ def build_spec(row: dict) -> dict:
         "test_case_ids": [c["id"] for c in tests],
         "checked_by": "AI source comparison",
         "checked_on": CHECKED_ON,
-        "implementation_status": "not_started",
+        "implementation_status": entry.get("implementation_status", "not_started"),
         "notes": entry["notes"],
     }
     spec = {
