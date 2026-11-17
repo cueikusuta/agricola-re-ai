@@ -1738,7 +1738,7 @@ mod tests {
     #[test]
     fn unrevealed_round_card_space_western_quarry_not_pass() {
         let (pre, mut post) = mid_round_pair();
-        let actor = pre.public.active_player;
+        let _actor = pre.public.active_player;
         // Replace the added space with WesternQuarry (unrevealed round card space).
         let added = *post
             .public
