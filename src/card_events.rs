@@ -4014,7 +4014,7 @@ mod tests {
             "the action space must be marked used by the resume"
         );
         assert_eq!(
-            game.card_uses.get("AW2").copied(),
+            game.public.card_uses.get("AW2").copied(),
             Some(2),
             "each effect must fire exactly once"
         );

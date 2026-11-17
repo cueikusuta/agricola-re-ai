@@ -406,7 +406,7 @@ impl Game {
                 self.public.round,
                 &self.public.used,
                 &mut self.event_budget,
-                &mut self.card_uses,
+                &mut self.public.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
                 allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
@@ -435,7 +435,7 @@ impl Game {
             self.public.round,
             &self.public.used,
             &mut self.event_budget,
-            &mut self.card_uses,
+            &mut self.public.card_uses,
             &self.card_use_limits,
             &mut self.pending,
             allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
@@ -459,7 +459,7 @@ impl Game {
             self.public.round,
             &self.public.used,
             &mut self.event_budget,
-            &mut self.card_uses,
+            &mut self.public.card_uses,
             &self.card_use_limits,
             &mut self.pending,
             allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
@@ -1552,7 +1552,7 @@ impl Game {
                             self.public.round,
                             &self.public.used,
                             &mut self.event_budget,
-                            &mut self.card_uses,
+                            &mut self.public.card_uses,
                             &self.card_use_limits,
                             &mut self.pending,
                         )?;
@@ -1621,7 +1621,7 @@ impl Game {
                     self.public.round,
                     &self.public.used,
                     &mut self.event_budget,
-                    &mut self.card_uses,
+                    &mut self.public.card_uses,
                     &self.card_use_limits,
                     &mut self.pending,
                 )?;
@@ -1733,7 +1733,7 @@ impl Game {
                         self.public.round,
                         &self.public.used,
                         &mut self.event_budget,
-                        &mut self.card_uses,
+                        &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
                     )?;
@@ -1818,7 +1818,7 @@ impl Game {
                         self.public.round,
                         &self.public.used,
                         &mut self.event_budget,
-                        &mut self.card_uses,
+                        &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
                     )?;
@@ -1838,7 +1838,7 @@ impl Game {
                         p,
                         &mut self.public.improvement_market,
                         &mut self.delayed_well,
-                        &mut self.well_food_schedule,
+                        &mut self.public.well_food_schedule,
                         self.public.round,
                         *improvement,
                         PurchaseArgs {
@@ -1857,7 +1857,7 @@ impl Game {
                         p,
                         &mut self.public.improvement_market,
                         &mut self.delayed_well,
-                        &mut self.well_food_schedule,
+                        &mut self.public.well_food_schedule,
                         self.public.round,
                         *improvement,
                         PurchaseArgs {
@@ -1877,7 +1877,7 @@ impl Game {
                         p,
                         &mut self.public.improvement_market,
                         &mut self.delayed_well,
-                        &mut self.well_food_schedule,
+                        &mut self.public.well_food_schedule,
                         self.public.round,
                         *improvement,
                         PurchaseArgs {
@@ -1904,7 +1904,7 @@ impl Game {
                             p,
                             &mut self.public.improvement_market,
                             &mut self.delayed_well,
-                            &mut self.well_food_schedule,
+                            &mut self.public.well_food_schedule,
                             self.public.round,
                             *i,
                             PurchaseArgs {
@@ -1933,7 +1933,7 @@ impl Game {
                             p,
                             &mut self.public.improvement_market,
                             &mut self.delayed_well,
-                            &mut self.well_food_schedule,
+                            &mut self.public.well_food_schedule,
                             self.public.round,
                             *improvement,
                             PurchaseArgs {

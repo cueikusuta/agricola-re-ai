@@ -526,6 +526,26 @@ impl Space {
     }
 }
 
+/// Layer 0: the single canonical structure of public game state.
+///
+/// Every path that reads or writes public state (engine, dispatcher, apply,
+/// validation, MCTS, replay) must go through this struct — there is no second
+/// copy of any field here. Fields that used to live as `Game` mirrors with a
+/// duplicate in `Observation` (`well_food_schedule`, `card_uses`) now live
+/// only here; `Game::observation` projects them to the observer together with
+/// the rest of the struct.
+///
+/// Deliberately NOT part of Layer 0:
+/// - `Game::pending` / `event_budget` / `next_decision_id`: transition
+///   machinery (decision bookkeeping), not public state; restructured by the
+///   dispatcher two-axis design.
+/// - `Game::card_use_limits`: immutable derived data (`CardDefinition::use_limit`
+///   over the public card set); it never changes during play, so it is a
+///   cache next to its source, not state.
+/// - `Game::delayed_well`: the private source of truth; the public mirror of
+///   it is `well_food_schedule` below.
+/// - `Game::log`: the replay record; its integrity is enforced by the event
+///   hash chain and `load_json` replay verification.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PublicState {
     pub round: u8,
@@ -541,6 +561,62 @@ pub struct PublicState {
     pub workers_placed: Vec<u8>,
     pub additional_action_space_enabled: bool,
     pub finished: bool,
+    /// Public mirror of `Game::delayed_well` (Finding A, PR #265): which
+    /// player receives one food at which future round from a Well purchase.
+    /// Well purchases are public actions, so the schedule is public state.
+    /// `serde(default)` keeps pre-aggregation saves loading.
+    #[serde(default)]
+    pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
+    /// Per-card use counts in the current round. Card plays are public
+    /// actions, so the ledger is public state. Cleared at each round
+    /// boundary; `serde(default)` keeps pre-aggregation saves loading.
+    #[serde(default)]
+    pub card_uses: BTreeMap<String, u32>,
+}
+
+/// The exact `PublicState` field set the LOG_VERSION=5 `state_hash` tuple
+/// serialized, in declaration order. Serializing this mirror produces
+/// byte-identical JSON to serializing the 13-field v5 `PublicState`, so
+/// `state_hash` VALUES are unchanged by the Layer-0 aggregation even though
+/// `PublicState` grew. The aggregated fields (`well_food_schedule`,
+/// `card_uses`) are deliberately excluded here — their integrity is enforced
+/// by `integrity_hash` instead. Do not reorder or add fields.
+#[derive(Serialize)]
+pub(crate) struct PublicStateHashMaterialV5<'a> {
+    round: &'a u8,
+    active_player: &'a usize,
+    start_player: &'a usize,
+    used: &'a BTreeSet<Space>,
+    revealed: &'a Vec<RoundCard>,
+    accumulations: &'a BTreeMap<Space, u32>,
+    animal_accumulations: &'a BTreeMap<Space, u32>,
+    players: &'a Vec<Player>,
+    improvement_market: &'a Vec<Improvement>,
+    work_quota: &'a Vec<u8>,
+    workers_placed: &'a Vec<u8>,
+    additional_action_space_enabled: &'a bool,
+    finished: &'a bool,
+}
+
+impl PublicState {
+    /// v5-pinned hash material for this state (see [`PublicStateHashMaterialV5`]).
+    fn hash_material_v5(&self) -> PublicStateHashMaterialV5<'_> {
+        PublicStateHashMaterialV5 {
+            round: &self.round,
+            active_player: &self.active_player,
+            start_player: &self.start_player,
+            used: &self.used,
+            revealed: &self.revealed,
+            accumulations: &self.accumulations,
+            animal_accumulations: &self.animal_accumulations,
+            players: &self.players,
+            improvement_market: &self.improvement_market,
+            work_quota: &self.work_quota,
+            workers_placed: &self.workers_placed,
+            additional_action_space_enabled: &self.additional_action_space_enabled,
+            finished: &self.finished,
+        }
+    }
 }
 
 impl PublicState {
@@ -582,10 +658,9 @@ pub struct Game {
     pub hidden_round_deck: Vec<RoundCard>,
     pub rng: RngStreams,
     pub delayed_well: BTreeMap<u8, Vec<usize>>,
-    /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
-    /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
-    #[serde(default)]
-    pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
+    /// The public mirror of `delayed_well` lives in
+    /// [`PublicState::well_food_schedule`] (Layer-0 aggregation): one single
+    /// canonical copy instead of separate `Game` and `Observation` mirrors.
     #[serde(
         default,
         serialize_with = "serialize_arc",
@@ -610,15 +685,13 @@ pub struct Game {
     /// single effect chain (loop guard) rather than the whole game.
     #[serde(default = "default_event_budget")]
     pub event_budget: u32,
-    /// Per-card use tracking for effects with limits (e.g., once per round).
-    /// Key: card ID, Value: use count in the current period. Cleared at each
-    /// round boundary, matching the "once per round" period used by the cards.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub card_uses: BTreeMap<String, u32>,
     /// Declared per-card use limits (card ID -> max resolutions per period).
     /// A card absent from this map has no per-period limit. Kept in `Game` so
     /// the limit is data, not a magic constant at the call site: an empty map
     /// is skipped when serializing, so existing v5 saves stay byte-identical.
+    /// (The per-round use *counts* are public state and live in
+    /// [`PublicState::card_uses`]; this map is immutable derived data and
+    /// never changes during play.)
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub card_use_limits: BTreeMap<String, u32>,
     /// Next decision ID for PendingDecision.
@@ -678,6 +751,13 @@ pub struct GameLog {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub integrity_hash: Option<String>,
 }
+/// The observer-side projection of Layer 0 plus the viewer's private hand.
+/// `public` carries the complete canonical [`PublicState`] — including the
+/// well-food schedule and per-card use ledger, which used to be duplicated as
+/// separate `Observation` mirrors (Layer-0 aggregation removed those
+/// duplicates). Per-card use limits are not projected: they derive from
+/// `card_definitions` (`CardDefinition::use_limit`), exactly as
+/// `Game::from_card_state` and the MCTS reconstruction derive them.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Observation {
     pub player_id: usize,
@@ -687,17 +767,6 @@ pub struct Observation {
     pub hand_counts: Vec<usize>,
     /// The implemented card vocabulary is public; its randomized locations are not.
     pub card_definitions: Vec<CardDefinition>,
-    /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
-    /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
-    pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
-    /// Per-card use tracking for the current round (public information).
-    /// Card plays are public actions, so use counts do not leak hidden information.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub card_uses: BTreeMap<String, u32>,
-    /// Declared per-card use limits (card ID -> max resolutions per round).
-    /// Derived from CardDefinition::use_limit; included to avoid recomputation.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub card_use_limits: BTreeMap<String, u32>,
 }
 impl Game {
     pub fn new(config: Config) -> Self {
@@ -804,6 +873,8 @@ impl Game {
             workers_placed: vec![0; config.players],
             additional_action_space_enabled: config.additional_action_space_enabled,
             finished: false,
+            well_food_schedule: BTreeMap::new(),
+            card_uses: BTreeMap::new(),
         };
         let log = GameLog {
             log_version: LOG_VERSION,
@@ -827,14 +898,12 @@ impl Game {
             hidden_round_deck: deck,
             rng,
             delayed_well: BTreeMap::new(),
-            well_food_schedule: BTreeMap::new(),
             card_set,
             cards,
             log,
             record_events: true,
             pending: None,
             event_budget: default_event_budget(),
-            card_uses: BTreeMap::new(),
             card_use_limits: Default::default(),
             next_decision_id: 0,
         };
@@ -861,9 +930,6 @@ impl Game {
             hand: self.cards.hands[player_id].clone(),
             hand_counts: self.cards.hands.iter().map(Vec::len).collect(),
             card_definitions: self.card_set.definitions.clone(),
-            well_food_schedule: self.well_food_schedule.clone(),
-            card_uses: self.card_uses.clone(),
-            card_use_limits: self.card_use_limits.clone(),
         })
     }
     pub fn state_hash(&self) -> String {
@@ -873,12 +939,16 @@ impl Game {
         // (well_food_schedule, pending, event_budget, card_uses, next_decision_id)
         // are serialized into saves via serde defaults, but are deliberately
         // EXCLUDED from the hash so legacy v5 fixtures keep verifying.
-        // well_food_schedule mirrors delayed_well (Finding A) and pending
+        // well_food_schedule and card_uses are Layer-0 public state and are
+        // serialized into saves inside `public`; for the hash the public state
+        // is projected onto its v5 field set (`hash_material_v5`), so hash
+        // VALUES stay identical to the pre-aggregation format. Pending
         // decisions are excluded from the hash; their integrity is enforced by
-        // PendingDecision::state_hash_before checks in the resume path instead.
+        // PendingDecision::state_hash_before checks in the resume path, and the
+        // aggregated fields by `integrity_hash` below.
         let data = serde_json::to_vec(&(
             &self.config,
-            &self.public,
+            &self.public.hash_material_v5(),
             &self.hidden_round_deck,
             &self.rng,
             &self.delayed_well,
@@ -902,10 +972,10 @@ impl Game {
     pub fn integrity_hash(&self) -> String {
         let data = serde_json::to_vec(&(
             self.state_hash(),
-            &self.well_food_schedule,
+            &self.public.well_food_schedule,
             &self.pending,
             self.event_budget,
-            &self.card_uses,
+            &self.public.card_uses,
             &self.card_use_limits,
             self.next_decision_id,
         ))
@@ -923,7 +993,6 @@ impl Game {
             hidden_round_deck: self.hidden_round_deck.clone(),
             rng: self.rng.clone(),
             delayed_well: self.delayed_well.clone(),
-            well_food_schedule: self.well_food_schedule.clone(),
             card_set: self.card_set.clone(),
             cards: self.cards.clone(),
             log: GameLog {
@@ -945,7 +1014,6 @@ impl Game {
             record_events: false,
             pending: self.pending.clone(),
             event_budget: self.event_budget,
-            card_uses: self.card_uses.clone(),
             card_use_limits: self.card_use_limits.clone(),
             next_decision_id: self.next_decision_id,
         }
@@ -962,12 +1030,10 @@ impl Game {
         hidden_round_deck: Vec<RoundCard>,
         rng: RngStreams,
         delayed_well: BTreeMap<u8, Vec<usize>>,
-        well_food_schedule: BTreeMap<u8, Vec<usize>>,
         card_set: Arc<CardSet>,
         cards: CardState,
         pending: Option<PendingDecision>,
         event_budget: u32,
-        card_uses: BTreeMap<String, u32>,
         card_use_limits: BTreeMap<String, u32>,
         next_decision_id: u64,
     ) -> Self {
@@ -980,7 +1046,6 @@ impl Game {
             hidden_round_deck,
             rng,
             delayed_well,
-            well_food_schedule,
             card_set: card_set.clone(),
             cards,
             log: GameLog {
@@ -1002,7 +1067,6 @@ impl Game {
             record_events: false,
             pending,
             event_budget,
-            card_uses,
             card_use_limits,
             next_decision_id,
         }
@@ -1094,7 +1158,7 @@ impl Game {
         self.public.used.clear();
         // Per-card use limits use the round as their period, so the ledger is
         // cleared when a new round opens.
-        self.card_uses.clear();
+        self.public.card_uses.clear();
         // A decision cannot span a round boundary: no production effect pauses
         // the round-start trigger, and carrying a stale decision into a new
         // round would make its `state_hash_before` meaningless.
@@ -1148,7 +1212,7 @@ impl Game {
         {
             self.public.players[id].supply.food += 1;
         }
-        self.well_food_schedule.remove(&self.public.round);
+        self.public.well_food_schedule.remove(&self.public.round);
         // Round-start triggers go through the phase dispatcher so the event
         // budget and per-card use limits apply here too. The budget is reset
         // for a new round: a round boundary is not part of one action's chain.
@@ -1164,7 +1228,7 @@ impl Game {
                 self.public.round,
                 &self.public.used,
                 &mut self.event_budget,
-                &mut self.card_uses,
+                &mut self.public.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
             )
@@ -1428,7 +1492,7 @@ impl Game {
         let round = next.public.round;
         let used_spaces = next.public.used.clone();
         let mut event_budget = next.event_budget;
-        let mut card_uses = next.card_uses.clone();
+        let mut card_uses = next.public.card_uses.clone();
         let card_use_limits = next.card_use_limits.clone();
         let mut pending = next.pending.clone(); // Should be None after resolution
 
@@ -1760,7 +1824,7 @@ impl Game {
         next.public.improvement_market = improvement_market;
         next.delayed_well = delayed_well;
         next.event_budget = event_budget;
-        next.card_uses = card_uses;
+        next.public.card_uses = card_uses;
         next.pending = pending; // Should remain None
 
         // Feeding/breeding plans from the original action (or generated now)
@@ -1926,7 +1990,7 @@ impl Game {
                     round: self.public.round,
                     used_spaces: &self.public.used,
                     event_budget: &mut self.event_budget,
-                    card_uses: &mut self.card_uses,
+                    card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,
                     pending: &mut self.pending,
                     actor: pending.player,
