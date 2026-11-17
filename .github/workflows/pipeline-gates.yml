@@ -1,0 +1,40 @@
+name: Pipeline Gates
+
+# Always run on pull requests: the three Python gates are the pipeline's
+# chapter contract (spec errors: [], catalog audit, blocked-card register).
+# They complete in seconds on stdlib-only Python, so no paths filter and no
+# per-trigger skip logic is warranted. This complements ci.yml (Rust) and the
+# path-filtered bga-card-contract / card-catalog-audit workflows, which only
+# fire when their named files change and therefore never run on src-only PRs.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline-gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline-gates:
+    name: Pipeline gates (spec/catalog/blockers)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: BGA card spec contract (chapter gate: errors must be [])
+        run: python3 scripts/validate_bga_card_specs.py
+      - name: Blocked-card register stays fail closed
+        run: python3 scripts/card_verification_blockers.py
+      - name: Card catalog audit
+        run: python3 scripts/validate_card_catalog.py --report "$RUNNER_TEMP/card-catalog-audit-report.json"
+      - name: Save catalog audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-gates-card-catalog-report
+          path: ${{ runner.temp }}/card-catalog-audit-report.json
+          if-no-files-found: ignore
+          retention-days: 7
