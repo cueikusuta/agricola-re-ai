@@ -502,6 +502,7 @@ impl Space {
     pub fn additional_for(self, players: usize) -> bool {
         Self::extra_for(players).contains(&self)
     }
+
     pub fn accumulation_for(self, players: usize) -> Option<(Good, u32)> {
         match self {
             Self::Hollow if players == 4 => Some((Good::Clay, 2)),
@@ -541,6 +542,33 @@ pub struct PublicState {
     pub additional_action_space_enabled: bool,
     pub finished: bool,
 }
+
+impl PublicState {
+    /// Compute the set of available action spaces for this public state.
+    /// Used by both `Game::validate` (full validation) and
+    /// `crate::validation::validate_incremental` (incremental validation)
+    /// to ensure the same availability logic is applied consistently.
+    pub(crate) fn available_spaces(
+        &self,
+        players: usize,
+        additional_action_space_enabled: bool,
+        card_set_enabled: bool,
+    ) -> BTreeSet<Space> {
+        let mut available: BTreeSet<_> = Space::regular_for(players).into_iter().collect();
+        if card_set_enabled {
+            available.insert(Space::Lessons);
+            if players >= 3 {
+                available.insert(Space::ExtraLessons);
+            }
+        }
+        available.extend(self.revealed.iter().copied().map(Space::from));
+        if additional_action_space_enabled {
+            available.extend(Space::extra_for(players));
+        }
+        available
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RngStreams {
     pub round: ChaCha8Rng,
@@ -1211,19 +1239,11 @@ impl Game {
         {
             return Err("multiple mutually-exclusive additional spaces used".into());
         }
-        let mut available: BTreeSet<_> = Space::regular_for(self.config.players)
-            .into_iter()
-            .collect();
-        if self.card_set.enabled() {
-            available.insert(Space::Lessons);
-            if self.config.players >= 3 {
-                available.insert(Space::ExtraLessons);
-            }
-        }
-        available.extend(p.revealed.iter().copied().map(Space::from));
-        if self.config.additional_action_space_enabled {
-            available.extend(Space::extra_for(self.config.players));
-        }
+        let available = p.available_spaces(
+            self.config.players,
+            self.config.additional_action_space_enabled,
+            self.card_set.enabled(),
+        );
         if !p.used.is_subset(&available) {
             return Err("a non-revealed action space was used".into());
         }

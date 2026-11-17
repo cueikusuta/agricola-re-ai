@@ -133,6 +133,34 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
     if added.len() != 1 {
         return Verdict::Fail("a work move must add exactly one used space".into());
     }
+    let added_space = added[0];
+    // 6b. The added space must be available (same logic as full validation).
+    // Pre is assumed valid, so we only need to check the newly added space.
+    let players = pre.config.players;
+    let additional_enabled = pre.public.additional_action_space_enabled;
+    let card_set_enabled = pre.card_set.enabled();
+    // 6b-i. Disabled additional space.
+    if !additional_enabled && added_space.additional_for(players) {
+        return Verdict::Fail("disabled additional space used".into());
+    }
+    // 6b-ii. Multiple mutually-exclusive additional spaces.
+    // Count additional spaces in post.used; if > 1, reject.
+    let additional_count = post
+        .public
+        .used
+        .iter()
+        .filter(|s| s.additional_for(players))
+        .count();
+    if additional_count > 1 {
+        return Verdict::Fail("multiple mutually-exclusive additional spaces used".into());
+    }
+    // 6b-iii. Space not in available set.
+    let available = pre
+        .public
+        .available_spaces(players, additional_enabled, card_set_enabled);
+    if !available.contains(added_space) {
+        return Verdict::Fail("a non-revealed action space was used".into());
+    }
     // 7. Major improvements: the union across market + player tables must keep
     //    every physical major improvement in exactly one location (the same
     //    invariant `validate_full` enforces). A work move may move an item
@@ -1700,5 +1728,103 @@ mod tests {
                     && post.public.workers_placed != post.public.work_quota
             })
             .expect("no plain mid-round move sampled")
+    }
+
+    /// Reproduction test: using an unrevealed round-card space (WesternQuarry)
+    /// must not return Pass from incremental validation.
+    /// WesternQuarry is a RoundCard-derived space that only becomes available
+    /// when the corresponding RoundCard is in `revealed`. Mid-round, revealed is
+    /// frozen, so a move onto WesternQuarry when it's not revealed must Fail/Unsure.
+    #[test]
+    fn unrevealed_round_card_space_western_quarry_not_pass() {
+        let (pre, mut post) = mid_round_pair();
+        let _actor = pre.public.active_player;
+        // Replace the added space with WesternQuarry (unrevealed round card space).
+        let added = *post
+            .public
+            .used
+            .difference(&pre.public.used)
+            .next()
+            .expect("one new space");
+        post.public.used.remove(&added);
+        post.public.used.insert(Space::WesternQuarry);
+        // Verify the full validator rejects this state.
+        assert!(
+            validate_full(&post).is_err(),
+            "full validator must reject unrevealed WesternQuarry"
+        );
+        // Incremental validation must NOT return Pass.
+        let verdict = validate_incremental(&post, &pre);
+        assert!(
+            matches!(verdict, Verdict::Fail(_) | Verdict::Unsure),
+            "unrevealed WesternQuarry must not Pass (got {verdict:?})"
+        );
+    }
+
+    /// Reproduction test: using Copse with additional_action_space_enabled=false
+    /// must not return Pass from incremental validation.
+    /// Copse is an additional space (Space::extra_for) and is unavailable when
+    /// the setting is OFF.
+    #[test]
+    fn additional_space_copse_disabled_not_pass() {
+        let mut game = cardless(2, 99);
+        // Drive to a mid-round state.
+        let mut rng = ChaCha8Rng::seed_from_u64(0xC0FFEE);
+        for _ in 0..6 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            game.apply(action).unwrap();
+        }
+        let pre = game.clone();
+        // Verify additional spaces are OFF.
+        assert!(!pre.public.additional_action_space_enabled);
+        // Apply one more action to get a legitimate post state.
+        let actor = pre.public.active_player;
+        let obs = pre.observation(actor).unwrap();
+        let legal = pre.legal_spaces();
+        let space = RandomPolicy
+            .select(&obs, &legal, &mut rng)
+            .expect("legal space");
+        let action = CardChoiceDetails
+            .produce(&obs, space)
+            .expect("legal detail");
+        let mut post = pre.clone();
+        post.apply(action).expect("legitimate action must apply");
+        // Now tamper: replace the added space with Copse (additional space).
+        let added = *post
+            .public
+            .used
+            .difference(&pre.public.used)
+            .next()
+            .expect("one new space");
+        post.public.used.remove(&added);
+        post.public.used.insert(Space::Copse);
+        // Verify the full validator rejects this state.
+        assert!(
+            validate_full(&post).is_err(),
+            "full validator must reject Copse when disabled"
+        );
+        // Incremental validation must NOT return Pass.
+        let verdict = validate_incremental(&post, &pre);
+        assert!(
+            matches!(verdict, Verdict::Fail(_) | Verdict::Unsure),
+            "disabled Copse must not Pass (got {verdict:?})"
+        );
+    }
+
+    /// Sanity test: Forest (regular_for space) must still Pass.
+    #[test]
+    fn regular_forest_space_still_passes() {
+        let (pre, post) = mid_round_pair();
+        // Forest is a regular space (BASE). The added space in mid_round_pair
+        // should already be valid, so just verify Pass.
+        assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
     }
 }
