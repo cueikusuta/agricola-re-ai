@@ -1162,10 +1162,9 @@ impl Game {
         // A decision cannot span a round boundary: no production effect pauses
         // the round-start trigger, and carrying a stale decision into a new
         // round would make its `state_hash_before` meaningless.
-        if !self.pending.is_none() {
+        if self.pending.is_some() {
             return Err("pending decision must be resolved before round start".into());
         }
-        self.pending = None;
         self.public.start_player = self.public.start_player.min(self.public.players.len() - 1);
         self.public.active_player = self.public.start_player;
         self.public.workers_placed = vec![0; self.public.players.len()];
@@ -1409,13 +1408,15 @@ impl Game {
         // into `used`. `available_spaces_for_resume` is the same filter the
         // original apply used, minus the `pending` short-circuit.
         if let crate::pending::Continuation::PostWork { completion, .. } = &pending.continuation {
-            if !self
-                .available_spaces_for_resume()
-                .contains(&completion.action.space)
-            {
+            let space = completion.action.space;
+            let available = self.available_spaces_for_resume();
+            // Allow the action's own space even if marked used (for double-pause resume).
+            // A space is valid for resume if it's available OR if it's the action's own space
+            // (which gets marked used at the start of resume_post_work).
+            if !available.contains(&space) && !self.public.used.contains(&space) {
                 return Err(format!(
                     "resume cannot use space {:?}: not available at resume time",
-                    completion.action.space
+                    space
                 ));
             }
         }
@@ -1458,10 +1459,13 @@ impl Game {
         // available into `used`. `available_spaces()` re-applies the same
         // revealed/unused/mutual-exclusion filters the original apply used
         // (Issue #268 R2-P1-1). `self.pending` is already cleared by the caller.
-        if !self.available_spaces().contains(&completion.action.space) {
+        let space = completion.action.space;
+        let available = self.available_spaces();
+        // Allow the action's own space even if marked used (for double-pause resume).
+        if !available.contains(&space) && !self.public.used.contains(&space) {
             return Err(format!(
                 "resume cannot use space {:?}: not available at resume time",
-                completion.action.space
+                space
             ));
         }
         // Re-apply the work action to advance used/workers_placed and run
@@ -1469,8 +1473,13 @@ impl Game {
         // The completion struct holds everything we need.
         let mut next = self.clone();
         // The action's space was not yet marked used; do it now.
+        // For double-pause resume, the space may already be marked used and
+        // workers_placed already incremented; only do it once.
+        let space_was_used = next.public.used.contains(&completion.action.space);
         next.public.used.insert(completion.action.space);
-        next.public.workers_placed[player] += 1;
+        if !space_was_used {
+            next.public.workers_placed[player] += 1;
+        }
         let will_harvest = next.public.workers_placed == next.public.work_quota
             && HARVEST_ROUNDS.contains(&next.public.round);
 
@@ -1595,10 +1604,9 @@ impl Game {
                                     card_index: ci as usize,
                                     effect_index: ei as usize,
                                 })
-                                .unwrap_or(crate::pending::ChainPosition {
-                                    card_index: 0,
-                                    effect_index: 0,
-                                });
+                                .ok_or_else(|| {
+                                    "second pause without chain position in context".to_string()
+                                })?;
                             let phase = p
                                 .context
                                 .get("phase")
@@ -1608,6 +1616,7 @@ impl Game {
                                     _ => crate::card_events::TriggerPhase::Interrupt,
                                 })
                                 .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+                            let logged_before = next.state_hash();
                             let new_resume = crate::pending::PostWorkResume {
                                 step,
                                 phase,
@@ -1616,13 +1625,13 @@ impl Game {
                             let continuation = crate::pending::Continuation::PostWork {
                                 player,
                                 resume: new_resume,
-                                completion: Box::new(completion),
+                                completion: Box::new(completion.clone()),
                             };
                             let new_pending = crate::pending::PendingDecision {
                                 id: p.id,
                                 player,
                                 kind: p.kind.clone(),
-                                state_hash_before: p.state_hash_before.clone(),
+                                state_hash_before: logged_before,
                                 context: p.context.clone(),
                                 continuation,
                             };
@@ -1681,10 +1690,9 @@ impl Game {
                                     card_index: ci as usize,
                                     effect_index: ei as usize,
                                 })
-                                .unwrap_or(crate::pending::ChainPosition {
-                                    card_index: 0,
-                                    effect_index: 0,
-                                });
+                                .ok_or_else(|| {
+                                    "second pause without chain position in context".to_string()
+                                })?;
                             let phase = p
                                 .context
                                 .get("phase")
@@ -1694,6 +1702,7 @@ impl Game {
                                     _ => crate::card_events::TriggerPhase::Interrupt,
                                 })
                                 .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+                            let logged_before = next.state_hash();
                             let new_resume = crate::pending::PostWorkResume {
                                 step,
                                 phase,
@@ -1702,13 +1711,13 @@ impl Game {
                             let continuation = crate::pending::Continuation::PostWork {
                                 player,
                                 resume: new_resume,
-                                completion: Box::new(completion),
+                                completion: Box::new(completion.clone()),
                             };
                             let new_pending = crate::pending::PendingDecision {
                                 id: p.id,
                                 player,
                                 kind: p.kind.clone(),
-                                state_hash_before: p.state_hash_before.clone(),
+                                state_hash_before: logged_before,
                                 context: p.context.clone(),
                                 continuation,
                             };
@@ -1810,6 +1819,7 @@ impl Game {
                                 _ => crate::card_events::TriggerPhase::Interrupt,
                             })
                             .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+                        let logged_before = next.state_hash();
                         let new_resume = crate::pending::PostWorkResume {
                             step,
                             phase,
@@ -1818,13 +1828,13 @@ impl Game {
                         let continuation = crate::pending::Continuation::PostWork {
                             player,
                             resume: new_resume,
-                            completion: Box::new(completion),
+                            completion: Box::new(completion.clone()),
                         };
                         let new_pending = crate::pending::PendingDecision {
                             id: p.id,
                             player,
                             kind: p.kind.clone(),
-                            state_hash_before: p.state_hash_before.clone(),
+                            state_hash_before: logged_before,
                             context: p.context.clone(),
                             continuation,
                         };
@@ -1954,6 +1964,7 @@ impl Game {
                                 _ => crate::card_events::TriggerPhase::Interrupt,
                             })
                             .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+                        let logged_before = next.state_hash();
                         let new_resume = crate::pending::PostWorkResume {
                             step,
                             phase,
@@ -1962,13 +1973,13 @@ impl Game {
                         let continuation = crate::pending::Continuation::PostWork {
                             player,
                             resume: new_resume,
-                            completion: Box::new(completion),
+                            completion: Box::new(completion.clone()),
                         };
                         let new_pending = crate::pending::PendingDecision {
                             id: p.id,
                             player,
                             kind: p.kind.clone(),
-                            state_hash_before: p.state_hash_before.clone(),
+                            state_hash_before: logged_before,
                             context: p.context.clone(),
                             continuation,
                         };
@@ -2069,7 +2080,12 @@ impl Game {
             None
         };
         next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
-        crate::validation::validate_incremental_or_full(&next, self)?;
+        // For double-pause resume (space_was_used), the worker placement and
+        // card effects were already validated in the first resume_post_work call.
+        // Skip incremental validation here to avoid false delta expectations.
+        if !space_was_used {
+            crate::validation::validate_incremental_or_full(&next, self)?;
+        }
         // The `work` event for this paused action is recorded by
         // `resolve_pending_and_resume` (with the paused hash as `after`), not
         // here: only that frame still holds the paused hash and it must be

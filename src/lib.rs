@@ -111,3 +111,6 @@ pub mod counting {
 // alphabetical position above, and keeping this line in a different hunk lets
 // the two PRs merge without a conflict.
 pub use model::{Config, Game, Observation};
+#[cfg(test)]
+#[path = "test_seed_check.rs"]
+mod test_seed_check;
