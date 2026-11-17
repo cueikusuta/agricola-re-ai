@@ -649,7 +649,8 @@ fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String>
 
 /// Execute one prevalidated card play; the containing Game transaction provides rollback.
 /// This function validates the play, pays costs, applies on-play effects (Before phase),
-/// moves the card from hand to played, and updates card_points.
+/// moves the card from hand to played, applies AfterPlay effects (After phase), and
+/// updates card_points.
 /// This is the canonical public API used by evaluation, policy, and unit tests.
 pub fn play(
     set: &CardSet,
@@ -669,10 +670,19 @@ pub fn play(
     for (good, amount) in card_costs(card, player, extra_food) {
         player.supply.pay(good, amount)?;
     }
-    // Apply on-play (Before phase) effects
+    // Apply on-play (Before phase) effects (pre-move state: no self-count)
     apply_on_play_effects(set, player, id)?;
     // Move card from hand to played via the single canonical implementation
     crate::card_zones::hand_to_played(hand, player, id).map_err(|e| e.to_string())?;
+    // Apply AfterPlay (After phase) effects (post-move state, P1-1 unified order)
+    let food_paid = card
+        .cost
+        .iter()
+        .filter(|(good, _)| *good == Good::Food)
+        .map(|(_, n)| *n)
+        .sum::<u32>()
+        .saturating_add(extra_food);
+    apply_after_play_effects(set, player, food_paid)?;
     // Update card points
     let next_points = player
         .card_points
@@ -752,6 +762,33 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
             },
             _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// Apply AfterPlay (After phase) effects for a card that has been moved to played.
+/// Called by the canonical play path and the event dispatcher after the zone move.
+/// This covers earlier played cards' After effects that respond to this play
+/// (today: C116 `AfterOccupationGainPerFoodCost`, which pays per food spent as
+/// the current occupation's cost). P1-1 unified play order.
+pub fn apply_after_play_effects(
+    set: &CardSet,
+    player: &mut Player,
+    food_paid: u32,
+) -> Result<(), String> {
+    if food_paid == 0 {
+        return Ok(());
+    }
+    for id in player.played_cards.clone() {
+        let card = set.definition(&id).ok_or("unknown played card")?;
+        for effect in &card.effects {
+            if let CardEffect::AfterOccupationGainPerFoodCost { good, amount } = effect {
+                let total = amount
+                    .checked_mul(food_paid)
+                    .ok_or("occupation-play bonus overflow")?;
+                safe_gain(player, *good, total)?;
+            }
         }
     }
     Ok(())
