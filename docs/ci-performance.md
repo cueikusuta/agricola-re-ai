@@ -73,3 +73,14 @@ M1/M2のリリースビルド統合は成功した。コンパイル成果物の
 6. 冷・温キャッシュそれぞれの最遅ジョブとCI全体の時間を確認する。
 
 公式の参考: [GitHub 必須チェックのスキップ仕様](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)、[dorny/paths-filter](https://github.com/dorny/paths-filter)、[Rust cache](https://github.com/Swatinem/rust-cache)、[Cargo test --release](https://doc.rust-lang.org/cargo/commands/cargo-test.html)。
+
+## PR 検証の Actions 逃がし（2026-11-17）
+
+ワーカーPCのCPU・メモリを空けるため、PR検証の主体をGitHub Actionsに移す。この節はHermesパイプライン（実装カード・レビューカード）の運用規則であり、ワークフロー定義は変更しない。
+
+- **ワーカーのローカル実行は対象を絞る**: 実装したカードのテスト（`cargo test --lib <モジュール>` 相当）と、直接編集したモジュールに関係するテストのみ。章の全成果物に影響する変更（プールカウント・MCTSダイジェスト）を行った場合のみ、該当テスト（`cargo test --test m6_verified_pool` とダイジェスト定数テスト）をローカルで確認する。
+- **全件確認は Actions に任せる**: `cargo test`（ci.yml の nextest `--release --all-targets`）と Pipeline Gates（`pipeline-gates.yml`: spec エラー空・カタログ監査・ブロッカーレジスタ）がPR上で必ず走る。ローカルでの `cargo test --locked` 全件実行を必須とはしない。
+- **レビュー・マージの判断根拠**: reviewer はPRのActionsチェックの状態（`CI required` / `Pipeline Gates` ほか各ジョブ）を根拠に判断する。ローカル再実行は、Actionsでは拾えない症状（環境依存・Windows固有）の調査や、レビューで指摘された再現確認に限る。
+- **Actionsの結果はPR本文に記録する**: ワーカーはPR本文のゲート欄にActionsのジョブ実測（チェック名・結論・所要時間）を書く。ローカルで実行した絞り込みテストはその旨を明記して併記する。
+- **失敗時**: Actionsが赤のとき、ワーカーは失敗ジョブのログ（run URL）を突き合わせて原因を特定し、修正をpushする。ローカル全件で再確認する必要はない。
+- **AI実験や大量検証のワークフロー（g0-gate・mode-verification等、main push時のもの）は例外的な実行のままとする**。PRでは走らない設計のため、本運用の対象外。
