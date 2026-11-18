@@ -2762,6 +2762,44 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 },
             ],
         ),
+        // C006 石取り作業 (Stone Removal Work): cost 1 wood; after a worker is
+        // placed on Farmland or Cultivation, gain 1 grain.
+        card(
+            "C006",
+            minor,
+            vec![(Good::Wood, 1)],
+            vec![
+                CardEffect::AfterWorkerGain {
+                    space: Space::Farmland,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerGain {
+                    space: Space::Cultivation,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+            ],
+        ),
+        // C007 刈り鋏 (Reaping Hook): cost 1 wood; after a worker is placed on
+        // GrainSeeds or VegetableSeeds, gain 1 grain.
+        card(
+            "C007",
+            minor,
+            vec![(Good::Wood, 1)],
+            vec![
+                CardEffect::AfterWorkerGain {
+                    space: Space::GrainSeeds,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerGain {
+                    space: Space::VegetableSeeds,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+            ],
+        ),
     ]
 }
 #[cfg(test)]
@@ -2904,12 +2942,114 @@ mod verified_band_c_tests {
     #[test]
     fn band_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["C076", "C106", "C111", "C116"] {
+        for id in ["C076", "C106", "C111", "C116", "C006", "C007"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
             );
         }
+    }
+
+    #[test]
+    fn c006_costs_one_wood_and_has_zero_points() {
+        let set = set();
+        let card = set.definition("C006").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        let mut hand = vec!["C006".to_string()];
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "C006",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.played_cards, vec!["C006"]);
+    }
+
+    #[test]
+    fn c006_gains_grain_on_farmland_and_cultivation_only() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("C006".into());
+        after_worker(&set, &mut p, Space::Farmland).unwrap();
+        assert_eq!(p.supply.grain, 1);
+        after_worker(&set, &mut p, Space::Cultivation).unwrap();
+        assert_eq!(p.supply.grain, 2);
+        // 他のスペースでは発動しない
+        after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
+        after_worker(&set, &mut p, Space::VegetableSeeds).unwrap();
+        after_worker(&set, &mut p, Space::Forest).unwrap();
+        after_worker(&set, &mut p, Space::DayLaborer).unwrap();
+        assert_eq!(p.supply.grain, 2);
+    }
+
+    #[test]
+    fn c006_multiple_farmland_and_cultivation_actions_stack() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("C006".into());
+        after_worker(&set, &mut p, Space::Farmland).unwrap();
+        after_worker(&set, &mut p, Space::Farmland).unwrap();
+        after_worker(&set, &mut p, Space::Cultivation).unwrap();
+        after_worker(&set, &mut p, Space::Cultivation).unwrap();
+        assert_eq!(p.supply.grain, 4);
+    }
+
+    #[test]
+    fn c007_costs_one_wood_and_has_zero_points() {
+        let set = set();
+        let card = set.definition("C007").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        let mut hand = vec!["C007".to_string()];
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "C007",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.played_cards, vec!["C007"]);
+    }
+
+    #[test]
+    fn c007_gains_grain_on_grain_seeds_and_vegetable_seeds_only() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("C007".into());
+        after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
+        assert_eq!(p.supply.grain, 1);
+        after_worker(&set, &mut p, Space::VegetableSeeds).unwrap();
+        assert_eq!(p.supply.grain, 2);
+        // 他のスペースでは発動しない
+        after_worker(&set, &mut p, Space::Farmland).unwrap();
+        after_worker(&set, &mut p, Space::Cultivation).unwrap();
+        after_worker(&set, &mut p, Space::Forest).unwrap();
+        after_worker(&set, &mut p, Space::DayLaborer).unwrap();
+        assert_eq!(p.supply.grain, 2);
+    }
+
+    #[test]
+    fn c007_multiple_seeds_actions_stack() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("C007".into());
+        after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
+        after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
+        after_worker(&set, &mut p, Space::VegetableSeeds).unwrap();
+        after_worker(&set, &mut p, Space::VegetableSeeds).unwrap();
+        assert_eq!(p.supply.grain, 4);
     }
 }
 
