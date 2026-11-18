@@ -8,7 +8,6 @@ use agricola_re_ai::cards::verified_basic_card_set;
 use agricola_re_ai::cards::CardKind;
 use agricola_re_ai::engine::{Action, Detail};
 use agricola_re_ai::model::{Config, Game, Good, PublicState, Space};
-use serde_json;
 
 /// The new `card_accumulations` field must exist in `PublicState` and be
 /// serializable with `serde(default)` for backward compatibility.
