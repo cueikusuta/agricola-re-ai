@@ -857,7 +857,17 @@ fn legacy_v5_fixture_loads_and_replays() {
     cards_game.validate().unwrap();
     let cards_hash = cards_game.state_hash();
 
-    // Continue both games for a few moves to verify they can be replayed
+    // Load fixture with well_food_schedule and card_uses (tests migration)
+    let well_json = include_str!("fixtures/v5/with_well_schedule_2p_seed7_r4.json");
+    let mut well_game = Game::load_json(well_json).unwrap();
+    well_game.validate().unwrap();
+    let well_hash = well_game.state_hash();
+    // Verify migration worked
+    assert_eq!(well_game.public.well_food_schedule.get(&5), Some(&vec![0]));
+    assert_eq!(well_game.public.well_food_schedule.get(&6), Some(&vec![0]));
+    assert_eq!(well_game.public.card_uses.get("A001"), Some(&1));
+
+    // Continue all games for a few moves to verify they can be replayed
     let mut rng = ChaCha8Rng::seed_from_u64(0xDEAD);
     for _ in 0..5 {
         if cardless_game.public.finished {
@@ -891,6 +901,24 @@ fn legacy_v5_fixture_loads_and_replays() {
         cards_game.apply(action).unwrap();
     }
     assert_ne!(cards_game.state_hash(), cards_hash); // hash changes after moves
+
+    // Also replay the well_game
+    let mut rng = ChaCha8Rng::seed_from_u64(0xDEAD);
+    for _ in 0..5 {
+        if well_game.public.finished {
+            break;
+        }
+        let id = well_game.public.active_player;
+        let obs = well_game.observation(id).unwrap();
+        let legal = well_game.legal_spaces();
+        if legal.is_empty() {
+            break;
+        }
+        let space = RandomPolicy.select(&obs, &legal, &mut rng).expect("legal");
+        let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+        well_game.apply(action).unwrap();
+    }
+    assert_ne!(well_game.state_hash(), well_hash); // hash changes after moves
 
     // Save and reload to verify round-trip
     let cardless_reloaded = Game::load_json(&cardless_game.save_json().unwrap()).unwrap();
