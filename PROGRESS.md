@@ -51,7 +51,9 @@
 - 起点: `research/deepai-layer1-2-survey`（PR #355）の Head。PR の base は #355 のブランチに置く（スタック）。
 - 対象 **60枚**（OR費用13・他人手番42・カード畑5）を、基盤着地後に即実装できる粒度へ落とす。
 - 成果物: `docs/stage12-readiness.md`。Rust・仕様 JSON・テストは変更しない。
-- 章ごとに commit / push し、この節と `result-deepai.md` を更新する。全5章と付録が完了。PR を作成する（マージしない）。
+- 章ごとに commit / push し、この節と `result-deepai.md` を更新する。全5章と付録が完了。
+- PR #362 を作成（base = `research/deepai-stage12-readiness`、stacked）。**マージしない**。
+  https://github.com/cueikusuta/agricola-re-ai/pull/362
 - 第1章（OR費用13枚）: **完了**。C044 / E052 の費用をカード画像で修正し、A064 は #355 の記載が正しいことを確認。
 - 第2章（他人手番42枚・前半21枚）: **完了**。A154 のタイミング、B138 の即時獲得、C144 の3人戦即時葦、C145 の対象スペース、C146 のペア置き場を修正。
 - 第3章（他人手番42枚・後半21枚）: **完了**。D139 の自己発火、D160 の配置回数、D163/E154 の即時・得点効果、E066 の2〜4人戦、E144 の資材選択を修正。
