@@ -865,16 +865,5 @@
       }
     ],
     "integrity_hash": null
-  },
-  "well_food_schedule": {
-    "5": [
-      0
-    ],
-    "6": [
-      0
-    ]
-  },
-  "card_uses": {
-    "A001": 1
   }
 }
