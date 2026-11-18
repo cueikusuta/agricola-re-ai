@@ -47,7 +47,6 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::Prerequisite { .. } => TriggerPhase::Replace,
         // On-play gains are instantaneous at play time — Before phase
         CardEffect::OnPlayGain { .. } => TriggerPhase::Before,
-        CardEffect::OnPlayGainAnimal { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerStored { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainIfHouse { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
@@ -472,9 +471,6 @@ fn resolve_phase_scan(
                 CardEffect::OnPlayGain { good, amount } => {
                     handle_on_play_gain(ctx, player, good, *amount)?
                 }
-                CardEffect::OnPlayGainAnimal { animal, amount } => {
-                    handle_on_play_gain_animal(ctx, player, animal, *amount)?
-                }
                 CardEffect::OnPlayGainPerStored {
                     stored,
                     divisor,
@@ -718,7 +714,6 @@ fn effect_condition_holds(
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
-        CardEffect::OnPlayGainAnimal { .. } => true,
         #[cfg(test)]
         CardEffect::PendingProbe { .. } => true,
     }
@@ -811,9 +806,6 @@ pub fn execute_chosen_triggers(
             }
             CardEffect::OnPlayGain { good, amount } => {
                 handle_on_play_gain(ctx, player, good, *amount)?
-            }
-            CardEffect::OnPlayGainAnimal { animal, amount } => {
-                handle_on_play_gain_animal(ctx, player, animal, *amount)?
             }
             CardEffect::OnPlayGainPerStored {
                 stored,
@@ -1021,22 +1013,6 @@ fn handle_on_play_gain(
         .checked_add(amount)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
-    Ok(EffectResult::Resolved)
-}
-
-fn handle_on_play_gain_animal(
-    ctx: &mut DispatchContext<'_>,
-    _player: usize,
-    animal: &Animal,
-    amount: u32,
-) -> Result<EffectResult, String> {
-    let p = &mut ctx.player;
-    let next = p
-        .supply
-        .get_animal(*animal)
-        .checked_add(amount)
-        .ok_or("animal overflow")?;
-    p.supply.set_animal(*animal, next);
     Ok(EffectResult::Resolved)
 }
 

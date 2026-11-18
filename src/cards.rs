@@ -35,10 +35,6 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
-    OnPlayGainAnimal {
-        animal: Animal,
-        amount: u32,
-    },
     AfterWorkerGain {
         space: Space,
         good: Good,
@@ -150,7 +146,6 @@ impl CardEffect {
             #[cfg(test)]
             CardEffect::PendingProbe { .. } => "pending_probe",
             CardEffect::OnPlayGain { .. } => "on_play_gain",
-            CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
             CardEffect::AfterWorkerGain { .. } => "after_worker_gain",
             CardEffect::EndGameBonus { .. } => "end_game_bonus",
             CardEffect::Prerequisite { .. } => "prerequisite",
@@ -369,7 +364,6 @@ impl CardSet {
                 || card.effects.iter().any(|effect| {
                     let amount = match effect {
                         CardEffect::OnPlayGain { amount, .. }
-                        | CardEffect::OnPlayGainAnimal { amount, .. }
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
@@ -461,16 +455,13 @@ impl CardSet {
         }
         for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
             let count = self.definitions.iter().filter(|c| c.kind == kind).count();
-            // Minimum: one complete 7-card hand of each kind. The 2-player
-            // verified preset (16 occ / 19 minor >= 14) still meets the full
-            // 7*players requirement, while the experimental 3-4 player catalog
-            // (60 implemented cards: 37 occ / 23 minor) deals partial hands
-            // through `CardState::deal` (`7.min(pool.len())`) until more cards
-            // are implemented. Requiring 7*players here made every
-            // `card_set_for_game(4, _)` deck permanently invalid without new
+            // Minimum: one complete 7-card hand of each kind per player.
+            // The 2-player verified preset (16 occ / 19 minor >= 14) meets the full
+            // 7*players requirement. 3-4 player catalogs must have sufficient cards
+            // to deal full hands; if they don't, the deck is invalid without new
             // card implementations (P1-2 scope excludes adding cards).
-            if count < 7 {
-                return Err("implemented card set needs at least seven cards of each kind".into());
+            if count < 7 * players {
+                return Err("implemented card set needs at least seven cards of each kind per player".into());
             }
         }
         Ok(())
@@ -4619,20 +4610,16 @@ mod p1_2_repro_tests {
                         ));
                     }
                     4 => {
-                        assert_eq!(active.len(), 1);
-                        assert!(matches!(
-                            &active[0],
-                            CardEffect::OnPlayGainAnimal {
-                                animal: Animal::Sheep,
-                                amount: 2
-                            }
-                        ));
+                        // B102 is not eligible for 4 players (OnPlayGainAnimal not implemented)
+                        panic!("B102 at 4 players should not be eligible");
                     }
                     _ => {}
                 }
             } else {
                 if players == 2 {
                     panic!("B102 at 2 players: NOT FOUND (should exist)");
+                } else if players == 4 {
+                    // Expected: B102 not eligible for 4 players
                 } else {
                     println!("B102 at {} players: NOT FOUND (unexpected)", players);
                     panic!(
