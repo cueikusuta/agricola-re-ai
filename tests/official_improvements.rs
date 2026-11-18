@@ -100,9 +100,9 @@ fn each_major_improvement_uses_its_official_cost_and_score() {
             );
         }
         if card == Improvement::Well {
-            assert_eq!(g.delayed_well.len(), 5);
+            assert_eq!(g.public.well_food_schedule.len(), 5);
             for round in 2..=6 {
-                assert_eq!(g.delayed_well.get(&round), Some(&vec![id]));
+                assert_eq!(g.public.well_food_schedule.get(&round), Some(&vec![id]));
             }
         }
     }

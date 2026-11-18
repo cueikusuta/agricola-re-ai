@@ -484,9 +484,9 @@ fn validate_incremental_impl(post: &Game, pre: &Game, expect: DeltaExpectation) 
     if !std::sync::Arc::ptr_eq(&post.card_set, &pre.card_set) {
         return Verdict::Unsure;
     }
-    // 14. post.delayed_well: Well purchase adds entries; engine path is complex.
+    // 14. post.public.well_food_schedule: Well purchase adds entries; engine path is complex.
     //     Downgrade to Unsure→full (soundness: Fail only for proven violations).
-    if post.delayed_well != pre.delayed_well {
+    if post.public.well_food_schedule != pre.public.well_food_schedule {
         return Verdict::Unsure;
     }
     Verdict::Pass
@@ -771,8 +771,8 @@ pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
     if !std::sync::Arc::ptr_eq(&post.card_set, &pre.card_set) {
         return Verdict::Unsure;
     }
-    // 15. post.delayed_well: Well purchase not possible in free action, but downgrade.
-    if post.delayed_well != pre.delayed_well {
+    // 15. post.public.well_food_schedule: Well purchase not possible in free action, but downgrade.
+    if post.public.well_food_schedule != pre.public.well_food_schedule {
         return Verdict::Unsure;
     }
     Verdict::Pass
@@ -1283,11 +1283,13 @@ mod tests {
         assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
     }
 
-    /// P1-A: mutating `post.delayed_well` (hidden ledger) is not proved -> Unsure.
+    /// P1-A: mutating `post.public.well_food_schedule` (public ledger) is not proved -> Unsure.
     #[test]
-    fn tampered_delayed_well_declines() {
+    fn tampered_well_food_schedule_declines() {
         let (pre, mut post) = mid_round_pair();
-        post.delayed_well.insert(5, vec![pre.public.active_player]);
+        post.public
+            .well_food_schedule
+            .insert(5, vec![pre.public.active_player]);
         assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
     }
 

@@ -360,7 +360,6 @@ impl TrainingSample {
             "hidden_round_deck",
             "round_seed",
             "action_seed",
-            "delayed_well",
             "\"rng\"",
             "\"events\"",
         ] {

@@ -270,10 +270,7 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
 
     // well_food_schedule from the canonical public state (Layer-0 aggregation:
     // the schedule lives in obs.public.well_food_schedule; there is no separate
-    // Observation mirror anymore). delayed_well mirrors the schedule; use the
-    // same data for both.
-    let well_food_schedule = obs.public.well_food_schedule.clone();
-    let delayed_well = well_food_schedule.clone();
+    // Observation mirror anymore). The schedule travels with the public clone.
 
     // card_use_limits is DERIVED from the card definitions
     // (CardDefinition::use_limit), not carried by the observation at all:
@@ -283,7 +280,7 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     // at startup. The per-card use ledger needs no separate extraction: it is
     // part of `obs.public` (Layer-0 aggregation) and travels with the public
     // clone into search_from_parts.
-    let card_use_limits = obs
+    let card_use_limits: BTreeMap<String, u32> = obs
         .card_definitions
         .iter()
         .filter_map(|card| card.use_limit.map(|limit| (card.id.clone(), limit)))
@@ -301,7 +298,6 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
         obs.public.clone(),
         deck,
         rng_streams,
-        delayed_well,
         card_set,
         cards,
         None,                   // pending
@@ -1496,7 +1492,7 @@ mod tests {
         );
     }
 
-    /// Test with well reservations (delayed_well / well_food_schedule).
+    /// Test with well reservations (well_food_schedule).
     #[test]
     fn sample_game_reconstructs_well_reservations() {
         use crate::cards::verified_basic_card_set;
@@ -1513,10 +1509,9 @@ mod tests {
         .unwrap();
 
         // Install a reservation for round 3 in the exact shape a real Well
-        // purchase produces (both maps written together, one recipient). A full
-        // purchase path needs resource setup that is irrelevant to what this
-        // test pins: sample_game must carry the schedule across the rebuild.
-        game.delayed_well.entry(3).or_default().push(0);
+        // purchase produces. A full purchase path needs resource setup that
+        // is irrelevant to what this test pins: sample_game must carry the
+        // schedule across the rebuild.
         game.public.well_food_schedule.entry(3).or_default().push(0);
 
         let obs = game.observation(0).unwrap();
@@ -1530,7 +1525,6 @@ mod tests {
             reconstructed_obs.public.well_food_schedule,
             obs.public.well_food_schedule
         );
-        assert_eq!(sampled.delayed_well, game.delayed_well);
         assert_eq!(
             sampled.public.well_food_schedule,
             game.public.well_food_schedule
@@ -1664,7 +1658,7 @@ mod tests {
     }
 
     /// Test that start_round transition preserves public rewards for well and
-    /// limited cards (card_uses cleared, well_food_schedule mirror maintained).
+    /// limited cards (card_uses cleared, well_food_schedule maintained).
     #[test]
     fn start_round_preserves_well_and_card_limits() {
         use crate::cards::verified_basic_card_set;
@@ -1681,7 +1675,6 @@ mod tests {
         .unwrap();
 
         // Set up well reservation for round 2.
-        game.delayed_well.entry(2).or_default().push(0);
         game.public.well_food_schedule.entry(2).or_default().push(0);
 
         // Set up some card_uses (simulating a card was used this round).
@@ -1698,9 +1691,7 @@ mod tests {
         // Player 0 is start player with 2 initial food + 1 from well = 3.
         assert_eq!(game.public.players[0].supply.food, 2 + 1);
 
-        // delayed_well and the public well_food_schedule for round 2 should be
-        // consumed.
-        assert!(!game.delayed_well.contains_key(&2));
+        // well_food_schedule for round 2 should be consumed.
         assert!(!game.public.well_food_schedule.contains_key(&2));
 
         // card_uses should be cleared at round boundary.
@@ -1711,7 +1702,7 @@ mod tests {
 
         // Acceptance (d) + round boundary: the post-start_round state round-trips
         // through sample_game — supply, public state and every Observation field
-        // (well mirror consumed, card_uses cleared, limits intact) must match.
+        // (well schedule consumed, card_uses cleared, limits intact) must match.
         let obs = game.observation(0).unwrap();
         assert!(obs.public.well_food_schedule.is_empty());
         let mut rng = ChaCha8Rng::seed_from_u64(0x5EED_0002);
@@ -1727,7 +1718,7 @@ mod tests {
     /// schedule entry for the consumed round instead of feeding the orphan
     /// mirror forever, while a real paired reservation still grants its food.
     #[test]
-    fn start_round_drops_an_orphan_well_schedule_entry() {
+    fn start_round_consumes_well_food_schedule() {
         use crate::cards::verified_basic_card_set;
 
         let mut game = Game::with_cards(
@@ -1738,22 +1729,20 @@ mod tests {
             verified_basic_card_set(2).unwrap(),
         )
         .unwrap();
-        // Orphan: schedule entry without a delayed_well twin (legacy save shape).
+        // Install a well reservation for round 2 (single source of truth).
         game.public.well_food_schedule.entry(2).or_default().push(1);
 
         game.start_round().expect("start_round must succeed");
         assert_eq!(game.public.round, 2);
+        // The schedule entry for round 2 must be consumed.
         assert!(
             !game.public.well_food_schedule.contains_key(&2),
-            "the orphan schedule entry must be dropped unconditionally"
+            "the schedule entry must be dropped unconditionally"
         );
-        assert!(
-            !game.delayed_well.contains_key(&2),
-            "nothing may appear in delayed_well for a schedule-only entry"
-        );
-        // No grant may have fired from the orphan: both players keep their
-        // initial food (start player 2, other 3).
+        // Food must be granted to the recipient (player 1).
+        // Start player (0) gets initial 2 food.
+        // Player 1 gets initial 3 food + 1 from well = 4.
         assert_eq!(game.public.players[0].supply.food, 2);
-        assert_eq!(game.public.players[1].supply.food, 3);
+        assert_eq!(game.public.players[1].supply.food, 3 + 1);
     }
 }

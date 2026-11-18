@@ -275,13 +275,7 @@ mod tests {
 
         let obs = a.observe(0).unwrap();
         let json = serde_json::to_string(&obs).unwrap();
-        for secret in [
-            "hidden_round_deck",
-            "round_seed",
-            "action_seed",
-            "delayed_well",
-            "\"rng\"",
-        ] {
+        for secret in ["hidden_round_deck", "round_seed", "action_seed", "\"rng\""] {
             assert!(!json.contains(secret), "observation leaked {secret}");
         }
         // Only the viewer's own hand is present.
