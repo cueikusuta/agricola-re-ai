@@ -576,7 +576,9 @@ pub struct PublicState {
     /// resources on themselves (e.g., "place 1 wood on this card each round")
     /// store their accumulations here. Keyed by player index, then card ID,
     /// then resource type. `serde(default)` keeps pre-aggregation saves loading.
-    #[serde(default)]
+    /// `skip_serializing_if = "BTreeMap::is_empty"` keeps empty ledger out of
+    /// JSON so pre-card_accumulations saves stay byte-identical (PR #327 pattern).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub card_accumulations: BTreeMap<usize, BTreeMap<String, BTreeMap<Good, u32>>>,
 }
 
@@ -943,10 +945,10 @@ impl Game {
         // Event log is intentionally omitted; this is the full game state, including hidden cards and RNG.
         // LOG_VERSION=5 compatibility: the hash tuple MUST stay identical to the
         // v5 format (7 fields, tests/fixtures/v5/*). New bookkeeping fields
-        // (well_food_schedule, pending, event_budget, card_uses, next_decision_id)
+        // (well_food_schedule, pending, event_budget, card_uses, card_accumulations, next_decision_id)
         // are serialized into saves via serde defaults, but are deliberately
         // EXCLUDED from the hash so legacy v5 fixtures keep verifying.
-        // well_food_schedule and card_uses are Layer-0 public state and are
+        // well_food_schedule, card_uses, and card_accumulations are Layer-0 public state and are
         // serialized into saves inside `public`; for the hash the public state
         // is projected onto its v5 field set (`hash_material_v5`), so hash
         // VALUES stay identical to the pre-aggregation format. Pending
@@ -968,7 +970,7 @@ impl Game {
 
     /// Full integrity hash covering the whole `Game`, including the Step 3
     /// bookkeeping fields (`well_food_schedule`, `pending`, `event_budget`,
-    /// `card_uses`, `next_decision_id`) that `state_hash` deliberately omits for
+    /// `card_uses`, `card_accumulations`, `next_decision_id`) that `state_hash` deliberately omits for
     /// LOG_VERSION=5 compatibility.
     ///
     /// Use this for save/restore/resume integrity checks on NEW saves:
@@ -976,17 +978,38 @@ impl Game {
     /// that an interrupted PendingDecision survives a save/load round-trip
     /// byte-for-byte (Issue #266 acceptance: "PendingDecision save/restore/resume
     /// with a consistent state hash").
+    ///
+    /// `card_accumulations` is included only when non-empty (PR #371 backward
+    /// compatibility): empty ledger uses the 7-element tuple (same as pre-PR
+    /// #371) so existing saves keep their integrity_hash. Non-empty ledger uses
+    /// the 8-element tuple and any tampering is detected.
     pub fn integrity_hash(&self) -> String {
-        let data = serde_json::to_vec(&(
-            self.state_hash(),
-            &self.public.well_food_schedule,
-            &self.pending,
-            self.event_budget,
-            &self.public.card_uses,
-            &self.public.card_accumulations,
-            &self.card_use_limits,
-            self.next_decision_id,
-        ))
+        // Backward compatibility: when card_accumulations is empty, compute hash
+        // from 7-element tuple (same as before card_accumulations was added).
+        // This matches PR #327's bonus_points pattern: skip domain separator
+        // append for empty ledger so pre-existing saves keep same integrity_hash.
+        let data = if self.public.card_accumulations.is_empty() {
+            serde_json::to_vec(&(
+                self.state_hash(),
+                &self.public.well_food_schedule,
+                &self.pending,
+                self.event_budget,
+                &self.public.card_uses,
+                &self.card_use_limits,
+                self.next_decision_id,
+            ))
+        } else {
+            serde_json::to_vec(&(
+                self.state_hash(),
+                &self.public.well_food_schedule,
+                &self.pending,
+                self.event_budget,
+                &self.public.card_uses,
+                &self.public.card_accumulations,
+                &self.card_use_limits,
+                self.next_decision_id,
+            ))
+        }
         .expect("integrity serialization");
         format!("{:x}", Sha256::digest(&data))
     }

@@ -262,7 +262,7 @@ fn validation_rejects_invalid_card_accumulations() {
         .card_accumulations
         .entry(player_idx)
         .or_default()
-        .entry(occupation_id)
+        .entry(occupation_id.clone())
         .or_default()
         .insert(Good::Wood, 1);
 
@@ -277,6 +277,28 @@ fn validation_rejects_invalid_card_accumulations() {
         .entry("CARD".to_string())
         .or_default()
         .insert(Good::Wood, 1);
+    assert!(game.validate().is_err());
+    game.public.card_accumulations.clear();
+
+    // Unplayed card (card not in player's played_cards)
+    game.public
+        .card_accumulations
+        .entry(player_idx)
+        .or_default()
+        .entry("UNPLAYED_CARD".to_string())
+        .or_default()
+        .insert(Good::Wood, 1);
+    assert!(game.validate().is_err());
+    game.public.card_accumulations.clear();
+
+    // Zero amount (should not exist in resource map)
+    game.public
+        .card_accumulations
+        .entry(player_idx)
+        .or_default()
+        .entry(occupation_id.clone())
+        .or_default()
+        .insert(Good::Wood, 0);
     assert!(game.validate().is_err());
     game.public.card_accumulations.clear();
 
@@ -318,4 +340,85 @@ fn observation_includes_card_accumulations() {
         obs1.public.card_accumulations,
         game.public.card_accumulations
     );
+}
+
+/// Regression test: saves without `card_accumulations` field (old format)
+/// must load successfully with the new code. The integrity_hash for empty
+/// ledger must be computed identically whether the field is present or not.
+#[test]
+fn old_save_without_card_accumulations_loads() {
+    // Build a game with the new code, save it, then strip card_accumulations
+    // from the JSON and verify it loads with the SAME integrity_hash.
+    // This verifies the backward-compatible hash computation for empty ledger.
+    let config = Config {
+        players: 2,
+        seed: 42,
+        additional_action_space_enabled: false,
+    };
+    let card_set = verified_basic_card_set(2).unwrap();
+    let game = Game::with_cards(config.clone(), card_set.clone()).unwrap();
+
+    // Save with new code (stamps integrity_hash with empty card_accumulations)
+    let json = game.save_json().unwrap();
+    let mut value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    // Capture the integrity_hash that new code produces for empty ledger
+    let new_integrity_hash = value["log"]["integrity_hash"].as_str().unwrap().to_string();
+
+    // Remove card_accumulations from public state (simulating old save format)
+    value["public"]
+        .as_object_mut()
+        .unwrap()
+        .remove("card_accumulations");
+
+    // The integrity_hash should already match (new code computes same hash for empty)
+    let old_save_json = serde_json::to_string(&value).unwrap();
+
+    // This should load without "saved game bookkeeping integrity mismatch"
+    let loaded = Game::load_json(&old_save_json).expect("old save must load");
+
+    // Verify card_accumulations is empty (default)
+    assert!(loaded.public.card_accumulations.is_empty());
+
+    // Verify integrity_hash matches the stamped value (backward compatible)
+    assert_eq!(loaded.integrity_hash(), new_integrity_hash);
+
+    // Verify state_hash matches the initial state hash
+    assert_eq!(loaded.state_hash(), loaded.log.initial_state_hash);
+}
+
+/// Regression test: saving a game with empty `card_accumulations` must not
+/// include the field in JSON (byte-identical to pre-PR saves).
+#[test]
+fn empty_card_accumulations_save_excludes_field() {
+    let config = Config {
+        players: 2,
+        seed: 999,
+        additional_action_space_enabled: false,
+    };
+    let card_set = verified_basic_card_set(2).unwrap();
+    let game = Game::with_cards(config, card_set).unwrap();
+
+    let json = game.save_json().unwrap();
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    // card_accumulations must not appear in public state when empty
+    assert!(
+        !value["public"]
+            .as_object()
+            .unwrap()
+            .contains_key("card_accumulations"),
+        "empty card_accumulations must not be serialized: {}",
+        value["public"]
+    );
+
+    // card_use_limits must not appear when empty (existing PR #327 pattern)
+    assert!(
+        !value.as_object().unwrap().contains_key("card_use_limits"),
+        "empty card_use_limits must not be serialized"
+    );
+
+    // well_food_schedule uses #[serde(default)] only, so it appears as {}
+    // This is intentional - changing it would break other compatibility.
+    assert!(value["public"]["well_food_schedule"].is_object());
 }
