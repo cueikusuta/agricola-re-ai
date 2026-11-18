@@ -4215,163 +4215,340 @@ mod tests {
         );
     }
 
-    /// Double-pause test: resume from AfterClayConstruction ChooseTriggerOrder
-    /// pause into AfterWorker ChooseTriggerOrder pause.
-    /// Uses two custom cards: one with 2 AfterClayConstructionGain effects
-    /// (triggered by building a clay room in a clay house), one with
-    /// 2 AfterWorkerGain effects on FarmExpansion.
-    ///
-    /// TODO: Disabled due to resource accounting bug during double-pause resume.
-    /// The pause chain works (two pauses occur), but effects are applied twice
-    /// during the second resume_post_work. Re-enable after fixing the resume
-    /// accounting logic.
-    #[ignore]
+    /// Double-pause regression (PR #352 Round 2 P0-1/P1-2): resume from an
+    /// AfterClayConstruction ChooseTriggerOrder pause into an AfterWorker
+    /// ChooseTriggerOrder pause, with every state element produced by public
+    /// actions only (card plays via Lessons, the clay house via renovation,
+    /// clay/reed via accumulation spaces) -- so the save/load/replay section is
+    /// a real proof rather than log-external state mutation. Each of the four
+    /// card effects must apply exactly once: the delta across the double-pause
+    /// resume is +2 food / +2 wood regardless of the starting supply.
     #[test]
     fn double_pause_after_clay_then_after_worker() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind};
         use crate::engine::{Action, Detail};
         use crate::harvest::SimpleHarvestDetails;
-        use crate::model::{Config, Game, House, Space};
+        use crate::model::{Config, Game, Good, House, RoundCard, Space};
         use crate::pending::{PendingResolution, Transition};
 
-        // Card A: 2 AfterClayConstructionGain effects (trigger on clay room build in clay house)
-        // Card B: 2 AfterWorkerGain effects on FarmExpansion
+        // Two test occupations: 2x AfterClayConstructionGain and 2x
+        // AfterWorkerGain on FarmExpansion. Fillers (inert, free) pad each
+        // hand to the 7+7 deal the draft-hands constructor requires.
+        let filler_occ = |i: usize| CardDefinition {
+            use_limit: None,
+            id: format!("FILLER_OCC_{i}"),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        };
+        let filler_minor = |i: usize| CardDefinition {
+            use_limit: None,
+            id: format!("FILLER_MINOR_{i}"),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        };
         let mut set = crate::cards::verified_basic_card_set(2).expect("verified basic card set");
-        set.definitions.extend(vec![
-            crate::cards::CardDefinition {
-                use_limit: None,
-                id: "TEST_CLAY_DOUBLE".into(),
-                kind: crate::cards::CardKind::Occupation,
-                cost: vec![],
-                points: 0,
-                effects: vec![
-                    crate::cards::CardEffect::AfterClayConstructionGain {
-                        good: crate::model::Good::Food,
-                        amount: 1,
-                    },
-                    crate::cards::CardEffect::AfterClayConstructionGain {
-                        good: crate::model::Good::Wood,
-                        amount: 1,
-                    },
-                ],
-            },
-            crate::cards::CardDefinition {
-                use_limit: None,
-                id: "TEST_WORKER_DOUBLE".into(),
-                kind: crate::cards::CardKind::Occupation,
-                cost: vec![],
-                points: 0,
-                effects: vec![
-                    crate::cards::CardEffect::AfterWorkerGain {
-                        space: Space::FarmExpansion,
-                        good: crate::model::Good::Food,
-                        amount: 1,
-                    },
-                    crate::cards::CardEffect::AfterWorkerGain {
-                        space: Space::FarmExpansion,
-                        good: crate::model::Good::Wood,
-                        amount: 1,
-                    },
-                ],
-            },
-        ]);
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "TEST_CLAY_DOUBLE".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterClayConstructionGain {
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::AfterClayConstructionGain {
+                    good: Good::Wood,
+                    amount: 1,
+                },
+            ],
+        });
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "TEST_WORKER_DOUBLE".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterWorkerGain {
+                    space: Space::FarmExpansion,
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerGain {
+                    space: Space::FarmExpansion,
+                    good: Good::Wood,
+                    amount: 1,
+                },
+            ],
+        });
+        for i in 0..12 {
+            set.definitions.push(filler_occ(i));
+        }
+        for i in 0..14 {
+            set.definitions.push(filler_minor(i));
+        }
 
-        let mut game = Game::with_cards(
+        let p0_occ = [
+            "TEST_CLAY_DOUBLE",
+            "TEST_WORKER_DOUBLE",
+            "FILLER_OCC_0",
+            "FILLER_OCC_1",
+            "FILLER_OCC_2",
+            "FILLER_OCC_3",
+            "FILLER_OCC_4",
+        ];
+        let p0_minor = [
+            "FILLER_MINOR_0",
+            "FILLER_MINOR_1",
+            "FILLER_MINOR_2",
+            "FILLER_MINOR_3",
+            "FILLER_MINOR_4",
+            "FILLER_MINOR_5",
+            "FILLER_MINOR_6",
+        ];
+        let p1_occ = [
+            "FILLER_OCC_5",
+            "FILLER_OCC_6",
+            "FILLER_OCC_7",
+            "FILLER_OCC_8",
+            "FILLER_OCC_9",
+            "FILLER_OCC_10",
+            "FILLER_OCC_11",
+        ];
+        let p1_minor = [
+            "FILLER_MINOR_7",
+            "FILLER_MINOR_8",
+            "FILLER_MINOR_9",
+            "FILLER_MINOR_10",
+            "FILLER_MINOR_11",
+            "FILLER_MINOR_12",
+            "FILLER_MINOR_13",
+        ];
+        let hands = vec![
+            p0_occ
+                .iter()
+                .chain(p0_minor.iter())
+                .map(|s| (*s).to_string())
+                .collect(),
+            p1_occ
+                .iter()
+                .chain(p1_minor.iter())
+                .map(|s| (*s).to_string())
+                .collect(),
+        ];
+
+        // Player 0 is the start player: deterministic turn order.
+        let mut game = Game::with_cards_and_hands_with_start_player(
             Config {
                 players: 2,
                 seed: 1,
                 additional_action_space_enabled: false,
             },
             set,
+            hands,
+            0,
         )
         .expect("game creation must succeed");
 
-        // Manually give player 0 both test cards (played)
-        game.public.active_player = 0;
-        game.public.players[0]
-            .played_cards
-            .push("TEST_CLAY_DOUBLE".into());
-        game.public.players[0]
-            .played_cards
-            .push("TEST_WORKER_DOUBLE".into());
+        fn act(game: &mut Game, player: usize, space: Space, detail: Detail) -> Transition {
+            game.public.active_player = player;
+            match game.apply_with_plans(Action { space, detail }, None, None, &SimpleHarvestDetails)
+            {
+                Ok(t) => t,
+                Err(e) => panic!("P{player} action {space:?} failed: {e}"),
+            }
+        }
 
-        // Player 0 needs Clay house and resources for FarmExpansion (clay room)
-        game.public.players[0].house = House::Clay;
-        game.public.players[0].supply.clay = 5; // enough for clay room
-        game.public.players[0].supply.reed = 2; // for room
+        // --- Round 1: play both occupations via Lessons (public actions only).
+        // The first occupation play costs no fee; the second costs 1 food.
+        // (Both are played by the placement loop below, one per round, since
+        // Lessons is usable once per round.)
+        assert_eq!(game.public.players[0].played_cards, [] as [String; 0]);
 
-        // Player 0 takes FarmExpansion action to build a clay room
-        let build_action = Action {
-            space: Space::FarmExpansion,
-            detail: Detail::Build {
-                rooms: vec![1], // build room at index 1 (adjacent to starting room at 0)
-                stables: vec![],
-            },
-        };
-        let transition = game
-            .apply_with_plans(build_action, None, None, &SimpleHarvestDetails)
-            .expect("apply must succeed");
+        // --- Rounds 2..: accumulate clay (7) and reed (3), renovate to a clay
+        // house as soon as HouseRedevelopment is revealed, then build a clay
+        // room via FarmExpansion. That build triggers the double pause:
+        // AfterClayConstruction (2 effects) -> AfterWorker (2 effects).
+        let mut paused: Option<Box<crate::pending::PendingDecision>> = None;
+        let mut build_pre: Option<(u32, u32)> = None;
+        // Alternate P0 / P1 placements. Lessons is usable once per round per
+        // player (a used space stays used until the round ends), so the two
+        // occupation plays land in different rounds automatically.
+        let mut p0_turn = true;
+        for _ in 0..60 {
+            if paused.is_some() {
+                break;
+            }
+            if p0_turn {
+                let clay = game.public.players[0].supply.clay;
+                let reed = game.public.players[0].supply.reed;
+                let house = game.public.players[0].house;
+                let clay_double = game.public.players[0]
+                    .played_cards
+                    .iter()
+                    .any(|id| id == "TEST_CLAY_DOUBLE");
+                let worker_double = game.public.players[0]
+                    .played_cards
+                    .iter()
+                    .any(|id| id == "TEST_WORKER_DOUBLE");
+                let lessons_free = !game.public.used.contains(&Space::Lessons);
+                let (space, detail) = if !clay_double && lessons_free {
+                    (
+                        Space::Lessons,
+                        Detail::PlayOccupation {
+                            card_id: "TEST_CLAY_DOUBLE".into(),
+                        },
+                    )
+                } else if !worker_double && lessons_free {
+                    (
+                        Space::Lessons,
+                        Detail::PlayOccupation {
+                            card_id: "TEST_WORKER_DOUBLE".into(),
+                        },
+                    )
+                } else if house == House::Clay && clay >= 5 && reed >= 2 {
+                    (
+                        Space::FarmExpansion,
+                        Detail::Build {
+                            rooms: vec![1], // adjacent to the starting room at 0
+                            stables: vec![],
+                        },
+                    )
+                } else if house == House::Wood
+                    && clay >= 7
+                    && reed >= 3
+                    && game
+                        .public
+                        .revealed
+                        .contains(&RoundCard::HouseRedevelopment)
+                {
+                    (
+                        Space::HouseRedevelopment,
+                        Detail::Renovate {
+                            bonus_improvement: None,
+                            instant_bake: 0,
+                            pastures: vec![],
+                        },
+                    )
+                } else {
+                    let preferred = if clay < 7 {
+                        Space::ClayPit
+                    } else if reed < 3 {
+                        Space::ReedBank
+                    } else {
+                        Space::DayLaborer
+                    };
+                    let fallback = if game.public.used.contains(&preferred) {
+                        [
+                            Space::DayLaborer,
+                            Space::ClayPit,
+                            Space::ReedBank,
+                            Space::Fishing,
+                            Space::Forest,
+                        ]
+                        .into_iter()
+                        .find(|s| !game.public.used.contains(s))
+                        .expect("P0 has a free fallback space")
+                    } else {
+                        preferred
+                    };
+                    (fallback, Detail::None)
+                };
+                // Snapshot supply right before the build so the delta asserts
+                // below measure exactly this action's card effects.
+                if space == Space::FarmExpansion {
+                    build_pre = Some((
+                        game.public.players[0].supply.food,
+                        game.public.players[0].supply.wood,
+                    ));
+                }
+                let t = act(&mut game, 0, space, detail);
+                match t {
+                    Transition::Completed => {}
+                    Transition::Paused(pending) => {
+                        paused = Some(pending);
+                        break;
+                    }
+                }
+            } else {
+                // P1 placement: filler, no played cards => no card effects.
+                let p1_space = [Space::DayLaborer, Space::Fishing, Space::Forest]
+                    .into_iter()
+                    .find(|s| game.legal_spaces().contains(s))
+                    .expect("P1 must have a simple legal space");
+                act(&mut game, 1, p1_space, Detail::None);
+            }
+            p0_turn = !p0_turn;
+        }
+        let pending = paused.expect("the clay-room build must pause");
 
-        // Should pause on AfterClayConstruction with 2 effects
-        let Transition::Paused(pending) = transition else {
-            panic!(
-                "expected pause on AfterClayConstruction, got {:?}",
-                transition
-            );
-        };
+        // First pause: AfterClayConstruction, two simultaneous After effects.
         assert!(matches!(
             pending.kind,
-            crate::pending::PendingKind::ChooseTriggerOrder {
+            PendingKind::ChooseTriggerOrder {
                 phase: crate::card_events::TriggerPhase::After,
                 ..
             }
         ));
 
-        // Resolve first pause (choose order [0, 1])
+        // Resolve first pause -> the chain advances to AfterWorker and pauses again.
         let outcome = game
             .resolve_pending_and_resume(PendingResolution::ChooseTriggerOrder {
                 chosen_order: vec![0, 1],
             })
             .expect("first resolution must succeed");
-
-        // Should pause AGAIN on AfterWorker with 2 effects
         let Transition::Paused(pending2) = outcome else {
-            panic!("expected second pause on AfterWorker, got {:?}", outcome);
+            panic!("expected second pause on AfterWorker, got {outcome:?}");
         };
         assert!(matches!(
             pending2.kind,
-            crate::pending::PendingKind::ChooseTriggerOrder {
+            PendingKind::ChooseTriggerOrder {
                 phase: crate::card_events::TriggerPhase::After,
                 ..
             }
         ));
 
-        // Resolve second pause
+        // Resolve second pause -> the action completes.
         let outcome2 = game
             .resolve_pending_and_resume(PendingResolution::ChooseTriggerOrder {
                 chosen_order: vec![0, 1],
             })
             .expect("second resolution must succeed");
-
         assert_eq!(
             outcome2,
             Transition::Completed,
             "final resume must complete"
         );
 
-        // Verify both cards' effects applied
+        // Each of the four card effects applied exactly once: +2 food, +2 wood
+        // relative to the state right before the build. Asserting the delta
+        // (not the absolute supply) keeps the test meaningful regardless of
+        // feeding/begging from earlier rounds.
+        let (pre_food, pre_wood) = build_pre.expect("the build action ran");
         assert_eq!(
-            game.public.players[0].supply.food, 2,
-            "1 from clay + 1 from worker"
+            game.public.players[0].supply.food,
+            pre_food + 2,
+            "one food from clay + one food from worker"
         );
         assert_eq!(
-            game.public.players[0].supply.wood, 2,
-            "1 from clay + 1 from worker"
+            game.public.players[0].supply.wood,
+            pre_wood + 2,
+            "one wood from clay + one wood from worker"
         );
-        assert!(game.public.players[0]
-            .improvements
-            .contains(&crate::model::Improvement::Fireplace2));
 
-        // Save/load/replay round-trip
+        // Sanity: the build really happened (room count grew) and the action
+        // bookkeeping is complete (space used, worker placed).
+        assert_eq!(game.public.players[0].rooms(), 3);
+        assert!(game.public.used.contains(&Space::FarmExpansion));
+
+        // Round-trip save/load/replay: every state element above was produced
+        // by public actions, so this must reproduce byte-for-byte.
         let json = game.save_json().expect("save must succeed");
         let loaded = Game::load_json(&json).expect("load_json must succeed");
         let replayed = Game::replay_with_setup_and_start_player(
@@ -4388,8 +4565,16 @@ mod tests {
             replayed.state_hash(),
             "state_hash must match after save/load/replay round-trip"
         );
-        assert_eq!(replayed.public.players[0].supply.food, 2);
-        assert_eq!(replayed.public.players[0].supply.wood, 2);
+        assert_eq!(
+            replayed.public.players[0].supply.food, game.public.players[0].supply.food,
+            "food must reproduce after replay"
+        );
+        assert_eq!(
+            replayed.public.players[0].supply.wood, game.public.players[0].supply.wood,
+            "wood must reproduce after replay"
+        );
+        assert!(replayed.public.used.contains(&Space::FarmExpansion));
+        assert_eq!(replayed.public.workers_placed, game.public.workers_placed);
     }
 
     /// C111 小動物飼育員 via the production round-start dispatcher: the

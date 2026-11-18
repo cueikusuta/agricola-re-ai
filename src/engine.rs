@@ -940,6 +940,10 @@ impl Game {
                     step,
                     phase: pause_phase,
                     after,
+                    // First segment of the logical action: the space/worker
+                    // bookkeeping has NOT been applied yet (it happens at
+                    // completion in `resume_post_work`).
+                    space_applied: false,
                 };
                 let completion = Box::new(crate::pending::WorkCompletion {
                     action: action.clone(),
