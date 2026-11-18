@@ -568,13 +568,13 @@ pub struct PublicState {
     #[serde(default)]
     pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
     /// Per-card use counts in the current round. Card plays are public
-        /// actions, so the ledger is public state. Cleared at each round
-        /// boundary; `serde(default)` keeps pre-aggregation saves loading.
-        /// Key format: "card_id:EventKind" (e.g., "TEST_LIMITED:WorkerPlaced"),
-        /// allowing per-(card, event_kind) limits within the same round period.
-        #[serde(default)]
-        pub card_uses: BTreeMap<String, u32>,
-    }
+    /// actions, so the ledger is public state. Cleared at each round
+    /// boundary; `serde(default)` keeps pre-aggregation saves loading.
+    /// Key format: "card_id:EventKind" (e.g., "TEST_LIMITED:WorkerPlaced"),
+    /// allowing per-(card, event_kind) limits within the same round period.
+    #[serde(default)]
+    pub card_uses: BTreeMap<String, u32>,
+}
 
 /// The exact `PublicState` field set the LOG_VERSION=5 `state_hash` tuple
 /// serialized, in declaration order. Serializing this mirror produces
@@ -683,23 +683,23 @@ pub struct Game {
     #[serde(default)]
     pub pending: Option<PendingDecision>,
     /// Event chain budget: max effect resolutions per action (default 64).
-        /// Replenished at the start of every committed action, so it bounds a
-        /// single effect chain (loop guard) rather than the whole game.
-        #[serde(default = "default_event_budget")]
-        pub event_budget: u32,
-        /// Declared per-card use limits (card ID -> max resolutions per period).
-        /// A card absent from this map has no per-period limit. Kept in `Game` so
-        /// the limit is data, not a magic constant at the call site: an empty map
-        /// is skipped when serializing, so existing v5 saves stay byte-identical.
-        /// (The per-round use *counts* are public state and live in
-        /// [`PublicState::card_uses`]; this map is immutable derived data and
-        /// never changes during play.)
-        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-        pub card_use_limits: BTreeMap<String, u32>,
-        /// Next decision ID for PendingDecision.
-        #[serde(default)]
-        pub next_decision_id: u64,
-    }
+    /// Replenished at the start of every committed action, so it bounds a
+    /// single effect chain (loop guard) rather than the whole game.
+    #[serde(default = "default_event_budget")]
+    pub event_budget: u32,
+    /// Declared per-card use limits (card ID -> max resolutions per period).
+    /// A card absent from this map has no per-period limit. Kept in `Game` so
+    /// the limit is data, not a magic constant at the call site: an empty map
+    /// is skipped when serializing, so existing v5 saves stay byte-identical.
+    /// (The per-round use *counts* are public state and live in
+    /// [`PublicState::card_uses`]; this map is immutable derived data and
+    /// never changes during play.)
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub card_use_limits: BTreeMap<String, u32>,
+    /// Next decision ID for PendingDecision.
+    #[serde(default)]
+    pub next_decision_id: u64,
+}
 
 /// Maximum effect resolutions inside one action's effect chain (loop guard).
 pub const DEFAULT_EVENT_BUDGET: u32 = 64;

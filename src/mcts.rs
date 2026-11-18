@@ -1624,12 +1624,13 @@ mod tests {
         .unwrap();
 
         let obs = game.observation(0).unwrap();
-                assert_eq!(
-                    obs.public.card_uses
-                        .get(&format!("TEST_LIMITED:{:?}", EventKind::WorkerPlaced)),
-                    Some(&1),
-                    "the card was really used once this round"
-                );
+        assert_eq!(
+            obs.public
+                .card_uses
+                .get(&format!("TEST_LIMITED:{:?}", EventKind::WorkerPlaced)),
+            Some(&1),
+            "the card was really used once this round"
+        );
         // The observation does not carry a limits mirror (Layer-0 aggregation);
         // the limit is derivable from the public card definitions alone.
         assert_eq!(
@@ -1688,8 +1689,9 @@ mod tests {
         game.public.well_food_schedule.entry(2).or_default().push(0);
 
         // Set up some card_uses (simulating a card was used this round).
-                game.public.card_uses
-                    .insert(format!("TEST_CARD:{:?}", EventKind::RoundStart), 1);
+        game.public
+            .card_uses
+            .insert(format!("TEST_CARD:{:?}", EventKind::RoundStart), 1);
 
         // Save card_use_limits before start_round.
         let card_use_limits_before = game.card_use_limits.clone();

@@ -4025,12 +4025,13 @@ mod tests {
             "the action space must be marked used by the resume"
         );
         assert_eq!(
-                    game.public.card_uses
-                        .get(&format!("AW2:{:?}", EventKind::WorkerPlaced))
-                        .copied(),
-                    Some(2),
-                    "each effect must fire exactly once"
-                );
+            game.public
+                .card_uses
+                .get(&format!("AW2:{:?}", EventKind::WorkerPlaced))
+                .copied(),
+            Some(2),
+            "each effect must fire exactly once"
+        );
         assert_eq!(game.event_budget, 62, "two effects consume two budget");
     }
 
