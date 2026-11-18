@@ -6223,7 +6223,7 @@ mod tests {
 
         let mut market = vec![];
         let mut well = BTreeMap::new();
-        let mut used = std::collections::BTreeSet::new();
+        let used = std::collections::BTreeSet::new();
         let mut pending = None;
 
         // First: RoundStart dispatch (food gain)
@@ -6281,35 +6281,54 @@ mod tests {
         );
     }
 
-    /// Reproduction test for Audit P0-1 Finding 3: Multi-grant in post-work chain.
-    /// apply_post_work_card_effects calls three dispatchers sequentially (bake, clay,
-    /// worker) sharing the same card_uses map. If a card has effects matching
-    /// multiple event kinds in this chain, it could be granted multiple times.
-    /// This test verifies that a card with effects for different event kinds in
-    /// the post-work chain only fires once per event kind.
+    /// Replacement for Audit P0-1 Finding 3's test (review Round 1).
+    ///
+    /// The old `post_work_chain_no_multi_grant` used E111, whose effects are
+    /// RoundStart/Harvest-only: it never exercised the post-work chain at all, so
+    /// `fix1`+`fix2` reversions left it green (vacuous). This test inspects the
+    /// chain's *real* behavior: played cards whose effects DO span post-work event
+    /// kinds must each be granted exactly once, in their own dispatcher only.
+    ///
+    /// Cards used:
+    ///   * A063 (verified_extra_simple_cards): AfterHarvestBakeGain { amount: 3 }
+    ///     — a bake-kind effect.
+    ///   * C076 (verified_band_c_cards): 3x AfterWorkerGain
+    ///     (Forest/Copse/Grove → wood 2) — worker-kind effects.
+    ///
+    /// Chain code evidence (card_events.rs): each post-work dispatcher stamps a
+    /// distinct `event_kind` in its `PhaseTriggerData` — bake = EventKind::Bake,
+    /// clay = EventKind::ClayConstruction, worker = EventKind::WorkerPlaced — and
+    /// `effect_condition_holds` matches each effect variant only against its own
+    /// kind, while each handler re-checks its trigger fields (`trigger.baked`,
+    /// `trigger.space == Some(*space)`). A single bonus therefore cannot be granted
+    /// twice by the bake→clay→worker chain: within one dispatcher each (card,
+    /// effect) is visited at most once per scan, and across dispatchers the
+    /// event_kind filter prevents cross-kind re-firing.
+    ///
+    /// Chain order mirrors `apply_post_work_card_effects` in src/engine.rs:
+    /// dispatch_after_harvest_bake → dispatch_after_clay_construction →
+    /// dispatch_after_worker.
     #[test]
-    fn post_work_chain_no_multi_grant() {
-        // Use a card that has effects for multiple post-work event kinds
-        // For this test, we use a custom card definition since no existing card
-        // spans bake/clay/worker. The fix should ensure card_uses is keyed by
-        // (card_id, event_kind) so each dispatcher tracks independently.
+    fn post_work_chain_grants_each_effect_once_per_event_kind() {
         let set = CardSet {
-            definitions: crate::cards::verified_band_e_cards(),
+            definitions: crate::cards::verified_extra_simple_cards()
+                .into_iter()
+                .chain(crate::cards::verified_band_c_cards())
+                .collect(),
         };
         let mut c = Ctx::new();
-        // E111 has RoundStart and Harvest effects - NOT in post-work chain
-        // This test documents the expected behavior: per-event-kind tracking
-        c.players[0].played_cards = vec!["E111".into()];
-        c.limits.insert("E111".into(), 1);
+        // A063: bake bonus (+3 food). C076: wood bonuses on Forest/Copse/Grove.
+        c.players[0].played_cards = vec!["A063".into(), "C076".into()];
 
         let mut market = vec![];
         let mut well = BTreeMap::new();
-        let mut used = std::collections::BTreeSet::new();
+        let used = std::collections::BTreeSet::new();
         let mut pending = None;
+        // Round 5: one round after harvest round 4, so the bake dispatcher window
+        // is open (round >= 2 && HARVEST_ROUNDS.contains(&(round - 1))).
 
-        // Simulate post-work chain: after_harvest_bake, after_clay_construction, after_worker
-        // None of these should trigger E111 (which is RoundStart/Harvest only)
-        // This verifies no cross-contamination between event kinds
+        // 1) Bake dispatcher: grants A063's bake bonus once (+3 food).
+        //    C076's worker-kind effects must NOT fire here.
         dispatch_after_harvest_bake(
             &set,
             0,
@@ -6317,7 +6336,7 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
-            4,
+            5,
             &used,
             &mut c.budget,
             &mut c.uses,
@@ -6326,6 +6345,16 @@ mod tests {
             false,
         )
         .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 3,
+            "A063 bake bonus granted exactly once in the bake dispatcher"
+        );
+        assert_eq!(
+            c.players[0].supply.wood, 0,
+            "C076 worker-kind effects must not fire in the bake dispatcher"
+        );
+
+        // 2) Clay dispatcher: no clay-kind effects on these cards; nothing re-granted.
         dispatch_after_clay_construction(
             &set,
             0,
@@ -6335,7 +6364,7 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
-            4,
+            5,
             &used,
             &mut c.budget,
             &mut c.uses,
@@ -6344,15 +6373,26 @@ mod tests {
             false,
         )
         .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 3,
+            "A063 bake bonus must not be re-granted in the clay dispatcher"
+        );
+        assert_eq!(
+            c.players[0].supply.wood, 0,
+            "C076 must not fire in the clay dispatcher"
+        );
+
+        // 3) Worker dispatcher on Forest: grants C076's Forest effect once (+2 wood).
+        //    A063's bake-kind effect must NOT fire here.
         dispatch_after_worker(
             &set,
             0,
-            Space::DayLaborer,
+            Space::Forest,
             &mut c.cards,
             &mut c.players,
             &mut market,
             &mut well,
-            4,
+            5,
             &used,
             &mut c.budget,
             &mut c.uses,
@@ -6361,15 +6401,13 @@ mod tests {
             false,
         )
         .unwrap();
-
-        // E111 should not have fired on any post-work dispatcher
         assert_eq!(
-            c.players[0].supply.food, 0,
-            "E111 must not fire on post-work dispatchers"
+            c.players[0].supply.food, 3,
+            "A063 bake-kind effect must not fire in the worker dispatcher"
         );
         assert_eq!(
-            c.players[0].supply.wood, 0,
-            "E111 must not fire on post-work dispatchers"
+            c.players[0].supply.wood, 2,
+            "C076 Forest effect granted exactly once in the worker dispatcher"
         );
     }
 }
