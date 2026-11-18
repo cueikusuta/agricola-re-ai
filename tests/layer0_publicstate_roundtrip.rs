@@ -313,3 +313,61 @@ fn use_limit_ledger_survives_save_load_as_canonical_state() {
     assert_eq!(reconstructed.public.card_uses, game.public.card_uses);
     assert_eq!(reconstructed.card_use_limits.get("TEST_LIMITED"), Some(&1));
 }
+
+/// `start_round` に pending decision が残っているときは Err を返し、
+/// 状態 (state_hash) を変更しないことを確認する (P1: ガード順序の回帰テスト)。
+#[test]
+fn start_round_rejects_pending_and_preserves_state_hash() {
+    let mut game = Game::new(Config {
+        players: 2,
+        seed: 42,
+        additional_action_space_enabled: false,
+    });
+    // Game::new() は内部で start_round() を呼ぶため、初期状態は round=1。
+    // さらに 1 回 start_round() を呼んで round=2 にする。
+    game.start_round().expect("second start_round must succeed");
+
+    // state_hash を取得
+    let hash_before = game.state_hash();
+
+    // 手動で pending decision を注入 (ChooseTriggerOrder を模倣)
+    use agricola_re_ai::card_events::TriggerPhase;
+    use agricola_re_ai::pending::{PendingDecision, PendingKind};
+    let decision = PendingDecision::new(
+        1, // id
+        0, // player
+        PendingKind::ChooseTriggerOrder {
+            phase: TriggerPhase::After,
+            triggers: vec![("fake_card".into(), 0, "fake_trigger".into())],
+        },
+        hash_before.clone(), // state_hash_before は現在の hash と一致
+        serde_json::json!({}),
+    );
+    game.pending = Some(decision);
+
+    // start_round が Err を返すことを確認
+    let err = game
+        .start_round()
+        .expect_err("start_round must fail when pending exists");
+    assert!(
+        err.contains("pending decision must be resolved before round start"),
+        "error message should mention pending decision: {err}"
+    );
+
+    // state_hash が変わっていないことを確認 (部分的な状態変更が起きていない)
+    assert_eq!(
+        game.state_hash(),
+        hash_before,
+        "state_hash must remain unchanged when start_round fails due to pending decision"
+    );
+
+    // 追加で確認: round が進んでいない (2 のまま)、revealed が増えていない、used/card_uses が clear されていない
+    assert_eq!(game.public.round, 2, "round must not advance on error");
+    assert_eq!(
+        game.public.revealed.len(),
+        2,
+        "revealed must not grow on error"
+    );
+    // used と card_uses は start_round 成功時に clear されるため、失敗時は元のまま
+    // (初期状態では空なので変化なし。ここでは hash 一致で十分)
+}

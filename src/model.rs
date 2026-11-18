@@ -915,7 +915,7 @@ impl Game {
             .iter()
             .filter_map(|card| card.use_limit.map(|limit| (card.id.clone(), limit)))
             .collect();
-        result.start_round();
+        result.start_round()?;
         result.log.initial_state_hash = result.state_hash();
         result.log.initial_public_state = Some(result.public.clone());
         Ok(result)
@@ -1151,7 +1151,14 @@ impl Game {
         }
         Ok(result)
     }
-    pub fn start_round(&mut self) {
+    pub fn start_round(&mut self) -> Result<(), String> {
+        // A decision cannot span a round boundary: no production effect pauses
+        // the round-start trigger, and carrying a stale decision into a new
+        // round would make its `state_hash_before` meaningless.
+        if self.pending.is_some() {
+            return Err("pending decision must be resolved before round start".into());
+        }
+
         self.public.round += 1;
         let card = self.hidden_round_deck.pop().expect("14 rounds only");
         self.public.revealed.push(card);
@@ -1159,14 +1166,6 @@ impl Game {
         // Per-card use limits use the round as their period, so the ledger is
         // cleared when a new round opens.
         self.public.card_uses.clear();
-        // A decision cannot span a round boundary: no production effect pauses
-        // the round-start trigger, and carrying a stale decision into a new
-        // round would make its `state_hash_before` meaningless.
-        debug_assert!(
-            self.pending.is_none(),
-            "a pending decision must be resolved before the next round starts"
-        );
-        self.pending = None;
         self.public.start_player = self.public.start_player.min(self.public.players.len() - 1);
         self.public.active_player = self.public.start_player;
         self.public.workers_placed = vec![0; self.public.players.len()];
@@ -1240,6 +1239,7 @@ impl Game {
                 Transition::Completed
             });
         }
+        Ok(())
     }
     pub fn validate(&self) -> Result<(), String> {
         let p = &self.public;
@@ -1402,20 +1402,32 @@ impl Game {
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&resolution)?;
-        // R2-P1-1: a paused work action's space must still be revealed/available
-        // at resume time. Check it BEFORE taking the decision so a stale or
-        // tampered save is refused atomically — nothing is applied and the
-        // decision stays resolvable — instead of smuggling a non-revealed space
-        // into `used`. `available_spaces_for_resume` is the same filter the
-        // original apply used, minus the `pending` short-circuit.
-        if let crate::pending::Continuation::PostWork { completion, .. } = &pending.continuation {
-            if !self
-                .available_spaces_for_resume()
-                .contains(&completion.action.space)
-            {
+        // R2-P1-1 (+ Round 2 P1-1): a paused work action's space must still be
+        // revealed/available at resume time. Check it BEFORE taking the
+        // decision so a stale or tampered save is refused atomically — nothing
+        // is applied and the decision stays resolvable — instead of smuggling
+        // a non-revealed space into `used`. `available_spaces_for_resume` is
+        // the same filter the original apply used, minus the `pending`
+        // short-circuit. A second-segment resume (explicit `space_applied`
+        // state, stamped only by the engine itself) re-joins its own already-
+        // used space: the consistency it claims (`used` membership) is
+        // enforced instead of re-running the availability filter, which by
+        // definition excludes the action's own used space.
+        if let crate::pending::Continuation::PostWork {
+            completion, resume, ..
+        } = &pending.continuation
+        {
+            let space = completion.action.space;
+            if resume.space_applied {
+                if !self.public.used.contains(&space) {
+                    return Err(format!(
+                        "resume claims space {space:?} already applied, but it is not marked used"
+                    ));
+                }
+            } else if !self.available_spaces_for_resume().contains(&space) {
                 return Err(format!(
                     "resume cannot use space {:?}: not available at resume time",
-                    completion.action.space
+                    space
                 ));
             }
         }
@@ -1458,19 +1470,37 @@ impl Game {
         // available into `used`. `available_spaces()` re-applies the same
         // revealed/unused/mutual-exclusion filters the original apply used
         // (Issue #268 R2-P1-1). `self.pending` is already cleared by the caller.
-        if !self.available_spaces().contains(&completion.action.space) {
+        // Round 2 P1-1: a second-segment resume (explicit `space_applied`
+        // state, stamped only by the engine itself) re-joins its own already-
+        // used space; the consistency it claims is enforced instead of a
+        // blanket "any used space is resumable" bypass, which would let a
+        // stale save resume onto another player's used space.
+        let space = completion.action.space;
+        let available = self.available_spaces();
+        if resume.space_applied {
+            if !self.public.used.contains(&space) {
+                return Err(format!(
+                    "resume claims space {space:?} already applied, but it is not marked used"
+                ));
+            }
+        } else if !available.contains(&space) {
             return Err(format!(
                 "resume cannot use space {:?}: not available at resume time",
-                completion.action.space
+                space
             ));
         }
         // Re-apply the work action to advance used/workers_placed and run
         // the harvest/breeding/round-end logic that was deferred.
         // The completion struct holds everything we need.
         let mut next = self.clone();
-        // The action's space was not yet marked used; do it now.
-        next.public.used.insert(completion.action.space);
-        next.public.workers_placed[player] += 1;
+        // The space/worker bookkeeping happens exactly once per logical
+        // action: here in the first segment. A second segment
+        // (`space_applied == true`) must find it already in place — enforced
+        // by the guard above — and must not re-apply it (Round 2 P0-2).
+        if !resume.space_applied {
+            next.public.used.insert(completion.action.space);
+            next.public.workers_placed[player] += 1;
+        }
         let will_harvest = next.public.workers_placed == next.public.work_quota
             && HARVEST_ROUNDS.contains(&next.public.round);
 
@@ -1578,8 +1608,21 @@ impl Game {
                             )?
                         };
                         if let Transition::Paused(p) = after_transition {
-                            // Should not happen: the decision was just resolved.
-                            return Err(format!("unexpected pause during resume: {p:?}"));
+                            // A second pause during resume: commit the partially-resumed
+                            // state and return Transition::Paused instead of erroring out.
+                            next.public.players = players;
+                            next.cards = cards;
+                            next.public.improvement_market = improvement_market;
+                            next.delayed_well = delayed_well;
+                            next.event_budget = event_budget;
+                            next.public.card_uses = card_uses;
+                            return self.commit_second_pause(
+                                next,
+                                p.as_ref(),
+                                player,
+                                step,
+                                &completion,
+                            );
                         }
                         // Interrupt phase (resume only for an Interrupt-phase pause).
                         let transition = if let Some(after) = after {
@@ -1615,8 +1658,21 @@ impl Game {
                             )?
                         };
                         if let Transition::Paused(p) = transition {
-                            // Should not happen: the decision was just resolved.
-                            return Err(format!("unexpected pause during resume: {p:?}"));
+                            // A second pause during resume: commit the partially-resumed
+                            // state and return Transition::Paused instead of erroring out.
+                            next.public.players = players;
+                            next.cards = cards;
+                            next.public.improvement_market = improvement_market;
+                            next.delayed_well = delayed_well;
+                            next.event_budget = event_budget;
+                            next.public.card_uses = card_uses;
+                            return self.commit_second_pause(
+                                next,
+                                p.as_ref(),
+                                player,
+                                step,
+                                &completion,
+                            );
                         }
                     }
                 }
@@ -1682,7 +1738,21 @@ impl Game {
                         )?
                     };
                     if let Transition::Paused(p) = after_transition {
-                        return Err(format!("unexpected pause during resume: {p:?}"));
+                        // A second pause during resume: commit the partially-resumed
+                        // state and return Transition::Paused instead of erroring out.
+                        next.public.players = players;
+                        next.cards = cards;
+                        next.public.improvement_market = improvement_market;
+                        next.delayed_well = delayed_well;
+                        next.event_budget = event_budget;
+                        next.public.card_uses = card_uses;
+                        return self.commit_second_pause(
+                            next,
+                            p.as_ref(),
+                            player,
+                            step,
+                            &completion,
+                        );
                     }
                     // Interrupt phase (resume only for an Interrupt-phase pause).
                     let transition = if let Some(after) = after {
@@ -1776,7 +1846,21 @@ impl Game {
                         )?
                     };
                     if let Transition::Paused(p) = after_transition {
-                        return Err(format!("unexpected pause during resume: {p:?}"));
+                        // A second pause during resume: commit the partially-resumed
+                        // state and return Transition::Paused instead of erroring out.
+                        next.public.players = players;
+                        next.cards = cards;
+                        next.public.improvement_market = improvement_market;
+                        next.delayed_well = delayed_well;
+                        next.event_budget = event_budget;
+                        next.public.card_uses = card_uses;
+                        return self.commit_second_pause(
+                            next,
+                            p.as_ref(),
+                            player,
+                            step,
+                            &completion,
+                        );
                     }
                     // Interrupt phase (resume only for an Interrupt-phase pause).
                     let transition = if let Some(after) = after {
@@ -1834,7 +1918,7 @@ impl Game {
                 value
             } else {
                 let mut preview = next.clone();
-                preview.harvest_fields();
+                preview.harvest_fields()?;
                 (0..preview.public.players.len())
                     .map(|id| policy.plan_feeding(&preview.observation(id).expect("valid player")))
                     .collect::<Vec<_>>()
@@ -1851,7 +1935,7 @@ impl Game {
         };
         let breeding_plans = if will_harvest {
             let mut preview = next.clone();
-            preview.harvest_fields();
+            preview.harvest_fields()?;
             preview.feed_after_fields(harvest_plans.as_deref().expect("feeding plans"))?;
             let plans = if let Some(value) = completion.breeding_plans {
                 value
@@ -1871,13 +1955,83 @@ impl Game {
             None
         };
         next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
-        crate::validation::validate_incremental_or_full(&next, self)?;
+        // Round 2 P0-2: the integrity gate runs on EVERY resume segment — no
+        // skips. The delta expectations depend on the segment: the first
+        // segment applies the space/worker bookkeeping (one worker, one used
+        // space); a second segment resumes an already-applied action (no
+        // worker/space delta). Every other mid-round law is unchanged for both
+        // segments (validation.rs).
+        if resume.space_applied {
+            crate::validation::validate_incremental_resume_completion_or_full(&next, self)?;
+        } else {
+            crate::validation::validate_incremental_or_full(&next, self)?;
+        }
         // The `work` event for this paused action is recorded by
         // `resolve_pending_and_resume` (with the paused hash as `after`), not
         // here: only that frame still holds the paused hash and it must be
         // logged before the `pending_resolution` event to keep the chain valid.
         *self = next;
         Ok(Transition::Completed)
+    }
+
+    /// Commit a second pause during `resume_post_work` (Round 2 P0-1/P2):
+    /// freeze the partially-resumed state, build the continuation carrying
+    /// the explicit `space_applied: true` resume state (the action's
+    /// space/worker bookkeeping was applied by the first segment of this
+    /// same logical move), stamp the decision, store it on `self`, and return
+    /// `Transition::Paused`. The chain position comes from the pause context;
+    /// a missing position is a hard error rather than a silent restart from
+    /// the chain head (which would re-apply effects).
+    fn commit_second_pause(
+        &mut self,
+        mut next: Game,
+        p: &crate::pending::PendingDecision,
+        player: usize,
+        step: crate::pending::ChainStep,
+        completion: &crate::pending::WorkCompletion,
+    ) -> Result<Transition, String> {
+        let after_pos = p
+            .context
+            .get("card_index")
+            .and_then(|v| v.as_u64())
+            .zip(p.context.get("effect_index").and_then(|v| v.as_u64()))
+            .map(|(ci, ei)| crate::pending::ChainPosition {
+                card_index: ci as usize,
+                effect_index: ei as usize,
+            })
+            .ok_or_else(|| "second pause without chain position in context".to_string())?;
+        let phase = p
+            .context
+            .get("phase")
+            .and_then(|v| v.as_str())
+            .map(|s| match s {
+                "After" => crate::card_events::TriggerPhase::After,
+                _ => crate::card_events::TriggerPhase::Interrupt,
+            })
+            .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+        let logged_before = next.state_hash();
+        let new_resume = crate::pending::PostWorkResume {
+            step,
+            phase,
+            after: after_pos,
+            space_applied: true,
+        };
+        let continuation = crate::pending::Continuation::PostWork {
+            player,
+            resume: new_resume,
+            completion: Box::new(completion.clone()),
+        };
+        let new_pending = crate::pending::PendingDecision {
+            id: p.id,
+            player,
+            kind: p.kind.clone(),
+            state_hash_before: logged_before,
+            context: p.context.clone(),
+            continuation,
+        };
+        next.pending = Some(new_pending.clone());
+        *self = next;
+        Ok(Transition::Paused(Box::new(new_pending)))
     }
 
     /// Internal: apply a validated pending resolution to the game state.
@@ -2008,19 +2162,6 @@ impl Game {
                     chosen_order,
                     &triggerable,
                 )?;
-
-                if self.record_events {
-                    self.log.events.push(crate::model::Event {
-                        player: Some(pending.player),
-                        kind: "pending_resolution".into(),
-                        payload: serde_json::json!({
-                            "phase": format!("{:?}", phase),
-                            "chosen_order": chosen_order,
-                        }),
-                        before: pending.state_hash_before.clone(),
-                        after: self.state_hash(),
-                    });
-                }
                 Ok(())
             }
             (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => {

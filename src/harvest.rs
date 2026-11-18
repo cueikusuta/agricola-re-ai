@@ -95,7 +95,7 @@ impl HarvestDetailPolicy for SimpleHarvestDetails {
 impl Game {
     /// Only an internal preview copy is used to query policies at the
     /// beginning of the harvest. The real field phase happens in harvest().
-    pub(crate) fn harvest_fields(&mut self) {
+    pub(crate) fn harvest_fields(&mut self) -> Result<()> {
         // Cardless games have no harvest effects at all, so skip the dispatch
         // entirely: this is the hot path for the cardless baseline.
         let carded = self.card_set.enabled();
@@ -121,8 +121,7 @@ impl Game {
                     &mut self.public.card_uses,
                     &self.card_use_limits,
                     &mut self.pending,
-                )
-                .expect("validated card field-phase reward");
+                )?;
             }
             let p = &mut self.public.players[p];
             for cell in &mut p.farm {
@@ -149,6 +148,7 @@ impl Game {
                 }
             }
         }
+        Ok(())
     }
     /// Called only on the preview AFTER field harvesting, to generate
     /// breeding decisions from the actual post-feeding public state.
@@ -173,7 +173,7 @@ impl Game {
         if breeding.len() != self.public.players.len() {
             return Err("breeding plan per player required".into());
         }
-        self.harvest_fields();
+        self.harvest_fields()?;
         self.feed_after_fields(feeding)?;
         for (player, plan) in self.public.players.iter_mut().zip(breeding) {
             plan.apply(player)?;
