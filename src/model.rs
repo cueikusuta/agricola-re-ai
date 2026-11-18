@@ -1152,6 +1152,13 @@ impl Game {
         Ok(result)
     }
     pub fn start_round(&mut self) -> Result<(), String> {
+        // A decision cannot span a round boundary: no production effect pauses
+        // the round-start trigger, and carrying a stale decision into a new
+        // round would make its `state_hash_before` meaningless.
+        if self.pending.is_some() {
+            return Err("pending decision must be resolved before round start".into());
+        }
+
         self.public.round += 1;
         let card = self.hidden_round_deck.pop().expect("14 rounds only");
         self.public.revealed.push(card);
@@ -1159,12 +1166,6 @@ impl Game {
         // Per-card use limits use the round as their period, so the ledger is
         // cleared when a new round opens.
         self.public.card_uses.clear();
-        // A decision cannot span a round boundary: no production effect pauses
-        // the round-start trigger, and carrying a stale decision into a new
-        // round would make its `state_hash_before` meaningless.
-        if self.pending.is_some() {
-            return Err("pending decision must be resolved before round start".into());
-        }
         self.public.start_player = self.public.start_player.min(self.public.players.len() - 1);
         self.public.active_player = self.public.start_player;
         self.public.workers_placed = vec![0; self.public.players.len()];
@@ -1614,7 +1615,7 @@ impl Game {
                             next.public.improvement_market = improvement_market;
                             next.delayed_well = delayed_well;
                             next.event_budget = event_budget;
-                            next.card_uses = card_uses;
+                            next.public.card_uses = card_uses;
                             return self.commit_second_pause(
                                 next,
                                 p.as_ref(),
@@ -1664,7 +1665,7 @@ impl Game {
                             next.public.improvement_market = improvement_market;
                             next.delayed_well = delayed_well;
                             next.event_budget = event_budget;
-                            next.card_uses = card_uses;
+                            next.public.card_uses = card_uses;
                             return self.commit_second_pause(
                                 next,
                                 p.as_ref(),
@@ -1744,7 +1745,7 @@ impl Game {
                         next.public.improvement_market = improvement_market;
                         next.delayed_well = delayed_well;
                         next.event_budget = event_budget;
-                        next.card_uses = card_uses;
+                        next.public.card_uses = card_uses;
                         return self.commit_second_pause(
                             next,
                             p.as_ref(),
@@ -1852,7 +1853,7 @@ impl Game {
                         next.public.improvement_market = improvement_market;
                         next.delayed_well = delayed_well;
                         next.event_budget = event_budget;
-                        next.card_uses = card_uses;
+                        next.public.card_uses = card_uses;
                         return self.commit_second_pause(
                             next,
                             p.as_ref(),
