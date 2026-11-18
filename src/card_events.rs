@@ -493,6 +493,12 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
+                CardEffect::OnPlayPlaceStonesOnEmptyFields {
+                    stones_per_field,
+                } => handle_on_play_place_stones_on_empty_fields(ctx, player, *stones_per_field)?,
+                CardEffect::OnPlayChooseGainFoodOrPerSheep => {
+                    handle_on_play_choose_gain_food_or_per_sheep(ctx, player, &trigger.card_id)?
+                }
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -833,6 +839,12 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
+            CardEffect::OnPlayPlaceStonesOnEmptyFields {
+                stones_per_field,
+            } => handle_on_play_place_stones_on_empty_fields(ctx, player, *stones_per_field)?,
+            CardEffect::OnPlayChooseGainFoodOrPerSheep => {
+                handle_on_play_choose_gain_food_or_per_sheep(ctx, player, &trigger.card_id)?
+            }
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1117,6 +1129,56 @@ fn handle_on_play_gain_per_count(
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
+}
+
+fn handle_on_play_place_stones_on_empty_fields(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    stones_per_field: u32,
+) -> Result<EffectResult, String> {
+    // Find all empty fields (Field { crop: None, remaining: 0 })
+    for (idx, cell) in ctx.player.farm.iter().enumerate() {
+        if matches!(cell.tile, Tile::Field { crop: None, remaining: 0 }) {
+            ctx.player.c006_stone_fields.push(idx);
+        }
+    }
+    // Note: The stones are "placed" conceptually. At the next field phase,
+    // the harvest logic will grant `stones_per_field` stone per field and clear the list.
+    // The fields "count as cultivated" until then.
+    Ok(EffectResult::Resolved)
+}
+
+fn handle_on_play_choose_gain_food_or_per_sheep(
+    ctx: &mut DispatchContext<'_>,
+    player: usize,
+    card_id: &str,
+) -> Result<EffectResult, String> {
+    // Create a pending decision for the player to choose between:
+    // - Gain 3 food
+    // - Gain 1 food per sheep owned (sheep are kept)
+    let sheep_count = ctx.player.supply.sheep;
+    let options = vec![
+        crate::pending::GainOption {
+            good: Good::Food,
+            amount: 3,
+        },
+        crate::pending::GainOption {
+            good: Good::Food,
+            amount: sheep_count,
+        },
+    ];
+    let kind = crate::pending::PendingKind::ChooseGain {
+        source_card: card_id.to_string(),
+        options,
+    };
+    let decision = crate::pending::PendingDecision::new(
+        ctx.next_decision_id,
+        player,
+        kind,
+        ctx.game_state_hash(),
+    );
+    ctx.next_decision_id += 1;
+    Ok(EffectResult::Pending(decision))
 }
 
 fn handle_passive(

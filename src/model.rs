@@ -208,6 +208,10 @@ pub struct Player {
     /// saves; defaults to None so scoring treats it as 0.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field_goods_before_final_harvest: Option<u32>,
+    /// Indices of farm cells that have C006 (Stone Clearing) stones placed on them.
+    /// These are empty fields that will yield 1 stone each at the next field phase.
+    #[serde(default)]
+    pub c006_stone_fields: Vec<usize>,
 }
 impl Player {
     pub fn new(id: usize, food: u32) -> Self {
@@ -240,8 +244,8 @@ impl Player {
             extra_housing: 0,
             begging: 0,
             field_goods_before_final_harvest: None,
+            c006_stone_fields: vec![],
         }
-    }
     pub fn rooms(&self) -> usize {
         self.farm
             .iter()
