@@ -270,20 +270,21 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
     // CardSet from observation's card definitions.
     let card_set = Arc::new(set);
 
-    // well_food_schedule from observation (added in PR #265).
-    // delayed_well mirrors well_food_schedule; use the same data for both.
-    let well_food_schedule = obs.well_food_schedule.clone();
+    // well_food_schedule from the canonical public state (Layer-0 aggregation:
+    // the schedule lives in obs.public.well_food_schedule; there is no separate
+    // Observation mirror anymore). delayed_well mirrors the schedule; use the
+    // same data for both.
+    let well_food_schedule = obs.public.well_food_schedule.clone();
     let delayed_well = well_food_schedule.clone();
 
-    // card_uses and card_use_limits from observation (P2-3).
-    // card_uses tracks per-card use counts in the current round (public info).
-    // card_use_limits is DERIVED from the card definitions (CardDefinition::use_limit),
-    // not copied from the observation: obs.card_use_limits is a convenience mirror
-    // (#[serde(default)] => {} for pre-mirror saves), while card_definitions is
-    // always complete. Deriving here means a save/restore that dropped the mirror
-    // still reconstructs a Game with correct per-round limits, matching how
-    // Game::from_card_state builds card_use_limits at startup.
-    let card_uses = obs.card_uses.clone();
+    // card_use_limits is DERIVED from the card definitions
+    // (CardDefinition::use_limit), not carried by the observation at all:
+    // card_definitions is always complete, so deriving here reconstructs
+    // correct per-round limits even from a state that never serialized a
+    // limits mirror, matching how Game::from_card_state builds card_use_limits
+    // at startup. The per-card use ledger needs no separate extraction: it is
+    // part of `obs.public` (Layer-0 aggregation) and travels with the public
+    // clone into search_from_parts.
     let card_use_limits = obs
         .card_definitions
         .iter()
@@ -303,12 +304,10 @@ pub fn sample_game(obs: &Observation, rng: &mut ChaCha8Rng) -> Option<Game> {
         deck,
         rng_streams,
         delayed_well,
-        well_food_schedule,
         card_set,
         cards,
         None,                   // pending
         default_event_budget(), // event_budget
-        card_uses,
         card_use_limits,
         0, // next_decision_id
     );
@@ -1197,16 +1196,15 @@ mod tests {
     }
 
     /// Compare two observations for public-information equality (shared by the
-    /// sample_game acceptance tests below).
+    /// sample_game acceptance tests below). The well-food schedule and the
+    /// per-card use ledger are compared as part of `public` (Layer-0
+    /// aggregation: they are canonical PublicState fields now).
     fn obs_eq_public(a: &Observation, b: &Observation) {
         assert_eq!(a.player_id, b.player_id);
         assert_eq!(a.public, b.public);
         assert_eq!(a.hand, b.hand);
         assert_eq!(a.hand_counts, b.hand_counts);
         assert_eq!(a.card_definitions, b.card_definitions);
-        assert_eq!(a.well_food_schedule, b.well_food_schedule);
-        assert_eq!(a.card_uses, b.card_uses);
-        assert_eq!(a.card_use_limits, b.card_use_limits);
     }
 
     /// Acceptance (c) + roundtrip: sample_game reconstructs a game whose
@@ -1521,18 +1519,24 @@ mod tests {
         // purchase path needs resource setup that is irrelevant to what this
         // test pins: sample_game must carry the schedule across the rebuild.
         game.delayed_well.entry(3).or_default().push(0);
-        game.well_food_schedule.entry(3).or_default().push(0);
+        game.public.well_food_schedule.entry(3).or_default().push(0);
 
         let obs = game.observation(0).unwrap();
-        assert!(obs.well_food_schedule.contains_key(&3));
+        assert!(obs.public.well_food_schedule.contains_key(&3));
 
         let mut rng = ChaCha8Rng::seed_from_u64(0xDEAD_BEEF);
         let sampled = sample_game(&obs, &mut rng).expect("sample_game must succeed");
         let reconstructed_obs = sampled.observation(0).unwrap();
 
-        assert_eq!(reconstructed_obs.well_food_schedule, obs.well_food_schedule);
+        assert_eq!(
+            reconstructed_obs.public.well_food_schedule,
+            obs.public.well_food_schedule
+        );
         assert_eq!(sampled.delayed_well, game.delayed_well);
-        assert_eq!(sampled.well_food_schedule, game.well_food_schedule);
+        assert_eq!(
+            sampled.public.well_food_schedule,
+            game.public.well_food_schedule
+        );
     }
 
     /// Acceptance (e): a synthetic `use_limit` card that is really played and
@@ -1620,39 +1624,45 @@ mod tests {
         .unwrap();
 
         let obs = game.observation(0).unwrap();
+                assert_eq!(
+                    obs.public.card_uses
+                        .get(&format!("TEST_LIMITED:{:?}", EventKind::WorkerPlaced)),
+                    Some(&1),
+                    "the card was really used once this round"
+                );
+        // The observation does not carry a limits mirror (Layer-0 aggregation);
+        // the limit is derivable from the public card definitions alone.
         assert_eq!(
-            obs.card_uses
-                .get(&format!("TEST_LIMITED:{:?}", EventKind::WorkerPlaced)),
-            Some(&1),
-            "the card was really used once this round"
+            obs.card_definitions
+                .iter()
+                .find(|c| c.id == "TEST_LIMITED")
+                .and_then(|c| c.use_limit),
+            Some(1)
         );
-        assert_eq!(obs.card_use_limits.get("TEST_LIMITED"), Some(&1));
 
         let mut rng = ChaCha8Rng::seed_from_u64(0xBEEF_CAFE);
         let sampled = sample_game(&obs, &mut rng).expect("sample_game must succeed");
         let reconstructed_obs = sampled.observation(0).unwrap();
 
         obs_eq_public(&obs, &reconstructed_obs);
-        assert_eq!(sampled.card_uses, game.card_uses);
+        assert_eq!(sampled.public.card_uses, game.public.card_uses);
         assert_eq!(
             sampled.card_use_limits, game.card_use_limits,
             "limits must derive from the card definitions identically"
         );
         sampled.validate().unwrap();
 
-        // P2-A: the mirror is a convenience copy behind `#[serde(default)]`, so
-        // a pre-mirror save yields an empty Observation mirror while the
-        // definitions still declare the limit. Deriving from card_definitions
-        // must still rebuild a Game with the declared limits.
-        let mut stripped = obs.clone();
-        stripped.card_use_limits.clear();
+        // P2-A: card_use_limits is not observation state at all, so an
+        // observation whose definitions still declare the limit always
+        // reconstructs a Game with the declared limits — there is no mirror
+        // that could go stale or be dropped.
         let mut rng2 = ChaCha8Rng::seed_from_u64(0xCAFE_0001);
         let sampled_stripped =
-            sample_game(&stripped, &mut rng2).expect("a mirror-less observation must sample");
+            sample_game(&obs, &mut rng2).expect("a definition-derived observation must sample");
         assert_eq!(
             sampled_stripped.card_use_limits.get("TEST_LIMITED"),
             Some(&1),
-            "limits must come from CardDefinition::use_limit, not the observation mirror"
+            "limits must come from CardDefinition::use_limit, not an observation mirror"
         );
     }
 
@@ -1675,11 +1685,11 @@ mod tests {
 
         // Set up well reservation for round 2.
         game.delayed_well.entry(2).or_default().push(0);
-        game.well_food_schedule.entry(2).or_default().push(0);
+        game.public.well_food_schedule.entry(2).or_default().push(0);
 
         // Set up some card_uses (simulating a card was used this round).
-        game.card_uses
-            .insert(format!("TEST_CARD:{:?}", EventKind::RoundStart), 1);
+                game.public.card_uses
+                    .insert(format!("TEST_CARD:{:?}", EventKind::RoundStart), 1);
 
         // Save card_use_limits before start_round.
         let card_use_limits_before = game.card_use_limits.clone();
@@ -1692,12 +1702,13 @@ mod tests {
         // Player 0 is start player with 2 initial food + 1 from well = 3.
         assert_eq!(game.public.players[0].supply.food, 2 + 1);
 
-        // delayed_well and well_food_schedule for round 2 should be consumed.
+        // delayed_well and the public well_food_schedule for round 2 should be
+        // consumed.
         assert!(!game.delayed_well.contains_key(&2));
-        assert!(!game.well_food_schedule.contains_key(&2));
+        assert!(!game.public.well_food_schedule.contains_key(&2));
 
         // card_uses should be cleared at round boundary.
-        assert!(game.card_uses.is_empty());
+        assert!(game.public.card_uses.is_empty());
 
         // card_use_limits should persist unchanged.
         assert_eq!(game.card_use_limits, card_use_limits_before);
@@ -1706,7 +1717,7 @@ mod tests {
         // through sample_game — supply, public state and every Observation field
         // (well mirror consumed, card_uses cleared, limits intact) must match.
         let obs = game.observation(0).unwrap();
-        assert!(obs.well_food_schedule.is_empty());
+        assert!(obs.public.well_food_schedule.is_empty());
         let mut rng = ChaCha8Rng::seed_from_u64(0x5EED_0002);
         let sampled =
             sample_game(&obs, &mut rng).expect("the post-start_round state must reconstruct");
@@ -1732,12 +1743,12 @@ mod tests {
         )
         .unwrap();
         // Orphan: schedule entry without a delayed_well twin (legacy save shape).
-        game.well_food_schedule.entry(2).or_default().push(1);
+        game.public.well_food_schedule.entry(2).or_default().push(1);
 
         game.start_round();
         assert_eq!(game.public.round, 2);
         assert!(
-            !game.well_food_schedule.contains_key(&2),
+            !game.public.well_food_schedule.contains_key(&2),
             "the orphan schedule entry must be dropped unconditionally"
         );
         assert!(

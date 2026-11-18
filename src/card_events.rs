@@ -50,6 +50,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::OnPlayGainPerStored { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainIfHouse { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayGainPerCount { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -490,6 +491,11 @@ fn resolve_phase_scan(
                 CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                     handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
                 }
+                CardEffect::OnPlayGainPerCount {
+                    count_kind,
+                    good,
+                    amount,
+                } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -708,6 +714,7 @@ fn effect_condition_holds(
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
+        CardEffect::OnPlayGainPerCount { .. } => true,
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
@@ -826,6 +833,11 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
             }
+            CardEffect::OnPlayGainPerCount {
+                count_kind,
+                good,
+                amount,
+            } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1062,6 +1074,40 @@ fn handle_on_play_gain_per_improvement_played(
     amount: u32,
 ) -> Result<EffectResult, String> {
     let count = crate::cards::improvement_count_in_front(ctx.card_set, ctx.player);
+    let bonus = count
+        .checked_mul(amount)
+        .ok_or("on-play card bonus overflow")?;
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(bonus)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+fn handle_on_play_gain_per_count(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    count_kind: &crate::cards::CountKind,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let count = match count_kind {
+        crate::cards::CountKind::Occupations => {
+            crate::cards::occupation_count(ctx.card_set, ctx.player) as u32
+        }
+        crate::cards::CountKind::ClayRooms => crate::cards::clay_room_count(ctx.player) as u32,
+        crate::cards::CountKind::Improvements => {
+            crate::cards::improvement_count_in_front(ctx.card_set, ctx.player)
+        }
+        crate::cards::CountKind::FamilyMembers => ctx.player.family as u32,
+        crate::cards::CountKind::MajorImprovementsBottomRow => {
+            crate::cards::major_improvements_bottom_row(ctx.player) as u32
+        }
+        crate::cards::CountKind::SownFields => crate::cards::sown_field_count(ctx.player) as u32,
+    };
     let bonus = count
         .checked_mul(amount)
         .ok_or("on-play card bonus overflow")?;
@@ -3979,12 +4025,12 @@ mod tests {
             "the action space must be marked used by the resume"
         );
         assert_eq!(
-            game.card_uses
-                .get(&format!("AW2:{:?}", EventKind::WorkerPlaced))
-                .copied(),
-            Some(2),
-            "each effect must fire exactly once"
-        );
+                    game.public.card_uses
+                        .get(&format!("AW2:{:?}", EventKind::WorkerPlaced))
+                        .copied(),
+                    Some(2),
+                    "each effect must fire exactly once"
+                );
         assert_eq!(game.event_budget, 62, "two effects consume two budget");
     }
 

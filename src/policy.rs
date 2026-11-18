@@ -558,6 +558,25 @@ fn card_priority(
                 | CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount, .. } => {
                     card_good_value(*good) * i64::from(*amount) * horizon / 2
                 }
+                // OnPlayGainPerCount (ch3 OnPlayGainPerCount chapter): the exact
+                // per-count quantity needs board state this heuristic does not
+                // have, so use a per-kind typical count at play time.
+                CardEffect::OnPlayGainPerCount {
+                    count_kind,
+                    good,
+                    amount,
+                    ..
+                } => {
+                    let avg_count: i64 = match count_kind {
+                        crate::cards::CountKind::Occupations => 2, // ~2 occupations mid-game
+                        crate::cards::CountKind::ClayRooms => 1, // ~1 clay room after upgrade
+                        crate::cards::CountKind::Improvements => 3, // ~3 improvements (base + 2 minor)
+                        crate::cards::CountKind::FamilyMembers => 3, // ~3 family members
+                        crate::cards::CountKind::MajorImprovementsBottomRow => 1,
+                        crate::cards::CountKind::SownFields => 2, // ~2 sown fields
+                    };
+                    card_good_value(*good) * i64::from(*amount) * avg_count
+                }
                 CardEffect::Passive { .. } => horizon * 5,
                 CardEffect::EndGameBonus { .. } => 12,
                 CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,

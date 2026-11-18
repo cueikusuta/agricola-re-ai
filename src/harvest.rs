@@ -118,7 +118,7 @@ impl Game {
                     self.public.round,
                     &self.public.used,
                     &mut self.event_budget,
-                    &mut self.card_uses,
+                    &mut self.public.card_uses,
                     &self.card_use_limits,
                     &mut self.pending,
                 )
