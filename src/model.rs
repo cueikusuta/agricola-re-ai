@@ -1479,7 +1479,7 @@ impl Game {
                             baked: true,
                             previous_player: None,
                             used_spaces: used_spaces.clone(),
-                            event_kind: crate::registry::EventKind::Bake,
+                            site: crate::card_events::Site::Bake,
                         };
                         // After phase. If THIS is the paused step and the pause
                         // was in the After phase (a resolved ChooseTriggerOrder,
@@ -1586,7 +1586,7 @@ impl Game {
                         baked: false,
                         previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
-                        event_kind: crate::registry::EventKind::ClayConstruction,
+                        site: crate::card_events::Site::ClayConstruction,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -1680,7 +1680,7 @@ impl Game {
                         baked: false,
                         previous_player: None,
                         used_spaces: used_spaces.clone(),
-                        event_kind: crate::registry::EventKind::WorkerPlaced,
+                        site: crate::card_events::Site::WorkerPlaced,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -1864,7 +1864,11 @@ impl Game {
                 Ok(())
             }
             (
-                PendingKind::ChooseTriggerOrder { phase, triggers },
+                PendingKind::ChooseTriggerOrder {
+                    phase,
+                    site: _site,
+                    triggers,
+                },
                 PendingResolution::ChooseTriggerOrder { chosen_order },
             ) => {
                 // Execute the triggers in the chosen order

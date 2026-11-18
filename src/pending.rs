@@ -136,9 +136,12 @@ pub enum PendingKind {
     /// Choose the order of simultaneous trigger resolution (2016 Lookout p.8).
     /// When multiple card effects trigger simultaneously in After/Interrupt phase,
     /// the active player chooses the resolution order.
+    /// Limited to effects within the same Phase × Site combination.
     ChooseTriggerOrder {
         /// The phase in which triggers fire.
         phase: TriggerPhase,
+        /// The site at which triggers fire.
+        site: crate::card_events::Site,
         /// The triggerable effects: (card_id, effect_index, effect_description).
         triggers: Vec<(String, usize, String)>,
     },

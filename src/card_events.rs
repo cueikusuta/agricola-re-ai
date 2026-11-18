@@ -13,9 +13,66 @@
 use crate::cards::{CardEffect, CardSet};
 use crate::model::{Animal, Crop, Good, House, Player, Space};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
-use crate::registry::EventKind;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+
+/// Trigger site (Phase × Site 2-axis dispatcher).
+/// Each site corresponds to a distinct game event that can trigger card effects.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum Site {
+    /// Worker placement on an action space.
+    #[default]
+    WorkerPlaced,
+    /// Card played from hand.
+    CardPlayed,
+    /// Round start.
+    RoundStart,
+    /// Harvest phase.
+    Harvest,
+    /// Clay construction (room/stone upgrade or improvement purchase).
+    ClayConstruction,
+    /// Baking (after harvest).
+    Bake,
+}
+
+impl Site {
+    /// All defined sites.
+    pub const ALL: [Site; 6] = [
+        Site::WorkerPlaced,
+        Site::CardPlayed,
+        Site::RoundStart,
+        Site::Harvest,
+        Site::ClayConstruction,
+        Site::Bake,
+    ];
+
+    /// Convert from registry EventKind (for compatibility during transition).
+    pub fn from_event_kind(kind: crate::registry::EventKind) -> Self {
+        match kind {
+            crate::registry::EventKind::WorkerPlaced => Site::WorkerPlaced,
+            crate::registry::EventKind::CardPlayed => Site::CardPlayed,
+            crate::registry::EventKind::RoundStart => Site::RoundStart,
+            crate::registry::EventKind::Harvest => Site::Harvest,
+            crate::registry::EventKind::ClayConstruction => Site::ClayConstruction,
+            crate::registry::EventKind::Bake => Site::Bake,
+        }
+    }
+
+    /// Convert to registry EventKind (for compatibility during transition).
+    pub fn to_event_kind(self) -> crate::registry::EventKind {
+        match self {
+            Site::WorkerPlaced => crate::registry::EventKind::WorkerPlaced,
+            Site::CardPlayed => crate::registry::EventKind::CardPlayed,
+            Site::RoundStart => crate::registry::EventKind::RoundStart,
+            Site::Harvest => crate::registry::EventKind::Harvest,
+            Site::ClayConstruction => crate::registry::EventKind::ClayConstruction,
+            Site::Bake => crate::registry::EventKind::Bake,
+        }
+    }
+}
 
 /// Phase in which a card effect triggers. Determines resolution order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -320,6 +377,10 @@ fn resolve_phase_scan(
         );
         context.insert("trigger_data".into(), trigger_data_json);
         context.insert("phase".into(), serde_json::json!(format!("{:?}", phase)));
+        context.insert(
+            "site".into(),
+            serde_json::json!(format!("{:?}", trigger_data.site)),
+        );
         context.insert("card_owner".into(), serde_json::json!(player));
         context.insert("card_index".into(), serde_json::json!(last.card_index));
         context.insert("effect_index".into(), serde_json::json!(last.effect_index));
@@ -327,7 +388,11 @@ fn resolve_phase_scan(
         let decision = PendingDecision::new(
             0, // Will be stamped by engine
             player,
-            PendingKind::ChooseTriggerOrder { phase, triggers },
+            PendingKind::ChooseTriggerOrder {
+                phase,
+                site: trigger_data.site,
+                triggers,
+            },
             String::new(), // Will be stamped by engine
             serde_json::Value::Object(context),
         );
@@ -358,7 +423,7 @@ fn resolve_phase_scan(
             baked: trigger_data.baked,
             previous_player: trigger_data.previous_player.clone(),
             used_spaces: trigger_data.used_spaces.clone(),
-            event_kind: trigger_data.event_kind,
+            site: trigger_data.site,
         };
 
         // Collect all players for snapshot
@@ -642,9 +707,9 @@ pub struct PhaseTriggerData {
     pub previous_player: Option<Player>,
     /// Used spaces in the current round (for AfterWorkerGainIfUsed).
     pub used_spaces: std::collections::BTreeSet<Space>,
-    /// The event kind that triggered this dispatch (for site-specific effects).
+    /// The site that triggered this dispatch (for site-specific effects).
     #[serde(default)]
-    pub event_kind: EventKind,
+    pub site: Site,
 }
 
 /// Check if an effect's trigger condition holds, without consuming budget or card uses.
@@ -660,50 +725,44 @@ fn effect_condition_holds(
 ) -> bool {
     match effect {
         CardEffect::AfterWorkerGain { space, .. } => {
-            trigger.event_kind == EventKind::WorkerPlaced && trigger.space == Some(*space)
+            trigger.site == Site::WorkerPlaced && trigger.space == Some(*space)
         }
         CardEffect::AfterWorkerGainIfUsed {
             space,
             required_space,
             ..
         } => {
-            trigger.event_kind == EventKind::WorkerPlaced
+            trigger.site == Site::WorkerPlaced
                 && trigger.space == Some(*space)
                 && used_spaces.contains(required_space)
         }
         CardEffect::StartRoundGain { house, rooms, .. } => {
-            trigger.event_kind == EventKind::RoundStart && {
+            trigger.site == Site::RoundStart && {
                 let house_ok = house.is_none_or(|h| player.house == h);
                 let rooms_ok = rooms.is_none_or(|r| player.rooms() == usize::from(r));
                 house_ok && rooms_ok
             }
         }
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
-            trigger.event_kind == EventKind::RoundStart && player.supply.food >= u32::from(round)
+            trigger.site == Site::RoundStart && player.supply.food >= u32::from(round)
         }
         // E111 世捨て人: the no-minor-improvements condition needs card
         // definitions, so the scan reports it as triggerable and the
         // handler performs the check.
-        CardEffect::StartRoundGainIfNoMinorPlayed { .. } => {
-            trigger.event_kind == EventKind::RoundStart
-        }
-        CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
-            trigger.event_kind == EventKind::Harvest
-        }
+        CardEffect::StartRoundGainIfNoMinorPlayed { .. } => trigger.site == Site::RoundStart,
+        CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => trigger.site == Site::Harvest,
         // C116 調度品職員 fires only from dispatch_play's dedicated after-play
         // scan, never from the generic phase scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => false,
         CardEffect::AfterClayConstructionGain { .. } => {
-            trigger.event_kind == EventKind::ClayConstruction
+            trigger.site == Site::ClayConstruction
                 && trigger.previous_player.as_ref().is_some_and(|prev| {
                     (prev.house == House::Clay && player.rooms() > prev.rooms())
                         || (prev.house == House::Clay && player.house == House::Stone)
                 })
         }
-        CardEffect::AfterHarvestBakeGain { .. } => {
-            trigger.event_kind == EventKind::Bake && trigger.baked
-        }
-        CardEffect::HarvestFieldGain { .. } => trigger.event_kind == EventKind::Harvest,
+        CardEffect::AfterHarvestBakeGain { .. } => trigger.site == Site::Bake && trigger.baked,
+        CardEffect::HarvestFieldGain { .. } => trigger.site == Site::Harvest,
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
@@ -1453,7 +1512,7 @@ pub fn dispatch_play(
         baked: false,
         previous_player: None,
         used_spaces: std::collections::BTreeSet::new(),
-        event_kind: EventKind::CardPlayed,
+        site: Site::CardPlayed,
     };
 
     // Phase 1: Replace (prerequisites) - ONLY for the new card
@@ -1594,7 +1653,7 @@ pub fn dispatch_after_worker(
         baked: false,
         previous_player: None,
         used_spaces: used_spaces.clone(),
-        event_kind: EventKind::WorkerPlaced,
+        site: Site::WorkerPlaced,
     };
 
     // AfterWorkerGain and AfterWorkerGainIfUsed are After phase. A pause here
@@ -1666,7 +1725,7 @@ pub fn dispatch_start_round(
             baked: false,
             previous_player: None,
             used_spaces: used_spaces.clone(),
-            event_kind: EventKind::RoundStart,
+            site: Site::RoundStart,
         };
 
         resolve_phase(
@@ -1744,7 +1803,7 @@ pub fn dispatch_after_clay_construction(
         baked: false,
         previous_player: Some(previous.clone()),
         used_spaces: used_spaces.clone(),
-        event_kind: EventKind::ClayConstruction,
+        site: Site::ClayConstruction,
     };
 
     // After phase first: a ChooseTriggerOrder pause (Issue #270) must reach
@@ -1816,7 +1875,7 @@ pub fn dispatch_harvest_field(
         baked: false,
         previous_player: None,
         used_spaces: used_spaces.clone(),
-        event_kind: EventKind::Harvest,
+        site: Site::Harvest,
     };
 
     resolve_phase(
@@ -1894,7 +1953,7 @@ pub fn dispatch_after_harvest_bake(
         baked: true,
         previous_player: None,
         used_spaces: used_spaces.clone(),
-        event_kind: EventKind::Bake,
+        site: Site::Bake,
     };
 
     // After phase first: a ChooseTriggerOrder pause (Issue #270) must reach
@@ -1923,6 +1982,125 @@ pub fn dispatch_after_harvest_bake(
         return Ok(Transition::Paused(p));
     }
     Ok(Transition::Completed)
+}
+
+/// Dispatch Before phase for worker placement (WorkerPlaced site).
+/// This runs Before-phase effects that trigger on worker placement, if any.
+#[allow(clippy::too_many_arguments)]
+pub fn dispatch_before_worker(
+    card_set: &CardSet,
+    player: usize,
+    space: Space,
+    cards: &mut crate::cards::CardState,
+    players: &mut [Player],
+    improvement_market: &mut Vec<crate::model::Improvement>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    round: u8,
+    used_spaces: &std::collections::BTreeSet<Space>,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    pending: &mut Option<PendingDecision>,
+) -> Result<Transition, String> {
+    // Clone players for all_players parameter to avoid borrow checker issues
+    let all_players = players.to_vec();
+    let mut ctx = DispatchContext {
+        card_set,
+        player: &mut players[player],
+        cards,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+        actor: player,
+        card_owner: player,
+        beneficiary: player,
+    };
+
+    let trigger = PhaseTriggerData {
+        space: Some(space),
+        improvement: None,
+        baked: false,
+        previous_player: None,
+        used_spaces: used_spaces.clone(),
+        site: Site::WorkerPlaced,
+    };
+
+    // Before phase only - no Interrupt phase for before-worker
+    resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::Before,
+        &trigger,
+        &all_players,
+        false, // before-worker: not post-work chain
+    )
+}
+
+/// Alias for dispatch_start_round (for API consistency with Phase×Site naming).
+#[allow(clippy::too_many_arguments)]
+pub fn dispatch_round_start(
+    card_set: &CardSet,
+    players: &mut [Player],
+    cards: &mut crate::cards::CardState,
+    improvement_market: &mut Vec<crate::model::Improvement>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    round: u8,
+    used_spaces: &std::collections::BTreeSet<Space>,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    pending: &mut Option<PendingDecision>,
+) -> Result<Transition, String> {
+    dispatch_start_round(
+        card_set,
+        players,
+        cards,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+    )
+}
+
+/// Alias for dispatch_harvest_field (for API consistency with Phase×Site naming).
+#[allow(clippy::too_many_arguments)]
+pub fn dispatch_harvest(
+    card_set: &CardSet,
+    player: usize,
+    cards: &mut crate::cards::CardState,
+    players: &mut [Player],
+    improvement_market: &mut Vec<crate::model::Improvement>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    round: u8,
+    used_spaces: &std::collections::BTreeSet<Space>,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    pending: &mut Option<PendingDecision>,
+) -> Result<Transition, String> {
+    dispatch_harvest_field(
+        card_set,
+        player,
+        cards,
+        players,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+    )
 }
 
 /// Legacy compatibility functions (kept for equivalence testing).
@@ -3963,8 +4141,13 @@ mod tests {
         );
         let pending = game.pending.clone().expect("a decision must be recorded");
         match &pending.kind {
-            PendingKind::ChooseTriggerOrder { phase, triggers } => {
+            PendingKind::ChooseTriggerOrder {
+                phase,
+                site,
+                triggers,
+            } => {
                 assert_eq!(*phase, TriggerPhase::After);
+                assert_eq!(*site, crate::card_events::Site::WorkerPlaced);
                 assert_eq!(triggers.len(), 2, "both effects must be offered");
             }
             other => panic!("expected ChooseTriggerOrder, got: {other:?}"),
