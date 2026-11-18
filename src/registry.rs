@@ -393,7 +393,6 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed {
                             amount, ..
                         }
-                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
                         | crate::cards::CardEffect::AfterOccupationGainPerFoodCost {
                             amount, ..
                         }
