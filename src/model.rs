@@ -572,6 +572,12 @@ pub struct PublicState {
     /// boundary; `serde(default)` keeps pre-aggregation saves loading.
     #[serde(default)]
     pub card_uses: BTreeMap<String, u32>,
+    /// Per-card resource accumulations on played cards. Cards that place
+    /// resources on themselves (e.g., "place 1 wood on this card each round")
+    /// store their accumulations here. Keyed by player index, then card ID,
+    /// then resource type. `serde(default)` keeps pre-aggregation saves loading.
+    #[serde(default)]
+    pub card_accumulations: BTreeMap<usize, BTreeMap<String, BTreeMap<Good, u32>>>,
 }
 
 /// The exact `PublicState` field set the LOG_VERSION=5 `state_hash` tuple
@@ -579,8 +585,8 @@ pub struct PublicState {
 /// byte-identical JSON to serializing the 13-field v5 `PublicState`, so
 /// `state_hash` VALUES are unchanged by the Layer-0 aggregation even though
 /// `PublicState` grew. The aggregated fields (`well_food_schedule`,
-/// `card_uses`) are deliberately excluded here — their integrity is enforced
-/// by `integrity_hash` instead. Do not reorder or add fields.
+/// `card_uses`, `card_accumulations`) are deliberately excluded here — their
+/// integrity is enforced by `integrity_hash` instead. Do not reorder or add fields.
 #[derive(Serialize)]
 pub(crate) struct PublicStateHashMaterialV5<'a> {
     round: &'a u8,
@@ -875,6 +881,7 @@ impl Game {
             finished: false,
             well_food_schedule: BTreeMap::new(),
             card_uses: BTreeMap::new(),
+            card_accumulations: BTreeMap::new(),
         };
         let log = GameLog {
             log_version: LOG_VERSION,
@@ -976,6 +983,7 @@ impl Game {
             &self.pending,
             self.event_budget,
             &self.public.card_uses,
+            &self.public.card_accumulations,
             &self.card_use_limits,
             self.next_decision_id,
         ))
@@ -1330,6 +1338,30 @@ impl Game {
             .collect::<BTreeSet<_>>();
         if all_cards != RoundCard::ALL.into_iter().collect() {
             return Err("round deck contains duplicate or missing cards".into());
+        }
+        // Validate card_accumulations: player index must be valid, card must be played by that player.
+        for (player_idx, card_map) in &p.card_accumulations {
+            if *player_idx >= p.players.len() {
+                return Err(format!(
+                    "card_accumulations: invalid player index {player_idx}"
+                ));
+            }
+            let player = &p.players[*player_idx];
+            for (card_id, resource_map) in card_map {
+                if !player.played_cards.contains(card_id) {
+                    return Err(format!(
+                                "card_accumulations: player {player_idx} has accumulation on unplayed card {card_id}"
+                            ));
+                }
+                // Resource amounts are u32 (non-negative by type), but check for zero entries that shouldn't exist.
+                for &amount in resource_map.values() {
+                    if amount == 0 {
+                        return Err(format!(
+                                            "card_accumulations: player {player_idx} card {card_id} has zero amount"
+                                        ));
+                    }
+                }
+            }
         }
         Ok(())
     }
