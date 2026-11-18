@@ -185,6 +185,6 @@ M7 #335 C004 cost → 2赤、M8 #340 C116 自己発動 → **ブランチのみ�
 
 ### このタスクの完了状態
 
-- ブランチ `research/deepai-stage12-readiness`、PR 作成のみ。マージしない。
+- ブランチ `research/deepai-stage12-readiness`、PR #360 を作成。マージしない。
 - 章ごとに commit / push 済み（第1章〜第4章、進捗記録）。
 - 次の担当は `docs/stage12-readiness.md` の 4.5 マトリクスと 4.8 チェックリストから再開する。
