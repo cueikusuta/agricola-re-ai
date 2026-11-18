@@ -45,3 +45,14 @@
 - PR #355 を作成（base は #354 のブランチ）。マージしない。
 
 ### 第3部: ボーナス点 残り4枚の解放条件（ブランチ `research/deepai-bonus-remaining-unblock`）— 未着手
+
+### 第4部: 段階1・段階2 実装準備（ブランチ `research/deepai-stage12-readiness`）— **進行中**
+
+- 起点: `research/deepai-layer1-2-survey`（PR #355）の Head。PR の base は #355 のブランチに置く（スタック）。
+- 対象 **60枚**（OR費用13・他人手番42・カード畑5）を、基盤着地後に即実装できる粒度へ落とす。
+- 成果物: `docs/stage12-readiness.md`。Rust・仕様 JSON・テストは変更しない。
+- 章ごとに commit / push し、この節と `result-deepai.md` を更新する。
+- 第1章（OR費用13枚）: **完了**。A064 / C044 / E052 の費用をカード画像で修正。
+- 第2章（他人手番42枚・前半21枚）: 未着手。
+- 第3章（他人手番42枚・後半21枚）: 未着手。
+- 第4章（カード畑5枚・残件整理）: 未着手。
