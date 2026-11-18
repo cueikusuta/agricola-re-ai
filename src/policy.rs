@@ -534,7 +534,6 @@ fn card_priority(
         value += match effect {
                 // Exact gains and discounted costs were simulated above.
                 CardEffect::OnPlayGain { .. }
-                                | CardEffect::OnPlayGainAnimal { .. }
                                 | CardEffect::OnPlayGainPerStored { .. }
                                 | CardEffect::OnPlayGainIfHouse { .. }
                                 | CardEffect::OnPlayGainPerImprovementPlayed { .. }

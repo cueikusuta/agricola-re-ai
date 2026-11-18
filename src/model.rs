@@ -96,12 +96,6 @@ pub struct Supply {
     pub food: u32,
     pub grain: u32,
     pub vegetable: u32,
-    #[serde(default)]
-    pub sheep: u32,
-    #[serde(default)]
-    pub boar: u32,
-    #[serde(default)]
-    pub cattle: u32,
 }
 impl Supply {
     pub fn get(&self, k: Good) -> u32 {
@@ -125,28 +119,6 @@ impl Supply {
             Good::Grain => self.grain = n,
             Good::Vegetable => self.vegetable = n,
         }
-    }
-    pub fn get_animal(&self, a: Animal) -> u32 {
-        match a {
-            Animal::Sheep => self.sheep,
-            Animal::Boar => self.boar,
-            Animal::Cattle => self.cattle,
-        }
-    }
-    pub fn set_animal(&mut self, a: Animal, n: u32) {
-        match a {
-            Animal::Sheep => self.sheep = n,
-            Animal::Boar => self.boar = n,
-            Animal::Cattle => self.cattle = n,
-        }
-    }
-    pub fn gain_animal(&mut self, a: Animal, n: u32) {
-        self.set_animal(
-            a,
-            self.get_animal(a)
-                .checked_add(n)
-                .expect("animal counter overflow"),
-        )
     }
     pub fn gain(&mut self, k: Good, n: u32) {
         self.set(
