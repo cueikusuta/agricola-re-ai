@@ -431,9 +431,9 @@ impl CardRegistryBuilder {
                     .iter()
                     .any(|(_, quantity)| *quantity == 0 || *quantity > 30)
                 || card.effects.iter().any(|effect| {
-                                    let amount = match effect {
-                                        crate::cards::CardEffect::OnPlayGain { amount, .. }
-                                        | crate::cards::CardEffect::AfterWorkerGain { amount, .. } => *amount,
+                    let amount = match effect {
+                        crate::cards::CardEffect::OnPlayGain { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         crate::cards::CardEffect::EndGameBonus { .. }
                         | crate::cards::CardEffect::Prerequisite { .. }
                         | crate::cards::CardEffect::Passive { .. } => 1,
@@ -927,39 +927,39 @@ fn merge_card_variants(
             eligible_players = vec![2, 3, 4];
         }
         "B102" => {
-                    // B102: 2p=Clay3, 3p=Reed2, 4p=Sheep2 (per official spec)
-                    // Cards.rs only defines 2p variant; 3p variant added via registry.
-                    // 4p effect (Sheep 2) requires OnPlayGainAnimal which is not implemented.
-                    // Therefore B102 is NOT eligible for 4 players (eligible_at_4 = No).
-                    merged_effects.clear();
+            // B102: 2p=Clay3, 3p=Reed2, 4p=Sheep2 (per official spec)
+            // Cards.rs only defines 2p variant; 3p variant added via registry.
+            // 4p effect (Sheep 2) requires OnPlayGainAnimal which is not implemented.
+            // Therefore B102 is NOT eligible for 4 players (eligible_at_4 = No).
+            merged_effects.clear();
 
-                    // 2 players: Clay 3
-                    merged_effects.push(CardEffect::Prerequisite {
-                        rule: CardRequirement::MinimumPlayers(2),
-                    });
-                    merged_effects.push(CardEffect::Prerequisite {
-                        rule: CardRequirement::MaximumPlayers(2),
-                    });
-                    merged_effects.push(CardEffect::OnPlayGain {
-                        good: Good::Clay,
-                        amount: 3,
-                    });
+            // 2 players: Clay 3
+            merged_effects.push(CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumPlayers(2),
+            });
+            merged_effects.push(CardEffect::Prerequisite {
+                rule: CardRequirement::MaximumPlayers(2),
+            });
+            merged_effects.push(CardEffect::OnPlayGain {
+                good: Good::Clay,
+                amount: 3,
+            });
 
-                    // 3 players: Reed 2
-                    merged_effects.push(CardEffect::Prerequisite {
-                        rule: CardRequirement::MinimumPlayers(3),
-                    });
-                    merged_effects.push(CardEffect::Prerequisite {
-                        rule: CardRequirement::MaximumPlayers(3),
-                    });
-                    merged_effects.push(CardEffect::OnPlayGain {
-                        good: Good::Reed,
-                        amount: 2,
-                    });
+            // 3 players: Reed 2
+            merged_effects.push(CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumPlayers(3),
+            });
+            merged_effects.push(CardEffect::Prerequisite {
+                rule: CardRequirement::MaximumPlayers(3),
+            });
+            merged_effects.push(CardEffect::OnPlayGain {
+                good: Good::Reed,
+                amount: 2,
+            });
 
-                    // Eligible for 2 and 3 players only (4p effect not implemented)
-                    eligible_players = vec![2, 3];
-                }
+            // Eligible for 2 and 3 players only (4p effect not implemented)
+            eligible_players = vec![2, 3];
+        }
         _ => {
             // For other cards, check if effects differ by player count
             // If they do, we'd need more sophisticated merging, but for now
