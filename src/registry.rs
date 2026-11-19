@@ -301,6 +301,10 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterSowGain { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterSowGainPerDistinctCrop { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
                 | crate::cards::CardEffect::EndGameBonus { .. } => continue,
@@ -400,7 +404,11 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
-                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. } => *amount,
+                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
+                        | crate::cards::CardEffect::AfterSowGain { amount, .. }
+                        | crate::cards::CardEffect::AfterSowGainPerDistinctCrop { amount } => {
+                            *amount
+                        }
                     };
                     amount == 0 || amount > 30
                 })

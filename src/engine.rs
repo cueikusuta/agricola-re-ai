@@ -448,10 +448,23 @@ impl Game {
         }
         // Worker trigger: AfterWorkerGain and AfterWorkerGainIfUsed, in the
         // active player's played_cards order.
+        let sow_detail = if matches!(
+            action.space,
+            Space::GrainSeeds
+                | Space::VegetableSeeds
+                | Space::GrainUtilization
+                | Space::Cultivation
+                | Space::Farmland
+        ) {
+            Some(action.detail.clone())
+        } else {
+            None
+        };
         let result = crate::card_events::dispatch_after_worker(
             &self.card_set,
             player,
             action.space,
+            sow_detail,
             &mut self.cards,
             &mut self.public.players,
             &mut self.public.improvement_market,

@@ -80,7 +80,7 @@ pub enum House {
     Clay,
     Stone,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Crop {
     Grain,
@@ -1654,6 +1654,7 @@ impl Game {
                             previous_player: None,
                             used_spaces: used_spaces.clone(),
                             event_kind: crate::registry::EventKind::Bake,
+                            sow_detail: None,
                         };
                         // After phase. If THIS is the paused step and the pause
                         // was in the After phase (a resolved ChooseTriggerOrder,
@@ -1787,6 +1788,7 @@ impl Game {
                         previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
                         event_kind: crate::registry::EventKind::ClayConstruction,
+                        sow_detail: None,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -1888,6 +1890,18 @@ impl Game {
                         card_owner: player,
                         beneficiary: player,
                     };
+                    let sow_detail = if matches!(
+                        completion.action.space,
+                        Space::GrainSeeds
+                            | Space::VegetableSeeds
+                            | Space::GrainUtilization
+                            | Space::Cultivation
+                            | Space::Farmland
+                    ) {
+                        Some(completion.action.detail.clone())
+                    } else {
+                        None
+                    };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: Some(completion.action.space),
                         improvement: None,
@@ -1895,6 +1909,7 @@ impl Game {
                         previous_player: None,
                         used_spaces: used_spaces.clone(),
                         event_kind: crate::registry::EventKind::WorkerPlaced,
+                        sow_detail,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue

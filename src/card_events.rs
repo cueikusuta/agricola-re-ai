@@ -11,6 +11,7 @@
 //! Source: docs/bga-card-specification.md and existing repo citations.
 
 use crate::cards::{CardEffect, CardSet};
+use crate::engine::Detail;
 use crate::model::{Animal, Crop, Good, House, Player, Space};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
 use crate::registry::EventKind;
@@ -68,6 +69,8 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterHarvestBakeGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
+        CardEffect::AfterSowGain { .. } => TriggerPhase::After,
+        CardEffect::AfterSowGainPerDistinctCrop { .. } => TriggerPhase::After,
         // End game scoring — After phase
         CardEffect::EndGameBonus { .. } => TriggerPhase::After,
     }
@@ -359,6 +362,7 @@ fn resolve_phase_scan(
             previous_player: trigger_data.previous_player.clone(),
             used_spaces: trigger_data.used_spaces.clone(),
             event_kind: trigger_data.event_kind,
+            sow_detail: trigger_data.sow_detail.clone(),
         };
 
         // Collect all players for snapshot
@@ -511,6 +515,12 @@ fn resolve_phase_scan(
                     *amount,
                     trigger_data,
                 )?,
+                CardEffect::AfterSowGain { good, amount } => {
+                    handle_after_sow_gain(ctx, player, good, *amount, trigger_data)?
+                }
+                CardEffect::AfterSowGainPerDistinctCrop { amount } => {
+                    handle_after_sow_gain_per_distinct_crop(ctx, player, *amount, trigger_data)?
+                }
                 CardEffect::StartRoundGain {
                     good,
                     amount,
@@ -645,6 +655,47 @@ pub struct PhaseTriggerData {
     /// The event kind that triggered this dispatch (for site-specific effects).
     #[serde(default)]
     pub event_kind: EventKind,
+    /// Sow action detail (plantings, bake) for after-sow effects.
+    /// Only populated for sow spaces; `None` otherwise.
+    /// v5 save compatibility: the field is omitted when `None` (identical
+    /// bytes to pre-sow saves) and old saves without the field deserialize
+    /// to `None` via `default`. Serializing it when `Some` is required for
+    /// the ChooseTriggerOrder pause/resume path (model.rs rebuilds the
+    /// trigger from the pending context; a skipped field would drop the
+    /// payload and silently disable the sow effects at resolution time).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sow_detail: Option<Detail>,
+}
+
+/// Check if a space is a sow action space.
+fn is_sow_space(space: Option<Space>) -> bool {
+    matches!(
+        space,
+        Some(
+            Space::GrainSeeds
+                | Space::VegetableSeeds
+                | Space::GrainUtilization
+                | Space::Cultivation
+                | Space::Farmland
+        )
+    )
+}
+
+/// Check if the sow detail represents an unconditional sow action.
+/// For pure sow spaces (GrainSeeds, VegetableSeeds, Cultivation, Farmland),
+/// any sow detail qualifies. For GrainUtilization, it must have plantings
+/// and no bake component.
+fn is_unconditional_sow(detail: Option<&Detail>) -> bool {
+    use crate::engine::Detail;
+    match detail {
+        Some(Detail::Sow { plantings, bake }) => !plantings.is_empty() && *bake == 0,
+        Some(Detail::SowDetailed { plantings, baking }) => {
+            !plantings.is_empty() && baking.is_empty()
+        }
+        Some(Detail::Cultivate { plantings, .. }) => !plantings.is_empty(),
+        Some(Detail::Plow { .. }) => false, // Plow only, no sow
+        _ => false,                         // Other details or None
+    }
 }
 
 /// Check if an effect's trigger condition holds, without consuming budget or card uses.
@@ -704,6 +755,16 @@ fn effect_condition_holds(
             trigger.event_kind == EventKind::Bake && trigger.baked
         }
         CardEffect::HarvestFieldGain { .. } => trigger.event_kind == EventKind::Harvest,
+        CardEffect::AfterSowGain { .. } => {
+            trigger.event_kind == EventKind::WorkerPlaced
+                && is_sow_space(trigger.space)
+                && is_unconditional_sow(trigger.sow_detail.as_ref())
+        }
+        CardEffect::AfterSowGainPerDistinctCrop { .. } => {
+            trigger.event_kind == EventKind::WorkerPlaced
+                && is_sow_space(trigger.space)
+                && trigger.sow_detail.is_some()
+        }
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
@@ -847,6 +908,12 @@ pub fn execute_chosen_triggers(
                 *amount,
                 trigger_data,
             )?,
+            CardEffect::AfterSowGain { good, amount } => {
+                handle_after_sow_gain(ctx, player, good, *amount, trigger_data)?
+            }
+            CardEffect::AfterSowGainPerDistinctCrop { amount } => {
+                handle_after_sow_gain_per_distinct_crop(ctx, player, *amount, trigger_data)?
+            }
             CardEffect::StartRoundGain {
                 good,
                 amount,
@@ -1175,6 +1242,72 @@ fn handle_after_worker_gain_if_used(
     Ok(EffectResult::Resolved)
 }
 
+/// Handle AfterSowGain: gain `amount` of `good` after an unconditional sow action.
+fn handle_after_sow_gain(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    good: &Good,
+    amount: u32,
+    _trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    // Condition already checked in effect_condition_holds; trigger.space is a sow space
+    // and sow_detail confirms unconditional sow.
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(amount)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// Handle AfterSowGainPerDistinctCrop: gain `amount` food per distinct crop type
+/// sown in the action.
+fn handle_after_sow_gain_per_distinct_crop(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    // Count distinct crop types from the sow detail.
+    let distinct_crops = count_distinct_sown_crops(trigger.sow_detail.as_ref());
+    if distinct_crops == 0 {
+        return Ok(EffectResult::Resolved);
+    }
+    let total = distinct_crops
+        .checked_mul(amount)
+        .ok_or("resource overflow")?;
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(Good::Food)
+        .checked_add(total)
+        .ok_or("resource overflow")?;
+    p.supply.set(Good::Food, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// Count distinct crop types (Grain/Vegetable) in a sow detail.
+fn count_distinct_sown_crops(detail: Option<&Detail>) -> u32 {
+    use crate::engine::Detail;
+    let mut crops = std::collections::BTreeSet::new();
+    match detail {
+        Some(Detail::Sow { plantings, .. }) | Some(Detail::SowDetailed { plantings, .. }) => {
+            for planting in plantings {
+                crops.insert(planting.crop);
+            }
+        }
+        Some(Detail::Cultivate { plantings, .. }) => {
+            for planting in plantings {
+                crops.insert(planting.crop);
+            }
+        }
+        _ => {}
+    }
+    crops.len() as u32
+}
+
 fn handle_start_round_gain(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
@@ -1457,6 +1590,7 @@ pub fn dispatch_play(
         previous_player: None,
         used_spaces: std::collections::BTreeSet::new(),
         event_kind: EventKind::CardPlayed,
+        sow_detail: None,
     };
 
     // Phase 1: Replace (prerequisites) - ONLY for the new card
@@ -1560,6 +1694,7 @@ pub fn dispatch_after_worker(
     card_set: &CardSet,
     player: usize,
     space: Space,
+    sow_detail: Option<Detail>,
     cards: &mut crate::cards::CardState,
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
@@ -1598,6 +1733,7 @@ pub fn dispatch_after_worker(
         previous_player: None,
         used_spaces: used_spaces.clone(),
         event_kind: EventKind::WorkerPlaced,
+        sow_detail,
     };
 
     // AfterWorkerGain and AfterWorkerGainIfUsed are After phase. A pause here
@@ -1670,6 +1806,7 @@ pub fn dispatch_start_round(
             previous_player: None,
             used_spaces: used_spaces.clone(),
             event_kind: EventKind::RoundStart,
+            sow_detail: None,
         };
 
         resolve_phase(
@@ -1748,6 +1885,7 @@ pub fn dispatch_after_clay_construction(
         previous_player: Some(previous.clone()),
         used_spaces: used_spaces.clone(),
         event_kind: EventKind::ClayConstruction,
+        sow_detail: None,
     };
 
     // After phase first: a ChooseTriggerOrder pause (Issue #270) must reach
@@ -1820,6 +1958,7 @@ pub fn dispatch_harvest_field(
         previous_player: None,
         used_spaces: used_spaces.clone(),
         event_kind: EventKind::Harvest,
+        sow_detail: None,
     };
 
     resolve_phase(
@@ -1898,6 +2037,7 @@ pub fn dispatch_after_harvest_bake(
         previous_player: None,
         used_spaces: used_spaces.clone(),
         event_kind: EventKind::Bake,
+        sow_detail: None,
     };
 
     // After phase first: a ChooseTriggerOrder pause (Issue #270) must reach
@@ -2448,6 +2588,7 @@ mod tests {
             &set,
             0,
             Space::Forest,
+            None,
             &mut cards,
             &mut players,
             &mut improvement_market,
@@ -2463,6 +2604,137 @@ mod tests {
         .unwrap();
 
         assert_eq!(players[0].supply.wood, 1);
+    }
+
+    /// A065 + E050 on one sow action: two simultaneous After triggers pause
+    /// with ChooseTriggerOrder in the post-work chain. The paused context
+    /// carries the trigger data through serialization (save/load), so the
+    /// resume must still see the sow payload and fire BOTH effects. This
+    /// pins the `#[serde(default, skip_serializing_if)]` contract on
+    /// `PhaseTriggerData::sow_detail`: a skipped field would deserialize to
+    /// `None` at resolution time and silently disable both sow effects.
+    #[test]
+    fn sow_choose_trigger_order_pause_survives_serialization_round_trip() {
+        let mut definitions = verified_band_a_cards();
+        definitions.extend(crate::cards::verified_band_e_cards());
+        let set = CardSet { definitions };
+        let mut players = vec![Player::new(0, 0), Player::new(1, 0)];
+        players[0].played_cards.push("A065".into());
+        players[0].played_cards.push("E050".into());
+        let mut cards = crate::cards::CardState::default();
+        let mut improvement_market = vec![];
+        let mut delayed_well = std::collections::BTreeMap::new();
+        let mut event_budget = 64u32;
+        let mut card_uses = std::collections::BTreeMap::new();
+        let card_use_limits = std::collections::BTreeMap::new();
+        let mut pending = None;
+
+        let sow_detail = Some(Detail::Sow {
+            plantings: vec![crate::engine::Plant {
+                cell: 1,
+                crop: Crop::Grain,
+            }],
+            bake: 0,
+        });
+        let transition = dispatch_after_worker(
+            &set,
+            0,
+            Space::GrainSeeds,
+            sow_detail,
+            &mut cards,
+            &mut players,
+            &mut improvement_market,
+            &mut delayed_well,
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true, // post-work chain: pause permitted
+        )
+        .unwrap();
+        let Transition::Paused(decision) = transition else {
+            panic!("two simultaneous sow effects must pause with ChooseTriggerOrder");
+        };
+        assert!(matches!(
+            decision.kind,
+            PendingKind::ChooseTriggerOrder { .. }
+        ));
+
+        // Simulate the save/load round trip the engine performs: the paused
+        // decision is persisted (pending context incl. trigger_data) and
+        // rebuilt at resolution time.
+        let json = serde_json::to_string(&decision).expect("decision serialization");
+        let restored: PendingDecision = serde_json::from_str(&json).expect("decision round trip");
+
+        let trigger_data: PhaseTriggerData = restored
+            .context
+            .get("trigger_data")
+            .cloned()
+            .and_then(|v| serde_json::from_value(v).ok())
+            .expect("restored context must carry trigger_data");
+        assert!(
+            trigger_data.sow_detail.is_some(),
+            "sow payload must survive the pending-context round trip"
+        );
+        let triggerable: Vec<TriggerableEffect> = restored
+            .context
+            .get("triggerable_effects")
+            .cloned()
+            .and_then(|v| serde_json::from_value(v).ok())
+            .expect("restored context must carry triggerable_effects");
+
+        // Resume exactly as model.rs does: rebuild the dispatch context and
+        // execute the chosen order over the restored trigger data.
+        let mut resumed_players = [Player::new(0, 0), Player::new(1, 0)];
+        resumed_players[0].played_cards.push("A065".into());
+        resumed_players[0].played_cards.push("E050".into());
+        let mut resumed_cards = crate::cards::CardState::default();
+        let mut resumed_market = vec![];
+        let mut resumed_well = std::collections::BTreeMap::new();
+        let mut resumed_budget = 64u32;
+        let mut resumed_uses = std::collections::BTreeMap::new();
+        let resumed_limits = std::collections::BTreeMap::new();
+        let mut resumed_pending = None;
+        {
+            let mut ctx = DispatchContext {
+                card_set: &set,
+                player: &mut resumed_players[0],
+                cards: &mut resumed_cards,
+                improvement_market: &mut resumed_market,
+                delayed_well: &mut resumed_well,
+                round: 1,
+                used_spaces: &std::collections::BTreeSet::new(),
+                event_budget: &mut resumed_budget,
+                card_uses: &mut resumed_uses,
+                card_use_limits: &resumed_limits,
+                pending: &mut resumed_pending,
+                actor: 0,
+                card_owner: 0,
+                beneficiary: 0,
+            };
+            // `_all_players` is unused by execute_chosen_triggers; pass an
+            // empty slice to avoid aliasing the mutably-borrowed player.
+            execute_chosen_triggers(
+                &mut ctx,
+                0,
+                TriggerPhase::After,
+                &trigger_data,
+                &[],
+                &[0, 1],
+                &triggerable,
+            )
+            .unwrap();
+        }
+        assert_eq!(
+            resumed_players[0].supply.grain, 1,
+            "A065 must fire on resume (1 grain)"
+        );
+        assert_eq!(
+            resumed_players[0].supply.food, 1,
+            "E050 must fire on resume (1 distinct crop -> 1 food)"
+        );
     }
 
     #[test]
@@ -2691,6 +2963,7 @@ mod tests {
                 &set,
                 0,
                 space,
+                None,
                 &mut c.cards,
                 &mut c.players,
                 &mut market,
@@ -2941,6 +3214,7 @@ mod tests {
                     &set,
                     0,
                     space,
+                    None,
                     &mut c.cards,
                     &mut c.players,
                     &mut market,
@@ -3356,6 +3630,7 @@ mod tests {
             &set,
             0,
             Space::Forest,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -3445,6 +3720,7 @@ mod tests {
             &set,
             0,
             Space::Forest,
+            None,
             &mut cards,
             &mut players,
             &mut market,
@@ -3481,6 +3757,7 @@ mod tests {
             &set,
             0,
             Space::Fishing,
+            None,
             &mut cards,
             &mut players,
             &mut market,
@@ -3546,6 +3823,7 @@ mod tests {
             &set,
             0,
             Space::Forest,
+            None,
             &mut cards,
             &mut players,
             &mut market,
@@ -3580,6 +3858,7 @@ mod tests {
             &set,
             0,
             Space::Forest,
+            None,
             &mut cards,
             &mut players,
             &mut market,
@@ -3739,6 +4018,7 @@ mod tests {
             &set,
             0,
             Space::Forest,
+            None,
             &mut cards,
             &mut players,
             &mut improvement_market,
@@ -3780,6 +4060,7 @@ mod tests {
             &set,
             0,
             Space::Fishing,
+            None,
             &mut cards,
             &mut players,
             &mut improvement_market,
@@ -5126,6 +5407,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -5167,6 +5449,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -5207,6 +5490,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -5249,6 +5533,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -5288,6 +5573,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -5337,6 +5623,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -5389,6 +5676,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -5435,6 +5723,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -5481,6 +5770,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -5521,6 +5811,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,
@@ -5567,6 +5858,7 @@ mod tests {
             &set,
             0,
             Space::DayLaborer,
+            None,
             &mut c.cards,
             &mut c.players,
             &mut market,

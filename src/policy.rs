@@ -550,15 +550,20 @@ fn card_priority(
                     card_good_value(*good) * i64::from(*amount) * horizon
                 }
                 CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
-                | CardEffect::HarvestFieldGain { good, amount, .. }
-                | CardEffect::AfterClayConstructionGain { good, amount }
-                // E111's halves fire only while the owner stays minor-free; the
-                // heuristic accepts the conditional gain optimistically.
-                | CardEffect::StartRoundGainIfNoMinorPlayed { good, amount, .. }
-                | CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount, .. } => {
-                    card_good_value(*good) * i64::from(*amount) * horizon / 2
-                }
-                // OnPlayGainPerCount (ch3 OnPlayGainPerCount chapter): the exact
+                                | CardEffect::HarvestFieldGain { good, amount, .. }
+                                | CardEffect::AfterClayConstructionGain { good, amount }
+                                | CardEffect::AfterSowGain { good, amount, .. }
+                                // E111's halves fire only while the owner stays minor-free; the
+                                // heuristic accepts the conditional gain optimistically.
+                                | CardEffect::StartRoundGainIfNoMinorPlayed { good, amount, .. }
+                                | CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                }
+                                CardEffect::AfterSowGainPerDistinctCrop { amount } => {
+                                    // Heuristic: ~1.5 distinct crops per sow action on average
+                                    card_good_value(Good::Food) * i64::from(*amount) * 3 / 2 * horizon / 2
+                                }
+                                // OnPlayGainPerCount (ch3 OnPlayGainPerCount chapter): the exact
                 // per-count quantity needs board state this heuristic does not
                 // have, so use a per-kind typical count at play time.
                 CardEffect::OnPlayGainPerCount {
