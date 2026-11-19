@@ -352,7 +352,7 @@ pub fn deal_initial_hands(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cards::{CardDefinition, CardKind, CardSet};
+    use crate::cards::{CardDefinition, CardKind, CardSet, PostPlayDestination};
     use crate::model::Player;
 
     fn test_setup() -> (CardSet, CardState, Vec<Player>) {
@@ -365,6 +365,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: PostPlayDestination::PlayedArea,
                 },
                 CardDefinition {
                     use_limit: None,
@@ -373,6 +374,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: PostPlayDestination::PlayedArea,
                 },
             ],
         };
@@ -423,6 +425,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
         });
         let err = validate_card_partition(&set, &cards, &players).unwrap_err();
         assert!(err.contains("missing"));
@@ -447,6 +450,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: PostPlayDestination::PlayedArea,
                 },
                 CardDefinition {
                     use_limit: None,
@@ -455,6 +459,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: PostPlayDestination::PlayedArea,
                 },
             ],
         };
@@ -646,6 +651,7 @@ mod tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: PostPlayDestination::PlayedArea,
             }],
         };
         let mut cards = CardState {

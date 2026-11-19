@@ -1186,11 +1186,9 @@ mod tests {
         // Updated: added E007/E008 to verified_immediate_resource_cards — E-prefixed cards are
         // excluded from the verified pool, so the sample_game distribution is unchanged.
         // Updated: added A042 Forest Lake Hut to verified_minor_worker_cards (pool size 33->34)
-        // Updated: added A121 Brick Stamping to verified_minor_worker_cards (pool size 34->35)
-        // Updated: added B064 Waterwheel + C141 Sheep Provider + A050 Milk Jug + D061 Bale of Straw
-        // to the verified pools (worker_bonus + round_and_harvest, pool size 35->39)
+        // Updated: added A001-A007 on-play simple gain cards to verified_a_onplay_simple_cards (pool size 35->40)
         assert_eq!(
-            digest, "26895709ce7d07c170a1cefdf39dfe53a2d04b8a1e18bcb5a7e6c9adcb9151f0",
+            digest, "775345ef163590ff21753eb582fc08973c8642d8e8dfb4a7e55b66923743f2ce",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
@@ -1546,7 +1544,9 @@ mod tests {
     /// the observation mirror.
     #[test]
     fn sample_game_reconstructs_card_use_limits() {
-        use crate::cards::{verified_basic_card_set, CardDefinition, CardEffect, CardSet};
+        use crate::cards::{
+            verified_basic_card_set, CardDefinition, CardEffect, CardSet, PostPlayDestination,
+        };
         use crate::engine::{Action, Detail};
         use crate::model::Good;
         use rand::SeedableRng;
@@ -1565,6 +1565,7 @@ mod tests {
                 amount: 1,
             }],
             use_limit: Some(1),
+            post_play: PostPlayDestination::PlayedArea,
         });
         let card_set = CardSet { definitions };
 

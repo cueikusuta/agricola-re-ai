@@ -15,10 +15,10 @@
 //! - Cards absent from the registry are treated as `unverified` (fail closed),
 //!   never as usable.
 use crate::cards::{
-    verified_extra_simple_cards, verified_immediate_resource_cards, verified_minor_worker_cards,
-    verified_multiplayer_passive_cards, verified_passive_cards, verified_round_and_harvest_cards,
-    verified_scoring_cards, verified_simple_occupations, verified_worker_bonus_cards,
-    CardDefinition, CardKind, CardSet,
+    verified_a_onplay_simple_cards, verified_extra_simple_cards, verified_immediate_resource_cards,
+    verified_minor_worker_cards, verified_multiplayer_passive_cards, verified_passive_cards,
+    verified_round_and_harvest_cards, verified_scoring_cards, verified_simple_occupations,
+    verified_worker_bonus_cards, CardDefinition, CardKind, CardSet,
 };
 use crate::registry::{CardPool, CardRegistry};
 use serde::{Deserialize, Serialize};
@@ -147,6 +147,7 @@ pub fn builtin_implemented_cards() -> Vec<CardDefinition> {
     cards.extend(verified_round_and_harvest_cards());
     cards.extend(verified_passive_cards());
     cards.extend(verified_extra_simple_cards());
+    cards.extend(verified_a_onplay_simple_cards());
     let mut seen = BTreeSet::new();
     cards.retain(|card| seen.insert(card.id.clone()));
     cards
@@ -301,7 +302,7 @@ pub fn experimental_pool_card_ids(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cards::CardKind;
+    use crate::cards::{CardKind, PostPlayDestination};
 
     fn def(id: &str, kind: CardKind) -> CardDefinition {
         CardDefinition {
@@ -311,6 +312,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
         }
     }
 

@@ -7,7 +7,7 @@
 //! - `CardSet` compat adapter — preserves existing API for saves/replays/observations
 
 use crate::card_pool::{CardReview, Eligibility, ReviewStatus};
-use crate::cards::{CardDefinition, CardKind, CardSet};
+use crate::cards::{CardDefinition, CardKind, CardSet, PostPlayDestination};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -117,6 +117,7 @@ impl RegisteredCard {
             cost: self.cost.clone(),
             points: self.points,
             effects: self.effects.clone(),
+            post_play: PostPlayDestination::PlayedArea,
         }
     }
 }
@@ -278,10 +279,16 @@ impl CardRegistryBuilder {
             let kind = match effect {
                 crate::cards::CardEffect::AfterWorkerGain { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::OnPlayGain { .. }
-                | crate::cards::CardEffect::OnPlayGainPerStored { .. }
-                | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
-                | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                                | crate::cards::CardEffect::OnPlayGainPerStored { .. }
+                                | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
+                                | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
+                                | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                                // A001–A007 on-play simple effects
+                                | crate::cards::CardEffect::OnPlayBuildStableInPasture { .. }
+                                | crate::cards::CardEffect::OnPlayPlowField { .. }
+                                | crate::cards::CardEffect::OnPlayPickAndPlayOccupation { .. }
+                                | crate::cards::CardEffect::OnPlayGainPerMatchingImprovement { .. }
+                                | crate::cards::CardEffect::OnPlayGainPerFieldType { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -302,18 +309,11 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
-                crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
-                crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
-                crate::cards::CardEffect::AfterAnyWorkerGain { .. } => EventKind::WorkerPlaced,
-                crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
-                    EventKind::WorkerPlaced
-                }
-                crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
                 | crate::cards::CardEffect::EndGameBonus { .. } => continue,
                 #[cfg(test)]
-                crate::cards::CardEffect::PendingProbe { .. } => continue,
+                crate::cards::CardEffect::PendingProbe { .. } => continue
             };
             self.event_index
                 .by_kind
@@ -409,14 +409,13 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
-                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
-                        | crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
-                        | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
-                        | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
-                        | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
-                        | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. } => {
-                            *amount
-                        }
+                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. } => *amount,
+                        // New on-play simple gain effects (M10 Chapter 1) - no amount field
+                        crate::cards::CardEffect::OnPlayBuildStableInPasture { .. }
+                        | crate::cards::CardEffect::OnPlayPlowField { .. }
+                        | crate::cards::CardEffect::OnPlayPickAndPlayOccupation { .. }
+                        | crate::cards::CardEffect::OnPlayGainPerMatchingImprovement { .. }
+                        | crate::cards::CardEffect::OnPlayGainPerFieldType { .. } => 1,
                     };
                     amount == 0 || amount > 30
                 })
@@ -787,6 +786,16 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
     builder = add_cards_inner(
         builder,
         crate::cards::verified_extra_simple_cards(),
+        &mut seen,
+    )?;
+    // A-deck on-play simple cards (A001/A002/A003/A006/A007) — BGA-checked
+    // specs with typed on-play effects and post_play = LeftNeighborHand.
+    // Registered like every other implemented card: the review stays
+    // `unverified` because official verification is tracked externally (#115
+    // ledger), so the new and legacy pool-gate reports stay in parity.
+    builder = add_cards_inner(
+        builder,
+        crate::cards::verified_a_onplay_simple_cards(),
         &mut seen,
     )?;
     // C-deck band 070-120 typed effects (kept out of the A/B two-player
