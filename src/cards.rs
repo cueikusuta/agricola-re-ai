@@ -150,6 +150,13 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// C006 石取り作業 / C007 刈り鋏 (BGA spec `post_play.destination =
+    /// "left_neighbor_hand"`): the card does not stay in front of the owner;
+    /// after its play resolves, it is passed to the left neighbor's hand.
+    /// This is zone-move metadata, not a resolvable effect: the engine's
+    /// PlayMinor/PlayOccupation arms move the card after the play chain
+    /// completes, and every dispatcher/policy match treats it as a no-op.
+    PostPlayPassLeft,
     /// C068 書棚 (Bookcase): each time the owner plays an occupation AFTER
     /// this card, gain `amount` of `good`. Fixed amount per occupation played,
     /// independent of the occupation's cost. Fired from the play dispatcher's
@@ -231,6 +238,7 @@ impl CardEffect {
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
             CardEffect::OnPlayChoiceGain { .. } => "on_play_choice_gain",
             CardEffect::OnPlayAddStoneToEmptyFields { .. } => "on_play_add_stone_to_empty_fields",
+            CardEffect::PostPlayPassLeft => "post_play_pass_left",
         }
     }
 }
@@ -476,6 +484,9 @@ impl CardSet {
                         | CardEffect::AfterAnyWorkerOthersGain { amount, .. }
                         | CardEffect::HarvestStartGainIfFields { amount, .. }
                         | CardEffect::OnPlayAddStoneToEmptyFields { amount, .. } => *amount,
+                        // PostPlayPassLeft is a zone move, not a gain: no
+                        // amount to bound.
+                        CardEffect::PostPlayPassLeft => 1,
                         CardEffect::OnPlayChoiceGain { options } => {
                             options.iter().map(|o| o.amount).max().unwrap_or(1)
                         }
@@ -957,6 +968,10 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                     };
                     safe_gain(player, opt.good, amount)?;
                 }
+            }
+            CardEffect::PostPlayPassLeft => {
+                // Zone-move metadata: the engine play arm performs the hand
+                // pass after the play transaction; nothing to resolve here.
             }
             _ => {}
         }
@@ -2377,7 +2392,36 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
     }
     // Harvest field_stones placed by C006 石取り作業 / Stone Clearing:
     // stones on fields are converted to stone goods at the field phase,
-    // and the field_stones counter is reset.
+    // and the field_stones counter is reset. Single source of truth — also
+    // called from the engine's `harvest_fields` (production path).
+    harvest_field_stones(set, player)?;
+    Ok(())
+}
+
+/// Apply one gain option of an `OnPlayChoiceGain` effect (C007 刈り鋏):
+/// the option at `chosen` is resolved against the player's current state.
+/// `None` (out of range) fails closed. This is the single resolution point
+/// shared by the engine's `PlayMinorChoice` arm and tests.
+pub fn apply_choice_gain(
+    player: &mut Player,
+    options: &[ChoiceGainOption],
+    chosen: usize,
+) -> Result<(), String> {
+    let opt = options
+        .get(chosen)
+        .ok_or("choice index out of range for OnPlayChoiceGain")?;
+    let amount = match opt.per_animal {
+        Some(animal) => opt.amount.saturating_mul(player.animal_count(animal)),
+        None => opt.amount,
+    };
+    safe_gain(player, opt.good, amount)
+}
+
+/// Collect stones placed on the player's fields (C006 石取り作業):
+/// each stone becomes 1 stone good for the owner and the per-field
+/// counter is reset. Shared by the engine field phase and the legacy
+/// `harvest_field_rewards` wrapper so both path families agree.
+pub fn harvest_field_stones(_set: &CardSet, player: &mut Player) -> Result<(), String> {
     let stones_to_harvest: Vec<u32> = player
         .farm
         .iter()
@@ -3468,6 +3512,7 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                     good: Good::Stone,
                     amount: 1,
                 },
+                CardEffect::PostPlayPassLeft,
             ],
         ),
         // C007 刈り鋏 (Blade Shears): cost wood1, prerequisite 1 pasture; on
@@ -3495,6 +3540,7 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                         },
                     ],
                 },
+                CardEffect::PostPlayPassLeft,
             ],
         ),
     ]
@@ -3967,6 +4013,493 @@ mod verified_band_c_tests {
         // per_sheep: 1 food per sheep × 0 sheep = 0 food
         assert_eq!(p.supply.food, 0);
         assert_eq!(p.animal_count(Animal::Sheep), 0);
+    }
+
+    /// Pad the verified band-C pool up to the validated deck size (7 cards
+    /// of each kind per player) with inert dummy definitions so the contract
+    /// cases can drive the production `Game::apply` path.
+    fn production_definitions() -> Vec<CardDefinition> {
+        let mut definitions = verified_band_c_cards();
+        let minors = definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::MinorImprovement)
+            .count();
+        for i in 0..(14usize.saturating_sub(minors)) {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("M9X{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        let occupations = definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::Occupation)
+            .count();
+        for i in 0..(14usize.saturating_sub(occupations)) {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("O9X{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        definitions
+    }
+
+    /// Deal a deterministic, valid hand: seat 0 holds the band-C minors and
+    /// occupations it needs (with `focus` injected over a dummy), seat 1
+    /// holds dummies.
+    fn production_hands(focus: &str) -> Vec<Vec<String>> {
+        let definitions = production_definitions();
+        let mut minors: Vec<String> = definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::MinorImprovement && c.id.starts_with('C'))
+            .map(|c| c.id.clone())
+            .collect();
+        minors.retain(|id| id != focus);
+        let mut hand0: Vec<String> = vec![focus.to_string()];
+        hand0.extend(minors.iter().take(4).cloned());
+        hand0.extend(["M9X0", "M9X1"].iter().map(|s| s.to_string()));
+        assert_eq!(hand0.len(), 7, "seat 0 must hold seven minor improvements");
+        let occ0: Vec<String> = definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::Occupation && c.id.starts_with('C'))
+            .map(|c| c.id.clone())
+            .collect();
+        hand0.extend(occ0.iter().take(3).cloned());
+        hand0.extend(
+            ["O9X0", "O9X1", "O9X2", "O9X3"]
+                .iter()
+                .map(|s| s.to_string()),
+        );
+        assert_eq!(
+            hand0.len(),
+            14,
+            "seat 0 must hold seven minors + seven occupations"
+        );
+        // Seat 1 gets the leftovers: the one band-C minor seat 0 did not take
+        // (minors[4], the fifth non-focus band-C minor) plus six dummies.
+        let minor_rest = minors.get(4).cloned().expect("six band-C minors");
+        let mut hand1: Vec<String> = vec![minor_rest];
+        hand1.extend(["M9X2", "M9X3", "M9X4", "M9X5", "M9X6", "M9X7"].map(|s| s.to_string()));
+        hand1.extend(
+            ["O9X4", "O9X5", "O9X6", "O9X7", "O9X8", "O9X9", "O9X10"].map(|s| s.to_string()),
+        );
+        assert_eq!(
+            hand1.len(),
+            14,
+            "seat 1 must hold seven minors + seven occupations"
+        );
+        vec![hand0, hand1]
+    }
+
+    #[test]
+    fn c006_production_path_places_stones_and_passes_left() {
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Space};
+
+        // band_c pool + a played occupation to satisfy the prerequisite.
+        let set = CardSet {
+            definitions: production_definitions(),
+        };
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                seed: 7, // round 1 reveals the Major Improvement space
+                ..Config::default()
+            },
+            set,
+            production_hands("C006"),
+        )
+        .unwrap();
+        let p = &mut game.public.players[0];
+        // Prerequisite: one played occupation (from the dealt hand).
+        let occ = game.cards.hands[0]
+            .iter()
+            .find(|id| {
+                game.card_set
+                    .definition(id)
+                    .is_some_and(|c| c.kind == CardKind::Occupation)
+            })
+            .cloned()
+            .expect("seat 0 holds occupations");
+        game.cards.hands[0].retain(|id| id != &occ);
+        p.played_cards.push(occ.clone());
+        p.supply.food = 1;
+        // Contract case C006-normal setup: 2 empty fields + 1 occupied.
+        p.farm[0].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[1].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        let action = Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinor {
+                card_id: "C006".into(),
+            },
+        };
+        game.validate_action(&action).unwrap();
+        game.apply(action).unwrap();
+
+        let owner = &game.public.players[0];
+        // Contract: stones_on_fields == 2, occupied field got none.
+        assert_eq!(owner.farm[0].field_stones, 1);
+        assert_eq!(owner.farm[1].field_stones, 1);
+        assert_eq!(owner.farm[2].field_stones, 0);
+        // Cost paid: food 1 -> 0.
+        assert_eq!(owner.supply.food, 0);
+        // Contract: post_play destination = left_neighbor_hand. Two players:
+        // the left neighbor of seat 0 is seat 1.
+        assert!(
+            !owner.played_cards.iter().any(|c| c == "C006"),
+            "C006 must not stay in front of the owner"
+        );
+        assert!(
+            game.cards.hands[1].iter().any(|c| c == "C006"),
+            "C006 must be in the left neighbor's hand"
+        );
+        // The occupation stays in front of the owner.
+        assert!(owner.played_cards.iter().any(|c| c == &occ));
+    }
+
+    #[test]
+    fn c006_production_path_harvests_stones_at_field_phase() {
+        use crate::model::{Config, Game};
+
+        let set = CardSet {
+            definitions: production_definitions(),
+        };
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                seed: 7, // round 1 reveals the Major Improvement space
+                ..Config::default()
+            },
+            set,
+            production_hands("C006"),
+        )
+        .unwrap();
+        let p = &mut game.public.players[0];
+        // Contract case C006-harvest setup: 3 stones standing on fields.
+        p.farm[0].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[0].field_stones = 3;
+        let stone_before = p.supply.stone;
+        game.public.round = 4; // a field-phase (harvest) round
+        game.harvest_fields().unwrap();
+        let p = &game.public.players[0];
+        // Contract: owner_stone_delta == 3 and the fields are cleared.
+        assert_eq!(p.supply.stone, stone_before + 3);
+        assert_eq!(p.farm[0].field_stones, 0);
+    }
+
+    #[test]
+    fn c007_production_path_choice_flat_and_per_sheep() {
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Pasture, Space};
+
+        let set = CardSet {
+            definitions: production_definitions(),
+        };
+        let hands = production_hands("C007");
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                seed: 7, // round 1 reveals the Major Improvement space
+                ..Config::default()
+            },
+            set,
+            hands,
+        )
+        .unwrap();
+        {
+            let p = &mut game.public.players[0];
+            // Contract prerequisites: pasture_count == 1. Build legal fenced
+            // pastures on non-adjacent cells 10 and 12.
+            p.farm[10].tile = Tile::Pasture { id: 0 };
+            p.farm[12].tile = Tile::Pasture { id: 1 };
+            p.pastures.push(Pasture {
+                id: 0,
+                cells: vec![10],
+                animal: None,
+                quantity: 0,
+            });
+            p.supply.wood = 1;
+            // Contract case C007-flat setup: 1 sheep.
+            p.pastures.push(Pasture {
+                id: 1,
+                cells: vec![12],
+                animal: Some(Animal::Sheep),
+                quantity: 1,
+            });
+            let mut fences = crate::model::pasture_border(&[10]);
+            fences.extend(crate::model::pasture_border(&[12]));
+            p.fences = fences;
+        }
+        // Plain PlayMinor must fail closed for the choice card.
+        let plain = Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinor {
+                card_id: "C007".into(),
+            },
+        };
+        assert!(game.apply(plain).is_err());
+
+        // Choice index 0 = flat 3 food.
+        let food_before = game.public.players[0].supply.food;
+        let action = Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinorChoice {
+                card_id: "C007".into(),
+                option: 0,
+            },
+        };
+        game.apply(action).unwrap();
+        let owner = &game.public.players[0];
+        // Contract C007-flat: food_delta == 3, sheep kept.
+        assert_eq!(owner.supply.food, food_before + 3);
+        assert_eq!(owner.animal_count(Animal::Sheep), 1);
+        assert_eq!(owner.supply.wood, 0);
+        // Post-play pass.
+        assert!(!owner.played_cards.iter().any(|c| c == "C007"));
+        assert!(game.cards.hands[1].iter().any(|c| c == "C007"));
+    }
+
+    #[test]
+    fn c007_production_path_per_sheep_and_zero_sheep() {
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Pasture, Space};
+
+        let set = CardSet {
+            definitions: production_definitions(),
+        };
+        // 4 sheep case: per_sheep option (index 1) grants 4 food.
+        let hands = production_hands("C007");
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                seed: 7, // round 1 reveals the Major Improvement space
+                ..Config::default()
+            },
+            set,
+            hands,
+        )
+        .unwrap();
+        {
+            let p = &mut game.public.players[0];
+            // One two-cell pasture: capacity 2 cells * 2 = 4 slots for the
+            // 4 sheep, and pasture_count == 1 satisfies the prerequisite.
+            p.farm[10].tile = Tile::Pasture { id: 0 };
+            p.farm[11].tile = Tile::Pasture { id: 0 };
+            p.supply.wood = 1;
+            p.pastures.push(Pasture {
+                id: 0,
+                cells: vec![10, 11],
+                animal: Some(Animal::Sheep),
+                quantity: 4,
+            });
+            p.fences = crate::model::pasture_border(&[10, 11]);
+        }
+        let action = Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinorChoice {
+                card_id: "C007".into(),
+                option: 1,
+            },
+        };
+        let food_before = game.public.players[0].supply.food;
+        game.apply(action).unwrap();
+        // Contract C007-per-sheep: food_delta == 4, sheep kept.
+        assert_eq!(game.public.players[0].supply.food, food_before + 4);
+        assert_eq!(game.public.players[0].animal_count(Animal::Sheep), 4);
+
+        // Out-of-range option fails closed.
+        let set = CardSet {
+            definitions: production_definitions(),
+        };
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                seed: 7, // round 1 reveals the Major Improvement space
+                ..Config::default()
+            },
+            set,
+            production_hands("C007"),
+        )
+        .unwrap();
+        {
+            let p = &mut game.public.players[0];
+            p.farm[10].tile = Tile::Pasture { id: 0 };
+            p.pastures.push(Pasture {
+                id: 0,
+                cells: vec![10],
+                animal: None,
+                quantity: 0,
+            });
+            p.fences = crate::model::pasture_border(&[10]);
+            p.supply.wood = 1;
+        }
+        let bad = Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinorChoice {
+                card_id: "C007".into(),
+                option: 2,
+            },
+        };
+        assert!(game.apply(bad).is_err());
+
+        // Contract C007-zero-sheep: per_sheep with 0 sheep -> 0 food (playable).
+        let set = CardSet {
+            definitions: production_definitions(),
+        };
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                seed: 7, // round 1 reveals the Major Improvement space
+                ..Config::default()
+            },
+            set,
+            production_hands("C007"),
+        )
+        .unwrap();
+        {
+            let p = &mut game.public.players[0];
+            p.farm[10].tile = Tile::Pasture { id: 0 };
+            p.pastures.push(Pasture {
+                id: 0,
+                cells: vec![10],
+                animal: None,
+                quantity: 0,
+            });
+            p.fences = crate::model::pasture_border(&[10]);
+            p.supply.wood = 1;
+        }
+        let action = Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinorChoice {
+                card_id: "C007".into(),
+                option: 1,
+            },
+        };
+        let food_before = game.public.players[0].supply.food;
+        game.apply(action).unwrap();
+        assert_eq!(game.public.players[0].supply.food, food_before);
+    }
+
+    #[test]
+    fn c006_zero_empty_fields_production_path_still_playable() {
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Space};
+
+        let set = CardSet {
+            definitions: production_definitions(),
+        };
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                seed: 7, // round 1 reveals the Major Improvement space
+                ..Config::default()
+            },
+            set,
+            production_hands("C006"),
+        )
+        .unwrap();
+        {
+            let p = &mut game.public.players[0];
+            let occ = game.cards.hands[0]
+                .iter()
+                .find(|id| {
+                    game.card_set
+                        .definition(id)
+                        .is_some_and(|c| c.kind == CardKind::Occupation)
+                })
+                .cloned()
+                .expect("seat 0 holds occupations");
+            game.cards.hands[0].retain(|id| id != &occ);
+            p.played_cards.push(occ);
+            p.supply.food = 1;
+            // Contract case C006-zero-empty: no empty fields (3 occupied).
+            p.farm[0].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            };
+            p.farm[1].tile = Tile::Field {
+                crop: Some(Crop::Vegetable),
+                remaining: 1,
+            };
+            p.farm[2].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            };
+        }
+        let action = Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinor {
+                card_id: "C006".into(),
+            },
+        };
+        // Contract: play_allowed with zero empty fields, stones_on_fields == 0.
+        game.apply(action).unwrap();
+        let owner = &game.public.players[0];
+        assert_eq!(owner.farm[0].field_stones, 0);
+        assert_eq!(owner.farm[1].field_stones, 0);
+        assert_eq!(owner.farm[2].field_stones, 0);
+        // Still consumed cost + passed left.
+        assert_eq!(owner.supply.food, 0);
+        assert!(!owner.played_cards.iter().any(|c| c == "C006"));
+        assert!(game.cards.hands[1].iter().any(|c| c == "C006"));
+    }
+
+    #[test]
+    fn c006_prerequisite_enforced_on_production_path() {
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Space};
+
+        let set = CardSet {
+            definitions: production_definitions(),
+        };
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                seed: 7, // round 1 reveals the Major Improvement space
+                ..Config::default()
+            },
+            set,
+            production_hands("C006"),
+        )
+        .unwrap();
+        game.public.players[0].supply.food = 1;
+        // No occupation played: the contract's prerequisite must reject.
+        let action = Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinor {
+                card_id: "C006".into(),
+            },
+        };
+        assert!(game.apply(action).is_err());
+        // Also fails without the food cost.
+        let mut game = Game::with_cards_and_hands(
+            Config::default(),
+            CardSet {
+                definitions: production_definitions(),
+            },
+            production_hands("C006"),
+        )
+        .unwrap();
+        game.public.players[0].supply.wood = 1; // wrong good
+        let action = Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinor {
+                card_id: "C006".into(),
+            },
+        };
+        assert!(game.apply(action).is_err());
     }
 }
 

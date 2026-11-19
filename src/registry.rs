@@ -283,9 +283,8 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. }
                 | crate::cards::CardEffect::OnPlayChoiceGain { .. }
-                | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. } => {
-                    EventKind::CardPlayed
-                }
+                | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. }
+                | crate::cards::CardEffect::PostPlayPassLeft => EventKind::CardPlayed,
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -423,6 +422,8 @@ impl CardRegistryBuilder {
                         crate::cards::CardEffect::OnPlayChoiceGain { options } => {
                             options.iter().map(|o| o.amount).max().unwrap_or(1)
                         }
+                        // Zone-move metadata carries no gain amount.
+                        crate::cards::CardEffect::PostPlayPassLeft => 1,
                     };
                     amount == 0 || amount > 30
                 })
