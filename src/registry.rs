@@ -298,12 +298,20 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterOccupationGainPerFoodCost { .. } => {
                     EventKind::CardPlayed
                 }
+                crate::cards::CardEffect::AfterOccupationGain { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::HarvestFieldGain { .. } => EventKind::Harvest,
                 crate::cards::CardEffect::AfterClayConstructionGain { .. } => {
                     EventKind::ClayConstruction
                 }
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
+                crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterAnyWorkerGain { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
                 crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
                     EventKind::ImprovementPlayed
                 }
@@ -402,11 +410,17 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterOccupationGainPerFoodCost {
                             amount, ..
                         }
+                        | crate::cards::CardEffect::AfterOccupationGain { amount, .. }
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
+                        | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
+                        | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. }
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
                         }

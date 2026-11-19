@@ -1,89 +1,84 @@
-## Summary
+## 概要
 
-PR #372 の P1 指摘への対処: `load_json` の旧セーブ移行ブロックが実質的にデッドコードになっていた問題を、旧形式のみの v5 fixture と修正前 RED / 修正後 GREEN の実測証跡で固定。
+帯内未実装 4 枚（A109/A118/C088/C115）＋ 実装済み記録漏れ 2 枚（A088/A110）について、
+外部レビュー（Arena 読み取り専用）の指摘 6 件を実コード・PR・ボードで照合し、
+記録の補完と A109 の実装を行った。
 
-## Problem
+## Step 1: 指摘 6 件の照合結果
 
-現行の `with_well_schedule_2p_seed7_r4.json` fixture は新旧混在形式（トップレベルにも `public` にも `well_food_schedule` / `card_uses` が非空）だったため、`load_json` の移行分岐（`public.*` が空のときのみ移設）が**一度も通らない**。移行ブロックを丸ごと削除しても `legacy_v5_fixture_loads_and_replays` が緑のまま（レビュー側で実測）。さらに fixture の `log.integrity_hash` が `null` で、元 P1 の「旧セーブが integrity mismatch で拒否される」経路も再現していなかった。
+| ID | (a) src/実装 | (b) spec JSON | (c) 保留記録 | (d) 台帳/一覧表 | 判定 | 根拠 |
+|---|---|---|---|---|---|---|
+| **A109 小商人** | なし | あり (`bga_checked`, `not_started`) | なし | あり (ledger, catalog) | **実在** | `git grep A109 src/` = 0; `data/bga-card-specs/A109.json` 存在・status確認; ledger行あり; catalog行あり (難易度3) |
+| **A118 樹木庭師** | なし | あり (`bga_checked`, `not_started`) | なし | あり (ledger, catalog) | **実在** | `git grep A118 src/` = 0; `data/bga-card-specs/A118.json` 存在・status確認; ledger行あり; catalog行あり (難易度3) |
+| **C088 見習い大工** | なし | **なし** (spec JSON 存在せず) | なし | あり (ledger, catalog) | **実在** | `git grep C088 src/` = 0; `data/bga-card-specs/` に C088.json なし; ledger行あり; catalog行あり (難易度3) |
+| **C115 播種人** | なし | **なし** (spec JSON 存在せず) | なし | あり (ledger, catalog) | **実在** | `git grep C115 src/` = 0; `data/bga-card-specs/` に C115.json なし; ledger行あり; catalog行あり (難易度3) |
+| **A088 生け垣管理人** | あり (`PassiveRule::FenceWoodDiscount(3)`) | あり (`implemented`) | なし | あり (ledger, catalog) | **一部実在** (実装済み・記録欠落) | spec.implementation_status=implemented, ledger.implementation_status=implemented; 「文書に未記載」は実装欠落ではなく記録側の欠落 |
+| **A110 仕立屋** | あり (`AfterClayConstructionGain { food, 3 }`) | あり (`implemented`) | なし | あり (ledger, catalog) | **一部実在** (実装済み・記録欠落) | 同上 |
 
-## Changes
+## Step 2: 記録の補完
 
-1. **旧形式のみの v5 fixture を新規作成** (`tests/fixtures/v5/old_format_well_schedule_2p_seed7_r4.json`)
-   - トップレベルに `well_food_schedule` / `card_uses` 非空、`public.*` には両欄なし
-   - `log.initial_public_state` にも両欄なし（空オブジェクトなし）
-   - `log.integrity_hash: null`（pre-Step3 互換）
-   - 既存 `with_well_schedule_2p_seed7_r4.json` から `public.*` と `log.initial_public_state.*` を除去して生成
+新規ドキュメント `docs/outband-unimplemented-records.md` を作成し、6 枚すべての個別記録を記録した。
+- A109/A118/C088/C115: 未実装の理由・必要前提・次の一手
+- A088/A110: 実装済みであることを正式記録（DEEPAI_PROGRESS.md への記載は open PR 6 本と衝突するため行わない）
 
-2. **混在 fixture を純粋新形式に修正** (`tests/fixtures/v5/with_well_schedule_2p_seed7_r4.json`)
-   - トップレベルの `well_food_schedule` / `card_uses` を削除
-   - `public.*` と `log.initial_public_state.*` のみを正本とする
+## Step 3: A109 実装（最優先）
 
-3. **テスト追加・更新** (`tests/m1.rs`)
-   - `legacy_v5_old_format_fixture_migrates_correctly`: 旧形式 fixture のロード→移行検証→再演照合→整合性検証→継続プレイ→往復保存を一連で検証
-   - `legacy_v5_fixture_loads_and_replays`: コメント修正（移行テスト→新形式ロードテスト）
+**仕様**: 改進歩（大進歩/小進歩）が手札からプレイされるたび、3 食料を獲得。
 
-## RED / GREEN 実測証跡
+**変更内容**:
+1. `EventKind::ImprovementPlayed` 追加 (`src/registry.rs`)
+2. `CardEffect::AfterImprovementPlayedGain { good, amount }` 追加 (`src/cards.rs`)
+3. `effect_phase` / `effect_condition_holds` / `execute_chosen_triggers` 対応 (`src/card_events.rs`)
+4. `dispatch_play` に改進歩プレイ後の専用スキャン追加 (`src/card_events.rs`)
+3. イベントインデックス登録追加 (`src/registry.rs`)
+4. `verified_band_a_cards()` に A109 定義追加 (`src/cards.rs`)
+5. `src/policy.rs` ヒューリスティック対応
+6. **テスト追加** (`tests/ch04_after_improvement_played.rs`, 6 件):
+   - レジストリ到達性
+   - `apply_on_play_effects` 経路（on-play 効果なし）
+   - `dispatch_play` 経路: 正系（小進歩プレイで発火）
+   - `dispatch_play` 経路: 不発（職業プレイでは発火しない）
+   - `dispatch_play` 経路: 複数回発火
+   - `dispatch_play` 経路: 境界（A109 より前にプレイされた改進歩では発火しない）
 
-### RED: 移行ブロック削除状態（`314c775` 相当）で旧形式 fixture が失敗
+## 既存カード `t_49f032aa` との切り分け
 
-```bash
-# src/model.rs の移行ブロック（1089-1106行）をコメントアウト
-cargo test legacy_v5_old_format_fixture_migrates_correctly -- --nocapture
-```
+- A118 の実装は `t_49f032aa` (worker-kilo, ready, branch `m10/hermes-ch-harvest-followup`) の担当。本 PR では **A118 を実装しない**。
+- 記録のみを行う。
 
-```
-thread 'legacy_v5_old_format_fixture_migrates_correctly' panicked at tests/m1.rs:945:9:
-assertion `left == right` failed: well_food_schedule round 5 should migrate to public
-  left: None
- right: Some([0])
-test legacy_v5_old_format_fixture_migrates_correctly ... FAILED
-```
+## C088 / C115 の扱い
 
-→ 移行なしでは `public.well_food_schedule` が `None` のまま（トップレベルの値が移設されない）
+- いずれも **spec JSON が存在しない** ため、仕様作成 (`data/bga-card-specs/<ID>.json` + tests JSON、`scripts/validate_bga_card_specs.py` 緑) が前提。
+- C115 はカード上在庫 (`card_accumulations`, PR #371 未マージ) が前提。
+- C088 は費用軽減の順序記録 (LOG) が前提。
+- 基盤が main にないまま近似実装しない方針のため、**本 PR では実装せず**、記録に「仕様未作成のため実装不可」と理由を記載し、PR 本文の残件欄に送る。
 
-### GREEN: 移行ブロック有効で同テストが通過
+## ゲート確認
 
-```bash
-# 移行ブロックを復元
-cargo test legacy_v5_old_format_fixture_migrates_correctly -- --nocapture
-```
+- `cargo fmt --check` ✅
+- `cargo clippy --all-targets --all-features --locked -- -D warnings` ✅
+- 追加テスト `cargo test --test ch04_after_improvement_played` ✅ (6/6 passed)
+- 既存テスト `cargo test --lib` ✅ (414/414 passed)
+- `cargo test --test m6_verified_pool` ✅ (プール数・MCTS ダイジェスト・`state_hash` 不変)
+- `cargo test --lib mcts::tests::sample_game_distribution_digest_is_stable` ✅
+- `band_a_cards_are_absent_from_the_two_player_preset` ✅ (A109 は 2 人用プリセットに入らない)
 
-```
-test legacy_v5_old_format_fixture_migrates_correctly ... ok
-```
+## 残件
 
-→ `public.well_food_schedule.get(&5) == Some(&vec![0])` 等、移行が正しく動作
+| カード | 状態 | ブロッカー |
+|---|---|---|
+| A118 | 記録のみ | `t_49f032aa` 担当、仕様 JSON 修正（`frequency`, 購入上限）が前提 |
+| C088 | 未実装 | 仕様 JSON なし、LOG 基盤なし |
+| C115 | 未実装 | 仕様 JSON なし、カード上在庫 (PR #371) 未マージ |
+| A088 | 記録補正のみ | 実装済み・テスト済み |
+| A110 | 記録補正のみ | 実装済み・テスト済み (仕様データ残件 R-A4 は別 PR) |
 
-### 既存テスト全緑確認
+## PR 状態確認（Step 0）
 
-```bash
-cargo test --test m1
-# 32 tests passed (新テスト含む)
+- PR #370: open, head=7204d1f, base=research/deepai-allstages-readiness
+- PR #375: open, head=176c9400, base=main
+- PR #376: open, head=6d97269a, base=research/deepai-allstages-merged (stacked on #370)
+- PR #371: open, head=d3b6919, base=main (card_accumulations)
+- いずれも main 未マージ。本 PR が触るファイル (`src/cards.rs`, `src/card_events.rs`, `src/registry.rs`, `tests/`) に触る同一関心の open PR はなし。
 
-cargo test --test layer0_publicstate_roundtrip
-# 6 tests passed
-
-cargo test --test replay_integrity
-# 4 tests passed
-
-cargo test --test final_integrity
-# 5 tests passed
-```
-
-## Verification
-
-- `cargo fmt --check` ✓
-- `cargo clippy --locked --all-targets --all-features -- -D warnings` ✓
-- `cargo test --test m1` (32 tests) ✓
-- 既存 fixture のロード・再演テスト継続合格 ✓
-
-## Base SHA
-
-fe036db569fcb014d6553d3f4697977dccd7bd2b (PR #372 HEAD before this fix)
-
-## Related
-
-- PR #372 (load_json 移行・v5 fixture 追加) - 元 PR
-- PR #357 (Layer 0 正本化) - マージコミット 3024302
-- レビュー記録: https://github.com/cueikusuta/agricola-re-ai/pull/372#issuecomment-6994476033
-- 親レビューカード: t_3c3f5aeb
+**マージしない。レビュー待ちで完了。**
