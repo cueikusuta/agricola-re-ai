@@ -140,6 +140,8 @@ pub enum EventKind {
     ClayConstruction,
     /// Baking
     Bake,
+    /// Improvement played from hand (Major/Minor Improvement action, including renovation-combined)
+    ImprovementPlayed,
 }
 
 impl EventKind {
@@ -151,6 +153,7 @@ impl EventKind {
             EventKind::Harvest,
             EventKind::ClayConstruction,
             EventKind::Bake,
+            EventKind::ImprovementPlayed,
         ]
     }
 }
@@ -301,6 +304,9 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
+                    EventKind::ImprovementPlayed
+                }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
                 | crate::cards::CardEffect::EndGameBonus { .. } => continue,
@@ -400,7 +406,10 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
-                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. } => *amount,
+                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
+                        | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
+                            *amount
+                        }
                     };
                     amount == 0 || amount > 30
                 })

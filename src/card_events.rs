@@ -62,6 +62,8 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGainIfNoMinorPlayed { .. } => TriggerPhase::After,
         // Fired only by the play dispatcher's dedicated after-play scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
+        // Improvement played from hand — After phase (fired by dispatch_play's after-play scan)
+        CardEffect::AfterImprovementPlayedGain { .. } => TriggerPhase::After,
         // Clay construction purchase — After phase
         CardEffect::AfterClayConstructionGain { .. } => TriggerPhase::After,
         // Harvest/baking — After phase
@@ -461,6 +463,9 @@ fn resolve_phase_scan(
                 // Never fires via the generic phase scan (see
                 // effect_condition_holds); dispatch_play's after-play scan owns it.
                 CardEffect::AfterOccupationGainPerFoodCost { .. } => EffectResult::Resolved,
+                // Never fires via the generic phase scan; dispatch_play's after-play
+                // scan for improvements owns it.
+                CardEffect::AfterImprovementPlayedGain { .. } => EffectResult::Resolved,
                 #[cfg(test)]
                 CardEffect::PendingProbe { options } => {
                     handle_pending_probe(ctx, player, card_id, options.clone(), trigger_data)?
@@ -693,6 +698,9 @@ fn effect_condition_holds(
         // C116 調度品職員 fires only from dispatch_play's dedicated after-play
         // scan, never from the generic phase scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => false,
+        // A109 小商人 fires only from dispatch_play's dedicated after-play scan
+        // for improvements.
+        CardEffect::AfterImprovementPlayedGain { .. } => false,
         CardEffect::AfterClayConstructionGain { .. } => {
             trigger.event_kind == EventKind::ClayConstruction
                 && trigger.previous_player.as_ref().is_some_and(|prev| {
@@ -797,6 +805,9 @@ pub fn execute_chosen_triggers(
             // Never fires via the generic phase scan (see
             // effect_condition_holds); dispatch_play's after-play scan owns it.
             CardEffect::AfterOccupationGainPerFoodCost { .. } => EffectResult::Resolved,
+            // Never fires via the generic phase scan; dispatch_play's after-play
+            // scan for improvements owns it.
+            CardEffect::AfterImprovementPlayedGain { .. } => EffectResult::Resolved,
             #[cfg(test)]
             CardEffect::PendingProbe { options } => {
                 handle_pending_probe(ctx, player, &trigger.card_id, options.clone(), trigger_data)?
@@ -1544,6 +1555,43 @@ pub fn dispatch_play(
                             .ok_or("resource overflow")?;
                         p.supply.set(*good, next);
                     }
+                }
+            }
+        }
+    }
+
+    // Phase 4b: After — improvement-play dependent triggers owned by EARLIER played
+    // cards. A109 小商人 (`AfterImprovementPlayedGain`): each time the owner plays
+    // an improvement from hand (MinorImprovement or MajorImprovement via
+    // renovation-combined action), it grants food. The new card is already last in
+    // `played_cards` (the caller ran the zone move), so the scan covers exactly
+    // the cards played "before this one".
+    if let Some(new_card) = card_set.definition(new_card_id) {
+        if new_card.kind == crate::cards::CardKind::MinorImprovement {
+            let played = ctx.player.played_cards.clone();
+            let owned = played.len().saturating_sub(1); // exclude the new card
+            for id in &played[..owned] {
+                let Some(card) = card_set.definition(id) else {
+                    continue;
+                };
+                for effect in &card.effects {
+                    let CardEffect::AfterImprovementPlayedGain { good, amount } = effect else {
+                        continue;
+                    };
+                    consume_budget(ctx.event_budget)?;
+                    let limit = ctx
+                        .card_use_limits
+                        .get(id.as_str())
+                        .copied()
+                        .unwrap_or(u32::MAX);
+                    check_card_use(ctx.card_uses, id, limit)?;
+                    let p = &mut ctx.player;
+                    let next = p
+                        .supply
+                        .get(*good)
+                        .checked_add(*amount)
+                        .ok_or("resource overflow")?;
+                    p.supply.set(*good, next);
                 }
             }
         }
