@@ -42,9 +42,12 @@
       "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "is_cumulative_space",
+          "predicate": "worker_space_used",
           "params": {
-            "resource": "food"
+            "spaces": [
+              "fishing",
+              "traveling_players"
+            ]
           }
         },
         {
@@ -77,7 +80,7 @@
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "owner",
-      "notes": "After another player uses a food accumulation space, may give that player 1 grain from the owner supply to gain 1 bonus point."
+      "notes": "After another player uses a food accumulation space (Fishing or Small Theater), may give that player 1 grain from the owner supply to gain 1 bonus point."
     }
   ],
   "post_play": {
