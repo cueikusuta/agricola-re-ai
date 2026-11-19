@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3019",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -69,7 +69,7 @@
       "notes": "This card is a field that can only grow vegetables (card-as-field modeling flagged in unresolved)."
     },
     {
-      "trigger": "harvest_field",
+      "trigger": "harvest_field_phase",
       "conditions": [
         {
           "predicate": "harvested_from",
@@ -122,8 +122,8 @@
       "C070-timing-pending"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "This card is a field that can only grow vegetables. You may immediately turn each vegetable you harvest from this card into 4 food."
+    "notes": "This card is a field that can only grow vegetables. When harvesting vegetables from this card, they may immediately be converted to 4 food each. The harvest trigger name was aligned to harvest_field_phase."
   }
 }
