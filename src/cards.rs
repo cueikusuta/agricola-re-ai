@@ -1098,11 +1098,14 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                     }
                 }
                 ScoreBonusRule::FarmyardAllUsed => {
-                    // Farm has 15 cells (0-14). All must be non-Empty.
+                    // A farm cell counts as used when it carries a non-Empty
+                    // tile or a stable is built on it: a stable-on-empty space
+                    // (tile Empty, stable true) is occupied by the stable, so
+                    // it must not be counted as unused.
                     let all_used = player
                         .farm
                         .iter()
-                        .all(|cell| !matches!(cell.tile, Tile::Empty));
+                        .all(|cell| !matches!(cell.tile, Tile::Empty) || cell.stable);
                     if all_used {
                         2
                     } else {
@@ -3916,6 +3919,54 @@ mod verified_band_d_tests {
     }
 
     #[test]
+    fn d032_snapshot_captured_before_final_harvest_decrement() {
+        // Regression test for PR #378 P1: the D032 snapshot must record the
+        // goods standing in fields *before* the final-harvest field phase
+        // decrements them, not the reduced count afterwards.
+        use crate::model::{Config, Game};
+
+        // Build a cardless game, advance to round 14 (final harvest), and
+        // stand 3 grain fields with 3 crops each = 9 goods before harvest.
+        let mut game = Game::new(Config::default());
+        game.public.round = 14;
+        let p = &mut game.public.players[0];
+        p.played_cards.push("D032".into());
+        for cell in &mut p.farm[1..=3] {
+            cell.tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 3,
+            };
+        }
+
+        game.harvest_fields().unwrap();
+
+        // Borrow ends here; re-borrow immutably for assertions.
+        let p = &game.public.players[0];
+
+        // Capture happened before the decrement: 3 + 3 + 3 = 9.
+        assert_eq!(p.field_goods_before_final_harvest, Some(9));
+        // The fields were consumed by the harvest (remaining now 2 each).
+        assert!(p.farm[1..=3]
+            .iter()
+            .all(|cell| matches!(cell.tile, Tile::Field { remaining: 2, .. })));
+
+        // End-game scoring awards +2 once the pre-harvest snapshot reaches 7.
+        let d032_set = CardSet {
+            definitions: vec![CardDefinition {
+                use_limit: None,
+                id: "D032".into(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![(Good::Wood, 1)],
+                points: 0,
+                effects: vec![CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::FieldsGoodsBeforeFinalHarvest(7),
+                }],
+            }],
+        };
+        assert_eq!(end_game_bonus(&d032_set, p), 2);
+    }
+
+    #[test]
     fn d032_cost_is_one_wood_and_absent_from_two_player_preset() {
         let set = set();
         let card = set.definition("D032").unwrap();
@@ -4171,6 +4222,40 @@ mod verified_band_e_tests {
             q.farm[i].tile = Tile::Pasture { id: 0 };
         }
         assert_eq!(end_game_bonus(&set, &q), 2);
+    }
+
+    #[test]
+    fn e034_stable_on_empty_counts_as_used() {
+        // P2: a stable-on-empty cell (Tile::Empty with stable == true) is
+        // occupied by the stable and must count as used for E034.
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E034".into());
+        p.farm[0].tile = Tile::Room;
+        p.farm[5].tile = Tile::Room;
+        for i in 1..=4 {
+            p.farm[i].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            };
+        }
+        for i in 6..=13 {
+            p.farm[i].tile = Tile::Field {
+                crop: Some(Crop::Vegetable),
+                remaining: 1,
+            };
+        }
+        // Cell 14 is an Empty tile carrying a stable: stable-on-empty.
+        p.farm[14].tile = Tile::Empty;
+        p.farm[14].stable = true;
+        assert_eq!(end_game_bonus(&set, &p), 2);
+
+        // Same layout without the stable -> not all used -> 0.
+        let mut q = p.clone();
+        q.farm[14].stable = false;
+        assert_eq!(end_game_bonus(&set, &q), 0);
     }
 
     #[test]

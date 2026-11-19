@@ -104,6 +104,26 @@ impl Game {
         if carded {
             self.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         }
+        // Capture the D032 snapshot (goods standing in fields) at the start of
+        // the final-harvest field phase, BEFORE any field's `remaining` is
+        // decremented. The spec counts goods that stood before the final
+        // harvest, not what remains after each field yields one good.
+        if self.public.round == 14 {
+            for player in &mut self.public.players {
+                let goods: u32 = player
+                    .farm
+                    .iter()
+                    .map(|cell| match cell.tile {
+                        Tile::Field {
+                            crop: Some(_),
+                            remaining,
+                        } => remaining as u32,
+                        _ => 0,
+                    })
+                    .sum();
+                player.field_goods_before_final_harvest = Some(goods);
+            }
+        }
         for p in 0..self.public.players.len() {
             // Route the harvest trigger through the dispatcher so the event
             // budget and per-card use limits apply.
@@ -146,25 +166,6 @@ impl Game {
                         }
                     }
                 }
-            }
-        }
-        // Capture snapshot of field goods before final harvest for D032 (木のくまで).
-        // This runs after all fields have been harvested, so remaining crops
-        // represent what was standing before the final harvest.
-        if self.public.round == 14 {
-            for player in &mut self.public.players {
-                let goods: u32 = player
-                    .farm
-                    .iter()
-                    .map(|cell| match cell.tile {
-                        Tile::Field {
-                            crop: Some(_),
-                            remaining,
-                        } => remaining as u32,
-                        _ => 0,
-                    })
-                    .sum();
-                player.field_goods_before_final_harvest = Some(goods);
             }
         }
         Ok(())
