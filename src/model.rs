@@ -768,6 +768,7 @@ pub struct Observation {
     /// The implemented card vocabulary is public; its randomized locations are not.
     pub card_definitions: Vec<CardDefinition>,
 }
+
 impl Game {
     pub fn new(config: Config) -> Self {
         Self::with_cards(config, CardSet::default()).expect("default cardless setup")
@@ -1080,7 +1081,31 @@ impl Game {
         serde_json::to_string_pretty(&stamped).map_err(|e| e.to_string())
     }
     pub fn load_json(text: &str) -> Result<Self, String> {
-        let result: Self = serde_json::from_str(text).map_err(|e| e.to_string())?;
+        // Two-step deserialization to handle old format (top-level well_food_schedule/card_uses)
+        // and new format (inside public).
+        let mut value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
+
+        // Migrate old top-level fields to public if they exist
+        if let Some(well_schedule) = value.get("well_food_schedule").cloned() {
+            if value["public"]["well_food_schedule"]
+                .as_object()
+                .is_none_or(|o| o.is_empty())
+            {
+                value["public"]["well_food_schedule"] = well_schedule;
+            }
+            value.as_object_mut().unwrap().remove("well_food_schedule");
+        }
+        if let Some(card_uses) = value.get("card_uses").cloned() {
+            if value["public"]["card_uses"]
+                .as_object()
+                .is_none_or(|o| o.is_empty())
+            {
+                value["public"]["card_uses"] = card_uses;
+            }
+            value.as_object_mut().unwrap().remove("card_uses");
+        }
+
+        let result: Self = serde_json::from_value(value).map_err(|e| e.to_string())?;
         result.validate()?;
         if result.log.log_version != LOG_VERSION
             || result.log.rules_version != RULES_VERSION
