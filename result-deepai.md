@@ -374,3 +374,10 @@ M7 #335 C004 cost → 2赤、M8 #340 C116 自己発動 → **ブランチのみ�
 
 - 仕様データに誤り・欠落がある16枚について、分類を「確定」とするか「暫定」とするかを §6.1 に分けて記録。
 - 暫定は4枚（A071 / A092 / A103 / D082）。いずれも効果文が文献だけに依存する。
+
+### PR 作成
+
+- PR #376: https://github.com/cueikusuta/agricola-re-ai/pull/376
+- base = `research/deepai-allstages-merged`（#370 の上に積む stacked PR）。マージはしない。
+- HEAD `3ec8e33` の Actions: CI required / Pipeline gates / Detect changed files が pass。Rust変更が無いため rustfmt・clippy・cargo test は paths filter で skip。
+- 独立レビュー対象（帰宅の段階3扱い、段階4のサイト数え方、D082 の段階1亜型、段階外90枚の類型）。
