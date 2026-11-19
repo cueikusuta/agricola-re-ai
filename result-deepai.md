@@ -499,6 +499,7 @@ M7 #335 C004 cost → 2赤、M8 #340 C116 自己発動 → **ブランチのみ�
   全 Python テスト287件が成功。Rust は未変更。
 - CI対応3: 小劇場のキーを A150/A154/A158 で `traveling_players` に統一（A160/C152 と同じ）。
   B155/E166 の `small_theater` は別残件として第6章に記録。仕様検証 errors 0、Python 287件成功。
-- Actions最終: 最新 HEAD は bga-spec-contract / Pipeline gates / Python 287件 / rustfmt / clippy /
-  cargo test / M1/M2/M7 seeded performance / CI required がすべて pass。途中の clippy は
-  src/cards.rs の既存 lint で fail したが再実行で pass（src の差分は0行）。
+- Actions最終: bga-spec-contract / Pipeline gates / Python 287件 / rustfmt / cargo test /
+  M1/M2/M7 seeded performance は pass。clippy は src/cards.rs の既存 needless_range_loop で fail し、
+  CI required も fail（src の差分は0行、本 PR に起因しない）。土台ブランチが main より26コミット遅れており、
+  rebase 時に解消が必要。Rust を触らない指示のため未修正。
