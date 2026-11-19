@@ -1934,7 +1934,16 @@ mod tests {
             .entry(5)
             .or_default()
             .push(actor % pre.public.players.len());
-        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        // Close-out (PR #358 review): mirror-only drift is not producible by
+        // any committed work move — the only mid-round writer (Well purchase)
+        // writes both ledgers, so check 14 fires first. Definite Fail; full
+        // validation deliberately tolerates in-range orphan mirrors (P1-4).
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
     }
 
     /// Audit element 2: a suspended decision appearing out of nowhere cannot
@@ -1956,7 +1965,17 @@ mod tests {
             post.state_hash(),
             serde_json::json!({}),
         ));
-        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        // Close-out: validated transitions have `pending == None` on both
+        // sides (apply rejects a stored decision, a pause commits outside this
+        // validator, and the resume path enters with the decision cleared), so
+        // any pending drift is not producible → definite Fail. Full validation
+        // deliberately does not inspect `pending`.
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
     }
 
     /// Audit element 3: the event budget is replenished to
@@ -1982,7 +2001,14 @@ mod tests {
         let (mut pre, mut post) = mid_round_pair();
         pre.card_uses.insert("A001".into(), 2);
         post.card_uses.insert("A001".into(), 1);
-        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        // Close-out: a same-round decrease re-opens a card's use budget and no
+        // work move can produce it (the ledger only grows mid-round; the
+        // round-start clear already returned Unsure at check 2) → definite Fail.
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
         // Growth, however, is what legitimate first-use looks like and must
         // keep the fast path: only the increase is present, so Pass.
         let (mut pre, mut post) = mid_round_pair();
@@ -2012,7 +2038,15 @@ mod tests {
     fn tampered_next_decision_id_declines() {
         let (pre, mut post) = mid_round_pair();
         post.next_decision_id += 1;
-        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        // Close-out: the counter only advances at pause commit, which never
+        // reaches this validator — any drift on a validated transition is not
+        // producible → definite Fail. Full validation does not read the counter.
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
     }
 
     /// Audit element 7/8 (axiomatic, deliberately NOT checked): `rng` and
@@ -2042,6 +2076,9 @@ mod tests {
             validate_incremental(&post, &pre),
             Verdict::Fail(_)
         ));
+        // Close-out element 5: already a direct Fail at the pre-fix HEAD, so
+        // the wrapper rejects it too — no Unsure→full hole for this element.
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
     }
 
     /// Audit element 10: animal accumulations obey the same monotone rule as
@@ -2052,7 +2089,14 @@ mod tests {
         let (pre, mut post) = mid_round_pair();
         // A new key (growth of an existing key exercises the same `_` arm).
         post.public.animal_accumulations.insert(Space::Forest, 1);
-        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        // Close-out: mid-round growth has no producer (accumulation happens at
+        // start_round, which check 2 already returned Unsure for) → definite
+        // Fail; full additionally rejects this non-market key.
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
         // Growth of an existing entry must also decline.
         let (mut pre, mut post) = mid_round_pair();
         pre.public
@@ -2061,11 +2105,19 @@ mod tests {
         post.public
             .animal_accumulations
             .insert(Space::SheepMarket, 2);
-        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+        // The full validator accepts a market-key accumulation of any size, so
+        // only the transition check can prove this drift illegal.
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
         // Taking (decrease/removal) stays legal — the take action removes the
         // key when the market empties.
         post.public.animal_accumulations.remove(&Space::SheepMarket);
         assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+        validate_incremental_or_full(&post, &pre).unwrap();
     }
 
     /// Full validation must reject a use-ledger entry for a card nobody has
@@ -2194,5 +2246,277 @@ mod tests {
             .animal_accumulations
             .insert(Space::SheepMarket, 1);
         assert_eq!(validate_full(&market_key), Ok(()));
+    }
+
+    // ---- Close-out (PR #358 review): Unsure→full holes for transition-only
+    // provable tampering. Each test changes exactly one element on a normal
+    // mid-round (pre, post) pair and asserts the FINAL wrapper result. The
+    // `validate_full` assertion next to each tamper documents why the hole
+    // existed: the full validator alone cannot see these drifts. ----
+
+    /// Element 1: an orphan `well_food_schedule` entry without the paired
+    /// `delayed_well` change. Full validation accepts any in-range mirror
+    /// entry, so only the transition check can prove it illegal.
+    #[test]
+    fn closeout_well_food_schedule_mirror_orphan_rejected() {
+        let (pre, mut post) = mid_round_pair();
+        let actor = pre.public.active_player;
+        post.well_food_schedule.entry(5).or_default().push(actor);
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// Element 2: a suspended decision appearing on a committed work move.
+    /// Full validation deliberately does not inspect `pending`.
+    #[test]
+    fn closeout_pending_decision_appearing_rejected() {
+        let (pre, mut post) = mid_round_pair();
+        post.pending = Some(crate::pending::PendingDecision::new(
+            pre.next_decision_id,
+            pre.public.active_player,
+            crate::pending::PendingKind::ChooseGain {
+                source_card: "A001".into(),
+                options: vec![crate::pending::GainOption {
+                    good: crate::model::Good::Food,
+                    amount: 1,
+                }],
+            },
+            post.state_hash(),
+            serde_json::json!({}),
+        ));
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// Element 3a: a brand-new use-ledger key for a card nobody has played.
+    /// At the pre-fix HEAD the incremental layer returned `Pass` (its loop only
+    /// covers keys present in `pre`), which short-circuits full validation —
+    /// even though full validation itself rejects this state.
+    #[test]
+    fn closeout_card_uses_new_unplayed_key_rejected() {
+        let (pre, mut post) = mid_round_pair();
+        post.card_uses.insert("ZZ_NOT_A_CARD".into(), 1);
+        assert!(validate_full(&post).is_err());
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// Element 3b: a same-round count decrease on a PLAYED card. Full
+    /// validation accepts the post state (played card, no per-round limit), so
+    /// only the transition check can see the reopened use budget.
+    #[test]
+    fn closeout_card_uses_same_round_decrease_on_played_card_rejected() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 29,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xFEED);
+        // Find a REAL mid-round work-move pair whose incremental verdict is
+        // Pass (so every check up to the ledger check is exercised) and where
+        // some card is already on a table.
+        let mut found = None;
+        for _ in 0..40 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+            let pre = game.clone();
+            game.apply(action).expect("random move");
+            let post = game.clone();
+            if post.public.round == pre.public.round
+                && post.public.start_player == pre.public.start_player
+                && post
+                    .public
+                    .players
+                    .iter()
+                    .any(|p| !p.played_cards.is_empty())
+                && validate_incremental(&post, &pre) == Verdict::Pass
+            {
+                found = Some((pre, post));
+                break;
+            }
+        }
+        let (mut pre, mut post) = found.expect("a mid-round pair with a played card");
+        let played_id = post
+            .public
+            .players
+            .iter()
+            .flat_map(|p| p.played_cards.iter())
+            .next()
+            .expect("played card on some table")
+            .clone();
+        pre.card_uses.insert(played_id.clone(), 2);
+        post.card_uses.insert(played_id.clone(), 1);
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// Element 4: decision-counter drift. Full validation does not read the
+    /// counter, so only the transition check can prove the drift illegal.
+    #[test]
+    fn closeout_next_decision_id_drift_rejected() {
+        let (pre, mut post) = mid_round_pair();
+        post.next_decision_id += 1;
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// Element 5: `record_events` flip — does NOT reproduce at the pre-fix
+    /// HEAD: check 21 already returns a direct Fail, so the wrapper rejects.
+    #[test]
+    fn closeout_record_events_flip_already_direct_fail() {
+        let (pre, mut post) = mid_round_pair();
+        post.record_events = !pre.record_events;
+        assert!(matches!(
+            validate_incremental(&post, &pre),
+            Verdict::Fail(_)
+        ));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    /// Element 6: same-round growth of an animal-market accumulation. Full
+    /// validation accepts any market-key accumulation, so only the transition
+    /// check can prove the growth illegal.
+    #[test]
+    fn closeout_animal_accumulation_same_round_growth_rejected() {
+        let (mut pre, mut post) = mid_round_pair();
+        pre.public
+            .animal_accumulations
+            .insert(Space::SheepMarket, 1);
+        post.public
+            .animal_accumulations
+            .insert(Space::SheepMarket, 2);
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+        // A brand-new market key mid-round is the same unproducible growth.
+        let (mut pre, mut post) = mid_round_pair();
+        pre.public.animal_accumulations.remove(&Space::SheepMarket);
+        post.public.animal_accumulations.insert(Space::SheepMarket, 1);
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_incremental_or_full(&post, &pre).is_err());
+    }
+
+    // ---- Normal pairs that must stay accepted after the Fail upgrades ----
+
+    /// Legitimate Well purchase: the only mid-round writer of the well mirror
+    /// writes BOTH ledgers together, so the incremental layer declines (check
+    /// 14) and full validation accepts — before and after the fix.
+    #[test]
+    fn closeout_legit_well_purchase_accepted() {
+        for seed in 0u64..64 {
+            let mut game = cardless(2, seed);
+            let mut rng = ChaCha8Rng::seed_from_u64(seed ^ 0xBEEF);
+            let mut steps = 0;
+            while !game
+                .available_spaces()
+                .contains(&Space::MajorImprovement)
+                && steps < 40
+                && !game.public.finished
+            {
+                let id = game.public.active_player;
+                let obs = game.observation(id).unwrap();
+                let legal = game.legal_spaces();
+                let space = RandomPolicy
+                    .select(&obs, &legal, &mut rng)
+                    .expect("legal space");
+                let action = CardChoiceDetails
+                    .produce(&obs, space)
+                    .expect("detail");
+                game.apply(action).expect("random move");
+                steps += 1;
+            }
+            if game.public.finished
+                || !game
+                    .available_spaces()
+                    .contains(&Space::MajorImprovement)
+                || !game
+                    .public
+                    .improvement_market
+                    .contains(&crate::model::Improvement::Well)
+            {
+                continue;
+            }
+            let mut pre = game;
+            let actor = pre.public.active_player;
+            // Well costs 1 wood + 3 stone (Improvement::cost); the granted
+            // supply keeps `pre` full-valid (supply provenance is not part of
+            // the full invariant set).
+            pre.public.players[actor]
+                .supply
+                .set(crate::model::Good::Wood, 1);
+            pre.public.players[actor]
+                .supply
+                .set(crate::model::Good::Stone, 3);
+            assert_eq!(validate_full(&pre), Ok(()));
+            let round = pre.public.round;
+            let mut post = pre.clone();
+            post.apply(crate::engine::Action {
+                space: Space::MajorImprovement,
+                detail: crate::engine::Detail::Buy {
+                    improvement: crate::model::Improvement::Well,
+                    instant_bake: 0,
+                },
+            })
+            .expect("legitimate Well purchase applies");
+            assert!(!post.delayed_well.is_empty());
+            for r in (round + 1)..=14u8.min(round + 5) {
+                assert_eq!(
+                    post.delayed_well.get(&r),
+                    post.well_food_schedule.get(&r),
+                    "the purchase must write both ledgers identically"
+                );
+            }
+            validate_incremental_or_full(&post, &pre)
+                .expect("legitimate Well purchase must stay accepted");
+            return;
+        }
+        panic!("no seed produced a legitimate Well purchase window");
+    }
+
+    /// Resource-market take-all on a 2p additional-space game: a normal work
+    /// move that empties an accumulation pile must stay accepted.
+    #[test]
+    fn closeout_legit_resource_market_take_all_accepted() {
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 5,
+            additional_action_space_enabled: true,
+        });
+        let actor = game.public.active_player;
+        let pre = game.clone();
+        let stone_before = pre.public.players[actor].supply.stone;
+        let food_before = pre.public.players[actor].supply.food;
+        game.apply(crate::engine::Action {
+            space: Space::ResourceMarket,
+            detail: crate::engine::Detail::None,
+        })
+        .expect("take-all applies");
+        let post = game;
+        assert!(post.public.players[actor].supply.stone > stone_before);
+        assert!(post.public.players[actor].supply.food > food_before);
+        assert_eq!(post.event_budget, crate::model::DEFAULT_EVENT_BUDGET);
+        validate_incremental_or_full(&post, &pre)
+            .expect("legitimate take-all must stay accepted");
+    }
+
+    /// Event-budget boundaries: the replenish cap (64) and a fully spent
+    /// chain (0) both stay accepted — only above-cap is a definite Fail.
+    #[test]
+    fn closeout_event_budget_zero_and_cap_accepted() {
+        let (pre, post) = mid_round_pair();
+        assert_eq!(post.event_budget, crate::model::DEFAULT_EVENT_BUDGET);
+        validate_incremental_or_full(&post, &pre).unwrap();
+        let mut depleted = post;
+        depleted.event_budget = 0;
+        assert_eq!(validate_incremental(&depleted, &pre), Verdict::Pass);
+        validate_incremental_or_full(&depleted, &pre).unwrap();
     }
 }
