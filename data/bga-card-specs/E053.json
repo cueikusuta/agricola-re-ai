@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2700",
         "language": "ja",
-        "checked_on": "2026-11-14",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -45,7 +45,7 @@
     ],
     "prerequisites": [],
     "printed_points": 1,
-    "alternative_cost_notes": "1 木, 1_石"
+    "alternative_cost_notes": null
   },
   "effects": [
     {
@@ -105,8 +105,8 @@
       "E053-harvest-breeding"
     ],
     "checked_by": "AI source comparison vs BGA wiki",
-    "checked_on": "2026-11-14",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Third-party BGA wiki cross-check only; not official Lookout verification."
+    "notes": "Cost 1 wood + 1 stone (single bundle). Outside the harvest breeding phase, each time you gain a boar you may immediately convert it to 4 food. The duplicate alternative-cost note was removed."
   }
 }

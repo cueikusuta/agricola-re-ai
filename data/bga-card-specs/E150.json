@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2603",
         "language": "ja",
-        "checked_on": "2026-11-14",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -37,7 +37,55 @@
     "prerequisites": [],
     "printed_points": 0
   },
-  "effects": null,
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "space_yields_stone_and_other_building_material",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "use_action_space_even_if_occupied"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "May use an occupied action space that gives both stone and another building material."
+    },
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "good": "stone",
+            "amount": 2,
+            "scope": "stone_room_building"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Building a stone room costs 2 less stone."
+    }
+  ],
   "post_play": {
     "destination": "unknown",
     "notes": "Destination not confirmed; typical occupation stays in played area."
@@ -45,15 +93,14 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects",
-      "post_play.destination"
+      "effects[0].conditions: space_yields_stone_and_other_building_material needs formalization"
     ],
     "test_case_ids": [
       "E150-play"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Occupation card. BGA rating 6.50. Goods hint: 石. Upgrade hint: 資材市場. Effect details unresolved pending official source verification."
+    "notes": "May use an occupied space that yields stone plus another building material. Stone rooms cost 2 less stone. The effect values are fixed; the space predicate remains to be formalized."
   }
 }
