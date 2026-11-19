@@ -202,7 +202,8 @@ PREREQ = {
         "C052": [cond("has_improvement", kind="fireplace"),
                  cond("has_improvement", kind="cooking_hearth")],
         "C058": [cond("occupation_count", n=1)],
-    "A013": [cond("house_is", house="wood"), cond("room_count", n=2)],
+                "C068": [cond("occupation_count", n=1)],
+            "A013": [cond("house_is", house="wood"), cond("room_count", n=2)],
     "A027": [cond("has_improvement", kind="fireplace"),
              cond("has_improvement", kind="cooking_hearth")],
     "A057": [cond("unused_farmyard_spaces_at_least", n=4)],
@@ -4217,7 +4218,25 @@ CARDS = {
                 "effects[0].conditions[0].predicate: 'cooking_conversion_goods' predicate not in vocabulary"
             ],
         },
-    }
+            "C068": {
+                "post": "played_area",
+                "effects": [
+                    effect("after_occupation", [gain("vegetable", 1)],
+                           freq="every_use", dur="permanent",
+                           notes="Each time after you play an occupation, gain 1 vegetable.")
+                ],
+                "notes": "Cost: 2 wood. Prerequisite: 1 occupation. Effect: each time after you play an occupation, gain 1 vegetable.",
+                "implementation_status": "tested",
+                "tests": [
+                    case("C068-normal", {"vegetable": 0}, {"play_occupation": 1},
+                         {"vegetable_delta": 1}),
+                    case("C068-two", {"vegetable": 0}, {"play_occupation": 2},
+                         {"vegetable_delta": 2}),
+                    case("C068-not-triggered", {"vegetable": 0}, {"play_minor_improvement": 1},
+                         {"vegetable_delta": 0}),
+                ],
+            },
+            }
 
 
 def parse_cost(raw: str):

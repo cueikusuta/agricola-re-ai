@@ -20,14 +20,14 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3021",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
-        "note": "English list page row used to cross-check the card id, name and effect text"
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
       }
     ]
   },
@@ -47,8 +47,7 @@
         }
       }
     ],
-    "printed_points": 0,
-    "alternative_cost_notes": null
+    "printed_points": 0
   },
   "effects": [
     {
@@ -85,8 +84,8 @@
       "C068-not-triggered"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "Each time after you play an occupation, gain 1 vegetable."
+    "checked_on": "2026-11-09",
+    "implementation_status": "tested",
+    "notes": "Cost: 2 wood. Prerequisite: 1 occupation. Effect: each time after you play an occupation, gain 1 vegetable."
   }
 }
