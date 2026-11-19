@@ -492,3 +492,6 @@ M7 #335 C004 cost → 2赤、M8 #340 C116 自己発動 → **ブランチのみ�
 - 第9章: 変更40ファイルの JSON 構文・必須キー・effect/step の enum を Node で確認し全件成功。
   Python の仕様検証はローカルに Python が無く実行できないため、Actions の pipeline-gates に委ねる。
 - 合計: A 11枚、B 11枚、C 8枚、D 3枚、E 7枚（B050 は URL が正しく変更なし）。
+- CI対応: `bga-spec-contract` の再生成一致のため、`scripts/build_bga_card_specs.py` の
+  A118/A150/A154/A156/A158/A159/D079 の表と `data/bga-card-tests/` の5枚を更新した。Rust は未変更。
+  `validate_bga_card_specs.py` は `errors: []`、ビルダー契約テスト3件は成功。

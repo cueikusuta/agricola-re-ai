@@ -6,7 +6,7 @@
       "id": "A156-normal",
       "scope": "effect_only",
       "setup": {
-        "other_player_uses": "forest",
+        "other_player_uses": "reed_bank",
         "food": 1
       },
       "action": {
@@ -14,7 +14,7 @@
       },
       "expected": {
         "food_delta": -1,
-        "wood_delta": 1
+        "reed_delta": 1
       }
     },
     {

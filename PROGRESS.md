@@ -167,3 +167,6 @@
 - **第9章 完了**: 変更40ファイルの JSON・必須キー・operation/target/snapshot を Node で機械確認（全て成功）。
   Python がローカルに無いため仕様検証スクリプトは Actions に委ねる。Rust・スキーマ・台帳・テストは未変更。
 - 次の再開位置: PR 作成と Actions の確認。マージしない。独立レビューは別セッション。
+- **補足（CI対応）**: `bga-spec-contract` の再生成一致を保つため、`scripts/build_bga_card_specs.py` の
+  A118/A150/A154/A156/A158/A159/D079 の表と、`data/bga-card-tests/` の該当5枚を更新した。
+  Rust は変更していない。`validate_bga_card_specs.py` は errors 0、ビルダー契約テスト3件は成功。

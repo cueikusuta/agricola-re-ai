@@ -6,29 +6,29 @@
       "id": "A158-normal",
       "scope": "effect_only",
       "setup": {
-        "other_player_uses": "forest",
-        "food": 4
+        "other_player_uses": "small_theater",
+        "grain": 1
       },
       "action": {
-        "exchange": true
+        "exchange": "grain"
       },
       "expected": {
-        "food_delta": -4,
-        "wood_delta": 1
+        "grain_delta": -1,
+        "food_delta": 4
       }
     },
     {
       "id": "A158-not-triggered",
       "scope": "effect_only",
       "setup": {
-        "owner_uses": "forest",
-        "food": 4
+        "owner_uses": "small_theater",
+        "grain": 1
       },
       "action": {
-        "exchange": true
+        "exchange": "grain"
       },
       "expected": {
-        "wood_delta": 0
+        "food_delta": 0
       }
     }
   ]

@@ -6,7 +6,8 @@
 - 正本: 2016年改訂版 Lookout 公式ルール。カード個別の効果は、日本語版 BGA アグリコラカード情報 wiki の
   個別ページ・カード画像、非公式コンペンディウム、既存の分類文書（#362 / #370 / #375 / #376 / #377）を
   突き合わせた**自分の言葉の要約**で確認した。原文・画像・PDF はリポジトリに収録しない。
-- 範囲: **仕様 JSON のみ**。Rust・スキーマ・台帳・テスト・分類文書は変更しない。
+- 範囲: 仕様 JSON と、その再生成元 `scripts/build_bga_card_specs.py` の該当7枚分、および再生成された `data/bga-card-tests/` の5枚。Rust・スキーマ・台帳・分類文書は変更しない。
+  ビルダーは仕様 JSON の正本であり、これを更新しないと `bga-spec-contract` の再生成一致が壊れるため、最小限の範囲で同時に更新した。
 - 章: A / B / C / D / E の帯ごとに commit / push し、確定できなかったものは最後のチェックリストへ回す。
 
 ## 0. 残件の集め方と対象外
@@ -382,10 +383,13 @@
 | 効果のキー | `trigger` / `conditions` / `steps` / `optional` / `frequency` / `duration` / `snapshot` / `order` 以外の追加キーなし | 0件 |
 | step の値 | `operation` 13種、`target` 8種、`snapshot` 4種の enum に一致 | 0件 |
 | 仕様ファイル数 | `data/bga-card-specs/*.json` | 695枚のまま（新規作成なし） |
-| コード・台帳・テスト | `git diff --stat -- src tests data/bga-card-ledger.csv schemas` | 0 |
-| Python 検証 | `scripts/validate_bga_card_specs.py` | ローカルに Python が無く実行不可。Actions の `pipeline-gates` に委ねる |
+| Rust・スキーマ・台帳 | `git diff --stat -- src schemas data/bga-card-base-ledger.csv` | 0 |
+| ビルダー再生成 | `python scripts/build_bga_card_specs.py --force --cards A118,A150,A154,A156,A158,A159,D079` | 7枚を再生成。生成仕様・テストはコミット済みと一致 |
+| 仕様検証 | `python scripts/validate_bga_card_specs.py` | `errors: []`、spec 695 / without_spec 145 |
+| ビルダー契約 | `python -m unittest discover -s tests -p "test_bga_card_specs_builder.py" -v` | 3テスト成功（再生成一致・テスト参照・検証通過） |
 
-- 変更したのは `data/bga-card-specs/` の40ファイル、`docs/spec-data-fixes.md`、`PROGRESS.md`、`result-deepai.md` のみ。
+- 変更したのは `data/bga-card-specs/` の40ファイル、`data/bga-card-tests/` の5ファイル、
+  `scripts/build_bga_card_specs.py`、`docs/spec-data-fixes.md`、`PROGRESS.md`、`result-deepai.md`。Rust は変更していない。
 - `TRIAL_REPORT.md`（作業開始前から未追跡）は触っていない。
 
 ### 9.2 自己レビュー（章・コミット単位）
@@ -399,10 +403,11 @@
 | 第4章 D | D079 の前提、D160/D163 の空効果、D025/D159 の保留 | 修正済み |
 | 第5章 E | E002 の1束、E052 の選択費用、E148/E150 の語彙 | 修正済み（E052 は cost=null に戻した） |
 | 第6〜8章 | 先行文書との不一致、分類への影響、未決質問 | 修正済み（#375 の C044・印刷点・A075 の記述を撤回） |
-| コミット | 第0〜1章 / 第2章 / 第3章 / 第4章 / 第5章 / 最終章 | 各章で push |
+| コミット | 第0〜1章 / 第2章 / 第3章 / 第4章 / 第5章 / 最終章 / ビルダー同期 | 各段階で push |
 
 ### 9.3 未解決事項
 
-- Actions の `pipeline-gates`（仕様検証・台帳・ブロッカー）と `ci.yml` の結果は PR 作成後に確認する。
+- Actions の `pipeline-gates` / `bga-spec-contract` / `ci.yml` の結果は最新 HEAD で確認する。
+- ビルダーを触ったため、仕様 JSON の手修正だけで完結しない点は PR に明記する。
 - 独立レビュー（AGENTS.md §14）は別セッションで行う。本 PR ではマージしない。
 - C038 の分類訂正、S-1 の仕様作成、スキーマ拡張、トリガー語彙の統一は別 Issue / 別 PR。

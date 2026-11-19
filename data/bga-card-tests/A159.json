@@ -13,8 +13,8 @@
         "trade": true
       },
       "expected": {
-        "wood_delta": 1,
-        "food_delta": -2
+        "wood_delta": -1,
+        "food_delta": 2
       }
     },
     {

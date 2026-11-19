@@ -26,7 +26,7 @@
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "English list page row used to cross-check the card id and name"
       }
     ]
@@ -53,7 +53,7 @@
       ],
       "optional": false,
       "frequency": "every_harvest",
-      "duration": "instant",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none"
