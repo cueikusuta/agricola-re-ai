@@ -1206,7 +1206,15 @@ fn handle_after_worker_gain_if_used(
 /// unfenced stables (cell order), the free pet slot, and discard for any
 /// overflow. Overflow discard is the official rule for animals with no room
 /// (2016 Lookout; 放棄 is one of the five legal destinations).
-fn auto_animal_plan(p: &Player, animal: Animal, amount: u32) -> crate::engine::AnimalPlan {
+///
+/// `pub(crate)` so the production AI pending resolver (`policy`) can reuse the
+/// exact same placement derivation when auto-resolving a
+/// `ChooseAnimalPlacement` pause (C147 牛の飼育士) — one derivation, no drift.
+pub(crate) fn auto_animal_plan(
+    p: &Player,
+    animal: Animal,
+    amount: u32,
+) -> crate::engine::AnimalPlan {
     let mut plan = crate::engine::AnimalPlan {
         animal,
         to_pastures: vec![],
