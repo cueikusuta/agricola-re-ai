@@ -252,6 +252,7 @@ pub enum CardRequirement {
     MinimumAnimals { animal: Animal, number: u32 },
     MinimumCropFields { crop: Crop, number: u8 },
     MinimumPlayers(u8),
+    MinimumImprovements(u8),
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -692,17 +693,20 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
     }
     let occupations = occupation_count(set, player);
     card.effects.iter().all(|effect| {
-        let CardEffect::Prerequisite { rule } = effect else { return true; };
-        match rule {
-            CardRequirement::MinimumOccupations(min) => occupations >= usize::from(*min),
-            CardRequirement::MaximumOccupations(max) => occupations <= usize::from(*max),
-            CardRequirement::MinimumAnimals { animal, number } => player.animal_count(*animal) >= *number,
-            CardRequirement::MinimumCropFields { crop, number } => player.farm.iter().filter(|cell| {
-                matches!(cell.tile, Tile::Field { crop: Some(found), .. } if found == *crop)
-            }).count() >= usize::from(*number),
-            CardRequirement::MinimumPlayers(_) => true,
-        }
-    })
+            let CardEffect::Prerequisite { rule } = effect else { return true; };
+            match rule {
+                CardRequirement::MinimumOccupations(min) => occupations >= usize::from(*min),
+                CardRequirement::MaximumOccupations(max) => occupations <= usize::from(*max),
+                CardRequirement::MinimumAnimals { animal, number } => player.animal_count(*animal) >= *number,
+                CardRequirement::MinimumCropFields { crop, number } => player.farm.iter().filter(|cell| {
+                    matches!(cell.tile, Tile::Field { crop: Some(found), .. } if found == *crop)
+                }).count() >= usize::from(*number),
+                crate::cards::CardRequirement::MinimumImprovements(min) => {
+                                improvement_count_in_front(set, player) >= u32::from(*min)
+                            }
+                CardRequirement::MinimumPlayers(_) => true,
+            }
+        })
 }
 
 fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String> {
@@ -3185,6 +3189,31 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 gain(Space::TravelingPlayers, Good::Grain, 1),
             ],
         },
+        // A008 食材かご (Food Basket): cost 1 reed; prerequisites 2 occupations and
+        // 2 improvements in front; on play gain 1 grain and 1 vegetable.
+        CardDefinition {
+            use_limit: None,
+            id: "A008".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Reed, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(2),
+                },
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumImprovements(2),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Vegetable,
+                    amount: 1,
+                },
+            ],
+        },
     ]
 }
 
@@ -4123,6 +4152,113 @@ mod verified_band_a_tests {
             can_play(&set, card, &p, 0),
             "A155 should be playable via can_play"
         );
+    }
+
+    #[test]
+    fn a008_grain_vegetable_fixed_with_prereqs() {
+        let mut set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        // Add a dummy minor improvement for counting
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "minor1".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        });
+        // Test 1: prerequisite fails with 0 occupations
+        let mut p = Player::new(0, 5); // 5 food for reed cost
+        p.supply.reed = 1;
+        p.improvements.push(Improvement::Well); // 1 base improvement
+        let result = play(
+            &set,
+            &mut vec!["A008".into()],
+            &mut p,
+            "A008",
+            CardKind::MinorImprovement,
+            1, // reed cost
+        );
+        assert!(result.is_err(), "Should fail with 0 occupations");
+
+        // Test 2: prerequisite fails with 1 occupation
+        p = Player::new(0, 5);
+        p.supply.reed = 1;
+        p.improvements.push(Improvement::Well);
+        p.played_cards.push("A117".into()); // 1 occupation
+        let result = play(
+            &set,
+            &mut vec!["A008".into()],
+            &mut p,
+            "A008",
+            CardKind::MinorImprovement,
+            1,
+        );
+        assert!(result.is_err(), "Should fail with 1 occupation");
+
+        // Test 3: prerequisite fails with 2 occupations but <2 improvements
+        p = Player::new(0, 5);
+        p.supply.reed = 1;
+        p.improvements.push(Improvement::Well); // only 1 improvement (base)
+        p.played_cards.push("A117".into());
+        p.played_cards.push("A101".into()); // 2 occupations
+        assert_eq!(improvement_count_in_front(&set, &p), 1); // base only
+        let result = play(
+            &set,
+            &mut vec!["A008".into()],
+            &mut p,
+            "A008",
+            CardKind::MinorImprovement,
+            1,
+        );
+        assert!(
+            result.is_err(),
+            "Should fail with 2 occupations but <2 improvements"
+        );
+
+        // Test 4: prerequisite passes with 2 occupations and 2 improvements (base + 1 minor)
+        p = Player::new(0, 5);
+        p.supply.reed = 1;
+        p.improvements.push(Improvement::Well);
+        p.improvements.push(Improvement::Fireplace2); // 2 improvements (base + 1 minor)
+        p.played_cards.push("A117".into());
+        p.played_cards.push("A101".into()); // 2 occupations
+        assert_eq!(improvement_count_in_front(&set, &p), 2);
+        play(
+            &set,
+            &mut vec!["A008".into()],
+            &mut p,
+            "A008",
+            CardKind::MinorImprovement,
+            1,
+        )
+        .unwrap();
+        // Fixed 1 grain + 1 vegetable regardless of improvement count
+        assert_eq!(p.supply.grain, 1);
+        assert_eq!(p.supply.vegetable, 1);
+
+        // Test 5: with more improvements, still fixed 1 grain + 1 vegetable
+        p = Player::new(0, 5);
+        p.supply.reed = 1;
+        p.improvements.push(Improvement::Well);
+        p.improvements.push(Improvement::Fireplace2);
+        p.improvements.push(Improvement::Hearth4); // 3 improvements (base + 2 minors)
+        p.played_cards.push("A117".into());
+        p.played_cards.push("A101".into());
+        assert_eq!(improvement_count_in_front(&set, &p), 3);
+        play(
+            &set,
+            &mut vec!["A008".into()],
+            &mut p,
+            "A008",
+            CardKind::MinorImprovement,
+            1,
+        )
+        .unwrap();
+        // Still fixed 1 grain + 1 vegetable
+        assert_eq!(p.supply.grain, 1);
+        assert_eq!(p.supply.vegetable, 1);
     }
 }
 

@@ -990,6 +990,9 @@ fn handle_prerequisite(
                 .count()
                 >= usize::from(*number)
         }
+        crate::cards::CardRequirement::MinimumImprovements(min) => {
+            crate::cards::improvement_count_in_front(ctx.card_set, p) >= u32::from(*min)
+        }
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
     };
 
