@@ -702,6 +702,7 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play_destination: None,
             }],
         };
         let mut players = vec![crate::model::Player::new(0, 0)];
@@ -891,6 +892,7 @@ mod tests {
                 amount: 1,
             }],
             use_limit: Some(1),
+            post_play_destination: None,
         };
         let set = CardSet {
             definitions: vec![card("LIMITED"), card("USER")],
@@ -953,6 +955,7 @@ mod tests {
                     amount: 1,
                 }],
                 use_limit: None,
+                post_play_destination: None,
             }],
         };
         let mut game = Game::new(Config {
@@ -1012,6 +1015,7 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2), (Good::Wood, 1)],
             }],
+            post_play_destination: None,
         });
         // Add 13 more occupations to reach 14 total
         for i in 1..=13 {
@@ -1022,6 +1026,7 @@ mod tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play_destination: None,
             });
         }
         // Add 14 minor improvements
@@ -1033,6 +1038,7 @@ mod tests {
                 cost: vec![],
                 points: 1,
                 effects: vec![],
+                post_play_destination: None,
             });
         }
         let set = CardSet { definitions };
@@ -1260,6 +1266,7 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2)],
             }],
+            post_play_destination: None,
         };
         let set = CardSet {
             definitions: vec![probe],

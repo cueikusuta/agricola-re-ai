@@ -801,6 +801,7 @@ fn fixture_card_set(pool: &DraftPool) -> CardSet {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play_destination: None,
     };
     let mut definitions = Vec::new();
     for id in &pool.occupations {

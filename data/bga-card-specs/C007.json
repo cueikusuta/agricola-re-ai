@@ -97,16 +97,16 @@
     "destination": "left_neighbor_hand"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
-    "test_case_ids": [
-      "C007-flat",
-      "C007-per-sheep",
-      "C007-zero-sheep"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
-    "notes": "Gain 3 food or 1 food per sheep owned (sheep are kept); pass left."
-  }
-}
+        "status": "bga_checked",
+        "unresolved_fields": [],
+        "test_case_ids": [
+          "C007-flat",
+          "C007-per-sheep",
+          "C007-zero-sheep"
+        ],
+        "checked_by": "AI source comparison",
+        "checked_on": "2026-11-09",
+        "implementation_status": "tested",
+        "notes": "Gain 3 food or 1 food per sheep owned (sheep are kept); pass left."
+      }
+    }

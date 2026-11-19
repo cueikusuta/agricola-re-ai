@@ -311,6 +311,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play_destination: None,
         }
     }
 

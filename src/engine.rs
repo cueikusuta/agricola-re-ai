@@ -1566,19 +1566,19 @@ impl Game {
                             &mut self.public.players[id],
                             card.points,
                         )?;
-                    // Handle post-play destination (e.g., C006/C007 pass to left neighbor)
-                    let mut ctx = CardMoveCtx {
-                        cards: &mut self.cards,
-                        players: &mut self.public.players,
-                        improvement_market: &mut self.public.improvement_market,
-                    };
-                    crate::card_zones::handle_post_play_destination(
-                        &mut ctx,
-                        &self.card_set,
-                        id,
-                        card_id,
-                        self.config.players,
-                    )?;
+                        // Handle post-play destination (e.g., C006/C007 pass to left neighbor)
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        crate::card_zones::handle_post_play_destination(
+                            &mut ctx,
+                            &self.card_set,
+                            id,
+                            card_id,
+                            self.config.players,
+                        )?;
                     }
                     _ => return Err("invalid starting-player details".into()),
                 }
@@ -1648,19 +1648,19 @@ impl Game {
                     &mut self.public.players[id],
                     card.points,
                 )?;
-                    // Handle post-play destination (e.g., C006/C007 pass to left neighbor)
-                    let mut ctx = CardMoveCtx {
-                        cards: &mut self.cards,
-                        players: &mut self.public.players,
-                        improvement_market: &mut self.public.improvement_market,
-                    };
-                    crate::card_zones::handle_post_play_destination(
-                        &mut ctx,
-                        &self.card_set,
-                        id,
-                        card_id,
-                        self.config.players,
-                    )?;
+                // Handle post-play destination (e.g., C006/C007 pass to left neighbor)
+                let mut ctx = CardMoveCtx {
+                    cards: &mut self.cards,
+                    players: &mut self.public.players,
+                    improvement_market: &mut self.public.improvement_market,
+                };
+                crate::card_zones::handle_post_play_destination(
+                    &mut ctx,
+                    &self.card_set,
+                    id,
+                    card_id,
+                    self.config.players,
+                )?;
             }
             Space::DayLaborer => {
                 require_none(detail)?;

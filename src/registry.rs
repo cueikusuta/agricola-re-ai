@@ -117,6 +117,7 @@ impl RegisteredCard {
             cost: self.cost.clone(),
             points: self.points,
             effects: self.effects.clone(),
+            post_play_destination: None,
         }
     }
 }
@@ -281,7 +282,9 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainPerStored { .. }
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayPlaceStonesOnEmptyFields { .. }
+                | crate::cards::CardEffect::OnPlayChooseGainFoodOrPerSheep => EventKind::CardPlayed,
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -403,6 +406,8 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. } => *amount,
+                        crate::cards::CardEffect::OnPlayPlaceStonesOnEmptyFields { .. }
+                        | crate::cards::CardEffect::OnPlayChooseGainFoodOrPerSheep => 1,
                     };
                     amount == 0 || amount > 30
                 })

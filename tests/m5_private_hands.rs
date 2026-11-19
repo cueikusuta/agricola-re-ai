@@ -15,6 +15,7 @@ fn sample_set(players: usize) -> CardSet {
                 good: Good::Food,
                 amount: 1,
             }],
+            post_play_destination: None,
         });
         definitions.push(CardDefinition {
             use_limit: None,
@@ -26,6 +27,7 @@ fn sample_set(players: usize) -> CardSet {
                 good: Good::Wood,
                 amount: 1,
             }],
+            post_play_destination: None,
         });
     }
     CardSet { definitions }

@@ -391,6 +391,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 },
                 CardDefinition {
                     use_limit: None,
@@ -399,6 +400,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 },
             ],
         };
@@ -449,6 +451,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play_destination: None,
         });
         let err = validate_card_partition(&set, &cards, &players).unwrap_err();
         assert!(err.contains("missing"));
@@ -473,6 +476,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 },
                 CardDefinition {
                     use_limit: None,
@@ -481,6 +485,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 },
             ],
         };
@@ -672,6 +677,7 @@ mod tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play_destination: None,
             }],
         };
         let mut cards = CardState {
