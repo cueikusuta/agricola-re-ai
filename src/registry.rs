@@ -281,7 +281,11 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainPerStored { .. }
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayChoiceGain { .. }
+                | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. } => {
+                    EventKind::CardPlayed
+                }
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -412,6 +416,12 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
                         | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. } => {
                             *amount
+                        }
+                        crate::cards::CardEffect::OnPlayAddStoneToEmptyFields {
+                            amount, ..
+                        } => *amount,
+                        crate::cards::CardEffect::OnPlayChoiceGain { options } => {
+                            options.iter().map(|o| o.amount).max().unwrap_or(1)
                         }
                     };
                     amount == 0 || amount > 30

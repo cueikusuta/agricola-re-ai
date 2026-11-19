@@ -76,6 +76,9 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::HarvestStartGainIfFields { .. } => TriggerPhase::After,
         // End game scoring — After phase
         CardEffect::EndGameBonus { .. } => TriggerPhase::After,
+        // On-play choice gain / stone placement — instantaneous at play time — Before phase
+        CardEffect::OnPlayChoiceGain { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayAddStoneToEmptyFields { .. } => TriggerPhase::Before,
     }
 }
 
@@ -572,6 +575,10 @@ fn resolve_phase_scan(
                     // Scoring is handled separately in evaluation; no runtime effect.
                     EffectResult::Resolved
                 }
+                // On-play effects handled by apply_on_play_effects in the play path;
+                // the generic phase scan has nothing to do here.
+                CardEffect::OnPlayChoiceGain { .. } => EffectResult::Resolved,
+                CardEffect::OnPlayAddStoneToEmptyFields { .. } => EffectResult::Resolved,
             };
 
             // Handle pending interrupt: pause with the resume position.
@@ -755,6 +762,9 @@ fn effect_condition_holds(
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
+        // On-play effects always trigger when played — condition holds immediately.
+        CardEffect::OnPlayChoiceGain { .. } => true,
+        CardEffect::OnPlayAddStoneToEmptyFields { .. } => true,
         #[cfg(test)]
         CardEffect::PendingProbe { .. } => true,
     }
@@ -942,6 +952,10 @@ pub fn execute_chosen_triggers(
                 // Scoring is handled separately in evaluation; no runtime effect.
                 EffectResult::Resolved
             }
+            // On-play effects handled by apply_on_play_effects in the play path;
+            // the generic phase scan has nothing to do here.
+            CardEffect::OnPlayChoiceGain { .. } => EffectResult::Resolved,
+            CardEffect::OnPlayAddStoneToEmptyFields { .. } => EffectResult::Resolved,
         };
 
         // Handle pending interrupt: pause with the resume position.
@@ -1059,6 +1073,7 @@ fn handle_prerequisite(
             crate::cards::improvement_count_in_front(ctx.card_set, p) >= u32::from(*min)
         }
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
+        crate::cards::CardRequirement::PastureCount(n) => p.pastures.len() >= usize::from(*n),
     };
 
     if !ok {

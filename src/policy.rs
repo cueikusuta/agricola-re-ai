@@ -595,6 +595,10 @@ fn card_priority(
                                     // Conditional on field count; optimistic half-weight
                                     card_good_value(*good) * i64::from(*amount) * horizon / 2
                                 }
+                                // C006/C007 on-play effects: stone placement and choice gain
+                                // are resolved at play time; heuristic assigns neutral value.
+                                CardEffect::OnPlayChoiceGain { .. } => 0,
+                                CardEffect::OnPlayAddStoneToEmptyFields { .. } => 0,
                             };
     }
     Some(value)

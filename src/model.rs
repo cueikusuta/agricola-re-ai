@@ -152,6 +152,10 @@ pub struct Cell {
     pub tile: Tile,
     pub stable: bool,
     pub stable_animal: Option<Animal>,
+    /// Stones placed on this field (e.g. by C006 石取り作業 / Stone Clearing),
+    /// harvested at the next field phase. Meaningful only for `Tile::Field`.
+    #[serde(default)]
+    pub field_stones: u32,
 }
 impl Default for Cell {
     fn default() -> Self {
@@ -159,6 +163,7 @@ impl Default for Cell {
             tile: Tile::Empty,
             stable: false,
             stable_animal: None,
+            field_stones: 0,
         }
     }
 }
