@@ -84,7 +84,10 @@ fn hands_with_b102_in_seat0(set: &CardSet) -> Vec<Vec<String>> {
         .filter(|card| card.kind == CardKind::MinorImprovement)
         .map(|card| card.id.clone())
         .collect();
-    assert!(occupations.len() >= 14, "set needs 14 occupations for two seats");
+    assert!(
+        occupations.len() >= 14,
+        "set needs 14 occupations for two seats"
+    );
     assert!(
         minors.len() >= 14,
         "set needs 14 minor improvements for two seats"
@@ -96,7 +99,11 @@ fn hands_with_b102_in_seat0(set: &CardSet) -> Vec<Vec<String>> {
     // Deal the remaining occupations round-robin until both seats hold 7.
     let mut seat = 1;
     for id in occupations {
-        let target = if hands[seat].len() < 7 { seat } else { 1 - seat };
+        let target = if hands[seat].len() < 7 {
+            seat
+        } else {
+            1 - seat
+        };
         if hands[target].len() < 7 {
             hands[target].push(id);
         }
@@ -125,8 +132,7 @@ fn raw_b102_def_carries_both_player_series() {
     // Fixture premise: the registry B102 really is a dual-series card.
     let b102 = raw_b102_registry_form();
     assert_eq!(
-        b102
-            .effects
+        b102.effects
             .iter()
             .filter(|effect| matches!(effect, CardEffect::OnPlayGain { .. }))
             .count(),
@@ -154,7 +160,7 @@ fn raw_b102_both_series_fire_in_two_player_game() {
         set,
         hands,
     )
-    .expect("entry accepted (fixed tree rejects this instead — see raw_b102 test)");
+    .expect("entry accepts the set; the fixed tree projects it to 2 players (see raw_a155 test for the reject path)");
 
     // Play the raw B102 in seat 0 and measure the actually granted resources.
     let owner = 0;
@@ -186,11 +192,41 @@ fn raw_b102_both_series_fire_in_two_player_game() {
         "2-player game must grant only the 2p Clay 3 series of B102"
     );
 
-    // Use ledger: playing B102 must record exactly one use.
+    // The projected card carried into the game has only the 2p series:
+    // the 3p Reed series must be absent from the game's own card set.
+    let b102_in_game = game
+        .card_set
+        .definition("B102")
+        .expect("B102 present in the game set");
     assert_eq!(
-        game.public.card_uses.get("B102"),
-        Some(&1),
-        "card_uses must record exactly one B102 play"
+        b102_in_game
+            .effects
+            .iter()
+            .filter(|effect| matches!(
+                effect,
+                CardEffect::OnPlayGain {
+                    good: Good::Reed,
+                    ..
+                }
+            ))
+            .count(),
+        0,
+        "the 2-player game's B102 must not carry the 3p Reed series"
+    );
+    assert_eq!(
+        b102_in_game
+            .effects
+            .iter()
+            .filter(|effect| matches!(
+                effect,
+                CardEffect::OnPlayGain {
+                    good: Good::Clay,
+                    ..
+                }
+            ))
+            .count(),
+        1,
+        "the 2-player game's B102 keeps exactly one 2p Clay series"
     );
 }
 

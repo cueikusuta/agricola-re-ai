@@ -459,55 +459,18 @@ impl CardSet {
         }
         for card in &self.definitions {
             // Parse effects to find prerequisite guards for each effect.
-            // Prerequisites immediately preceding a non-prerequisite effect guard that effect.
-            // Unpaired prerequisites (no following effect) are whole-card requirements.
-            let mut prereq_buffer: Vec<&CardRequirement> = Vec::new();
-            for effect in &card.effects {
-                if let CardEffect::Prerequisite { rule } = effect {
-                    prereq_buffer.push(rule);
-                } else {
-                    // This effect is guarded by all prerequisites in the buffer.
-                    // Check if all guards are satisfied for this player count.
-                    let guards_satisfied = prereq_buffer.iter().all(|rule| {
-                        match rule {
-                            CardRequirement::MinimumPlayers(min) => {
-                                *min != 0 && *min as usize <= players
-                            }
-                            CardRequirement::MaximumPlayers(max) => {
-                                *max != 0 && *max as usize >= players
-                            }
-                            _ => true, // Other prerequisites validated elsewhere or always true here
-                        }
-                    });
-                    if !guards_satisfied {
-                        // Effect not active for this player count; skip its guards.
-                    }
-                    // Clear buffer for next effect
-                    prereq_buffer.clear();
-                }
-            }
-            // Any remaining prerequisites in buffer are unpaired -> whole-card requirements
-            for rule in prereq_buffer {
-                match rule {
-                    CardRequirement::MinimumPlayers(min) => {
-                        if *min == 0 || *min as usize > players {
-                            return Err(format!(
-                                "card {} is not eligible for this player count",
-                                card.id
-                            ));
-                        }
-                    }
-                    CardRequirement::MaximumPlayers(max)
-                        if *max == 0 || (*max as usize) < players =>
-                    {
-                        return Err(format!(
-                            "card {} is not eligible for this player count",
-                            card.id
-                        ));
-                    }
-                    _ => {}
-                }
-            }
+            // A consecutive run of player-count prerequisites
+            // (MinimumPlayers/MaximumPlayers) guards every following effect
+            // UP TO the next player-count run or the end of the list. A
+            // trailing run with no following effect is a whole-card
+            // requirement. Non-player prerequisites (occupation/animal/field
+            // counts) guard only the immediately following effect and are
+            // evaluated at play time, not here.
+            let Some(strict_err) = players_guarded_effects_valid(&card.id, &card.effects, players)
+            else {
+                continue;
+            };
+            return Err(strict_err);
         }
         for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
             let count = self.definitions.iter().filter(|c| c.kind == kind).count();
@@ -525,6 +488,180 @@ impl CardSet {
         }
         Ok(())
     }
+
+    /// Project this card set to a specific player count, exactly once, at a
+    /// game entry point (PR #368 close verdict: 人数投影を全ゲーム入口で固定し
+    /// 未投影セットを拒否).
+    ///
+    /// A consecutive run of player-count prerequisites guards every following
+    /// effect up to the next player-count run or the end of the list, and a
+    /// trailing run is a whole-card requirement — the same grammar
+    /// `CardSet::validate` enforces. Effects guarded for a different player
+    /// count are removed. A card that originally had effects but would lose
+    /// ALL of them for this player count is not playable here: the set is
+    /// unprojectable and rejected rather than silently kept as a dead card
+    /// (raw A155 in a 2-player game is the motivating case).
+    ///
+    /// The projection is idempotent: a set already projected for its player
+    /// count (the verified 2-player preset, the v5 save fixtures, every
+    /// `card_set_for_game` set) has no unsatisfied guards and passes through
+    /// unchanged, so content hashes and recorded replays are preserved.
+    pub fn projected_for_players(&self, players: usize) -> Result<CardSet, String> {
+        let mut definitions = Vec::with_capacity(self.definitions.len());
+        for card in &self.definitions {
+            let effects = project_effects_for_players(&card.effects, players);
+            if !card.effects.is_empty() && effects.is_empty() {
+                return Err(format!(
+                    "card {} has no active effects at {players} players",
+                    card.id
+                ));
+            }
+            definitions.push(CardDefinition {
+                use_limit: card.use_limit,
+                id: card.id.clone(),
+                kind: card.kind,
+                cost: card.cost.clone(),
+                points: card.points,
+                effects,
+            });
+        }
+        Ok(CardSet { definitions })
+    }
+}
+
+/// Whether a player-count requirement player guard is satisfied for `players`.
+fn players_guard_satisfied(rule: &CardRequirement, players: usize) -> bool {
+    match rule {
+        CardRequirement::MinimumPlayers(min) => *min != 0 && usize::from(*min) <= players,
+        CardRequirement::MaximumPlayers(max) => *max != 0 && usize::from(*max) >= players,
+        _ => true,
+    }
+}
+
+/// One segment of the player-count guard grammar: a consecutive run of
+/// MinimumPlayers/MaximumPlayers prerequisites (`guards`) plus everything that
+/// run covers (`covered`): every following effect up to the next player-count
+/// run or the end of the list, including non-player play-time prerequisites
+/// that stay attached to the effect they precede. The leading segment before
+/// any player-count prerequisite has no guards.
+#[derive(Default)]
+struct PlayerGuardSegment {
+    guards: Vec<CardEffect>,
+    covered: Vec<CardEffect>,
+}
+
+impl PlayerGuardSegment {
+    fn has_player_guard(&self) -> bool {
+        !self.guards.is_empty()
+    }
+
+    fn guards_satisfied(&self, players: usize) -> bool {
+        self.guards.iter().all(|effect| match effect {
+            CardEffect::Prerequisite { rule } => players_guard_satisfied(rule, players),
+            _ => true,
+        })
+    }
+
+    fn regular_effect_count(&self) -> usize {
+        self.covered
+            .iter()
+            .filter(|effect| !matches!(effect, CardEffect::Prerequisite { .. }))
+            .count()
+    }
+}
+
+/// Segment a card's effect list into player-count guard runs: consecutive
+/// player-count prerequisites merge into one run, and a run ends at the next
+/// player-count prerequisite once it has covered at least one effect.
+fn player_guard_segments(effects: &[CardEffect]) -> Vec<PlayerGuardSegment> {
+    let is_player_guard = |rule: &CardRequirement| {
+        matches!(
+            rule,
+            CardRequirement::MinimumPlayers(_) | CardRequirement::MaximumPlayers(_)
+        )
+    };
+    let mut segments: Vec<PlayerGuardSegment> = Vec::new();
+    let mut current = PlayerGuardSegment {
+        guards: Vec::new(),
+        covered: Vec::new(),
+    };
+    for effect in effects {
+        if let CardEffect::Prerequisite { rule } = effect {
+            if is_player_guard(rule) {
+                if !current.covered.is_empty() {
+                    segments.push(std::mem::take(&mut current));
+                }
+                current.guards.push(effect.clone());
+                continue;
+            }
+            // Non-player prerequisite: play-time guard on the next effect;
+            // stays with the effect it precedes.
+            current.covered.push(effect.clone());
+            continue;
+        }
+        current.covered.push(effect.clone());
+    }
+    segments.push(current);
+    segments
+}
+
+/// Strict player-count guard check for `CardSet::validate` (PR #368 close
+/// verdict: 人数投影を全ゲーム入口で固定し未投影セットを拒否). A set handed to
+/// a game entry is projected by [`CardSet::projected_for_players`] first, so
+/// an unsatisfied player-count guard at validation time means an unprojected
+/// (raw) set reached validation and must be rejected instead of being treated
+/// as validated.
+///
+/// Grammar, shared with the entry projection: a consecutive run of
+/// MinimumPlayers/MaximumPlayers prerequisites guards every following effect
+/// up to the next player-count run or the end of the list; effects before the
+/// first player-count run are unguarded; a trailing run with no following
+/// regular effect is a whole-card requirement. Non-player prerequisites are
+/// play-time checks on the effect they precede and are ignored here.
+fn players_guarded_effects_valid(
+    card_id: &str,
+    effects: &[CardEffect],
+    players: usize,
+) -> Option<String> {
+    for segment in player_guard_segments(effects) {
+        if !segment.has_player_guard() || segment.guards_satisfied(players) {
+            continue;
+        }
+        if segment.regular_effect_count() > 0 {
+            return Some(format!(
+                "card {card_id} carries an effect guarded for a different player count"
+            ));
+        }
+        return Some(format!(
+            "card {card_id} is not eligible for this player count"
+        ));
+    }
+    None
+}
+
+/// Project a card's effects to `players` with the shared guard grammar
+/// (PR #368: every game entry projects exactly once). A run whose guards are
+/// unsatisfied loses its covered effects together with the run itself;
+/// satisfied runs stay in place, so the projection is idempotent on sets that
+/// were already projected (the verified 2-player preset, v5 save fixtures,
+/// `card_set_for_game` output). A trailing run covering no effect is a
+/// whole-card requirement: it is kept so [`CardSet::validate`] rejects the
+/// set instead of silently stripping the requirement.
+pub(crate) fn project_effects_for_players(
+    effects: &[CardEffect],
+    players: usize,
+) -> Vec<CardEffect> {
+    let mut result: Vec<CardEffect> = Vec::with_capacity(effects.len());
+    for segment in player_guard_segments(effects) {
+        let keep = !segment.has_player_guard()
+            || segment.guards_satisfied(players)
+            || segment.regular_effect_count() == 0;
+        if keep {
+            result.extend(segment.guards);
+            result.extend(segment.covered);
+        }
+    }
+    result
 }
 
 /// Private: must never be serialized into a player's Observation.
@@ -5414,13 +5551,16 @@ mod p1_2_repro_tests {
         println!("Missing from builtin: {:?}", missing);
         println!("Extra in builtin: {:?}", extra);
 
-        // Both should have the same count (currently 65 implemented cards)
+        // Both must carry exactly the same catalog. The hard count is
+        // intentionally not pinned: the implemented catalog grows as cards
+        // land on main (65 at the original P1-2 audit, 75 after the M7-C
+        // implementation wave merged there); what must not drift is the
+        // builtin/registry identity itself.
         assert_eq!(
             builtin.len(),
-            65,
-            "builtin_implemented_cards should have 65 cards"
+            registry.len(),
+            "builtin_implemented_cards and registry must cover the same cards"
         );
-        assert_eq!(registry.len(), 65, "registry should have 65 cards");
         assert!(
             missing.is_empty(),
             "builtin should not miss any registry cards"
