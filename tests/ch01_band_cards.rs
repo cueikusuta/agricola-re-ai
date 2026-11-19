@@ -176,12 +176,44 @@ fn game_with_valid_cards(players: usize, seed: u64) -> Game {
 /// Does NOT advance turns - uses the current active player.
 fn setup_active_player_with_card(game: &mut Game, card_id: &str) -> usize {
     let player = game.public.active_player;
-    // Add the card to the player's hand
-    game.cards.hands[player].push(card_id.to_string());
-    // Also add to played_cards so dispatch_after_worker can find it
+    // PR #358 close-out: pushing the card blindly duplicated it when it was
+    // already dealt (it always is — the set is constructed containing it), and
+    // incremental validation used to Pass the resulting state because the
+    // play wrote a new use-ledger key that skipped full validation. Relocate
+    // the single existing copy into the active player's hand and then onto
+    // their played pile so the fixture stays canonical under the new
+    // Unsure→full delegation.
+    let take_from_hands = |game: &mut Game| -> bool {
+        for hand in game.cards.hands.iter_mut() {
+            if let Some(pos) = hand.iter().position(|id| id == card_id) {
+                hand.remove(pos);
+                return true;
+            }
+        }
+        false
+    };
+    let found = take_from_hands(game)
+        || game
+            .cards
+            .undealt
+            .iter()
+            .position(|id| id == card_id)
+            .map(|pos| {
+                game.cards.undealt.remove(pos);
+                true
+            })
+            .unwrap_or(false);
+    assert!(found, "fixture: {card_id} must exist in the game partition");
+    // Hand -> played pile: a partition-preserving move, with card_points
+    // tracking it (the running invariant full validation checks).
     game.public.players[player]
         .played_cards
         .push(card_id.to_string());
+    game.public.players[player].card_points += game
+        .card_set
+        .definition(card_id)
+        .map(|d| d.points)
+        .unwrap_or(0);
     player
 }
 
