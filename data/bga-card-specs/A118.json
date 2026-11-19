@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3307",
         "language": "ja",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -52,7 +52,7 @@
         }
       ],
       "optional": false,
-      "frequency": "once_per_play",
+      "frequency": "every_harvest",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
@@ -77,7 +77,8 @@
                 "good": "wood",
                 "amount": 1
               }
-            ]
+            ],
+            "max_per_harvest": 2
           }
         }
       ],
@@ -101,8 +102,8 @@
       "A118-boundary"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Field phase: 1 wood; may buy up to 2 more wood for 1 food each."
+    "notes": "Each harvest field phase: gain 1 wood, and may buy up to 2 more wood for 1 food each. The first effect is per harvest, not once per play, and the purchase cap is 2 per harvest."
   }
 }

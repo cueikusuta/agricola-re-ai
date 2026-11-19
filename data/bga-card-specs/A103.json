@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3322",
         "language": "ja",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -37,15 +37,98 @@
     "prerequisites": [],
     "printed_points": 0
   },
-  "effects": null,
+  "effects": [
+    {
+      "trigger": "on_take_from_accumulation",
+      "conditions": [
+        {
+          "predicate": "food_taken_from_accumulation_at_least",
+          "params": {
+            "n": 1
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "vegetable",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When taking at least 1 food from a food accumulation space, additionally gain 1 vegetable."
+    },
+    {
+      "trigger": "on_take_from_accumulation",
+      "conditions": [
+        {
+          "predicate": "food_taken_from_accumulation_at_least",
+          "params": {
+            "n": 2
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When taking at least 2 food from a food accumulation space, additionally gain 1 grain."
+    },
+    {
+      "trigger": "on_take_from_accumulation",
+      "conditions": [
+        {
+          "predicate": "food_taken_from_accumulation_at_least",
+          "params": {
+            "n": 3
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "reed",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When taking at least 3 food from a food accumulation space, additionally gain 1 reed."
+    }
+  ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "tier_mapping_positional_or_cumulative"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
       "A103-normal",
       "A103-boundary-two",
@@ -54,8 +137,8 @@
       "A103-tier-contract-pending"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "The relationship between 1/2/3+ food and vegetable/grain/reed is not settled by conflicting third-party descriptions. Fail closed: do not execute provisional tier logic until source confirmed."
+    "notes": "Each time you take 1/2/3+ food from a food accumulation space, additionally gain 1 vegetable/wheat/reed. Tier reading fixed by the literature (MR-03)."
   }
 }

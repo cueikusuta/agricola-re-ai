@@ -138,3 +138,16 @@
 - Actions（HEAD `9c1cdab`）: Detect changed files / Pipeline gates / CI required が pass。
   Rust変更が無いため rustfmt・clippy・cargo test・M1/M2/M7 seeded performance は paths filter で skip。
 - 次の再開位置: 独立レビュー（別セッション）。指摘対応は PR #377 上で行う。
+
+<!-- spec-fixes-progress -->
+### 第9部: 仕様データ（`data/bga-card-specs/`）の残件修正（ブランチ `research/deepai-spec-fixes`）
+
+- 起点: `research/deepai-outband-merged`（PR #377 の HEAD）。PR は #377 の上に積む（stacked）。
+- 範囲: 仕様 JSON のみ。Rust・スキーマ・台帳・テスト・分類文書は変更しない。
+- 成果物: `docs/spec-data-fixes.md`（残件一覧・修正根拠・チェックリスト）。
+- **第0章 完了**: #362 / #370 / #375 / #376 / #377 と過去レビューの残件を ID 単位で統合。
+  S-1（仕様の新規作成145枚）は Hermes の進行中範囲のため対象外。仕様が無い ID も修正対象外。
+- **第1章（A帯）完了**: A071 / A092 / A103 / A110 / A111 / A118 / A150 / A154 / A156 / A158 / A159 を修正。
+  A073 / A075 / A084 / A094 / A096 / A097 / A100 / A107 は変更不要、A135 / A136 はチェックリスト。
+- 次の再開位置: 第2章（B帯）。B010/B013/B050/B062/B095/B098/B099/B121/B126/B142 の参照 URL、
+  B048 の石材累積、B069 の anytime 効果。

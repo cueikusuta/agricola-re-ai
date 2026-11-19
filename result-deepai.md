@@ -453,3 +453,21 @@ M7 #335 C004 cost → 2赤、M8 #340 C116 自己発動 → **ブランチのみ�
   - CI required: pass — https://github.com/cueikusuta/agricola-re-ai/actions/runs/44465605656/job/135362650774
   - rustfmt / clippy / cargo test / M1・M2・M7 seeded performance: docs のみの変更として skip。
 - 独立レビュー対象（211→204の同定、E075のAND読み、段階3優先、37件の段階4判断）。
+
+## 第9部（2026-11-19）— 仕様データ残件の修正（ブランチ `research/deepai-spec-fixes`）
+
+- 起点: `research/deepai-outband-merged`（PR #377 の HEAD）。PR は #377 に積む（stacked）。
+- 本編: `docs/spec-data-fixes.md`。仕様 JSON のみを変更し、Rust・スキーマ・台帳・テスト・分類文書は触らない。
+- 第0章: 残件を #362 / #370 / #375 / #376 / #377 と過去レビューから ID 単位で統合。
+  S-1 の145枚と、仕様が無い D075/E070/E072/E080/D080/D082/E075/D086/E084/E086/A119 は
+  Hermes の進行中範囲・新規作成のため対象外とした。
+- 第1章（A帯）: 11枚を修正。
+  - A150 は農地→小劇場、耕作→部屋に修正。
+  - A154 は種まき前→食料累積スペースの使用後に修正。
+  - A156 は森林・粘土坑→葦・石材・羊・猪、相手の資源取得→供給から同じ品物に修正。
+  - A158 は森林→小劇場、食料4→木材1→小麦/羊/野菜1→食料4/5/7に修正。
+  - A159 は漁・粘土坑→漁・葦原、支払い方向を修正。
+  - A071/A092/A103 は空効果を文献で補完。A110 は2経路に分割。A111 は任意→必須。A118 は毎収穫・上限2に修正。
+  - A073/A075/A084/A094/A096/A097/A100/A107 は現行値が正しく変更不要。A135/A136 は版差・文言差のため保留。
+- 検証: 変更 JSON の構文・必須キー・operation/target/snapshot を Node で機械確認。
+  Python がローカルに無いため `scripts/validate_bga_card_specs.py` は実行できず、Actions に委ねる。
