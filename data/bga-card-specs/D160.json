@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2761",
         "language": "ja",
-        "checked_on": "2026-11-14",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -37,21 +37,61 @@
     "prerequisites": [],
     "printed_points": 0
   },
-  "effects": null,
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "family_growth_with_room",
+              "family_growth_no_room"
+            ]
+          }
+        },
+        {
+          "predicate": "other_player_only",
+          "params": {}
+        },
+        {
+          "predicate": "acting_player_first_placement_this_round",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When another player uses Family Growth with their first person of the round, gain 1 grain from the general supply."
+    }
+  ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects"
+      "effects[0].conditions: acting_player_first_placement_this_round needs formalization (what counts as the first person)"
     ],
     "test_case_ids": [
       "D160-other-player-family-growth"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Trigger on other player's first-person Family Growth action. Gain 1 grain. Exact action identification unresolved. Eligibility per ledger: 2=no, 3=no, 4=yes."
+    "notes": "Another player uses Family Growth with their first person: gain 1 grain. The effect value is fixed; the first-person condition remains to be formalized."
   }
 }
