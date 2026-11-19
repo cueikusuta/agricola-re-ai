@@ -68,6 +68,10 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterHarvestBakeGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
+        CardEffect::AfterHarvestGain { .. } => TriggerPhase::After,
+        CardEffect::AfterHarvestGainIfAtLeast { .. } => TriggerPhase::After,
+        // A118 optional exchange — Interrupt phase (requires player decision)
+        CardEffect::HarvestFieldOptionalExchange { .. } => TriggerPhase::Interrupt,
         // End game scoring — After phase
         CardEffect::EndGameBonus { .. } => TriggerPhase::After,
     }
@@ -537,6 +541,30 @@ fn resolve_phase_scan(
                 CardEffect::HarvestFieldGain { rule, good, amount } => {
                     handle_harvest_field_gain(ctx, player, rule, good, *amount, trigger_data)?
                 }
+                CardEffect::AfterHarvestGain { good, amount } => {
+                    handle_after_harvest_gain(ctx, player, good, *amount)?
+                }
+                CardEffect::AfterHarvestGainIfAtLeast {
+                    good,
+                    threshold,
+                    gain,
+                    amount,
+                } => handle_after_harvest_gain_if_at_least(
+                    ctx, player, good, *threshold, gain, *amount,
+                )?,
+                CardEffect::HarvestFieldOptionalExchange {
+                    cost,
+                    cost_amount,
+                    gain,
+                    gain_amount,
+                } => handle_harvest_field_optional_exchange(
+                    ctx,
+                    player,
+                    cost,
+                    *cost_amount,
+                    gain,
+                    *gain_amount,
+                )?,
                 CardEffect::EndGameBonus { .. } => {
                     // Scoring is handled separately in evaluation; no runtime effect.
                     EffectResult::Resolved
@@ -704,6 +732,9 @@ fn effect_condition_holds(
             trigger.event_kind == EventKind::Bake && trigger.baked
         }
         CardEffect::HarvestFieldGain { .. } => trigger.event_kind == EventKind::Harvest,
+        CardEffect::AfterHarvestGain { .. } => trigger.event_kind == EventKind::Harvest,
+        CardEffect::AfterHarvestGainIfAtLeast { .. } => trigger.event_kind == EventKind::Harvest,
+        CardEffect::HarvestFieldOptionalExchange { .. } => trigger.event_kind == EventKind::Harvest,
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
@@ -873,6 +904,30 @@ pub fn execute_chosen_triggers(
             CardEffect::HarvestFieldGain { rule, good, amount } => {
                 handle_harvest_field_gain(ctx, player, rule, good, *amount, trigger_data)?
             }
+            CardEffect::AfterHarvestGain { good, amount } => {
+                handle_after_harvest_gain(ctx, player, good, *amount)?
+            }
+            CardEffect::AfterHarvestGainIfAtLeast {
+                good,
+                threshold,
+                gain,
+                amount,
+            } => {
+                handle_after_harvest_gain_if_at_least(ctx, player, good, *threshold, gain, *amount)?
+            }
+            CardEffect::HarvestFieldOptionalExchange {
+                cost,
+                cost_amount,
+                gain,
+                gain_amount,
+            } => handle_harvest_field_optional_exchange(
+                ctx,
+                player,
+                cost,
+                *cost_amount,
+                gain,
+                *gain_amount,
+            )?,
             CardEffect::EndGameBonus { .. } => {
                 // Scoring is handled separately in evaluation; no runtime effect.
                 EffectResult::Resolved
@@ -1362,6 +1417,7 @@ fn handle_harvest_field_gain(
                 })
                 .count() as u32
         }
+        crate::cards::HarvestFieldRule::Fixed => 1,
     };
     let gain = multiplier
         .checked_mul(amount)
@@ -1373,6 +1429,88 @@ fn handle_harvest_field_gain(
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
+}
+
+/// A145 綱作り (Ropemaker): unconditional gain at the end of each harvest.
+/// Fires from the EventKind::Harvest After scan; the generic condition scan
+/// already verified the event kind, so we just grant the resource.
+fn handle_after_harvest_gain(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(amount)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// C066 永遠のライ麦畑 (Eternal Rye Cultivation): conditional gain at the end
+/// of each harvest. If the owner has at least `threshold` of `good`, gain
+/// `amount` of `gain`. The generic condition scan reports it as triggerable
+/// for Harvest; the handler performs the threshold check (same pattern as
+/// E111 世捨て人).
+fn handle_after_harvest_gain_if_at_least(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    good: &Good,
+    threshold: u32,
+    gain: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    if ctx.player.supply.get(*good) >= threshold {
+        let p = &mut ctx.player;
+        let next = p
+            .supply
+            .get(*gain)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*gain, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// A118 樹木庭師 (Treegardener): optional exchange during harvest field
+/// phase. If the owner has at least `cost_amount` of `cost`, they may pay
+/// it to gain `gain_amount` of `gain`. This creates a PendingDecision
+/// (Custom kind) so the player chooses whether to execute the exchange.
+fn handle_harvest_field_optional_exchange(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    cost: &Good,
+    cost_amount: u32,
+    gain: &Good,
+    gain_amount: u32,
+) -> Result<EffectResult, String> {
+    // Only offer the exchange if the player can afford the cost.
+    if ctx.player.supply.get(*cost) >= cost_amount {
+        let kind = crate::pending::PendingKind::Custom {
+            source_card: "A118".to_string(),
+            payload: serde_json::json!({}),
+        };
+        let decision = PendingDecision::new(
+            0,
+            ctx.actor,
+            kind,
+            String::new(),
+            serde_json::json!({
+                "card": "A118",
+                "type": "harvest_field_optional_exchange",
+                "cost": format!("{:?}", cost),
+                "cost_amount": cost_amount,
+                "gain": format!("{:?}", gain),
+                "gain_amount": gain_amount,
+            }),
+        );
+        Ok(EffectResult::Pending(decision))
+    } else {
+        Ok(EffectResult::Resolved)
+    }
 }
 
 /// E111 世捨て人: shared gain logic for its round-start and harvest-start
@@ -2248,6 +2386,7 @@ pub mod legacy {
                                 })
                                 .count() as u32
                         }
+                        crate::cards::HarvestFieldRule::Fixed => 1,
                     };
                     let gain = multiplier
                         .checked_mul(*amount)

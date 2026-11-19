@@ -580,6 +580,13 @@ fn card_priority(
                 CardEffect::Passive { .. } => horizon * 5,
                 CardEffect::EndGameBonus { .. } => 12,
                 CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
+                                CardEffect::AfterHarvestGain { good, amount, .. }
+                                | CardEffect::AfterHarvestGainIfAtLeast { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                }
+                                CardEffect::HarvestFieldOptionalExchange { gain, gain_amount, .. } => {
+                                    card_good_value(*gain) * i64::from(*gain_amount) * horizon / 2
+                                }
             };
     }
     Some(value)

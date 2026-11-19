@@ -135,6 +135,35 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// A145 綱作り (Ropemaker): at the end of each harvest (After phase of
+    /// EventKind::Harvest), gain `amount` of `good`. The generic condition
+    /// scan reports it as triggerable for Harvest; the handler performs the
+    /// unconditional gain.
+    AfterHarvestGain {
+        good: Good,
+        amount: u32,
+    },
+    /// C066 永遠のライ麦畑 (Eternal Rye Cultivation): at the end of each
+    /// harvest, if the owner has at least `threshold` of `good`, gain
+    /// `amount` of `gain`. The generic condition scan reports it as
+    /// triggerable for Harvest; the handler performs the threshold check
+    /// (same pattern as E111 世捨て人).
+    AfterHarvestGainIfAtLeast {
+        good: Good,
+        threshold: u32,
+        gain: Good,
+        amount: u32,
+    },
+    /// A118 樹木庭師 (Treegardener): optional exchange during harvest field
+    /// phase. If the owner pays `cost_amount` of `cost`, gain `gain_amount`
+    /// of `gain`. This uses a PendingDecision (Custom kind) so the player
+    /// chooses whether to execute the exchange each harvest.
+    HarvestFieldOptionalExchange {
+        cost: Good,
+        cost_amount: u32,
+        gain: Good,
+        gain_amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -173,6 +202,9 @@ impl CardEffect {
                 "on_play_gain_per_improvement_played"
             }
             CardEffect::OnPlayGainPerCount { .. } => "on_play_gain_per_count",
+            CardEffect::AfterHarvestGain { .. } => "after_harvest_gain",
+            CardEffect::AfterHarvestGainIfAtLeast { .. } => "after_harvest_gain_if_at_least",
+            CardEffect::HarvestFieldOptionalExchange { .. } => "harvest_field_optional_exchange",
         }
     }
 }
@@ -242,6 +274,9 @@ pub enum HarvestFieldRule {
     /// for vegetables (the printed card pays 2 food per last grain and 1 per
     /// last vegetable, hence two rule variants instead of one).
     LastVegetableTaken,
+    /// A118 樹木庭師 (Treegardener): fixed amount per harvest field phase,
+    /// independent of field count or crop state.
+    Fixed,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -382,7 +417,12 @@ impl CardSet {
                         | CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | CardEffect::AfterClayConstructionGain { amount, .. }
                         | CardEffect::AfterHarvestBakeGain { amount }
-                        | CardEffect::OnPlayGainPerCount { amount, .. } => *amount,
+                        | CardEffect::OnPlayGainPerCount { amount, .. }
+                        | CardEffect::AfterHarvestGain { amount, .. }
+                        | CardEffect::AfterHarvestGainIfAtLeast { amount, .. } => *amount,
+                        CardEffect::HarvestFieldOptionalExchange { gain_amount, .. } => {
+                            *gain_amount
+                        }
                     };
                     amount == 0 || amount > 30
                 })
@@ -2141,6 +2181,7 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                             })
                             .count() as u32
                     }
+                    HarvestFieldRule::Fixed => 1,
                 };
                 safe_gain(
                     player,
@@ -2272,6 +2313,71 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 house: None,
                 rooms: Some(2),
             }],
+        },
+        // A118 樹木庭師 (Treegardener): 1 wood per harvest field phase (fixed),
+        // plus optional: pay 1 food for 1 wood (up to 2x per harvest).
+        CardDefinition {
+            use_limit: None,
+            id: "A118".into(),
+            kind: occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::Fixed,
+                    good: Good::Wood,
+                    amount: 1,
+                },
+                // Optional exchange: pay 1 food for 1 wood.
+                // Implemented via a pending decision at harvest field phase.
+                CardEffect::HarvestFieldOptionalExchange {
+                    cost: Good::Food,
+                    cost_amount: 1,
+                    gain: Good::Wood,
+                    gain_amount: 1,
+                },
+            ],
+        },
+        // A145 綱作り (Ropemaker): 1 reed after each harvest.
+        CardDefinition {
+            use_limit: None,
+            id: "A145".into(),
+            kind: occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterHarvestGain {
+                good: Good::Reed,
+                amount: 1,
+            }],
+        },
+        // C066 永遠のライ麦畑 (Eternal Rye Cultivation): after each harvest,
+        // if grain >= 2 gain 1 food; if grain >= 3 gain 1 grain (optional).
+        CardDefinition {
+            use_limit: None,
+            id: "C066".into(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumCropFields {
+                        crop: Crop::Grain,
+                        number: 1,
+                    },
+                },
+                CardEffect::AfterHarvestGainIfAtLeast {
+                    good: Good::Grain,
+                    threshold: 2,
+                    gain: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::AfterHarvestGainIfAtLeast {
+                    good: Good::Grain,
+                    threshold: 3,
+                    gain: Good::Grain,
+                    amount: 1,
+                },
+            ],
         },
     ]
 }
@@ -2683,20 +2789,20 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 35);
+        assert_eq!(set.definitions.len(), 38);
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::MinorImprovement)
                 .count(),
-            19
+            20
         );
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::Occupation)
                 .count(),
-            16
+            18
         );
         assert!(verified_basic_card_set(3).is_err());
     }

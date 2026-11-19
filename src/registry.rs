@@ -296,6 +296,9 @@ impl CardRegistryBuilder {
                     EventKind::CardPlayed
                 }
                 crate::cards::CardEffect::HarvestFieldGain { .. } => EventKind::Harvest,
+                crate::cards::CardEffect::AfterHarvestGain { .. } => EventKind::Harvest,
+                crate::cards::CardEffect::AfterHarvestGainIfAtLeast { .. } => EventKind::Harvest,
+                crate::cards::CardEffect::HarvestFieldOptionalExchange { .. } => EventKind::Harvest,
                 crate::cards::CardEffect::AfterClayConstructionGain { .. } => {
                     EventKind::ClayConstruction
                 }
@@ -400,7 +403,15 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
-                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. } => *amount,
+                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
+                        | crate::cards::CardEffect::AfterHarvestGain { amount, .. }
+                        | crate::cards::CardEffect::AfterHarvestGainIfAtLeast { amount, .. } => {
+                            *amount
+                        }
+                        crate::cards::CardEffect::HarvestFieldOptionalExchange {
+                            gain_amount,
+                            ..
+                        } => *gain_amount,
                     };
                     amount == 0 || amount > 30
                 })

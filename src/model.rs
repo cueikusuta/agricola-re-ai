@@ -2189,9 +2189,69 @@ impl Game {
                 )?;
                 Ok(())
             }
-            (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => {
-                // Extensible: custom effects handle their own payload.
-                Ok(())
+            (PendingKind::Custom { .. }, PendingResolution::Custom { payload }) => {
+                // Check if this is an A118 harvest field optional exchange
+                if pending.context.get("type").and_then(|v| v.as_str())
+                    == Some("harvest_field_optional_exchange")
+                {
+                    let confirmed = payload
+                        .get("confirmed")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    if confirmed {
+                        let cost_str = pending.context.get("cost").and_then(|v| v.as_str());
+                        let cost_amount = pending
+                            .context
+                            .get("cost_amount")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32;
+                        let gain_str = pending.context.get("gain").and_then(|v| v.as_str());
+                        let gain_amount = pending
+                            .context
+                            .get("gain_amount")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32;
+
+                        // Parse Good from string
+                        let cost_good = cost_str.and_then(|s| match s {
+                            "Food" => Some(Good::Food),
+                            "Wood" => Some(Good::Wood),
+                            "Clay" => Some(Good::Clay),
+                            "Reed" => Some(Good::Reed),
+                            "Stone" => Some(Good::Stone),
+                            "Grain" => Some(Good::Grain),
+                            "Vegetable" => Some(Good::Vegetable),
+                            _ => None,
+                        });
+                        let gain_good = gain_str.and_then(|s| match s {
+                            "Food" => Some(Good::Food),
+                            "Wood" => Some(Good::Wood),
+                            "Clay" => Some(Good::Clay),
+                            "Reed" => Some(Good::Reed),
+                            "Stone" => Some(Good::Stone),
+                            "Grain" => Some(Good::Grain),
+                            "Vegetable" => Some(Good::Vegetable),
+                            _ => None,
+                        });
+
+                        if let (Some(cost_good), Some(gain_good)) = (cost_good, gain_good) {
+                            let player = &mut self.public.players[pending.player];
+                            // Pay cost
+                            player.supply.pay(cost_good, cost_amount)?;
+                            // Gain resource
+                            let next = player
+                                .supply
+                                .get(gain_good)
+                                .checked_add(gain_amount)
+                                .ok_or("resource overflow")?;
+                            player.supply.set(gain_good, next);
+                        }
+                    }
+                    Ok(())
+                } else {
+                    // Extensible: other custom effects handle their own payload
+                    Ok(())
+                }
             }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }

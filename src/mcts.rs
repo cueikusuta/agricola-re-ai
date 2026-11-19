@@ -1187,8 +1187,9 @@ mod tests {
         // excluded from the verified pool, so the sample_game distribution is unchanged.
         // Updated: added A042 Forest Lake Hut to verified_minor_worker_cards (pool size 33->34)
         // Updated: added A121 Brick Stamping to verified_minor_worker_cards (pool size 34->35)
+        // Updated: added A118/A145/C066 to verified_round_and_harvest_cards (pool size 35->38)
         assert_eq!(
-            digest, "a024ed2ee08bad2a70262613afa86f07d89686e4f28cb17c0a6415d700104e99",
+            digest, "7b4508153accba157318da796da9041853fde151829815e4e192fc94420a9e58",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
