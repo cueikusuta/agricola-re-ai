@@ -930,41 +930,90 @@ mod tests {
     #[test]
     fn cards_without_a_declared_limit_are_unlimited() {
         use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
-        let set = CardSet {
-            definitions: vec![CardDefinition {
-                id: "FREE".into(),
+        // PR #358 close-out: the fixture used to graft a one-card set onto a
+        // default game by hand, leaving a state full validation rejects (the
+        // set fails the 7-per-kind rule). It only ran because the play wrote a
+        // new use-ledger key and incremental validation Passed it, so full
+        // validation was never consulted. With the new-key Unsure→full
+        // delegation the state is now correctly rejected; build a canonical
+        // 14+14 set (same shape as the Issue #268 e2e test) with the FREE card
+        // dealt to the active player, and play it through the real path.
+        let mut definitions = vec![CardDefinition {
+            id: "FREE".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterWorkerGain {
+                space: crate::model::Space::DayLaborer,
+                good: Good::Wood,
+                amount: 1,
+            }],
+            use_limit: None,
+        }];
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
                 kind: CardKind::Occupation,
                 cost: vec![],
                 points: 0,
-                effects: vec![CardEffect::AfterWorkerGain {
-                    space: crate::model::Space::DayLaborer,
-                    good: Good::Wood,
-                    amount: 1,
-                }],
+                effects: vec![],
+            });
+        }
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
                 use_limit: None,
-            }],
-        };
-        let mut game = Game::new(Config {
-            players: 2,
-            seed: 32,
-            additional_action_space_enabled: false,
-        });
-        game.card_set = std::sync::Arc::new(set.clone());
-        game.card_use_limits = set
-            .definitions
-            .iter()
-            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
-            .collect();
-        game.cards = crate::cards::CardState {
-            hands: vec![vec![], vec![]],
-            undealt: vec![],
-        };
-        assert!(
-            game.card_use_limits.is_empty(),
-            "no limit declared means no entry"
-        );
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+        // seed 32 makes player 1 the start player; the FREE card must sit in
+        // the active player's hand, so deal it to seat 1 with six OCC_ fillers
+        // (7 occupations) and seven minors. Seat 0 takes the other seven OCC_
+        // and seven minors; nothing is left undealt.
+        let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![
+            {
+                let mut h: Vec<String> = occ_ids[6..13].to_vec();
+                h.extend(minor_ids[0..7].iter().cloned());
+                h
+            },
+            {
+                let mut h: Vec<String> = vec!["FREE".to_string()];
+                h.extend(occ_ids[0..6].iter().cloned());
+                h.extend(minor_ids[7..14].iter().cloned());
+                h
+            },
+        ];
+        hands[0].sort();
+        hands[1].sort();
+
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 32,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands,
+        )
+        .expect("game creation must succeed");
+        assert!(game.card_use_limits.is_empty());
         let active = game.public.active_player;
+        assert_eq!(active, 1, "fixture pins the FREE card to the active player");
         game.public.players[active].played_cards.push("FREE".into());
+        game.cards.hands[active].retain(|id| id != "FREE");
+        game.public.players[active].card_points +=
+            set.definition("FREE").expect("definition").points as i32;
+        assert!(
+            game.validate().is_ok(),
+            "fixture must be canonical before the move"
+        );
         game.apply(crate::engine::Action {
             space: crate::model::Space::DayLaborer,
             detail: crate::engine::Detail::None,

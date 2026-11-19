@@ -3383,8 +3383,22 @@ mod grow_with_minor_regression_tests {
     fn setup_game_with_fgwr() -> (Game, usize) {
         let set = verified_basic_card_set(2).unwrap();
         let mut game = Game::with_cards(Config::default(), set).unwrap();
+        // PR #358 close-out: the fixture appended a second round card while
+        // pinning round = 1, leaving "round/revealed count mismatch" states
+        // that only passed because the B010 duplicate took the new use-ledger
+        // key through an incremental Pass that short-circuited full
+        // validation. Two revealed cards means round 2.
         game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
-        game.public.round = 1;
+        // Keep the 14-card partition: the pushed card must come out of the
+        // hidden deck. Remove the matching card where it actually sits so the
+        // revealed list stays a permutation of the canonical 14.
+        let pos = game
+            .hidden_round_deck
+            .iter()
+            .position(|c| *c == RoundCard::FamilyGrowthWithRoom)
+            .expect("setup: FGWR round card must be in the hidden deck");
+        game.hidden_round_deck.remove(pos);
+        game.public.round = 2;
         game.public.players[0].farm[1].tile = Tile::Room;
         (game, 0)
     }
@@ -3400,14 +3414,40 @@ mod grow_with_minor_regression_tests {
             set,
         )
         .unwrap();
-        game.public.round = 1;
+        // PR #358 close-out: the test used to pin round = 5 while only one
+        // round card stood revealed ("round/revealed count mismatch"); the
+        // state only survived because the duplicated B010 keyed an incremental
+        // Pass that skipped full validation. Drive the canonical round chain
+        // to round 5 instead (start_round reveals card 5).
+        for _ in 0..4 {
+            game.start_round();
+        }
+        assert_eq!(game.public.round, 5);
         game.public.players[0].farm[1].tile = Tile::Room;
         (game, 0)
     }
 
     fn add_b010_to_hand(game: &mut Game) {
-        game.cards.hands[0].push("B010".to_string());
-        game.cards.undealt.retain(|id| id != "B010");
+        // PR #358 close-out: pushing blindly duplicated B010 when it already
+        // sits in a hand (it is dealt into hand[0] under the fgwr setup and
+        // hand[1] under the modest seed-123 setup), and incremental validation
+        // used to Pass such duplicate states before full validation ever saw
+        // them. Relocate the single existing copy to hand[0] instead so the
+        // fixture stays canonical through the wrapper's Unsure→full path.
+        if game.cards.hands[0].iter().any(|id| id == "B010") {
+            return;
+        }
+        for hand in game.cards.hands.iter_mut().skip(1) {
+            if let Some(pos) = hand.iter().position(|id| id == "B010") {
+                hand.remove(pos);
+                game.cards.hands[0].push("B010".to_string());
+                break;
+            }
+        }
+        if let Some(pos) = game.cards.undealt.iter().position(|id| id == "B010") {
+            game.cards.undealt.remove(pos);
+            game.cards.hands[0].push("B010".to_string());
+        }
     }
 
     fn give_b010_resources(player: &mut Player) {
@@ -3778,6 +3818,33 @@ mod audit_p2_1_exhaustive_tests {
     use crate::harvest::SimpleHarvestDetails;
     use crate::model::{Animal, Config, Crop, Game, Improvement, Space, Tile};
     use crate::registry::build_default_registry;
+
+    /// PR #358 close-out: move `id` into hand 0 by relocating the single
+    /// existing copy (from the undealt pile or another hand) instead of
+    /// pushing a duplicate. The old push-based fixtures produced states full
+    /// validation rejects ("card missing, duplicate or unknown"), which only
+    /// slipped through because incremental validation Passed the new
+    /// use-ledger key and short-circuited full validation; with the new-key
+    /// Unsure→full delegation those states are now correctly rejected, so the
+    /// fixtures must stay canonical.
+    fn move_card_to_hand0(game: &mut Game, id: &str) {
+        if game.cards.hands[0].iter().any(|c| c == id) {
+            return;
+        }
+        if let Some(pos) = game.cards.undealt.iter().position(|c| c == id) {
+            game.cards.undealt.remove(pos);
+            game.cards.hands[0].push(id.to_string());
+            return;
+        }
+        for hand in game.cards.hands.iter_mut().skip(1) {
+            if let Some(pos) = hand.iter().position(|c| c == id) {
+                hand.remove(pos);
+                game.cards.hands[0].push(id.to_string());
+                return;
+            }
+        }
+        panic!("card {id} is not in the game partition; fixture cannot be canonicalized");
+    }
 
     /// Test that every card in the default registry can be resolved and driven
     /// through the production paths: apply_with_plans, start_round, harvest_fields.
@@ -4490,7 +4557,7 @@ mod audit_p2_1_exhaustive_tests {
             let mut game =
                 Game::with_cards(Config::default(), card_set.clone()).expect("game with card set");
             let p = 0;
-            game.cards.hands[p].push(card_id.to_string());
+            move_card_to_hand0(&mut game, card_id);
             game.public.players[p].supply.food = 20;
             game.public.players[p].supply.wood = 20;
             game.public.players[p].supply.clay = 20;
@@ -4560,49 +4627,66 @@ mod audit_p2_1_exhaustive_tests {
         // A117 OnPlayGainPerImprovementPlayed (occupation, no cost)
         struct Case {
             card: &'static str,
-            setup: fn(&mut Player),
+            setup: fn(&mut Game, usize),
             expect: fn(&Player) -> bool,
             describe: &'static str,
         }
         let cases: Vec<Case> = vec![
             Case {
                 card: "A077",
-                setup: |p| p.supply.wood = 20,
+                setup: |g, p| g.public.players[p].supply.wood = 20,
                 expect: |p| p.supply.clay >= 1,
                 describe: "A077 OnPlayGain must grant 1 clay",
             },
             Case {
                 card: "E007",
-                setup: |p| p.supply.grain = 20,
+                setup: |g, p| g.public.players[p].supply.grain = 20,
                 expect: |p| p.supply.food >= 4,
                 describe: "E007 OnPlayGain must grant 4 food",
             },
             Case {
                 card: "A121",
-                setup: |_| {},
+                setup: |_, _| {},
                 expect: |p| p.supply.clay >= 1,
                 describe: "A121 OnPlayGain must grant 1 clay",
             },
             Case {
                 card: "A005",
-                setup: |p| {
-                    p.supply.food = 20;
-                    p.supply.clay = 6; // 6/2 = 3 clay gain
+                setup: |g, p| {
+                    g.public.players[p].supply.food = 20;
+                    g.public.players[p].supply.clay = 6; // 6/2 = 3 clay gain
                 },
                 expect: |p| p.supply.clay >= 6 + 3 - 1, // gain 3, pay 1 food, clay unchanged by cost
                 describe: "A005 OnPlayGainPerStored must grant clay per 2 stored",
             },
             Case {
                 card: "A125",
-                setup: |p| {
-                    p.house = House::Clay;
+                setup: |g, p| {
+                    g.public.players[p].house = House::Clay;
                 },
                 expect: |p| p.supply.clay >= 3,
                 describe: "A125 OnPlayGainIfHouse must grant clay in a 2-room clay house",
             },
             Case {
                 card: "A117",
-                setup: |p| p.improvements.push(Improvement::Well),
+                // PR #358 close-out: grant the improvement canonically by
+                // moving the Well out of the market instead of duplicating it
+                // onto the player's table — full validation rejects the old
+                // duplicated state ("major improvement duplicated or missing"),
+                // and the new use-ledger delegation no longer hides it.
+                setup: |g, p| {
+                    if let Some(pos) = g
+                        .public
+                        .improvement_market
+                        .iter()
+                        .position(|i| *i == Improvement::Well)
+                    {
+                        g.public.improvement_market.remove(pos);
+                        g.public.players[p].improvements.push(Improvement::Well);
+                    } else {
+                        panic!("setup: the Well must be purchasable from the market");
+                    }
+                },
                 expect: |p| p.supply.wood >= 1,
                 describe: "A117 OnPlayGainPerImprovementPlayed must grant wood per improvement",
             },
@@ -4619,13 +4703,13 @@ mod audit_p2_1_exhaustive_tests {
             let mut game =
                 Game::with_cards(Config::default(), card_set.clone()).expect("game with card set");
             let p = 0;
-            game.cards.hands[p].push(case.card.to_string());
+            move_card_to_hand0(&mut game, case.card);
             game.public.players[p].supply.food = 20;
             game.public.players[p].supply.wood = 20;
             game.public.players[p].supply.clay = 20;
             game.public.players[p].supply.reed = 20;
             game.public.players[p].supply.stone = 20;
-            (case.setup)(&mut game.public.players[p]);
+            (case.setup)(&mut game, p);
 
             let action = match def.kind {
                 crate::cards::CardKind::Occupation => Action {
