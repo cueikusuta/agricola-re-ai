@@ -11,7 +11,7 @@
 //! Source: docs/bga-card-specification.md and existing repo citations.
 
 use crate::cards::{CardEffect, CardSet};
-use crate::model::{Animal, Crop, Good, House, Player, Space};
+use crate::model::{Animal, Crop, Good, House, Player, Space, Tile};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
 use crate::registry::EventKind;
 use serde::{Deserialize, Serialize};
@@ -69,6 +69,11 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterHarvestBakeGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
+        // Any-player worker triggers — After phase (fired by dispatch_after_worker_any_player)
+        CardEffect::AfterAnyWorkerGain { .. } => TriggerPhase::After,
+        CardEffect::AfterAnyWorkerOthersGain { .. } => TriggerPhase::After,
+        // Harvest start field check — After phase (fired by dispatch_harvest_field)
+        CardEffect::HarvestStartGainIfFields { .. } => TriggerPhase::After,
         // End game scoring — After phase
         CardEffect::EndGameBonus { .. } => TriggerPhase::After,
     }
@@ -539,6 +544,30 @@ fn resolve_phase_scan(
                 CardEffect::HarvestFieldGain { rule, good, amount } => {
                     handle_harvest_field_gain(ctx, player, rule, good, *amount, trigger_data)?
                 }
+                // AfterAnyWorkerGain / AfterAnyWorkerOthersGain are handled in
+                // dispatch_after_worker_any_player, not the generic phase scan.
+                // HarvestStartGainIfFields is handled in dispatch_harvest_field via the generic scan.
+                CardEffect::AfterAnyWorkerGain { .. }
+                | CardEffect::AfterAnyWorkerOthersGain { .. } => {
+                    panic!(
+                        "{:?} should be handled in special dispatch, not generic phase resolution",
+                        effect
+                    )
+                }
+                CardEffect::HarvestStartGainIfFields {
+                    crop,
+                    threshold,
+                    good,
+                    amount,
+                } => handle_harvest_start_gain_if_fields(
+                    ctx,
+                    player,
+                    crop,
+                    *threshold,
+                    good,
+                    *amount,
+                    trigger_data,
+                )?,
                 CardEffect::EndGameBonus { .. } => {
                     // Scoring is handled separately in evaluation; no runtime effect.
                     EffectResult::Resolved
@@ -673,6 +702,13 @@ fn effect_condition_holds(
                 && trigger.space == Some(*space)
                 && used_spaces.contains(required_space)
         }
+        // AfterAnyWorkerGain and AfterAnyWorkerOthersGain are handled in
+        // dispatch_after_worker_any_player, not the generic phase scan.
+        // Return false here to prevent double-triggering.
+        CardEffect::AfterAnyWorkerGain { .. } => false,
+        CardEffect::AfterAnyWorkerOthersGain { .. } => false,
+        // HarvestStartGainIfFields is handled in dispatch_harvest_field via the generic scan.
+        CardEffect::HarvestStartGainIfFields { .. } => trigger.event_kind == EventKind::Harvest,
         CardEffect::StartRoundGain { house, rooms, .. } => {
             trigger.event_kind == EventKind::RoundStart && {
                 let house_ok = house.is_none_or(|h| player.house == h);
@@ -879,6 +915,29 @@ pub fn execute_chosen_triggers(
             CardEffect::HarvestFieldGain { rule, good, amount } => {
                 handle_harvest_field_gain(ctx, player, rule, good, *amount, trigger_data)?
             }
+            // AfterAnyWorkerGain / AfterAnyWorkerOthersGain are handled in
+            // dispatch_after_worker_any_player, not the generic phase scan.
+            // HarvestStartGainIfFields is handled in dispatch_harvest_field via the generic scan.
+            CardEffect::AfterAnyWorkerGain { .. } | CardEffect::AfterAnyWorkerOthersGain { .. } => {
+                panic!(
+                    "{:?} should be handled in special dispatch, not generic phase resolution",
+                    effect
+                )
+            }
+            CardEffect::HarvestStartGainIfFields {
+                crop,
+                threshold,
+                good,
+                amount,
+            } => handle_harvest_start_gain_if_fields(
+                ctx,
+                player,
+                crop,
+                *threshold,
+                good,
+                *amount,
+                trigger_data,
+            )?,
             CardEffect::EndGameBonus { .. } => {
                 // Scoring is handled separately in evaluation; no runtime effect.
                 EffectResult::Resolved
@@ -1171,6 +1230,68 @@ fn handle_after_worker_gain_if_used(
 ) -> Result<EffectResult, String> {
     if trigger.space == Some(*space) && trigger.used_spaces.contains(required_space) {
         let p = &mut ctx.player;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// A050 (others half): each time ANY player uses the specified space,
+/// all players EXCEPT the card owner gain `amount` of `good`.
+fn handle_after_any_worker_others_gain(
+    players: &mut [Player],
+    card_owner: usize,
+    space: &Space,
+    good: &Good,
+    amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        for (idx, p) in players.iter_mut().enumerate() {
+            if idx == card_owner {
+                continue;
+            }
+            let next = p
+                .supply
+                .get(*good)
+                .checked_add(amount)
+                .ok_or("resource overflow")?;
+            p.supply.set(*good, next);
+        }
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// D061: at harvest start, if the card owner has at least `threshold`
+/// fields sown with `crop`, gain `amount` of `good`.
+fn handle_harvest_start_gain_if_fields(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    crop: &Crop,
+    threshold: u8,
+    good: &Good,
+    amount: u32,
+    _trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    let field_count = p
+        .farm
+        .iter()
+        .filter(|cell| {
+            matches!(
+                cell.tile,
+                Tile::Field {
+                    crop: Some(c),
+                    remaining: 1..,
+                } if c == *crop
+            )
+        })
+        .count() as u8;
+    if field_count >= threshold {
         let next = p
             .supply
             .get(*good)
@@ -1573,7 +1694,95 @@ pub fn dispatch_play(
             }
         }
     }
+    Ok(())
+}
 
+/// Dispatch AfterAnyWorkerGain / AfterAnyWorkerOthersGain effects for ALL players.
+/// These effects trigger when ANY player uses a space, so we scan all players'
+/// cards (not just the actor's). This is called from `dispatch_after_worker`
+/// after the actor's own effects have resolved.
+#[allow(clippy::too_many_arguments)]
+fn dispatch_after_worker_any_player(
+    card_set: &CardSet,
+    _actor: usize,
+    space: Space,
+    _cards: &mut crate::cards::CardState,
+    players: &mut [Player],
+    _improvement_market: &mut Vec<crate::model::Improvement>,
+    _delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    _round: u8,
+    _used_spaces: &std::collections::BTreeSet<Space>,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    _pending: &mut Option<PendingDecision>,
+    trigger: &PhaseTriggerData,
+    _all_players: &[Player],
+) -> Result<(), String> {
+    // For each player (as card owner), check their played cards for the new variants
+    // Use index-based loop to avoid borrow checker issues with mutable access
+    for card_owner in 0..players.len() {
+        let played_cards = players[card_owner].played_cards.clone();
+        for card_id in played_cards {
+            let Some(card) = card_set.definition(&card_id) else {
+                continue;
+            };
+            for effect in &card.effects {
+                // Only handle the two new variants
+                let (effect_space, good, amount) = match effect {
+                    CardEffect::AfterAnyWorkerGain {
+                        space,
+                        good,
+                        amount,
+                    } => (*space, *good, *amount),
+                    CardEffect::AfterAnyWorkerOthersGain {
+                        space,
+                        good,
+                        amount,
+                    } => (*space, *good, *amount),
+                    _ => continue,
+                };
+
+                // Check condition: space matches and event is WorkerPlaced
+                if effect_space != space || trigger.event_kind != EventKind::WorkerPlaced {
+                    continue;
+                }
+
+                // Consume event budget
+                consume_budget(event_budget)?;
+
+                // Check card use limit
+                let limit = card_use_limits.get(&card_id).copied().unwrap_or(u32::MAX);
+                check_card_use(card_uses, &card_id, limit)?;
+
+                // Apply effect based on variant
+                match effect {
+                    CardEffect::AfterAnyWorkerGain { .. } => {
+                        // Grant to card owner
+                        let p = &mut players[card_owner];
+                        let next = p
+                            .supply
+                            .get(good)
+                            .checked_add(amount)
+                            .ok_or("resource overflow")?;
+                        p.supply.set(good, next);
+                    }
+                    CardEffect::AfterAnyWorkerOthersGain { .. } => {
+                        // Grant to all players EXCEPT card owner
+                        handle_after_any_worker_others_gain(
+                            players,
+                            card_owner,
+                            &effect_space,
+                            &good,
+                            amount,
+                            trigger,
+                        )?;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+    }
     Ok(())
 }
 
@@ -1599,6 +1808,69 @@ pub fn dispatch_after_worker(
 ) -> Result<Transition, String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
+
+    let trigger = PhaseTriggerData {
+        space: Some(space),
+        improvement: None,
+        baked: false,
+        previous_player: None,
+        used_spaces: used_spaces.clone(),
+        event_kind: EventKind::WorkerPlaced,
+    };
+
+    // AfterWorkerGain and AfterWorkerGainIfUsed are After phase. A pause here
+    // (ChooseTriggerOrder, Issue #270) must reach the engine so it can build
+    // the PostWork continuation — propagate instead of discarding.
+    let mut ctx = DispatchContext {
+        card_set,
+        player: &mut players[player],
+        cards,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+        actor: player,
+        card_owner: player,
+        beneficiary: player,
+    };
+    if let Transition::Paused(p) = resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::After,
+        &trigger,
+        &all_players,
+        allow_choose_trigger_order_pause,
+    )? {
+        return Ok(Transition::Paused(p));
+    }
+
+    // AfterAnyWorkerGain / AfterAnyWorkerOthersGain: scan ALL players' cards
+    // (not just the actor's) because these effects trigger on any player's
+    // use of the space. We do this after the actor's own effects so that
+    // ChooseTriggerOrder pause only applies to the active player's effects.
+    dispatch_after_worker_any_player(
+        card_set,
+        player,
+        space,
+        cards,
+        players,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+        &trigger,
+        &all_players,
+    )?;
+
+    // Recreate ctx for Interrupt phase (re-borrow the mutables)
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -1616,28 +1888,6 @@ pub fn dispatch_after_worker(
         beneficiary: player,
     };
 
-    let trigger = PhaseTriggerData {
-        space: Some(space),
-        improvement: None,
-        baked: false,
-        previous_player: None,
-        used_spaces: used_spaces.clone(),
-        event_kind: EventKind::WorkerPlaced,
-    };
-
-    // AfterWorkerGain and AfterWorkerGainIfUsed are After phase. A pause here
-    // (ChooseTriggerOrder, Issue #270) must reach the engine so it can build
-    // the PostWork continuation — propagate instead of discarding.
-    if let Transition::Paused(p) = resolve_phase(
-        &mut ctx,
-        player,
-        TriggerPhase::After,
-        &trigger,
-        &all_players,
-        allow_choose_trigger_order_pause,
-    )? {
-        return Ok(Transition::Paused(p));
-    }
     // Interrupts pause the chain after the passive phase has resolved
     // (2016 Lookout p.8: the active player resolves their effects in the
     // order they choose; a choice-requiring effect stops the chain).
@@ -4064,12 +4314,13 @@ mod tests {
         let mut game = Game::with_cards(
             Config {
                 players: 2,
-                seed: 1, // seed 1 gives player 0 both A078 and an occupation (B121)
+                seed: 47, // seed 47 gives player 0 both A078 and B121 (with the expanded verified pool)
                 additional_action_space_enabled: false,
             },
             set,
         )
         .expect("game creation must succeed");
+        game.public.active_player = 0;
 
         // Helper to let player 1 take a simple accumulation action
         let p1_simple_action = |game: &mut Game, space: Space| {

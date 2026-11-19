@@ -585,7 +585,17 @@ fn card_priority(
                 CardEffect::Passive { .. } => horizon * 5,
                 CardEffect::EndGameBonus { .. } => 12,
                 CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
-            };
+                                // New variants for market followup cards
+                                CardEffect::AfterAnyWorkerGain { good, amount, .. }
+                                | CardEffect::AfterAnyWorkerOthersGain { good, amount, .. } => {
+                                    // Fires on any player's use of the space; approximate with per-round expectation
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 4
+                                }
+                                CardEffect::HarvestStartGainIfFields { good, amount, .. } => {
+                                    // Conditional on field count; optimistic half-weight
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                }
+                            };
     }
     Some(value)
 }
