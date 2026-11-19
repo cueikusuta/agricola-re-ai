@@ -52,7 +52,7 @@
         }
       ],
       "optional": false,
-      "frequency": "once_per_play",
+      "frequency": "every_harvest",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,

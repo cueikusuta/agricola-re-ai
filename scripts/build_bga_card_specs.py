@@ -3325,7 +3325,7 @@ CARDS = {
     "A118": {
         "post": "played_area",
         "effects": [
-            effect("harvest_field_phase", [gain("wood", 1)]),
+            effect("harvest_field_phase", [gain("wood", 1)], freq="every_harvest"),
             effect("harvest_field_phase",
                    [exchange(give=[{"good": "food", "amount": 1}],
                              receive=[{"good": "wood", "amount": 1}])],
