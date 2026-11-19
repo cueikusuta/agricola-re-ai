@@ -83,7 +83,7 @@
 | A159 | 海の指物師 | 漁・粘土坑。木材を相手から取り、食料を相手へ渡す | 漁・葦原。木材1を相手へ渡し、食料2/3を得る | [p=3266](https://agricola.cloudfree.jp/?p=3266) |
 
 - A150/A154/A156/A158/A159 は、既存の `after_worker_space` + `other_player_only` /
-  `other_player_uses` の書き方に合わせた。`small_theater` は B155/E166 と同じ語彙。
+  `other_player_uses` の書き方に合わせた。小劇場はエンジンの `traveling_players`（A160/C152 と同じ語彙）で表した。B155/E166 の `small_theater` は別の残件として第6章に記録する。
 - A156 の「同じ品物」は、使用された累積スペースの品物を指す `same_good_as_used_space` で表した。
   既存の `same_animal_as_space`（D138）と同じ型の表現である。
 - A158 の 3 択と A150 の 3 択は、既存の `other` + `choice` で表した。
@@ -316,6 +316,7 @@
 | 145枚の仕様が無い（S-1） | Hermes のバッチ作成中 | 他担当の範囲。本 PR では触らない |
 | 費用の選択肢（`cost_alternatives`） | スキーマ v1 が複数束を持てない | スキーマ拡張の別 Issue |
 | トリガー語彙の統一 | `after_worker_space` と `on_other_player_action`、`other_player_action` が併存 | 設計の別 Issue。カード単位の値ではない |
+| 小劇場のスペースキー | A150/A154/A158/A160/C152 は `traveling_players`。B155/E166 は `small_theater` を使っている | 別 Issue。本 PR の対象カードは `traveling_players` に揃えた |
 | カード畑・カード上収容 | 既存語彙が無い | #377 の S-5 / 実装設計 |
 | 台帳と仕様の二重管理（S-6） | 生成元の一本化は設計変更 | 別 Issue |
 

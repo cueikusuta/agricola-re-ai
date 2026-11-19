@@ -44,7 +44,7 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "space": "small_theater"
+            "space": "traveling_players"
           }
         },
         {
@@ -115,6 +115,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Another player uses Small Theater: may exchange 1 grain / 1 sheep / 1 vegetable for 4 / 5 / 7 food. The previous trigger and exchange direction were wrong."
+    "notes": "Another player uses Small Theater (traveling_players): may exchange 1 grain / 1 sheep / 1 vegetable for 4 / 5 / 7 food. The previous trigger and exchange direction were wrong."
   }
 }

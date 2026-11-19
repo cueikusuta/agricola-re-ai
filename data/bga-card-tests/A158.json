@@ -6,7 +6,7 @@
       "id": "A158-normal",
       "scope": "effect_only",
       "setup": {
-        "other_player_uses": "small_theater",
+        "other_player_uses": "traveling_players",
         "grain": 1
       },
       "action": {
@@ -21,7 +21,7 @@
       "id": "A158-not-triggered",
       "scope": "effect_only",
       "setup": {
-        "owner_uses": "small_theater",
+        "owner_uses": "traveling_players",
         "grain": 1
       },
       "action": {

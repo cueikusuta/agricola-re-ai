@@ -497,3 +497,5 @@ M7 #335 C004 cost → 2赤、M8 #340 C116 自己発動 → **ブランチのみ�
   `validate_bga_card_specs.py` は `errors: []`、ビルダー契約テスト3件は成功。
 - CI対応2: A071/A092/A103 を「効果なし・未解決」に固定していた Python 回帰テスト2本を更新し、
   全 Python テスト287件が成功。Rust は未変更。
+- CI対応3: 小劇場のキーを A150/A154/A158 で `traveling_players` に統一（A160/C152 と同じ）。
+  B155/E166 の `small_theater` は別残件として第6章に記録。仕様検証 errors 0、Python 287件成功。

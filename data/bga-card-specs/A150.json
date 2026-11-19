@@ -44,7 +44,7 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "space": "small_theater"
+            "space": "traveling_players"
           }
         },
         {
@@ -97,6 +97,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Another player uses Small Theater: may take one of Fencing / Build Stables / Build Room. The trigger space and action list are corrected from the JA wiki."
+    "notes": "Another player uses Small Theater (traveling_players): may take one of Fencing / Build Stables / Build Room. The trigger space and action list are corrected from the JA wiki."
   }
 }

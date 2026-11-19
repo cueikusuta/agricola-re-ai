@@ -172,3 +172,5 @@
   Rust は変更していない。`validate_bga_card_specs.py` は errors 0、ビルダー契約テスト3件は成功。
 - **CI対応2**: A071/A092/A103 を「効果なし・未解決」に固定していた Python 回帰テスト2本を、
   文献で確定した値に合わせて更新。`python -m unittest discover -s tests -p "test_*.py"` は287件成功。
+- **CI対応3**: 小劇場のスペースキーを A150/A154/A158 で `traveling_players` に統一（A160/C152 と同じ）。
+  B155/E166 の `small_theater` は別残件として記録。仕様検証 errors 0、Python 287件成功。
