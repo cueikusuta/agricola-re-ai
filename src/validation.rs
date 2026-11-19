@@ -2537,4 +2537,280 @@ mod tests {
         assert_eq!(validate_incremental(&depleted, &pre), Verdict::Pass);
         validate_incremental_or_full(&depleted, &pre).unwrap();
     }
+
+    // ---- Free-side close-out (PR #358 review, card t_51c3a9e7): the free
+    // validator's Pass short-circuits validate_full for the Step 3
+    // bookkeeping fields. Each tamper test changes exactly one element on a
+    // normal engine-produced free-action (pre, post) pair and asserts the
+    // wrapper's FINAL verdict; the validate_full result asserted next to it
+    // documents whether the full validator could ever have seen the tamper.
+    // The free/isolated sibling of the transition-only close-out block above:
+    // execute_free touches no bookkeeping field, so every drift below is
+    // unproducible by the only committed free path (apply_free). ----
+
+    /// Drive a cardless game to a plain mid-round committed state and take one
+    /// real engine free action (Discard 1 Food), producing the shared
+    /// (pre, post, actor) fixture for the free-side close-out tamper tests.
+    fn free_action_pair() -> (Game, Game, usize) {
+        let (committed, _) = mid_round_pair();
+        let pre = committed;
+        let actor = pre.public.active_player;
+        // Supply provenance is outside the full invariant set (see
+        // closeout_legit_well_purchase_accepted), so topping the actor up
+        // keeps `pre` full-valid while guaranteeing the discard is legal.
+        let mut pre = pre;
+        if pre.public.players[actor].supply.food == 0 {
+            pre.public.players[actor].supply.food = 1;
+        }
+        assert_eq!(validate_full(&pre), Ok(()));
+        let mut post = pre.clone();
+        post.apply_free(
+            actor,
+            FreeAction::DiscardGood {
+                good: crate::model::Good::Food,
+                quantity: 1,
+            },
+        )
+        .expect("engine free action must apply");
+        (pre, post, actor)
+    }
+
+    /// Baseline: the engine-produced free transition itself must keep the
+    /// fast Pass — the new bookkeeping checks accept every committed free
+    /// action unchanged (apply_free replenishes the budget to the cap and
+    /// execute_free touches no other bookkeeping field).
+    #[test]
+    fn closeout_free_committed_transition_stays_pass() {
+        let (pre, post, actor) = free_action_pair();
+        assert_eq!(validate_free_action(&post, &pre, actor), Verdict::Pass);
+        validate_free_action_or_full(&post, &pre, actor).unwrap();
+        assert_eq!(validate_full(&post), Ok(()));
+        assert_eq!(post.event_budget, crate::model::DEFAULT_EVENT_BUDGET);
+    }
+
+    /// Free-side event-budget boundary: a depleted post budget stays
+    /// accepted — only above-cap is a definite Fail. The budget is
+    /// replenished to the cap, so the free check must NOT demand pre/post
+    /// equality (a prior card chain can leave pre legitimately below cap).
+    #[test]
+    fn closeout_free_event_budget_depleted_accepted() {
+        let (pre, mut post, actor) = free_action_pair();
+        post.event_budget = 0;
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_ok());
+    }
+
+    /// Free-side review claim (a): post.event_budget above the replenish cap.
+    /// The full validator rejects the same state, but the free validator used
+    /// to Pass it straight through to Ok.
+    #[test]
+    fn closeout_free_event_budget_above_cap_rejected() {
+        let (pre, mut post, actor) = free_action_pair();
+        post.event_budget = crate::model::DEFAULT_EVENT_BUDGET + 1;
+        assert!(validate_full(&post).is_err());
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "above-cap budget must be definite Fail (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+    }
+
+    /// Free-side review claim (b): a fabricated key in card_use_limits. No
+    /// committed transition writes the limits map, and the full validator
+    /// rejects a map that disagrees with the card definitions.
+    #[test]
+    fn closeout_free_card_use_limits_fabricated_key_rejected() {
+        let (pre, mut post, actor) = free_action_pair();
+        post.card_use_limits.insert("ZZ_NOT_A_CARD".into(), 1);
+        assert!(validate_full(&post).is_err());
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "card_use_limits drift must be definite Fail (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+    }
+
+    /// Element 1, free path: an orphan well_food_schedule entry without the
+    /// paired delayed_well change. Full validation accepts any in-range
+    /// mirror entry, so only the free transition check can prove it illegal.
+    #[test]
+    fn closeout_free_well_food_schedule_mirror_orphan_rejected() {
+        let (pre, mut post, actor) = free_action_pair();
+        post.well_food_schedule.entry(5).or_default().push(actor);
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+    }
+
+    /// Element 2, free path: a suspended decision appearing on a committed
+    /// free action. Full validation deliberately does not inspect `pending`.
+    #[test]
+    fn closeout_free_pending_decision_appearing_rejected() {
+        let (pre, mut post, actor) = free_action_pair();
+        post.pending = Some(crate::pending::PendingDecision::new(
+            pre.next_decision_id,
+            actor,
+            crate::pending::PendingKind::ChooseGain {
+                source_card: "A001".into(),
+                options: vec![crate::pending::GainOption {
+                    good: crate::model::Good::Food,
+                    amount: 1,
+                }],
+            },
+            post.state_hash(),
+            serde_json::json!({}),
+        ));
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+    }
+
+    /// Element 3a, free path: a brand-new use-ledger key must reach the full
+    /// validator (Pass would short-circuit the ownership check); the
+    /// decrease/new-key split mirrors the transition-side semantics exactly.
+    #[test]
+    fn closeout_free_card_uses_new_unplayed_key_rejected() {
+        let (pre, mut post, actor) = free_action_pair();
+        post.card_uses.insert("ZZ_NOT_A_CARD".into(), 1);
+        assert!(validate_full(&post).is_err());
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+    }
+
+    /// Element 3a companion, free path: a fabricated ledger key for a card
+    /// that IS on someone's table. The full validator accepts this state
+    /// (played card, no per-round limit entry), so delegating with Unsure
+    /// would let the tamper through — only a definite Fail closes it. On the
+    /// free path this is sound: execute_free has no card-chain, and no
+    /// committed free action can add a use-ledger key.
+    #[test]
+    fn closeout_free_card_uses_new_key_on_played_card_rejected() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 29,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xFEED);
+        // Find a committed mid-round state where some card is on a table.
+        let mut committed = None;
+        for _ in 0..40 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails.produce(&obs, space).expect("detail");
+            game.apply(action).expect("random move");
+            if game
+                .public
+                .players
+                .iter()
+                .any(|p| !p.played_cards.is_empty())
+                && game.pending.is_none()
+            {
+                committed = Some(game.clone());
+                break;
+            }
+        }
+        let pre = committed.expect("a state with a played card on a table");
+        let played_id = pre
+            .public
+            .players
+            .iter()
+            .flat_map(|p| p.played_cards.iter())
+            .next()
+            .cloned()
+            .expect("played card on some table");
+        let actor = pre.public.active_player;
+        let mut pre = pre;
+        if pre.public.players[actor].supply.food == 0 {
+            pre.public.players[actor].supply.food = 1;
+        }
+        let mut post = pre.clone();
+        post.apply_free(
+            actor,
+            FreeAction::DiscardGood {
+                good: crate::model::Good::Food,
+                quantity: 1,
+            },
+        )
+        .expect("engine free action must apply");
+        assert!(!pre.card_uses.contains_key(&played_id));
+        post.card_uses.insert(played_id.clone(), 1);
+        // Full validation cannot see this tamper: the card is played and the
+        // declared set has no per-round limit for it.
+        assert_eq!(validate_full(&post), Ok(()));
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "fabricated ledger key on a played card must be definite Fail (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+    }
+
+    /// Element 3b, free path: a same-round ledger decrease re-opens a card's
+    /// use budget and no committed free action can produce it.
+    #[test]
+    fn closeout_free_card_uses_decrease_rejected() {
+        let (mut pre, mut post, actor) = free_action_pair();
+        pre.card_uses.insert("A001".into(), 2);
+        post.card_uses.insert("A001".into(), 1);
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "ledger decrease must be definite Fail (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+    }
+
+    /// Element 4, free path: decision-counter drift. Full validation does
+    /// not read the counter, so only the free transition check can see it.
+    #[test]
+    fn closeout_free_next_decision_id_drift_rejected() {
+        let (pre, mut post, actor) = free_action_pair();
+        post.next_decision_id += 1;
+        assert_eq!(validate_full(&post), Ok(()));
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "next_decision_id drift must be definite Fail (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+    }
+
+    /// Element 5, free path: `record_events` is a serde-skipped search flag
+    /// no apply/apply_free path writes; a flip between pre and post is not
+    /// producible by any committed transition. Full validation cannot see it.
+    #[test]
+    fn closeout_free_record_events_flip_rejected() {
+        let (pre, mut post, actor) = free_action_pair();
+        post.record_events = !pre.record_events;
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "record_events flip must be definite Fail (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+    }
+
+    /// Element 6, free path: same-round growth of an animal-market
+    /// accumulation. Full validation accepts any market-key accumulation,
+    /// so only the transition check can prove the growth illegal; taking
+    /// (decrease/removal) stays legal on the free path.
+    #[test]
+    fn closeout_free_animal_accumulation_same_round_growth_rejected() {
+        let (mut pre, mut post, actor) = free_action_pair();
+        pre.public.animal_accumulations.insert(Space::SheepMarket, 1);
+        post.public.animal_accumulations.insert(Space::SheepMarket, 2);
+        assert_eq!(validate_full(&post), Ok(()));
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+        // Taking (decrease/removal) stays legal — the take action removes
+        // the key when the market empties.
+        post.public.animal_accumulations.remove(&Space::SheepMarket);
+        validate_free_action_or_full(&post, &pre, actor).unwrap();
+    }
 }
