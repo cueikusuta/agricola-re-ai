@@ -46,3 +46,13 @@ PR #370 の分類は追認せず、文献と仕様データから独立に組み
 - 分類表 204行（各帯51）、欠番0・重複0、各表8列、段階合計204（1=3, 2=12, 3=32, 4=8, 外=149）。
 - `p=` 204行すべて取得データと一致。仕様の有無 59/145 が表と一致。
 - コード変更なしのため cargo は未実行。Actions は PR で確認。
+
+## PR とゲート
+
+- PR: #375（base `main`、head `research/freebuff-outband-sources`）。**マージしない**。
+- HEAD `4d382dd` の Actions: Rust CI（Detect changed files / CI required）pass、
+  cargo test・clippy・rustfmt・perf は docs のみの変更として skipped、
+  Pipeline gates (spec/catalog/blockers) pass。
+  - https://github.com/cueikusuta/agricola-re-ai/actions/runs/44440387490
+  - https://github.com/cueikusuta/agricola-re-ai/actions/runs/44440387676
+- 独立レビューは未実施。AGENTS.md §14 の対象（分類・AI評価の前提）であり、別セッションでの初回レビューが必要。
