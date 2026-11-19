@@ -2382,6 +2382,43 @@ pub mod legacy {
                         .filter(|improvement| improvement.is_cooking())
                         .count()
                         as i32,
+                    crate::cards::ScoreBonusRule::FieldsGoodsBeforeFinalHarvest(threshold) => {
+                        let goods = player.field_goods_before_final_harvest.unwrap_or(0);
+                        if goods >= *threshold {
+                            2
+                        } else {
+                            0
+                        }
+                    }
+                    crate::cards::ScoreBonusRule::StoneRoomsExceedPeople => {
+                        let stone_rooms = if matches!(player.house, crate::model::House::Stone) {
+                            player.rooms()
+                        } else {
+                            0
+                        };
+                        if stone_rooms > player.family as usize {
+                            4
+                        } else {
+                            0
+                        }
+                    }
+                    crate::cards::ScoreBonusRule::FarmyardAllUsed => {
+                        let all_used = player
+                            .farm
+                            .iter()
+                            .all(|cell| !matches!(cell.tile, crate::model::Tile::Empty));
+                        if all_used {
+                            2
+                        } else {
+                            0
+                        }
+                    }
+                    crate::cards::ScoreBonusRule::ExactFamilyMembers => match player.family {
+                        4 => 2,
+                        3 => 3,
+                        2 => 5,
+                        _ => 0,
+                    },
                 },
                 _ => 0,
             })

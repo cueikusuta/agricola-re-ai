@@ -202,6 +202,12 @@ pub struct Player {
     #[serde(default)]
     pub extra_housing: u8,
     pub begging: u32,
+    /// Snapshot of total crop goods in fields at the end of the final harvest
+    /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
+    /// if at least 7 goods were in fields before final harvest. Absent in v5
+    /// saves; defaults to None so scoring treats it as 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_goods_before_final_harvest: Option<u32>,
 }
 impl Player {
     pub fn new(id: usize, food: u32) -> Self {
@@ -233,6 +239,7 @@ impl Player {
             stone_cost_discount: 0,
             extra_housing: 0,
             begging: 0,
+            field_goods_before_final_harvest: None,
         }
     }
     pub fn rooms(&self) -> usize {

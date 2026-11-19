@@ -277,6 +277,16 @@ pub enum ScoreBonusRule {
     /// improvement in front of the player (the engine's cooking
     /// improvements are the fireplace/hearth set, see `Improvement::is_cooking`).
     CookingImprovements,
+    /// D032 木のくまで (Wood Rake): +2 points if at least 7 goods stood in
+    /// fields before the final harvest. Threshold stored in the variant.
+    FieldsGoodsBeforeFinalHarvest(u32),
+    /// D034 豪華な宿泊所 (Luxurious Hostel): +4 points if stone rooms exceed
+    /// family members.
+    StoneRoomsExceedPeople,
+    /// E034 登記簿 (Land Register): +2 points if every farmyard space is used.
+    FarmyardAllUsed,
+    /// E035 人間不信 (Misanthropy): 2/3/5 points for exactly 4/3/2 family members.
+    ExactFamilyMembers,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1066,6 +1076,45 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                     .iter()
                     .filter(|improvement| improvement.is_cooking())
                     .count() as i32,
+                ScoreBonusRule::FieldsGoodsBeforeFinalHarvest(threshold) => {
+                    // Snapshot taken at end of final harvest field phase; if missing, treat as 0.
+                    let goods = player.field_goods_before_final_harvest.unwrap_or(0);
+                    if goods >= *threshold {
+                        2
+                    } else {
+                        0
+                    }
+                }
+                ScoreBonusRule::StoneRoomsExceedPeople => {
+                    let stone_rooms = if matches!(player.house, House::Stone) {
+                        player.rooms()
+                    } else {
+                        0
+                    };
+                    if stone_rooms > player.family as usize {
+                        4
+                    } else {
+                        0
+                    }
+                }
+                ScoreBonusRule::FarmyardAllUsed => {
+                    // Farm has 15 cells (0-14). All must be non-Empty.
+                    let all_used = player
+                        .farm
+                        .iter()
+                        .all(|cell| !matches!(cell.tile, Tile::Empty));
+                    if all_used {
+                        2
+                    } else {
+                        0
+                    }
+                }
+                ScoreBonusRule::ExactFamilyMembers => match player.family {
+                    4 => 2,
+                    3 => 3,
+                    2 => 5,
+                    _ => 0,
+                },
             },
             _ => 0,
         })
@@ -3086,6 +3135,26 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         ),
+        // D032 木のくまで (Wood Rake): cost 1 wood; at scoring, +2 points if at least
+        // 7 goods stood in fields before the final harvest.
+        card(
+            "D032",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1)],
+            vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::FieldsGoodsBeforeFinalHarvest(7),
+            }],
+        ),
+        // D034 豪華な宿泊所 (Luxurious Hostel): cost 1 wood + 2 clay; at scoring,
+        // +4 points if stone rooms exceed family members.
+        card(
+            "D034",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1), (Good::Clay, 2)],
+            vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::StoneRoomsExceedPeople,
+            }],
+        ),
     ]
 }
 
@@ -3597,6 +3666,30 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 gain(Space::ResourceMarket, Good::Wood, 1),
             ],
         },
+        // E034 登記簿 (Land Register): cost 1 wood; at scoring, +2 points if
+        // every farmyard space is used.
+        CardDefinition {
+            use_limit: None,
+            id: "E034".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::FarmyardAllUsed,
+            }],
+        },
+        // E035 人間不信 (Misanthropy): cost 1 wood; at scoring, 2/3/5 points for
+        // exactly 4/3/2 family members.
+        CardDefinition {
+            use_limit: None,
+            id: "E035".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::ExactFamilyMembers,
+            }],
+        },
     ]
 }
 
@@ -3785,9 +3878,92 @@ mod verified_band_d_tests {
     }
 
     #[test]
+    fn d032_two_points_when_field_goods_snapshot_reaches_threshold() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D032".into());
+        // No snapshot recorded (cardless or pre-harvest) -> no bonus.
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // Boundary: 6 goods is below the printed threshold of 7.
+        p.field_goods_before_final_harvest = Some(6);
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // Exactly 7 -> +2.
+        p.field_goods_before_final_harvest = Some(7);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        // 8 also qualifies.
+        p.field_goods_before_final_harvest = Some(8);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        // Snapshot is set at the end of the final harvest field phase.
+        let mut game_snapshot = Player::new(0, 0);
+        game_snapshot.played_cards.push("D032".into());
+        game_snapshot.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 7,
+        };
+        let goods: u32 = game_snapshot
+            .farm
+            .iter()
+            .map(|cell| match cell.tile {
+                Tile::Field {
+                    crop: Some(_),
+                    remaining,
+                } => remaining as u32,
+                _ => 0,
+            })
+            .sum();
+        game_snapshot.field_goods_before_final_harvest = Some(goods);
+        assert_eq!(end_game_bonus(&set, &game_snapshot), 2);
+    }
+
+    #[test]
+    fn d032_cost_is_one_wood_and_absent_from_two_player_preset() {
+        let set = set();
+        let card = set.definition("D032").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        let preset = verified_basic_card_set(2).unwrap();
+        assert!(preset.definition("D032").is_none());
+    }
+
+    #[test]
+    fn d034_four_points_only_when_stone_rooms_exceed_family() {
+        let set = set();
+        // Same room count as family -> 0 (boundary: rooms == family).
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D034".into());
+        p.house = House::Stone;
+        assert_eq!(p.family, 2);
+        assert_eq!(p.rooms(), 2);
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // Wood house with extra rooms never qualifies.
+        p.farm[1].tile = Tile::Room;
+        p.house = House::Wood;
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // Stone house, rooms 3 > family 2 -> +4.
+        p.house = House::Stone;
+        assert_eq!(end_game_bonus(&set, &p), 4);
+        // Larger family catches up: 3 stone rooms vs 3 family -> 0.
+        p.family = 3;
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // Rooms ahead again -> +4.
+        p.farm[2].tile = Tile::Room;
+        assert_eq!(end_game_bonus(&set, &p), 4);
+    }
+
+    #[test]
+    fn d034_cost_is_wood_and_clay() {
+        let set = set();
+        let card = set.definition("D034").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1), (Good::Clay, 2)]);
+        assert_eq!(card.points, 0);
+    }
+
+    #[test]
     fn band_d_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["D100", "D105", "D109"] {
+        for id in ["D100", "D105", "D109", "D032", "D034"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -3842,7 +4018,7 @@ mod verified_band_e_tests {
         assert!(card.cost.is_empty());
         assert_eq!(card.points, 0);
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["E107", "E111", "E113", "E117", "E118"] {
+        for id in ["E107", "E111", "E113", "E117", "E118", "E034", "E035"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -3958,6 +4134,93 @@ mod verified_band_e_tests {
         after_worker(&set, &mut p, Space::Forest).unwrap();
         after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
         assert_eq!(p.supply.wood, 4);
+    }
+
+    #[test]
+    fn e034_two_points_only_when_every_farmyard_cell_is_used() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E034".into());
+        // Default farm has two Room cells and 13 Empty cells -> not all used.
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // Fill most cells but leave one Empty -> still 0 (boundary: 14 of 15).
+        for i in 0..14 {
+            p.farm[i].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            };
+        }
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // All 15 cells used (two rooms + 13 fields) -> +2.
+        p.farm[14].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        // Pasture tiles also count as used.
+        let mut q = Player::new(0, 0);
+        q.played_cards.push("E034".into());
+        q.farm[0].tile = Tile::Room;
+        q.farm[5].tile = Tile::Room;
+        for i in 1..5 {
+            q.farm[i].tile = Tile::Pasture { id: 0 };
+        }
+        for i in 6..15 {
+            q.farm[i].tile = Tile::Pasture { id: 0 };
+        }
+        assert_eq!(end_game_bonus(&set, &q), 2);
+    }
+
+    #[test]
+    fn e034_cost_is_one_wood_and_absent_from_two_player_preset() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let card = set.definition("E034").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        let preset = verified_basic_card_set(2).unwrap();
+        assert!(preset.definition("E034").is_none());
+    }
+
+    #[test]
+    fn e035_table_pays_two_three_five_for_exactly_four_three_two() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        // 2 family members -> +5.
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E035".into());
+        assert_eq!(p.family, 2);
+        assert_eq!(end_game_bonus(&set, &p), 5);
+        // 3 family members -> +3.
+        p.family = 3;
+        assert_eq!(end_game_bonus(&set, &p), 3);
+        // 4 family members -> +2.
+        p.family = 4;
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        // 5 family members -> 0 (printed card pays nothing at 5).
+        p.family = 5;
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // 1 family member is not a listed row -> 0.
+        p.family = 1;
+        assert_eq!(end_game_bonus(&set, &p), 0);
+    }
+
+    #[test]
+    fn e035_cost_is_one_wood_and_absent_from_two_player_preset() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let card = set.definition("E035").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        let preset = verified_basic_card_set(2).unwrap();
+        assert!(preset.definition("E035").is_none());
     }
 }
 #[cfg(test)]

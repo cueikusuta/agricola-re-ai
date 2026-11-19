@@ -148,6 +148,25 @@ impl Game {
                 }
             }
         }
+        // Capture snapshot of field goods before final harvest for D032 (木のくまで).
+        // This runs after all fields have been harvested, so remaining crops
+        // represent what was standing before the final harvest.
+        if self.public.round == 14 {
+            for player in &mut self.public.players {
+                let goods: u32 = player
+                    .farm
+                    .iter()
+                    .map(|cell| match cell.tile {
+                        Tile::Field {
+                            crop: Some(_),
+                            remaining,
+                        } => remaining as u32,
+                        _ => 0,
+                    })
+                    .sum();
+                player.field_goods_before_final_harvest = Some(goods);
+            }
+        }
         Ok(())
     }
     /// Called only on the preview AFTER field harvesting, to generate
