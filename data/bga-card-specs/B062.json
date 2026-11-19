@@ -18,9 +18,9 @@
     },
     "references": [
       {
-        "url": "https://agricola.cloudfree.jp/?p=3207",
+        "url": "https://agricola.cloudfree.jp/?p=3195",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, points and effect"
       },
       {
@@ -88,8 +88,8 @@
       "B062-not-triggered"
     ],
     "checked_by": "AI source comparison vs Rust CardDefinition",
-    "checked_on": "2026-11-13",
+    "checked_on": "2026-11-19",
     "implementation_status": "implemented",
-    "notes": "Verified against Rust CardDefinition in verified_round_and_harvest_cards(): MinorImprovement, cost Wood 1, points 0, AfterWorkerGainIfUsed { space: GrainSeeds, required_space: Farmland, good: Food, amount: 3 }. Zero diff."
+    "notes": "Verified against Rust CardDefinition in verified_round_and_harvest_cards(): MinorImprovement, cost Wood 1, points 0, AfterWorkerGainIfUsed { space: GrainSeeds, required_space: Farmland, good: Food, amount: 3 }. Zero diff. The JA reference URL was corrected to this card's own page (the previous URL pointed to B050 Butter Churn)."
   }
 }

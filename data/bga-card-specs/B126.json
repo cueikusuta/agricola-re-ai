@@ -18,9 +18,9 @@
     },
     "references": [
       {
-        "url": "https://agricola.cloudfree.jp/?p=3207",
+        "url": "https://agricola.cloudfree.jp/?p=3131",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, points and effect"
       },
       {
@@ -69,8 +69,8 @@
       "B126-room-cost"
     ],
     "checked_by": "AI source comparison vs Rust CardDefinition",
-    "checked_on": "2026-11-13",
+    "checked_on": "2026-11-19",
     "implementation_status": "implemented",
-    "notes": "Verified against Rust CardDefinition in verified_passive_cards(): Occupation, cost [], points 0, Passive RoomCost(3). Zero diff."
+    "notes": "Verified against Rust CardDefinition in verified_passive_cards(): Occupation, cost [], points 0, Passive RoomCost(3). Zero diff. The JA reference URL was corrected to this card's own page (the previous URL pointed to B050 Butter Churn)."
   }
 }
