@@ -495,3 +495,5 @@ M7 #335 C004 cost → 2赤、M8 #340 C116 自己発動 → **ブランチのみ�
 - CI対応: `bga-spec-contract` の再生成一致のため、`scripts/build_bga_card_specs.py` の
   A118/A150/A154/A156/A158/A159/D079 の表と `data/bga-card-tests/` の5枚を更新した。Rust は未変更。
   `validate_bga_card_specs.py` は `errors: []`、ビルダー契約テスト3件は成功。
+- CI対応2: A071/A092/A103 を「効果なし・未解決」に固定していた Python 回帰テスト2本を更新し、
+  全 Python テスト287件が成功。Rust は未変更。

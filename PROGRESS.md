@@ -170,3 +170,5 @@
 - **補足（CI対応）**: `bga-spec-contract` の再生成一致を保つため、`scripts/build_bga_card_specs.py` の
   A118/A150/A154/A156/A158/A159/D079 の表と、`data/bga-card-tests/` の該当5枚を更新した。
   Rust は変更していない。`validate_bga_card_specs.py` は errors 0、ビルダー契約テスト3件は成功。
+- **CI対応2**: A071/A092/A103 を「効果なし・未解決」に固定していた Python 回帰テスト2本を、
+  文献で確定した値に合わせて更新。`python -m unittest discover -s tests -p "test_*.py"` は287件成功。

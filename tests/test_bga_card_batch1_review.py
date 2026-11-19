@@ -27,12 +27,16 @@ class Batch1ReviewTest(unittest.TestCase):
         self.assertEqual(cases["A082-normal-action-drains-space"]["expected"]
                          ["take_1_from_accumulation"], None)
 
-    def test_clearing_spade_anytime_is_not_ready_for_engine(self) -> None:
+    def test_clearing_spade_effect_is_fixed_but_anytime_window_remains_unresolved(self) -> None:
         spec = data("bga-card-specs", "A071")
         self.assertEqual(spec["review"]["status"], "needs_resolution")
-        self.assertIsNone(spec["effects"])
-        self.assertIn("anytime_free_action_window_and_deterministic_replay",
-                      spec["review"]["unresolved_fields"])
+        self.assertEqual(spec["effects"][0]["trigger"], "any_time")
+        self.assertEqual(spec["effects"][0]["steps"][0]["params"]["kind"],
+                         "move_crop_between_fields")
+        self.assertTrue(any("legal_window" in field
+                            for field in spec["review"]["unresolved_fields"]))
+        self.assertTrue(any("replay" in field
+                            for field in spec["review"]["unresolved_fields"]))
 
 
 if __name__ == "__main__":

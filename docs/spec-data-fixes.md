@@ -6,8 +6,10 @@
 - 正本: 2016年改訂版 Lookout 公式ルール。カード個別の効果は、日本語版 BGA アグリコラカード情報 wiki の
   個別ページ・カード画像、非公式コンペンディウム、既存の分類文書（#362 / #370 / #375 / #376 / #377）を
   突き合わせた**自分の言葉の要約**で確認した。原文・画像・PDF はリポジトリに収録しない。
-- 範囲: 仕様 JSON と、その再生成元 `scripts/build_bga_card_specs.py` の該当7枚分、および再生成された `data/bga-card-tests/` の5枚。Rust・スキーマ・台帳・分類文書は変更しない。
-  ビルダーは仕様 JSON の正本であり、これを更新しないと `bga-spec-contract` の再生成一致が壊れるため、最小限の範囲で同時に更新した。
+- 範囲: 仕様 JSON と、その再生成元 `scripts/build_bga_card_specs.py` の該当7枚分、再生成された `data/bga-card-tests/` の5枚、
+  および「未解決のまま固定する」旧回帰テスト2本。Rust・スキーマ・台帳・分類文書は変更しない。
+  ビルダーは仕様 JSON の正本であり、これを更新しないと `bga-spec-contract` の再生成一致が壊れる。
+  旧回帰テストは A071/A092/A103 を「効果なし・未解決」に固定していたため、文献で確定した値に合わせて更新した。
 - 章: A / B / C / D / E の帯ごとに commit / push し、確定できなかったものは最後のチェックリストへ回す。
 
 ## 0. 残件の集め方と対象外
@@ -387,9 +389,11 @@
 | ビルダー再生成 | `python scripts/build_bga_card_specs.py --force --cards A118,A150,A154,A156,A158,A159,D079` | 7枚を再生成。生成仕様・テストはコミット済みと一致 |
 | 仕様検証 | `python scripts/validate_bga_card_specs.py` | `errors: []`、spec 695 / without_spec 145 |
 | ビルダー契約 | `python -m unittest discover -s tests -p "test_bga_card_specs_builder.py" -v` | 3テスト成功（再生成一致・テスト参照・検証通過） |
+| Python 全テスト | `python -m unittest discover -s tests -p "test_*.py"` | 287テスト成功 |
 
 - 変更したのは `data/bga-card-specs/` の40ファイル、`data/bga-card-tests/` の5ファイル、
-  `scripts/build_bga_card_specs.py`、`docs/spec-data-fixes.md`、`PROGRESS.md`、`result-deepai.md`。Rust は変更していない。
+  `scripts/build_bga_card_specs.py`、`tests/test_bga_card_batch1_review.py`、`tests/test_bga_card_batch2_timing.py`、
+  `docs/spec-data-fixes.md`、`PROGRESS.md`、`result-deepai.md`。Rust は変更していない。
 - `TRIAL_REPORT.md`（作業開始前から未追跡）は触っていない。
 
 ### 9.2 自己レビュー（章・コミット単位）
