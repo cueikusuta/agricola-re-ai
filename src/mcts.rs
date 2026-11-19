@@ -1188,8 +1188,10 @@ mod tests {
         // Updated: added A042 Forest Lake Hut to verified_minor_worker_cards (pool size 33->34)
         // Updated: added A121 Brick Stamping to verified_minor_worker_cards (pool size 34->35)
         // Updated: added A118/A145/C066 to verified_round_and_harvest_cards (pool size 35->38)
+        // Updated: PR #385 review fix (e) — A145 removed from the two-player
+        // preset (spec eligibility "2": "no"), pool size 38->37.
         assert_eq!(
-            digest, "7b4508153accba157318da796da9041853fde151829815e4e192fc94420a9e58",
+            digest, "c3561c61929915f3f45408b3447068c8cf73d358658a4770a34f751e0184474e",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
