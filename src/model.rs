@@ -2255,6 +2255,22 @@ impl Game {
                 // Extensible: custom effects handle their own payload.
                 Ok(())
             }
+            (
+                PendingKind::ChooseAnimalPlacement { .. },
+                PendingResolution::ChooseAnimalPlacement { plan },
+            ) => {
+                let player = &mut self.public.players[pending.player];
+                crate::engine::place_animals(
+                    player,
+                    plan,
+                    plan.to_pastures.iter().map(|x| x.1).sum::<u32>()
+                        + plan.to_stables.len() as u32
+                        + u32::from(plan.pet)
+                        + plan.cook
+                        + plan.discard,
+                )
+                .map_err(|e| format!("animal placement failed: {e}"))
+            }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
     }

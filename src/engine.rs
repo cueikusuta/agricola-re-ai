@@ -2891,7 +2891,7 @@ fn take_animals(
     }
     Ok(())
 }
-fn place_animals(p: &mut Player, plan: &AnimalPlan, n: u32) -> Result<()> {
+pub fn place_animals(p: &mut Player, plan: &AnimalPlan, n: u32) -> Result<()> {
     let assigned: u32 = plan.to_pastures.iter().map(|x| x.1).sum::<u32>()
         + plan.to_stables.len() as u32
         + u32::from(plan.pet)

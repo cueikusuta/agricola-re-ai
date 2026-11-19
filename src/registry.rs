@@ -302,6 +302,8 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
+                crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerGain { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
                     EventKind::WorkerPlaced
@@ -408,6 +410,8 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
                         | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. } => {
