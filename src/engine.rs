@@ -3605,6 +3605,7 @@ mod grow_with_minor_regression_tests {
             }
         }
         let mut game = game.expect("failed to find seed with B010 in player 0 hand");
+        game.public.active_player = 0;
         game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
         game.public.round = 1;
         // Give player 0 resources to play B010 (wood3, food3)
