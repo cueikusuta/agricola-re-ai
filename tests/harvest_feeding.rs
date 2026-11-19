@@ -183,6 +183,101 @@ fn a145_reed_waits_until_the_harvest_completes() {
     assert_eq!(g.public.players[0].supply.reed, 1);
 }
 
+/// (b) C066 at grain >= 3 is a CHOICE: the plan flag c066_take_food_instead
+/// opts back into the 1 food. GREEN: food 9 (10 - 2 + 1), grain stays 3.
+#[test]
+fn c066_owner_may_opt_back_into_the_food_at_three_grain() {
+    struct TakeFood;
+    impl agricola_re_ai::harvest::HarvestDetailPolicy for TakeFood {
+        fn plan_feeding(
+            &self,
+            _: &agricola_re_ai::model::Observation,
+        ) -> agricola_re_ai::harvest::FeedingPlan {
+            let mut plan = agricola_re_ai::harvest::FeedingPlan::default();
+            plan.c066_take_food_instead = true;
+            plan
+        }
+    }
+    let mut g = harvest_fixture();
+    teleport_into_play(&mut g, &["C066"]);
+    grain_fields(&mut g, &[1, 2, 3]);
+    g.apply_with_harvest_policy(place_day_laborer(), &TakeFood)
+        .expect("C066 food-choice must complete the harvest");
+    let p = &g.public.players[0];
+    assert_eq!(
+        p.supply.food, 9,
+        "opting into the food grants it at >=3 grain"
+    );
+    assert_eq!(p.supply.grain, 3, "no extra grain when the food is chosen");
+}
+
+/// (c) A118 extra purchases are capped at 2 per harvest by plan validation:
+/// a plan asking for 3 buys is rejected; 2 buys execute as 2 food -> 2 wood.
+/// The fixture policy is owner-aware (the observation carries played_cards),
+/// so only the A118 holder's plan requests the exchange.
+/// GREEN: 2 buys => food 10-2(feed)-2(buy)=6, wood 1(fixed)+2(buy)=3.
+#[test]
+fn a118_exchange_capped_at_two_per_harvest() {
+    struct BuyWoodFlat;
+    impl agricola_re_ai::harvest::HarvestDetailPolicy for BuyWoodFlat {
+        fn plan_feeding(
+            &self,
+            obs: &agricola_re_ai::model::Observation,
+        ) -> agricola_re_ai::harvest::FeedingPlan {
+            let mut plan = agricola_re_ai::harvest::FeedingPlan::default();
+            let holder = obs.public.players[obs.player_id]
+                .played_cards
+                .iter()
+                .any(|c| c == "A118");
+            if holder {
+                plan.a118_wood_buys = 2;
+            }
+            plan
+        }
+    }
+    struct BuyWoodTooMany;
+    impl agricola_re_ai::harvest::HarvestDetailPolicy for BuyWoodTooMany {
+        fn plan_feeding(
+            &self,
+            obs: &agricola_re_ai::model::Observation,
+        ) -> agricola_re_ai::harvest::FeedingPlan {
+            let mut plan = agricola_re_ai::harvest::FeedingPlan::default();
+            let holder = obs.public.players[obs.player_id]
+                .played_cards
+                .iter()
+                .any(|c| c == "A118");
+            if holder {
+                plan.a118_wood_buys = 3; // 「追加で木材2まで」 exceeds the printed cap
+            }
+            plan
+        }
+    }
+    let mut g = harvest_fixture();
+    teleport_into_play(&mut g, &["A118"]);
+    g.public.players[0].supply.food = 10;
+    let capped = g.apply_with_harvest_policy(place_day_laborer(), &BuyWoodTooMany);
+    assert!(
+        capped.is_err(),
+        "3 buys must be rejected: {:?}",
+        capped.unwrap_err()
+    );
+    assert!(!g.has_pending(), "the rejected plan leaves no pending");
+    let p = &g.public.players[0];
+    assert_eq!(
+        p.supply.wood, 0,
+        "nothing granted while the plan was rejected"
+    );
+    assert_eq!(p.supply.food, 10);
+    let mut g = harvest_fixture();
+    teleport_into_play(&mut g, &["A118"]);
+    g.public.players[0].supply.food = 10;
+    g.apply_with_harvest_policy(place_day_laborer(), &BuyWoodFlat)
+        .expect("2 buys must be legal for an A118 holder with food");
+    let p = &g.public.players[0];
+    assert_eq!(p.supply.wood, 3, "fixed 1 + 2 purchased wood");
+    assert_eq!(p.supply.food, 6, "10 - 2 feeding - 2 purchases");
+}
+
 /// (e) A145 is 3+/4-player only (spec eligibility 2=no): it must not be dealt
 /// in the two-player verified preset at all.
 #[test]
