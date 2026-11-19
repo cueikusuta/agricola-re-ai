@@ -159,6 +159,16 @@ pub enum PendingKind {
         /// Opaque payload for the specific effect.
         payload: serde_json::Value,
     },
+    /// Choose how to place animals gained from a card effect (C083/C147).
+    /// The player provides an AnimalPlan for exact placement.
+    ChooseAnimalPlacement {
+        /// Source card ID that triggered this decision.
+        source_card: String,
+        /// The animal type being placed.
+        animal: crate::model::Animal,
+        /// Total amount of animals to place.
+        amount: u32,
+    },
 }
 
 /// A single gain option.
@@ -199,6 +209,7 @@ pub enum PendingResolution {
     DelayedWellRelief { confirmed: bool },
     ChooseTriggerOrder { chosen_order: Vec<usize> },
     Custom { payload: serde_json::Value },
+    ChooseAnimalPlacement { plan: crate::engine::AnimalPlan },
 }
 
 impl PendingDecision {
@@ -263,6 +274,10 @@ impl PendingDecision {
                 Ok(())
             }
             (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => Ok(()),
+            (
+                PendingKind::ChooseAnimalPlacement { .. },
+                PendingResolution::ChooseAnimalPlacement { .. },
+            ) => Ok(()),
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
     }

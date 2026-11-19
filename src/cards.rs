@@ -135,6 +135,20 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// C083 若牛 (Early Cattle): on play, gain `amount` of `animal` (cattle).
+    /// The player must provide an AnimalPlan for placement.
+    OnPlayGainAnimal {
+        animal: Animal,
+        amount: u32,
+    },
+    /// C147 牛の飼育士 (Cowherd): each time the owner uses `space` (CattleMarket),
+    /// gain `amount` of `animal` (cattle). The player must provide an AnimalPlan
+    /// for placement.
+    AfterWorkerGainAnimal {
+        space: Space,
+        animal: Animal,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -173,6 +187,8 @@ impl CardEffect {
                 "on_play_gain_per_improvement_played"
             }
             CardEffect::OnPlayGainPerCount { .. } => "on_play_gain_per_count",
+            CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
+            CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
         }
     }
 }
@@ -364,7 +380,9 @@ impl CardSet {
                 || card.effects.iter().any(|effect| {
                     let amount = match effect {
                         CardEffect::OnPlayGain { amount, .. }
-                        | CardEffect::AfterWorkerGain { amount, .. } => *amount,
+                        | CardEffect::AfterWorkerGain { amount, .. }
+                        | CardEffect::OnPlayGainAnimal { amount, .. }
+                        | CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
                         | CardEffect::Passive { .. } => 1,
@@ -2857,6 +2875,29 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 },
             ],
         ),
+        // C083 若牛 (Early Cattle): minor improvement, -3 points, on play gain 2 cattle.
+        CardDefinition {
+            use_limit: None,
+            id: "C083".to_owned(),
+            kind: minor,
+            cost: vec![],
+            points: -3,
+            effects: vec![CardEffect::OnPlayGainAnimal {
+                animal: Animal::Cattle,
+                amount: 2,
+            }],
+        },
+        // C147 牛の飼育士 (Cowherd): occupation, 0 points, each time owner uses CattleMarket gain 1 cattle.
+        card(
+            "C147",
+            occupation,
+            vec![],
+            vec![CardEffect::AfterWorkerGainAnimal {
+                space: Space::CattleMarket,
+                animal: Animal::Cattle,
+                amount: 1,
+            }],
+        ),
     ]
 }
 #[cfg(test)]
@@ -2999,12 +3040,45 @@ mod verified_band_c_tests {
     #[test]
     fn band_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["C076", "C106", "C111", "C116"] {
+        for id in ["C076", "C106", "C111", "C116", "C083", "C147"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
             );
         }
+    }
+
+    #[test]
+    fn c083_has_negative_three_points_and_no_cost() {
+        let set = set();
+        let card = set.definition("C083").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, -3);
+        assert_eq!(
+            card.effects,
+            vec![CardEffect::OnPlayGainAnimal {
+                animal: Animal::Cattle,
+                amount: 2,
+            }]
+        );
+    }
+
+    #[test]
+    fn c147_has_zero_points_and_no_cost() {
+        let set = set();
+        let card = set.definition("C147").unwrap();
+        assert_eq!(card.kind, CardKind::Occupation);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+        assert_eq!(
+            card.effects,
+            vec![CardEffect::AfterWorkerGainAnimal {
+                space: Space::CattleMarket,
+                animal: Animal::Cattle,
+                amount: 1,
+            }]
+        );
     }
 }
 
