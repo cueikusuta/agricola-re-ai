@@ -442,3 +442,14 @@ M7 #335 C004 cost → 2赤、M8 #340 C116 自己発動 → **ブランチのみ�
 - `cargo fmt --check` 成功。`cargo clippy --all-targets --all-features --locked -- -D warnings` は
   `src/cards.rs` と既存テストの `needless_range_loop` など既存lintで失敗（docsのみの変更に起因しない）。
 - 付録Aに帯外204枚の効果要約と `p=` 典拠、付録Bに帯内636枚の出典、付録Cに帯内側の再確認候補を記載。
+
+### PR 作成
+
+- PR #377: https://github.com/cueikusuta/agricola-re-ai/pull/377
+- base = `research/deepai-outband-classification`（#376 の上に積む stacked PR）。マージはしない。
+- HEAD `9c1cdab` の Actions:
+  - Detect changed files: pass — https://github.com/cueikusuta/agricola-re-ai/actions/runs/44465605656/job/135362547429
+  - Pipeline gates (spec/catalog/blockers): pass — https://github.com/cueikusuta/agricola-re-ai/actions/runs/44465605806/job/135362547680
+  - CI required: pass — https://github.com/cueikusuta/agricola-re-ai/actions/runs/44465605656/job/135362650774
+  - rustfmt / clippy / cargo test / M1・M2・M7 seeded performance: docs のみの変更として skip。
+- 独立レビュー対象（211→204の同定、E075のAND読み、段階3優先、37件の段階4判断）。

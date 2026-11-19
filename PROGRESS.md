@@ -133,3 +133,8 @@
   効果要約と典拠、付録Cに帯内側の再確認候補を記載。`cargo fmt --check` 成功、clippy は既存lintで失敗
   （docsのみの変更に起因しない）。
 - 次の再開位置: PR 作成（base = `research/deepai-outband-classification`）。マージしない。
+- **PR #377 を作成**（base = `research/deepai-outband-classification`・マージしない）。
+  https://github.com/cueikusuta/agricola-re-ai/pull/377
+- Actions（HEAD `9c1cdab`）: Detect changed files / Pipeline gates / CI required が pass。
+  Rust変更が無いため rustfmt・clippy・cargo test・M1/M2/M7 seeded performance は paths filter で skip。
+- 次の再開位置: 独立レビュー（別セッション）。指摘対応は PR #377 上で行う。
