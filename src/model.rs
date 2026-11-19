@@ -202,6 +202,12 @@ pub struct Player {
     #[serde(default)]
     pub extra_housing: u8,
     pub begging: u32,
+    /// Snapshot of total crop goods in fields at the end of the final harvest
+    /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
+    /// if at least 7 goods were in fields before final harvest. Absent in v5
+    /// saves; defaults to None so scoring treats it as 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_goods_before_final_harvest: Option<u32>,
 }
 impl Player {
     pub fn new(id: usize, food: u32) -> Self {
@@ -233,6 +239,7 @@ impl Player {
             stone_cost_discount: 0,
             extra_housing: 0,
             begging: 0,
+            field_goods_before_final_harvest: None,
         }
     }
     pub fn rooms(&self) -> usize {
@@ -502,6 +509,7 @@ impl Space {
     pub fn additional_for(self, players: usize) -> bool {
         Self::extra_for(players).contains(&self)
     }
+
     pub fn accumulation_for(self, players: usize) -> Option<(Good, u32)> {
         match self {
             Self::Hollow if players == 4 => Some((Good::Clay, 2)),
@@ -525,6 +533,26 @@ impl Space {
     }
 }
 
+/// Layer 0: the single canonical structure of public game state.
+///
+/// Every path that reads or writes public state (engine, dispatcher, apply,
+/// validation, MCTS, replay) must go through this struct — there is no second
+/// copy of any field here. Fields that used to live as `Game` mirrors with a
+/// duplicate in `Observation` (`well_food_schedule`, `card_uses`) now live
+/// only here; `Game::observation` projects them to the observer together with
+/// the rest of the struct.
+///
+/// Deliberately NOT part of Layer 0:
+/// - `Game::pending` / `event_budget` / `next_decision_id`: transition
+///   machinery (decision bookkeeping), not public state; restructured by the
+///   dispatcher two-axis design.
+/// - `Game::card_use_limits`: immutable derived data (`CardDefinition::use_limit`
+///   over the public card set); it never changes during play, so it is a
+///   cache next to its source, not state.
+/// - `Game::delayed_well`: the private source of truth; the public mirror of
+///   it is `well_food_schedule` below.
+/// - `Game::log`: the replay record; its integrity is enforced by the event
+///   hash chain and `load_json` replay verification.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PublicState {
     pub round: u8,
@@ -540,7 +568,98 @@ pub struct PublicState {
     pub workers_placed: Vec<u8>,
     pub additional_action_space_enabled: bool,
     pub finished: bool,
+    /// Public mirror of `Game::delayed_well` (Finding A, PR #265): which
+    /// player receives one food at which future round from a Well purchase.
+    /// Well purchases are public actions, so the schedule is public state.
+    /// `serde(default)` keeps pre-aggregation saves loading.
+    #[serde(default)]
+    pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
+    /// Per-card use counts in the current round. Card plays are public
+    /// actions, so the ledger is public state. Cleared at each round
+    /// boundary; `serde(default)` keeps pre-aggregation saves loading.
+    #[serde(default)]
+    pub card_uses: BTreeMap<String, u32>,
+    /// Per-card resource accumulations on played cards. Cards that place
+    /// resources on themselves (e.g., "place 1 wood on this card each round")
+    /// store their accumulations here. Keyed by player index, then card ID,
+    /// then resource type. `serde(default)` keeps pre-aggregation saves loading.
+    /// `skip_serializing_if = "BTreeMap::is_empty"` keeps empty ledger out of
+    /// JSON so pre-card_accumulations saves stay byte-identical (PR #327 pattern).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub card_accumulations: BTreeMap<usize, BTreeMap<String, BTreeMap<Good, u32>>>,
 }
+
+/// The exact `PublicState` field set the LOG_VERSION=5 `state_hash` tuple
+/// serialized, in declaration order. Serializing this mirror produces
+/// byte-identical JSON to serializing the 13-field v5 `PublicState`, so
+/// `state_hash` VALUES are unchanged by the Layer-0 aggregation even though
+/// `PublicState` grew. The aggregated fields (`well_food_schedule`,
+/// `card_uses`, `card_accumulations`) are deliberately excluded here — their
+/// integrity is enforced by `integrity_hash` instead. Do not reorder or add fields.
+#[derive(Serialize)]
+pub(crate) struct PublicStateHashMaterialV5<'a> {
+    round: &'a u8,
+    active_player: &'a usize,
+    start_player: &'a usize,
+    used: &'a BTreeSet<Space>,
+    revealed: &'a Vec<RoundCard>,
+    accumulations: &'a BTreeMap<Space, u32>,
+    animal_accumulations: &'a BTreeMap<Space, u32>,
+    players: &'a Vec<Player>,
+    improvement_market: &'a Vec<Improvement>,
+    work_quota: &'a Vec<u8>,
+    workers_placed: &'a Vec<u8>,
+    additional_action_space_enabled: &'a bool,
+    finished: &'a bool,
+}
+
+impl PublicState {
+    /// v5-pinned hash material for this state (see [`PublicStateHashMaterialV5`]).
+    fn hash_material_v5(&self) -> PublicStateHashMaterialV5<'_> {
+        PublicStateHashMaterialV5 {
+            round: &self.round,
+            active_player: &self.active_player,
+            start_player: &self.start_player,
+            used: &self.used,
+            revealed: &self.revealed,
+            accumulations: &self.accumulations,
+            animal_accumulations: &self.animal_accumulations,
+            players: &self.players,
+            improvement_market: &self.improvement_market,
+            work_quota: &self.work_quota,
+            workers_placed: &self.workers_placed,
+            additional_action_space_enabled: &self.additional_action_space_enabled,
+            finished: &self.finished,
+        }
+    }
+}
+
+impl PublicState {
+    /// Compute the set of available action spaces for this public state.
+    /// Used by both `Game::validate` (full validation) and
+    /// `crate::validation::validate_incremental` (incremental validation)
+    /// to ensure the same availability logic is applied consistently.
+    pub(crate) fn available_spaces(
+        &self,
+        players: usize,
+        additional_action_space_enabled: bool,
+        card_set_enabled: bool,
+    ) -> BTreeSet<Space> {
+        let mut available: BTreeSet<_> = Space::regular_for(players).into_iter().collect();
+        if card_set_enabled {
+            available.insert(Space::Lessons);
+            if players >= 3 {
+                available.insert(Space::ExtraLessons);
+            }
+        }
+        available.extend(self.revealed.iter().copied().map(Space::from));
+        if additional_action_space_enabled {
+            available.extend(Space::extra_for(players));
+        }
+        available
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RngStreams {
     pub round: ChaCha8Rng,
@@ -554,10 +673,9 @@ pub struct Game {
     pub hidden_round_deck: Vec<RoundCard>,
     pub rng: RngStreams,
     pub delayed_well: BTreeMap<u8, Vec<usize>>,
-    /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
-    /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
-    #[serde(default)]
-    pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
+    /// The public mirror of `delayed_well` lives in
+    /// [`PublicState::well_food_schedule`] (Layer-0 aggregation): one single
+    /// canonical copy instead of separate `Game` and `Observation` mirrors.
     #[serde(
         default,
         serialize_with = "serialize_arc",
@@ -582,15 +700,13 @@ pub struct Game {
     /// single effect chain (loop guard) rather than the whole game.
     #[serde(default = "default_event_budget")]
     pub event_budget: u32,
-    /// Per-card use tracking for effects with limits (e.g., once per round).
-    /// Key: card ID, Value: use count in the current period. Cleared at each
-    /// round boundary, matching the "once per round" period used by the cards.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub card_uses: BTreeMap<String, u32>,
     /// Declared per-card use limits (card ID -> max resolutions per period).
     /// A card absent from this map has no per-period limit. Kept in `Game` so
     /// the limit is data, not a magic constant at the call site: an empty map
     /// is skipped when serializing, so existing v5 saves stay byte-identical.
+    /// (The per-round use *counts* are public state and live in
+    /// [`PublicState::card_uses`]; this map is immutable derived data and
+    /// never changes during play.)
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub card_use_limits: BTreeMap<String, u32>,
     /// Next decision ID for PendingDecision.
@@ -650,6 +766,13 @@ pub struct GameLog {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub integrity_hash: Option<String>,
 }
+/// The observer-side projection of Layer 0 plus the viewer's private hand.
+/// `public` carries the complete canonical [`PublicState`] — including the
+/// well-food schedule and per-card use ledger, which used to be duplicated as
+/// separate `Observation` mirrors (Layer-0 aggregation removed those
+/// duplicates). Per-card use limits are not projected: they derive from
+/// `card_definitions` (`CardDefinition::use_limit`), exactly as
+/// `Game::from_card_state` and the MCTS reconstruction derive them.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Observation {
     pub player_id: usize,
@@ -659,10 +782,8 @@ pub struct Observation {
     pub hand_counts: Vec<usize>,
     /// The implemented card vocabulary is public; its randomized locations are not.
     pub card_definitions: Vec<CardDefinition>,
-    /// Public mirror of delayed_well for accurate determinization (Finding A, PR #265).
-    /// Well purchases are PUBLIC actions; this schedule mirrors delayed_well.
-    pub well_food_schedule: BTreeMap<u8, Vec<usize>>,
 }
+
 impl Game {
     pub fn new(config: Config) -> Self {
         Self::with_cards(config, CardSet::default()).expect("default cardless setup")
@@ -768,6 +889,9 @@ impl Game {
             workers_placed: vec![0; config.players],
             additional_action_space_enabled: config.additional_action_space_enabled,
             finished: false,
+            well_food_schedule: BTreeMap::new(),
+            card_uses: BTreeMap::new(),
+            card_accumulations: BTreeMap::new(),
         };
         let log = GameLog {
             log_version: LOG_VERSION,
@@ -791,14 +915,12 @@ impl Game {
             hidden_round_deck: deck,
             rng,
             delayed_well: BTreeMap::new(),
-            well_food_schedule: BTreeMap::new(),
             card_set,
             cards,
             log,
             record_events: true,
             pending: None,
             event_budget: default_event_budget(),
-            card_uses: BTreeMap::new(),
             card_use_limits: Default::default(),
             next_decision_id: 0,
         };
@@ -810,7 +932,7 @@ impl Game {
             .iter()
             .filter_map(|card| card.use_limit.map(|limit| (card.id.clone(), limit)))
             .collect();
-        result.start_round();
+        result.start_round()?;
         result.log.initial_state_hash = result.state_hash();
         result.log.initial_public_state = Some(result.public.clone());
         Ok(result)
@@ -825,22 +947,25 @@ impl Game {
             hand: self.cards.hands[player_id].clone(),
             hand_counts: self.cards.hands.iter().map(Vec::len).collect(),
             card_definitions: self.card_set.definitions.clone(),
-            well_food_schedule: self.well_food_schedule.clone(),
         })
     }
     pub fn state_hash(&self) -> String {
         // Event log is intentionally omitted; this is the full game state, including hidden cards and RNG.
         // LOG_VERSION=5 compatibility: the hash tuple MUST stay identical to the
         // v5 format (7 fields, tests/fixtures/v5/*). New bookkeeping fields
-        // (well_food_schedule, pending, event_budget, card_uses, next_decision_id)
+        // (well_food_schedule, pending, event_budget, card_uses, card_accumulations, next_decision_id)
         // are serialized into saves via serde defaults, but are deliberately
         // EXCLUDED from the hash so legacy v5 fixtures keep verifying.
-        // well_food_schedule mirrors delayed_well (Finding A) and pending
+        // well_food_schedule, card_uses, and card_accumulations are Layer-0 public state and are
+        // serialized into saves inside `public`; for the hash the public state
+        // is projected onto its v5 field set (`hash_material_v5`), so hash
+        // VALUES stay identical to the pre-aggregation format. Pending
         // decisions are excluded from the hash; their integrity is enforced by
-        // PendingDecision::state_hash_before checks in the resume path instead.
+        // PendingDecision::state_hash_before checks in the resume path, and the
+        // aggregated fields by `integrity_hash` below.
         let data = serde_json::to_vec(&(
             &self.config,
-            &self.public,
+            &self.public.hash_material_v5(),
             &self.hidden_round_deck,
             &self.rng,
             &self.delayed_well,
@@ -853,7 +978,7 @@ impl Game {
 
     /// Full integrity hash covering the whole `Game`, including the Step 3
     /// bookkeeping fields (`well_food_schedule`, `pending`, `event_budget`,
-    /// `card_uses`, `next_decision_id`) that `state_hash` deliberately omits for
+    /// `card_uses`, `card_accumulations`, `next_decision_id`) that `state_hash` deliberately omits for
     /// LOG_VERSION=5 compatibility.
     ///
     /// Use this for save/restore/resume integrity checks on NEW saves:
@@ -861,16 +986,38 @@ impl Game {
     /// that an interrupted PendingDecision survives a save/load round-trip
     /// byte-for-byte (Issue #266 acceptance: "PendingDecision save/restore/resume
     /// with a consistent state hash").
+    ///
+    /// `card_accumulations` is included only when non-empty (PR #371 backward
+    /// compatibility): empty ledger uses the 7-element tuple (same as pre-PR
+    /// #371) so existing saves keep their integrity_hash. Non-empty ledger uses
+    /// the 8-element tuple and any tampering is detected.
     pub fn integrity_hash(&self) -> String {
-        let data = serde_json::to_vec(&(
-            self.state_hash(),
-            &self.well_food_schedule,
-            &self.pending,
-            self.event_budget,
-            &self.card_uses,
-            &self.card_use_limits,
-            self.next_decision_id,
-        ))
+        // Backward compatibility: when card_accumulations is empty, compute hash
+        // from 7-element tuple (same as before card_accumulations was added).
+        // This matches PR #327's bonus_points pattern: skip domain separator
+        // append for empty ledger so pre-existing saves keep same integrity_hash.
+        let data = if self.public.card_accumulations.is_empty() {
+            serde_json::to_vec(&(
+                self.state_hash(),
+                &self.public.well_food_schedule,
+                &self.pending,
+                self.event_budget,
+                &self.public.card_uses,
+                &self.card_use_limits,
+                self.next_decision_id,
+            ))
+        } else {
+            serde_json::to_vec(&(
+                self.state_hash(),
+                &self.public.well_food_schedule,
+                &self.pending,
+                self.event_budget,
+                &self.public.card_uses,
+                &self.public.card_accumulations,
+                &self.card_use_limits,
+                self.next_decision_id,
+            ))
+        }
         .expect("integrity serialization");
         format!("{:x}", Sha256::digest(&data))
     }
@@ -885,7 +1032,6 @@ impl Game {
             hidden_round_deck: self.hidden_round_deck.clone(),
             rng: self.rng.clone(),
             delayed_well: self.delayed_well.clone(),
-            well_food_schedule: self.well_food_schedule.clone(),
             card_set: self.card_set.clone(),
             cards: self.cards.clone(),
             log: GameLog {
@@ -907,7 +1053,6 @@ impl Game {
             record_events: false,
             pending: self.pending.clone(),
             event_budget: self.event_budget,
-            card_uses: self.card_uses.clone(),
             card_use_limits: self.card_use_limits.clone(),
             next_decision_id: self.next_decision_id,
         }
@@ -924,12 +1069,10 @@ impl Game {
         hidden_round_deck: Vec<RoundCard>,
         rng: RngStreams,
         delayed_well: BTreeMap<u8, Vec<usize>>,
-        well_food_schedule: BTreeMap<u8, Vec<usize>>,
         card_set: Arc<CardSet>,
         cards: CardState,
         pending: Option<PendingDecision>,
         event_budget: u32,
-        card_uses: BTreeMap<String, u32>,
         card_use_limits: BTreeMap<String, u32>,
         next_decision_id: u64,
     ) -> Self {
@@ -942,7 +1085,6 @@ impl Game {
             hidden_round_deck,
             rng,
             delayed_well,
-            well_food_schedule,
             card_set: card_set.clone(),
             cards,
             log: GameLog {
@@ -964,7 +1106,6 @@ impl Game {
             record_events: false,
             pending,
             event_budget,
-            card_uses,
             card_use_limits,
             next_decision_id,
         }
@@ -978,7 +1119,31 @@ impl Game {
         serde_json::to_string_pretty(&stamped).map_err(|e| e.to_string())
     }
     pub fn load_json(text: &str) -> Result<Self, String> {
-        let result: Self = serde_json::from_str(text).map_err(|e| e.to_string())?;
+        // Two-step deserialization to handle old format (top-level well_food_schedule/card_uses)
+        // and new format (inside public).
+        let mut value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
+
+        // Migrate old top-level fields to public if they exist
+        if let Some(well_schedule) = value.get("well_food_schedule").cloned() {
+            if value["public"]["well_food_schedule"]
+                .as_object()
+                .is_none_or(|o| o.is_empty())
+            {
+                value["public"]["well_food_schedule"] = well_schedule;
+            }
+            value.as_object_mut().unwrap().remove("well_food_schedule");
+        }
+        if let Some(card_uses) = value.get("card_uses").cloned() {
+            if value["public"]["card_uses"]
+                .as_object()
+                .is_none_or(|o| o.is_empty())
+            {
+                value["public"]["card_uses"] = card_uses;
+            }
+            value.as_object_mut().unwrap().remove("card_uses");
+        }
+
+        let result: Self = serde_json::from_value(value).map_err(|e| e.to_string())?;
         result.validate()?;
         if result.log.log_version != LOG_VERSION
             || result.log.rules_version != RULES_VERSION
@@ -1049,22 +1214,21 @@ impl Game {
         }
         Ok(result)
     }
-    pub fn start_round(&mut self) {
+    pub fn start_round(&mut self) -> Result<(), String> {
+        // A decision cannot span a round boundary: no production effect pauses
+        // the round-start trigger, and carrying a stale decision into a new
+        // round would make its `state_hash_before` meaningless.
+        if self.pending.is_some() {
+            return Err("pending decision must be resolved before round start".into());
+        }
+
         self.public.round += 1;
         let card = self.hidden_round_deck.pop().expect("14 rounds only");
         self.public.revealed.push(card);
         self.public.used.clear();
         // Per-card use limits use the round as their period, so the ledger is
         // cleared when a new round opens.
-        self.card_uses.clear();
-        // A decision cannot span a round boundary: no production effect pauses
-        // the round-start trigger, and carrying a stale decision into a new
-        // round would make its `state_hash_before` meaningless.
-        debug_assert!(
-            self.pending.is_none(),
-            "a pending decision must be resolved before the next round starts"
-        );
-        self.pending = None;
+        self.public.card_uses.clear();
         self.public.start_player = self.public.start_player.min(self.public.players.len() - 1);
         self.public.active_player = self.public.start_player;
         self.public.workers_placed = vec![0; self.public.players.len()];
@@ -1097,11 +1261,20 @@ impl Game {
                 *self.public.animal_accumulations.entry(space).or_default() += 1
             }
         }
-        if let Some(recipients) = self.delayed_well.remove(&self.public.round) {
-            for id in recipients {
-                self.public.players[id].supply.food += 1
-            }
+        // Consume any delayed well for this round and grant the food. The
+        // schedule mirror entry is removed UNCONDITIONALLY: delayed_well is the
+        // source of truth, but a legacy save can carry a well_food_schedule
+        // entry whose delayed_well entry is already gone, and dropping the
+        // grant inside `if let` left such orphan schedule entries behind
+        // forever (P1-4 + PR #341 review P3).
+        for id in self
+            .delayed_well
+            .remove(&self.public.round)
+            .unwrap_or_default()
+        {
+            self.public.players[id].supply.food += 1;
         }
+        self.public.well_food_schedule.remove(&self.public.round);
         // Round-start triggers go through the phase dispatcher so the event
         // budget and per-card use limits apply here too. The budget is reset
         // for a new round: a round boundary is not part of one action's chain.
@@ -1117,7 +1290,7 @@ impl Game {
                 self.public.round,
                 &self.public.used,
                 &mut self.event_budget,
-                &mut self.card_uses,
+                &mut self.public.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
             )
@@ -1129,6 +1302,7 @@ impl Game {
                 Transition::Completed
             });
         }
+        Ok(())
     }
     pub fn validate(&self) -> Result<(), String> {
         let p = &self.public;
@@ -1192,19 +1366,11 @@ impl Game {
         {
             return Err("multiple mutually-exclusive additional spaces used".into());
         }
-        let mut available: BTreeSet<_> = Space::regular_for(self.config.players)
-            .into_iter()
-            .collect();
-        if self.card_set.enabled() {
-            available.insert(Space::Lessons);
-            if self.config.players >= 3 {
-                available.insert(Space::ExtraLessons);
-            }
-        }
-        available.extend(p.revealed.iter().copied().map(Space::from));
-        if self.config.additional_action_space_enabled {
-            available.extend(Space::extra_for(self.config.players));
-        }
+        let available = p.available_spaces(
+            self.config.players,
+            self.config.additional_action_space_enabled,
+            self.card_set.enabled(),
+        );
         if !p.used.is_subset(&available) {
             return Err("a non-revealed action space was used".into());
         }
@@ -1227,6 +1393,30 @@ impl Game {
             .collect::<BTreeSet<_>>();
         if all_cards != RoundCard::ALL.into_iter().collect() {
             return Err("round deck contains duplicate or missing cards".into());
+        }
+        // Validate card_accumulations: player index must be valid, card must be played by that player.
+        for (player_idx, card_map) in &p.card_accumulations {
+            if *player_idx >= p.players.len() {
+                return Err(format!(
+                    "card_accumulations: invalid player index {player_idx}"
+                ));
+            }
+            let player = &p.players[*player_idx];
+            for (card_id, resource_map) in card_map {
+                if !player.played_cards.contains(card_id) {
+                    return Err(format!(
+                                "card_accumulations: player {player_idx} has accumulation on unplayed card {card_id}"
+                            ));
+                }
+                // Resource amounts are u32 (non-negative by type), but check for zero entries that shouldn't exist.
+                for &amount in resource_map.values() {
+                    if amount == 0 {
+                        return Err(format!(
+                                            "card_accumulations: player {player_idx} card {card_id} has zero amount"
+                                        ));
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -1299,20 +1489,32 @@ impl Game {
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&resolution)?;
-        // R2-P1-1: a paused work action's space must still be revealed/available
-        // at resume time. Check it BEFORE taking the decision so a stale or
-        // tampered save is refused atomically — nothing is applied and the
-        // decision stays resolvable — instead of smuggling a non-revealed space
-        // into `used`. `available_spaces_for_resume` is the same filter the
-        // original apply used, minus the `pending` short-circuit.
-        if let crate::pending::Continuation::PostWork { completion, .. } = &pending.continuation {
-            if !self
-                .available_spaces_for_resume()
-                .contains(&completion.action.space)
-            {
+        // R2-P1-1 (+ Round 2 P1-1): a paused work action's space must still be
+        // revealed/available at resume time. Check it BEFORE taking the
+        // decision so a stale or tampered save is refused atomically — nothing
+        // is applied and the decision stays resolvable — instead of smuggling
+        // a non-revealed space into `used`. `available_spaces_for_resume` is
+        // the same filter the original apply used, minus the `pending`
+        // short-circuit. A second-segment resume (explicit `space_applied`
+        // state, stamped only by the engine itself) re-joins its own already-
+        // used space: the consistency it claims (`used` membership) is
+        // enforced instead of re-running the availability filter, which by
+        // definition excludes the action's own used space.
+        if let crate::pending::Continuation::PostWork {
+            completion, resume, ..
+        } = &pending.continuation
+        {
+            let space = completion.action.space;
+            if resume.space_applied {
+                if !self.public.used.contains(&space) {
+                    return Err(format!(
+                        "resume claims space {space:?} already applied, but it is not marked used"
+                    ));
+                }
+            } else if !self.available_spaces_for_resume().contains(&space) {
                 return Err(format!(
                     "resume cannot use space {:?}: not available at resume time",
-                    completion.action.space
+                    space
                 ));
             }
         }
@@ -1355,19 +1557,37 @@ impl Game {
         // available into `used`. `available_spaces()` re-applies the same
         // revealed/unused/mutual-exclusion filters the original apply used
         // (Issue #268 R2-P1-1). `self.pending` is already cleared by the caller.
-        if !self.available_spaces().contains(&completion.action.space) {
+        // Round 2 P1-1: a second-segment resume (explicit `space_applied`
+        // state, stamped only by the engine itself) re-joins its own already-
+        // used space; the consistency it claims is enforced instead of a
+        // blanket "any used space is resumable" bypass, which would let a
+        // stale save resume onto another player's used space.
+        let space = completion.action.space;
+        let available = self.available_spaces();
+        if resume.space_applied {
+            if !self.public.used.contains(&space) {
+                return Err(format!(
+                    "resume claims space {space:?} already applied, but it is not marked used"
+                ));
+            }
+        } else if !available.contains(&space) {
             return Err(format!(
                 "resume cannot use space {:?}: not available at resume time",
-                completion.action.space
+                space
             ));
         }
         // Re-apply the work action to advance used/workers_placed and run
         // the harvest/breeding/round-end logic that was deferred.
         // The completion struct holds everything we need.
         let mut next = self.clone();
-        // The action's space was not yet marked used; do it now.
-        next.public.used.insert(completion.action.space);
-        next.public.workers_placed[player] += 1;
+        // The space/worker bookkeeping happens exactly once per logical
+        // action: here in the first segment. A second segment
+        // (`space_applied == true`) must find it already in place — enforced
+        // by the guard above — and must not re-apply it (Round 2 P0-2).
+        if !resume.space_applied {
+            next.public.used.insert(completion.action.space);
+            next.public.workers_placed[player] += 1;
+        }
         let will_harvest = next.public.workers_placed == next.public.work_quota
             && HARVEST_ROUNDS.contains(&next.public.round);
 
@@ -1389,7 +1609,7 @@ impl Game {
         let round = next.public.round;
         let used_spaces = next.public.used.clone();
         let mut event_budget = next.event_budget;
-        let mut card_uses = next.card_uses.clone();
+        let mut card_uses = next.public.card_uses.clone();
         let card_use_limits = next.card_use_limits.clone();
         let mut pending = next.pending.clone(); // Should be None after resolution
 
@@ -1440,6 +1660,7 @@ impl Game {
                             baked: true,
                             previous_player: None,
                             used_spaces: used_spaces.clone(),
+                            event_kind: crate::registry::EventKind::Bake,
                         };
                         // After phase. If THIS is the paused step and the pause
                         // was in the After phase (a resolved ChooseTriggerOrder,
@@ -1474,8 +1695,21 @@ impl Game {
                             )?
                         };
                         if let Transition::Paused(p) = after_transition {
-                            // Should not happen: the decision was just resolved.
-                            return Err(format!("unexpected pause during resume: {p:?}"));
+                            // A second pause during resume: commit the partially-resumed
+                            // state and return Transition::Paused instead of erroring out.
+                            next.public.players = players;
+                            next.cards = cards;
+                            next.public.improvement_market = improvement_market;
+                            next.delayed_well = delayed_well;
+                            next.event_budget = event_budget;
+                            next.public.card_uses = card_uses;
+                            return self.commit_second_pause(
+                                next,
+                                p.as_ref(),
+                                player,
+                                step,
+                                &completion,
+                            );
                         }
                         // Interrupt phase (resume only for an Interrupt-phase pause).
                         let transition = if let Some(after) = after {
@@ -1511,8 +1745,21 @@ impl Game {
                             )?
                         };
                         if let Transition::Paused(p) = transition {
-                            // Should not happen: the decision was just resolved.
-                            return Err(format!("unexpected pause during resume: {p:?}"));
+                            // A second pause during resume: commit the partially-resumed
+                            // state and return Transition::Paused instead of erroring out.
+                            next.public.players = players;
+                            next.cards = cards;
+                            next.public.improvement_market = improvement_market;
+                            next.delayed_well = delayed_well;
+                            next.event_budget = event_budget;
+                            next.public.card_uses = card_uses;
+                            return self.commit_second_pause(
+                                next,
+                                p.as_ref(),
+                                player,
+                                step,
+                                &completion,
+                            );
                         }
                     }
                 }
@@ -1546,6 +1793,7 @@ impl Game {
                         baked: false,
                         previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
+                        event_kind: crate::registry::EventKind::ClayConstruction,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -1577,7 +1825,21 @@ impl Game {
                         )?
                     };
                     if let Transition::Paused(p) = after_transition {
-                        return Err(format!("unexpected pause during resume: {p:?}"));
+                        // A second pause during resume: commit the partially-resumed
+                        // state and return Transition::Paused instead of erroring out.
+                        next.public.players = players;
+                        next.cards = cards;
+                        next.public.improvement_market = improvement_market;
+                        next.delayed_well = delayed_well;
+                        next.event_budget = event_budget;
+                        next.public.card_uses = card_uses;
+                        return self.commit_second_pause(
+                            next,
+                            p.as_ref(),
+                            player,
+                            step,
+                            &completion,
+                        );
                     }
                     // Interrupt phase (resume only for an Interrupt-phase pause).
                     let transition = if let Some(after) = after {
@@ -1639,6 +1901,7 @@ impl Game {
                         baked: false,
                         previous_player: None,
                         used_spaces: used_spaces.clone(),
+                        event_kind: crate::registry::EventKind::WorkerPlaced,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -1670,7 +1933,21 @@ impl Game {
                         )?
                     };
                     if let Transition::Paused(p) = after_transition {
-                        return Err(format!("unexpected pause during resume: {p:?}"));
+                        // A second pause during resume: commit the partially-resumed
+                        // state and return Transition::Paused instead of erroring out.
+                        next.public.players = players;
+                        next.cards = cards;
+                        next.public.improvement_market = improvement_market;
+                        next.delayed_well = delayed_well;
+                        next.event_budget = event_budget;
+                        next.public.card_uses = card_uses;
+                        return self.commit_second_pause(
+                            next,
+                            p.as_ref(),
+                            player,
+                            step,
+                            &completion,
+                        );
                     }
                     // Interrupt phase (resume only for an Interrupt-phase pause).
                     let transition = if let Some(after) = after {
@@ -1718,7 +1995,7 @@ impl Game {
         next.public.improvement_market = improvement_market;
         next.delayed_well = delayed_well;
         next.event_budget = event_budget;
-        next.card_uses = card_uses;
+        next.public.card_uses = card_uses;
         next.pending = pending; // Should remain None
 
         // Feeding/breeding plans from the original action (or generated now)
@@ -1728,7 +2005,7 @@ impl Game {
                 value
             } else {
                 let mut preview = next.clone();
-                preview.harvest_fields();
+                preview.harvest_fields()?;
                 (0..preview.public.players.len())
                     .map(|id| policy.plan_feeding(&preview.observation(id).expect("valid player")))
                     .collect::<Vec<_>>()
@@ -1745,7 +2022,7 @@ impl Game {
         };
         let breeding_plans = if will_harvest {
             let mut preview = next.clone();
-            preview.harvest_fields();
+            preview.harvest_fields()?;
             preview.feed_after_fields(harvest_plans.as_deref().expect("feeding plans"))?;
             let plans = if let Some(value) = completion.breeding_plans {
                 value
@@ -1765,13 +2042,83 @@ impl Game {
             None
         };
         next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
-        crate::validation::validate_incremental_or_full(&next, self)?;
+        // Round 2 P0-2: the integrity gate runs on EVERY resume segment — no
+        // skips. The delta expectations depend on the segment: the first
+        // segment applies the space/worker bookkeeping (one worker, one used
+        // space); a second segment resumes an already-applied action (no
+        // worker/space delta). Every other mid-round law is unchanged for both
+        // segments (validation.rs).
+        if resume.space_applied {
+            crate::validation::validate_incremental_resume_completion_or_full(&next, self)?;
+        } else {
+            crate::validation::validate_incremental_or_full(&next, self)?;
+        }
         // The `work` event for this paused action is recorded by
         // `resolve_pending_and_resume` (with the paused hash as `after`), not
         // here: only that frame still holds the paused hash and it must be
         // logged before the `pending_resolution` event to keep the chain valid.
         *self = next;
         Ok(Transition::Completed)
+    }
+
+    /// Commit a second pause during `resume_post_work` (Round 2 P0-1/P2):
+    /// freeze the partially-resumed state, build the continuation carrying
+    /// the explicit `space_applied: true` resume state (the action's
+    /// space/worker bookkeeping was applied by the first segment of this
+    /// same logical move), stamp the decision, store it on `self`, and return
+    /// `Transition::Paused`. The chain position comes from the pause context;
+    /// a missing position is a hard error rather than a silent restart from
+    /// the chain head (which would re-apply effects).
+    fn commit_second_pause(
+        &mut self,
+        mut next: Game,
+        p: &crate::pending::PendingDecision,
+        player: usize,
+        step: crate::pending::ChainStep,
+        completion: &crate::pending::WorkCompletion,
+    ) -> Result<Transition, String> {
+        let after_pos = p
+            .context
+            .get("card_index")
+            .and_then(|v| v.as_u64())
+            .zip(p.context.get("effect_index").and_then(|v| v.as_u64()))
+            .map(|(ci, ei)| crate::pending::ChainPosition {
+                card_index: ci as usize,
+                effect_index: ei as usize,
+            })
+            .ok_or_else(|| "second pause without chain position in context".to_string())?;
+        let phase = p
+            .context
+            .get("phase")
+            .and_then(|v| v.as_str())
+            .map(|s| match s {
+                "After" => crate::card_events::TriggerPhase::After,
+                _ => crate::card_events::TriggerPhase::Interrupt,
+            })
+            .unwrap_or(crate::card_events::TriggerPhase::Interrupt);
+        let logged_before = next.state_hash();
+        let new_resume = crate::pending::PostWorkResume {
+            step,
+            phase,
+            after: after_pos,
+            space_applied: true,
+        };
+        let continuation = crate::pending::Continuation::PostWork {
+            player,
+            resume: new_resume,
+            completion: Box::new(completion.clone()),
+        };
+        let new_pending = crate::pending::PendingDecision {
+            id: p.id,
+            player,
+            kind: p.kind.clone(),
+            state_hash_before: logged_before,
+            context: p.context.clone(),
+            continuation,
+        };
+        next.pending = Some(new_pending.clone());
+        *self = next;
+        Ok(Transition::Paused(Box::new(new_pending)))
     }
 
     /// Internal: apply a validated pending resolution to the game state.
@@ -1884,7 +2231,7 @@ impl Game {
                     round: self.public.round,
                     used_spaces: &self.public.used,
                     event_budget: &mut self.event_budget,
-                    card_uses: &mut self.card_uses,
+                    card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,
                     pending: &mut self.pending,
                     actor: pending.player,
@@ -1902,19 +2249,6 @@ impl Game {
                     chosen_order,
                     &triggerable,
                 )?;
-
-                if self.record_events {
-                    self.log.events.push(crate::model::Event {
-                        player: Some(pending.player),
-                        kind: "pending_resolution".into(),
-                        payload: serde_json::json!({
-                            "phase": format!("{:?}", phase),
-                            "chosen_order": chosen_order,
-                        }),
-                        before: pending.state_hash_before.clone(),
-                        after: self.state_hash(),
-                    });
-                }
                 Ok(())
             }
             (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => {

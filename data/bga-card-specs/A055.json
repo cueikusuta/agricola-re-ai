@@ -28,6 +28,12 @@
         "language": "en",
         "checked_on": "2026-11-09",
         "note": "English list page row used to cross-check the card id and name"
+      },
+      {
+        "url": "https://www.reedstonefood.com/agricola/compendium",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "ReedStoneFood Compendium (secondary source); confirms cost '1W 1C' (both wood and clay required) and effect '1 food per improvement played'"
       }
     ]
   },
@@ -73,8 +79,14 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "partial",
+    "unresolved_fields": [
+      "bga.eligibility",
+      "play.cost",
+      "play.prerequisites",
+      "play.printed_points",
+      "effects.0.engine_mapping"
+    ],
     "test_case_ids": [
       "A055-normal",
       "A055-other-improvement",
@@ -83,6 +95,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Each improvement built, including this card, gives 1 food."
+    "notes": "Cost and effect from secondary sources (BGA Wiki, ReedStoneFood Compendium) only. Official printed card confirmation needed for cost '1W 1C' (both required vs. choice), effect scope, and printed points. Issue #91 discusses payment resources and improved effect scope; not officially resolved. Cannot enter distribution pool until player eligibility confirmed (fail-closed)."
   }
 }

@@ -98,15 +98,17 @@
     "destination": "left_neighbor_hand"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "partial",
+    "unresolved_fields": [
+      "count[improvement] の語義が spec notes「1 clay per major improvement owned」と実装（improvement_count_in_front = プレイ済み小進歩カード + 所有大進歩、A117 木材調達人 先行）で不一致。語義確定まで実装は improvement_count_in_front に固定（AGENTS §3・人間決定待ち、Issue #349）"
+    ],
     "test_case_ids": [
       "C005-normal",
       "C005-zero"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "tested",
     "notes": "Gain 1 clay per clay room and 1 clay per major improvement owned; pass left."
   }
 }

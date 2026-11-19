@@ -4,7 +4,7 @@
   "identity": {
     "kind": "occupation",
     "name_ja": "葦売り",
-    "name_en": "Reed Seller"
+    "name_en": "Reed Gourd Merchant"
   },
   "bga": {
     "listed": "no",
@@ -21,13 +21,13 @@
         "url": "https://agricola.cloudfree.jp/unimplemented/",
         "language": "ja",
         "checked_on": "2026-11-14",
-        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect; card not implemented on BGA"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
         "checked_on": "2026-11-14",
-        "note": "English list page row used to cross-check the card id and name"
+        "note": "English list page row used to cross-check the card id and name; D159 not found in cardlist_en as of 2026-11-14"
       }
     ]
   },
@@ -55,6 +55,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-14",
     "implementation_status": "not_started",
-    "notes": "Unimplemented card per wiki. Reed -> 3 food exchange, blockable by other players paying 2 food. BGA listed=no, playable=no, eligibility 2=no, 3=no, 4=yes, ban_status=none per ledger. Printed points unknown per ledger."
+    "notes": "Unimplemented card per wiki. Reed -> 3 food exchange, blockable by other players paying 2 food. BGA listed=no, playable=no, eligibility 2=no, 3=no, 4=yes per ledger. Printed points unknown per ledger. NamuWiki source for name/effect not accessible (Cloudflare challenge). English name 'Reed Gourd Merchant' from secondary sources only; official printed card confirmation needed."
   }
 }

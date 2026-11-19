@@ -20,14 +20,14 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3038",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-09",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
-        "note": "English list page row used to cross-check the card id, name and effect text"
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
       }
     ]
   },
@@ -40,8 +40,7 @@
       }
     ],
     "prerequisites": [],
-    "printed_points": 1,
-    "alternative_cost_notes": null
+    "printed_points": 1
   },
   "effects": [
     {
@@ -54,7 +53,7 @@
           }
         },
         {
-          "predicate": "any_player",
+          "predicate": "other_player_only",
           "params": {}
         }
       ],
@@ -67,7 +66,10 @@
             "space": "fishing",
             "payment_good": "food",
             "payment_amount": 1,
-            "taxed_players": "all_other_players"
+            "taxed_players": "all_other_players",
+            "refill_good": "food",
+            "refill_amount": 2,
+            "refill_phase": "returning_home"
           }
         }
       ],
@@ -77,7 +79,7 @@
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Other players must pay the owner 1 food before using Fishing; if paid, 2 food goes onto Fishing in that round's returning-home phase (refill modeled within the same trigger; see unresolved)."
+      "notes": "Other players must pay owner 1 food before using Fishing; if paid, 2 food goes onto Fishing in that round's returning-home phase (refill modeled within the same trigger; see unresolved)."
     }
   ],
   "post_play": {
@@ -86,8 +88,8 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects.0.tax: the wiki requires other players to pay the owner 1 food before using the Fishing accumulation space; no established step vocabulary expresses a tax another player must pay to the owner",
-      "effects.0.refill: the wiki places 2 food on Fishing in that round's returning-home phase conditioned on the tax having been paid; the returning-home-phase placement shares no established trigger with the after_worker_space tax"
+      "effects[0].steps[0].params.kind: 'tax_space_use' operation kind not in vocabulary",
+      "effects[0].notes: returning-home-phase refill (帰宅フェイズ補充) not expressible in established trigger vocabulary"
     ],
     "test_case_ids": [
       "C051-normal",
@@ -96,8 +98,8 @@
       "C051-timing-pending"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Other players must pay you 1 food before using the Fishing accumulation space; when paid, place 2 food on Fishing in that round's returning-home phase."
+    "notes": "Cost: 1 reed. Printed points: 1. Effect: Other players must pay owner 1 food before using Fishing accumulation space; if paid, 2 food is placed on Fishing in that round's returning-home phase. Multiplayer tax mechanic (tax_space_use) and returning-home-phase refill not in established vocabulary; modeled with after_worker_space trigger (wiki_literature). Verified via BGA Wiki. Source: https://agricola.cloudfree.jp/?p=3038 (ja, 2026-11-16). 条件なし。コスト：1葦。勝利点：1。効果：他のプレイヤーは累積スペース「漁」を使用するたび、その前にあなたに食料1を支払わなければならない。支払った場合、そのラウンドの帰宅フェイズに漁に食料2が置かれる。プレイエリアに残る。"
   }
 }
