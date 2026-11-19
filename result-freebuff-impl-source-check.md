@@ -70,3 +70,14 @@
 - 日本語ページと英語一覧の効果文は75枚すべて実質一致。差はA099の誤植とC111の時制表現のみ。
 - カード固有の公式FAQは未確認。範囲の裁定はページ内コメント（等級D）に依存する点を限界として明記。
 - 機械照合: 帯表75行・一意75・欠落0・重複0。判定合計 一致47 / 食い違い7 / 欠落・表現不足20 / 未確定1。
+
+## PR とゲート
+
+- PR: #387（base `main`、head `research/freebuff-impl-source-check`）。**マージしない。**
+- HEAD `652a003` の Actions:
+  - Detect changed files: pass / CI required: pass
+  - Pipeline gates (spec/catalog/blockers): pass
+  - cargo test / clippy / rustfmt / M1・M2・M7 seeded performance: skipped（docs のみの変更）
+  - https://github.com/cueikusuta/agricola-re-ai/actions/runs/44563779469
+  - https://github.com/cueikusuta/agricola-re-ai/actions/runs/44563779476
+- 独立レビューは未実施。カード効果の解釈に関わるため AGENTS.md §14 の対象。別セッションでの初回レビューが必要。
