@@ -502,14 +502,6 @@ fn card_good_value(good: Good) -> i64 {
     }
 }
 
-fn card_animal_value(animal: Animal) -> i64 {
-    match animal {
-        Animal::Cattle => 5, // Cattle are most valuable (can breed, worth 1 VP each)
-        Animal::Sheep => 4,  // Sheep breed fast
-        Animal::Boar => 3,   // Boar don't breed but worth 1 VP
-    }
-}
-
 /// Score the card's actual immediate resource/point change after payments,
 /// then add a bounded forecast for explicitly recurring or passive effects.
 /// This avoids treating conditional on-play rewards as unconditional.
@@ -540,12 +532,18 @@ fn card_priority(
     let horizon = i64::from(15u8.saturating_sub(round)).min(5);
     for effect in &card.effects {
         value += match effect {
-                // Exact gains and discounted costs were simulated above.
-                CardEffect::OnPlayGain { .. }
-                | CardEffect::OnPlayGainPerStored { .. }
-                | CardEffect::OnPlayGainIfHouse { .. }
-                | CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | CardEffect::Prerequisite { .. } => 0,
+                        // Exact gains and discounted costs were simulated above.
+                        CardEffect::OnPlayGain { .. }
+                        | CardEffect::OnPlayGainPerStored { .. }
+                        | CardEffect::OnPlayGainIfHouse { .. }
+                        | CardEffect::OnPlayGainPerImprovementPlayed { .. }
+                        | CardEffect::Prerequisite { .. }
+                        // A001–A007 on-play simple effects: immediate gains/actions evaluated at play time
+                        | CardEffect::OnPlayBuildStableInPasture { .. }
+                        | CardEffect::OnPlayPlowField { .. }
+                        | CardEffect::OnPlayPickAndPlayOccupation { .. }
+                        | CardEffect::OnPlayGainPerMatchingImprovement { .. }
+                        | CardEffect::OnPlayGainPerFieldType { .. } => 0,
                 #[cfg(test)]
                 // Test-only probe; never part of a real evaluated pool.
                 CardEffect::PendingProbe { .. } => 0,
@@ -592,22 +590,8 @@ fn card_priority(
                 }
                 CardEffect::Passive { .. } => horizon * 5,
                 CardEffect::EndGameBonus { .. } => 12,
-                CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
-                                // New variants for market followup cards
-                                CardEffect::AfterAnyWorkerGain { good, amount, .. }
-                                | CardEffect::AfterAnyWorkerOthersGain { good, amount, .. } => {
-                                    // Fires on any player's use of the space; approximate with per-round expectation
-                                    card_good_value(*good) * i64::from(*amount) * horizon / 4
-                                }
-                                CardEffect::HarvestStartGainIfFields { good, amount, .. } => {
-                                                                    // Conditional on field count; optimistic half-weight
-                                                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
-                                                                }
-                                                                CardEffect::OnPlayGainAnimal { animal, amount, .. }
-                                                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
-                                                                    card_animal_value(*animal) * i64::from(*amount) * horizon
-                                                                }
-                                                            };
+                CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon
+            };
     }
     Some(value)
 }
@@ -957,7 +941,7 @@ pub fn resolve_decision(
 #[cfg(test)]
 mod card_choice_tests {
     use super::*;
-    use crate::cards::{CardDefinition, CardEffect, CardKind};
+    use crate::cards::{CardDefinition, CardEffect, CardKind, PostPlayDestination};
 
     #[test]
     fn card_choice_uses_best_affordable_known_card_not_first() {
@@ -974,6 +958,7 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: food,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
             });
             obs.hand.push(id.into());
         }
@@ -1010,6 +995,7 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: 5,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
             },
             CardDefinition {
                 use_limit: None,
@@ -1023,6 +1009,7 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: 5,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
             },
             CardDefinition {
                 use_limit: None,
@@ -1034,6 +1021,7 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: 1,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
             },
         ];
         obs.hand = vec!["bait".into(), "house_bait".into(), "sure_food".into()];
@@ -1082,7 +1070,7 @@ mod card_choice_tests {
             decision.detail,
             Detail::Build {
                 rooms: vec![],
-                stables: vec![14],
+                stables: vec![14]
             }
         );
     }

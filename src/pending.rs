@@ -311,6 +311,7 @@ pub trait PendingExt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cards::PostPlayDestination;
     use crate::model::{Config, Game, Good};
 
     #[test]
@@ -717,6 +718,7 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
             }],
         };
         let mut players = vec![crate::model::Player::new(0, 0)];
@@ -892,7 +894,7 @@ mod tests {
     /// CommittedAction, not just by a direct dispatcher call.
     #[test]
     fn a_real_card_use_limit_is_enforced_through_the_engine() {
-        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet, PostPlayDestination};
         // Occupation whose effects fire on every worker placement, limited to
         // one resolution per round.
         let card = |id: &str| CardDefinition {
@@ -906,6 +908,7 @@ mod tests {
                 amount: 1,
             }],
             use_limit: Some(1),
+            post_play: PostPlayDestination::PlayedArea,
         };
         let set = CardSet {
             definitions: vec![card("LIMITED"), card("USER")],
@@ -955,7 +958,7 @@ mod tests {
     /// data and do not change existing card behaviour.
     #[test]
     fn cards_without_a_declared_limit_are_unlimited() {
-        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet, PostPlayDestination};
         let set = CardSet {
             definitions: vec![CardDefinition {
                 id: "FREE".into(),
@@ -968,6 +971,7 @@ mod tests {
                     amount: 1,
                 }],
                 use_limit: None,
+                post_play: PostPlayDestination::PlayedArea,
             }],
         };
         let mut game = Game::new(Config {
@@ -1010,7 +1014,7 @@ mod tests {
     /// save/restore, and verifies the replay produces identical state.
     #[test]
     fn e2e_real_card_event_pause_save_restore_resolve_resume_replay() {
-        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet, PostPlayDestination};
         use crate::engine::Action;
         use crate::model::Space;
 
@@ -1027,6 +1031,7 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2), (Good::Wood, 1)],
             }],
+            post_play: PostPlayDestination::PlayedArea,
         });
         // Add 13 more occupations to reach 14 total
         for i in 1..=13 {
@@ -1037,6 +1042,7 @@ mod tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: PostPlayDestination::PlayedArea,
             });
         }
         // Add 14 minor improvements
@@ -1048,6 +1054,7 @@ mod tests {
                 cost: vec![],
                 points: 1,
                 effects: vec![],
+                post_play: PostPlayDestination::PlayedArea,
             });
         }
         let set = CardSet { definitions };
@@ -1262,7 +1269,7 @@ mod tests {
     /// an opaque "illegal space" refusal.
     #[test]
     fn apply_rejects_a_card_interrupt_without_changing_state() {
-        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet, PostPlayDestination};
         use crate::engine::Action;
         use crate::model::Space;
 
@@ -1275,6 +1282,7 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2)],
             }],
+            post_play: PostPlayDestination::PlayedArea,
         };
         let set = CardSet {
             definitions: vec![probe],

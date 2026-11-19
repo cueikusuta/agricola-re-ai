@@ -903,7 +903,7 @@ mod projection_tests {
 
     #[test]
     fn projecting_a_known_occupation_uses_only_own_hand() {
-        use crate::cards::{CardDefinition, CardEffect, CardKind};
+        use crate::cards::{CardDefinition, CardEffect, CardKind, PostPlayDestination};
 
         let mut obs = observed(|_| {});
         obs.card_definitions.push(CardDefinition {
@@ -916,6 +916,7 @@ mod projection_tests {
                 good: Good::Wood,
                 amount: 2,
             }],
+            post_play: PostPlayDestination::PlayedArea,
         });
         obs.hand.push("sample_occ".into());
         let original = &obs.public.players[obs.player_id];
@@ -937,8 +938,8 @@ mod projection_tests {
             &Action {
                 space: Space::Lessons,
                 detail: Detail::PlayOccupation {
-                    card_id: "unknown".into(),
-                },
+                    card_id: "unknown".into()
+                }
             },
         )
         .is_none());
@@ -973,7 +974,9 @@ mod projection_tests {
 
     #[test]
     fn card_end_game_bonus_affects_occupation_action_value() {
-        use crate::cards::{CardDefinition, CardEffect, CardKind, ScoreBonusRule};
+        use crate::cards::{
+            CardDefinition, CardEffect, CardKind, PostPlayDestination, ScoreBonusRule,
+        };
         let mut obs = observed(|_| {});
         obs.card_definitions.push(CardDefinition {
             use_limit: None,
@@ -984,6 +987,7 @@ mod projection_tests {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::HouseMaterial,
             }],
+            post_play: PostPlayDestination::PlayedArea,
         });
         obs.hand.push("bonus".into());
         let value = action_value_with_details(&obs, Space::Lessons, &SimpleDetails).unwrap();
@@ -993,7 +997,7 @@ mod projection_tests {
 
     #[test]
     fn projection_matches_conditional_worker_card_trigger_timing() {
-        use crate::cards::{CardDefinition, CardEffect, CardKind};
+        use crate::cards::{CardDefinition, CardEffect, CardKind, PostPlayDestination};
         let mut obs = observed(|p| p.played_cards.push("conditional".into()));
         obs.card_definitions.push(CardDefinition {
             use_limit: None,
@@ -1007,6 +1011,7 @@ mod projection_tests {
                 good: Good::Food,
                 amount: 2,
             }],
+            post_play: PostPlayDestination::PlayedArea,
         });
         let action = Action {
             space: Space::GrainSeeds,

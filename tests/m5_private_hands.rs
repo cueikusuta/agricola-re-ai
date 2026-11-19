@@ -1,4 +1,4 @@
-use agricola_re_ai::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+use agricola_re_ai::cards::{CardDefinition, CardEffect, CardKind, CardSet, PostPlayDestination};
 use agricola_re_ai::model::{Config, Game, Good, Space};
 
 fn sample_set(players: usize) -> CardSet {
@@ -15,6 +15,7 @@ fn sample_set(players: usize) -> CardSet {
                 good: Good::Food,
                 amount: 1,
             }],
+            post_play: PostPlayDestination::default(),
         });
         definitions.push(CardDefinition {
             use_limit: None,
@@ -26,6 +27,7 @@ fn sample_set(players: usize) -> CardSet {
                 good: Good::Wood,
                 amount: 1,
             }],
+            post_play: PostPlayDestination::default(),
         });
     }
     CardSet { definitions }

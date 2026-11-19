@@ -1,5 +1,7 @@
 //! Regression carried forward from the earlier endgame-score implementation.
-use agricola_re_ai::cards::{CardDefinition, CardEffect, CardKind, CardSet, ScoreBonusRule};
+use agricola_re_ai::cards::{
+    CardDefinition, CardEffect, CardKind, CardSet, PostPlayDestination, ScoreBonusRule,
+};
 use agricola_re_ai::engine::{Action, Detail};
 use agricola_re_ai::evaluation::EvaluationPolicy;
 use agricola_re_ai::model::{Config, Game, Space};
@@ -16,6 +18,7 @@ fn test_cards() -> CardSet {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: PostPlayDestination::default(),
         });
         definitions.push(CardDefinition {
             use_limit: None,
@@ -26,6 +29,7 @@ fn test_cards() -> CardSet {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::HouseMaterial,
             }],
+            post_play: PostPlayDestination::default(),
         });
     }
     CardSet { definitions }
