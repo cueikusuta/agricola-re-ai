@@ -197,6 +197,11 @@ pub enum RecordedAction {
         player: usize,
         decision_id: u64,
         resolution: crate::pending::PendingResolution,
+        /// Whether this resolution came from `resolve_pending_and_resume` (true)
+        /// or `resolve_pending` (false). This distinguishes the two APIs for
+        /// replay integrity (P1-1 fix).
+        #[serde(default)]
+        from_resume: bool,
     },
 }
 
@@ -891,6 +896,9 @@ impl Game {
             Transition::Paused(mut pending) => {
                 // P0-1: Commit the mid-action state (worker action + partial card effects applied)
                 // so resume does not lose mid-action modifications.
+                // P1-3 FIX: Capture previous_player BEFORE committing state, so ClayConstruction
+                // trigger sees the pre-action player state (without the new improvement).
+                let previous_player = self.public.players[player].clone();
                 *self = next;
                 // Stamp the decision with engine-level metadata (Issue #268):
                 // - decision ID
@@ -947,7 +955,7 @@ impl Game {
                 };
                 let completion = Box::new(crate::pending::WorkCompletion {
                     action: action.clone(),
-                    previous_player: self.public.players[player].clone(),
+                    previous_player,
                     harvest_plans: forced.clone(),
                     breeding_plans: forced_breeding.clone(),
                     logged_before: if record {
@@ -1289,6 +1297,7 @@ impl Game {
                 player,
                 decision_id,
                 resolution,
+                ..
             } => {
                 if event.kind != "pending_resolution" || event.player != Some(player) {
                     return Err("replay pending_resolution metadata/player mismatch".into());
@@ -4655,4 +4664,9 @@ mod audit_p2_1_exhaustive_tests {
             );
         }
     }
+}
+
+#[cfg(test)]
+mod p1_tests {
+    include!("p1_tests.rs");
 }
