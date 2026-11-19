@@ -297,6 +297,7 @@ pub trait PendingExt {
 mod tests {
     use super::*;
     use crate::model::{Config, Game, Good};
+    use crate::cards::{CardDefinition, CardKind, CardSet, PostPlayDestination};
 
     #[test]
     fn pending_decision_serialize_roundtrip() {
@@ -683,28 +684,30 @@ mod tests {
     }
 
     /// Per-card use limits and the event budget are both enforced (Issue #266
-    /// acceptance: "use limits and unbounded-chain guards proven by tests").
-    #[test]
-    fn card_use_limit_and_event_budget_are_enforced() {
-        use crate::card_events::dispatch_start_round;
-        use crate::cards::CardSet;
-        // Build a two-card chain where the same card fires repeatedly.
-        let set = CardSet {
-            definitions: vec![crate::cards::CardDefinition {
-                use_limit: None,
-                id: "LOOP".into(),
-                kind: crate::cards::CardKind::Occupation,
-                cost: vec![],
-                points: 0,
-                effects: vec![crate::cards::CardEffect::StartRoundGain {
-                    good: Good::Food,
-                    amount: 1,
-                    house: None,
-                    rooms: None,
+        /// acceptance: "use limits and unbounded-chain guards proven by tests").
+        #[test]
+        fn card_use_limit_and_event_budget_are_enforced() {
+            use crate::card_events::dispatch_start_round;
+            use crate::cards::CardSet;
+            // Build a two-card chain where the same card fires repeatedly.
+            let set = CardSet {
+                definitions: vec![crate::cards::CardDefinition {
+                    use_limit: None,
+                    id: "LOOP".into(),
+                    kind: crate::cards::CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![crate::cards::CardEffect::StartRoundGain {
+                        good: Good::Food,
+                        amount: 1,
+                        house: None,
+                        rooms: None,
+                    }],
+                    post_play: PostPlayDestination::PlayedArea,
+                    ..Default::default()
                 }],
-            }],
-        };
-        let mut players = vec![crate::model::Player::new(0, 0)];
+            };
+            let mut players = vec![crate::model::Player::new(0, 0)];
         for _ in 0..5 {
             players[0].played_cards.push("LOOP".into());
         }
@@ -891,6 +894,8 @@ mod tests {
                 amount: 1,
             }],
             use_limit: Some(1),
+        post_play: PostPlayDestination::PlayedArea,
+        ..Default::default()
         };
         let set = CardSet {
             definitions: vec![card("LIMITED"), card("USER")],
@@ -953,6 +958,8 @@ mod tests {
                     amount: 1,
                 }],
                 use_limit: None,
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
             }],
         };
         let mut game = Game::new(Config {
@@ -1002,44 +1009,50 @@ mod tests {
         // Create a valid card set with 14 occupations and 14 minor improvements
         // (required by CardState::deal for 2 players: 7 cards of each kind per player).
         let mut definitions = Vec::new();
-        // The probe card that triggers a pending decision on worker completion (Occupation played via Lessons)
-        definitions.push(CardDefinition {
-            use_limit: None,
-            id: "CHOICE_CARD".into(),
-            kind: CardKind::Occupation,
-            cost: vec![],
-            points: 0,
-            effects: vec![CardEffect::PendingProbe {
-                options: vec![(Good::Food, 2), (Good::Wood, 1)],
-            }],
-        });
-        // Add 13 more occupations to reach 14 total
-        for i in 1..=13 {
-            definitions.push(CardDefinition {
-                use_limit: None,
-                id: format!("OCC_{i}"),
-                kind: CardKind::Occupation,
-                cost: vec![],
-                points: 0,
-                effects: vec![],
-            });
-        }
-        // Add 14 minor improvements
-        for i in 1..=14 {
-            definitions.push(CardDefinition {
-                use_limit: None,
-                id: format!("MINOR_{i}"),
-                kind: CardKind::MinorImprovement,
-                cost: vec![],
-                points: 1,
-                effects: vec![],
-            });
-        }
-        let set = CardSet { definitions };
+                // The probe card that triggers a pending decision on worker completion (Occupation played via Lessons)
+                definitions.push(CardDefinition {
+                    use_limit: None,
+                    id: "CHOICE_CARD".into(),
+                    kind: CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![CardEffect::PendingProbe {
+                        options: vec![(Good::Food, 2), (Good::Wood, 1)],
+                    }],
+                    post_play: PostPlayDestination::PlayedArea,
+                    ..Default::default()
+                });
+                // Add 13 more occupations to reach 14 total
+                for i in 1..=13 {
+                    definitions.push(CardDefinition {
+                        use_limit: None,
+                        id: format!("OCC_{i}"),
+                        kind: CardKind::Occupation,
+                        cost: vec![],
+                        points: 0,
+                        effects: vec![],
+                        post_play: PostPlayDestination::PlayedArea,
+                        ..Default::default()
+                    });
+                }
+                // Add 14 minor improvements
+                for i in 1..=14 {
+                    definitions.push(CardDefinition {
+                        use_limit: None,
+                        id: format!("MINOR_{i}"),
+                        kind: CardKind::MinorImprovement,
+                        cost: vec![],
+                        points: 1,
+                        effects: vec![],
+                        post_play: PostPlayDestination::PlayedArea,
+                        ..Default::default()
+                    });
+                }
+                let set = CardSet { definitions };
 
-        // Create a game with the custom card set and exact initial hands from the start
-        let active = 0; // We'll make player 0 the active player
-                        // Split 14 occupations and 14 minors between the two players (7 each)
+                // Create a game with the custom card set and exact initial hands from the start
+                let active = 0; // We'll make player 0 the active player
+                // Split 14 occupations and 14 minors between the two players (7 each)
         let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
         let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
         let mut hands = vec![
@@ -1260,6 +1273,8 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2)],
             }],
+        post_play: PostPlayDestination::PlayedArea,
+        ..Default::default()
         };
         let set = CardSet {
             definitions: vec![probe],

@@ -352,31 +352,35 @@ pub fn deal_initial_hands(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cards::{CardDefinition, CardKind, CardSet};
+    use crate::cards::{CardDefinition, CardKind, CardSet, PostPlayDestination};
     use crate::model::Player;
 
     fn test_setup() -> (CardSet, CardState, Vec<Player>) {
-        let set = CardSet {
-            definitions: vec![
-                CardDefinition {
-                    use_limit: None,
-                    id: "A001".into(),
-                    kind: CardKind::Occupation,
-                    cost: vec![],
-                    points: 0,
-                    effects: vec![],
-                },
-                CardDefinition {
-                    use_limit: None,
-                    id: "A002".into(),
-                    kind: CardKind::MinorImprovement,
-                    cost: vec![],
-                    points: 0,
-                    effects: vec![],
-                },
-            ],
-        };
-        let cards = CardState {
+            let set = CardSet {
+                definitions: vec![
+                    CardDefinition {
+                        use_limit: None,
+                        id: "A001".into(),
+                        kind: CardKind::Occupation,
+                        cost: vec![],
+                        points: 0,
+                        effects: vec![],
+                        post_play: PostPlayDestination::PlayedArea,
+                        ..Default::default()
+                    },
+                    CardDefinition {
+                        use_limit: None,
+                        id: "A002".into(),
+                        kind: CardKind::MinorImprovement,
+                        cost: vec![],
+                        points: 0,
+                        effects: vec![],
+                        post_play: PostPlayDestination::PlayedArea,
+                        ..Default::default()
+                    },
+                ],
+            };
+            let cards = CardState {
             hands: vec![vec!["A001".into()], vec!["A002".into()]],
             undealt: vec![],
         };
@@ -414,21 +418,23 @@ mod tests {
     }
 
     #[test]
-    fn validate_card_partition_detects_missing() {
-        let (mut set, cards, players) = test_setup();
-        set.definitions.push(CardDefinition {
-            use_limit: None,
-            id: "A003".into(),
-            kind: CardKind::Occupation,
-            cost: vec![],
-            points: 0,
-            effects: vec![],
-        });
-        let err = validate_card_partition(&set, &cards, &players).unwrap_err();
-        assert!(err.contains("missing"));
-    }
+        fn validate_card_partition_detects_missing() {
+            let (mut set, cards, players) = test_setup();
+            set.definitions.push(CardDefinition {
+                use_limit: None,
+                id: "A003".into(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
+            });
+            let err = validate_card_partition(&set, &cards, &players).unwrap_err();
+            assert!(err.contains("missing"));
+        }
 
-    #[test]
+        #[test]
     fn validate_card_partition_detects_duplicate() {
         let (set, mut cards, players) = test_setup();
         cards.undealt.push("A001".into()); // duplicate
@@ -447,6 +453,8 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
                 },
                 CardDefinition {
                     use_limit: None,
@@ -455,6 +463,8 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
                 },
             ],
         };
@@ -646,6 +656,8 @@ mod tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
             }],
         };
         let mut cards = CardState {

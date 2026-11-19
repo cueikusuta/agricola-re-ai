@@ -10,7 +10,7 @@
 //! Each resolution site carries a comment citing the 2016 Lookout rulebook.
 //! Source: docs/bga-card-specification.md and existing repo citations.
 
-use crate::cards::{CardEffect, CardSet};
+use crate::cards::{CardEffect, CardSet, PostPlayDestination};
 use crate::model::{Animal, Crop, Good, House, Player, Space};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
 use crate::registry::EventKind;
@@ -51,6 +51,12 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::OnPlayGainIfHouse { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerCount { .. } => TriggerPhase::Before,
+        // A001–A007 on-play simple effects — Before phase
+        CardEffect::OnPlayBuildStableInPasture { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayPlowField { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayPickAndPlayOccupation { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayGainPerMatchingImprovement { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayGainPerFieldType { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -493,6 +499,27 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
+                CardEffect::OnPlayBuildStableInPasture { pasture_size } => {
+                    handle_on_play_build_stable_in_pasture(ctx, player, *pasture_size)?
+                }
+                CardEffect::OnPlayPlowField { amount } => {
+                    handle_on_play_plow_field(ctx, player, *amount)?
+                }
+                CardEffect::OnPlayPickAndPlayOccupation { sample_size } => {
+                    handle_on_play_pick_and_play_occupation(ctx, player, *sample_size)?
+                }
+                CardEffect::OnPlayGainPerMatchingImprovement { pairs } => {
+                    handle_on_play_gain_per_matching_improvement(ctx, player, pairs)?
+                }
+                CardEffect::OnPlayGainPerFieldType {
+                    grain_field_food,
+                    vegetable_field_grain,
+                } => handle_on_play_gain_per_field_type(
+                    ctx,
+                    player,
+                    *grain_field_food,
+                    *vegetable_field_grain,
+                )?,
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -716,6 +743,12 @@ fn effect_condition_holds(
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
+        // A001–A007 on-play simple effects — always trigger on CardPlayed
+        CardEffect::OnPlayBuildStableInPasture { .. } => true,
+        CardEffect::OnPlayPlowField { .. } => true,
+        CardEffect::OnPlayPickAndPlayOccupation { .. } => true,
+        CardEffect::OnPlayGainPerMatchingImprovement { .. } => true,
+        CardEffect::OnPlayGainPerFieldType { .. } => true,
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
@@ -833,6 +866,27 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
+            CardEffect::OnPlayBuildStableInPasture { pasture_size } => {
+                handle_on_play_build_stable_in_pasture(ctx, player, *pasture_size)?
+            }
+            CardEffect::OnPlayPlowField { amount } => {
+                handle_on_play_plow_field(ctx, player, *amount)?
+            }
+            CardEffect::OnPlayPickAndPlayOccupation { sample_size } => {
+                handle_on_play_pick_and_play_occupation(ctx, player, *sample_size)?
+            }
+            CardEffect::OnPlayGainPerMatchingImprovement { pairs } => {
+                handle_on_play_gain_per_matching_improvement(ctx, player, pairs)?
+            }
+            CardEffect::OnPlayGainPerFieldType {
+                grain_field_food,
+                vegetable_field_grain,
+            } => handle_on_play_gain_per_field_type(
+                ctx,
+                player,
+                *grain_field_food,
+                *vegetable_field_grain,
+            )?,
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1116,6 +1170,177 @@ fn handle_on_play_gain_per_count(
         .checked_add(bonus)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// A001 雨除け (Shelter): on play, build a free stable on a 1-cell pasture.
+/// The stable is placed on the single cell of a fenced pasture of size 1.
+fn handle_on_play_build_stable_in_pasture(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    pasture_size: u8,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    // Find a fenced pasture with exactly `pasture_size` cells that has at least one cell without a stable.
+    for pasture in &p.pastures {
+        if pasture.cells.len() == usize::from(pasture_size) {
+            for &cell_idx in &pasture.cells {
+                if !p.farm[cell_idx].stable && crate::engine::stable_site_available(p, cell_idx) {
+                    // Build free stable (no wood cost)
+                    p.farm[cell_idx].stable = true;
+                    return Ok(EffectResult::Resolved);
+                }
+            }
+        }
+    }
+    // No valid 1-cell pasture found; effect does nothing (optional effect)
+    Ok(EffectResult::Resolved)
+}
+
+/// A002 移動耕作 (Shifting Cultivation): on play, plow 1 field.
+/// The player chooses an empty farm cell to plow. For deterministic execution, pick the first valid cell.
+fn handle_on_play_plow_field(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    let mut plowed = 0u32;
+    for i in 0..crate::model::FARM_CELLS {
+        if plowed >= amount {
+            break;
+        }
+        if matches!(p.farm[i].tile, crate::model::Tile::Empty) && !p.farm[i].stable {
+            // Check adjacency to existing field if any fields exist
+            if p.fields() == 0
+                || crate::model::neighbors(i)
+                    .iter()
+                    .any(|&j| matches!(p.farm[j].tile, crate::model::Tile::Field { .. }))
+            {
+                p.farm[i].tile = crate::model::Tile::Field {
+                    crop: None,
+                    remaining: 0,
+                };
+                plowed += 1;
+            }
+        }
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// A003 ペーパーナイフ (Paper Knife): on play, pick 1 of up to 3 random
+/// occupations from hand and play it without paying its cost.
+fn handle_on_play_pick_and_play_occupation(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    sample_size: u32,
+) -> Result<EffectResult, String> {
+    let player_idx = ctx.actor;
+    let hand = &mut ctx.cards.hands[player_idx];
+    // Collect occupation cards from hand
+    let mut occupation_cards: Vec<String> = hand
+        .iter()
+        .filter(|id| {
+            ctx.card_set
+                .definition(id)
+                .is_some_and(|c| c.kind == crate::cards::CardKind::Occupation)
+        })
+        .cloned()
+        .collect();
+    if occupation_cards.is_empty() {
+        return Ok(EffectResult::Resolved);
+    }
+    // Deterministic selection: sort by card id for reproducibility, then take first sample_size
+    occupation_cards.sort();
+    let sample_len = (sample_size as usize).min(occupation_cards.len());
+    let candidates = &occupation_cards[..sample_len];
+    // Pick the first candidate (deterministic)
+    let chosen = &candidates[0];
+    // Remove from hand
+    if let Some(pos) = hand.iter().position(|x| x == chosen) {
+        hand.remove(pos);
+    }
+    // Play the chosen occupation for free (no cost payment)
+    // Use hand_to_played for proper zone move
+    crate::card_zones::hand_to_played(hand, ctx.player, chosen).map_err(|e| e.to_string())?;
+    // Apply its on-play effects (Replace/Before phases)
+    // Note: We need to dispatch the new card's effects. For simplicity, we use the existing
+    // apply_on_play_effects which applies Before-phase effects.
+    crate::cards::apply_on_play_effects(ctx.card_set, ctx.player, chosen)?;
+    // Update card points
+    if let Some(card) = ctx.card_set.definition(chosen) {
+        crate::cards::update_card_points_on_play(ctx.player, card.points)?;
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// A006 納屋 (Storage Barn): on play, for each owned improvement in the
+/// provided list, gain the matching good.
+fn handle_on_play_gain_per_matching_improvement(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    pairs: &[(crate::model::Improvement, crate::model::Good)],
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    for (improvement, good) in pairs {
+        if p.improvements.iter().any(|imp| imp == improvement) {
+            let next = p
+                .supply
+                .get(*good)
+                .checked_add(1)
+                .ok_or("resource overflow")?;
+            p.supply.set(*good, next);
+        }
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// A007 園芸用ナイフ (Gardener's Knife): on play, gain 1 food per grain field
+/// and 1 grain per vegetable field.
+fn handle_on_play_gain_per_field_type(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    grain_field_food: u32,
+    vegetable_field_grain: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    let mut grain_fields = 0u32;
+    let mut vegetable_fields = 0u32;
+    for cell in &p.farm {
+        match cell.tile {
+            crate::model::Tile::Field {
+                crop: Some(crate::model::Crop::Grain),
+                ..
+            } => grain_fields += 1,
+            crate::model::Tile::Field {
+                crop: Some(crate::model::Crop::Vegetable),
+                ..
+            } => vegetable_fields += 1,
+            _ => {}
+        }
+    }
+    if grain_fields > 0 && grain_field_food > 0 {
+        let bonus = grain_fields
+            .checked_mul(grain_field_food)
+            .ok_or("on-play bonus overflow")?;
+        let next = p
+            .supply
+            .get(crate::model::Good::Food)
+            .checked_add(bonus)
+            .ok_or("resource overflow")?;
+        p.supply.set(crate::model::Good::Food, next);
+    }
+    if vegetable_fields > 0 && vegetable_field_grain > 0 {
+        let bonus = vegetable_fields
+            .checked_mul(vegetable_field_grain)
+            .ok_or("on-play bonus overflow")?;
+        let next = p
+            .supply
+            .get(crate::model::Good::Grain)
+            .checked_add(bonus)
+            .ok_or("resource overflow")?;
+        p.supply.set(crate::model::Good::Grain, next);
+    }
     Ok(EffectResult::Resolved)
 }
 
@@ -1570,6 +1795,26 @@ pub fn dispatch_play(
                         p.supply.set(*good, next);
                     }
                 }
+            }
+        }
+    }
+
+    // Handle post-play movement (e.g., pass to left neighbor)
+    if let Some(card) = card_set.definition(new_card_id) {
+        if matches!(card.post_play, PostPlayDestination::LeftNeighborHand) {
+            let num_players = players.len();
+            if num_players >= 2 {
+                let left_neighbor = (player + 1) % num_players;
+                // Remove from played area
+                if let Some(pos) = players[player]
+                    .played_cards
+                    .iter()
+                    .position(|x| x == new_card_id)
+                {
+                    players[player].played_cards.remove(pos);
+                }
+                // Add to left neighbor's hand
+                cards.hands[left_neighbor].push(new_card_id.to_string());
             }
         }
     }
@@ -2312,6 +2557,8 @@ mod tests {
                         good: Good::Wood,
                         amount: 1,
                     }],
+                    post_play: PostPlayDestination::PlayedArea,
+                    ..Default::default()
                 },
                 CardDefinition {
                     use_limit: None,
@@ -2323,6 +2570,8 @@ mod tests {
                         good: Good::Food,
                         amount: 2,
                     }],
+                    post_play: PostPlayDestination::PlayedArea,
+                    ..Default::default()
                 },
             ],
         };
@@ -2381,6 +2630,8 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
             }],
         };
         let mut players = vec![Player::new(0, 0)];
@@ -2427,6 +2678,8 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
             }],
         };
         let mut players = vec![Player::new(0, 0)];
@@ -2474,6 +2727,8 @@ mod tests {
             cost: vec![],
             points: 0,
             effects,
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         };
         CardSet {
             definitions: vec![
@@ -2542,6 +2797,8 @@ mod tests {
                         good: Good::Grain,
                         amount: 2,
                     }],
+                    post_play: PostPlayDestination::PlayedArea,
+                    ..Default::default()
                 },
             ],
         }
@@ -3125,6 +3382,8 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2), (Good::Wood, 1)],
             }],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         };
         let set = CardSet {
             definitions: vec![probe("CHOICE_A")],
@@ -3189,6 +3448,8 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
             }],
         };
         // Two copies of the same card in play, limit 1 per period.
@@ -3238,6 +3499,8 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2), (Good::Wood, 1)],
             }],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         };
         let set = CardSet {
             definitions: vec![probe("CHOICE_CARD")],
@@ -3327,6 +3590,8 @@ mod tests {
                     good: Good::Food,
                     amount: 2,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
             }],
         };
 
@@ -3427,6 +3692,8 @@ mod tests {
                     good: Good::Wood,
                     amount: 3,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
             }],
         };
 
@@ -3523,6 +3790,8 @@ mod tests {
                     house: Some(House::Stone),
                     rooms: None,
                 }],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
             }],
         };
 
@@ -3620,6 +3889,8 @@ mod tests {
                         amount: 1,
                     },
                 ],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
             }],
         };
 
@@ -3804,6 +4075,8 @@ mod tests {
                     amount: 1,
                 },
             ],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         };
         let mut definitions = vec![card];
         for i in 1..=14 {
@@ -3814,6 +4087,8 @@ mod tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
             });
         }
         for i in 1..=13 {
@@ -3824,6 +4099,8 @@ mod tests {
                 cost: vec![],
                 points: 1,
                 effects: vec![],
+                post_play: PostPlayDestination::PlayedArea,
+                ..Default::default()
             });
         }
         let set = CardSet { definitions };
@@ -4145,6 +4422,8 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         };
         let filler_minor = |i: usize| CardDefinition {
             use_limit: None,
@@ -4153,6 +4432,8 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         };
         let mut set = crate::cards::verified_basic_card_set(2).expect("verified basic card set");
         set.definitions.push(CardDefinition {
@@ -4171,6 +4452,8 @@ mod tests {
                     amount: 1,
                 },
             ],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         });
         set.definitions.push(CardDefinition {
             use_limit: None,
@@ -4190,6 +4473,8 @@ mod tests {
                     amount: 1,
                 },
             ],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         });
         for i in 0..12 {
             set.definitions.push(filler_occ(i));
@@ -4581,6 +4866,8 @@ mod tests {
             cost: vec![(Good::Food, 2)],
             points: 0,
             effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         });
         let mut c = Ctx::new();
         // Zone move already applied by the caller: C116 first, new card last.
@@ -4669,6 +4956,8 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: PostPlayDestination::PlayedArea,
+                    ..Default::default()
                 });
                 defs
             },
@@ -4743,6 +5032,8 @@ mod tests {
             cost: vec![(Good::Wood, 1)],
             points: 0,
             effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         });
         let mut c = Ctx::new();
         c.players[0].played_cards = vec!["C068".into(), "minor_test".into()];
@@ -4789,6 +5080,8 @@ mod tests {
             cost: vec![(Good::Food, 2)],
             points: 0,
             effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
         });
         let mut c = Ctx::new();
         // Both C068 and C116 played, then an occupation
@@ -4883,6 +5176,8 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: PostPlayDestination::PlayedArea,
+                    ..Default::default()
                 });
                 defs
             },
@@ -5098,6 +5393,8 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: PostPlayDestination::PlayedArea,
+                    ..Default::default()
                 });
                 defs.push(CardDefinition {
                     use_limit: None,
@@ -5106,6 +5403,8 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: PostPlayDestination::PlayedArea,
+                    ..Default::default()
                 });
                 defs
             },

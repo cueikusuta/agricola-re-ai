@@ -1,6 +1,6 @@
 //! Loopback-only, single-user web UI. No external services or accounts.
 use crate::breeding::BreedingPlan;
-use crate::cards::{CardDefinition, CardSet};
+use crate::cards::{CardDefinition, CardSet, PostPlayDestination};
 use crate::draft::{
     CardKind, Direction, DraftCardInfo, DraftMode, DraftPhase, DraftPool, DraftRuleset, DraftSetup,
     DraftState,
@@ -801,6 +801,7 @@ fn fixture_card_set(pool: &DraftPool) -> CardSet {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play: PostPlayDestination::PlayedArea,
     };
     let mut definitions = Vec::new();
     for id in &pool.occupations {

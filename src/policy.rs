@@ -532,12 +532,18 @@ fn card_priority(
     let horizon = i64::from(15u8.saturating_sub(round)).min(5);
     for effect in &card.effects {
         value += match effect {
-                // Exact gains and discounted costs were simulated above.
-                CardEffect::OnPlayGain { .. }
-                | CardEffect::OnPlayGainPerStored { .. }
-                | CardEffect::OnPlayGainIfHouse { .. }
-                | CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | CardEffect::Prerequisite { .. } => 0,
+                        // Exact gains and discounted costs were simulated above.
+                        CardEffect::OnPlayGain { .. }
+                        | CardEffect::OnPlayGainPerStored { .. }
+                        | CardEffect::OnPlayGainIfHouse { .. }
+                        | CardEffect::OnPlayGainPerImprovementPlayed { .. }
+                        | CardEffect::Prerequisite { .. }
+                        // A001–A007 on-play simple effects: immediate gains/actions evaluated at play time
+                        | CardEffect::OnPlayBuildStableInPasture { .. }
+                        | CardEffect::OnPlayPlowField { .. }
+                        | CardEffect::OnPlayPickAndPlayOccupation { .. }
+                        | CardEffect::OnPlayGainPerMatchingImprovement { .. }
+                        | CardEffect::OnPlayGainPerFieldType { .. } => 0,
                 #[cfg(test)]
                 // Test-only probe; never part of a real evaluated pool.
                 CardEffect::PendingProbe { .. } => 0,
@@ -935,7 +941,7 @@ pub fn resolve_decision(
 #[cfg(test)]
 mod card_choice_tests {
     use super::*;
-    use crate::cards::{CardDefinition, CardEffect, CardKind};
+    use crate::cards::{CardDefinition, CardEffect, CardKind, PostPlayDestination};
 
     #[test]
     fn card_choice_uses_best_affordable_known_card_not_first() {
@@ -952,6 +958,8 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: food,
                 }],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
             });
             obs.hand.push(id.into());
         }
@@ -988,6 +996,8 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: 5,
                 }],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
             },
             CardDefinition {
                 use_limit: None,
@@ -1001,6 +1011,8 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: 5,
                 }],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
             },
             CardDefinition {
                 use_limit: None,
@@ -1012,6 +1024,8 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: 1,
                 }],
+            post_play: PostPlayDestination::PlayedArea,
+            ..Default::default()
             },
         ];
         obs.hand = vec!["bait".into(), "house_bait".into(), "sure_food".into()];

@@ -926,7 +926,7 @@ mod tests {
 
     #[test]
     fn sampler_keeps_own_hand_and_never_reads_real_opponent_hand() {
-        use crate::cards::{verified_basic_card_set, CardKind};
+        use crate::cards::{verified_basic_card_set, CardKind, PostPlayDestination};
         use rand::SeedableRng;
 
         let game = Game::with_cards(
@@ -1563,6 +1563,8 @@ mod tests {
                 amount: 1,
             }],
             use_limit: Some(1),
+        post_play: PostPlayDestination::PlayedArea,
+        ..Default::default()
         });
         let card_set = CardSet { definitions };
 
