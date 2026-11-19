@@ -70,6 +70,8 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
         CardEffect::AfterHarvestGain { .. } => TriggerPhase::After,
         CardEffect::AfterHarvestGainIfAtLeast { .. } => TriggerPhase::After,
+        // C066: conditional choice at the harvest tail — After phase
+        CardEffect::AfterHarvestChooseGainIfAtLeast { .. } => TriggerPhase::After,
         // A118 optional exchange — Interrupt phase (requires player decision)
         CardEffect::HarvestFieldOptionalExchange { .. } => TriggerPhase::Interrupt,
         // End game scoring — After phase
@@ -363,6 +365,7 @@ fn resolve_phase_scan(
             previous_player: trigger_data.previous_player.clone(),
             used_spaces: trigger_data.used_spaces.clone(),
             event_kind: trigger_data.event_kind,
+            c066_take_food_instead: trigger_data.c066_take_food_instead,
         };
 
         // Collect all players for snapshot
@@ -552,6 +555,26 @@ fn resolve_phase_scan(
                 } => handle_after_harvest_gain_if_at_least(
                     ctx, player, good, *threshold, gain, *amount,
                 )?,
+                CardEffect::AfterHarvestChooseGainIfAtLeast {
+                    good,
+                    threshold,
+                    gain,
+                    amount,
+                    upgrade_threshold,
+                    upgrade_gain,
+                    upgrade_amount,
+                } => handle_after_harvest_choose_gain_if_at_least(
+                    ctx,
+                    player,
+                    good,
+                    *threshold,
+                    gain,
+                    *amount,
+                    *upgrade_threshold,
+                    upgrade_gain,
+                    *upgrade_amount,
+                    trigger_data,
+                )?,
                 CardEffect::HarvestFieldOptionalExchange {
                     cost,
                     cost_amount,
@@ -673,6 +696,12 @@ pub struct PhaseTriggerData {
     /// The event kind that triggered this dispatch (for site-specific effects).
     #[serde(default)]
     pub event_kind: EventKind,
+    /// C066 永遠のライ麦畑 owner's instead-choice for this harvest: `true`
+    /// takes the 1 food at grain >= 3, `false` (default) takes the 1 grain.
+    /// Only read by the `AfterHarvestComplete` dispatch; harmless elsewhere.
+    /// PR #385 review finding (b).
+    #[serde(default)]
+    pub c066_take_food_instead: bool,
 }
 
 /// Check if an effect's trigger condition holds, without consuming budget or card uses.
@@ -732,9 +761,26 @@ fn effect_condition_holds(
             trigger.event_kind == EventKind::Bake && trigger.baked
         }
         CardEffect::HarvestFieldGain { .. } => trigger.event_kind == EventKind::Harvest,
-        CardEffect::AfterHarvestGain { .. } => trigger.event_kind == EventKind::Harvest,
-        CardEffect::AfterHarvestGainIfAtLeast { .. } => trigger.event_kind == EventKind::Harvest,
-        CardEffect::HarvestFieldOptionalExchange { .. } => trigger.event_kind == EventKind::Harvest,
+        // AfterHarvestGain/IfAtLeast are "at the end of each harvest" cards
+        // (A145/C066): they fire from dispatch_after_harvest_complete at the
+        // harvest tail, NOT from the field-phase trigger. On EventKind::Harvest
+        // (fired before the fields yield) they must stay dormant — that early
+        // firing was review finding (a) of PR #385.
+        CardEffect::AfterHarvestGain { .. } => {
+            trigger.event_kind == EventKind::AfterHarvestComplete
+        }
+        CardEffect::AfterHarvestGainIfAtLeast { .. } => {
+            trigger.event_kind == EventKind::AfterHarvestComplete
+        }
+        CardEffect::AfterHarvestChooseGainIfAtLeast { .. } => {
+            trigger.event_kind == EventKind::AfterHarvestComplete
+        }
+        // The A118 exchange is executed plan-driven by the engine's field
+        // phase (FeedingPlan::a118_wood_buys, capped at 2). The dispatcher
+        // scan stays dormant: a harvest-created PendingDecision has no
+        // resolution window (start_round rejects a carried pending), which
+        // bricked every A118-holder harvest — review finding (c) of PR #385.
+        CardEffect::HarvestFieldOptionalExchange { .. } => false,
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
@@ -915,6 +961,26 @@ pub fn execute_chosen_triggers(
             } => {
                 handle_after_harvest_gain_if_at_least(ctx, player, good, *threshold, gain, *amount)?
             }
+            CardEffect::AfterHarvestChooseGainIfAtLeast {
+                good,
+                threshold,
+                gain,
+                amount,
+                upgrade_threshold,
+                upgrade_gain,
+                upgrade_amount,
+            } => handle_after_harvest_choose_gain_if_at_least(
+                ctx,
+                player,
+                good,
+                *threshold,
+                gain,
+                *amount,
+                *upgrade_threshold,
+                upgrade_gain,
+                *upgrade_amount,
+                trigger_data,
+            )?,
             CardEffect::HarvestFieldOptionalExchange {
                 cost,
                 cost_amount,
@@ -1475,6 +1541,50 @@ fn handle_after_harvest_gain_if_at_least(
     Ok(EffectResult::Resolved)
 }
 
+/// C066 永遠のライ麦畑 (Eternal Rye Cultivation): conditional WITH-choice gain
+/// at the end of each harvest. Below `upgrade_threshold` the primary grant is
+/// unconditional; at or above it the owner chooses 「代わりに」 — take
+/// `upgrade_amount` of `upgrade_gain` (default) or, when the FeedingPlan set
+/// `c066_take_food_instead`, the primary `amount` of `gain` instead. The plan
+/// flag rides in `PhaseTriggerData` from `dispatch_after_harvest_complete`.
+/// PR #385 review finding (b): the previous twin unconditional effects
+/// granted both at grain >= 3.
+#[allow(clippy::too_many_arguments)] // mirrors the sibling after-harvest handlers' field threading
+fn handle_after_harvest_choose_gain_if_at_least(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    good: &Good,
+    threshold: u32,
+    gain: &Good,
+    amount: u32,
+    upgrade_threshold: u32,
+    upgrade_gain: &Good,
+    upgrade_amount: u32,
+    trigger_data: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    let owned = ctx.player.supply.get(*good);
+    if owned < threshold {
+        return Ok(EffectResult::Resolved);
+    }
+    let (target, granted) = if owned >= upgrade_threshold {
+        if trigger_data.c066_take_food_instead {
+            (*gain, amount)
+        } else {
+            (*upgrade_gain, upgrade_amount)
+        }
+    } else {
+        (*gain, amount)
+    };
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(target)
+        .checked_add(granted)
+        .ok_or("resource overflow")?;
+    p.supply.set(target, next);
+    Ok(EffectResult::Resolved)
+}
+
 /// A118 樹木庭師 (Treegardener): optional exchange during harvest field
 /// phase. If the owner has at least `cost_amount` of `cost`, they may pay
 /// it to gain `gain_amount` of `gain`. This creates a PendingDecision
@@ -1595,6 +1705,7 @@ pub fn dispatch_play(
         previous_player: None,
         used_spaces: std::collections::BTreeSet::new(),
         event_kind: EventKind::CardPlayed,
+        c066_take_food_instead: false,
     };
 
     // Phase 1: Replace (prerequisites) - ONLY for the new card
@@ -1736,6 +1847,7 @@ pub fn dispatch_after_worker(
         previous_player: None,
         used_spaces: used_spaces.clone(),
         event_kind: EventKind::WorkerPlaced,
+        c066_take_food_instead: false,
     };
 
     // AfterWorkerGain and AfterWorkerGainIfUsed are After phase. A pause here
@@ -1808,6 +1920,7 @@ pub fn dispatch_start_round(
             previous_player: None,
             used_spaces: used_spaces.clone(),
             event_kind: EventKind::RoundStart,
+            c066_take_food_instead: false,
         };
 
         resolve_phase(
@@ -1886,6 +1999,7 @@ pub fn dispatch_after_clay_construction(
         previous_player: Some(previous.clone()),
         used_spaces: used_spaces.clone(),
         event_kind: EventKind::ClayConstruction,
+        c066_take_food_instead: false,
     };
 
     // After phase first: a ChooseTriggerOrder pause (Issue #270) must reach
@@ -1958,6 +2072,7 @@ pub fn dispatch_harvest_field(
         previous_player: None,
         used_spaces: used_spaces.clone(),
         event_kind: EventKind::Harvest,
+        c066_take_food_instead: false,
     };
 
     resolve_phase(
@@ -1977,10 +2092,72 @@ pub fn dispatch_harvest_field(
         TriggerPhase::Interrupt,
         &trigger,
         &all_players,
-        false, // harvest-field: not post-work chain
+        false,
     )? {
         return Ok(Transition::Paused(p));
     }
+    Ok(Transition::Completed)
+}
+
+/// Dispatch the "end of each harvest" phase: fields, feeding and breeding are
+/// all resolved. This is the site for A145 綱作り 「各収穫の終わりに葦1を得る」
+/// and C066 永遠のライ麦畑 「各収穫の後に」. Only effects whose trigger maps to
+/// `EventKind::AfterHarvestComplete` fire here — the pre-field `Harvest`
+/// dispatch no longer carries them (PR #385 review finding (a)).
+/// `c066_take_food_instead` carries the owner's instead-choice for C066
+/// (review finding (b)); it only matters for players who own C066.
+#[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
+pub fn dispatch_after_harvest_complete(
+    card_set: &CardSet,
+    player: usize,
+    cards: &mut crate::cards::CardState,
+    players: &mut [Player],
+    improvement_market: &mut Vec<crate::model::Improvement>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    round: u8,
+    used_spaces: &std::collections::BTreeSet<Space>,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    pending: &mut Option<PendingDecision>,
+    c066_take_food_instead: bool,
+) -> Result<Transition, String> {
+    let all_players = players.to_vec();
+    let mut ctx = DispatchContext {
+        card_set,
+        player: &mut players[player],
+        cards,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+        actor: player,
+        card_owner: player,
+        beneficiary: player,
+    };
+
+    let trigger = PhaseTriggerData {
+        space: None,
+        improvement: None,
+        baked: false,
+        previous_player: None,
+        used_spaces: used_spaces.clone(),
+        event_kind: EventKind::AfterHarvestComplete,
+        c066_take_food_instead,
+    };
+
+    resolve_phase(
+        &mut ctx,
+        player,
+        TriggerPhase::After,
+        &trigger,
+        &all_players,
+        false, // harvest tail: not post-work chain
+    )?;
     Ok(Transition::Completed)
 }
 
@@ -2036,6 +2213,7 @@ pub fn dispatch_after_harvest_bake(
         previous_player: None,
         used_spaces: used_spaces.clone(),
         event_kind: EventKind::Bake,
+        c066_take_food_instead: false,
     };
 
     // After phase first: a ChooseTriggerOrder pause (Issue #270) must reach

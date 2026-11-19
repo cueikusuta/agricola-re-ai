@@ -154,10 +154,32 @@ pub enum CardEffect {
         gain: Good,
         amount: u32,
     },
+    /// C066 永遠のライ麦畑 (Eternal Rye Cultivation): at the end of each
+    /// harvest, if the owner has at least `threshold` of `good`, the owner
+    /// gains the printed bonus: below `upgrade_threshold` unconditionally
+    /// `amount` of `gain`; at or above it the owner CHOOSES `amount` of
+    /// `gain` OR `upgrade_amount` of `upgrade_gain`
+    /// （「3以上ある場合は代わりに小麦1を得る」）. The default (spec test
+    /// C066-three and `SimpleHarvestDetails`) takes the upgrade gain; the
+    /// `FeedingPlan` flag `c066_take_food_instead` opts back into the
+    /// primary gain. PR #385 review finding (b): the previous two
+    /// unconditional effects double-granted at grain>=3.
+    AfterHarvestChooseGainIfAtLeast {
+        good: Good,
+        threshold: u32,
+        gain: Good,
+        amount: u32,
+        upgrade_threshold: u32,
+        upgrade_gain: Good,
+        upgrade_amount: u32,
+    },
     /// A118 樹木庭師 (Treegardener): optional exchange during harvest field
     /// phase. If the owner pays `cost_amount` of `cost`, gain `gain_amount`
-    /// of `gain`. This uses a PendingDecision (Custom kind) so the player
-    /// chooses whether to execute the exchange each harvest.
+    /// of `gain`. Executed plan-driven (FeedingPlan::a118_wood_buys, capped
+    /// at 2 per harvest) by the engine's field phase; the dispatcher scan is
+    /// dormant for this variant — see effect_condition_holds. The definition
+    /// remains so the registry/draft catalog still describe the printed
+    /// exchange. PR #385 review finding (c).
     HarvestFieldOptionalExchange {
         cost: Good,
         cost_amount: u32,
@@ -204,6 +226,9 @@ impl CardEffect {
             CardEffect::OnPlayGainPerCount { .. } => "on_play_gain_per_count",
             CardEffect::AfterHarvestGain { .. } => "after_harvest_gain",
             CardEffect::AfterHarvestGainIfAtLeast { .. } => "after_harvest_gain_if_at_least",
+            CardEffect::AfterHarvestChooseGainIfAtLeast { .. } => {
+                "after_harvest_choose_gain_if_at_least"
+            }
             CardEffect::HarvestFieldOptionalExchange { .. } => "harvest_field_optional_exchange",
         }
     }
@@ -420,6 +445,11 @@ impl CardSet {
                         | CardEffect::OnPlayGainPerCount { amount, .. }
                         | CardEffect::AfterHarvestGain { amount, .. }
                         | CardEffect::AfterHarvestGainIfAtLeast { amount, .. } => *amount,
+                        CardEffect::AfterHarvestChooseGainIfAtLeast {
+                            amount,
+                            upgrade_amount,
+                            ..
+                        } => (*amount).max(*upgrade_amount),
                         CardEffect::HarvestFieldOptionalExchange { gain_amount, .. } => {
                             *gain_amount
                         }
@@ -2351,7 +2381,11 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             }],
         },
         // C066 永遠のライ麦畑 (Eternal Rye Cultivation): after each harvest,
-        // if grain >= 2 gain 1 food; if grain >= 3 gain 1 grain (optional).
+        // if grain >= 2 gain 1 food; at grain >= 3 the owner takes 1 grain
+        // INSTEAD of the food (default) or opts back into the food via the
+        // FeedingPlan flag. Single conditional-choice effect: the old twin
+        // unconditional effects double-granted at grain>=3 (PR #385 review
+        // finding (b)).
         CardDefinition {
             use_limit: None,
             id: "C066".into(),
@@ -2365,17 +2399,14 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                         number: 1,
                     },
                 },
-                CardEffect::AfterHarvestGainIfAtLeast {
+                CardEffect::AfterHarvestChooseGainIfAtLeast {
                     good: Good::Grain,
                     threshold: 2,
                     gain: Good::Food,
                     amount: 1,
-                },
-                CardEffect::AfterHarvestGainIfAtLeast {
-                    good: Good::Grain,
-                    threshold: 3,
-                    gain: Good::Grain,
-                    amount: 1,
+                    upgrade_threshold: 3,
+                    upgrade_gain: Good::Grain,
+                    upgrade_amount: 1,
                 },
             ],
         },
@@ -2718,7 +2749,13 @@ pub fn verified_basic_card_set(players: usize) -> Result<CardSet, String> {
             .filter(|c| !c.id.starts_with('E') && !c.id.starts_with('D')),
     );
     definitions.extend(verified_worker_bonus_cards(players));
-    definitions.extend(verified_round_and_harvest_cards());
+    // A145 綱作り is printed for 3+ players (spec eligibility "2": "no"), so
+    // keep it out of the built-in two-player pool. PR #385 review finding (e).
+    definitions.extend(
+        verified_round_and_harvest_cards()
+            .into_iter()
+            .filter(|c| c.id != "A145"),
+    );
     definitions.extend(verified_passive_cards());
     definitions.extend(verified_simple_occupations(players));
     definitions.extend(verified_extra_simple_cards());
@@ -2789,7 +2826,9 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 38);
+        // PR #385 review fix (e): A145 is 3+ players only (eligibility
+        // "2": "no"), so the preset is 37 = 17 occupations + 20 minors.
+        assert_eq!(set.definitions.len(), 37);
         assert_eq!(
             set.definitions
                 .iter()
@@ -2802,7 +2841,7 @@ mod simple_occupation_tests {
                 .iter()
                 .filter(|x| x.kind == CardKind::Occupation)
                 .count(),
-            18
+            17
         );
         assert!(verified_basic_card_set(3).is_err());
     }

@@ -47,12 +47,27 @@ fn full_games_apply_harvest_without_violating_invariants() {
 //                                  phase, before feeding/breeding complete
 
 fn harvest_fixture() -> Game {
+    harvest_fixture_with_extra(&[])
+}
+
+/// Same fixture, but with extra card definitions appended to the CardSet.
+/// Used by the A145 timing test: fix (e) removed A145 from the two-player
+/// PRESET (dealt pool), so exercising its dispatch mechanics here requires
+/// re-adding just the definition to the fixture's CardSet sandbox.
+fn harvest_fixture_with_extra(extra_ids: &[&str]) -> Game {
     let config = Config {
         players: 2,
         seed: 7,
         additional_action_space_enabled: false,
     };
-    let set = verified_basic_card_set(2).unwrap();
+    let mut set = verified_basic_card_set(2).unwrap();
+    for id in extra_ids {
+        let definition = agricola_re_ai::cards::verified_round_and_harvest_cards()
+            .into_iter()
+            .find(|c| c.id == *id)
+            .unwrap_or_else(|| panic!("fixture card {id} not in round_and_harvest pool"));
+        set.definitions.push(definition);
+    }
     let mut game = Game::with_cards(config, set).unwrap();
     while game.public.round < 4 {
         game.start_round().unwrap();
@@ -104,8 +119,7 @@ fn c066_two_grain_grants_food_after_feeding() {
     let p = &g.public.players[0];
     assert_eq!(p.supply.grain, 2, "two fields each yield 1 grain");
     assert_eq!(
-        p.supply.food,
-        9,
+        p.supply.food, 9,
         "C066 at >=2 grain must add 1 food after the 2-food feeding"
     );
     assert_eq!(p.begging, 0);
@@ -122,8 +136,7 @@ fn c066_three_grain_defaults_to_grain_instead_of_food() {
         .expect("C066 alone must not raise an unresolvable pending");
     let p = &g.public.players[0];
     assert_eq!(
-        p.supply.grain,
-        4,
+        p.supply.grain, 4,
         "C066 at >=3 grain grants 1 additional grain (spec default)"
     );
     assert_eq!(p.supply.food, 8, "no food bonus when the grain is taken");
@@ -143,7 +156,10 @@ fn a118_holder_completes_the_harvest_without_a_stranded_pending() {
         .expect("A118 must not strand an unresolvable pending in the harvest");
     assert!(!g.has_pending());
     let p = &g.public.players[0];
-    assert_eq!(p.supply.wood, 1, "fixed gain: 1 wood per harvest field phase");
+    assert_eq!(
+        p.supply.wood, 1,
+        "fixed gain: 1 wood per harvest field phase"
+    );
     assert_eq!(p.supply.food, 8);
 }
 
@@ -153,14 +169,13 @@ fn a118_holder_completes_the_harvest_without_a_stranded_pending() {
 /// GREEN: preview reed == 0 and the committed harvest carries reed == 1.
 #[test]
 fn a145_reed_waits_until_the_harvest_completes() {
-    let mut g = harvest_fixture();
+    let mut g = harvest_fixture_with_extra(&["A145"]);
     teleport_into_play(&mut g, &["A145"]);
     let preview = g
         .preview_harvest(&place_day_laborer(), None)
         .expect("preview runs the field phase only");
     assert_eq!(
-        preview.players[0].supply.reed,
-        0,
+        preview.players[0].supply.reed, 0,
         "the reed must not arrive during the field phase"
     );
     g.apply_with_harvest_policy(place_day_laborer(), &SimpleHarvestDetails)
@@ -178,4 +193,3 @@ fn a145_is_excluded_from_the_two_player_preset() {
         "A145 (eligibility 2=no) must not be in the 2-player preset"
     );
 }
-

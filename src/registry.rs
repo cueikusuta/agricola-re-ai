@@ -134,12 +134,17 @@ pub enum EventKind {
     CardPlayed,
     /// Round start
     RoundStart,
-    /// Harvest phase
+    /// Harvest phase (the field-phase trigger: fires BEFORE the fields yield
+    /// their crops; cards that watch the field state belong here)
     Harvest,
     /// Clay construction (room/stone upgrade)
     ClayConstruction,
     /// Baking
     Bake,
+    /// End of a whole harvest: fields + feeding + breeding all resolved.
+    /// Fires once per player at the harvest tail (A145 「各収穫の終わりに」,
+    /// C066 「各収穫の後に」). Added in the PR #385 review-fix round.
+    AfterHarvestComplete,
 }
 
 impl EventKind {
@@ -151,6 +156,7 @@ impl EventKind {
             EventKind::Harvest,
             EventKind::ClayConstruction,
             EventKind::Bake,
+            EventKind::AfterHarvestComplete,
         ]
     }
 }
@@ -296,8 +302,15 @@ impl CardRegistryBuilder {
                     EventKind::CardPlayed
                 }
                 crate::cards::CardEffect::HarvestFieldGain { .. } => EventKind::Harvest,
-                crate::cards::CardEffect::AfterHarvestGain { .. } => EventKind::Harvest,
-                crate::cards::CardEffect::AfterHarvestGainIfAtLeast { .. } => EventKind::Harvest,
+                crate::cards::CardEffect::AfterHarvestGain { .. } => {
+                    EventKind::AfterHarvestComplete
+                }
+                crate::cards::CardEffect::AfterHarvestGainIfAtLeast { .. } => {
+                    EventKind::AfterHarvestComplete
+                }
+                crate::cards::CardEffect::AfterHarvestChooseGainIfAtLeast { .. } => {
+                    EventKind::AfterHarvestComplete
+                }
                 crate::cards::CardEffect::HarvestFieldOptionalExchange { .. } => EventKind::Harvest,
                 crate::cards::CardEffect::AfterClayConstructionGain { .. } => {
                     EventKind::ClayConstruction
@@ -408,6 +421,11 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterHarvestGainIfAtLeast { amount, .. } => {
                             *amount
                         }
+                        crate::cards::CardEffect::AfterHarvestChooseGainIfAtLeast {
+                            amount,
+                            upgrade_amount,
+                            ..
+                        } => (*amount).max(*upgrade_amount),
                         crate::cards::CardEffect::HarvestFieldOptionalExchange {
                             gain_amount,
                             ..
