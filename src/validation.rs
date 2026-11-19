@@ -58,6 +58,41 @@ pub fn validate_full(game: &Game) -> Result<(), String> {
 /// validator arbitrates. A `Pass` is never reachable from a post state that
 /// `validate_full` rejects.
 pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
+    validate_incremental_impl(post, pre, PLAIN_MOVE)
+}
+
+/// Incremental validation for the completion segment of a resumed work
+/// action (double-pause continuation, PR #352 Round 2 P0-2): the action's
+/// space/worker bookkeeping was applied by the first segment of the same
+/// logical move, so this segment adds no worker and no used space; every
+/// other mid-round law is enforced exactly as for a plain move.
+pub fn validate_incremental_resume_completion(post: &Game, pre: &Game) -> Verdict {
+    validate_incremental_impl(post, pre, RESUME_COMPLETION)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct DeltaExpectation {
+    worker_delta: i32,
+    used_added: usize,
+}
+
+/// Delta expectations for a plain mid-round work move: the active player
+/// places exactly one worker on exactly one previously unused space.
+const PLAIN_MOVE: DeltaExpectation = DeltaExpectation {
+    worker_delta: 1,
+    used_added: 1,
+};
+
+/// Delta expectations for the completion segment of a resumed work action:
+/// the space/worker bookkeeping was applied by the first segment of the same
+/// logical move, so this segment adds no worker and no used space. Every
+/// other mid-round law is unchanged.
+const RESUME_COMPLETION: DeltaExpectation = DeltaExpectation {
+    worker_delta: 0,
+    used_added: 0,
+};
+
+fn validate_incremental_impl(post: &Game, pre: &Game, expect: DeltaExpectation) -> Verdict {
     // 1. Identity of the game itself.
     if post.config != pre.config {
         return Verdict::Fail("config mutated".into());
@@ -98,8 +133,8 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
         let delta =
             i32::from(post.public.workers_placed[i]) - i32::from(pre.public.workers_placed[i]);
         if i == actor {
-            if delta != 1 {
-                return Verdict::Fail("active player did not place exactly one worker".into());
+            if delta != expect.worker_delta {
+                return Verdict::Fail("active worker placement delta mismatch".into());
             }
         } else if delta != 0 {
             return Verdict::Fail("non-actor worker count changed".into());
@@ -130,36 +165,42 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
         return Verdict::Fail("a used space disappeared mid-round".into());
     }
     let added: Vec<_> = post.public.used.difference(&pre.public.used).collect();
-    if added.len() != 1 {
-        return Verdict::Fail("a work move must add exactly one used space".into());
+    if added.len() != expect.used_added {
+        return Verdict::Fail(if expect.used_added == 1 {
+            "a work move must add exactly one used space".into()
+        } else {
+            "a resumed completion must not add a used space".into()
+        });
     }
-    let added_space = added[0];
-    // 6b. The added space must be available (same logic as full validation).
-    // Pre is assumed valid, so we only need to check the newly added space.
-    let players = pre.config.players;
-    let additional_enabled = pre.public.additional_action_space_enabled;
-    let card_set_enabled = pre.card_set.enabled();
-    // 6b-i. Disabled additional space.
-    if !additional_enabled && added_space.additional_for(players) {
-        return Verdict::Fail("disabled additional space used".into());
-    }
-    // 6b-ii. Multiple mutually-exclusive additional spaces.
-    // Count additional spaces in post.used; if > 1, reject.
-    let additional_count = post
-        .public
-        .used
-        .iter()
-        .filter(|s| s.additional_for(players))
-        .count();
-    if additional_count > 1 {
-        return Verdict::Fail("multiple mutually-exclusive additional spaces used".into());
-    }
-    // 6b-iii. Space not in available set.
-    let available = pre
-        .public
-        .available_spaces(players, additional_enabled, card_set_enabled);
-    if !available.contains(added_space) {
-        return Verdict::Fail("a non-revealed action space was used".into());
+    if expect.used_added == 1 {
+        let added_space = added[0];
+        // 6b. The added space must be available (same logic as full validation).
+        // Pre is assumed valid, so we only need to check the newly added space.
+        let players = pre.config.players;
+        let additional_enabled = pre.public.additional_action_space_enabled;
+        let card_set_enabled = pre.card_set.enabled();
+        // 6b-i. Disabled additional space.
+        if !additional_enabled && added_space.additional_for(players) {
+            return Verdict::Fail("disabled additional space used".into());
+        }
+        // 6b-ii. Multiple mutually-exclusive additional spaces.
+        // Count additional spaces in post.used; if > 1, reject.
+        let additional_count = post
+            .public
+            .used
+            .iter()
+            .filter(|s| s.additional_for(players))
+            .count();
+        if additional_count > 1 {
+            return Verdict::Fail("multiple mutually-exclusive additional spaces used".into());
+        }
+        // 6b-iii. Space not in available set.
+        let available = pre
+            .public
+            .available_spaces(players, additional_enabled, card_set_enabled);
+        if !available.contains(added_space) {
+            return Verdict::Fail("a non-revealed action space was used".into());
+        }
     }
     // 7. Major improvements: the union across market + player tables must keep
     //    every physical major improvement in exactly one location (the same
@@ -273,6 +314,15 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
         }
     }
     if post.public.accumulations.len() > pre.public.accumulations.len() {
+        return Verdict::Unsure;
+    }
+    // 11b. `card_accumulations`: card effects may legally modify per-card
+    //      stored resources mid-round, and the cheap checks cannot prove the
+    //      delta sound (which card, which resource, which amount). Any change
+    //      therefore downgrades to Unsure so the full validator arbitrates —
+    //      mirroring the soundness contract applied to other bookkeeping
+    //      ledgers (PR #327's bonus_points pattern).
+    if post.public.card_accumulations != pre.public.card_accumulations {
         return Verdict::Unsure;
     }
     // 12. post.cards: mid-round checks.
@@ -460,6 +510,21 @@ pub fn validate_incremental_or_full(post: &Game, pre: &Game) -> Result<(), Strin
     }
 }
 
+/// Incremental validation for the completion segment of a resumed work
+/// action (double-pause continuation) with automatic fallback to full
+/// validation. The segment adds no worker and no used space; every other
+/// mid-round law is enforced by [`validate_incremental_resume_completion`].
+pub fn validate_incremental_resume_completion_or_full(
+    post: &Game,
+    pre: &Game,
+) -> Result<(), String> {
+    match validate_incremental_resume_completion(post, pre) {
+        Verdict::Pass => Ok(()),
+        Verdict::Fail(e) => Err(e),
+        Verdict::Unsure => validate_full(post),
+    }
+}
+
 /// Fast incremental validation for one free action (not a work move).
 ///
 /// `pre` is the committed state before the action; `post` is the state the
@@ -641,6 +706,13 @@ pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
     }
     if post.public.animal_accumulations.len() > pre.public.animal_accumulations.len() {
         return Verdict::Unsure;
+    }
+    // 11b. `card_accumulations` must not change in a free action: the free
+    //      executor has no card-effect dispatch (same certainty as
+    //      `card_uses`/`bonus_points` in PR #327's free-action contract),
+    //      so any difference is a definite violation.
+    if post.public.card_accumulations != pre.public.card_accumulations {
+        return Verdict::Fail("card_accumulations changed in free action".into());
     }
     // 12. active_player must not change in a free action.
     if post.public.active_player != pre.public.active_player {
@@ -1826,5 +1898,90 @@ mod tests {
         // Forest is a regular space (BASE). The added space in mid_round_pair
         // should already be valid, so just verify Pass.
         assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+    }
+
+    /// Regression (card accumulation state, PR #357-series follow-up): a work
+    /// move whose `card_accumulations` ledger changed must never return
+    /// `Pass` — card effects can legally modify it mid-round, but the cheap
+    /// checks cannot prove the delta, so the transition must downgrade to
+    /// `Unsure` and fall back to full validation.
+    #[test]
+    fn tampered_card_accumulations_decline_incremental() {
+        let (pre, mut post) = mid_round_pair();
+        // Add an entry for the actor's own played card (or any card id — the
+        // cheap layer cannot prove legality either way).
+        post.public
+            .card_accumulations
+            .entry(post.public.active_player)
+            .or_default()
+            .entry("B118".to_string())
+            .or_default()
+            .insert(crate::model::Good::Wood, 1);
+        let verdict = validate_incremental(&post, &pre);
+        assert_ne!(
+            verdict,
+            Verdict::Pass,
+            "changed card_accumulations must not Pass (got {verdict:?})"
+        );
+        assert!(matches!(verdict, Verdict::Unsure));
+    }
+
+    /// Regression (card accumulation state): a free action that changes
+    /// `card_accumulations` must be a definite `Fail` — the free executor has
+    /// no card-effect dispatch, so the ledger cannot legally change there.
+    #[test]
+    fn tampered_card_accumulations_decline_free_action() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 61,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xFADE);
+        let mut game = game;
+        for _ in 0..8 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            game.apply(action).unwrap();
+        }
+        let pre = game.clone();
+        let actor = pre.public.active_player;
+        let mut post = pre.clone();
+        post.public.players[actor].supply.food = 3;
+        post.apply_free(
+            actor,
+            crate::engine::FreeAction::DiscardGood {
+                good: crate::model::Good::Food,
+                quantity: 1,
+            },
+        )
+        .expect("free action must apply");
+        // Sanity: the legitimate free action passes.
+        assert_eq!(validate_free_action(&post, &pre, actor), Verdict::Pass);
+        // Now tamper: add a card accumulation entry.
+        post.public
+            .card_accumulations
+            .entry(actor)
+            .or_default()
+            .entry("X000".to_string())
+            .or_default()
+            .insert(crate::model::Good::Clay, 2);
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "changed card_accumulations in free action must be definite Fail (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
     }
 }

@@ -95,7 +95,7 @@ impl HarvestDetailPolicy for SimpleHarvestDetails {
 impl Game {
     /// Only an internal preview copy is used to query policies at the
     /// beginning of the harvest. The real field phase happens in harvest().
-    pub(crate) fn harvest_fields(&mut self) {
+    pub(crate) fn harvest_fields(&mut self) -> Result<()> {
         // Cardless games have no harvest effects at all, so skip the dispatch
         // entirely: this is the hot path for the cardless baseline.
         let carded = self.card_set.enabled();
@@ -103,6 +103,26 @@ impl Game {
         // is reset once here rather than per player.
         if carded {
             self.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
+        }
+        // Capture the D032 snapshot (goods standing in fields) at the start of
+        // the final-harvest field phase, BEFORE any field's `remaining` is
+        // decremented. The spec counts goods that stood before the final
+        // harvest, not what remains after each field yields one good.
+        if self.public.round == 14 {
+            for player in &mut self.public.players {
+                let goods: u32 = player
+                    .farm
+                    .iter()
+                    .map(|cell| match cell.tile {
+                        Tile::Field {
+                            crop: Some(_),
+                            remaining,
+                        } => remaining as u32,
+                        _ => 0,
+                    })
+                    .sum();
+                player.field_goods_before_final_harvest = Some(goods);
+            }
         }
         for p in 0..self.public.players.len() {
             // Route the harvest trigger through the dispatcher so the event
@@ -121,8 +141,7 @@ impl Game {
                     &mut self.public.card_uses,
                     &self.card_use_limits,
                     &mut self.pending,
-                )
-                .expect("validated card field-phase reward");
+                )?;
             }
             let p = &mut self.public.players[p];
             for cell in &mut p.farm {
@@ -149,6 +168,7 @@ impl Game {
                 }
             }
         }
+        Ok(())
     }
     /// Called only on the preview AFTER field harvesting, to generate
     /// breeding decisions from the actual post-feeding public state.
@@ -173,7 +193,7 @@ impl Game {
         if breeding.len() != self.public.players.len() {
             return Err("breeding plan per player required".into());
         }
-        self.harvest_fields();
+        self.harvest_fields()?;
         self.feed_after_fields(feeding)?;
         for (player, plan) in self.public.players.iter_mut().zip(breeding) {
             plan.apply(player)?;

@@ -251,13 +251,14 @@ CARDS = {
         ],
     },
     "A008": {
-        "post": "left_neighbor_hand",
-        "effects": [effect("on_play", [gain("grain", 1), gain("vegetable", 1)])],
-        "notes": "Gain 1 grain and 1 vegetable; pass left.",
-        "tests": [
-            case("A008-normal", {"grain": 0, "vegetable": 0}, {"play": "A008"},
-                 {"grain_delta": 1, "vegetable_delta": 1}),
-            case("A008-not-triggered", {"occupations_played": 1, "improvements_played": 2},
+            "post": "left_neighbor_hand",
+            "effects": [effect("on_play", [gain("grain", 1), gain("vegetable", 1)])],
+            "notes": "Gain 1 grain and 1 vegetable; pass left.",
+            "implementation_status": "tested",
+            "tests": [
+                case("A008-normal", {"grain": 0, "vegetable": 0}, {"play": "A008"},
+                     {"grain_delta": 1, "vegetable_delta": 1}),
+                case("A008-not-triggered", {"occupations_played": 1, "improvements_played": 2},
                  {"play": "A008"}, {"play_rejected": True}),
         ],
     },

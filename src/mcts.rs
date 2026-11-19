@@ -1697,7 +1697,7 @@ mod tests {
         let card_use_limits_before = game.card_use_limits.clone();
 
         // Advance to round 2.
-        game.start_round();
+        game.start_round().expect("start_round must succeed");
         assert_eq!(game.public.round, 2);
 
         // Well food should have been granted.
@@ -1747,7 +1747,7 @@ mod tests {
         // Orphan: schedule entry without a delayed_well twin (legacy save shape).
         game.public.well_food_schedule.entry(2).or_default().push(1);
 
-        game.start_round();
+        game.start_round().expect("start_round must succeed");
         assert_eq!(game.public.round, 2);
         assert!(
             !game.public.well_food_schedule.contains_key(&2),
