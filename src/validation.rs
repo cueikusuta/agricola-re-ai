@@ -598,6 +598,22 @@ pub fn validate_incremental_or_full(post: &Game, pre: &Game) -> Result<(), Strin
 /// - Used spaces, workers_placed
 /// - Major improvement multiset
 /// - Accumulations can only decrease
+///
+/// Soundness contract (free-side close-out, PR #358 review): `Pass` is
+/// returned only when every difference between `pre` and `post` has been
+/// proven legal by the checks below — including the Step 3 bookkeeping
+/// fields `well_food_schedule`, `pending`, `event_budget` cap, `card_uses`,
+/// `card_use_limits`, `next_decision_id` and `record_events` (checks
+/// 11/15b–15h), which mirror the transition-layer checks 11b/15–21. The only
+/// committed free path (`apply_free`→`execute_free`) resolves no card
+/// effects and never pauses, so unlike a work move it cannot produce any
+/// ledger/budget/decision delta; where the work side must delegate a
+/// provenance question to `validate_full` with Unsure (e.g. a first
+/// ledger use), the free side has no such producer and Drift is a definite
+/// Fail. A `Pass` is therefore never reachable from a post state that
+/// `validate_full` rejects — the Pass→Ok short-circuit in
+/// `validate_free_action_or_full` is sound for the same reason as the work
+/// side.
 pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
     // 1. Identity of the game itself.
     if post.config != pre.config {
@@ -748,15 +764,18 @@ pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
     if post.public.accumulations.len() > pre.public.accumulations.len() {
         return Verdict::Unsure;
     }
-    // 11. Animal accumulations same rule.
+    // 11. Animal accumulations: same-decrease rule for the general case,
+    //     but growth is a definite Fail on the free path (work-side parity,
+    //     check 11b): the only writer is start_round, and a round change
+    //     already returned Unsure at check 2, so any same-round growth or
+    //     new key is not producible by any committed free action. (Full
+    //     validation accepts any market-key accumulation, so Unsure→full
+    //     used to accept this tamper on the free path.)
     for (space, post_n) in &post.public.animal_accumulations {
         match pre.public.animal_accumulations.get(space) {
             Some(pre_n) if post_n <= pre_n => {}
-            _ => return Verdict::Unsure,
+            _ => return Verdict::Fail("animal accumulation grew mid-round".into()),
         }
-    }
-    if post.public.animal_accumulations.len() > pre.public.animal_accumulations.len() {
-        return Verdict::Unsure;
     }
     // 12. active_player must not change in a free action.
     if post.public.active_player != pre.public.active_player {
@@ -834,6 +853,70 @@ pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
     // 15. post.delayed_well: Well purchase not possible in free action, but downgrade.
     if post.delayed_well != pre.delayed_well {
         return Verdict::Unsure;
+    }
+    // 15b. post.well_food_schedule: public mirror of delayed_well. The only
+    //     mid-round writer is the Well purchase (a work move), and a round
+    //     change already returned Unsure at check 2, so a mirror delta on a
+    //     delayed_well-stable, same-round free transition is not producible
+    //     by any committed free action: definite Fail (work-side parity,
+    //     check 15). Full validation tolerates in-range orphan mirrors, so
+    //     Pass used to short-circuit the only check that can see this.
+    if post.well_food_schedule != pre.well_food_schedule {
+        return Verdict::Fail("well_food_schedule changed without paired delayed_well".into());
+    }
+    // 15c. post.pending: apply_free rejects a stored decision up front and
+    //     free actions never pause (execute_free has no card chain), so any
+    //     pending drift on a validated free transition is not producible:
+    //     definite Fail (work-side parity, check 16). Full validation
+    //     deliberately does not inspect `pending`.
+    if post.pending != pre.pending {
+        return Verdict::Fail("pending decision drifted on a committed transition".into());
+    }
+    // 15d. post.event_budget: replenished to DEFAULT_EVENT_BUDGET at the
+    //     start of every committed action (apply_free resets it exactly like
+    //     apply_with_plans) and only ever spent downward, so a value above
+    //     the cap cannot be produced by any transition. The exact remaining
+    //     budget is not provable (legit chains consume freely) and is left to
+    //     the full validator, which enforces the same cap (work-side parity,
+    //     check 17 — this is review claim (a): Pass used to skip it).
+    if post.event_budget > crate::model::DEFAULT_EVENT_BUDGET {
+        return Verdict::Fail("event_budget above replenish cap".into());
+    }
+    // 15e. post.card_uses: free actions never resolve card effects
+    //      (execute_free contains no card-chain), so the use ledger must be
+    //      byte-identical across a committed free transition. Unlike the
+    //      work side (where a legitimate first use must stay possible and
+    //      unseen keys delegate with Unsure), on the free path NO committed
+    //      action can produce a ledger delta of any kind: any drift is a
+    //      definite Fail. This is strictly stronger than the work side and
+    //      safe for the same soundness reason: a Fail is only ever returned
+    //      for deltas no committed free path can produce.
+    if post.card_uses != pre.card_uses {
+        return Verdict::Fail("card use ledger drifted in a free action".into());
+    }
+    // 15f. post.card_use_limits: derived from CardDefinition::use_limit at
+    //      game construction and never written again. With the card set
+    //      pointer-identical (check 14 above), any limits drift is
+    //      tampering: definite Fail (work-side parity, check 19 — review
+    //      claim (b): Pass used to skip the full validator's
+    //      definition-agreement check).
+    if post.card_use_limits != pre.card_use_limits {
+        return Verdict::Fail("card_use_limits mutated mid-game".into());
+    }
+    // 15g. post.next_decision_id: the counter only advances when a pause is
+    //      committed, and free actions never pause (15c); any drift visible
+    //      to this validator is therefore not producible: definite Fail
+    //      (work-side parity, check 20; full validation does not read the
+    //      counter, so Pass used to short-circuit the only check that can
+    //      see it).
+    if post.next_decision_id != pre.next_decision_id {
+        return Verdict::Fail("next_decision_id drifted on a committed transition".into());
+    }
+    // 15h. post.record_events: serde-skipped search flag; no apply/apply_free
+    //      path writes it, so a flip between pre and post is not producible
+    //      by any committed transition (work-side parity, check 21).
+    if post.record_events != pre.record_events {
+        return Verdict::Fail("record_events flipped mid-transition".into());
     }
     Verdict::Pass
 }
@@ -2804,8 +2887,12 @@ mod tests {
     #[test]
     fn closeout_free_animal_accumulation_same_round_growth_rejected() {
         let (mut pre, mut post, actor) = free_action_pair();
-        pre.public.animal_accumulations.insert(Space::SheepMarket, 1);
-        post.public.animal_accumulations.insert(Space::SheepMarket, 2);
+        pre.public
+            .animal_accumulations
+            .insert(Space::SheepMarket, 1);
+        post.public
+            .animal_accumulations
+            .insert(Space::SheepMarket, 2);
         assert_eq!(validate_full(&post), Ok(()));
         assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
         // Taking (decrease/removal) stays legal — the take action removes
