@@ -10,6 +10,8 @@ use crate::card_events::TriggerPhase;
 use crate::engine::Action;
 use crate::harvest::FeedingPlan;
 use crate::model::{Good, Player};
+#[cfg(test)]
+use crate::registry::EventKind;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -733,7 +735,7 @@ mod tests {
         .unwrap();
         assert_eq!(players[0].supply.food, 5);
         assert_eq!(
-            uses.get("LOOP"),
+            uses.get(&format!("LOOP:{:?}", EventKind::RoundStart)),
             Some(&5),
             "each resolution must be counted"
         );
