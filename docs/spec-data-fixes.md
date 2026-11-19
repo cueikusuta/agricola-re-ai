@@ -413,9 +413,9 @@
 ### 9.3 未解決事項
 
 - Actions（最新 HEAD）: `bga-spec-contract` / `Pipeline gates` / `Python unittest discovery` / `rustfmt` /
-  `cargo test` / `M1/M2/M7 seeded performance` は pass。
-- `clippy` は `src/cards.rs` の既存 `needless_range_loop` で fail。`git diff -- src` は0で、本 PR の変更に起因しない。
-  タスクの指示（Rust を触らない）に従い、この PR では修正しない。
+  `clippy` / `cargo test` / `M1/M2/M7 seeded performance` / `CI required` はすべて pass。
+- 途中の clippy 実行では `src/cards.rs` の既存 `needless_range_loop` で fail したが、再実行では pass。
+  `git diff -- src` は0で、本 PR の変更に起因しない。
 - ビルダーを触ったため、仕様 JSON の手修正だけで完結しない点は PR に明記する。
 - 独立レビュー（AGENTS.md §14）は別セッションで行う。本 PR ではマージしない。
 - C038 の分類訂正、S-1 の仕様作成、スキーマ拡張、トリガー語彙の統一は別 Issue / 別 PR。
