@@ -91,3 +91,14 @@
   - 効果の修正: A136（3/6/9）、E144（建材1＋葦1、複数種類の選択のみ残る）、B039（1/4/7頭以上）。
 - 残件: 第4章の R-1〜R-10（公式裁定待ち）と、仕様データの残欠（別Issue）。
 - 次の再開位置: `docs/allstages-merged.md` 第4章。仕様修正は独立レビュー付きの別PR。
+<!-- outband-progress -->
+### 第7部: 帯外（A/C/D/E 070〜120）の分類（ブランチ `research/deepai-outband-classification`）
+
+- 起点: `research/deepai-allstages-merged`（#370）。成果物 `docs/outband-classification.md`。
+  PR は #370 の上に積む（base = `research/deepai-allstages-merged`）。コード・仕様JSON・テストは変更しない。
+- 対象: 依頼は211枚。台帳の実データは **204枚**（A/C/D/E 各51枚）。差の7枚は未特定（BQ-0）。
+- 形式は #370 の段階定義・優先順・基盤記号をそのまま継承（新しく作らない）。
+- 進行中。現在地: 第0章＋第1章（Aデッキ） まで。
+- 章の進捗: ✓A（第1章） / ・C（第2章） / ・D（第3章） / ・E（第4章） / ・第5章 段階別準備 / ・第6〜7章・付録
+- 決定の適用: OR費用は支払い候補の選択（進歩の返却を含む）／アクションスペース追加は共通機構で個性に数えない／帰宅は段階3。
+- 次の再開位置: `docs/outband-classification.md` 第7章の BQ 一覧（人間確認）と、第6章の仕様データ残件（別Issue）。
