@@ -193,9 +193,10 @@ fn c066_owner_may_opt_back_into_the_food_at_three_grain() {
             &self,
             _: &agricola_re_ai::model::Observation,
         ) -> agricola_re_ai::harvest::FeedingPlan {
-            let mut plan = agricola_re_ai::harvest::FeedingPlan::default();
-            plan.c066_take_food_instead = true;
-            plan
+            agricola_re_ai::harvest::FeedingPlan {
+                c066_take_food_instead: true,
+                ..Default::default()
+            }
         }
     }
     let mut g = harvest_fixture();
