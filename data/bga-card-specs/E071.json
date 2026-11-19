@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "card_id": "E071",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "牛糞",
+    "name_en": "Cow Patty"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2682",
+        "language": "ja",
+        "checked_on": "2026-11-19",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-19",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "animal_count_at_least",
+        "params": {
+          "animal": "cattle",
+          "n": 1
+        }
+      }
+    ],
+    "printed_points": 1
+  },
+  "effects": [
+    {
+      "trigger": "after_sow",
+      "conditions": [
+        {
+          "predicate": "field_adjacent_to_pasture",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "planted_type",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each time you sow in a field orthogonally adjacent to a pasture, you may place 1 additional good of the planted type on it."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E071-adjacent",
+      "E071-not-adjacent"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-19",
+    "implementation_status": "not_started",
+    "notes": "Each time you sow in a field orthogonally adjacent to a pasture, you may place 1 additional good of the planted type on that field. Cost free; prereq 1 cattle; 1 printed point."
+  }
+}

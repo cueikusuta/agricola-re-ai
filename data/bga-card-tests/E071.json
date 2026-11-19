@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "E071",
+  "cases": [
+    {
+      "id": "E071-adjacent",
+      "scope": "effect_only",
+      "setup": {
+        "pasture_orthogonal_to_field": true,
+        "field_goods_before_sow": 0
+      },
+      "action": {
+        "play": "E071",
+        "sow": "grain_in_adjacent_field"
+      },
+      "expected": {
+        "goods_on_field": 2
+      },
+      "notes": "Field sown while orthogonally adjacent to a pasture gains 1 extra good of the planted type."
+    },
+    {
+      "id": "E071-not-adjacent",
+      "scope": "effect_only",
+      "setup": {
+        "pasture_orthogonal_to_field": false,
+        "field_goods_before_sow": 0
+      },
+      "action": {
+        "play": "E071",
+        "sow": "grain_in_non_adjacent_field"
+      },
+      "expected": {
+        "goods_on_field": 1
+      },
+      "notes": "Field not adjacent to a pasture gains nothing extra."
+    }
+  ]
+}
