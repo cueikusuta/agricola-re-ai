@@ -135,6 +135,15 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// C068 書棚 (Bookcase): each time the owner plays an occupation AFTER
+    /// this card, gain `amount` of `good`. Fixed amount per occupation played,
+    /// independent of the occupation's cost. Fired from the play dispatcher's
+    /// after-play scan; the legacy `cards::play` helper does not re-scan earlier
+    /// cards and therefore never fires it.
+    AfterOccupationGain {
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -163,6 +172,7 @@ impl CardEffect {
             CardEffect::AfterOccupationGainPerFoodCost { .. } => {
                 "after_occupation_gain_per_food_cost"
             }
+            CardEffect::AfterOccupationGain { .. } => "after_occupation_gain",
             CardEffect::StartRoundGainIfNoMinorPlayed { .. } => {
                 "start_round_gain_if_no_minor_played"
             }
@@ -375,6 +385,7 @@ impl CardSet {
                         | CardEffect::StartRoundGain { amount, .. }
                         | CardEffect::StartRoundGainIfFoodAtLeastRound { amount, .. }
                         | CardEffect::AfterOccupationGainPerFoodCost { amount, .. }
+                        | CardEffect::AfterOccupationGain { amount, .. }
                         | CardEffect::StartRoundGainIfNoMinorPlayed { amount, .. }
                         | CardEffect::HarvestFieldGainIfNoMinorPlayed { amount, .. }
                         | CardEffect::OnPlayGainPerImprovementPlayed { amount, .. }
@@ -2824,6 +2835,22 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 },
                 CardEffect::AfterOccupationGainPerFoodCost {
                     good: Good::Wood,
+                    amount: 1,
+                },
+            ],
+        ),
+        // C068 書棚 (Bookcase): cost 2 wood, prerequisite 1 occupation;
+        // each time an occupation is played after this, gain 1 vegetable.
+        card(
+            "C068",
+            minor,
+            vec![(Good::Wood, 2)],
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(1),
+                },
+                CardEffect::AfterOccupationGain {
+                    good: Good::Vegetable,
                     amount: 1,
                 },
             ],

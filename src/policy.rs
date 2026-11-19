@@ -545,11 +545,16 @@ fn card_priority(
                 | CardEffect::StartRoundGain { good, amount, .. }
                 | CardEffect::StartRoundGainIfFoodAtLeastRound { good, amount, .. }
                 // C116's wood-per-food-cost is occupation-cost dependent; the
-                // heuristic treats one grant per remaining round as an upper bound.
-                | CardEffect::AfterOccupationGainPerFoodCost { good, amount, .. } => {
-                    card_good_value(*good) * i64::from(*amount) * horizon
-                }
-                CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
+                                // heuristic treats one grant per remaining round as an upper bound.
+                                | CardEffect::AfterOccupationGainPerFoodCost { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                }
+                                // C068 書棚: fixed gain per occupation played; similar heuristic to
+                                // PerFoodCost but without food-cost scaling.
+                                | CardEffect::AfterOccupationGain { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                }
+                                CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
                 | CardEffect::HarvestFieldGain { good, amount, .. }
                 | CardEffect::AfterClayConstructionGain { good, amount }
                 // E111's halves fire only while the owner stays minor-free; the

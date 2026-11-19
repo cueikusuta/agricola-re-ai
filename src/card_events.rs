@@ -62,6 +62,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGainIfNoMinorPlayed { .. } => TriggerPhase::After,
         // Fired only by the play dispatcher's dedicated after-play scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
+        CardEffect::AfterOccupationGain { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
         // Clay construction purchase — After phase
         CardEffect::AfterClayConstructionGain { .. } => TriggerPhase::After,
         // Harvest/baking — After phase
@@ -461,6 +462,7 @@ fn resolve_phase_scan(
                 // Never fires via the generic phase scan (see
                 // effect_condition_holds); dispatch_play's after-play scan owns it.
                 CardEffect::AfterOccupationGainPerFoodCost { .. } => EffectResult::Resolved,
+                CardEffect::AfterOccupationGain { .. } => EffectResult::Resolved,
                 #[cfg(test)]
                 CardEffect::PendingProbe { options } => {
                     handle_pending_probe(ctx, player, card_id, options.clone(), trigger_data)?
@@ -693,6 +695,9 @@ fn effect_condition_holds(
         // C116 調度品職員 fires only from dispatch_play's dedicated after-play
         // scan, never from the generic phase scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => false,
+        // C068 書棚 fires only from dispatch_play's dedicated after-play
+        // scan, never from the generic phase scan.
+        CardEffect::AfterOccupationGain { .. } => false,
         CardEffect::AfterClayConstructionGain { .. } => {
             trigger.event_kind == EventKind::ClayConstruction
                 && trigger.previous_player.as_ref().is_some_and(|prev| {
@@ -797,6 +802,7 @@ pub fn execute_chosen_triggers(
             // Never fires via the generic phase scan (see
             // effect_condition_holds); dispatch_play's after-play scan owns it.
             CardEffect::AfterOccupationGainPerFoodCost { .. } => EffectResult::Resolved,
+            CardEffect::AfterOccupationGain { .. } => EffectResult::Resolved,
             #[cfg(test)]
             CardEffect::PendingProbe { options } => {
                 handle_pending_probe(ctx, player, &trigger.card_id, options.clone(), trigger_data)?
@@ -1499,14 +1505,16 @@ pub fn dispatch_play(
     // Phase 3: Core action (card is moved to played zone — handled by caller via move_card)
 
     // Phase 4: After — card-play dependent triggers owned by EARLIER played
-    // cards. The only such effect today is C116 調度品職人
-    // (`AfterOccupationGainPerFoodCost`): each time the owner plays an
-    // occupation after it, it grants wood per food paid as that occupation's
-    // cost (printed cost + the optional occupation fee). The new card is
-    // already last in `played_cards` (the caller ran the zone move), so the
-    // scan covers exactly the cards played "before this one".
+    // cards. C116 調度品職人 (`AfterOccupationGainPerFoodCost`): each time the owner
+    // plays an occupation after it, it grants wood per food paid as that occupation's
+    // cost (printed cost + the optional occupation fee). C068 書棚
+    // (`AfterOccupationGain`): each time the owner plays an occupation after it,
+    // grants a fixed amount of the specified good, independent of the occupation's
+    // cost. The new card is already last in `played_cards` (the caller ran the zone
+    // move), so the scan covers exactly the cards played "before this one".
     if let Some(new_card) = card_set.definition(new_card_id) {
         if new_card.kind == crate::cards::CardKind::Occupation {
+            // Calculate food paid for PerFoodCost effects
             let printed_food: u32 = new_card
                 .cost
                 .iter()
@@ -1514,18 +1522,38 @@ pub fn dispatch_play(
                 .map(|(_, n)| *n)
                 .sum();
             let food_paid = printed_food.saturating_add(extra_food_paid);
-            if food_paid > 0 {
-                let played = ctx.player.played_cards.clone();
-                let owned = played.len().saturating_sub(1); // exclude the new card
-                for id in &played[..owned] {
-                    let Some(card) = card_set.definition(id) else {
+            let played = ctx.player.played_cards.clone();
+            let owned = played.len().saturating_sub(1); // exclude the new card
+            for id in &played[..owned] {
+                let Some(card) = card_set.definition(id) else {
+                    continue;
+                };
+                for effect in &card.effects {
+                    // C116: AfterOccupationGainPerFoodCost — only triggers if food was paid
+                    if let CardEffect::AfterOccupationGainPerFoodCost { good, amount } = effect {
+                        if food_paid > 0 {
+                            consume_budget(ctx.event_budget)?;
+                            let limit = ctx
+                                .card_use_limits
+                                .get(id.as_str())
+                                .copied()
+                                .unwrap_or(u32::MAX);
+                            check_card_use(ctx.card_uses, id, limit)?;
+                            let total = amount
+                                .checked_mul(food_paid)
+                                .ok_or("occupation-play bonus overflow")?;
+                            let p = &mut ctx.player;
+                            let next = p
+                                .supply
+                                .get(*good)
+                                .checked_add(total)
+                                .ok_or("resource overflow")?;
+                            p.supply.set(*good, next);
+                        }
                         continue;
-                    };
-                    for effect in &card.effects {
-                        let CardEffect::AfterOccupationGainPerFoodCost { good, amount } = effect
-                        else {
-                            continue;
-                        };
+                    }
+                    // C068: AfterOccupationGain — triggers for any occupation, fixed amount
+                    if let CardEffect::AfterOccupationGain { good, amount } = effect {
                         consume_budget(ctx.event_budget)?;
                         let limit = ctx
                             .card_use_limits
@@ -1533,14 +1561,11 @@ pub fn dispatch_play(
                             .copied()
                             .unwrap_or(u32::MAX);
                         check_card_use(ctx.card_uses, id, limit)?;
-                        let total = amount
-                            .checked_mul(food_paid)
-                            .ok_or("occupation-play bonus overflow")?;
                         let p = &mut ctx.player;
                         let next = p
                             .supply
                             .get(*good)
-                            .checked_add(total)
+                            .checked_add(*amount)
                             .ok_or("resource overflow")?;
                         p.supply.set(*good, next);
                     }
@@ -4751,6 +4776,219 @@ mod tests {
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 5, "no food paid -> no gain");
+    }
+
+    /// C068 書棚 via the production play dispatcher: each later
+    /// occupation play grants 1 vegetable (fixed amount, independent of cost).
+    #[test]
+    fn c068_occupation_play_grants_vegetable() {
+        // Add a zero-cost occupation for boundary testing
+        let set = CardSet {
+            definitions: {
+                let mut defs = crate::cards::verified_band_c_cards();
+                defs.push(CardDefinition {
+                    use_limit: None,
+                    id: "occ_food0".into(),
+                    kind: CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                });
+                defs
+            },
+        };
+        let mut c = Ctx::new();
+        // Zone move already applied by the caller: C068 first, new card last.
+        c.players[0].played_cards = vec!["C068".into(), "occ_food0".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        dispatch_play(
+            &set,
+            0,
+            "occ_food0",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.vegetable, 1,
+            "zero-cost occupation must grant 1 vegetable via C068"
+        );
+
+        // Second occupation after C068 -> +1 more vegetable (total 2)
+        c.players[0].played_cards = vec!["C068".into(), "occ_food0".into(), "C111".into()];
+        dispatch_play(
+            &set,
+            0,
+            "C111",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.vegetable, 2,
+            "two occupations after C068 must grant 2 vegetable total"
+        );
+    }
+
+    /// C068 書棚: minor improvements do NOT trigger the effect.
+    #[test]
+    fn c068_minor_improvement_does_not_trigger() {
+        let mut set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        // Add a minor improvement for testing
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "minor_test".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![],
+        });
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C068".into(), "minor_test".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        dispatch_play(
+            &set,
+            0,
+            "minor_test",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.vegetable, 0,
+            "minor improvement play must not trigger C068"
+        );
+    }
+
+    /// C068 and C116 coexist: both trigger independently on the same occupation play.
+    #[test]
+    fn c068_and_c116_coexist_independently() {
+        let mut set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        // Add a food-cost-2 occupation
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "occ_food2".into(),
+            kind: CardKind::Occupation,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![],
+        });
+        let mut c = Ctx::new();
+        // Both C068 and C116 played, then an occupation
+        c.players[0].played_cards = vec!["C068".into(), "C116".into(), "occ_food2".into()];
+        c.players[0].supply.vegetable = 0;
+        c.players[0].supply.wood = 0;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        dispatch_play(
+            &set,
+            0,
+            "occ_food2",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        // C068: 1 vegetable (fixed)
+        // C116: 2 wood (2 food paid * 1 wood/food)
+        assert_eq!(c.players[0].supply.vegetable, 1, "C068 grants 1 vegetable");
+        assert_eq!(
+            c.players[0].supply.wood, 2,
+            "C116 grants 2 wood (2 food * 1)"
+        );
+    }
+
+    /// C068: occupation played BEFORE C068 does not trigger.
+    #[test]
+    fn c068_occupation_before_card_no_trigger() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        let mut c = Ctx::new();
+        // Occupation played first, then C068
+        c.players[0].played_cards = vec!["C111".into(), "C068".into()];
+        c.players[0].supply.vegetable = 0;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        dispatch_play(
+            &set,
+            0,
+            "C068",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+        )
+        .unwrap();
+        // Playing C068 (a minor improvement) should not trigger its own effect
+        assert_eq!(
+            c.players[0].supply.vegetable, 0,
+            "occupation played before C068 must not grant vegetable"
+        );
     }
 
     /// Dispatcher play path for A117 木材調達人: verifies that the dispatcher
