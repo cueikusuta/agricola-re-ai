@@ -100,7 +100,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "implemented",
-    "notes": "The wiki lists the card as strongly banned; the ban is metadata, not an effect."
+    "implementation_status": "tested",
+    "notes": "The wiki lists the card as strongly banned; the ban is metadata, not an effect. Rust end-game bonus covers improvement_count thresholds (5/6/7/8/9/10 -> 2/3/4/5/7/9 points); unavailable at 2 players via MinimumPlayers(3)."
   }
 }

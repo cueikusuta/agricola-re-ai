@@ -320,6 +320,9 @@ pub enum ScoreBonusRule {
     HouseMaterial,
     UnfencedStables,
     ImprovementCount,
+    /// A031 担保 (Debt Security): 1 bonus point per major improvement, capped at
+    /// the number of unused farmyard spaces (empty cells without a stable).
+    MajorImprovementsCappedByUnusedFarmyardSpaces,
     SparePastureCapacity,
     LaterOccupations,
     /// D100 君主 (Sovereign): 1 bonus point per scoring category that has
@@ -971,6 +974,12 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
     }
     let mut cards = vec![
         scoring(
+            "A031",
+            CardKind::MinorImprovement,
+            vec![(Good::Food, 2)],
+            ScoreBonusRule::MajorImprovementsCappedByUnusedFarmyardSpaces,
+        ),
+        scoring(
             "A032",
             CardKind::MinorImprovement,
             vec![(Good::Wood, 2)],
@@ -1078,6 +1087,15 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         9 => 7,
                         _ => 9,
                     }
+                }
+                ScoreBonusRule::MajorImprovementsCappedByUnusedFarmyardSpaces => {
+                    let major_improvements = player.improvements.len() as i32;
+                    let unused_farmyard_spaces = player
+                        .farm
+                        .iter()
+                        .filter(|cell| matches!(cell.tile, Tile::Empty) && !cell.stable)
+                        .count() as i32;
+                    major_improvements.min(unused_farmyard_spaces)
                 }
                 ScoreBonusRule::SparePastureCapacity => player
                     .pastures
@@ -1339,6 +1357,120 @@ mod verified_scoring_card_tests {
             "after_occ".into(),
         ];
         assert_eq!(end_game_bonus(&set, &player), 1);
+    }
+
+    #[test]
+    fn a031_major_improvements_capped_by_unused_farmyard_spaces() {
+        // Default farm: 15 cells, 2 rooms -> 13 unused spaces; 3 major improvements -> 3 points.
+        assert_eq!(
+            score_card("A031", |p| {
+                p.improvements.push(Improvement::Fireplace2);
+                p.improvements.push(Improvement::Fireplace3);
+                p.improvements.push(Improvement::Hearth4);
+            }),
+            3
+        );
+        // 5 major improvements but only 2 unused spaces -> capped at 2.
+        assert_eq!(
+            score_card("A031", |p| {
+                p.improvements.push(Improvement::Fireplace2);
+                p.improvements.push(Improvement::Fireplace3);
+                p.improvements.push(Improvement::Hearth4);
+                p.improvements.push(Improvement::Hearth5);
+                p.improvements.push(Improvement::ClayOven);
+                p.farm.truncate(3); // [Room, Empty, Empty] -> 2 unused spaces
+            }),
+            2
+        );
+    }
+
+    #[test]
+    fn a032_pasture_area_boundaries() {
+        assert_eq!(score_card("A032", |_| {}), 0);
+        assert_eq!(
+            score_card("A032", |p| {
+                p.pastures.push(Pasture {
+                    id: 0,
+                    cells: (0..5).collect(),
+                    animal: None,
+                    quantity: 0,
+                })
+            }),
+            0
+        );
+        assert_eq!(
+            score_card("A032", |p| {
+                p.pastures.push(Pasture {
+                    id: 0,
+                    cells: (0..6).collect(),
+                    animal: None,
+                    quantity: 0,
+                })
+            }),
+            1
+        );
+        assert_eq!(
+            score_card("A032", |p| {
+                p.pastures.push(Pasture {
+                    id: 0,
+                    cells: (0..10).collect(),
+                    animal: None,
+                    quantity: 0,
+                })
+            }),
+            4
+        );
+    }
+
+    #[test]
+    fn a098_unfenced_stables_count() {
+        assert_eq!(score_card("A098", |_| {}), 0);
+        assert_eq!(
+            score_card("A098", |p| {
+                p.farm[2].stable = true;
+                p.farm[4].stable = true;
+            }),
+            2
+        );
+    }
+
+    #[test]
+    fn a133_improvement_count_boundaries() {
+        let mut set = CardSet {
+            definitions: verified_scoring_cards(3),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "test_minor".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        });
+        // 4 total improvements (0 minors + 4 built) -> 0 points.
+        let mut player = Player::new(0, 0);
+        player.played_cards.push("A133".into());
+        player.improvements.extend([
+            Improvement::Fireplace2,
+            Improvement::Fireplace3,
+            Improvement::Hearth4,
+            Improvement::Hearth5,
+        ]);
+        assert_eq!(end_game_bonus(&set, &player), 0);
+        // 5 total -> 2 points.
+        player.played_cards.push("test_minor".into());
+        assert_eq!(end_game_bonus(&set, &player), 2);
+        // 6 total -> 3 points.
+        player.improvements.push(Improvement::ClayOven);
+        assert_eq!(end_game_bonus(&set, &player), 3);
+        // 9 total (1 minor + 7 built) -> 7 points.
+        player.improvements.extend([
+            Improvement::StoneOven,
+            Improvement::Joinery,
+            Improvement::Pottery,
+        ]);
+        assert_eq!(end_game_bonus(&set, &player), 7);
+        assert!(!verified_scoring_cards(2).iter().any(|c| c.id == "A133"));
     }
 }
 
