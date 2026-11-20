@@ -90,6 +90,6 @@
     "checked_by": "AI source comparison vs Rust CardDefinition",
     "checked_on": "2026-11-19",
     "implementation_status": "implemented",
-    "notes": "Verified against Rust CardDefinition in verified_round_and_harvest_cards(): MinorImprovement, cost Wood 1, points 0, AfterWorkerGainIfUsed { space: GrainSeeds, required_space: Farmland, good: Food, amount: 3 }. Zero diff. The JA reference URL was corrected to this card's own page (the previous URL pointed to B050 Butter Churn)."
+    "notes": "Verified against Rust CardDefinition: AfterWorkerGainIfUsed { space: GrainSeeds, required_space: Farmland, good: Food, amount: 3 }. The Farmland space may be occupied by any player's person, including the owner's (official RE appendix: occupied = a person is on the space; the JA printing says 'anyone's'). The Rust check uses the shared public.used set, so the value is already correct; the spec predicate should state any_player explicitly."
   }
 }

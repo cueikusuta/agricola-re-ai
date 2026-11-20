@@ -78,6 +78,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Scoring: 1 bonus point per own cooking improvement (pot icon category)."
+    "notes": "Scoring: 1 bonus point per own improvement with the cooking symbol (pot icon). Kilns/ovens without the cooking symbol (clay oven, stone oven) are excluded."
   }
 }

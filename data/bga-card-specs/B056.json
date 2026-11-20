@@ -80,8 +80,7 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "play.prerequisites: 'worker_on_space fishing' means a family member is currently on the Fishing space; modeled using precedent E029 'worker_on_space day_laborer'",
-      "effects.0.conditions: the four action spaces above Fishing are not named by the wiki; the BGA board layout has 3-6 spaces above Fishing depending on player count; the exact four-space set is unresolved"
+      "effects.0.conditions: the fourth action space above Fishing is not identified; Forest, Clay Pit and Reed Bank are confirmed (official RE appendix 'column of the game board' + NL012 text + D110 errata)"
     ],
     "test_case_ids": [
       "B056-prereq-ok",
@@ -91,6 +90,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-14",
     "implementation_status": "not_started",
-    "notes": "Free cost; prereq a family member on Fishing. Each use of one of the four action spaces above Fishing grants +1 food. bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
+    "notes": "Free cost; prerequisite a family member on Fishing (checked at play time only). Each use of one of the four action spaces above Fishing grants +1 food. 'Above' means the same board column (official RE appendix). Forest, Clay Pit and Reed Bank are confirmed; the fourth space is unresolved (candidate: the round-1 revealed action-card slot). Implementation should use board position metadata, not a fixed list."
   }
 }
