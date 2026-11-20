@@ -4301,7 +4301,11 @@ RAW_TEXT_PREREQ = {
     "C003": "未配置の人物1（未配置の人物が1人以上いる）",
     "C010": "大きい進歩2（大きい進歩を2つ出している）",
     "C020": "ラウンド9またはその後に出す（ラウンド9以降に出す）",
-    "D005": "栽培中の畑1（栽培中の畑が1つ以上ある）",
+    # D005 ("栽培中の畑1") intentionally stays out of this table: the Rust parity test
+    # spec_cost_prereq_parity_with_verified_cards pins its spec prerequisites to [].  Adding
+    # the condition here would desynchronise the snapshot from the committed spec until the
+    # implementation gains the same prerequisite.  Tracked as Q-08 in
+    # docs/card-data-3way-audit.md.
     "D021": "家に人物がいない",
 }
 for _card_id, _text in RAW_TEXT_PREREQ.items():
