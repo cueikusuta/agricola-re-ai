@@ -39,7 +39,20 @@
         "amount": 2
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 2
+        }
+      },
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "ストックに建設資材1以上（建設資材が1以上ある）"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -94,8 +107,10 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: recorded as raw_text; no predicate in the current vocabulary"
+    ],
     "test_case_ids": [
       "B018-normal",
       "B018-round"

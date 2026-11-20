@@ -43,7 +43,9 @@
       "conditions": [
         {
           "predicate": "has_stone_in_stock",
-          "params": { "minimum": 1 }
+          "params": {
+            "minimum": 1
+          }
         }
       ],
       "steps": [
@@ -69,11 +71,15 @@
       "conditions": [
         {
           "predicate": "round_is",
-          "params": { "round": 14 }
+          "params": {
+            "round": 14
+          }
         },
         {
           "predicate": "has_stone_in_stock",
-          "params": { "minimum": 1 }
+          "params": {
+            "minimum": 1
+          }
         }
       ],
       "steps": [
@@ -103,7 +109,8 @@
     "unresolved_fields": [],
     "test_case_ids": [
       "B110-setup-phase-end-stone-food",
-      "B110-round14-setup-phase-end-stone-vegetable"
+      "B110-round14-setup-phase-end-stone-vegetable",
+      "B110-setup-phase-end-no-stone"
     ],
     "checked_by": "AI source comparison vs BGA wiki",
     "checked_on": "2026-11-14",

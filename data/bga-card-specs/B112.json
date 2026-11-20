@@ -72,7 +72,8 @@
     "status": "bga_checked",
     "unresolved_fields": [],
     "test_case_ids": [
-      "B112-most-recent-action-space-grain"
+      "B112-most-recent-action-space-grain",
+      "B112-other-action-space-no-grain"
     ],
     "checked_by": "AI source comparison vs BGA wiki",
     "checked_on": "2026-11-14",

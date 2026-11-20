@@ -43,7 +43,9 @@
       "conditions": [
         {
           "predicate": "pay_wood",
-          "params": { "amount": 1 }
+          "params": {
+            "amount": 1
+          }
         }
       ],
       "steps": [
@@ -72,7 +74,8 @@
     "status": "bga_checked",
     "unresolved_fields": [],
     "test_case_ids": [
-      "B109-play-occupation-pay-wood-gain-food"
+      "B109-play-occupation-pay-wood-gain-food",
+      "B109-play-occupation-no-pay"
     ],
     "checked_by": "AI source comparison vs BGA wiki",
     "checked_on": "2026-11-14",
