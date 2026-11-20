@@ -40,3 +40,10 @@
 - 表の行数 17＋14＋15 = 46、判定の内訳 一致23・表現不足3・食い違い20。
 - 全46枚で費用・前提・印刷点を突合し、相違は D080 のOR費用のみ。
 - 変更は `docs/dband-spec-check.md`・`PROGRESS.md`・本ログのみ（`src/` `data/` `tests/` は無変更）。
+
+## PR とゲート
+
+- PR: #402（base `main`、head `research/freebuff-dband-spec-check`）。**マージしない。**
+- Actions（文書のみの変更）: Detect changed files / CI required / Pipeline gates (spec/catalog/blockers) が pass。
+  cargo test・clippy・rustfmt・M1/M2/M7 seeded performance は skipping。実行SHAと run URL は PR 本文に記録した。
+- 独立レビューは未実施。カード効果の解釈に関わるため `AGENTS.md` §14 の対象で、別セッションでの初回レビューが必要。
