@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "D076",
+  "cases": [
+    {
+      "id": "D076-no-food-gain-wood-clay",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_harvest"
+      },
+      "expected": {
+        "wood_delta": 1,
+        "clay_delta": 1,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "0 food after feeding -> gain 1 wood and 1 clay"
+    },
+    {
+      "id": "D076-has-food-no-gain",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2
+      },
+      "action": {
+        "trigger": "after_harvest"
+      },
+      "expected": {
+        "wood_unchanged": true,
+        "clay_unchanged": true,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "Has food after feeding -> no gain"
+    },
+    {
+      "id": "D076-multiple-harvests",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_harvest",
+        "harvest_number": 1
+      },
+      "expected": {
+        "wood_delta": 1,
+        "clay_delta": 1
+      },
+      "notes": "Effect triggers every harvest when condition met"
+    }
+  ]
+}

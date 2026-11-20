@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "card_id": "D085",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "読書家",
+    "name_en": "Reader"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2836",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "occupation_count",
+          "params": {
+            "min": 6
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "grant_residence_slot",
+            "slots": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "職業: stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: occupation_count min=6 for '職業が6枚' - draft variant 7枚 is separate flag",
+      "effects[0].steps[0].params.kind: grant_residence_slot not in vocabulary - needs formalization",
+      "effects[0].trigger: passive condition check timing for occupation count needs clarification"
+    ],
+    "test_case_ids": [
+      "D085-5-occupations-no-slot",
+      "D085-6-occupations-grant-slot",
+      "D085-draft-variant-7-occupations"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Effect: When player has 6 occupations (7 in draft variant), this card provides 1 residence slot. Stage 3: residence slot. Stays in play area as occupation."
+  }
+}

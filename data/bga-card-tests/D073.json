@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "card_id": "D073",
+  "cases": [
+    {
+      "id": "D073-fishing-buy-grain",
+      "scope": "effect_only",
+      "setup": {
+        "food": 3
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "fishing",
+        "choose_option": "buy_grain"
+      },
+      "expected": {
+        "food_delta": -1,
+        "grain_delta": 1,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "After fishing, pay 1 food for 1 grain"
+    },
+    {
+      "id": "D073-fishing-buy-vegetable",
+      "scope": "effect_only",
+      "setup": {
+        "food": 3
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "fishing",
+        "choose_option": "buy_vegetable"
+      },
+      "expected": {
+        "food_delta": -3,
+        "vegetable_delta": 1,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "After fishing, pay 3 food for 1 vegetable"
+    },
+    {
+      "id": "D073-fishing-decline",
+      "scope": "effect_only",
+      "setup": {
+        "food": 3
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "fishing",
+        "choose_option": "decline"
+      },
+      "expected": {
+        "resources_unchanged": true,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "Player may decline the optional purchase"
+    },
+    {
+      "id": "D073-insufficient-food",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "fishing",
+        "choose_option": "buy_vegetable"
+      },
+      "expected": {
+        "effect_rejected": true,
+        "reason": "insufficient food to pay cost"
+      },
+      "notes": "Cannot buy vegetable without 3 food"
+    }
+  ]
+}
