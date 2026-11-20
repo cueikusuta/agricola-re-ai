@@ -321,3 +321,113 @@
 ### 4.6 ドラフト評価の記録
 
 L1/L2 とも §5 の記録形式に従い、加えて次を残す: ドラフトイベント列（各席の正当な観測投影を含む）・ドラフト再演ハッシュ・`start_player`・ピック別時間・参照ドラフト方策の版ID・プール版（`card_set_hash` と40+40ゲート実測）・破棄カードID（コーディネータ側のみ）。
+
+## 5. 計測の記録形式
+
+**目的: あとから版どうしを比べられること。** そのためには「どの条件で・どの版で・どのseedで・どの規約で集計したか」が機械可読に固定され、条件の違いが暗黙に混ざらないことが必要である。本章のスキーマは**設計提案（未実装）**であり、既存実装の字段は §1.7 の基盤を正本とする。
+
+### 5.1 記録の層
+
+| 層 | ファイル | 役割 | 既存基盤 |
+|---|---|---|---|
+| 実行マニフェスト | `run-manifest.json` | 実験同一性・条件・事前登録（判定規則・追加上限・seed範囲） | `docs/m13-runs/*/run-manifest.json`、m8-3設計§5 |
+| 試合行 | `shard-N/matches.jsonl` | 1試合1行。再演検証付きの権威側記録 | `paired_eval` schema v1 |
+| ドラフト記録 | 試合行に内包、または `draft-events.jsonl` | ドラフトイベント・ピック時間・観測投影 | `DraftState`/`DraftEpisode`（拡張提案） |
+| 集計レポート | `report.json` | 指標・区間・ガード・判定区分 | `paired_eval_stats.py` |
+| 失敗記録 | `errors.jsonl` | 失敗seed・理由・再現コマンド | m8-3設計§5 |
+| 学習データ | `episodes.jsonl` | `EpisodeRecord`（評価試合とは別系統） | `src/episode_data.rs` |
+| G0証拠 | `evidence.json` + `checks.json` | 実ファイルから再計算したhash束縛 | `docs/m12-dataset-split-and-g0.md` |
+
+### 5.2 実行マニフェスト（提案骨子）
+
+```json
+{
+  "schema_version": 2,
+  "experiment_id": "eval-4p-draft107-<slug>",
+  "condition_id": "<SHA256(players, ruleset, deck_content_hash, draft_mode, opponent_profile, compute_budget, engine_version)>",
+  "preregistration": {
+    "primary_comparison": "candidate vs frozen-baseline (head-to-head + mirror)",
+    "decision_rule_version": "lexicographic-first-v1 (§3.3)",
+    "interim_plan": "initial 250 blocks -> 1 predeclared increment -> final",
+    "max_blocks": 1000,
+    "bootstrap": { "method": "percentile-block", "iterations": 10000, "seed": 20261106 }
+  },
+  "code_sha": "...", "engine_sha": "...", "ruleset_version": "...",
+  "players": 4, "card_mode": "verified_4p", "card_set_count": 80, "card_set_hash": "...",
+  "pool_gate_snapshot": { "usable_occupations_4p": 40, "usable_minors_4p": 40, "measured_at_sha": "..." },
+  "draft_mode": "draft_10_7_simultaneous",
+  "draft_ruleset": { "direction": "right/right", "start_player_stream": "independent", "pick_order": "<#155確定値>" },
+  "arms": {
+    "candidate": { "game_policy_id": "...", "config_id": "...", "weights_hash": "...", "draft_policy_id": "...", "details_policy_id": "..." },
+    "baseline":  { "game_policy_id": "puct", "config_id": "puct-s32-d2-c1.5-pt6-vt8-terminal-rl0-fp0", "draft_policy_id": "...", "code_sha": "..." }
+  },
+  "compute_budget": { "search_mode": "time-budgeted|simulation-capped", "decision_budget_ms": 0, "detail_reserve_ms": 0, "simulations": 32, "time_budget_max_simulations": 0 },
+  "seeds": { "seed_start": 0, "blocks": 250, "shards": 8, "split_version": "...", "test_range_locked": "..." },
+  "environment": { "host_os": "...", "cpu_model": "...", "rustc_version": "...", "build_profile": "release" },
+  "run_id": "...", "attempt": 1, "started_at": "...", "finished_at": "...", "artifact_url": "..."
+}
+```
+
+- `preregistration` は**実行前**に確定して記録する。結果を見てから判定規則・追加上限・seed範囲を書き換えない。
+- `pool_gate_snapshot` は配布可能枚数の実測（`card_pool_report`）を登録時のSHA付きで残す。40+40未達なら最終モードの実行自体を拒否する。
+- 相手席の方策が焦点席と異なる既定設定で動く場合（§2.5）、そのことを `arms` に明記する。
+
+### 5.3 試合行（既存 schema v1 ＋ 最終モード拡張）
+
+**既存の必須字段**（`paired_eval_stats.py` が検証する。抜粋）:
+
+- 同一性: `schema_version`, `block_index`, `seed`, `arm_id`, `candidate_seat`, `players`, `cards`, `additional_action_space`, `focus_policy`, `opponent_policy`, `candidate_puct_config_id`, `baseline_puct_config_id`, `puct_*` スカラー。
+- 完全性: `finished`, `rounds_completed=14`, `replay_verified`, `replay_hash`（64桁hex）, `card_set_count`, `card_set_hash`。
+- 結果: `scores_by_seat`, `ranks_by_seat`, `first_place_credit`, `expected_rank_observation`, `score_margin`。
+- 時間: `total_wall_ms`, `decisions`, `focus_decisions`, `max_policy_select_ms`, `p50/p95/p99_policy_select_ms`, `focus_max/p95/p99_decision_ms`, `focus_max/p95_detail_ms`, `timeout_count`, `fallback_count`, `focus_*_fallback_count`, `focus_late_decision_count`, `focus_max_decision_overshoot_ms`, `focus_budget_tolerance_ms`。
+- 予算モード: `search_mode`, `decision_budget_ms`, `mcts_deadline_active`, `deterministic_policy_selection`, `search_budget_enforced`, `whole_decision_budget_enforced`, `detail_reserve_ms`, `time_budget_max_simulations`, `focus_observed_all_decisions_within_budget(_tolerance/_10s)`。
+
+**最終モード拡張（提案・`schema_version` を上げて追加）**:
+
+| 字段 | 内容 | 公開境界 |
+|---|---|---|
+| `draft_mode`, `draft_ruleset_id` | ドラフト方式と確定パラメータ | 条件メタデータ |
+| `draft_policy_id_by_seat`, `game_policy_id_by_seat` | 全4席の方策版（焦点席だけでなく全席） | 条件メタデータ |
+| `draft_replay_hash` | ドラフトイベント列の再演ハッシュ | コーディネータ側 |
+| `start_player` | ドラフト前抽選の初回スタートプレイヤー | 公開情報 |
+| `final_hands_by_seat`, `discarded_private_ids` | 各席の最終手札・破棄カード | **コーディネータ側のみ。AI観測・学習サンプルに出さない** |
+| `focus_pick_max_ms`, `focus_pick_p95_ms`, `pick_timeout_count`, `pick_fallback_count` | 1ピック単位の時間・フォールバック | 計測 |
+| `interference_proxy` | 妨害系カードのプレイ/選択回数と自己得点損失の代理計数（§1.4） | 計測 |
+
+- 行は**信頼できるコーディネータ側の記録**であり、`TrainingSample`（公開情報のみ）とは別物。この境界は `EpisodeRecord` と同じ規約で保つ。
+- 集約側は拡張字段の型・範囲・席数一致を検証し、`draft_mode` と行の条件が一致しないレポートを拒否する。
+
+### 5.4 集計レポート（既存 ＋ 拡張）
+
+既存 `paired_eval_stats.py` のレポート（首位クレジット・差・95%CI・席別内訳・参考値3種・`comparison_design`・`saturation`・必要ブロック数・速度・config ID・10秒観測フラグ）に、次を追加する:
+
+- **判定区分**（§3.3）: `decision.layer1_category`（adopted / improvement_below_target / hold / rejected）、`decision.layer2_rank_reference`（期待順位差と区間・参照可否）、`decision.final`（未判定を含む）。
+- 期待順位差・得点差差のブロック区間（§3.2）。得点差は平均に加えて分布（分位・ヒストグラム）を記録する。
+- ドラフト節（L1/L2）: ピック時間分位・フォールバック率・手札代理指標・L1↔L2相関（§4.5）。
+- ガード結果一覧（§3.4）と、ガード不合格時の「判定不能」明示。
+
+### 5.5 版どうしの比較可能性の規則
+
+1. **直接比較は `condition_id` 一致が前提**。モード・デッキ版・ドラフト方式・予算モード・予算値・相手構成のいずれかが違えば別条件であり、合算しない。
+2. provenance（engine/rules/cards/code/AI版）の一様性を集約側で強制し、不一致は fail closed で拒否する。config ID と行内スカラーの矛盾も拒否する（既存実装）。
+3. **未知の `schema_version` は拒否**する。旧形式行（config IDなし等）は履歴として受理するが、新形式と暗黙に混在させない。
+4. 異なるRun間の比較は、同一 `condition_id`・同一bootstrap規約の場合のみ「比較可能」と表示する。条件をまたぐ主張は**橋渡し実験**（同一seed群で両条件を実行）を別途登録して行う。
+5. **過去データを書き換えない**。基準が昇格しても旧Runは旧基準の記録として残し、各Runのマニフェストが「どの版を基準にしたか」を保持する（§2.5）。
+6. 数値は実ファイルから再計算する。試合数・hashを手入力した証拠は受理しない（`g0_evidence.py` の規約。G0 evidence v2）。
+
+### 5.6 保全（長期archive）
+
+- GitHub Actions Artifactは保持期間で消える。**正式Runはリポジトリ内 `docs/eval-runs/<date>-<slug>/` に保全する**（`run-manifest.json`・`report.json`・`shard-N.matches.jsonl.gz`・evidence）。先行例: `docs/m13-runs/`・`docs/g0-runs/`。ポインタ方針は `docs/perf/` のREADME慣行に倣う。
+- 保全対象は「あとから版を比較するのに必要な最小完全セット」（マニフェスト・全試合行・レポート・証拠）。生ログはArtifact側に残し、长期保全は圧縮試合行とする。
+- 秘密情報（内部seedのAI入力・非公開手札の観測流出）は記録に含めない。コーディネータ側字段とAI観測の境界（§5.3）を保全時も保つ。
+
+### 5.7 スキーマ進化
+
+- `schema_version` は単調増加。読取側は未知版を拒否（fail closed）。
+- 追加字段は旧行で欠落を許す（後方互換）。**意味の変更は新版＋移行フィクスチャ**（旧版で生成した実データを新版が読めることの証明）を伴う。旧データを無言で再解釈しない（ドラフトschema v1→v2の先例）。
+
+### 5.8 学習データとG0証拠（別系統）
+
+- 学習データは `EpisodeRecord`（schema_version=1）のJSONL。全件再演検証・`inspect_dataset` による件数/重複seed/破損/provenance検査・`training_samples(viewer)` の `assert_public()` を経て分割Manifestへ渡す。
+- G0証拠は evidence v2（`matches_sha256`・`checks_sha256` を実ファイルから計算）で束縛し、`dataset_split g0` が scale・ブロック完全性・seedブロック・test範囲ロックを**行から再計算**して pass/hold/fail を出す。自己申告では合格しない（`docs/m12-dataset-split-and-g0.md`）。
+- 評価試合の記録（§5.3）と学習データは seedプール・用途が異なる（§2.1）。同一ファイルを両用しない。
