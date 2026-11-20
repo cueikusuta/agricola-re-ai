@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "card_id": "E074",
+  "cases": [
+    {
+      "id": "E074-place-5",
+      "scope": "effect_only",
+      "setup": {
+        "supply_fences": 9
+      },
+      "action": {
+        "play": "E074"
+      },
+      "expected": {
+        "fences_on_card": 5,
+        "supply_fences": 4
+      },
+      "notes": "On play, (up to) 5 fences move from supply to this card."
+    },
+    {
+      "id": "E074-fence-from-card-free",
+      "scope": "effect_only",
+      "setup": {
+        "fences_on_card": 5
+      },
+      "action": {
+        "play": "E074",
+        "build_fences": 2
+      },
+      "expected": {
+              "fences_taken_from_card": 2,
+              "fencing_cost": 0,
+              "fences_on_card": 3
+            },
+      "notes": "Building fences consumes the card's fences first, at no cost."
+    },
+    {
+      "id": "E074-sixth-fence-normal",
+      "scope": "effect_only",
+      "setup": {
+        "fences_on_card": 0,
+        "supply_fences": 7
+      },
+      "action": {
+        "play": "E074",
+        "build_fences": 1
+      },
+      "expected": {
+        "fencing_cost": "normal",
+        "fences_on_card": 0
+      },
+      "notes": "Fences built from the supply once the card is empty cost the normal price."
+    }
+  ]
+}
