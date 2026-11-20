@@ -112,16 +112,18 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
-    "test_case_ids": [
-      "D107-choose-food",
-      "D107-choose-vp",
-      "D107-no-brick"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-20",
-    "implementation_status": "not_started",
-    "notes": "Classification: stage 3 (return home phase). Uses RH. MQ-14: whether 'all bricks' includes bricks on this card (STACK) unresolved - currently assumed stock only per MQ-14 resolution."
-  }
+      "status": "needs_resolution",
+      "unresolved_fields": [
+        "effects: whether 'all bricks' includes bricks on this card (STACK) unresolved - no MQ-14 reference exists in repository"
+      ],
+      "test_case_ids": [
+        "D107-choose-food",
+        "D107-choose-vp",
+        "D107-no-brick"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-20",
+      "implementation_status": "not_started",
+      "notes": "Classification: stage 3 (return home phase). Uses RH. Whether 'all bricks' includes bricks on this card (STACK) is unresolved."
+    }
 }

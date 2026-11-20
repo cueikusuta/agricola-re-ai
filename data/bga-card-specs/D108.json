@@ -89,6 +89,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-20",
     "implementation_status": "not_started",
-    "notes": "Classification: stage外 (single site: harvest / exchange). Uses TR-SITE. Once per harvest per wiki '収穫時、このカードで石材ちょうど1を食料3に変換できる'."
+    "notes": "Classification: stage外 (single site: harvest / exchange). Uses TR-SITE. Once per harvest, convert exactly 1 stone to 3 food."
   }
 }

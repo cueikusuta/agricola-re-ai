@@ -105,6 +105,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-20",
     "implementation_status": "not_started",
-    "notes": "Classification: stage外 (single site: harvest/fields / purchase). Uses TR-SITE. Wiki: '畑から収穫した小麦の数だけ、食料3払って野菜1を購入できる。畑から最後の小麦を収穫したなら、野菜を食料2で購入できる'."
+    "notes": "Classification: stage外 (single site: harvest/fields / purchase). Uses TR-SITE. Per grain harvested from fields, may buy 1 vegetable for 3 food; last grain costs 2 food."
   }
 }

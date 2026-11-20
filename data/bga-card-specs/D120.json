@@ -60,7 +60,7 @@
       "snapshot": "before_effect",
       "order": 0,
       "decision_owner": "none",
-      "notes": "On play, place 1 brick on each unplayed round space from 6 to 14. At start of each of those rounds, gain the brick. Wiki: 'ラウンド6から14のうち未プレイのラウンドスペース全てにレンガ1ずつ置く。これらのラウンドのはじめにそのレンガを得る'."
+      "notes": "On play, place 1 brick on each unplayed round space from 6 to 14. At start of each of those rounds, gain the brick."
     }
   ],
   "post_play": {
@@ -77,6 +77,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-20",
     "implementation_status": "not_started",
-    "notes": "Classification: stage 4 P7 (round reservation + start of round gain). Uses PS, TR-SITE, STACK. On play: place 1 brick on rounds 6-14 (9 bricks if played before round 6). At round_start of each, gain 1 brick. Rounds already played are skipped ('未プレイのラウンドスペース')."
+    "notes": "Classification: stage 4 P7 (round reservation + start of round gain). Uses PS, TR-SITE, STACK. On play: place 1 brick on rounds 6-14 (9 bricks if played before round 6). At round_start of each, gain 1 brick. Rounds already played are skipped (unplayed round spaces)."
   }
 }

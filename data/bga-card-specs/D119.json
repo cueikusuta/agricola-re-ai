@@ -89,7 +89,7 @@
       "snapshot": "before_event",
       "order": 0,
       "decision_owner": "owner",
-      "notes": "Before using action space with fence build or room build action, choose: gain 2 wood OR exchange up to 2 wood for 1 reed each (1:1). Wiki: '木材2を得るか、木材2までをそれぞれ葦1と交換するか、どちらかを選んで行える'."
+      "notes": "Before using action space with fence build or room build action, choose: gain 2 wood OR exchange up to 2 wood for 1 reed each (1:1)."
     }
   ],
   "post_play": {

@@ -60,7 +60,7 @@
       "snapshot": "before_effect",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Each renovation: place 1 food on each of the next 6 round spaces. At start of those rounds, gain the food. Wiki: 'その先6ラウンドのスペースに食料1ずつ置く' = next 6 rounds. rounds param may need specific round numbers 1-6 from current."
+      "notes": "Each renovation: place 1 food on each of the next 6 round spaces. At start of those rounds, gain the food. Rounds param may need specific round numbers 1-6 from current."
     }
   ],
   "post_play": {

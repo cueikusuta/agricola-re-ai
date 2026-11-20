@@ -87,7 +87,7 @@
       "snapshot": "before_effect",
       "order": 1,
       "decision_owner": "owner",
-      "notes": "Each improvement played from hand: up to 2 wood in its cost can be paid with 1 food each. Wiki: '進歩コストの木材2つまでを食料1ずつで代用できる'."
+      "notes": "Each improvement played from hand: up to 2 wood in its cost can be paid with 1 food each."
     }
   ],
   "post_play": {

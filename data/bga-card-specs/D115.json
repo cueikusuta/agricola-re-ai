@@ -97,6 +97,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-20",
     "implementation_status": "not_started",
-    "notes": "Classification: stage外 (single site: harvest/breeding / sow). Uses TR-SITE. Wiki: '収穫の繁殖フェイズで、あなたは得た家畜の子1につき、畑ちょうど1に農作物を種まきしてもよい'."
+    "notes": "Classification: stage外 (single site: harvest/breeding / sow). Uses TR-SITE. During harvest breeding phase, per baby animal gained, may sow 1 crop on exactly 1 empty field."
   }
 }

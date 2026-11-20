@@ -38,69 +38,45 @@
     "printed_points": 0
   },
   "effects": [
-    {
-      "trigger": "passive",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "other",
-          "target": "owner",
-          "params": {
-            "kind": "personal_accumulation_space",
-            "space_name": "wood_1",
-            "resource": "wood",
-            "rate": 1,
-            "owner_only": true
+      {
+        "trigger": "stone_accumulation_space_revealed",
+        "conditions": [],
+        "steps": [
+          {
+            "operation": "other",
+            "target": "card",
+            "params": {
+              "kind": "move_all_goods_on_card_to_supply",
+              "good": "wood",
+              "notes": "Discard all wood on this card when Quarry (stone accumulation space) is newly revealed"
+            }
           }
-        }
-      ],
-      "optional": false,
-      "frequency": "always",
-      "duration": "permanent",
-      "snapshot": "live_state",
-      "order": 0,
-      "decision_owner": "none",
-      "notes": "Creates a personal accumulation space 'Wood 1' that only this player can use. Accumulates 1 wood per round."
-    },
-    {
-      "trigger": "stone_accumulation_space_revealed",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "other",
-          "target": "card",
-          "params": {
-            "kind": "move_all_goods_on_card_to_supply",
-            "good": "wood",
-            "notes": "Discard all wood on this card when Quarry (stone accumulation space) is newly revealed"
-          }
-        }
-      ],
-      "optional": false,
-      "frequency": "every_use",
-      "duration": "instant",
-      "snapshot": "before_effect",
-      "order": 1,
-      "decision_owner": "none",
-      "notes": "When Quarry action space card is newly revealed, discard all wood on this card. Wiki: 'アクションスペースカード「石切り場」が新たに公開されるたび、このカードの上の木材を全て捨てなければならない'."
-    }
-  ],
+        ],
+        "optional": false,
+        "frequency": "every_use",
+        "duration": "instant",
+        "snapshot": "before_effect",
+        "order": 0,
+        "decision_owner": "none",
+        "notes": "When Quarry action space card is newly revealed, discard all wood on this card."
+      }
+    ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "effects: personal_accumulation_space and stone_accumulation_space_revealed trigger not in standard vocabulary; move_all_goods_on_card_to_supply kind for specific good only"
-    ],
-    "test_case_ids": [
-      "D116-accumulate-wood",
-      "D116-quarry-revealed-discard",
-      "D116-owner-only-access"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-20",
-    "implementation_status": "not_started",
-    "notes": "Classification: stage 4 P6 (own accumulation space + reset). Uses PS, TR-SITE, STACK. Ban status: weak per ledger. Personal accumulation space only usable by owner; Quarry reveal resets wood on card to 0."
-  }
+      "status": "needs_resolution",
+      "unresolved_fields": [
+        "effects: personal_accumulation_space not in standard vocabulary; stone_accumulation_space_revealed is in vocabulary (2026-11-09 supplement); move_all_goods_on_card_to_supply kind for specific good only"
+      ],
+      "test_case_ids": [
+        "D116-accumulate-wood",
+        "D116-quarry-revealed-discard",
+        "D116-owner-only-access"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-20",
+      "implementation_status": "not_started",
+      "notes": "Classification: stage 4 P6 (own accumulation space + reset). Uses PS, TR-SITE, STACK. Ban status: weak per ledger. Personal accumulation space only usable by owner; Quarry reveal resets wood on card to 0."
+    }
 }
