@@ -86,3 +86,47 @@
 前回 #387 でB帯21枚を照合済み。`origin/main` のB帯実装は21件のままで、追加されたカードは無い。
 本章での新規照合は無し。
 
+## 第C章 C帯（2枚）
+
+C帯の実装は10枚で、うち8枚は #387 で照合済み。今回追加された **C083 若牛** と **C147 牛の飼育士** を照合した。
+**効果文・費用・前提・回数は2枚とも文献と一致。** 食い違いは C083 の「置き場所がないときの扱い」に集中している。
+
+| ID | カード | 仕様データの読み（要約） | 文献の読み（要約） | 判定 | 根拠 |
+|---|---|---|---|---|---|
+| C083 | 若牛 | 小進歩。費用なし・前提なし・-3点。出した時、牛2を得る（`on_play` / `once_per_play` / `instant`）。テストは空き容量0ならプレイ拒否 | 費用なし・前提なし・-3点。出したときすぐ牛2を得る。収容できない牛は「逃げる」（放棄） | 一致（本体）／テスト期待は食い違い | [wiki p=3006](https://agricola.cloudfree.jp/?p=3006)・[英語一覧](https://agricola.cloudfree.jp/cardlist_en/) |
+| C147 | 牛の飼育士 | 職業。費用なし・0点。自分が累積スペース「牛市場」を使うたび（`every_use`）追加で牛1。2人=不可、3/4人=可 | 職業。3〜5人。累積スペース「1牛（牛市場、ラウンド10または11に登場）」を使うたび、追加で牛1を**共通ストックから**得る | 一致 | [wiki p=2942](https://agricola.cloudfree.jp/?p=2942)・[英語一覧](https://agricola.cloudfree.jp/cardlist_en/)・[Unofficial Compendium v9.0](https://m.alavigne.net/Gaming/Agricola/agricola-comp-v9.0.html) |
+
+### 第C章の要点
+
+- **C083 若牛**: 日本語ページ・英語一覧とも「このカードを出したとき、すぐに牛2を得る」で、費用・前提なし、-3点。
+  仕様JSONの `effects` は `on_play` で牛2を1回だけ得る形になっており、**効果の読みは一致**する。
+  論点は端数処理で、仕様テスト `C083-capacity-full` が「空き容量0ならプレイ拒否」を期待している点（第2章 食い違い1）。
+- **C147 牛の飼育士**: 仕様の `after_worker_space` + `worker_space_used(cattle_market)` + `every_use` は
+  文献の「自分の牛市場の使用のたび・追加で牛1」と一致。回数（毎回）、対象（所有者のみ）、
+  出所（共通ストック＝累積スペースの牛とは別枠）も一致している。
+  文献側の境界裁定として「5人戦の『好きな動物1』スペースでは発動しない」があり、
+  実装が `Space::CattleMarket` に限定している点はこの裁定と同じ構造である（2人戦の追加タイル「動物市場」は別 `Space`）。
+  ただし**人数適格（2人=不可）が実装レジストリに反映されていない**（第2章 食い違い3。コードは修正しない）。
+
+### 第C章 個別メモ（C083 の端数処理）
+
+文献の根拠は3段階に分かれる。
+
+1. **公式ルール（等級A）**: 家畜は農場に収容する必要があり、「収容しなければ家畜は逃げていく」。
+   また「いつでも、家畜を含む財を共通ストックへ放棄できる」。したがって
+   「牛2を得る」効果で空きが無いときは、**カードは出せて、収容できない分は放棄**という読みが自然である。
+   （2016年改訂版ルールブック。参照した公開PDF: [bgames.com.ua の revised ルール](https://www.bgames.com.ua/rules/agricola_revised.pdf)、
+   [board-game-rules.com の revised ルール](https://board-game-rules.com/boardgames/agricola-revised-edition)）
+2. **BGA実装の説明（等級C）**: 「家畜を獲得した場合、即座に『牧場』か『牧場外の厩』か『家』に配置するか、
+   家畜を食料に変換できる進歩を所持している場合はそれを用いて直ちに食料に変換しなければならない。
+   配置も食料に変換もできない家畜は即座に逃がしてストックに戻す」。
+   つまり BGA でも**プレイ自体は拒否されず、超過分が解放される**。
+   （[BGA ゲームパネル 和文ルール](https://ja.boardgamearena.com/gamepanel?game=agricola)）
+3. **裁定集（等級D）**: カードで家畜を得る同型の効果について、
+   「手に入れた家畜は直ちにかまど等で食料に換えてもよい。このとき、農場内に空きスペースが無くてもよい」
+   という裁定が繰り返し示されている（例: 家畜の世話人/Stockman、Animal Dealer）。
+   したがって C083 の牛2も、**空きが無くても出せて、かまど等があれば直ちに食料化できる**のが文献側の扱い。
+   （[日本語コンピューディウム](https://shiwehi.com/boardgame/agricola/agricola_rule.pdf)、
+   [Unofficial Compendium v9.0](https://m.alavigne.net/Gaming/Agricola/agricola-comp-v9.0.html)、
+   [Agricola Norge Compendium](https://agricola.no/wp-content/uploads/2024/07/compendium.pdf)）
+
