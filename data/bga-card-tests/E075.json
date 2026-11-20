@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "E075",
+  "cases": [
+    {
+      "id": "E075-use-space-pay-stone",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 1
+      },
+      "action": {
+        "play": "E075",
+        "use": "wood_accumulation_space",
+        "return_stone": 1
+      },
+      "expected": {
+        "additional_wood": 3,
+        "stone_delta": -1
+      },
+      "notes": "Returning 1 stone when using a wood accumulation space yields 3 additional wood."
+    },
+    {
+      "id": "E075-use-space-no-stone",
+      "scope": "effect_only",
+      "setup": {
+        "stone": 0
+      },
+      "action": {
+        "play": "E075",
+        "use": "wood_accumulation_space"
+      },
+      "expected": {
+        "additional_wood": 0
+      },
+      "notes": "Without stone in stock the exchange cannot be made."
+    }
+  ]
+}

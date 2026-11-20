@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "card_id": "E081",
+  "cases": [
+    {
+      "id": "E081-owner-use",
+      "scope": "effect_only",
+      "setup": {
+        "owner_stock": [
+          "wood",
+          "stone"
+        ]
+      },
+      "action": {
+        "play": "E081",
+        "owner_use": true
+      },
+      "expected": {
+        "owner_wood": "+1",
+        "owner_stone": "+1",
+        "food_paid": 0
+      },
+      "notes": "The owner pays nothing and gains 1 of each building-resource type present in stock."
+    },
+    {
+      "id": "E081-other-pays-food",
+      "scope": "effect_only",
+      "setup": {
+        "opponent_stock": [
+          "clay",
+          "reed"
+        ],
+        "opponent_food": 1
+      },
+      "action": {
+        "play": "E081",
+        "opponent_use": true
+      },
+      "expected": {
+        "owner_food": "+1",
+        "opponent_clay": "+1",
+        "opponent_reed": "+1"
+      },
+      "notes": "A non-owner user first pays 1 food to the card owner."
+    },
+    {
+      "id": "E081-other-cannot-pay",
+      "scope": "effect_only",
+      "setup": {
+        "opponent_stock": [
+          "clay"
+        ],
+        "opponent_food": 0
+      },
+      "action": {
+        "play": "E081",
+        "opponent_use": true
+      },
+      "expected": {
+        "unresolved": "BQ-13: whether use is illegal or payment is waived when the user cannot pay — undecided"
+      },
+      "notes": "Placeholder: the undecided non-payer case is recorded, not resolved."
+    }
+  ]
+}

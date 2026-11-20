@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "card_id": "E070",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "輪作畑",
+    "name_en": "Crop Rotation Field"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2683",
+        "language": "ja",
+        "checked_on": "2026-11-19",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-19",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "this_card_is_a_field",
+            "card_field": true,
+            "crops": [
+              "grain",
+              "vegetable"
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "This card is a field on your board (card-as-field modeling not in the vocabulary)."
+    },
+    {
+      "trigger": "when_last_crop_removed_from_card",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "resow_opposite_crop_on_card",
+            "resow": "opposite_of_removed_type",
+            "trigger_removal": "any_removal_of_last_grain_or_vegetable"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Whenever the last grain or vegetable is removed from this card, you may immediately sow the opposite type (vegetable or grain) on this card."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: card-as-field modeling is not covered by the vocabulary; whether and how a minor improvement acts as a farmyard field is undecided (BQ-7 / R-C1)",
+      "effects.1.trigger: the removal of the last grain/vegetable can happen outside the field phase (e.g. other cards); the trigger point and granularity of the auto-resow are undecided (BQ-7)"
+    ],
+    "test_case_ids": [
+      "E070-resow-on-empty",
+      "E070-no-resow-partial",
+      "E070-resow-vegetable-side"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-19",
+    "implementation_status": "not_started",
+    "notes": "This card is a field. Each time the last grain or vegetable is removed from it, you may immediately sow the opposite crop type on it (grain removed -> may sow vegetables; vegetable removed -> may sow grain)."
+  }
+}
