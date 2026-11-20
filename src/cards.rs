@@ -186,6 +186,37 @@ pub enum CardEffect {
         animal: Animal,
         amount: u32,
     },
+    /// A015 大工の手斧 (Carpenter's Axe): after the owner uses a wood accumulation
+    /// space (Forest, Copse, Grove) with at least 7 wood in supply, optionally
+    /// build 1 stable for 1 wood (instead of the normal 2 wood).
+    AfterWorkerSpaceBuildStable {
+        spaces: Vec<Space>,
+        min_wood: u32,
+        wood_cost: u32,
+    },
+    /// A018 車輪鋤 (Wheel Plow): once per game, when the owner is the first person
+    /// to place a worker in a round and uses Farmland or Cultivation, plow 2 fields.
+    AfterWorkerSpacePlowFields {
+        spaces: Vec<Space>,
+        amount: u32,
+    },
+    /// A021 家族向け住宅 (Family Friendly Home): after the owner uses Build Rooms
+    /// while rooms exceed people, also Family Growth and gain 1 food.
+    AfterWorkerSpaceFamilyGrowth {
+        space: Space,
+        food_amount: u32,
+    },
+    /// A023 採石事業所 (Stone Company): after the owner uses Western Quarry or
+    /// Eastern Quarry, grant an Improvement action that must spend at least 1 stone.
+    AfterWorkerSpaceImprovementAction {
+        spaces: Vec<Space>,
+        must_spend_stone: bool,
+    },
+    /// A024 脱穀板 (Threshing Board): after the owner uses Farmland or Cultivation,
+    /// grant an additional Bake Bread action.
+    AfterWorkerSpaceBakeBread {
+        spaces: Vec<Space>,
+    },
 }
 
 impl CardEffect {
@@ -230,6 +261,13 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerGain { .. } => "after_any_worker_gain",
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
+            CardEffect::AfterWorkerSpaceBuildStable { .. } => "after_worker_space_build_stable",
+            CardEffect::AfterWorkerSpacePlowFields { .. } => "after_worker_space_plow_fields",
+            CardEffect::AfterWorkerSpaceFamilyGrowth { .. } => "after_worker_space_family_growth",
+            CardEffect::AfterWorkerSpaceImprovementAction { .. } => {
+                "after_worker_space_improvement_action"
+            }
+            CardEffect::AfterWorkerSpaceBakeBread { .. } => "after_worker_space_bake_bread",
         }
     }
 }
@@ -430,32 +468,39 @@ impl CardSet {
                     .any(|(_, quantity)| *quantity == 0 || *quantity > 30)
                 || card.effects.iter().any(|effect| {
                     let amount = match effect {
-                        CardEffect::OnPlayGain { amount, .. }
-                        | CardEffect::AfterWorkerGain { amount, .. }
-                        | CardEffect::OnPlayGainAnimal { amount, .. }
-                        | CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
+                        CardEffect::OnPlayGain { amount, .. } => *amount,
+                        CardEffect::AfterWorkerGain { amount, .. } => *amount,
+                        CardEffect::OnPlayGainAnimal { amount, .. } => *amount,
+                        CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
+                        CardEffect::AfterWorkerSpacePlowFields { amount, .. } => *amount,
+                        CardEffect::AfterWorkerSpaceFamilyGrowth { food_amount, .. } => {
+                            *food_amount
+                        }
+                        CardEffect::AfterWorkerSpaceBuildStable { wood_cost, .. } => *wood_cost,
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
                         | CardEffect::Passive { .. } => 1,
                         #[cfg(test)]
                         CardEffect::PendingProbe { .. } => 1,
-                        CardEffect::OnPlayGainPerStored { amount, .. }
-                        | CardEffect::OnPlayGainIfHouse { amount, .. }
-                        | CardEffect::StartRoundGain { amount, .. }
-                        | CardEffect::StartRoundGainIfFoodAtLeastRound { amount, .. }
-                        | CardEffect::AfterOccupationGainPerFoodCost { amount, .. }
-                        | CardEffect::AfterOccupationGain { amount, .. }
-                        | CardEffect::StartRoundGainIfNoMinorPlayed { amount, .. }
-                        | CardEffect::HarvestFieldGainIfNoMinorPlayed { amount, .. }
-                        | CardEffect::OnPlayGainPerImprovementPlayed { amount, .. }
-                        | CardEffect::HarvestFieldGain { amount, .. }
-                        | CardEffect::AfterWorkerGainIfUsed { amount, .. }
-                        | CardEffect::AfterClayConstructionGain { amount, .. }
-                        | CardEffect::AfterHarvestBakeGain { amount }
-                        | CardEffect::OnPlayGainPerCount { amount, .. }
-                        | CardEffect::AfterAnyWorkerGain { amount, .. }
-                        | CardEffect::AfterAnyWorkerOthersGain { amount, .. }
-                        | CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
+                        CardEffect::OnPlayGainPerStored { amount, .. } => *amount,
+                        CardEffect::OnPlayGainIfHouse { amount, .. } => *amount,
+                        CardEffect::StartRoundGain { amount, .. } => *amount,
+                        CardEffect::StartRoundGainIfFoodAtLeastRound { amount, .. } => *amount,
+                        CardEffect::AfterOccupationGainPerFoodCost { amount, .. } => *amount,
+                        CardEffect::AfterOccupationGain { amount, .. } => *amount,
+                        CardEffect::StartRoundGainIfNoMinorPlayed { amount, .. } => *amount,
+                        CardEffect::HarvestFieldGainIfNoMinorPlayed { amount, .. } => *amount,
+                        CardEffect::OnPlayGainPerImprovementPlayed { amount, .. } => *amount,
+                        CardEffect::HarvestFieldGain { amount, .. } => *amount,
+                        CardEffect::AfterWorkerGainIfUsed { amount, .. } => *amount,
+                        CardEffect::AfterClayConstructionGain { amount, .. } => *amount,
+                        CardEffect::AfterHarvestBakeGain { amount } => *amount,
+                        CardEffect::OnPlayGainPerCount { amount, .. } => *amount,
+                        CardEffect::AfterAnyWorkerGain { amount, .. } => *amount,
+                        CardEffect::AfterAnyWorkerOthersGain { amount, .. } => *amount,
+                        CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
+                        CardEffect::AfterWorkerSpaceImprovementAction { .. }
+                        | CardEffect::AfterWorkerSpaceBakeBread { .. } => 1,
                     };
                     amount == 0 || amount > 30
                 })
@@ -5359,6 +5404,94 @@ mod card_set_content_hash_tests {
         shuffled.definitions.reverse();
         assert_eq!(first.content_hash(), shuffled.content_hash());
     }
+}
+
+/// Aデッキ after_worker_space 単純獲得カード 5枚 (A015/A018/A021/A023/A024)。
+/// 全て MinorImprovement で、ワーカー配置後に特定スペース使用時に発動する効果を持つ。
+pub fn verified_after_worker_space_cards() -> Vec<CardDefinition> {
+    fn minor(
+        id: &str,
+        cost: Vec<(Good, u32)>,
+        points: i32,
+        effects: Vec<CardEffect>,
+    ) -> CardDefinition {
+        CardDefinition {
+            use_limit: None,
+            id: id.into(),
+            kind: CardKind::MinorImprovement,
+            cost,
+            points,
+            effects,
+        }
+    }
+
+    vec![
+        // A015 大工の手斧 (Carpenter's Axe)
+        // Cost: 1 wood. After using Forest/Copse/Grove with 7+ wood in supply: optionally build 1 stable for 1 wood.
+        minor(
+            "A015",
+            vec![(Good::Wood, 1)],
+            0,
+            vec![CardEffect::AfterWorkerSpaceBuildStable {
+                spaces: vec![Space::Forest, Space::Copse, Space::Grove],
+                min_wood: 7,
+                wood_cost: 1,
+            }],
+        ),
+        // A018 車輪鋤 (Wheel Plow)
+        // Cost: 2 wood. Once per game: when first person of round uses Farmland or Cultivation, plow 2 fields.
+        minor(
+            "A018",
+            vec![(Good::Wood, 2)],
+            0,
+            vec![CardEffect::AfterWorkerSpacePlowFields {
+                spaces: vec![Space::Farmland, Space::Cultivation],
+                amount: 2,
+            }],
+        ),
+        // A021 家族向け住宅 (Family Friendly Home)
+        // Cost: 0. Prerequisite: 1+ occupation. After using Build Rooms while rooms > people: Family Growth + 1 food.
+        minor(
+            "A021",
+            vec![],
+            0,
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(1),
+                },
+                CardEffect::AfterWorkerSpaceFamilyGrowth {
+                    space: Space::FamilyGrowthWithRoom,
+                    food_amount: 1,
+                },
+            ],
+        ),
+        // A023 採石事業所 (Stone Company)
+        // Cost: 2 clay + 1 reed. After using Western/Eastern Quarry: Improvement action that must spend 1+ stone.
+        minor(
+            "A023",
+            vec![(Good::Clay, 2), (Good::Reed, 1)],
+            1,
+            vec![CardEffect::AfterWorkerSpaceImprovementAction {
+                spaces: vec![Space::WesternQuarry, Space::EasternQuarry],
+                must_spend_stone: true,
+            }],
+        ),
+        // A024 脱穀板 (Threshing Board)
+        // Cost: 1 wood. Prerequisite: 2+ occupations. After using Farmland or Cultivation: additional Bake Bread action.
+        minor(
+            "A024",
+            vec![(Good::Wood, 1)],
+            1,
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(2),
+                },
+                CardEffect::AfterWorkerSpaceBakeBread {
+                    spaces: vec![Space::Farmland, Space::Cultivation],
+                },
+            ],
+        ),
+    ]
 }
 
 /// Get the default immutable card registry (built once, shared via Arc).

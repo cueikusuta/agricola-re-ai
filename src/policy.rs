@@ -604,10 +604,31 @@ fn card_priority(
                                                                     card_good_value(*good) * i64::from(*amount) * horizon / 2
                                                                 }
                                                                 CardEffect::OnPlayGainAnimal { animal, amount, .. }
-                                                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
-                                                                    card_animal_value(*animal) * i64::from(*amount) * horizon
-                                                                }
-                                                            };
+                                                                                                                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
+                                                                                                                                    card_animal_value(*animal) * i64::from(*amount) * horizon
+                                                                                                                                }
+                                                                                                                                // A015/A018/A021/A023/A024 after_worker_space effects
+                                                                                                                                CardEffect::AfterWorkerSpaceBuildStable { wood_cost, .. } => {
+                                                                                                                                    // Build stable for reduced wood cost; value depends on board state
+                                                                                                                                    i64::from(*wood_cost) * 3 * horizon / 4
+                                                                                                                                }
+                                                                                                                                CardEffect::AfterWorkerSpacePlowFields { amount, .. } => {
+                                                                                                                                    // Plow fields; each field is worth ~3 food equivalent
+                                                                                                                                    3 * i64::from(*amount) * horizon / 2
+                                                                                                                                }
+                                                                                                                                CardEffect::AfterWorkerSpaceFamilyGrowth { food_amount, .. } => {
+                                                                                                                                    // Family growth (worth ~12) + food
+                                                                                                                                    12 + card_good_value(Good::Food) * i64::from(*food_amount)
+                                                                                                                                }
+                                                                                                                                CardEffect::AfterWorkerSpaceImprovementAction { must_spend_stone, .. } => {
+                                                                                                                                    // Improvement action with stone requirement
+                                                                                                                                    if *must_spend_stone { horizon * 8 } else { horizon * 5 }
+                                                                                                                                }
+                                                                                                                                CardEffect::AfterWorkerSpaceBakeBread { .. } => {
+                                                                                                                                    // Additional bake action; value depends on grain/improvements
+                                                                                                                                    horizon * 6
+                                                                                                                                }
+                                                                                                                            };
     }
     Some(value)
 }

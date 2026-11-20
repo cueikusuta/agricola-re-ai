@@ -77,6 +77,12 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // Any-player worker triggers — After phase (fired by dispatch_after_worker_any_player)
         CardEffect::AfterAnyWorkerGain { .. } => TriggerPhase::After,
         CardEffect::AfterAnyWorkerOthersGain { .. } => TriggerPhase::After,
+        // AfterWorkerSpace triggers — After phase
+        CardEffect::AfterWorkerSpaceBuildStable { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerSpacePlowFields { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerSpaceFamilyGrowth { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerSpaceImprovementAction { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerSpaceBakeBread { .. } => TriggerPhase::After,
         // Harvest start field check — After phase (fired by dispatch_harvest_field)
         CardEffect::HarvestStartGainIfFields { .. } => TriggerPhase::After,
         // End game scoring — After phase
@@ -531,6 +537,40 @@ fn resolve_phase_scan(
                     animal,
                     amount,
                 } => handle_after_worker_gain_animal(ctx, space, animal, *amount, trigger_data)?,
+                // A015 大工の手斧
+                CardEffect::AfterWorkerSpaceBuildStable {
+                    spaces,
+                    min_wood,
+                    wood_cost,
+                } => handle_after_worker_space_build_stable(
+                    ctx,
+                    spaces,
+                    *min_wood,
+                    *wood_cost,
+                    trigger_data,
+                )?,
+                // A018 車輪鋤
+                CardEffect::AfterWorkerSpacePlowFields { spaces, amount } => {
+                    handle_after_worker_space_plow_fields(ctx, spaces, *amount, trigger_data)?
+                }
+                // A021 家族向け住宅
+                CardEffect::AfterWorkerSpaceFamilyGrowth { space, food_amount } => {
+                    handle_after_worker_space_family_growth(ctx, space, *food_amount, trigger_data)?
+                }
+                // A023 採石事業所
+                CardEffect::AfterWorkerSpaceImprovementAction {
+                    spaces,
+                    must_spend_stone,
+                } => handle_after_worker_space_improvement_action(
+                    ctx,
+                    spaces,
+                    *must_spend_stone,
+                    trigger_data,
+                )?,
+                // A024 脱穀板
+                CardEffect::AfterWorkerSpaceBakeBread { spaces } => {
+                    handle_after_worker_space_bake_bread(ctx, spaces, trigger_data)?
+                }
                 CardEffect::StartRoundGain {
                     good,
                     amount,
@@ -769,6 +809,36 @@ fn effect_condition_holds(
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.event_kind == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
+        // A015 大工の手斧: after Forest/Copse/Grove with 7+ wood in supply
+        CardEffect::AfterWorkerSpaceBuildStable {
+            spaces, min_wood, ..
+        } => {
+            trigger.event_kind == EventKind::WorkerPlaced
+                && trigger.space.is_some_and(|s| spaces.contains(&s))
+                && player.supply.wood >= *min_wood
+        }
+        // A018 車輪鋤: once per game, first person of round using Farmland/Cultivation
+        // Note: first-person-of-round check is done in the handler (needs round state)
+        CardEffect::AfterWorkerSpacePlowFields { spaces, .. } => {
+            trigger.event_kind == EventKind::WorkerPlaced
+                && trigger.space.is_some_and(|s| spaces.contains(&s))
+        }
+        // A021 家族向け住宅: after Build Rooms while rooms > people
+        CardEffect::AfterWorkerSpaceFamilyGrowth { space, .. } => {
+            trigger.event_kind == EventKind::WorkerPlaced
+                && trigger.space == Some(*space)
+                && player.rooms() > player.family as usize
+        }
+        // A023 採石事業所: after Western/Eastern Quarry
+        CardEffect::AfterWorkerSpaceImprovementAction { spaces, .. } => {
+            trigger.event_kind == EventKind::WorkerPlaced
+                && trigger.space.is_some_and(|s| spaces.contains(&s))
+        }
+        // A024 脱穀板: after Farmland/Cultivation
+        CardEffect::AfterWorkerSpaceBakeBread { spaces, .. } => {
+            trigger.event_kind == EventKind::WorkerPlaced
+                && trigger.space.is_some_and(|s| spaces.contains(&s))
+        }
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
@@ -914,6 +984,40 @@ pub fn execute_chosen_triggers(
                 animal,
                 amount,
             } => handle_after_worker_gain_animal(ctx, space, animal, *amount, trigger_data)?,
+            // A015 大工の手斧
+            CardEffect::AfterWorkerSpaceBuildStable {
+                spaces,
+                min_wood,
+                wood_cost,
+            } => handle_after_worker_space_build_stable(
+                ctx,
+                spaces,
+                *min_wood,
+                *wood_cost,
+                trigger_data,
+            )?,
+            // A018 車輪鋤
+            CardEffect::AfterWorkerSpacePlowFields { spaces, amount } => {
+                handle_after_worker_space_plow_fields(ctx, spaces, *amount, trigger_data)?
+            }
+            // A021 家族向け住宅
+            CardEffect::AfterWorkerSpaceFamilyGrowth { space, food_amount } => {
+                handle_after_worker_space_family_growth(ctx, space, *food_amount, trigger_data)?
+            }
+            // A023 採石事業所
+            CardEffect::AfterWorkerSpaceImprovementAction {
+                spaces,
+                must_spend_stone,
+            } => handle_after_worker_space_improvement_action(
+                ctx,
+                spaces,
+                *must_spend_stone,
+                trigger_data,
+            )?,
+            // A024 脱穀板
+            CardEffect::AfterWorkerSpaceBakeBread { spaces } => {
+                handle_after_worker_space_bake_bread(ctx, spaces, trigger_data)?
+            }
             CardEffect::StartRoundGain {
                 good,
                 amount,
@@ -1363,6 +1467,253 @@ fn handle_after_worker_gain_animal(
         return Ok(EffectResult::Pending(decision));
     }
     Ok(EffectResult::Resolved)
+}
+
+/// A015 大工の手斧 (Carpenter's Axe): after using Forest/Copse/Grove with 7+ wood,
+/// optionally build 1 stable for 1 wood. Creates a pending decision for the player
+/// to choose whether and where to build the stable.
+fn handle_after_worker_space_build_stable(
+    ctx: &mut DispatchContext<'_>,
+    spaces: &[Space],
+    min_wood: u32,
+    wood_cost: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.event_kind != EventKind::WorkerPlaced {
+        return Ok(EffectResult::Resolved);
+    }
+    let Some(space) = trigger.space else {
+        return Ok(EffectResult::Resolved);
+    };
+    if !spaces.contains(&space) {
+        return Ok(EffectResult::Resolved);
+    }
+    if ctx.player.supply.wood < min_wood {
+        return Ok(EffectResult::Resolved);
+    }
+
+    // Find all valid stable build locations
+    let mut valid_sites = Vec::new();
+    for i in 0..crate::model::FARM_CELLS {
+        if crate::engine::stable_site_available(ctx.player, i) {
+            valid_sites.push(i);
+        }
+    }
+    if valid_sites.is_empty() {
+        return Ok(EffectResult::Resolved);
+    }
+
+    // Create a custom pending decision for choosing whether/where to build
+    let kind = crate::pending::PendingKind::Custom {
+        source_card: "A015".to_string(),
+        payload: serde_json::json!({
+            "effect": "build_stable",
+            "valid_sites": valid_sites,
+            "wood_cost": wood_cost,
+            "space": space,
+        }),
+    };
+    let decision = PendingDecision::new(
+        0,
+        ctx.card_owner,
+        kind,
+        String::new(),
+        serde_json::json!({ "card": "A015", "space": space, "valid_sites": valid_sites, "wood_cost": wood_cost }),
+    );
+    Ok(EffectResult::Pending(decision))
+}
+
+/// A018 車輪鋤 (Wheel Plow): once per game, when first person of round uses
+/// Farmland or Cultivation, plow 2 fields. Creates a pending decision for
+/// choosing which fields to plow.
+fn handle_after_worker_space_plow_fields(
+    ctx: &mut DispatchContext<'_>,
+    spaces: &[Space],
+    amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.event_kind != EventKind::WorkerPlaced {
+        return Ok(EffectResult::Resolved);
+    }
+    let Some(space) = trigger.space else {
+        return Ok(EffectResult::Resolved);
+    };
+    if !spaces.contains(&space) {
+        return Ok(EffectResult::Resolved);
+    }
+
+    // Find all valid plow locations (empty tiles adjacent to existing fields, or any empty if no fields)
+    let mut valid_sites = Vec::new();
+    let has_fields = ctx
+        .player
+        .farm
+        .iter()
+        .any(|cell| matches!(cell.tile, crate::model::Tile::Field { .. }));
+    for i in 0..crate::model::FARM_CELLS {
+        if matches!(ctx.player.farm[i].tile, crate::model::Tile::Empty)
+            && !ctx.player.farm[i].stable
+            && (!has_fields
+                || crate::model::neighbors(i)
+                    .iter()
+                    .any(|&j| matches!(ctx.player.farm[j].tile, crate::model::Tile::Field { .. })))
+        {
+            valid_sites.push(i);
+        }
+    }
+    if valid_sites.is_empty() {
+        return Ok(EffectResult::Resolved);
+    }
+
+    let kind = crate::pending::PendingKind::Custom {
+        source_card: "A018".to_string(),
+        payload: serde_json::json!({
+            "effect": "plow_fields",
+            "valid_sites": valid_sites,
+            "amount": amount,
+            "space": space,
+            "once_per_game": true,
+        }),
+    };
+    let decision = PendingDecision::new(
+        0,
+        ctx.card_owner,
+        kind,
+        String::new(),
+        serde_json::json!({ "card": "A018", "space": space, "valid_sites": valid_sites, "amount": amount }),
+    );
+    Ok(EffectResult::Pending(decision))
+}
+
+/// A021 家族向け住宅 (Family Friendly Home): after using Build Rooms while rooms > people,
+/// Family Growth + 1 food. This is automatic (not optional).
+fn handle_after_worker_space_family_growth(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    food_amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.event_kind != EventKind::WorkerPlaced {
+        return Ok(EffectResult::Resolved);
+    }
+    if trigger.space != Some(*space) {
+        return Ok(EffectResult::Resolved);
+    }
+    // Condition already checked in effect_condition_holds: rooms > people
+    // Apply Family Growth
+    if ctx.player.family >= 5 {
+        return Ok(EffectResult::Resolved); // Max family size reached
+    }
+    ctx.player.family += 1;
+    ctx.player.newborns += 1;
+    // Gain food
+    let next = ctx
+        .player
+        .supply
+        .get(crate::model::Good::Food)
+        .checked_add(food_amount)
+        .ok_or("food overflow")?;
+    ctx.player.supply.set(crate::model::Good::Food, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// A023 採石事業所 (Stone Company): after using Western/Eastern Quarry,
+/// grant an Improvement action that must spend at least 1 stone.
+fn handle_after_worker_space_improvement_action(
+    ctx: &mut DispatchContext<'_>,
+    spaces: &[Space],
+    must_spend_stone: bool,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.event_kind != EventKind::WorkerPlaced {
+        return Ok(EffectResult::Resolved);
+    }
+    let Some(space) = trigger.space else {
+        return Ok(EffectResult::Resolved);
+    };
+    if !spaces.contains(&space) {
+        return Ok(EffectResult::Resolved);
+    }
+
+    // Get available improvements from the market
+    let available: Vec<_> = ctx.improvement_market.iter().enumerate().collect();
+    if available.is_empty() {
+        return Ok(EffectResult::Resolved);
+    }
+
+    let kind = crate::pending::PendingKind::Custom {
+        source_card: "A023".to_string(),
+        payload: serde_json::json!({
+            "effect": "improvement_action",
+            "must_spend_stone": must_spend_stone,
+            "available_improvements": available.iter().map(|(i, imp)| {
+                serde_json::json!({ "index": i, "improvement": format!("{:?}", imp) })
+            }).collect::<Vec<_>>(),
+            "space": space,
+        }),
+    };
+    let decision = PendingDecision::new(
+        0,
+        ctx.card_owner,
+        kind,
+        String::new(),
+        serde_json::json!({ "card": "A023", "space": space, "must_spend_stone": must_spend_stone }),
+    );
+    Ok(EffectResult::Pending(decision))
+}
+
+/// A024 脱穀板 (Threshing Board): after using Farmland or Cultivation,
+/// grant an additional Bake Bread action.
+fn handle_after_worker_space_bake_bread(
+    ctx: &mut DispatchContext<'_>,
+    spaces: &[Space],
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.event_kind != EventKind::WorkerPlaced {
+        return Ok(EffectResult::Resolved);
+    }
+    let Some(space) = trigger.space else {
+        return Ok(EffectResult::Resolved);
+    };
+    if !spaces.contains(&space) {
+        return Ok(EffectResult::Resolved);
+    }
+
+    // Check if player has any baking improvements
+    let has_baking = ctx.player.improvements.iter().any(|imp| {
+        matches!(
+            imp,
+            crate::model::Improvement::Fireplace2
+                | crate::model::Improvement::Fireplace3
+                | crate::model::Improvement::Hearth4
+                | crate::model::Improvement::Hearth5
+                | crate::model::Improvement::ClayOven
+                | crate::model::Improvement::StoneOven
+        )
+    });
+    if !has_baking {
+        return Ok(EffectResult::Resolved);
+    }
+
+    // Check if player has grain to bake
+    if ctx.player.supply.grain == 0 {
+        return Ok(EffectResult::Resolved);
+    }
+
+    let kind = crate::pending::PendingKind::Custom {
+        source_card: "A024".to_string(),
+        payload: serde_json::json!({
+            "effect": "bake_bread",
+            "space": space,
+        }),
+    };
+    let decision = PendingDecision::new(
+        0,
+        ctx.card_owner,
+        kind,
+        String::new(),
+        serde_json::json!({ "card": "A024", "space": space }),
+    );
+    Ok(EffectResult::Pending(decision))
 }
 
 /// A050 (others half): each time ANY player uses the specified space,
