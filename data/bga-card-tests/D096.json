@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "D096",
+  "cases": [
+    {
+      "id": "D096-on-play-gain-wood-2",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0
+      },
+      "action": {
+        "trigger": "on_play",
+        "play_card": "D096"
+      },
+      "expected": {
+        "play_allowed": true,
+        "wood_delta": 2
+      },
+      "notes": "On play, immediately gain 2 wood."
+    },
+    {
+      "id": "D096-build-room-discount-minor-improvement",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1,
+        "rooms": 2
+      },
+      "action": {
+        "trigger": "after_room_construction",
+        "build_room": true,
+        "play_minor_improvement": "cooking_hearth",
+        "apply_wood_discount": 1
+      },
+      "expected": {
+        "improvement_played": true,
+        "wood_delta": 0
+      },
+      "notes": "After building a room, play minor improvement (Cooking Hearth costs 3 clay, 1 reed, 1 wood). With wood=1, apply 1 wood discount -> pay 0 wood."
+    },
+    {
+      "id": "D096-build-room-discount-major-improvement",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1,
+        "rooms": 2
+      },
+      "action": {
+        "trigger": "after_room_construction",
+        "build_room": true,
+        "play_major_improvement": "fireplace",
+        "apply_wood_discount": 1
+      },
+      "expected": {
+        "improvement_played": null,
+        "notes": "Unresolved: whether major improvements are eligible for the discount. Test documents ambiguity."
+      },
+      "notes": "After building a room, try to play major improvement (Fireplace costs 3 wood, 2 clay). Ambiguity: does '進歩' include major improvements?"
+    }
+  ]
+}

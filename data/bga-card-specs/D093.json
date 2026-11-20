@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "card_id": "D093",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "羊調査員",
+    "name_en": "Sheep Inspector"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2828",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_work_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "action": "return_placed_person_home",
+                "cost": {
+                  "sheep": 1,
+                  "food": 2
+                },
+                "notes": "各労働フェイズに1回、羊1と食料2を払って、配置済みの別の人物を家へ戻せる"
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_round",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: 各労働フェイズに1回、羊1+食料2で配置済み人物を帰宅させる"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params.kind=other: return_placed_person_home の詳細仕様（対象人物の選択制約・同一人物の複数回使用可否・コスト支払い不可時の挙動）が未確定",
+      "effects[0].trigger: after_work_phase で『各労働フェイズに1回』をどう制限するか（ラウンド単位かフェイズ単位か）",
+      "classification: 段階外（単一サイト: アクション後/人物の帰還）だが、労働フェイズ終了時のタイミングと1回制限のスコープが要確認"
+    ],
+    "test_case_ids": [
+      "D093-return-person-pay-cost",
+      "D093-cannot-pay-cost",
+      "D093-once-per-work-phase"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: Once per work phase, pay 1 sheep and 2 food to return one placed person home. Trigger: after_work_phase. Unresolved: target person selection constraints, cost payment failure handling, once-per scope (per round vs per work phase)."
+  }
+}
