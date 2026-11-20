@@ -502,6 +502,14 @@ fn card_good_value(good: Good) -> i64 {
     }
 }
 
+fn card_animal_value(animal: Animal) -> i64 {
+    match animal {
+        Animal::Cattle => 5, // Cattle are most valuable (can breed, worth 1 VP each)
+        Animal::Sheep => 4,  // Sheep breed fast
+        Animal::Boar => 3,   // Boar don't breed but worth 1 VP
+    }
+}
+
 /// Score the card's actual immediate resource/point change after payments,
 /// then add a bounded forecast for explicitly recurring or passive effects.
 /// This avoids treating conditional on-play rewards as unconditional.
@@ -592,10 +600,14 @@ fn card_priority(
                                     card_good_value(*good) * i64::from(*amount) * horizon / 4
                                 }
                                 CardEffect::HarvestStartGainIfFields { good, amount, .. } => {
-                                    // Conditional on field count; optimistic half-weight
-                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
-                                }
-                            };
+                                                                    // Conditional on field count; optimistic half-weight
+                                                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                                                }
+                                                                CardEffect::OnPlayGainAnimal { animal, amount, .. }
+                                                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
+                                                                    card_animal_value(*animal) * i64::from(*amount) * horizon
+                                                                }
+                                                            };
     }
     Some(value)
 }
