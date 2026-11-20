@@ -14,7 +14,7 @@
       "expected": {
         "play_legal": true,
         "cost_paid": [],
-        "printed_points": "unknown"
+        "printed_points": 0
       },
       "notes": "Verify occupation can be played for free with no prerequisites."
     }
