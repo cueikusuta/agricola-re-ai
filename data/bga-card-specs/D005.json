@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "sown_field_at_least",
+        "params": {
+          "count": 1
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -88,6 +95,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "tested",
-    "notes": "Gain 1 clay per planted field; pass left."
+    "notes": "Gain 1 clay per planted field; pass left. Prerequisite: at least 1 sown field (JP printed '栽培中の畑1'; official appendix reads prerequisites as 'at least')."
   }
 }
