@@ -764,12 +764,17 @@ pub(crate) fn major_improvements_bottom_row(player: &Player) -> usize {
         .count()
 }
 
-/// Count sown fields (fields with a crop planted).
+/// Count sown fields (fields with a crop planted, or fields with stones placed
+/// by C006 石取り作業 that count as cultivated until the field phase reset).
 pub(crate) fn sown_field_count(player: &Player) -> usize {
     player
         .farm
         .iter()
-        .filter(|cell| matches!(cell.tile, Tile::Field { crop: Some(_), .. }))
+        .enumerate()
+        .filter(|(idx, cell)| {
+            matches!(cell.tile, Tile::Field { crop: Some(_), .. })
+                || player.c006_stone_fields.contains(idx)
+        })
         .count()
 }
 
@@ -779,14 +784,27 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
     }
     let occupations = occupation_count(set, player);
     card.effects.iter().all(|effect| {
-        let CardEffect::Prerequisite { rule } = effect else { return true; };
+        let CardEffect::Prerequisite { rule } = effect else {
+            return true;
+        };
         match rule {
             CardRequirement::MinimumOccupations(min) => occupations >= usize::from(*min),
             CardRequirement::MaximumOccupations(max) => occupations <= usize::from(*max),
-            CardRequirement::MinimumAnimals { animal, number } => player.animal_count(*animal) >= *number,
-            CardRequirement::MinimumCropFields { crop, number } => player.farm.iter().filter(|cell| {
-                matches!(cell.tile, Tile::Field { crop: Some(found), .. } if found == *crop)
-            }).count() >= usize::from(*number),
+            CardRequirement::MinimumAnimals { animal, number } => {
+                player.animal_count(*animal) >= *number
+            }
+            CardRequirement::MinimumCropFields { crop, number } => {
+                player
+                    .farm
+                    .iter()
+                    .enumerate()
+                    .filter(|(idx, cell)| {
+                        matches!(cell.tile, Tile::Field { crop: Some(found), .. } if found == *crop)
+                            || player.c006_stone_fields.contains(idx)
+                    })
+                    .count()
+                    >= usize::from(*number)
+            }
             CardRequirement::MinimumPlayers(_) => true,
             CardRequirement::MinimumPastures(min) => player.pastures.len() >= usize::from(*min),
             CardRequirement::MinimumImprovements(min) => {
@@ -2059,6 +2077,7 @@ pub fn verified_worker_bonus_cards(_players: usize) -> Vec<CardDefinition> {
                 good: Good::Food,
                 amount: 2,
             }],
+            post_play_destination: None,
         },
     ];
     cards
@@ -2501,6 +2520,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 good: Good::Grain,
                 amount: 1,
             }],
+            post_play_destination: None,
         },
         // A050 ミルクがめ: AfterAnyWorkerGain CattleMarket -> gain food 3 (self) + AfterAnyWorkerOthersGain CattleMarket -> gain food 1 (others)
         CardDefinition {
@@ -2521,6 +2541,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                     amount: 1,
                 },
             ],
+            post_play_destination: None,
         },
         // D061 わらのたわら: HarvestStartGainIfFields grain >= 3 -> gain food 2
         CardDefinition {
@@ -2535,6 +2556,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 good: Good::Food,
                 amount: 2,
             }],
+            post_play_destination: None,
         },
     ]
 }
@@ -3500,6 +3522,7 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 animal: Animal::Cattle,
                 amount: 2,
             }],
+            post_play_destination: None,
         },
         // C147 牛の飼育士 (Cowherd): occupation, 0 points, each time owner uses CattleMarket gain 1 cattle.
         card(
@@ -3511,6 +3534,7 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 animal: Animal::Cattle,
                 amount: 1,
             }],
+            None,
         ),
     ]
 }
@@ -3992,7 +4016,7 @@ mod verified_band_c_tests {
         assert_eq!(
             card.post_play_destination.as_deref(),
             Some("left_neighbor_hand")
-        };
+        );
     }
 
     #[test]
@@ -4019,7 +4043,7 @@ mod verified_band_c_tests {
         assert_eq!(
             card.post_play_destination.as_deref(),
             Some("left_neighbor_hand")
-        };
+        );
     }
 
     #[test]

@@ -946,7 +946,6 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainAnimal { animal, amount } => {
                 handle_on_play_gain_animal(ctx, animal, *amount)?
             }
-            }
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,

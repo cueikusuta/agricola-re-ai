@@ -417,7 +417,9 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
-                        | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
+                        | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. } => {
+                            *amount
+                        }
                         crate::cards::CardEffect::OnPlayPlaceStonesOnEmptyFields { .. }
                         | crate::cards::CardEffect::OnPlayChooseGainFoodOrPerSheep => 1,
                     };
