@@ -17,25 +17,25 @@
       "4": "yes"
     },
     "references": [
-          {
-            "url": "https://agricola.cloudfree.jp/?p=3370",
-            "language": "ja",
-            "checked_on": "2026-11-09",
-            "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
-          },
-          {
-            "url": "https://agricola.cloudfree.jp/cardlist_en/",
-            "language": "en",
-            "checked_on": "2026-11-09",
-            "note": "English list page row used to cross-check the card id and name"
-          },
-          {
-            "url": "https://www.reedstonefood.com/agricola/compendium",
-            "language": "en",
-            "checked_on": "2026-11-09",
-            "note": "ReedStoneFood Compendium (secondary source); confirms cost '1W 1C' (both wood and clay required) and effect '1 food per improvement played'"
-          }
-        ]
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3370",
+        "language": "ja",
+        "checked_on": "2026-11-09",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "English list page row used to cross-check the card id and name"
+      },
+      {
+        "url": "https://www.reedstonefood.com/agricola/compendium",
+        "language": "en",
+        "checked_on": "2026-11-09",
+        "note": "ReedStoneFood Compendium (secondary source); confirms cost '1W 1C' (both wood and clay required) and effect '1 food per improvement played'"
+      }
+    ]
   },
   "play": {
     "action": "minor_improvement",
@@ -79,22 +79,22 @@
     "destination": "played_area"
   },
   "review": {
-      "status": "partial",
-      "unresolved_fields": [
-        "bga.eligibility",
-        "play.cost",
-        "play.prerequisites",
-        "play.printed_points",
-        "effects.0.engine_mapping"
-      ],
-      "test_case_ids": [
-        "A055-normal",
-        "A055-other-improvement",
-        "A055-not-triggered"
-      ],
-      "checked_by": "AI source comparison",
-      "checked_on": "2026-11-09",
-      "implementation_status": "not_started",
-      "notes": "Cost and effect from secondary sources (BGA Wiki, ReedStoneFood Compendium) only. Official printed card confirmation needed for cost '1W 1C' (both required vs. choice), effect scope, and printed points. Issue #91 discusses payment resources and improved effect scope; not officially resolved. Cannot enter distribution pool until player eligibility confirmed (fail-closed)."
-    }
+    "status": "partial",
+    "unresolved_fields": [
+      "bga.eligibility",
+      "play.cost",
+      "play.prerequisites",
+      "play.printed_points",
+      "effects.0.engine_mapping"
+    ],
+    "test_case_ids": [
+      "A055-normal",
+      "A055-other-improvement",
+      "A055-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "not_started",
+    "notes": "Cost and effect from secondary sources (BGA Wiki, ReedStoneFood Compendium) only. Official printed card confirmation needed for cost '1W 1C' (both required vs. choice), effect scope, and printed points. Issue #91 discusses payment resources and improved effect scope; not officially resolved. Cannot enter distribution pool until player eligibility confirmed (fail-closed)."
   }
+}

@@ -406,7 +406,7 @@ impl Game {
                 self.public.round,
                 &self.public.used,
                 &mut self.event_budget,
-                &mut self.card_uses,
+                &mut self.public.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
                 allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
@@ -435,7 +435,7 @@ impl Game {
             self.public.round,
             &self.public.used,
             &mut self.event_budget,
-            &mut self.card_uses,
+            &mut self.public.card_uses,
             &self.card_use_limits,
             &mut self.pending,
             allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
@@ -459,7 +459,7 @@ impl Game {
             self.public.round,
             &self.public.used,
             &mut self.event_budget,
-            &mut self.card_uses,
+            &mut self.public.card_uses,
             &self.card_use_limits,
             &mut self.pending,
             allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
@@ -940,6 +940,10 @@ impl Game {
                     step,
                     phase: pause_phase,
                     after,
+                    // First segment of the logical action: the space/worker
+                    // bookkeeping has NOT been applied yet (it happens at
+                    // completion in `resume_post_work`).
+                    space_applied: false,
                 };
                 let completion = Box::new(crate::pending::WorkCompletion {
                     action: action.clone(),
@@ -994,7 +998,7 @@ impl Game {
                 value
             } else {
                 let mut preview = next.clone();
-                preview.harvest_fields();
+                preview.harvest_fields()?;
                 (0..preview.public.players.len())
                     .map(|id| policy.plan_feeding(&preview.observation(id).expect("valid player")))
                     .collect::<Vec<_>>()
@@ -1011,7 +1015,7 @@ impl Game {
         };
         let breeding_plans = if will_harvest {
             let mut preview = next.clone();
-            preview.harvest_fields();
+            preview.harvest_fields()?;
             preview.feed_after_fields(harvest_plans.as_deref().expect("feeding plans"))?;
             let plans = if let Some(value) = forced_breeding {
                 value
@@ -1083,7 +1087,7 @@ impl Game {
         }
         next.public.used.insert(action.space);
         next.public.workers_placed[id] += 1;
-        next.harvest_fields();
+        next.harvest_fields()?;
         if let Some(plans) = feeding {
             next.feed_after_fields(plans)?;
         }
@@ -1489,7 +1493,7 @@ impl Game {
         if self.public.round == 14 {
             self.public.finished = true
         } else {
-            self.start_round()
+            self.start_round()?;
         }
         Ok(())
     }
@@ -1552,7 +1556,7 @@ impl Game {
                             self.public.round,
                             &self.public.used,
                             &mut self.event_budget,
-                            &mut self.card_uses,
+                            &mut self.public.card_uses,
                             &self.card_use_limits,
                             &mut self.pending,
                         )?;
@@ -1621,7 +1625,7 @@ impl Game {
                     self.public.round,
                     &self.public.used,
                     &mut self.event_budget,
-                    &mut self.card_uses,
+                    &mut self.public.card_uses,
                     &self.card_use_limits,
                     &mut self.pending,
                 )?;
@@ -1733,7 +1737,7 @@ impl Game {
                         self.public.round,
                         &self.public.used,
                         &mut self.event_budget,
-                        &mut self.card_uses,
+                        &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
                     )?;
@@ -1818,7 +1822,7 @@ impl Game {
                         self.public.round,
                         &self.public.used,
                         &mut self.event_budget,
-                        &mut self.card_uses,
+                        &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
                     )?;
@@ -1838,7 +1842,7 @@ impl Game {
                         p,
                         &mut self.public.improvement_market,
                         &mut self.delayed_well,
-                        &mut self.well_food_schedule,
+                        &mut self.public.well_food_schedule,
                         self.public.round,
                         *improvement,
                         PurchaseArgs {
@@ -1857,7 +1861,7 @@ impl Game {
                         p,
                         &mut self.public.improvement_market,
                         &mut self.delayed_well,
-                        &mut self.well_food_schedule,
+                        &mut self.public.well_food_schedule,
                         self.public.round,
                         *improvement,
                         PurchaseArgs {
@@ -1877,7 +1881,7 @@ impl Game {
                         p,
                         &mut self.public.improvement_market,
                         &mut self.delayed_well,
-                        &mut self.well_food_schedule,
+                        &mut self.public.well_food_schedule,
                         self.public.round,
                         *improvement,
                         PurchaseArgs {
@@ -1904,7 +1908,7 @@ impl Game {
                             p,
                             &mut self.public.improvement_market,
                             &mut self.delayed_well,
-                            &mut self.well_food_schedule,
+                            &mut self.public.well_food_schedule,
                             self.public.round,
                             *i,
                             PurchaseArgs {
@@ -1933,7 +1937,7 @@ impl Game {
                             p,
                             &mut self.public.improvement_market,
                             &mut self.delayed_well,
-                            &mut self.well_food_schedule,
+                            &mut self.public.well_food_schedule,
                             self.public.round,
                             *improvement,
                             PurchaseArgs {
@@ -2887,7 +2891,7 @@ fn take_animals(
     }
     Ok(())
 }
-fn place_animals(p: &mut Player, plan: &AnimalPlan, n: u32) -> Result<()> {
+pub fn place_animals(p: &mut Player, plan: &AnimalPlan, n: u32) -> Result<()> {
     let assigned: u32 = plan.to_pastures.iter().map(|x| x.1).sum::<u32>()
         + plan.to_stables.len() as u32
         + u32::from(plan.pet)
@@ -3601,6 +3605,7 @@ mod grow_with_minor_regression_tests {
             }
         }
         let mut game = game.expect("failed to find seed with B010 in player 0 hand");
+        game.public.active_player = 0;
         game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
         game.public.round = 1;
         // Give player 0 resources to play B010 (wood3, food3)
@@ -3894,7 +3899,7 @@ mod audit_p2_1_exhaustive_tests {
                 game.pending = None;
             }
             game.public.round = 1;
-            game.start_round();
+            game.start_round().expect("start_round must succeed");
 
             // Test 3: Drive harvest_fields (tests HarvestFieldGain effects)
             // Play the card first if it's a passive/harvest card
@@ -3934,7 +3939,7 @@ mod audit_p2_1_exhaustive_tests {
                 *crop = Some(Crop::Grain);
                 *remaining = 1;
             }
-            game.harvest_fields();
+            game.harvest_fields().expect("harvest_fields must succeed");
         }
 
         println!(

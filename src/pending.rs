@@ -62,6 +62,17 @@ pub struct PostWorkResume {
     pub step: ChainStep,
     pub phase: TriggerPhase,
     pub after: ChainPosition,
+    /// Explicit resume state (PR #352 Round 2 P0-2/P1-1): when `true`, this
+    /// continuation was created by a SECOND pause during `resume_post_work`,
+    /// i.e. the action's space is already in `used` and its worker already
+    /// counted by the first segment of the same logical move. The resume then
+    /// (a) passes the space guard through this explicit state instead of a
+    /// blanket "used" bypass and (b) does not re-apply the space/worker
+    /// bookkeeping. `false` (the default for pre-existing saves) means the
+    /// first segment: the space must still be revealed/unused and the
+    /// bookkeeping happens here.
+    #[serde(default)]
+    pub space_applied: bool,
 }
 
 /// The remainder of a work action interrupted by a pending decision
@@ -154,6 +165,16 @@ pub enum PendingKind {
         /// Opaque payload for the specific effect.
         payload: serde_json::Value,
     },
+    /// Choose how to place animals gained from a card effect (C083/C147).
+    /// The player provides an AnimalPlan for exact placement.
+    ChooseAnimalPlacement {
+        /// Source card ID that triggered this decision.
+        source_card: String,
+        /// The animal type being placed.
+        animal: crate::model::Animal,
+        /// Total amount of animals to place.
+        amount: u32,
+    },
 }
 
 /// A single gain option.
@@ -194,6 +215,7 @@ pub enum PendingResolution {
     DelayedWellRelief { confirmed: bool },
     ChooseTriggerOrder { chosen_order: Vec<usize> },
     Custom { payload: serde_json::Value },
+    ChooseAnimalPlacement { plan: crate::engine::AnimalPlan },
 }
 
 impl PendingDecision {
@@ -258,6 +280,10 @@ impl PendingDecision {
                 Ok(())
             }
             (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => Ok(()),
+            (
+                PendingKind::ChooseAnimalPlacement { .. },
+                PendingResolution::ChooseAnimalPlacement { .. },
+            ) => Ok(()),
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
     }
@@ -1352,6 +1378,7 @@ mod tests {
                         card_index: 0,
                         effect_index: 0,
                     },
+                    space_applied: false,
                 },
                 completion: Box::new(WorkCompletion {
                     action: Action {
@@ -1427,5 +1454,94 @@ mod tests {
         let decoded: PendingKind = serde_json::from_value(json)
             .expect("deserialize must succeed");
         assert_eq!(kind, decoded, "explicit site must round-trip");
+    }
+
+    /// P1-1 (PR #352 Round 2): a paused work action may not resume onto a space
+    /// that is already used -- including one used by another player. With
+    /// `space_applied == false` the original availability filter
+    /// (`available_spaces_for_resume`) is re-run, which excludes used spaces, so
+    /// a stale or tampered save is refused atomically.
+    #[test]
+    fn resume_rejects_another_player_s_used_space() {
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Good, Space};
+        use crate::pending::{
+            ChainPosition, ChainStep, Continuation, GainOption, PendingDecision, PendingKind,
+            PendingResolution, PostWorkResume, WorkCompletion,
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 61,
+            additional_action_space_enabled: false,
+        });
+        let space = Space::DayLaborer;
+
+        // Another player used the space this round: it is no longer available.
+        game.public.used.insert(space);
+        assert!(!game.available_spaces_for_resume().contains(&space));
+
+        game.pending = Some(PendingDecision {
+            id: 0,
+            player: 0,
+            kind: PendingKind::ChooseGain {
+                source_card: "PROBE".into(),
+                options: vec![GainOption {
+                    good: Good::Food,
+                    amount: 1,
+                }],
+            },
+            state_hash_before: game.state_hash(),
+            context: serde_json::json!({}),
+            continuation: Continuation::PostWork {
+                player: 0,
+                resume: PostWorkResume {
+                    step: ChainStep::AfterWorker,
+                    phase: crate::card_events::TriggerPhase::Interrupt,
+                    after: ChainPosition {
+                        card_index: 0,
+                        effect_index: 0,
+                    },
+                    space_applied: false,
+                },
+                completion: Box::new(WorkCompletion {
+                    action: Action {
+                        space,
+                        detail: Detail::None,
+                    },
+                    previous_player: game.public.players[0].clone(),
+                    harvest_plans: None,
+                    breeding_plans: None,
+                    logged_before: String::new(),
+                }),
+            },
+        });
+        let used_before = game.public.used.clone();
+        let workers_before = game.public.workers_placed.clone();
+        let food_before = game.public.players[0].supply.food;
+
+        let err = game
+            .resolve_pending_and_resume(PendingResolution::ChooseGain {
+                chosen: GainOption {
+                    good: Good::Food,
+                    amount: 1,
+                },
+            })
+            .unwrap_err();
+        assert!(
+            err.contains("not available at resume time"),
+            "the resume must refuse a used space, got: {err}"
+        );
+        // Refused atomically: nothing applied, decision preserved.
+        assert_eq!(game.public.used, used_before, "no space may be marked used");
+        assert_eq!(
+            game.public.workers_placed, workers_before,
+            "no worker may be placed"
+        );
+        assert_eq!(
+            game.public.players[0].supply.food, food_before,
+            "the choice must not be applied"
+        );
+        assert!(game.has_pending(), "the decision must stay resolvable");
     }
 }
