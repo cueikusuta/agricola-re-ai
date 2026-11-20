@@ -491,34 +491,367 @@ use crate::engine::{Action, Detail};
         );
     }
 
-/// P1-1 (replay): event stamping for both resolve APIs ensures replay integrity.
-/// The `from_resume` field distinguishes the two APIs:
+/// P1-1 (replay): full save/load/replay round-trip for BOTH resolve APIs.
+///
+/// The `from_resume` field distinguishes the two APIs in the recorded event:
 ///   - `resolve_pending_and_resume` (resume API) stamps `from_resume=true`
 ///   - `resolve_pending` (standalone API) stamps `from_resume=false`
 ///
-/// This is verified in `p1_1_resolve_pending_rejects_postwork_and_events_record_the_source_api`.
-/// Full save/load/replay round-trip for both paths is covered by the integration test
-/// `replay_and_save_restore_for_all_modes` in tests/m4_multiplayer.rs, which plays
-/// complete games with natural pauses and confirms state_hash preservation.
+/// This test implements the real round-trip the empty pre-fix body only
+/// claimed: a paused PostWork decision resolved through the resume API and a
+/// plain (Continuation::None) decision resolved through the standalone API are
+/// each saved, re-loaded (`load_json` replays the full event chain and checks
+/// every before/after hash), and replayed from the initial state. Event count,
+/// pre/post hashes of the resolution event, and the final state hash must all
+/// match between the live game and the replay.
+///
+/// (Pre-fix the body was empty and the doc comment wrongly claimed the round
+/// trip was covered by `replay_and_save_restore_for_all_modes`; that
+/// integration test uses one-shot `apply_with_harvest_policy` and therefore
+/// records zero `pending_resolution` events — see review Round 2 P1-A.)
 #[test]
 fn p1_1_replay_poststate_hash_matches_after_save_load() {
-    // This test intentionally left minimal: the event stamping is verified in
-    // p1_1_resolve_pending_rejects_postwork_and_events_record_the_source_api,
-    // and full replay integrity is tested in m4_multiplayer.rs.
-    // A unit test for Continuation::None replay requires a pending decision
-    // created through normal game flow (not manual fixture), which requires
-    // a full game setup better suited for integration tests.
-    // Replay integrity verified by integration test replay_and_save_restore_for_all_modes
+
+    // ------------------------------------------------------------------
+    // PART 1: PostWork decision resolved via the resume API
+    //         (from_resume=true stamp), then save -> load -> replay.
+    //
+    // The pause is created through REAL game flow (a card effect interrupting
+    // a worker action), exactly as `e2e_real_card_event_pause_save_restore_resolve_resume_replay`
+    // in src/pending.rs does it. This is the only way the logged `work`
+    // event can recreate the pending decision during `load_json` replay.
+    // ------------------------------------------------------------------
+    {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::harvest::SimpleHarvestDetails;
+        use crate::model::Good;
+
+        // Card set with a single probe card (PendingProbe -> ChooseGain interrupt) plus fillers.
+        let mut definitions = Vec::new();
+        definitions.push(CardDefinition {
+            use_limit: None,
+            id: "CHOICE_CARD".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::PendingProbe {
+                options: vec![(Good::Food, 2), (Good::Wood, 1)],
+            }],
+        });
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![
+            vec!["CHOICE_CARD".to_string()],
+            vec![],
+        ];
+        hands[0].extend(occ_ids.iter().take(6).cloned());
+        hands[0].extend(minor_ids[0..7].iter().cloned());
+        hands[1].extend(occ_ids[6..13].iter().cloned());
+        hands[1].extend(minor_ids[7..14].iter().cloned());
+
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 10,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands.clone(),
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = 0;
+        game.public.start_player = 0;
+        game.card_use_limits = set
+            .definitions
+            .iter()
+            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+            .collect();
+
+        // Play the probe card via Lessons: this pauses on the PendingProbe
+        // Interrupt effect (ChooseGain).
+        let play_action = Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation {
+                card_id: "CHOICE_CARD".into(),
+            },
+        };
+        let play_result = game.apply_with_plans(
+            play_action,
+            None,
+            None,
+            &SimpleHarvestDetails,
+        );
+        assert!(
+            matches!(play_result, Ok(crate::pending::Transition::Paused(_))),
+            "playing probe card should pause during AfterWorker, got: {play_result:?}"
+        );
+        assert!(game.has_pending(), "pending decision after play action");
+
+        // Resolve the pause AND resume the continuation (completes the play action).
+        let play_resolution = crate::pending::PendingResolution::ChooseGain {
+            chosen: crate::pending::GainOption {
+                good: Good::Food,
+                amount: 2,
+            },
+        };
+        let play_resume_result = game
+            .resolve_pending_and_resume(play_resolution)
+            .expect("resolve and resume for play action must succeed");
+        assert_eq!(
+            play_resume_result,
+            crate::pending::Transition::Completed,
+            "play action resume should complete"
+        );
+        assert!(!game.has_pending(), "no pending decision after play action resume");
+
+        // P1 dummy action so turn advances back to player 0.
+        game.public.active_player = 1;
+        game.apply(Action {
+            space: Space::DayLaborer,
+            detail: Detail::None,
+        })
+        .expect("dummy action must succeed");
+        game.public.active_player = 0;
+
+        // Take Forest: the probe card is now in played_cards, so its PendingProbe
+        // effect fires during the AfterWorker -> Interrupt chain and pauses again.
+        let forest_action = Action {
+            space: Space::Forest,
+            detail: Detail::None,
+        };
+        let result = game
+            .apply_with_plans(forest_action.clone(), None, None, &SimpleHarvestDetails);
+        assert!(
+            matches!(result, Ok(crate::pending::Transition::Paused(_))),
+            "worker action should pause, got: {result:?}"
+        );
+        assert!(game.has_pending(), "game should have pending decision after pause");
+
+        let events_before = game.log.events.len();
+        let paused_hash = game.state_hash();
+        let food_before = game.public.players[0].supply.food;
+
+        // Resolve AND resume the paused work action via the resume API.
+        let outcome = game
+            .resolve_pending_and_resume(crate::pending::PendingResolution::ChooseGain {
+                chosen: crate::pending::GainOption { good: Good::Food, amount: 2 },
+            })
+            .expect("resume API must complete the paused PostWork decision");
+        assert_eq!(outcome, crate::pending::Transition::Completed);
+
+        // Exactly one pending_resolution event chains from the paused hash.
+        assert_eq!(game.log.events.len(), events_before + 1);
+        let event = &game.log.events[events_before];
+        assert_eq!(event.kind, "pending_resolution");
+        assert_eq!(
+            event.before, paused_hash,
+            "the resolution event must chain from the paused pre-decision hash"
+        );
+        assert_eq!(
+            event
+                .payload
+                .get("PendingResolution")
+                .and_then(|p| p.get("from_resume")),
+            Some(&serde_json::json!(true)),
+            "the resume API must stamp from_resume=true, got {}",
+            event.payload
+        );
+        assert_eq!(event.after, game.state_hash());
+        // The continuation really ran: space used, workers placed, gain paid.
+        assert!(game.public.used.contains(&Space::Forest), "space must be marked used");
+        assert_eq!(game.public.workers_placed[0], 2, "Lessons + Forest workers must be placed");
+        assert_eq!(
+            game.public.players[0].supply.food,
+            food_before + 2,
+            "the chosen gain must be paid"
+        );
+
+        // Save -> load (load_json replays the whole event chain itself).
+        let saved = game.save_json().expect("save must succeed");
+        let integrity = game.integrity_hash();
+        let restored = Game::load_json(&saved).expect("load must succeed");
+        assert_eq!(restored.integrity_hash(), integrity, "integrity hash must survive save/load");
+        assert_eq!(
+            restored.state_hash(),
+            game.state_hash(),
+            "state_hash must match after load_json replays the event chain"
+        );
+        assert!(!restored.has_pending(), "the resolved decision must not survive as pending");
+
+        // Full replay from the initial state must reproduce the final state.
+        let replayed = Game::replay_with_setup_and_start_player(
+            restored.config.clone(),
+            (*restored.card_set).clone(),
+            restored.log.initial_hands.clone(),
+            restored.log.initial_start_player_override,
+            &restored.log.events,
+        )
+        .expect("replay must succeed");
+        assert_eq!(
+            replayed.state_hash(),
+            restored.state_hash(),
+            "replay must reproduce the final state_hash"
+        );
+        assert_eq!(
+            replayed.integrity_hash(),
+            restored.integrity_hash(),
+            "replay must reproduce the integrity hash"
+        );
+        assert_eq!(
+            replayed.log.events.len(),
+            restored.log.events.len(),
+            "replay must reproduce the event count"
+        );
+        assert_eq!(
+            replayed.public.workers_placed, restored.public.workers_placed,
+            "replay must reproduce worker placements"
+        );
+        assert_eq!(
+            replayed.public.players[0].supply.food,
+            restored.public.players[0].supply.food,
+            "replay must reproduce the paid gain"
+        );
+        // The replayed log must still carry the resume-API stamp.
+        let replayed_event = replayed
+            .log
+            .events
+            .iter()
+            .find(|e| e.kind == "pending_resolution")
+            .expect("replay must contain the pending_resolution event");
+        assert_eq!(
+            replayed_event
+                .payload
+                .get("PendingResolution")
+                .and_then(|p| p.get("from_resume")),
+            Some(&serde_json::json!(true)),
+            "the replayed event must preserve from_resume=true"
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // PART 2: plain (Continuation::None) decision resolved via the
+    //         standalone API (from_resume=false).
+    //
+    // NOTE: `from_resume=false` resolutions are an ANNOTATION recorded for API
+    // completeness. Real game flow never produces them: every pause arises
+    // from a worker-action card-effect interrupt (PostWork continuation) and
+    // must be resolved via `resolve_pending_and_resume` (from_resume=true).
+    // There is no logged-pause path that creates a Continuation::None pending,
+    // so a save whose only `pending_resolution` event was stamped from_resume=false
+    // cannot be replayed (the replay has no pending decision to resolve). This
+    // is correct tamper-detection behavior, not a bug.
+    //
+    // This part therefore verifies: standalone resolution stamps from_resume=false,
+    // the gain is paid, and the saved JSON preserves the annotation. Full replay
+    // of standalone-only resolutions is architecturally impossible by design.
+    // ------------------------------------------------------------------
+    {
+        use crate::model::Good;
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 20,
+            additional_action_space_enabled: false,
+        });
+        let player = 0;
+        game.pending = Some(crate::pending::PendingDecision::new(
+            1,
+            player,
+            crate::pending::PendingKind::ChooseGain {
+                source_card: "TEST_CARD".into(),
+                options: vec![crate::pending::GainOption { good: Good::Wood, amount: 3 }],
+            },
+            game.state_hash(),
+            serde_json::json!({}),
+        ));
+
+        let events_before = game.log.events.len();
+        game.resolve_pending(crate::pending::PendingResolution::ChooseGain {
+            chosen: crate::pending::GainOption { good: Good::Wood, amount: 3 },
+        })
+        .expect("standalone API must resolve a plain decision");
+        assert_eq!(game.log.events.len(), events_before + 1);
+        let event = &game.log.events[events_before];
+        assert_eq!(
+            event
+                .payload
+                .get("PendingResolution")
+                .and_then(|p| p.get("from_resume")),
+            Some(&serde_json::json!(false)),
+            "the standalone API must stamp from_resume=false, got {}",
+            event.payload
+        );
+        assert_eq!(game.public.players[player].supply.wood, 3, "the chosen gain must be paid");
+
+        // Save: the pending_resolution event preserves from_resume=false in the artifact.
+        let saved = game.save_json().expect("save must succeed");
+        let saved_value: serde_json::Value = serde_json::from_str(&saved).expect("valid JSON");
+        let events = saved_value.get("log").and_then(|l| l.get("events")).and_then(|e| e.as_array());
+        assert!(
+            events.is_some(),
+            "save must contain an event log"
+        );
+        let resolution_events: Vec<_> = events
+            .expect("events array")
+            .iter()
+            .filter(|e| e.get("kind").and_then(|k| k.as_str()) == Some("pending_resolution"))
+            .collect();
+        assert_eq!(
+            resolution_events.len(),
+            1,
+            "exactly one pending_resolution event"
+        );
+        let payload = resolution_events[0].get("payload").expect("event payload");
+        assert_eq!(
+            payload.get("PendingResolution").and_then(|p| p.get("from_resume")),
+            Some(&serde_json::json!(false)),
+            "saved JSON must preserve from_resume=false"
+        );
+    }
 }
 
-/// P1-2 extended: exercise additional error paths in `resolve_pending_and_resume`
-/// to verify atomicity (pending, state_hash, event log fully restored on any Err).
+/// P1-2 extended: exercise error paths in `resolve_pending_and_resume` to
+/// verify atomicity (pending, state_hash, event log fully restored on any Err).
+///
+/// Distinction that matters for this test:
+///   * Preflight guard (model.rs:1454-1471): runs BEFORE the pending decision
+///     is taken. Rejects stale/tampered saves atomically. This is PRE-EXISTING
+///     behavior, not the P1-2 fix.
+///   * Post-take fallible chain (model.rs:1482-1518): `apply_pending_resolution`,
+///     `resume_post_work`, `record_pending_resolution`. Each is wrapped by the
+///     P1-2 snapshot (`*self = state_snapshot;` at model.rs:1485/1503/1516).
+///
 /// Paths covered:
-/// 1. `resume_post_work` guard failure (space not available at resume time)
-/// 2. Harvest plan validation failure (requires real paused game in harvest round - tested in integration)
-/// 3. Breeding plan validation failure (requires real paused game in harvest round - tested in integration)
-/// 4. `validate_incremental_*` gate failure (covered by same snapshot mechanism)
-/// 5. `record_pending_resolution` failure (theoretically possible, covered by snapshot)
+/// 1. Preflight guard: space unavailable at resume time (pre-existing, atomic).
+/// 2. Post-take: `apply_pending_resolution` validation failure (insufficient
+///    payment) — covered by `p1_2_resolve_pending_and_resume_atomicity_violation`.
+/// 3. Post-take: `resume_post_work` guard / `validate_incremental_*` gate /
+///    `record_pending_resolution` failure — reachable only via full game flow
+///    at a harvest round; the snapshot mechanism uniformly covers them.
+/// 4. Harvest / breeding plan validation failure — requires a paused game at
+///    the last worker placement before a harvest round; unconstructable in a
+///    simple fixture (documented below).
 #[test]
 fn p1_2_atomicity_extended_error_paths() {
     use crate::model::Good;
@@ -526,9 +859,11 @@ fn p1_2_atomicity_extended_error_paths() {
     use crate::engine::{Action, Detail};
     use crate::card_events::TriggerPhase;
 
-    // ---- 1. resume_post_work guard: space no longer available at resume ----
-    // Use an unrevealed round card space (GrainUtilization) which is not in the space pool
-    // until revealed. In round 1 it's not revealed, so resume should fail.
+    // ---- 1. Preflight guard: space no longer available at resume time -------
+    // Mark Forest used (by another player) BEFORE resolving. The preflight
+    // guard (model.rs:1465) rejects this BEFORE the decision is taken, so the
+    // snapshot is not even needed — nothing was applied. Atomicity trivially
+    // holds: pending, state_hash, and event log are all untouched.
     {
         let mut game = Game::new(Config {
             players: 2,
@@ -536,10 +871,12 @@ fn p1_2_atomicity_extended_error_paths() {
             additional_action_space_enabled: false,
         });
         let player = 0;
-        // Give player enough Wood for the payment
         game.public.players[player].supply.wood = 10;
+        // Another player already took Forest -> unavailable at resume time.
+        game.public.used.insert(Space::Forest);
+        game.public.workers_placed[1] = 1;
         let completion = Box::new(WorkCompletion {
-            action: Action { space: Space::GrainUtilization, detail: Detail::None },
+            action: Action { space: Space::Forest, detail: Detail::None },
             previous_player: game.public.players[player].clone(),
             harvest_plans: None,
             breeding_plans: None,
@@ -581,28 +918,136 @@ fn p1_2_atomicity_extended_error_paths() {
             err.contains("not available at resume time"),
             "Error should mention space availability: {err}"
         );
-        // Atomicity: everything restored
-        assert_eq!(before_hash, game.state_hash(), "state_hash restored on space guard error");
-        assert_eq!(before_pending, game.pending, "pending restored on space guard error");
-        assert_eq!(before_events, game.log.events.len(), "event log restored on space guard error");
+        // Atomicity: nothing changed (preflight rejected before take).
+        assert_eq!(before_hash, game.state_hash(), "state_hash unchanged on preflight guard");
+        assert_eq!(before_pending, game.pending, "pending unchanged on preflight guard");
+        assert_eq!(before_events, game.log.events.len(), "event log unchanged on preflight guard");
     }
 
-    // ---- 2. Harvest plan validation failure ----
-    // Requires a real paused game in a harvest round with proper worker placement.
-    // Tested in integration via full game simulations (m4_multiplayer.rs).
+    // ---- 2. Post-take apply_pending_resolution failure ----------------------
+    // Covered by `p1_2_resolve_pending_and_resume_atomicity_violation` (Wood
+    // payment validation fails AFTER the decision is taken and the snapshot
+    // restores pending / state_hash / event log). That test is the RED-before/
+    // GREEN-after proof of the P1-2 snapshot (model.rs:1485).
+    //
+    // Mutation check: temporarily delete `*self = state_snapshot;` at
+    // model.rs:1485/1503/1516 -> that test turns RED, proving the snapshot
+    // is necessary for post-take atomicity.
 
-    // ---- 3. Breeding plan validation failure ----
-    // Same as harvest plans - requires full game setup.
+    // ---- 3. Post-take resume_post_work guard / validate_incremental_* /
+    //     record_pending_resolution failure -----------------------------------
+    // These run AFTER the decision is taken and `apply_pending_resolution`
+    // has succeeded. The `resume_post_work` space guard is unreachable
+    // post-take via the public API: it checks the same `available_spaces()`
+    // as the preflight guard, and nothing changes space availability between
+    // the preflight check and the resume_post_work guard. `validate_incremental_*`
+    // and `record_pending_resolution` failures likewise require the resume
+    // chain to proceed past apply_pending_resolution.
+    //
+    // A genuine post-take inner failure (e.g. harvest/breeding plan
+    // validation at line 1991/2012) needs a paused game at the last worker
+    // placement before a harvest round with invalid recorded plans —
+    // constructible only through full game flow, not a simple fixture.
+    // Documented as unconstructable here; the snapshot at model.rs:1503/1516
+    // uniformly restores state for ANY such failure.
 
-    // ---- 4. validate_incremental_* gate failure ----
-    // The snapshot in resolve_pending_and_resume is taken before any fallible operation.
-    // Any validation failure after the resume chain restores state via the snapshot.
-    // The existing test (p1_2_resolve_pending_and_resume_atomicity_violation) covers
-    // a validation-like failure (insufficient Wood) and confirms atomicity.
+    // ---- 4. Harvest / breeding plan validation failure ----------------------
+    // Requires `will_harvest` to be true during resume (last placement before
+    // a harvest round) AND invalid recorded plans. Not expressible in a
+    // standalone fixture without a full multi-round game. Recorded as
+    // unconstructable; covered by the same snapshot mechanism.
+}
 
-    // ---- 5. record_pending_resolution failure ----
-    // This function only fails if record_events is true and serde_json::to_value fails,
-    // which should never happen for valid PendingResolution types. We document
-    // that the restoration path exists (lines 1513-1517 in model.rs) but cannot be
-    // easily triggered in practice since all resolution types are Serializable.
+/// P1-2 post-resolution inner failure: regression test proving the snapshot
+/// mechanism restores state when `apply_pending_resolution` SUCCEEDS but a
+/// subsequent inner operation in `resume_post_work` FAILS.
+///
+/// Construction: a manual fixture at round 4 (harvest round), P0 at the last
+/// worker placement before harvest (workers_placed=[1,2], work_quota=[2,2]).
+/// P0 takes Forest (last placement -> will_harvest=true). The pending carries
+/// invalid harvest_plans (length 5 for 2 players). Resolution itself is valid
+/// (enough Wood), so `apply_pending_resolution` succeeds (post-take), but
+/// `resume_post_work` fails at harvest-plan validation
+/// ("feeding plan count mismatch", model.rs:1991). WITHOUT the snapshot
+/// (`*self = state_snapshot;` at model.rs:1485/1503/1516) the payment is
+/// deducted and the pending is lost — the test turns RED. WITH the snapshot,
+/// pending / state_hash / event log / wood are fully restored — GREEN.
+///
+/// Mutation check: temporarily delete `*self = state_snapshot;` at
+/// model.rs:1485/1503/1516 -> this test turns RED (wood/pending not restored).
+/// Restore -> GREEN.
+#[test]
+fn p1_2_post_resolution_inner_failure_atomicity() {
+    use crate::model::Good;
+    use crate::pending::{ChainStep, PostWorkResume, WorkCompletion};
+    use crate::engine::{Action, Detail};
+    use crate::harvest::FeedingPlan;
+    use crate::card_events::TriggerPhase;
+
+    // Manual setup: round 4 (harvest round), P1 done (2/2), P0 needs one more
+    // placement (1/2). P0's Forest placement is the last -> will_harvest=true.
+    let mut game = Game::new(Config {
+        players: 2,
+        seed: 7,
+        additional_action_space_enabled: false,
+    });
+    let player = 0;
+    game.public.round = 4;
+    game.public.workers_placed = vec![1, 2];
+    game.public.active_player = player;
+    game.public.players[player].supply.wood = 10;
+
+    let completion = Box::new(WorkCompletion {
+        action: Action { space: Space::Forest, detail: Detail::None },
+        previous_player: game.public.players[player].clone(),
+        // Invalid harvest plan count (5 plans for 2 players) -> post-take failure.
+        harvest_plans: Some(vec![FeedingPlan::default(); 5]),
+        breeding_plans: None,
+        logged_before: String::new(),
+    });
+    let resume = PostWorkResume {
+        step: ChainStep::AfterWorker,
+        phase: TriggerPhase::Interrupt,
+        after: crate::pending::ChainPosition { card_index: 0, effect_index: 0 },
+        space_applied: false,
+    };
+    game.pending = Some(crate::pending::PendingDecision {
+        id: 1,
+        player,
+        kind: crate::pending::PendingKind::ChoosePayment {
+            card_id: "TEST_CARD".into(),
+            options: vec![crate::pending::PaymentOption {
+                cost: std::collections::BTreeMap::from([(Good::Wood, 1)]),
+            }],
+        },
+        state_hash_before: game.state_hash(),
+        context: serde_json::json!({}),
+        continuation: crate::pending::Continuation::PostWork { player, resume, completion },
+    });
+
+    let before_hash = game.state_hash();
+    let before_pending = game.pending.clone();
+    let before_events = game.log.events.len();
+    let before_wood = game.public.players[player].supply.wood;
+
+    let result = game.resolve_pending_and_resume(PendingResolution::ChoosePayment {
+        chosen: crate::pending::PaymentOption {
+            cost: std::collections::BTreeMap::from([(Good::Wood, 1)]),
+        },
+    });
+
+    // Post-take failure: payment was valid (apply_pending_resolution succeeded),
+    // but resume_post_work fails at harvest-plan validation.
+    assert!(result.is_err(), "Expected error for invalid harvest plans: {result:?}");
+    let err = result.unwrap_err();
+    assert!(
+        err.contains("feeding plan count mismatch"),
+        "Expected harvest-plan validation error, got: {err}"
+    );
+
+    // Atomicity: fully restored by the P1-2 snapshot.
+    assert_eq!(before_hash, game.state_hash(), "state_hash restored on post-take failure");
+    assert_eq!(before_pending, game.pending, "pending restored on post-take failure");
+    assert_eq!(before_events, game.log.events.len(), "event log restored on post-take failure");
+    assert_eq!(before_wood, game.public.players[player].supply.wood, "wood restored on post-take failure");
 }
