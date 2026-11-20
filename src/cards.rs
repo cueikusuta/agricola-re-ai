@@ -4301,8 +4301,8 @@ mod verified_band_d_tests {
         assert_eq!(end_game_bonus(&set, &p), 0);
         // fields 5 (=4 pts), pastures 4 (=4 pts), fenced stable x4 (=4 pts),
         // grain 8 (=4 pts) -> 4 categories.
-        for i in 1..6 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(6).skip(1) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
@@ -4315,9 +4315,9 @@ mod verified_band_d_tests {
                 quantity: 0,
             });
         }
-        for i in 10..14 {
-            p.farm[i].stable = true;
-            p.farm[i].tile = Tile::Pasture { id: (10 + i) as u8 };
+        for (i, cell) in p.farm.iter_mut().enumerate().take(14).skip(10) {
+            cell.stable = true;
+            cell.tile = Tile::Pasture { id: (10 + i) as u8 };
         }
         for _ in 0..8 {
             p.supply.grain += 1;
@@ -4335,8 +4335,8 @@ mod verified_band_d_tests {
         p.played_cards.push("D100".into());
 
         // Test fields boundary: 4 fields = 3 pts, 5 fields = 4 pts
-        for i in 1..5 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(5).skip(1) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
@@ -4405,9 +4405,9 @@ mod verified_band_d_tests {
         // Reset and test fenced_stables boundary: 3 fenced stables = 3 pts, 4 = 4 pts
         let mut p4 = Player::new(0, 0);
         p4.played_cards.push("D100".into());
-        for i in 10..13 {
-            p4.farm[i].stable = true;
-            p4.farm[i].tile = Tile::Pasture { id: (10 + i) as u8 };
+        for (i, cell) in p4.farm.iter_mut().enumerate().take(13).skip(10) {
+            cell.stable = true;
+            cell.tile = Tile::Pasture { id: (10 + i) as u8 };
         }
         assert_eq!(
             end_game_bonus(&set, &p4),
@@ -4740,8 +4740,8 @@ mod verified_band_e_tests {
         // Default farm has two Room cells and 13 Empty cells -> not all used.
         assert_eq!(end_game_bonus(&set, &p), 0);
         // Fill most cells but leave one Empty -> still 0 (boundary: 14 of 15).
-        for i in 0..14 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(14) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
@@ -4758,11 +4758,11 @@ mod verified_band_e_tests {
         q.played_cards.push("E034".into());
         q.farm[0].tile = Tile::Room;
         q.farm[5].tile = Tile::Room;
-        for i in 1..5 {
-            q.farm[i].tile = Tile::Pasture { id: 0 };
+        for cell in q.farm.iter_mut().take(5).skip(1) {
+            cell.tile = Tile::Pasture { id: 0 };
         }
-        for i in 6..15 {
-            q.farm[i].tile = Tile::Pasture { id: 0 };
+        for cell in q.farm.iter_mut().take(15).skip(6) {
+            cell.tile = Tile::Pasture { id: 0 };
         }
         assert_eq!(end_game_bonus(&set, &q), 2);
     }
@@ -4778,14 +4778,14 @@ mod verified_band_e_tests {
         p.played_cards.push("E034".into());
         p.farm[0].tile = Tile::Room;
         p.farm[5].tile = Tile::Room;
-        for i in 1..=4 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(5).skip(1) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
         }
-        for i in 6..=13 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(14).skip(6) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Vegetable),
                 remaining: 1,
             };
