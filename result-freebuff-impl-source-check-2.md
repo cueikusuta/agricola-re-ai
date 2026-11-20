@@ -52,5 +52,10 @@
 
 ## PR とゲート
 
-- PR: 作成まで。**マージしない。** 独立レビューは未実施（カード効果の解釈に関わるため AGENTS.md §14 の対象）。
-- Actions のチェック名・結論・run URL は PR 本文とこの節に追記する。
+- PR: #394（base `main`、head `research/freebuff-impl-source-check-2`）。**マージしない。**
+- HEAD `fad9ad7` の Actions（docs のみの変更のためコード系は skipped）:
+  - Detect changed files: pass / CI required: pass / Pipeline gates (spec/catalog/blockers): pass
+  - cargo test / clippy / rustfmt / M1・M2・M7 seeded performance: skipped
+  - https://github.com/cueikusuta/agricola-re-ai/actions/runs/44672162343
+  - https://github.com/cueikusuta/agricola-re-ai/actions/runs/44672162348
+- 独立レビューは未実施。カード効果の解釈に関わるため AGENTS.md §14 の対象で、別セッションでの初回レビューが必要。
