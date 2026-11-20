@@ -11,7 +11,7 @@
 //! Source: docs/bga-card-specification.md and existing repo citations.
 
 use crate::cards::{CardEffect, CardSet};
-use crate::model::{Animal, Crop, Good, House, Player, Space, Tile, FARM_CELLS};
+use crate::model::{Animal, Crop, Good, House, Player, Space, Tile};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
 use crate::registry::EventKind;
 use serde::{Deserialize, Serialize};
@@ -1338,14 +1338,11 @@ fn auto_animal_plan(p: &Player, animal: Animal, amount: u32) -> crate::engine::A
         }
     }
     // 2. Empty unfenced stables (one animal each), by cell index.
-    for i in 0..FARM_CELLS {
+    for (i, cell) in p.farm.iter().enumerate() {
         if remaining == 0 {
             break;
         }
-        if p.farm[i].stable
-            && matches!(p.farm[i].tile, Tile::Empty)
-            && p.farm[i].stable_animal.is_none()
-        {
+        if cell.stable && matches!(cell.tile, Tile::Empty) && cell.stable_animal.is_none() {
             plan.to_stables.push(i);
             remaining -= 1;
         }
