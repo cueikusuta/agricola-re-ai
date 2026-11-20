@@ -39,16 +39,6 @@ pub enum Site {
 }
 
 impl Site {
-    /// All defined sites.
-    pub const ALL: [Site; 6] = [
-        Site::WorkerPlaced,
-        Site::CardPlayed,
-        Site::RoundStart,
-        Site::Harvest,
-        Site::ClayConstruction,
-        Site::Bake,
-    ];
-
     /// Convert from registry EventKind (for compatibility during transition).
     pub fn from_event_kind(kind: crate::registry::EventKind) -> Self {
         match kind {
@@ -58,18 +48,6 @@ impl Site {
             crate::registry::EventKind::Harvest => Site::Harvest,
             crate::registry::EventKind::ClayConstruction => Site::ClayConstruction,
             crate::registry::EventKind::Bake => Site::Bake,
-        }
-    }
-
-    /// Convert to registry EventKind (for compatibility during transition).
-    pub fn to_event_kind(self) -> crate::registry::EventKind {
-        match self {
-            Site::WorkerPlaced => crate::registry::EventKind::WorkerPlaced,
-            Site::CardPlayed => crate::registry::EventKind::CardPlayed,
-            Site::RoundStart => crate::registry::EventKind::RoundStart,
-            Site::Harvest => crate::registry::EventKind::Harvest,
-            Site::ClayConstruction => crate::registry::EventKind::ClayConstruction,
-            Site::Bake => crate::registry::EventKind::Bake,
         }
     }
 }
@@ -2489,68 +2467,6 @@ pub fn dispatch_before_worker(
         &trigger,
         &all_players,
         false, // before-worker: not post-work chain
-    )
-}
-
-/// Alias for dispatch_start_round (for API consistency with Phase×Site naming).
-#[allow(clippy::too_many_arguments)]
-pub fn dispatch_round_start(
-    card_set: &CardSet,
-    players: &mut [Player],
-    cards: &mut crate::cards::CardState,
-    improvement_market: &mut Vec<crate::model::Improvement>,
-    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
-    round: u8,
-    used_spaces: &std::collections::BTreeSet<Space>,
-    event_budget: &mut u32,
-    card_uses: &mut BTreeMap<String, u32>,
-    card_use_limits: &BTreeMap<String, u32>,
-    pending: &mut Option<PendingDecision>,
-) -> Result<Transition, String> {
-    dispatch_start_round(
-        card_set,
-        players,
-        cards,
-        improvement_market,
-        delayed_well,
-        round,
-        used_spaces,
-        event_budget,
-        card_uses,
-        card_use_limits,
-        pending,
-    )
-}
-
-/// Alias for dispatch_harvest_field (for API consistency with Phase×Site naming).
-#[allow(clippy::too_many_arguments)]
-pub fn dispatch_harvest(
-    card_set: &CardSet,
-    player: usize,
-    cards: &mut crate::cards::CardState,
-    players: &mut [Player],
-    improvement_market: &mut Vec<crate::model::Improvement>,
-    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
-    round: u8,
-    used_spaces: &std::collections::BTreeSet<Space>,
-    event_budget: &mut u32,
-    card_uses: &mut BTreeMap<String, u32>,
-    card_use_limits: &BTreeMap<String, u32>,
-    pending: &mut Option<PendingDecision>,
-) -> Result<Transition, String> {
-    dispatch_harvest_field(
-        card_set,
-        player,
-        cards,
-        players,
-        improvement_market,
-        delayed_well,
-        round,
-        used_spaces,
-        event_budget,
-        card_uses,
-        card_use_limits,
-        pending,
     )
 }
 

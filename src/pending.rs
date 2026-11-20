@@ -1436,7 +1436,11 @@ mod tests {
             .expect("legacy ChooseTriggerOrder without site key must deserialize");
         match kind {
             PendingKind::ChooseTriggerOrder { site, .. } => {
-                assert_eq!(site, Site::WorkerPlaced, "absent site must default to WorkerPlaced");
+                assert_eq!(
+                    site,
+                    Site::WorkerPlaced,
+                    "absent site must default to WorkerPlaced"
+                );
             }
             other => panic!("expected ChooseTriggerOrder, got: {other:?}"),
         }
@@ -1451,8 +1455,7 @@ mod tests {
             triggers: vec![("TEST_CARD".into(), 0, "OnPlayGain".into())],
         };
         let json = serde_json::to_value(&kind).expect("serialize must succeed");
-        let decoded: PendingKind = serde_json::from_value(json)
-            .expect("deserialize must succeed");
+        let decoded: PendingKind = serde_json::from_value(json).expect("deserialize must succeed");
         assert_eq!(kind, decoded, "explicit site must round-trip");
     }
 
