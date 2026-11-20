@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "D103",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "運河の船頭",
+    "name_en": "Canal Boatman"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2818",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": ["fishing", "reed_bank"]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "action": "place_person_on_card_for_resources",
+                "cost_food": 1,
+                "gain_options": [
+                  { "stone": 3 },
+                  { "grain": 1, "vegetable": 1 }
+                ],
+                "notes": "漁か葦原を使うたび、食料1でカード上に人物を追加配置でき、石材3か小麦1+野菜1を得る"
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: 漁/葦原使用ごとに食料1でカード上に人物配置し、石3または小麦1+野菜1獲得（P9: 2スペース＋カード上配置）"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: worker_space_used で 'fishing' と 'reed_bank'（漁・葦原）スペースをどう特定するか",
+      "effects[0].steps[0].params.kind=other: place_person_on_card_for_resources の詳細仕様（カード上人物の上限・人物の供給源（手元の未配置人物か配置済み人物か）・獲得資源の選択・人物配置の永続性）",
+      "classification: 段階4（P9 2スペース＋カード上への追加配置）だが、カード上人物配置の上限と人物供給源が文献で確定できない"
+    ],
+    "test_case_ids": [
+      "D103-fishing-place-person-gain-stone",
+      "D103-reed-bank-place-person-gain-grain-veg",
+      "D103-no-food-cannot-use"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: Each time using Fishing or Reed Bank, may pay 1 food to place a person on this card and gain either 3 stone OR 1 grain + 1 vegetable. Trigger: after_worker_space (Fishing/Reed Bank). Unresolved: person source (unplaced? from board?), card person limit, resource choice, person persistence on card."
+  }
+}

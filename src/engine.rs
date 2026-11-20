@@ -2943,7 +2943,7 @@ fn take_animals(
     }
     Ok(())
 }
-fn place_animals(p: &mut Player, plan: &AnimalPlan, n: u32) -> Result<()> {
+pub fn place_animals(p: &mut Player, plan: &AnimalPlan, n: u32) -> Result<()> {
     let assigned: u32 = plan.to_pastures.iter().map(|x| x.1).sum::<u32>()
         + plan.to_stables.len() as u32
         + u32::from(plan.pet)
@@ -3657,6 +3657,7 @@ mod grow_with_minor_regression_tests {
             }
         }
         let mut game = game.expect("failed to find seed with B010 in player 0 hand");
+        game.public.active_player = 0;
         game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
         game.public.round = 1;
         // Give player 0 resources to play B010 (wood3, food3)

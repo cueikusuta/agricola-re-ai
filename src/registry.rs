@@ -305,6 +305,13 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
+                crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterAnyWorkerGain { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
                 | crate::cards::CardEffect::EndGameBonus { .. } => continue,
@@ -405,7 +412,12 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
-                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. } => *amount,
+                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
+                        | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
+                        | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
                         crate::cards::CardEffect::OnPlayPlaceStonesOnEmptyFields { .. }
                         | crate::cards::CardEffect::OnPlayChooseGainFoodOrPerSheep => 1,
                     };

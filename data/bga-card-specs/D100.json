@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "D100",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "君主",
+    "name_en": "Lord of the Manor"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2821",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "end_scoring",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "gain_points_per_max_category",
+            "action": "score_1_per_category_at_4_points",
+            "notes": "得点計算で、最大の4点に達している得点カテゴリ1つにつき1点"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "end_of_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: 得点計算時に4点カテゴリごとに1点ボーナス（実装済: cards.rs）"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params.kind=other: gain_points_per_max_category の詳細仕様（得点カテゴリの定義・4点『に達している』の判定（>=4か==4か）・複数カテゴリが4点の場合の扱い）",
+      "classification: 実装済（cards.rs）だが、仕様JSONでの効果記述は語彙外のため needs_resolution",
+      "#375 の段階は「外」だが実装済を独立区分としている"
+    ],
+    "test_case_ids": [
+      "D100-scoring-one-category-at-4",
+      "D100-scoring-multiple-categories-at-4",
+      "D100-scoring-category-at-5"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "implemented",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: At scoring, +1 point per scoring category that has reached the maximum of 4 points. Implemented in cards.rs. Trigger: end_scoring. Unresolved: exact category definition, >=4 vs ==4, multiple categories handling."
+  }
+}
