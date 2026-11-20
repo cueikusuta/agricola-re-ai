@@ -7,7 +7,7 @@
 //! - `CardSet` compat adapter — preserves existing API for saves/replays/observations
 
 use crate::card_pool::{CardReview, Eligibility, ReviewStatus};
-use crate::cards::{CardDefinition, CardKind, CardSet};
+use crate::cards::{CardDefinition, CardKind, CardSet, PostPlayDestination};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -102,13 +102,18 @@ pub struct RegisteredCard {
     /// unlimited. Preserved losslessly through `to_card_definition`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_limit: Option<u32>,
+    /// Where the card goes after being played (pass-left support). Preserved
+    /// losslessly through `to_card_definition` so pool-derived card sets keep
+    /// the printed "pass left" behaviour.
+    pub post_play: PostPlayDestination,
     /// Review metadata (official verification status, player-count eligibility)
     pub review: CardReview,
 }
 
 impl RegisteredCard {
     /// Convert to the legacy CardDefinition for compat adapter.
-    /// Preserves `use_limit` so registry -> CardSet conversion is lossless.
+    /// Preserves `use_limit` and `post_play` so registry -> CardSet conversion
+    /// is lossless.
     pub fn to_card_definition(&self) -> CardDefinition {
         CardDefinition {
             use_limit: self.use_limit,
@@ -117,6 +122,7 @@ impl RegisteredCard {
             cost: self.cost.clone(),
             points: self.points,
             effects: self.effects.clone(),
+            post_play: self.post_play,
         }
     }
 }
@@ -230,6 +236,7 @@ impl CardRegistryBuilder {
         points: i32,
         effects: Vec<crate::cards::CardEffect>,
         use_limit: Option<u32>,
+        post_play: PostPlayDestination,
         review: CardReview,
     ) -> Result<Self, RegistryBuildError> {
         // Validate external ID is known
@@ -265,6 +272,7 @@ impl CardRegistryBuilder {
             points,
             effects,
             use_limit,
+            post_play,
             review,
         };
 
@@ -281,7 +289,15 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainPerStored { .. }
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                // B-deck on-play chapter 1
+                | crate::cards::CardEffect::OnPlayBuildPasture { .. }
+                | crate::cards::CardEffect::OnPlayDrawPlayOrPassOccupation { .. }
+                | crate::cards::CardEffect::OnPlayGainByHandOccupationCount { .. }
+                | crate::cards::CardEffect::OnPlayExchangeGain { .. }
+                | crate::cards::CardEffect::OnPlayGainOrExchangeAnimal { .. } => {
+                    EventKind::CardPlayed
+                }
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -417,6 +433,21 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. } => {
                             *amount
                         }
+                        crate::cards::CardEffect::OnPlayBuildPasture { .. } => 1,
+                        crate::cards::CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost } => {
+                            *food_cost
+                        }
+                        crate::cards::CardEffect::OnPlayGainByHandOccupationCount { .. } => 1,
+                        crate::cards::CardEffect::OnPlayExchangeGain {
+                            give_amount,
+                            receive_amount,
+                            ..
+                        } => (*give_amount).max(*receive_amount),
+                        crate::cards::CardEffect::OnPlayGainOrExchangeAnimal {
+                            gain_amount,
+                            pay_amount,
+                            ..
+                        } => (*gain_amount).max(*pay_amount),
                     };
                     amount == 0 || amount > 30
                 })
@@ -738,6 +769,7 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
                     card.points,
                     card.effects,
                     card.use_limit,
+                    card.post_play,
                     review,
                 )?;
             }
@@ -804,6 +836,12 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
     // B-deck band cards with typed effects (kept out of the A/B two-player
     // preset; see verified_band_b_cards).
     builder = add_cards_inner(builder, crate::cards::verified_band_b_cards(), &mut seen)?;
+    // B-deck chapter 1: on-play simple cards (B002/B003/B005/B008/B009).
+    builder = add_cards_inner(
+        builder,
+        crate::cards::verified_b_onplay_simple_cards(),
+        &mut seen,
+    )?;
 
     builder.freeze()
 }
@@ -861,6 +899,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap()
@@ -885,6 +924,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap_err();
@@ -902,6 +942,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review.clone(),
             )
             .unwrap()
@@ -912,6 +953,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap_err();
@@ -929,6 +971,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review.clone(),
             )
             .unwrap()
@@ -942,6 +985,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap()
@@ -962,6 +1006,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review1,
             )
             .unwrap()
@@ -975,6 +1020,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review2,
             )
             .unwrap()
@@ -998,6 +1044,7 @@ mod tests {
                     amount: 1,
                 }],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap()
@@ -1028,6 +1075,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review_verified,
             )
             .unwrap()
@@ -1038,6 +1086,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review_unverified,
             )
             .unwrap()
@@ -1063,6 +1112,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap()
@@ -1128,6 +1178,7 @@ mod tests {
                 0,
                 vec![],
                 Some(3),
+                PostPlayDestination::PlayedArea,
                 review.clone(),
             )
             .unwrap()
@@ -1138,6 +1189,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap()
