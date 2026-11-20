@@ -33,7 +33,7 @@
   },
   "play": {
     "action": "minor_improvement",
-    "cost": [],
+    "cost": null,
     "prerequisites": [],
     "printed_points": 1,
     "alternative_cost_notes": "OR cost: return 1 wild boar to supply OR cook 1 wild boar (meaning unresolved - MQ-12)"
