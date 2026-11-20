@@ -86,7 +86,7 @@
 ## 第6章 集計
 
 - 47項目・60枚: **CONFIRMED 39／PARTIAL 7／UNRESOLVED 1**。
-- 残件7項目（A-03、A-04、B-02、C-04、C-05、D-01、D-07）は `docs/unresolved-sweep.md` 6.2 に
+- 残件8項目（A-03、A-04、B-02、C-04、C-05、D-01、D-07、E-07）は `docs/unresolved-sweep.md` 6.2 に
   「何があれば決まるか」と既定を記載。
 - 版差・翻訳差6件を記録（A136、A135/C135、D008、D021、E086、C109）。
 - 別Issue候補7件（C116 の Rust 過大計上、B062 any-player 述語、B107 ラウンドスペース品物、
