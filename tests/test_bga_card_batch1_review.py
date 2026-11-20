@@ -35,8 +35,9 @@ class Batch1ReviewTest(unittest.TestCase):
                          "move_crop_between_fields")
         self.assertTrue(any("legal_window" in field
                             for field in spec["review"]["unresolved_fields"]))
-        self.assertTrue(any("replay" in field
-                            for field in spec["review"]["unresolved_fields"]))
+        # The effect itself is confirmed; only the cross-player timing window is open.
+        self.assertFalse(any("replay" in field
+                             for field in spec["review"]["unresolved_fields"]))
 
 
 if __name__ == "__main__":
