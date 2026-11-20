@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "card_id": "D076",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "生活保護",
+    "name_en": "Social Benefits"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2845",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "max": 1
+        }
+      }
+    ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_harvest",
+      "conditions": [
+        {
+          "predicate": "resource_count",
+          "params": {
+            "good": "food",
+            "n": 0
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_harvest",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "回る進歩: use once then pass to left neighbor"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: 'food count = 0 after feeding phase' needs precise timing - after_harvest vs dedicated feeding_end trigger",
+      "effects[0].conditions: resource_count with n=0 for 'no food left' needs confirmation",
+      "play.prerequisites: occupation_count max=1 for '職業最大1' needs confirmation"
+    ],
+    "test_case_ids": [
+      "D076-no-food-gain-wood-clay",
+      "D076-has-food-no-gain",
+      "D076-multiple-harvests"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 reed. Prereq: at most 1 occupation. Effect: After each harvest's feeding phase, if player has 0 food, gain 1 wood and 1 clay. Passes to left neighbor."
+  }
+}

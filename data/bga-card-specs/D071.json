@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "card_id": "D071",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "植え替え",
+    "name_en": "Changeover"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2850",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_harvest",
+      "conditions": [
+        {
+          "predicate": "raw_text",
+          "params": {
+            "text": "harvest resulted in a field with exactly 1 good remaining"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "action": "replant_field",
+                "effect": {
+                  "operation": "other",
+                  "params": {
+                    "kind": "move_field_good_to_supply",
+                    "good": "any",
+                    "good_amount": 1,
+                    "max_source_fields": 1,
+                    "counts_as_field_phase": false,
+                    "counts_as_harvest": false,
+                    "followed_by": {
+                      "operation": "other",
+                      "params": {
+                        "kind": "move_crop_to_empty_field",
+                        "crop_amount": 1,
+                        "source_field_min_crops": 0,
+                        "counts_as_sow": true,
+                        "counts_as_harvest": false
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "action": "decline",
+                "effect": null
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "回る進歩: use once then pass to left neighbor"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: predicate for 'field with exactly 1 good after harvest' not in vocabulary",
+      "effects[0].steps[0].params.options[0].effect: compound operation (discard remaining good then sow) needs formalization",
+      "effects[0].trigger: after_harvest timing for individual field resolution needs clarification"
+    ],
+    "test_case_ids": [
+      "D071-field-with-one-good-replant",
+      "D071-field-with-multiple-goods-no-effect",
+      "D071-no-fields-with-one-good"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Effect: After harvest, if any field has exactly 1 good remaining, may discard that good and sow 1 crop in that field (counts as sow action). Passes to left neighbor. Complex compound effect needs vocabulary for 'single good field after harvest' and the discard-then-sow sequence."
+  }
+}

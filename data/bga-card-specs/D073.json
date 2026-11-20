@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "card_id": "D073",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "補給ボート",
+    "name_en": "Supply Boat"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2848",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "min": 1
+        }
+      }
+    ],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "fishing"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "action": "buy_grain",
+                "effect": {
+                  "operation": "exchange",
+                  "params": {
+                    "give": { "good": "food", "amount": 1 },
+                    "receive": { "good": "grain", "amount": 1 }
+                  }
+                }
+              },
+              {
+                "action": "buy_vegetable",
+                "effect": {
+                  "operation": "exchange",
+                  "params": {
+                    "give": { "good": "food", "amount": 3 },
+                    "receive": { "good": "vegetable", "amount": 1 }
+                  }
+                }
+              },
+              {
+                "action": "decline",
+                "effect": null
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "回る進歩: use once then pass to left neighbor"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: worker_space_used with 'fishing' space needs exact space identifier",
+      "effects[0].steps[0].params.options: exchange operation for buy choices needs validation against vocabulary",
+      "effects[0].trigger: after_worker_space timing for post-fishing resolution needs confirmation"
+    ],
+    "test_case_ids": [
+      "D073-fishing-buy-grain",
+      "D073-fishing-buy-vegetable",
+      "D073-fishing-decline",
+      "D073-insufficient-food"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 wood. Prereq: at least 1 occupation. Printed points: 1. Effect: After using the fishing space, may pay 1 food for 1 grain, or 3 food for 1 vegetable. Passes to left neighbor."
+  }
+}

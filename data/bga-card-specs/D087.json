@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "card_id": "D087",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "建築士",
+    "name_en": "Master Builder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2834",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "room_count_in",
+          "params": {
+            "values": [5, 6, 7, 8, 9, 10]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "grant_action",
+            "action": "build_room",
+            "once_per_game": true,
+            "free": true,
+            "without_room": false
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "職業: stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: room_count_in for '家が5部屋以上になったら' - needs >= 5 not exactly 5",
+      "effects[0].steps[0].params.kind: grant_action with once_per_game and free for build_room needs vocabulary confirmation",
+      "effects[0].trigger: passive with condition check for room count >= 5 needs timing clarification"
+    ],
+    "test_case_ids": [
+      "D087-4-rooms-no-action",
+      "D087-5-rooms-grant-free-room",
+      "D087-6-rooms-grant-free-room",
+      "D087-used-once-no-second-use"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Effect: When house has 5+ rooms, once per game may build 1 room for free. Stage 3: room (room count + free build). Stays in play area as occupation."
+  }
+}
