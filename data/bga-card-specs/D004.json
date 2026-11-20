@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [

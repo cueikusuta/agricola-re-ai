@@ -132,7 +132,8 @@
     "unresolved_fields": [],
     "test_case_ids": [
       "D163-on-play-stone",
-      "D163-other-player-stone-action"
+      "D163-other-player-stone-renovation",
+      "D163-other-player-stone-room"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",

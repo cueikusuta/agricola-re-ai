@@ -43,7 +43,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "cards_in_play_at_least",
+        "params": {
+          "n": 10
+        }
+      }
+    ],
     "printed_points": 1
   },
   "effects": [

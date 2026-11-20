@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "栽培中の畑1（栽培中の畑が1つ以上ある）"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -79,8 +86,10 @@
     "destination": "left_neighbor_hand"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: recorded as raw_text; no predicate in the current vocabulary"
+    ],
     "test_case_ids": [
       "D005-normal",
       "D005-zero"

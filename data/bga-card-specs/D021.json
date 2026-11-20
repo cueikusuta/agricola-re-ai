@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "家に人物がいない"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -78,8 +85,10 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: recorded as raw_text; no predicate in the current vocabulary"
+    ],
     "test_case_ids": [
       "D021-normal",
       "D021-not-triggered"

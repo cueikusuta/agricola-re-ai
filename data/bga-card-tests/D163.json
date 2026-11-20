@@ -6,29 +6,46 @@
       "id": "D163-on-play-stone",
       "scope": "effect_only",
       "setup": {
-        "card_played": true
+        "card_played": false,
+        "stone": 0
       },
       "action": {
-        "verify_effect": "D163-on-play-stone"
+        "play": "D163"
       },
       "expected": {
-        "effect_verified": true
+        "stone_delta": 2
       },
-      "notes": "Test case for D163: D163-on-play-stone"
+      "notes": "On play, gain 2 stone."
     },
     {
-      "id": "D163-other-player-stone-action",
+      "id": "D163-other-player-stone-renovation",
       "scope": "effect_only",
       "setup": {
-        "card_played": true
+        "card_played": true,
+        "other_player_renovates_to": "stone"
       },
       "action": {
-        "verify_effect": "D163-other-player-stone-action"
+        "other_player_renovates": true
       },
       "expected": {
-        "effect_verified": true
+        "stone_delta": 1
       },
-      "notes": "Test case for D163: D163-other-player-stone-action"
+      "notes": "Another player's renovation to a stone house gives 1 stone."
+    },
+    {
+      "id": "D163-other-player-stone-room",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "other_player_builds_room": "stone"
+      },
+      "action": {
+        "other_player_builds_rooms": 1
+      },
+      "expected": {
+        "stone_delta": 1
+      },
+      "notes": "Another player's stone room gives 1 stone."
     }
   ]
 }
