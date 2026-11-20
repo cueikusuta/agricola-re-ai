@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "card_id": "D115",
+  "cases": [
+    {
+      "id": "D115-baby-animals-sow",
+      "scope": "effect_only",
+      "setup": {
+        "empty_fields": 3,
+        "baby_animals_gained": 2,
+        "grain": 1,
+        "vegetable": 1
+      },
+      "action": {
+        "trigger": "harvest_start",
+        "phase": "breeding",
+        "sow_fields": [0, 1],
+        "sow_crops": ["grain", "vegetable"]
+      },
+      "expected": {
+        "field_0_crop": "grain",
+        "field_1_crop": "vegetable",
+        "sow_count": 2,
+        "notes": "2 baby animals gained, sow on 2 empty fields"
+      }
+    },
+    {
+      "id": "D115-no-baby-animals",
+      "scope": "effect_only",
+      "setup": {
+        "empty_fields": 3,
+        "baby_animals_gained": 0
+      },
+      "action": {
+        "trigger": "harvest_start",
+        "phase": "breeding"
+      },
+      "expected": {
+        "sow_count": 0,
+        "effect_not_triggered": true
+      },
+      "notes": "No baby animals gained, no sow actions granted"
+    },
+    {
+      "id": "D115-no-empty-fields",
+      "scope": "effect_only",
+      "setup": {
+        "empty_fields": 0,
+        "baby_animals_gained": 2
+      },
+      "action": {
+        "trigger": "harvest_start",
+        "phase": "breeding"
+      },
+      "expected": {
+        "sow_count": 0,
+        "effect_not_triggered": true,
+        "notes": "No empty fields, cannot sow"
+      }
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "card_id": "D117",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "木の専門家",
+    "name_en": "Wood Expert"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2804",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "BGA wiki card page; effect: on play gain 2 wood; each improvement played, up to 2 wood in cost substituted with 1 food each"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "when_buying",
+      "conditions": [
+        {
+          "predicate": "improvement_played_from_hand",
+          "params": {
+            "via_major_or_minor_action": true
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "substitute_cost",
+            "material_from": "wood",
+            "material_to": "food",
+            "scope": "improvement_cost",
+            "segment_cap": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "before_effect",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Each improvement played from hand: up to 2 wood in its cost can be paid with 1 food each. Wiki: '進歩コストの木材2つまでを食料1ずつで代用できる'."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "D117-on-play-wood",
+      "D117-substitute-wood-cost",
+      "D117-substitute-cap-2"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Classification: stage 4 P3 (on play + constant improvement cost substitution). Uses TR-SITE, DEF. Two effects: on_play gain 2 wood; when_buying substitute up to 2 wood with food per improvement."
+  }
+}

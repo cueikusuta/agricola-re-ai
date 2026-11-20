@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "card_id": "D111",
+  "cases": [
+    {
+      "id": "D111-renovation-rounds",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_renovation",
+        "house_type": "clay"
+      },
+      "expected": {
+        "round_markers": {
+          "6": {"food": 1},
+          "7": {"food": 1},
+          "8": {"food": 1},
+          "9": {"food": 1},
+          "10": {"food": 1},
+          "11": {"food": 1}
+        },
+        "food_delta_at_round_6_start": 1,
+        "food_delta_at_round_11_start": 1
+      },
+      "notes": "Renovate at round 5, place 1 food on rounds 6-11, gain at start of each"
+    },
+    {
+      "id": "D111-multiple-renovations",
+      "scope": "effect_only",
+      "setup": {
+        "round": 3,
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_renovation",
+        "house_type": "clay"
+      },
+      "expected": {
+        "round_markers": {
+          "4": {"food": 1},
+          "5": {"food": 1},
+          "6": {"food": 1},
+          "7": {"food": 1},
+          "8": {"food": 1},
+          "9": {"food": 1}
+        }
+      },
+      "notes": "First renovation at round 3. Second renovation would stack additional markers on overlapping rounds"
+    },
+    {
+      "id": "D111-round-14-clamp",
+      "scope": "effect_only",
+      "setup": {
+        "round": 10,
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_renovation",
+        "house_type": "stone"
+      },
+      "expected": {
+        "round_markers": {
+          "11": {"food": 1},
+          "12": {"food": 1},
+          "13": {"food": 1},
+          "14": {"food": 1}
+        },
+        "notes": "Rounds 15+ clamped/discarded per round limit (max round 14)"
+      }
+    }
+  ]
+}

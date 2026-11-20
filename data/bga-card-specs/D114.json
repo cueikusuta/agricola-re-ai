@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "D114",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "種商人",
+    "name_en": "Seed Trader"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2807",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "BGA wiki card page; effect: on play stack 2 grain + 2 veg on card; anytime buy grain for 2 food, veg for 3 food"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: anytime free action trigger window undefined (like A071/D106); on_play stacking goods on card expressible but anytime purchase requires free action API; classification stage 4 P6 accumulation + retrieval"
+    ],
+    "test_case_ids": [
+      "D114-on-play-stack",
+      "D114-buy-grain",
+      "D114-buy-veg",
+      "D114-stock-exhausted"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Classification: stage 4 P6 (accumulation + retrieval). Uses PS, TR-SITE, STACK. On play: stack 2 grain + 2 veg on card. Anytime: spend 2 food -> take 1 grain from card (max 2), spend 3 food -> take 1 veg from card (max 2). Anytime trigger unresolved per vocabulary."
+  }
+}
