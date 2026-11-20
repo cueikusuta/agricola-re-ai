@@ -31,6 +31,9 @@ fn sample_set(players: usize) -> CardSet {
     CardSet { definitions }
 }
 #[test]
+// The loop pairs each seat id with every opponent hand index for the
+// cross-seat privacy assertion; keep the explicit index form.
+#[allow(clippy::needless_range_loop)]
 fn private_deal_is_deterministic_and_observer_scoped() {
     for players in 2..=4 {
         let config = Config {

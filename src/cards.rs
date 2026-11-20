@@ -3800,6 +3800,8 @@ mod verified_band_d_tests {
     }
 
     #[test]
+    // Index loops into `p.farm` mirror the farm-grid layout the test asserts on.
+    #[allow(clippy::needless_range_loop)]
     fn d100_bonus_point_per_category_at_max_four() {
         let set = set();
         let mut p = Player::new(0, 0);
@@ -3835,6 +3837,8 @@ mod verified_band_d_tests {
     /// count towards the bonus. This ensures a mutation of the threshold from 4 to 3
     /// would be detected.
     #[test]
+    // Index loops into `p.farm` mirror the farm-grid layout the test asserts on.
+    #[allow(clippy::needless_range_loop)]
     fn d100_three_point_categories_do_not_count() {
         let set = set();
         let mut p = Player::new(0, 0);
