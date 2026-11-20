@@ -127,8 +127,10 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0-2]: whether taking 2/3+ food also yields the lower tiers (cumulative) or only the matching tier (positional) is ambiguous in the JA and EN wording; tests keep the positional reading and a fail-closed case"
+    ],
     "test_case_ids": [
       "A103-normal",
       "A103-boundary-two",
@@ -139,6 +141,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Each time you take 1/2/3+ food from a food accumulation space, additionally gain 1 vegetable/wheat/reed. Tier reading fixed by the literature (MR-03)."
+    "notes": "Each time you take 1/2/3+ food from a food accumulation space, additionally gain 1 vegetable/wheat/reed. Tier reading fixed by the literature (MR-03). Tier interpretation left open (positional vs cumulative)."
   }
 }

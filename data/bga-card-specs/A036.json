@@ -39,7 +39,14 @@
         "amount": 2
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "ストックの木材≧現在のラウンド数（木材がラウンド数以上）"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -110,8 +117,10 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: recorded as raw_text; no predicate in the current vocabulary"
+    ],
     "test_case_ids": [
       "A036-normal",
       "A036-capped"

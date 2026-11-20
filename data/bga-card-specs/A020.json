@@ -34,7 +34,14 @@
   "play": {
     "action": "minor_improvement",
     "cost": null,
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "ラウンド3(5)かその前に出す（ラウンド3、版によっては5までに出せる）"
+        }
+      }
+    ],
     "printed_points": 0,
     "alternative_cost_notes": "1 小麦 (+1 飯)"
   },
@@ -66,7 +73,8 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "play.cost: the cost depends on the round played (grain 1 up to round 3, grain 1 + food 1 in rounds 4-5); the cost vocabulary cannot express a round-dependent cost"
+      "play.cost: the cost depends on the round played (grain 1 up to round 3, grain 1 + food 1 in rounds 4-5); the cost vocabulary cannot express a round-dependent cost",
+      "play.prerequisites: recorded as raw_text; no predicate in the current vocabulary"
     ],
     "test_case_ids": [
       "A020-normal",

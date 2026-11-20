@@ -33,9 +33,14 @@
   },
   "play": {
     "action": "minor_improvement",
-    "cost": null,
-    "prerequisites": null,
-    "printed_points": null
+    "cost": [
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
   },
   "effects": [
     {
@@ -80,9 +85,6 @@
     "status": "partial",
     "unresolved_fields": [
       "bga.eligibility",
-      "play.cost",
-      "play.prerequisites",
-      "play.printed_points",
       "effects.0.engine_mapping"
     ],
     "test_case_ids": [
@@ -91,6 +93,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Illustrative incomplete entry only. Not approved for standard pool and not official verification."
+    "notes": "Illustrative incomplete entry only. Not approved for standard pool and not official verification. Cost 1 food, no play prerequisite and 0 printed points now match the ledger and the reference card page; the engine mapping is still open."
   }
 }

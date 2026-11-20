@@ -39,7 +39,15 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "resource_in_hand",
+        "params": {
+          "resource": "grain",
+          "min": 2
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
