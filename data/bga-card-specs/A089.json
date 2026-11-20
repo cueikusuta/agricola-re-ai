@@ -99,10 +99,8 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "round_space_marker_when_current_round_plus_offset_exceeds_14"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
       "A089-normal",
       "A089-not-triggered",
@@ -111,6 +109,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Rounds current+3/+6/+9 receive stable markers; those round starts allow one cost-free stable each. Unresolved: computed round beyond 14 at late play."
+    "notes": "Rounds current+3/+6/+9 receive stable markers; those round starts allow one cost-free stable each. Rounds beyond 14 are discarded (official RE appendix: only the remaining round spaces receive goods)."
   }
 }

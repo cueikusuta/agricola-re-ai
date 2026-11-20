@@ -68,8 +68,7 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "per_turn_and_per_harvest_limits_absent_in_en_list",
-      "replaced_bake_bread_sources_scope"
+      "per_harvest_limit: the 1-per-harvest cap appears only on the Japanese printing; the English list omits it"
     ],
     "test_case_ids": [
       "A097-normal",
@@ -79,6 +78,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Each obtained Bake Bread action may be replaced by playing one occupation without cost. Japanese text caps it per turn and per harvest; the English list row omits that cap."
+    "notes": "Each obtained Bake Bread action may be replaced by playing one occupation without cost. The 1-per-turn cap is confirmed by the official errata; card-granted Bake Bread actions are included. The 1-per-harvest cap is Japanese-printing only."
   }
 }

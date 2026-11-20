@@ -82,6 +82,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "implemented",
-    "notes": "BGA wiki content structured as a wood discount on the fence-building action; official verification remains separate."
+    "notes": "Wood discount on the Build Fences action. The trigger is the Build Fences action itself, including a Build Fences action granted by a card; effects that place fences directly (Mini Pasture, Overhaul) do not trigger it (official RE appendix: acting without placing a person can still be an action)."
   }
 }

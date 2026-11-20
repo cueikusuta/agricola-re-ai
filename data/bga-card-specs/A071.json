@@ -74,8 +74,7 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "legal_window: the wiki says only \"anytime\"; whether this is limited to the owner's own turn is MQ-09 and is not decided here",
-      "replay: the free-action decision must be recorded in the action log"
+      "legal_window: whether the owner may use it during another player's turn is undecided (MQ-09); the effect itself is confirmed"
     ],
     "test_case_ids": [
       "A071-normal",
@@ -86,6 +85,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Any time: move 1 crop from a field with 2+ crops to an empty field (not sowing/harvest). Effect value fixed from the JA wiki; the legal window and replay contract remain unresolved."
+    "notes": "Any time: move 1 crop from a field with 2+ crops to an empty field (not sowing/harvest). Free action, unlimited uses, no turn consumed (official RE appendix: acting without placing a person is not a turn). Only the cross-player timing window remains open."
   }
 }
