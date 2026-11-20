@@ -52,7 +52,7 @@ D070–D077 と D080 の仕様は `post_play.destination = "left_neighbor_hand"`
 ただし traveling かどうかは**カードごとに印刷面で決まる**。AgricolaDB は traveling card のテキストに
 「自分の前に置かず左隣のプレイヤーの手札に入れる」旨を含める（B008 露店で確認）。
 **D070–D077・D080 のテキストにはその文言が無く**、BGA wiki の効果文にも無い。
-このため9枚の `left_neighbor_hand` は文献に根拠が無いと判定した（第5章 食い違い1）。
+このため9枚の `left_neighbor_hand` は文献に根拠が無いと判定した（第4章 食い違い1）。
 なお D073 と D075 は AgricolaDB の見出しに再録記号（`*`）が付くが、これは再録・収録製品の印で traveling の印ではない
 （B008 も同じ記号を持つが、traveling の根拠は記号ではなくテキストの文言）。
 
@@ -123,4 +123,134 @@ D070–D077 と D080 の仕様は `post_play.destination = "left_neighbor_hand"`
 - D100 は仕様の未解決欄も「>=4 か ==4 か」を挙げているが、文献側の争点はそこではなく
   **柵で囲った厩を数えるか**の注記が仕様に無い点である。
 
-<!-- APPEND -->
+## 第3章 PR #401（15枚）
+
+15枚とも職業で、費用「ー」・前提「ー」・印刷点「ー」であり、仕様の `cost: []` / `prerequisites: []` / `printed_points: 0` と一致した。
+
+| ID | カード | 仕様の読み | 文献の読み | 判定 |
+|---|---|---|---|---|
+| D106 | ウイスキー蒸留者 | `effects: null`（「いつでも」の窓が語彙未定義のため意図的にフェイルクローズ） | いつでも小麦1を払い、現在ラウンド+2のスペースに食料4を置き、そのラウンド開始時に得る | 一致（本文）／仕様は未定義で保留 |
+| D107 | 釣鐘鋳造師 | 各ラウンドの帰宅フェイズに、レンガ1以上あれば全て破棄して食料3か+1点。任意 | 同 | 一致（「全て」の範囲は未確定） |
+| D108 | 石工 | 畑フェイズに石材**ちょうど1**を食料3に変換。`frequency: once_per_game`（ただし同JSONの notes は「once per harvest」） | 収穫時に石材ちょうど1を食料3に変換 | 食い違い（回数が内部で矛盾） |
+| D109 | 種まきの達人 | 出した時木材1。「種をまく」アクションを持つスペースの使用ごとに食料2 | 同。寸評も「種まきを付与するカードでは誘発しない」と補足 | 一致 |
+| D110 | 養魚家 | 漁の累積が**1以上**なら、葦原・粘土坑・森林のいずれでも食料2追加 | 漁の累積が 1/2/3+ のとき、それぞれ葦原/粘土坑/森林で食料2追加（葦原1・粘土坑2は「ちょうど」） | 食い違い（しきい値の割当） |
+| D111 | 内装業者 | 改築のたび、次の6ラウンドのスペースへ食料1（各ラウンド開始時に得る） | 同 | 一致（14ラウンド超の端数は未確定） |
+| D112 | 若い農夫 | 「大きい進歩」スペースの使用ごとに小麦1、その後「種をまく」 | 同 | 一致 |
+| D113 | 食料商人 | 畑フェイズに、収穫した小麦1につき食料3→野菜1。`frequency: once_per_game`、2食料の段なし | 畑から収穫した小麦の数だけ食料3→野菜1。**最後の小麦**なら食料2 | 食い違い（回数と価格の段） |
+| D114 | 種商人 | `effects: null`（「いつでも」の窓が未定義） | カード上に小麦2＋野菜2。いつでも食料2で小麦1、食料3で野菜1を購入 | 一致（本文）／仕様は未定義で保留 |
+| D115 | 飼い葉の栽培人 | `harvest_start`＋「収穫のないラウンドでない」条件で、得た子畜1につき空き畑1に播種。`once_per_game` | 収穫の**繁殖フェイズ**で、得た子畜1につき畑ちょうど1に播種 | 食い違い（時点と回数） |
+| D116 | 樹木検査人 | 自分専用の累積スペース（木材1/ラウンド）。石切り場が新規公開されるたびカード上の木材を全て捨てる | 同（自分だけが使える累積スペース「木材1」、石切り場の公開で全捨て） | 一致（蓄積レートは本文に明記なし） |
+| D117 | 木の専門家 | 出した時木材2。`when_buying`＋「手札から大小進歩アクションで出した進歩」に限り、木材2までを食料1で代用 | 出した時木材2。**進歩を出すたび**、そのコストの木材2までを食料1で代用（手段を問わない） | 食い違い（条件が狭い）＋レート未確定 |
+| D118 | 唐変木 | 出した時木材6をカード上。`after_improvement`＋手札から出した進歩で木材1 | 出した時木材6をカード上。**手札からカード（職業を含む）を出すたび**、直後に木材1 | 食い違い（職業のプレイが抜けている） |
+| D119 | 森の労役者 | 柵建設・部屋建設のスペース使用の**前に**、木材2を得るか木材2までを葦1と交換 | 同 | 一致 |
+| D120 | 粘土配達人 | ラウンド6–14のスペースにレンガ1（`rounds: [6..14]` の固定リスト、既プレイ分の除外は注記のみ） | ラウンド6–14のうち**未プレイ**のスペース全てにレンガ1、各ラウンド開始時に得る | 表現不足（既プレイ分の除外が構造に無い） |
+
+### 第3章の要点
+
+- D106 と D114 の `effects: null` は文献との食い違いではなく、プロジェクトが「いつでも」自由行為の窓を
+  未定義にしているための意図的な保留である。文献側の読みは明確なので、API整備後にそのまま実装できる。
+- 回数の誤りが目立つ: D108（`once_per_game` vs 毎収穫）、D113（同上）、D115（毎収穫の繁殖フェイズ）。
+- D110 は「3スペースに同じしきい値」を当てており、文献の 1/2/3+ の割当と一致しない。
+- D118 は対象が「手札から出すカード」全般（職業を含む）で、`after_improvement` だけでは職業のプレイが漏れる。
+
+## 第4章 食い違い一覧（根拠つき）
+
+重大度: **高** = 得点・権利・カードの所在が変わる／**中** = 効果の範囲・回数・対象が変わる／**低** = 表現・記述の不備。
+
+| # | ID | 対象 | 仕様の読み | 文献の読み | 重大度 | 根拠 |
+|---|---|---|---|---|---|---|
+| 1 | D070–D077, D080 | `post_play.destination = left_neighbor_hand`（「回る進歩」） | 使用後に左隣の手札へ渡す | 9枚とも traveling の文言が無い（印刷テキストに他プレイヤーへ渡す記述なし） | 高 | [AgricolaDB D070](https://db.agricolajp.dev/AG2/card/D070)〜[D080](https://db.agricolajp.dev/AG2/card/D080)、[BGA wiki](https://agricola.cloudfree.jp/?p=2851)、traveling の定義は[改訂版ルールブック](https://board-game-rules.com/boardgames/agricola-revised-edition) |
+| 2 | D071 | `effects[0].trigger` | `after_harvest`（収穫解決中） | 「いつでも」。収穫の結果として条件を満たしたあと、任意の時点で使える | 中 | [AgricolaDB D071](https://db.agricolajp.dev/AG2/card/D071)、[wiki p=2850](https://agricola.cloudfree.jp/?p=2850) |
+| 3 | D071 | `effects[0].steps[0]` | 品物を捨てたあと `move_crop_to_empty_field`（別の畑から作物を移す形） | 捨てたあと**その畑に限った**「種をまく」 | 中 | 同上 |
+| 4 | D072 | `effects[0].steps[0].params.amount` | `count: stable`（柵内外を問わず全厩） | 「柵で囲われていない厩」の数 | 中 | [AgricolaDB D072](https://db.agricolajp.dev/AG2/card/D072)、[wiki p=2849](https://agricola.cloudfree.jp/?p=2849) |
+| 5 | D074 | `effects[0]` | `discount_cost`（木材2につき1の割引）＋範囲「農場拡充と進歩」 | 農場拡充の使用時／進歩を建てた手番の終わりに、支払った木材2につき1木材を**後から得る** | 中 | [AgricolaDB D074](https://db.agricolajp.dev/AG2/card/D074)、[wiki p=2847](https://agricola.cloudfree.jp/?p=2847)（寸評にBGAでの挙動変更の記述） |
+| 6 | D075 | `effects[0].steps[0].params.amount` | `count_as_field: 2`（畑2枚として数える） | カードは**畑1**。木材を畑2枚相当まで植えられるだけ | 中 | [AgricolaDB D075](https://db.agricolajp.dev/AG2/card/D075)、[wiki p=2846](https://agricola.cloudfree.jp/?p=2846) |
+| 7 | D077 | `effects[0].trigger/conditions` | `after_renovation`＋`any_player`（改築なら種類を問わない） | **石の家への改築**のときだけ発動 | 中 | [AgricolaDB D077](https://db.agricolajp.dev/AG2/card/D077)、[wiki p=2844](https://agricola.cloudfree.jp/?p=2844) |
+| 8 | D080 | `play.cost` | `[{wood:1},{food:1}]`（両方払う形）＋注記「OR」 | 木1**または**食料1の二者択一 | 中 | [AgricolaDB D080](https://db.agricolajp.dev/AG2/card/D080)、[wiki p=2841](https://agricola.cloudfree.jp/?p=2841) |
+| 9 | D082 | `effects[0].steps[0].params.material_to` | 改築時の進歩コストを**レンガ**1で軽減 | 建設資材1（**種類は任意**）を軽減 | 中 | [AgricolaDB D082](https://db.agricolajp.dev/AG2/card/D082)、[wiki p=2839](https://agricola.cloudfree.jp/?p=2839) |
+| 10 | D086 | `effects[0].steps[0].params` | このカードの上に、条件を満たす職業数ぶんの羊を収容 | 条件を満たす職業カード**それぞれに**羊1を飼える | 低 | [AgricolaDB D086](https://db.agricolajp.dev/AG2/card/D086)、[wiki p=2835](https://agricola.cloudfree.jp/?p=2835) |
+| 11 | D087 | `effects[0].conditions[0]` | `room_count_in: [5,6,7,8,9,10]`（列挙） | 家が**5部屋以上**になり次第 | 中 | [AgricolaDB D087](https://db.agricolajp.dev/AG2/card/D087)、[wiki p=2834](https://agricola.cloudfree.jp/?p=2834) |
+| 12 | D092 | `effects[0].steps[0].params.cost_food` | 家族増加に**食料2**を支払う | 食料の支払いは無く、**-2点**のみ | 中 | [AgricolaDB D092](https://db.agricolajp.dev/AG2/card/D092)、[wiki p=2829](https://agricola.cloudfree.jp/?p=2829) |
+| 13 | D093 | `effects[0].trigger` | `after_work_phase`（労働フェイズ終了時） | **人物の行動を完了した後**（労働フェイズ中）、各労働フェイズに1回 | 中 | [AgricolaDB D093](https://db.agricolajp.dev/AG2/card/D093)、[wiki p=2828](https://agricola.cloudfree.jp/?p=2828) |
+| 14 | D094 | `effects[0].conditions[0]`＋step名 | 述語 `worker_on_space: second_person_this_round`（存在しないスペース）／step 名は「集会所から1人目を戻す」 | そのラウンドの2人目での部屋建設、戻すのは**集会所にいない**1人目 | 中 | [AgricolaDB D094](https://db.agricolajp.dev/AG2/card/D094)、[wiki p=2827](https://agricola.cloudfree.jp/?p=2827) |
+| 15 | D096 | `effects[1].steps[0].params.scope` | `minor_improvement` のみ | **進歩**（大小を問わない）。寸評も大進歩の建設を前提 | 中 | [AgricolaDB D096](https://db.agricolajp.dev/AG2/card/D096)、[wiki p=2825](https://agricola.cloudfree.jp/?p=2825) |
+| 16 | D097 | `effects[0].steps[0]` | 「物乞い1」を `gain_resource: food 1` として計上 | 物乞い（乞食 Marker）を得る。食料ではないため終局に-3点 | 高 | [AgricolaDB D097](https://db.agricolajp.dev/AG2/card/D097)、[wiki p=2824](https://agricola.cloudfree.jp/?p=2824) |
+| 17 | D099 | `effects[1].steps[1].params.amount` | レンガを**人物数ぶん固定**で支払う | レンガ1で1点を**最大で人物の数まで**（量は選べる） | 中 | [AgricolaDB D099](https://db.agricolajp.dev/AG2/card/D099)、[wiki p=2822](https://agricola.cloudfree.jp/?p=2822) |
+| 18 | D108 | `effects[0].frequency` | `once_per_game`（同JSONの notes は「once per harvest」） | 収穫のたびに1回 | 中 | [AgricolaDB D108](https://db.agricolajp.dev/AG2/card/D108)、[wiki p=2813](https://agricola.cloudfree.jp/?p=2813) |
+| 19 | D110 | `effects[0].conditions[1]` | `accumulation_at_least: fishing,1` を3スペース共通で適用 | 漁の累積 1/2/3+ がそれぞれ葦原/粘土坑/森林に対応（寸評は葦原1・粘土坑2が「ちょうど」と補足） | 中 | [AgricolaDB D110](https://db.agricolajp.dev/AG2/card/D110)、[wiki p=2811](https://agricola.cloudfree.jp/?p=2811) |
+| 20 | D113 | `effects[0].frequency`／`options[0]` | `once_per_game`、価格は食料3のみ | 収穫のたび、収穫した小麦の数だけ。最後の小麦は食料2 | 中 | [AgricolaDB D113](https://db.agricolajp.dev/AG2/card/D113)、[wiki p=2808](https://agricola.cloudfree.jp/?p=2808) |
+| 21 | D115 | `effects[0].trigger`＋`frequency` | `harvest_start`（収穫のないラウンドを除外）＋`once_per_game` | 収穫の**繁殖フェイズ**、収穫のたび | 中 | [AgricolaDB D115](https://db.agricolajp.dev/AG2/card/D115)、[wiki p=2806](https://agricola.cloudfree.jp/?p=2806) |
+| 22 | D117 | `effects[1].conditions[0]` | `improvement_played_from_hand`＋大小進歩アクション経由に限定 | 「進歩を出すたび」（手段を問わない） | 低 | [AgricolaDB D117](https://db.agricolajp.dev/AG2/card/D117)、[wiki p=2804](https://agricola.cloudfree.jp/?p=2804) |
+| 23 | D118 | `effects[1].trigger` | `after_improvement`（進歩を出したとき） | 手札から**カード**（職業を含む）を出すたび | 中 | [AgricolaDB D118](https://db.agricolajp.dev/AG2/card/D118)、[wiki p=2803](https://agricola.cloudfree.jp/?p=2803) |
+| 24 | D120 | `effects[0].steps[0].params.rounds` | `[6,7,...,14]` の固定リスト | ラウンド6–14のうち**未プレイ**のスペースのみ | 低 | [AgricolaDB D120](https://db.agricolajp.dev/AG2/card/D120)、[wiki p=2801](https://agricola.cloudfree.jp/?p=2801) |
+
+## 第5章 印刷面の転記ミスとして確定できるもの
+
+文献を引くまでもなく、同じJSONの中の記述どうしが矛盾しており、どちらかが誤りと確定できるもの。
+（ここでは「どちらが正しいか」までを書く。仕様データ自体は修正しない。）
+
+| ID | 箇所 | 矛盾 | 確定できる内容 |
+|---|---|---|---|
+| D080 | `play.cost` vs `alternative_cost_notes` | 費用配列は木1と食料1の両方、注記は「OR cost」 | 二者択一。配列はORを表せない |
+| D108 | `effects[0].frequency` vs `effects[0].notes` | `once_per_game` と「once per harvest」 | 毎収穫1回が本文の読み |
+| D074 | `effects[0].steps[0].operation` vs `notes` | `discount_cost` と「gain 1 wood per 2 wood paid」 | 割引ではなく後からの取得 |
+| D092 | step名 vs 条件 | **空き部屋があることが条件**なのに step 名が `family_growth_without_room_cost`、notes も「without room cost」 | 部屋は必要（空き部屋条件がある） |
+| D094 | step の `action` vs 本文の要約 | `return_first_person_from_meeting_place` と「集会所に**いない**1人目」 | 集会所の人物を戻すのではない |
+| D099 | `points` と `spend_resource` の関係 | 「最大で人物の数まで」なのに points も支払いも人物数で固定 | 支払い数は選べる必要がある |
+| D120 | `rounds` の固定リスト vs notes | 「未プレイのスペース」と書きながら既プレイ分を除外する構造が無い | 既プレイ分は除外が必須 |
+
+## 第6章 文献の間で扱いが割れているもの（決めない・割れたまま残す）
+
+| # | 対象 | 割れの内容 | 根拠 |
+|---|---|---|---|
+| S-1 | D074 | 本文系（AgricolaDB・コンピューディウム）は「農場拡充で支払った木材2につき1」。BGA wiki の寸評は「以前は柵でも返ってきたが、今は進歩のコストにしか反応しない」と**実装変更**を記録。柵を含むかで結果が変わる | [wiki p=2847](https://agricola.cloudfree.jp/?p=2847) 寸評・コメント |
+| S-2 | D082 | 費用の「猪を**調理**する」が何を指すか（かまどの使用が必須か、単に食料化するのか）。仕様も MQ-12 として保留している | [wiki p=2839](https://agricola.cloudfree.jp/?p=2839)、[AgricolaDB D082](https://db.agricolajp.dev/AG2/card/D082) |
+| S-3 | D110 | 本文は「食料1/2/3+」、寸評は「葦原は**ちょうど**1、粘土坑は**ちょうど**2、森林は3以上」と補足。本文の書き方と実装解釈が一致しない | [wiki p=2811](https://agricola.cloudfree.jp/?p=2811) |
+| S-4 | D071 | 本文は「いつでも」。BGA実装でどこまでの窓（自分の手番中のみか、他者の手番中もか）が許されるかは文献に無い | [wiki p=2850](https://agricola.cloudfree.jp/?p=2850) |
+| S-5 | D098 | 「ゲームボード上にある資材を**全て**」が累積スペースのみか、カード上に置かれた資源も含むか | [wiki p=2823](https://agricola.cloudfree.jp/?p=2823) |
+| S-6 | D117 | 「木材2までを食料1で代用」のレート（木材2→食料1 の合計置換か、木材1ずつ→食料1か）。同型のD088は「**それぞれ**小麦1で代用」と書き分けている | [wiki p=2804](https://agricola.cloudfree.jp/?p=2804)、[p=2833](https://agricola.cloudfree.jp/?p=2833) |
+
+## 第7章 文献で未確定（推測で埋めない）
+
+- D071 と D106・D114 の「いつでも」の受付窓（フリーアクションAPI未整備）。
+- D091・D106・D111・D120 のラウンド上限超過（ラウンド15以降・最終ラウンドの扱い）。
+- D091 の畑タイルを使用しなかった場合にマーカーが残るか。
+- D116 の私的累積スペースの蓄積量（毎ラウンド1か）と上限。
+- D087 の無料の部屋の素材（現在の家の素材に従うか）と、6部屋以上も可能か。
+- D093 の対象人物の制約（同じ人物を複数回戻せるか、戻した人物が再行動できるか）。
+- D102 の厩に家畜がいる場合の可否と、付与される小進歩アクションの実行時点。
+- D099 の「最後の収穫の後」の解決順（他の終局効果との前後）。
+- D092 の家族増加に伴う食料・新生児の扱い（文献は点数のみ規定）。
+
+## 第8章 人間への質問チェックリスト
+
+- [ ] **Q-1（D070–D077, D080 の移動先）** 9枚の `post_play.destination = left_neighbor_hand` を削除し `played_area` に戻してよいか。
+      traveling の根拠は印刷テキストの文言で判断した（B008 で校正済み）。反例（この9枚が traveling である典拠）があれば提示してほしい。
+- [ ] **Q-2（D097 物乞い）** 「物乞い（乞食 Marker）」を仕様の資源語彙に追加するか。追加しない場合、この効果をどう表現するか。
+- [ ] **Q-3（D092 食料2）** 仕様の `cost_food: 2` はどこに由来するか。文献には無いため、独自裁定ならその旨を `notes` に残す必要がある。
+- [ ] **Q-4（D074 柵）** 農場拡充で支払う木材に柵の木材を含むか。BGA の実装変更の記述があり、文献だけでは決められない。
+- [ ] **Q-5（D110 しきい値）** 葦原=1/粘土坑=2 を「ちょうど」と読むか「以上」と読むか。点数・食料供給に直結する。
+- [ ] **Q-6（D117 代用レート）** 木材2までを食料1で代用するのか、木材1につき食料1なのか。D088 との表記差を踏まえて確定してほしい。
+- [ ] **Q-7（「いつでも」の窓）** D071・D106・D114 を、フリーアクションAPI整備まで `effects: null` のまま据え置くか、当面の制限付き実装を許すか。
+- [ ] **Q-8（ラウンド上限）** D091・D106・D111・D120 で、ラウンド14を超えるマーカーをどう扱うか（捨てる／14に丸める／不発）。
+- [ ] **Q-9（D082 調理）** 「猪を調理する」にかまどの使用を要求するか。MQ-12 の決着に合わせるか。
+
+## 第9章 検証と限界
+
+### 9.1 機械的な確認
+
+- 対象集合: PR #396 の17枚＋#398 の14枚＋#401 の15枚 = **46枚**。PRのファイル一覧と一致し、重複0・欠落0。
+- 章別の行数: 第1章17行、第2章14行、第3章15行（計46行）。判定の内訳は一致23・表現不足3・食い違い20。
+- 全46枚で `play.cost`・`play.prerequisites`・`play.printed_points` を文献と突合し、相違は D080 のOR費用のみ。
+- `git diff --stat` で `src/` `data/` `tests/` の変更が0であることを確認（文書のみ）。
+
+### 9.2 限界
+
+- 印刷カードそのものを目視していない。テキストは AgricolaDB（非公式日本語訳）と BGA wiki の2系統で突合した。
+  両者が一致する箇所は信頼できるが、翻訳段階の揺れは排除できない。
+- traveling の判定は「印刷テキストに左隣へ渡す文言があるか」に依拠した。B008（traveling と確認できるカード）で
+  同じ判定方法が機能することを確かめたが、**カード画像の矢印記号は確認していない**。
+- BGA の実画面・実装ログは確認していない。寸評はプレイヤーの所感で、裁定ではない。
+- 公式付録（FAQ）の該当ページは直接確認していない。第6章の割れは「文献だけでは決められない」として残した。
+- 仕様データの修正・テスト契約の修正は行っていない（依頼どおり）。
+
