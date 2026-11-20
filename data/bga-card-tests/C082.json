@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "card_id": "C082",
+  "cases": [
+    {
+      "id": "C082-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 3
+      },
+      "action": {
+        "use_space": "day_laborer",
+        "pay_food": 2
+      },
+      "expected": {
+        "food_spent": 2,
+        "food_remaining": 1,
+        "wood_gained": 1,
+        "clay_gained": 1,
+        "reed_gained": 1,
+        "stone_gained": 1
+      },
+      "notes": "Use Day Laborer, pay 2 food -> gain 1 of each building resource"
+    },
+    {
+      "id": "C082-boundary-no-food",
+      "scope": "effect_only",
+      "setup": {
+        "food": 1
+      },
+      "action": {
+        "use_space": "day_laborer"
+      },
+      "expected": {
+        "food_spent": 0,
+        "wood_gained": 0,
+        "clay_gained": 0,
+        "reed_gained": 0,
+        "stone_gained": 0
+      },
+      "notes": "Not enough food -> cannot pay, no resources gained"
+    }
+  ]
+}

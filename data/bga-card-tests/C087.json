@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "C087",
+  "cases": [
+    {
+      "id": "C087-normal",
+      "scope": "effect_only",
+      "setup": {
+        "stone_rooms": 4,
+        "card_has_stone_room": true
+      },
+      "action": {
+        "build_room_from_card": true
+      },
+      "expected": {
+        "room_built": true,
+        "resources_paid": 0,
+        "stone_rooms_total": 5
+      },
+      "notes": "4 stone rooms, card has stone room -> build for free, now 5 stone rooms"
+    },
+    {
+      "id": "C087-boundary-3-stone-rooms",
+      "scope": "effect_only",
+      "setup": {
+        "stone_rooms": 3,
+        "card_has_stone_room": true
+      },
+      "action": {
+        "build_room_from_card": true
+      },
+      "expected": {
+        "room_built": false,
+        "resources_paid": 0
+      },
+      "notes": "Only 3 stone rooms (<4) -> cannot build for free"
+    }
+  ]
+}

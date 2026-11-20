@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "card_id": "C080",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "岩石地帯",
+    "name_en": "Rocky Terrain"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3009",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "plow_field",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "buy_stone_for_food_on_plow",
+            "food_cost": 1,
+            "stone_gained": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].operation=other kind=buy_stone_for_food_on_plow (not in vocabulary)",
+      "effects[0].trigger=plow_field (vocabulary has this trigger but may need verification)"
+    ],
+    "test_case_ids": [
+      "C080-normal",
+      "C080-boundary-no-food"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Each time you plow a field (tile or card), optionally pay 1 food to gain 1 stone. Stays in played area. Classification: Stage outside (TR-SITE)."
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "card_id": "C079",
+  "cases": [
+    {
+      "id": "C079-normal",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 1,
+        "remaining_rounds": 14
+      },
+      "action": {
+        "play": "C079"
+      },
+      "expected": {
+        "stone_on_even_rounds": 7,
+        "stone_gained_round_2": 1,
+        "stone_gained_round_4": 1,
+        "stone_gained_round_6": 1,
+        "stone_gained_round_8": 1,
+        "stone_gained_round_10": 1,
+        "stone_gained_round_12": 1,
+        "stone_gained_round_14": 1
+      },
+      "notes": "Play in round 1 -> stone on rounds 2,4,6,8,10,12,14 (7 rounds) -> gain 1 stone each at round start"
+    },
+    {
+      "id": "C079-boundary-late-play",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 11,
+        "remaining_rounds": 4
+      },
+      "action": {
+        "play": "C079"
+      },
+      "expected": {
+        "stone_on_even_rounds": 2,
+        "stone_gained_round_12": 1,
+        "stone_gained_round_14": 1
+      },
+      "notes": "Play in round 11 -> only rounds 12,14 remain as even -> stone on 2 rounds"
+    }
+  ]
+}

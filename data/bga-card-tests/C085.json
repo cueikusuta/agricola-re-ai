@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "card_id": "C085",
+  "cases": [
+    {
+      "id": "C085-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house_type": "stone",
+        "grain": 2,
+        "food": 3
+      },
+      "action": {
+        "pay": {"grain": 1, "food": 2}
+      },
+      "expected": {
+        "grain_spent": 1,
+        "food_spent": 2,
+        "grain_remaining": 1,
+        "food_remaining": 1,
+        "room_gained": 1,
+        "person_capacity": 1
+      },
+      "notes": "Stone house, pay 1 grain + 2 food -> card becomes room for 1 person"
+    },
+    {
+      "id": "C085-boundary-wood-house",
+      "scope": "effect_only",
+      "setup": {
+        "house_type": "wood",
+        "grain": 2,
+        "food": 3
+      },
+      "action": {
+        "pay": {"grain": 1, "food": 2}
+      },
+      "expected": {
+        "effect_available": false,
+        "room_gained": 0
+      },
+      "notes": "Wood house -> effect not available (requires clay or stone house)"
+    }
+  ]
+}

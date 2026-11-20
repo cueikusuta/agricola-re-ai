@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "card_id": "C076",
+  "cases": [
+    {
+      "id": "C076-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "use_space": "wood_3"
+      },
+      "expected": {
+        "wood_gained_base": 3,
+        "wood_gained_bonus": 2,
+        "total_wood": 5
+      },
+      "notes": "Use wood accumulation space (3 wood) -> gain +2 bonus wood = 5 total"
+    },
+    {
+      "id": "C076-boundary-multiple-uses",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "use_spaces": ["wood_1", "wood_2", "wood_4"]
+      },
+      "expected": {
+        "wood_gained_bonus_per_use": 2,
+        "total_bonus_wood": 6
+      },
+      "notes": "Use 3 different wood spaces -> +2 each = +6 bonus wood"
+    }
+  ]
+}

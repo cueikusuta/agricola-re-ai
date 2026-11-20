@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "C081",
+  "cases": [
+    {
+      "id": "C081-normal-wood",
+      "scope": "effect_only",
+      "setup": {
+        "card_stock": {"wood": 2, "clay": 2, "reed": 2, "stone": 2}
+      },
+      "action": {
+        "player_gains": {"wood": 5}
+      },
+      "expected": {
+        "wood_gained_from_card": 1,
+        "card_stock_remaining": {"wood": 1, "clay": 2, "reed": 2, "stone": 2}
+      },
+      "notes": "Any player gains 5+ wood -> owner gains 1 wood from card"
+    },
+    {
+      "id": "C081-normal-clay",
+      "scope": "effect_only",
+      "setup": {
+        "card_stock": {"wood": 2, "clay": 2, "reed": 2, "stone": 2}
+      },
+      "action": {
+        "player_gains": {"clay": 4}
+      },
+      "expected": {
+        "clay_gained_from_card": 1,
+        "card_stock_remaining": {"wood": 2, "clay": 1, "reed": 2, "stone": 2}
+      },
+      "notes": "Any player gains 4+ clay -> owner gains 1 clay from card"
+    },
+    {
+      "id": "C081-boundary-threshold",
+      "scope": "effect_only",
+      "setup": {
+        "card_stock": {"wood": 2, "clay": 2, "reed": 2, "stone": 2}
+      },
+      "action": {
+        "player_gains": {"wood": 4}
+      },
+      "expected": {
+        "wood_gained_from_card": 0,
+        "card_stock_remaining": {"wood": 2, "clay": 2, "reed": 2, "stone": 2}
+      },
+      "notes": "Player gains only 4 wood (below 5 threshold) -> no trigger"
+    }
+  ]
+}

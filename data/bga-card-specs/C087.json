@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "card_id": "C087",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "左官屋",
+    "name_en": "Mason"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3002",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "place_stone_room_on_card",
+            "count": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "stone_rooms_exceed_people",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "build_room_from_card_free",
+            "room_type": "stone",
+            "source": "this_card"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_game",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].operation=other kind=place_stone_room_on_card (not in vocabulary)",
+      "effects[1].steps[0].operation=other kind=build_room_from_card_free (not in vocabulary)",
+      "effects[1].conditions[0].predicate=stone_rooms_exceed_people (vocabulary has this but checks stone rooms > people; card says stone rooms >= 4)"
+    ],
+    "test_case_ids": [
+      "C087-normal",
+      "C087-boundary-3-stone-rooms"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "On play: place 1 stone room on this card. Once stone house has 4+ rooms, may build that room for free. Stays in played area. Classification: Stage 3 (ROOM)."
+  }
+}
