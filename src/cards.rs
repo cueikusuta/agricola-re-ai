@@ -2448,19 +2448,6 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 rooms: Some(2),
             }],
         },
-        // C141 羊の世話人: AfterAnyWorkerGain SheepMarket -> gain grain 1
-        CardDefinition {
-            use_limit: None,
-            id: "C141".into(),
-            kind: occupation,
-            cost: vec![],
-            points: 0,
-            effects: vec![CardEffect::AfterAnyWorkerGain {
-                space: Space::SheepMarket,
-                good: Good::Grain,
-                amount: 1,
-            }],
-        },
         // A050 ミルクがめ: AfterAnyWorkerGain CattleMarket -> gain food 3 (self) + AfterAnyWorkerOthersGain CattleMarket -> gain food 1 (others)
         CardDefinition {
             use_limit: None,
@@ -2589,10 +2576,10 @@ mod round_and_harvest_card_tests {
         use crate::cards::CardState;
         use std::collections::BTreeMap;
 
-        let definitions = verified_round_and_harvest_cards();
+        let definitions = verified_multiplayer_passive_cards(3);
         let set = CardSet { definitions };
         let mut cards = CardState::default();
-        let mut players = vec![Player::new(0, 0), Player::new(1, 1)];
+        let mut players = vec![Player::new(0, 0), Player::new(1, 1), Player::new(2, 2)];
         players[0].played_cards.push("C141".into());
         let mut used_spaces = std::collections::BTreeSet::new();
         let mut event_budget = 100;
@@ -3206,7 +3193,7 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 39);
+        assert_eq!(set.definitions.len(), 38);
         assert_eq!(
             set.definitions
                 .iter()
@@ -3219,9 +3206,68 @@ mod simple_occupation_tests {
                 .iter()
                 .filter(|x| x.kind == CardKind::Occupation)
                 .count(),
-            17
+            16
         );
         assert!(verified_basic_card_set(3).is_err());
+    }
+    #[test]
+    fn c141_not_in_two_player_preset() {
+        let set = verified_basic_card_set(2).unwrap();
+        assert!(
+            !set.definitions.iter().any(|c| c.id == "C141"),
+            "C141 (Sheep Provider) has eligibility 2=no and must not be in the 2-player preset"
+        );
+        // After fix: expected pool size 38 (occupation 16 / minor 22)
+        assert_eq!(set.definitions.len(), 38);
+        assert_eq!(
+            set.definitions
+                .iter()
+                .filter(|x| x.kind == CardKind::Occupation)
+                .count(),
+            16
+        );
+        assert_eq!(
+            set.definitions
+                .iter()
+                .filter(|x| x.kind == CardKind::MinorImprovement)
+                .count(),
+            22
+        );
+    }
+    #[test]
+    fn c141_registry_resolvable_and_usable_in_3_4_players() {
+        use crate::registry::{build_default_registry, CardPool};
+        // Registry must resolve C141 (band/pool dedupe order: round_and_harvest first,
+        // then multiplayer_passive for 3+ players)
+        let registry = build_default_registry().unwrap();
+        let c141_id = registry
+            .card_id("C141")
+            .expect("C141 must be resolvable from registry");
+        // Experimental pool (all implemented cards) must contain C141 for 2, 3, 4 players
+        let pool_2_exp = CardPool::new(&registry, 2, true);
+        let pool_3_exp = CardPool::new(&registry, 3, true);
+        let pool_4_exp = CardPool::new(&registry, 4, true);
+        assert!(
+            pool_2_exp.contains(c141_id),
+            "C141 must be in experimental pool for 2 players"
+        );
+        assert!(
+            pool_3_exp.contains(c141_id),
+            "C141 must be in experimental pool for 3 players"
+        );
+        assert!(
+            pool_4_exp.contains(c141_id),
+            "C141 must be in experimental pool for 4 players"
+        );
+        // Official pool for 2 players must NOT contain C141 (eligibility 2=no)
+        // Note: C141 currently has Unverified review status, so it's not in official pool
+        // for any player count. The eligibility check is the reason it would be excluded
+        // from 2-player official pool if it were Verified.
+        let pool_2_official = CardPool::new(&registry, 2, false);
+        assert!(
+            !pool_2_official.contains(c141_id),
+            "C141 must NOT be in official pool for 2 players (eligibility 2=no)"
+        );
     }
 }
 
@@ -5157,21 +5203,37 @@ pub fn verified_multiplayer_passive_cards(players: usize) -> Vec<CardDefinition>
     if players < 3 {
         return vec![];
     }
-    vec![CardDefinition {
-        use_limit: None,
-        id: "A143".into(),
-        kind: CardKind::Occupation,
-        cost: vec![],
-        points: 0,
-        effects: vec![
-            CardEffect::Prerequisite {
-                rule: CardRequirement::MinimumPlayers(3),
-            },
-            CardEffect::Passive {
-                rule: PassiveRule::StoneDiscount(1),
-            },
-        ],
-    }]
+    vec![
+        CardDefinition {
+            use_limit: None,
+            id: "A143".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::Passive {
+                    rule: PassiveRule::StoneDiscount(1),
+                },
+            ],
+        },
+        // C141 羊の世話人: AfterAnyWorkerGain SheepMarket -> gain grain 1
+        // Eligibility: 2=no, 3=yes, 4=yes (spec: data/bga-card-specs/C141.json)
+        CardDefinition {
+            use_limit: None,
+            id: "C141".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterAnyWorkerGain {
+                space: Space::SheepMarket,
+                good: Good::Grain,
+                amount: 1,
+            }],
+        },
+    ]
 }
 #[cfg(test)]
 mod m6_extra_passive_tests {
