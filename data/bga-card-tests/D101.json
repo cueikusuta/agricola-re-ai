@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "card_id": "D101",
+  "cases": [
+    {
+      "id": "D101-after-grain-util-buy-point",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space_used": "grain_utilization",
+        "buy_point_with_food": 1
+      },
+      "expected": {
+        "point_gained": 1,
+        "food_spent": 1,
+        "food_on_grain_util_space": 1
+      },
+      "notes": "After using Grain Utilization, pay 1 food -> gain 1 point, food placed on the space."
+    },
+    {
+      "id": "D101-after-other-space-no-effect",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space_used": "fishing",
+        "buy_point_with_food": 1
+      },
+      "expected": {
+        "point_gained": 0,
+        "reason": "not grain utilization space"
+      },
+      "notes": "Using Fishing space does not trigger the effect."
+    },
+    {
+      "id": "D101-multiple-uses-accumulate-food-on-space",
+      "scope": "effect_only",
+      "setup": {
+        "food": 3
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "first_use": {
+          "space_used": "grain_utilization",
+          "buy_point_with_food": 1
+        },
+        "second_use": {
+          "space_used": "grain_utilization",
+          "buy_point_with_food": 1
+        }
+      },
+      "expected": {
+        "total_points": 2,
+        "food_on_grain_util_space": 2,
+        "notes": "Food accumulates on the Grain Utilization space across multiple uses"
+      },
+      "notes": "Multiple uses of Grain Utilization -> food accumulates on the space."
+    }
+  ]
+}

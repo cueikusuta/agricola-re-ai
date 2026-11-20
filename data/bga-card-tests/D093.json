@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "card_id": "D093",
+  "cases": [
+    {
+      "id": "D093-return-person-pay-cost",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 1,
+        "food": 2,
+        "placed_people": 2
+      },
+      "action": {
+        "trigger": "after_work_phase",
+        "pay_sheep": 1,
+        "pay_food": 2,
+        "return_person_index": 0
+      },
+      "expected": {
+        "person_returned": true,
+        "people_placed_delta": -1,
+        "sheep_delta": -1,
+        "food_delta": -2
+      },
+      "notes": "Pay 1 sheep and 2 food, return one placed person home."
+    },
+    {
+      "id": "D093-cannot-pay-cost",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 0,
+        "food": 1,
+        "placed_people": 2
+      },
+      "action": {
+        "trigger": "after_work_phase",
+        "pay_sheep": 1,
+        "pay_food": 2,
+        "return_person_index": 0
+      },
+      "expected": {
+        "person_returned": false,
+        "reason": "insufficient resources"
+      },
+      "notes": "Cannot pay cost (0 sheep, 1 food). Effect not usable."
+    },
+    {
+      "id": "D093-once-per-work-phase",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 2,
+        "food": 4,
+        "placed_people": 3
+      },
+      "action": {
+        "trigger": "after_work_phase",
+        "first_use": {
+          "pay_sheep": 1,
+          "pay_food": 2,
+          "return_person_index": 0
+        },
+        "second_use_attempt": {
+          "pay_sheep": 1,
+          "pay_food": 2,
+          "return_person_index": 1
+        }
+      },
+      "expected": {
+        "first_use_allowed": true,
+        "second_use_allowed": false,
+        "reason": "once per work phase limit"
+      },
+      "notes": "Only once per work phase. Second attempt in same phase should be rejected."
+    }
+  ]
+}
