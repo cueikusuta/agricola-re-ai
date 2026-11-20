@@ -235,6 +235,7 @@ fn use_limit_ledger_survives_save_load_as_canonical_state() {
             amount: 1,
         }],
         use_limit: Some(1),
+        post_play_destination: None,
     });
     // 明示手配で TEST_LIMITED を player 0 の手札に置き、実際のエンジン経路で
     // カードをプレイしてから DayLaborer で使用する (Lessons → 相手が別枠 →

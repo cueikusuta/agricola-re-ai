@@ -593,6 +593,15 @@ fn card_priority(
                 CardEffect::Passive { .. } => horizon * 5,
                 CardEffect::EndGameBonus { .. } => 12,
                 CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
+                                CardEffect::OnPlayPlaceStonesOnEmptyFields { stones_per_field, .. } => {
+                                    // Stones are harvested at next field phase; estimate ~10 empty fields * stones_per_field
+                                    let avg_empty_fields: i64 = 10;
+                                    card_good_value(Good::Stone) * avg_empty_fields * i64::from(*stones_per_field)
+                                }
+                                CardEffect::OnPlayChooseGainFoodOrPerSheep => {
+                                    // Choice between 3 food or 1 food per sheep; estimate ~4 sheep mid-game
+                                    card_good_value(Good::Food) * i64::from(4u32)
+                                }
                                 // New variants for market followup cards
                                 CardEffect::AfterAnyWorkerGain { good, amount, .. }
                                 | CardEffect::AfterAnyWorkerOthersGain { good, amount, .. } => {
@@ -607,7 +616,7 @@ fn card_priority(
                                                                 | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
                                                                     card_animal_value(*animal) * i64::from(*amount) * horizon
                                                                 }
-                                                            };
+                            };
     }
     Some(value)
 }
@@ -974,6 +983,7 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: food,
                 }],
+                post_play_destination: None,
             });
             obs.hand.push(id.into());
         }
@@ -1010,6 +1020,7 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: 5,
                 }],
+                post_play_destination: None,
             },
             CardDefinition {
                 use_limit: None,
@@ -1023,6 +1034,7 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: 5,
                 }],
+                post_play_destination: None,
             },
             CardDefinition {
                 use_limit: None,
@@ -1034,6 +1046,7 @@ mod card_choice_tests {
                     good: Good::Food,
                     amount: 1,
                 }],
+                post_play_destination: None,
             },
         ];
         obs.hand = vec!["bait".into(), "house_bait".into(), "sure_food".into()];

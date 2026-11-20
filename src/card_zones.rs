@@ -335,6 +335,32 @@ pub fn play_from_hand(
     )
 }
 
+/// Handle post-play destination for cards that move after being played.
+/// If the card definition has `post_play_destination == Some("left_neighbor_hand")`,
+/// move the card from the player's played area to the left neighbor's hand.
+/// `num_players` is needed to compute the left neighbor (wraps around).
+pub fn handle_post_play_destination(
+    ctx: &mut CardMoveCtx<'_>,
+    card_set: &crate::cards::CardSet,
+    player: usize,
+    card_id: &str,
+    num_players: usize,
+) -> Result<(), CardZoneError> {
+    if let Some(card) = card_set.definition(card_id) {
+        if card.post_play_destination.as_deref() == Some("left_neighbor_hand") {
+            // Remove from player's played area
+            let player_ref = &mut ctx.players[player];
+            if let Some(pos) = player_ref.played_cards.iter().position(|x| x == card_id) {
+                player_ref.played_cards.remove(pos);
+            }
+            // Add to left neighbor's hand
+            let left_neighbor = (player + num_players - 1) % num_players;
+            ctx.cards.hands[left_neighbor].push(card_id.to_string());
+        }
+    }
+    Ok(())
+}
+
 /// Convenience: deal initial hands from undealt to each player's hand.
 /// Used by `CardState::deal` and `CardState::from_hands`.
 pub fn deal_initial_hands(
@@ -365,6 +391,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 },
                 CardDefinition {
                     use_limit: None,
@@ -373,6 +400,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 },
             ],
         };
@@ -423,6 +451,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play_destination: None,
         });
         let err = validate_card_partition(&set, &cards, &players).unwrap_err();
         assert!(err.contains("missing"));
@@ -447,6 +476,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 },
                 CardDefinition {
                     use_limit: None,
@@ -455,6 +485,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 },
             ],
         };
@@ -646,6 +677,7 @@ mod tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play_destination: None,
             }],
         };
         let mut cards = CardState {

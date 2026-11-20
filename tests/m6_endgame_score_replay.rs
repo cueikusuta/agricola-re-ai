@@ -16,6 +16,7 @@ fn test_cards() -> CardSet {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play_destination: None,
         });
         definitions.push(CardDefinition {
             use_limit: None,
@@ -26,6 +27,7 @@ fn test_cards() -> CardSet {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::HouseMaterial,
             }],
+            post_play_destination: None,
         });
     }
     CardSet { definitions }

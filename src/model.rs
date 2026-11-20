@@ -208,6 +208,10 @@ pub struct Player {
     /// saves; defaults to None so scoring treats it as 0.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub field_goods_before_final_harvest: Option<u32>,
+    /// Indices of farm cells that have C006 (Stone Clearing) stones placed on them.
+    /// These are empty fields that will yield 1 stone each at the next field phase.
+    #[serde(default)]
+    pub c006_stone_fields: Vec<usize>,
 }
 impl Player {
     pub fn new(id: usize, food: u32) -> Self {
@@ -240,6 +244,7 @@ impl Player {
             extra_housing: 0,
             begging: 0,
             field_goods_before_final_harvest: None,
+            c006_stone_fields: vec![],
         }
     }
     pub fn rooms(&self) -> usize {
@@ -593,9 +598,36 @@ pub struct PublicState {
 /// serialized, in declaration order. Serializing this mirror produces
 /// byte-identical JSON to serializing the 13-field v5 `PublicState`, so
 /// `state_hash` VALUES are unchanged by the Layer-0 aggregation even though
-/// `PublicState` grew. The aggregated fields (`well_food_schedule`,
 /// `card_uses`, `card_accumulations`) are deliberately excluded here — their
 /// integrity is enforced by `integrity_hash` instead. Do not reorder or add fields.
+/// v5-pinned hash material for Player (excludes c006_stone_fields added post-v5).
+#[derive(Serialize)]
+pub(crate) struct PlayerHashMaterialV5<'a> {
+    id: &'a usize,
+    family: &'a u8,
+    newborns: &'a u8,
+    house: &'a House,
+    supply: &'a Supply,
+    farm: &'a Vec<Cell>,
+    pastures: &'a Vec<Pasture>,
+    pet: &'a Option<Animal>,
+    fences: &'a BTreeSet<(u8, u8)>,
+    improvements: &'a Vec<Improvement>,
+    played_cards: &'a Vec<String>,
+    card_points: &'a i32,
+    pasture_capacity_bonus: &'a u32,
+    free_fence_wood: &'a u32,
+    improvement_wood_discount: &'a u32,
+    wooden_room_cost: &'a Option<u32>,
+    room_material_cost: &'a Option<u32>,
+    major_stone_discount_by_rooms: &'a bool,
+    stone_cost_discount: &'a u32,
+    extra_housing: &'a u8,
+    begging: &'a u32,
+}
+
+/// v5-pinned hash material for this state (see [`PublicStateHashMaterialV5`]).
+/// Do not reorder or add fields.
 #[derive(Serialize)]
 pub(crate) struct PublicStateHashMaterialV5<'a> {
     round: &'a u8,
@@ -605,7 +637,7 @@ pub(crate) struct PublicStateHashMaterialV5<'a> {
     revealed: &'a Vec<RoundCard>,
     accumulations: &'a BTreeMap<Space, u32>,
     animal_accumulations: &'a BTreeMap<Space, u32>,
-    players: &'a Vec<Player>,
+    players: Vec<PlayerHashMaterialV5<'a>>,
     improvement_market: &'a Vec<Improvement>,
     work_quota: &'a Vec<u8>,
     workers_placed: &'a Vec<u8>,
@@ -616,6 +648,33 @@ pub(crate) struct PublicStateHashMaterialV5<'a> {
 impl PublicState {
     /// v5-pinned hash material for this state (see [`PublicStateHashMaterialV5`]).
     fn hash_material_v5(&self) -> PublicStateHashMaterialV5<'_> {
+        let players: Vec<PlayerHashMaterialV5<'_>> = self
+            .players
+            .iter()
+            .map(|p| PlayerHashMaterialV5 {
+                id: &p.id,
+                family: &p.family,
+                newborns: &p.newborns,
+                house: &p.house,
+                supply: &p.supply,
+                farm: &p.farm,
+                pastures: &p.pastures,
+                pet: &p.pet,
+                fences: &p.fences,
+                improvements: &p.improvements,
+                played_cards: &p.played_cards,
+                card_points: &p.card_points,
+                pasture_capacity_bonus: &p.pasture_capacity_bonus,
+                free_fence_wood: &p.free_fence_wood,
+                improvement_wood_discount: &p.improvement_wood_discount,
+                wooden_room_cost: &p.wooden_room_cost,
+                room_material_cost: &p.room_material_cost,
+                major_stone_discount_by_rooms: &p.major_stone_discount_by_rooms,
+                stone_cost_discount: &p.stone_cost_discount,
+                extra_housing: &p.extra_housing,
+                begging: &p.begging,
+            })
+            .collect();
         PublicStateHashMaterialV5 {
             round: &self.round,
             active_player: &self.active_player,
@@ -624,7 +683,7 @@ impl PublicState {
             revealed: &self.revealed,
             accumulations: &self.accumulations,
             animal_accumulations: &self.animal_accumulations,
-            players: &self.players,
+            players,
             improvement_market: &self.improvement_market,
             work_quota: &self.work_quota,
             workers_placed: &self.workers_placed,

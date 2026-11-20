@@ -80,17 +80,17 @@
     "destination": "left_neighbor_hand"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
-    "test_case_ids": [
-      "C006-normal",
-      "C006-zero-empty",
-      "C006-harvest",
-      "C006-prerequisite"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "Place 1 stone on every empty field; collect them at the next field phase (fields count as cultivated until then); pass left."
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "C006-normal",
+        "C006-zero-empty",
+        "C006-harvest",
+        "C006-prerequisite"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-13",
+      "implementation_status": "tested",
+      "notes": "Place 1 stone on every empty field; collect them at the next field phase (fields count as cultivated until then); pass left."
+    }
   }
-}

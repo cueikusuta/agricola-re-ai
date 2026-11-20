@@ -39,6 +39,7 @@ fn occ_def(id: &str) -> CardDefinition {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play_destination: None,
     }
 }
 
@@ -50,6 +51,7 @@ fn minor_def(id: &str) -> CardDefinition {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play_destination: None,
     }
 }
 
@@ -147,6 +149,7 @@ fn c004_normal_occupations_3_wood_delta_3() {
                 good: Good::Wood,
                 amount: 1,
             }],
+            post_play_destination: None,
         },
         occ_def("occ1"),
         occ_def("occ2"),
@@ -171,6 +174,7 @@ fn c004_zero_occupations_0_wood_delta_0() {
             good: Good::Wood,
             amount: 1,
         }],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 0);
     apply_on_play_effects(&set, &mut player, "C004").expect("apply C004");
@@ -191,6 +195,7 @@ fn c004_dispatcher_route_grants_wood_per_occupation() {
                 good: Good::Wood,
                 amount: 1,
             }],
+            post_play_destination: None,
         },
         occ_def("occ1"),
         occ_def("occ2"),
@@ -228,6 +233,7 @@ fn c005_normal_clay_rooms_2_plus_improvement_1_clay_delta_3() {
                 amount: 1,
             },
         ],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 0);
     player.house = House::Clay; // default 2 rooms -> 2 clay rooms
@@ -255,6 +261,7 @@ fn c005_improvement_counts_played_minor_plus_major() {
                 good: Good::Clay,
                 amount: 1,
             }],
+            post_play_destination: None,
         },
         minor_def("minor1"),
     ]);
@@ -282,6 +289,7 @@ fn c005_zero_clay_delta_0() {
             good: Good::Clay,
             amount: 1,
         }],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 0); // wood house -> 0 clay rooms
     apply_on_play_effects(&set, &mut player, "C005").expect("apply C005");
@@ -303,6 +311,7 @@ fn d005_normal_sown_fields_2_clay_delta_2() {
             good: Good::Clay,
             amount: 1,
         }],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 0);
     player.farm[1].tile = Tile::Field {
@@ -330,6 +339,7 @@ fn d005_zero_clay_delta_0() {
             good: Good::Clay,
             amount: 1,
         }],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 0);
     apply_on_play_effects(&set, &mut player, "D005").expect("apply D005");
@@ -349,6 +359,7 @@ fn d005_dispatcher_route_grants_clay_per_sown_field() {
             good: Good::Clay,
             amount: 1,
         }],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 0);
     player.farm[3].tile = Tile::Field {
@@ -384,6 +395,7 @@ fn b006_normal_family_3_stone_delta_3() {
                 amount: 1,
             },
         ],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 2);
     player.family = 3;
@@ -405,6 +417,7 @@ fn b006_boundary_family_2_stone_delta_2() {
             good: Good::Stone,
             amount: 1,
         }],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 0);
     apply_on_play_effects(&set, &mut player, "B006").expect("apply B006");
@@ -429,6 +442,7 @@ fn b006_prerequisite_unmet_cannot_play() {
                 amount: 1,
             },
         ],
+        post_play_destination: None,
     }]);
     let card = set.definition("B006").unwrap();
     let mut player = Player::new(0, 10);
@@ -459,6 +473,7 @@ fn b006_prerequisite_met_can_play() {
                 good: Good::Stone,
                 amount: 1,
             }],
+            post_play_destination: None,
         },
         occ_def("occ1"),
     ]);
@@ -489,6 +504,7 @@ fn b006_dispatcher_route_prerequisite_unmet() {
                 amount: 1,
             },
         ],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 5);
     let mut hand = vec!["B006".to_owned()];
@@ -563,6 +579,7 @@ fn b006_dispatcher_route_family_3_stone_delta_3() {
                     amount: 1,
                 },
             ],
+            post_play_destination: None,
         },
         occ_def("occ1"),
     ]);
@@ -598,6 +615,7 @@ fn b007_normal_bottom_row_2_food_delta_4() {
                 amount: 1,
             },
         ],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 0);
     player.improvements.push(Improvement::Joinery);
@@ -618,6 +636,7 @@ fn b007_zero_food_delta_2() {
             good: Good::Food,
             amount: 2,
         }],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 0);
     apply_on_play_effects(&set, &mut player, "B007").expect("apply B007");
@@ -643,6 +662,7 @@ fn b007_dispatcher_route_bottom_row_2_food_delta_4() {
                 amount: 1,
             },
         ],
+        post_play_destination: None,
     }]);
     let mut player = Player::new(0, 0);
     player.improvements.push(Improvement::Pottery);

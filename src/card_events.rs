@@ -51,6 +51,8 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::OnPlayGainIfHouse { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerCount { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayPlaceStonesOnEmptyFields { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayChooseGainFoodOrPerSheep => TriggerPhase::Before,
         // On-play animal gain is an instantaneous play-time effect — Before
         // phase. Its placement plan is derived and applied via place_animals
         // (the play executor cannot represent a play-time pause).
@@ -508,6 +510,12 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
+                CardEffect::OnPlayPlaceStonesOnEmptyFields { stones_per_field } => {
+                    handle_on_play_place_stones_on_empty_fields(ctx, player, *stones_per_field)?
+                }
+                CardEffect::OnPlayChooseGainFoodOrPerSheep => {
+                    handle_on_play_choose_gain_food_or_per_sheep(ctx, player, card_id)?
+                }
                 CardEffect::OnPlayGainAnimal { animal, amount } => {
                     handle_on_play_gain_animal(ctx, animal, *amount)?
                 }
@@ -803,6 +811,8 @@ fn effect_condition_holds(
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
         CardEffect::OnPlayGainPerCount { .. } => true,
+        CardEffect::OnPlayPlaceStonesOnEmptyFields { .. } => true,
+        CardEffect::OnPlayChooseGainFoodOrPerSheep => true,
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
@@ -927,6 +937,12 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
+            CardEffect::OnPlayPlaceStonesOnEmptyFields { stones_per_field } => {
+                handle_on_play_place_stones_on_empty_fields(ctx, player, *stones_per_field)?
+            }
+            CardEffect::OnPlayChooseGainFoodOrPerSheep => {
+                handle_on_play_choose_gain_food_or_per_sheep(ctx, player, &trigger.card_id)?
+            }
             CardEffect::OnPlayGainAnimal { animal, amount } => {
                 handle_on_play_gain_animal(ctx, animal, *amount)?
             }
@@ -1125,6 +1141,9 @@ fn handle_prerequisite(
             crate::cards::improvement_count_in_front(ctx.card_set, p) >= u32::from(*min)
         }
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
+        crate::cards::CardRequirement::MinimumPastures(min) => {
+            p.pastures.len() >= usize::from(*min)
+        }
     };
 
     if !ok {
@@ -1242,6 +1261,62 @@ fn handle_on_play_gain_per_count(
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
+}
+
+fn handle_on_play_place_stones_on_empty_fields(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    _stones_per_field: u32,
+) -> Result<EffectResult, String> {
+    // Find all empty fields (Field { crop: None, remaining: 0 })
+    for (idx, cell) in ctx.player.farm.iter().enumerate() {
+        if matches!(
+            cell.tile,
+            Tile::Field {
+                crop: None,
+                remaining: 0
+            }
+        ) {
+            ctx.player.c006_stone_fields.push(idx);
+        }
+    }
+    // Note: The stones are "placed" conceptually. At the next field phase,
+    // the harvest logic will grant `stones_per_field` stone per field and clear the list.
+    // The fields "count as cultivated" until then.
+    Ok(EffectResult::Resolved)
+}
+
+fn handle_on_play_choose_gain_food_or_per_sheep(
+    ctx: &mut DispatchContext<'_>,
+    player: usize,
+    card_id: &str,
+) -> Result<EffectResult, String> {
+    // Create a pending decision for the player to choose between:
+    // - Gain 3 food
+    // - Gain 1 food per sheep owned (sheep are kept)
+    let sheep_count = ctx.player.animal_count(Animal::Sheep);
+    let options = vec![
+        crate::pending::GainOption {
+            good: Good::Food,
+            amount: 3,
+        },
+        crate::pending::GainOption {
+            good: Good::Food,
+            amount: sheep_count,
+        },
+    ];
+    let kind = crate::pending::PendingKind::ChooseGain {
+        source_card: card_id.to_string(),
+        options,
+    };
+    let decision = crate::pending::PendingDecision::new(
+        0, // Engine will stamp decision ID
+        player,
+        kind,
+        String::new(), // Engine will stamp state hash
+        serde_json::json!({ "card": card_id }),
+    );
+    Ok(EffectResult::Pending(decision))
 }
 
 fn handle_passive(
@@ -2734,6 +2809,7 @@ mod tests {
                         good: Good::Wood,
                         amount: 1,
                     }],
+                    post_play_destination: None,
                 },
                 CardDefinition {
                     use_limit: None,
@@ -2745,6 +2821,7 @@ mod tests {
                         good: Good::Food,
                         amount: 2,
                     }],
+                    post_play_destination: None,
                 },
             ],
         };
@@ -2803,6 +2880,7 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play_destination: None,
             }],
         };
         let mut players = vec![Player::new(0, 0)];
@@ -2849,6 +2927,7 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play_destination: None,
             }],
         };
         let mut players = vec![Player::new(0, 0)];
@@ -2896,6 +2975,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects,
+            post_play_destination: None,
         };
         CardSet {
             definitions: vec![
@@ -2964,6 +3044,7 @@ mod tests {
                         good: Good::Grain,
                         amount: 2,
                     }],
+                    post_play_destination: None,
                 },
             ],
         }
@@ -3547,6 +3628,7 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2), (Good::Wood, 1)],
             }],
+            post_play_destination: None,
         };
         let set = CardSet {
             definitions: vec![probe("CHOICE_A")],
@@ -3611,6 +3693,7 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play_destination: None,
             }],
         };
         // Two copies of the same card in play, limit 1 per period.
@@ -3660,6 +3743,7 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2), (Good::Wood, 1)],
             }],
+            post_play_destination: None,
         };
         let set = CardSet {
             definitions: vec![probe("CHOICE_CARD")],
@@ -3749,6 +3833,7 @@ mod tests {
                     good: Good::Food,
                     amount: 2,
                 }],
+                post_play_destination: None,
             }],
         };
 
@@ -3849,6 +3934,7 @@ mod tests {
                     good: Good::Wood,
                     amount: 3,
                 }],
+                post_play_destination: None,
             }],
         };
 
@@ -3945,6 +4031,7 @@ mod tests {
                     house: Some(House::Stone),
                     rooms: None,
                 }],
+                post_play_destination: None,
             }],
         };
 
@@ -4042,6 +4129,7 @@ mod tests {
                         amount: 1,
                     },
                 ],
+                post_play_destination: None,
             }],
         };
 
@@ -4226,6 +4314,7 @@ mod tests {
                     amount: 1,
                 },
             ],
+            post_play_destination: None,
         };
         let mut definitions = vec![card];
         for i in 1..=14 {
@@ -4236,6 +4325,7 @@ mod tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play_destination: None,
             });
         }
         for i in 1..=13 {
@@ -4246,6 +4336,7 @@ mod tests {
                 cost: vec![],
                 points: 1,
                 effects: vec![],
+                post_play_destination: None,
             });
         }
         let set = CardSet { definitions };
@@ -4572,6 +4663,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play_destination: None,
         };
         let filler_minor = |i: usize| CardDefinition {
             use_limit: None,
@@ -4580,6 +4672,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play_destination: None,
         };
         let mut set = crate::cards::verified_basic_card_set(2).expect("verified basic card set");
         set.definitions.push(CardDefinition {
@@ -4598,6 +4691,7 @@ mod tests {
                     amount: 1,
                 },
             ],
+            post_play_destination: None,
         });
         set.definitions.push(CardDefinition {
             use_limit: None,
@@ -4617,6 +4711,7 @@ mod tests {
                     amount: 1,
                 },
             ],
+            post_play_destination: None,
         });
         for i in 0..12 {
             set.definitions.push(filler_occ(i));
@@ -5008,6 +5103,7 @@ mod tests {
             cost: vec![(Good::Food, 2)],
             points: 0,
             effects: vec![],
+            post_play_destination: None,
         });
         let mut c = Ctx::new();
         // Zone move already applied by the caller: C116 first, new card last.
@@ -5095,6 +5191,7 @@ mod tests {
                     kind: CardKind::Occupation,
                     cost: vec![],
                     points: 0,
+                    post_play_destination: None,
                     effects: vec![],
                 });
                 defs
@@ -5168,6 +5265,7 @@ mod tests {
             id: "minor_test".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Wood, 1)],
+            post_play_destination: None,
             points: 0,
             effects: vec![],
         });
@@ -5213,6 +5311,7 @@ mod tests {
             use_limit: None,
             id: "occ_food2".into(),
             kind: CardKind::Occupation,
+            post_play_destination: None,
             cost: vec![(Good::Food, 2)],
             points: 0,
             effects: vec![],
@@ -5310,6 +5409,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 });
                 defs
             },
@@ -5525,6 +5625,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 });
                 defs.push(CardDefinition {
                     use_limit: None,
@@ -5533,6 +5634,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play_destination: None,
                 });
                 defs
             },

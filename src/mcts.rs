@@ -1565,6 +1565,7 @@ mod tests {
                 amount: 1,
             }],
             use_limit: Some(1),
+            post_play_destination: None,
         });
         let card_set = CardSet { definitions };
 
