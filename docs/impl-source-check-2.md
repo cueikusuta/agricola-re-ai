@@ -130,3 +130,13 @@ C帯の実装は10枚で、うち8枚は #387 で照合済み。今回追加さ�
    [Unofficial Compendium v9.0](https://m.alavigne.net/Gaming/Agricola/agricola-comp-v9.0.html)、
    [Agricola Norge Compendium](https://agricola.no/wp-content/uploads/2024/07/compendium.pdf)）
 
+## 第D章 D帯（対象0枚）
+
+前回 #387 でD帯8枚を照合済み。`origin/main` のD帯実装は8件のままで、追加されたカードは無い。
+本章での新規照合は無し。
+
+## 第E章 E帯（対象0枚）
+
+前回 #387 でE帯9枚を照合済み。`origin/main` のE帯実装は9件のままで、追加されたカードは無い。
+本章での新規照合は無し。
+
