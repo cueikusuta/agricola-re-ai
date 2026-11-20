@@ -47,39 +47,43 @@
     "printed_points": 0
   },
   "effects": [
-    {
-      "trigger": "on_play",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "discount_cost",
-          "target": "owner",
-          "params": {
-            "cost_type": "wooden_room",
-            "amount": 2
+      {
+        "trigger": "passive",
+        "conditions": [],
+        "steps": [
+          {
+            "operation": "other",
+            "target": "owner",
+            "params": {
+              "kind": "fixed_wooden_room_cost",
+              "wood_amount": 2,
+              "reed_amount": 2
+            }
           }
-        }
-      ],
-      "optional": false,
-      "frequency": "once",
-      "duration": "persistent",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none"
-    }
-  ],
+        ],
+        "optional": false,
+        "frequency": "always",
+        "duration": "permanent",
+        "snapshot": "live_state",
+        "order": 0,
+        "decision_owner": "none",
+        "notes": "Wooden rooms cost a fixed 2 wood + 2 reed (replaces normal 5 wood + 2 reed). Not a discount."
+      }
+    ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
-    "test_case_ids": [
-      "B013-wooden-room"
-    ],
-    "checked_by": "AI source comparison vs Rust CardDefinition",
-    "checked_on": "2026-11-19",
-    "implementation_status": "implemented",
-    "notes": "Verified against Rust CardDefinition in verified_passive_cards(): MinorImprovement, cost Stone 1 + Wood 1, points 0, Passive WoodenRoomCost(2). Zero diff. The JA reference URL was corrected to this card's own page (the previous URL pointed to B050 Butter Churn)."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "B013-wooden-room-fixed-cost",
+        "B013-clay-house-unaffected",
+        "B013-stone-house-unaffected"
+      ],
+      "checked_by": "AI source comparison vs Rust CardDefinition",
+      "checked_on": "2026-11-19",
+      "implementation_status": "implemented",
+      "notes": "Verified against Rust CardDefinition in verified_passive_cards(): MinorImprovement, cost Stone 1 + Wood 1, points 0, Passive WoodenRoomCost(2). Zero diff. The JA reference URL was corrected to this card's own page (the previous URL pointed to B050 Butter Churn). Effect is FIXED cost (2 wood + 2 reed for wooden rooms), not a discount."
+    }
 }

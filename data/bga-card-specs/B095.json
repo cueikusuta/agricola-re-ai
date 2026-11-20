@@ -38,39 +38,46 @@
     "printed_points": 0
   },
   "effects": [
-    {
-      "trigger": "on_play",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "discount_cost",
-          "target": "owner",
-          "params": {
-            "cost_type": "major_stone",
-            "by_rooms": true
+      {
+        "trigger": "passive",
+        "conditions": [],
+        "steps": [
+          {
+            "operation": "discount_cost",
+            "target": "owner",
+            "params": {
+              "good": "stone",
+              "amount": 1,
+              "scope": "major_improvement",
+              "per_room_built_from_initial": true
+            }
           }
-        }
-      ],
-      "optional": false,
-      "frequency": "once",
-      "duration": "persistent",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none"
-    }
-  ],
+        ],
+        "optional": false,
+        "frequency": "always",
+        "duration": "permanent",
+        "snapshot": "live_state",
+        "order": 0,
+        "decision_owner": "none",
+        "notes": "Major improvements cost 1 less stone per room built from the initial 2-room house (i.e., total rooms - 2). Wiki: 初期の家から建設した部屋の数だけ安くなる. Current engine implementation (MajorStoneDiscountByRooms) may count total rooms; this spec records the correct rule."
+      }
+    ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
-    "test_case_ids": [
-      "B095-stone-discount"
-    ],
-    "checked_by": "AI source comparison vs Rust CardDefinition",
-    "checked_on": "2026-11-19",
-    "implementation_status": "implemented",
-    "notes": "Verified against Rust CardDefinition in verified_passive_cards(): Occupation, cost [], points 0, Passive MajorStoneDiscountByRooms. Zero diff. The JA reference URL was corrected to this card's own page (the previous URL pointed to B050 Butter Churn)."
-  }
+        "status": "needs_resolution",
+        "unresolved_fields": [
+          "effects[0].steps[0].params.per_room_built_from_initial: engine support needed for (total_rooms - 2) discount"
+        ],
+        "test_case_ids": [
+          "B095-stone-discount-2-rooms-initial",
+          "B095-stone-discount-3-rooms",
+          "B095-stone-discount-5-rooms"
+        ],
+        "checked_by": "AI source comparison vs Rust CardDefinition",
+        "checked_on": "2026-11-19",
+        "implementation_status": "implemented",
+        "notes": "Verified against Rust CardDefinition in verified_passive_cards(): Occupation, cost [], points 0, Passive MajorStoneDiscountByRooms. Zero diff. The JA reference URL was corrected to this card's own page (the previous URL pointed to B050 Butter Churn). Spec corrected: discount is per room built from initial house (total - 2), not per total room. Engine implementation may need update. Status changed to needs_resolution due to unresolved engine dependency on per_room_built_from_initial."
+      }
 }

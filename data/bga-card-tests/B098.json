@@ -3,7 +3,7 @@
   "card_id": "B098",
   "cases": [
     {
-      "id": "B098-scoring",
+      "id": "B098-scoring-with-livestock-and-spare",
       "scope": "effect_only",
       "setup": {
         "card_played": true,
@@ -18,14 +18,119 @@
             "animal": null,
             "quantity": 0
           }
-        ]
+        ],
+        "sheep": 1
       },
       "action": {
         "run_scoring": true
       },
       "expected": {
         "bonus_points": 1
-      }
+      },
+      "notes": "Has livestock (1 sheep) and 1 pasture with spare capacity >= 3 (empty 2-cell pasture): 1 point"
+    },
+    {
+      "id": "B098-scoring-exact-spare-3",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures": [
+          {
+            "cells": 4,
+            "animal": "sheep",
+            "quantity": 1
+          }
+        ],
+        "sheep": 1
+      },
+      "action": {
+        "run_scoring": true
+      },
+      "expected": {
+        "bonus_points": 1
+      },
+      "notes": "Has livestock (1 sheep) and 1 pasture with exactly 3 spare capacity (4-cell with 1 animal): 1 point (boundary: spare >= 3)"
+    },
+    {
+      "id": "B098-scoring-no-livestock",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures": [
+          {
+            "cells": 2,
+            "animal": null,
+            "quantity": 0
+          },
+          {
+            "cells": 2,
+            "animal": null,
+            "quantity": 0
+          }
+        ],
+        "sheep": 0
+      },
+      "action": {
+        "run_scoring": true
+      },
+      "expected": {
+        "bonus_points": 0
+      },
+      "notes": "No livestock at all: 0 points even with spare pastures (家畜が1頭以上 condition not met)"
+    },
+    {
+      "id": "B098-scoring-livestock-but-no-spare",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures": [
+          {
+            "cells": 2,
+            "animal": "sheep",
+            "quantity": 2
+          }
+        ],
+        "sheep": 2
+      },
+      "action": {
+        "run_scoring": true
+      },
+      "expected": {
+        "bonus_points": 0
+      },
+      "notes": "Has livestock but no pasture with spare capacity >= 3: 0 points"
+    },
+    {
+      "id": "B098-scoring-multiple-spare-pastures",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "pastures": [
+          {
+            "cells": 2,
+            "animal": "sheep",
+            "quantity": 1
+          },
+          {
+            "cells": 2,
+            "animal": null,
+            "quantity": 0
+          },
+          {
+            "cells": 2,
+            "animal": null,
+            "quantity": 0
+          }
+        ],
+        "sheep": 1
+      },
+      "action": {
+        "run_scoring": true
+      },
+      "expected": {
+        "bonus_points": 2
+      },
+      "notes": "Has livestock and 2 pastures with spare capacity >= 3: 2 points"
     }
   ]
 }

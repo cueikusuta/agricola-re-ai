@@ -3,17 +3,88 @@
   "card_id": "B013",
   "cases": [
     {
-      "id": "B013-wooden-room",
+      "id": "B013-wooden-room-fixed-cost",
       "scope": "effect_only",
       "setup": {
         "card_played": true,
-        "stone": 1,
-        "wood": 1
+        "house": "wood",
+        "rooms": 1,
+        "reed": 2,
+        "wood": 10
       },
-      "action": {},
+      "action": {
+        "build_rooms": 1
+      },
       "expected": {
-        "wooden_room_cost": 2
-      }
+        "wood_spent": 2,
+        "reed_spent": 2,
+        "house": "wood",
+        "rooms_delta": 1
+      },
+      "notes": "Wooden room costs fixed 2 wood + 2 reed (not discount from 5)"
+    },
+    {
+      "id": "B013-wooden-room-fixed-cost-multiple",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "house": "wood",
+        "rooms": 2,
+        "reed": 4,
+        "wood": 20
+      },
+      "action": {
+        "build_rooms": 2
+      },
+      "expected": {
+        "wood_spent": 4,
+        "reed_spent": 4,
+        "house": "wood",
+        "rooms_delta": 2
+      },
+      "notes": "Two wooden rooms each cost fixed 2 wood + 2 reed (total 4 wood + 4 reed)"
+    },
+    {
+      "id": "B013-clay-house-unaffected",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "house": "clay",
+        "rooms": 1,
+        "reed": 2,
+        "clay": 10
+      },
+      "action": {
+        "build_rooms": 1
+      },
+      "expected": {
+        "clay_spent": 5,
+        "reed_spent": 2,
+        "house": "clay",
+        "rooms_delta": 1
+      },
+      "notes": "Clay house room cost unchanged (5 clay + 2 reed) - B013 only affects wooden rooms"
+    },
+    {
+      "id": "B013-stone-house-unaffected",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "house": "stone",
+        "rooms": 1,
+        "reed": 2,
+        "stone": 10
+      },
+      "action": {
+        "build_rooms": 1
+      },
+      "expected": {
+        "stone_spent": 5,
+        "reed_spent": 2,
+        "house": "stone",
+        "rooms_delta": 1
+      },
+      "notes": "Stone house room cost unchanged (5 stone + 2 reed) - B013 only affects wooden rooms"
     }
   ]
 }

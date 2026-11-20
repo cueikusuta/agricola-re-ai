@@ -67,14 +67,17 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
-    "test_case_ids": [
-      "B098-scoring"
-    ],
-    "checked_by": "AI source comparison vs Rust CardDefinition",
-    "checked_on": "2026-11-19",
-    "implementation_status": "implemented",
-    "notes": "Verified against Rust CardDefinition in verified_scoring_cards(): Occupation, cost [], points 0, EndGameBonus SparePastureCapacity. Zero diff. Scoring: 1 point per occupied pasture with spare capacity >= 3. The JA reference URL was corrected to this card's own page (the previous URL pointed to B050 Butter Churn)."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "B098-scoring-with-livestock-and-spare",
+        "B098-scoring-no-livestock",
+        "B098-scoring-livestock-but-no-spare",
+        "B098-scoring-multiple-spare-pastures"
+      ],
+      "checked_by": "AI source comparison vs Rust CardDefinition",
+      "checked_on": "2026-11-19",
+      "implementation_status": "implemented",
+      "notes": "Verified against Rust CardDefinition in verified_scoring_cards(): Occupation, cost [], points 0, EndGameBonus SparePastureCapacity. Zero diff. Scoring: 1 point per occupied pasture with spare capacity >= 3. The JA reference URL was corrected to this card's own page (the previous URL pointed to B050 Butter Churn). Test case IDs updated to match actual test contracts."
+    }
 }

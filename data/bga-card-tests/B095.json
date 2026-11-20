@@ -3,15 +3,60 @@
   "card_id": "B095",
   "cases": [
     {
-      "id": "B095-stone-discount",
+      "id": "B095-stone-discount-2-rooms-initial",
       "scope": "effect_only",
       "setup": {
-        "card_played": true
+        "card_played": true,
+        "rooms": 2,
+        "house": "wood"
       },
       "action": {},
       "expected": {
-        "major_stone_discount_by_rooms": true
-      }
+        "major_stone_discount": 0
+      },
+      "notes": "Initial 2-room wooden house: 0 rooms built from initial, so 0 stone discount"
+    },
+    {
+      "id": "B095-stone-discount-3-rooms",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "rooms": 3,
+        "house": "wood"
+      },
+      "action": {},
+      "expected": {
+        "major_stone_discount": 1
+      },
+      "notes": "3 rooms (1 built from initial): 1 stone discount on major improvements"
+    },
+    {
+      "id": "B095-stone-discount-4-rooms",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "rooms": 4,
+        "house": "wood"
+      },
+      "action": {},
+      "expected": {
+        "major_stone_discount": 2
+      },
+      "notes": "4 rooms (2 built from initial): 2 stone discount on major improvements"
+    },
+    {
+      "id": "B095-stone-discount-5-rooms",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true,
+        "rooms": 5,
+        "house": "clay"
+      },
+      "action": {},
+      "expected": {
+        "major_stone_discount": 3
+      },
+      "notes": "5 rooms (3 built from initial): 3 stone discount on major improvements"
     }
   ]
 }
