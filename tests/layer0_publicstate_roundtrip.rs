@@ -7,7 +7,9 @@
 //! 3. `state_hash` は v5 契約どおり集約欄 (`well_food_schedule`, `card_uses`) の
 //!    値を含まず、`integrity_hash` がそれらを検出する。
 
-use agricola_re_ai::cards::{verified_basic_card_set, CardDefinition, CardEffect, CardKind};
+use agricola_re_ai::cards::{
+    verified_basic_card_set, CardDefinition, CardEffect, CardKind, PostPlayDestination,
+};
 use agricola_re_ai::mcts::sample_game;
 use agricola_re_ai::model::{Config, Game, Good, Space};
 use agricola_re_ai::policy::{CardChoiceDetails, DetailPolicy, RandomPolicy, SpacePolicy};
@@ -235,6 +237,7 @@ fn use_limit_ledger_survives_save_load_as_canonical_state() {
             amount: 1,
         }],
         use_limit: Some(1),
+        post_play: PostPlayDestination::PlayedArea,
     });
     // 明示手配で TEST_LIMITED を player 0 の手札に置き、実際のエンジン経路で
     // カードをプレイしてから DayLaborer で使用する (Lessons → 相手が別枠 →

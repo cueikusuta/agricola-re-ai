@@ -55,6 +55,16 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // phase. Its placement plan is derived and applied via place_animals
         // (the play executor cannot represent a play-time pause).
         CardEffect::OnPlayGainAnimal { .. } => TriggerPhase::Before,
+        // B-deck on-play chapter 1 (B002/B003/B005/B008/B009) — Before phase.
+        // The hand-dependent ones (B003/B005) resolve deterministically from
+        // the dispatcher context; the play executor cannot represent a
+        // play-time pause, so the printed choices use fixed engine policies
+        // (documented on each handler).
+        CardEffect::OnPlayBuildPasture { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayDrawPlayOrPassOccupation { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayGainByHandOccupationCount { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayExchangeGain { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayGainOrExchangeAnimal { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -506,6 +516,49 @@ fn resolve_phase_scan(
                 CardEffect::OnPlayGainAnimal { animal, amount } => {
                     handle_on_play_gain_animal(ctx, animal, *amount)?
                 }
+                // B-deck on-play chapter 1 (B002/B003/B005/B008/B009)
+                CardEffect::OnPlayBuildPasture { spaces } => {
+                    handle_on_play_build_pasture(ctx, player, *spaces)?
+                }
+                CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost } => {
+                    handle_on_play_draw_play_or_pass_occupation(
+                        ctx,
+                        player,
+                        *food_cost,
+                        all_players.len(),
+                    )?
+                }
+                CardEffect::OnPlayGainByHandOccupationCount { bands } => {
+                    handle_on_play_gain_by_hand_occupation_count(ctx, player, bands)?
+                }
+                CardEffect::OnPlayExchangeGain {
+                    give,
+                    give_amount,
+                    receive,
+                    receive_amount,
+                } => handle_on_play_exchange_gain(
+                    ctx,
+                    player,
+                    give,
+                    *give_amount,
+                    receive,
+                    *receive_amount,
+                )?,
+                CardEffect::OnPlayGainOrExchangeAnimal {
+                    gain_good,
+                    gain_amount,
+                    pay_good,
+                    pay_amount,
+                    animal,
+                } => handle_on_play_gain_or_exchange_animal(
+                    ctx,
+                    player,
+                    gain_good,
+                    *gain_amount,
+                    pay_good,
+                    *pay_amount,
+                    animal,
+                )?,
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -766,6 +819,14 @@ fn effect_condition_holds(
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
         CardEffect::OnPlayGainAnimal { .. } => true,
+        // B-deck on-play chapter 1: unconditional on CardPlayed; hand presence
+        // and resource conditions are checked inside the handlers so the scan
+        // always reports them triggerable.
+        CardEffect::OnPlayBuildPasture { .. } => true,
+        CardEffect::OnPlayDrawPlayOrPassOccupation { .. } => true,
+        CardEffect::OnPlayGainByHandOccupationCount { .. } => true,
+        CardEffect::OnPlayExchangeGain { .. } => true,
+        CardEffect::OnPlayGainOrExchangeAnimal { .. } => true,
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.event_kind == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
@@ -792,7 +853,7 @@ pub fn execute_chosen_triggers(
     player: usize,
     phase: TriggerPhase,
     trigger_data: &PhaseTriggerData,
-    _all_players: &[Player],
+    all_players: &[Player],
     chosen_order: &[usize],
     triggerable: &[TriggerableEffect],
 ) -> Result<(), String> {
@@ -889,6 +950,49 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainAnimal { animal, amount } => {
                 handle_on_play_gain_animal(ctx, animal, *amount)?
             }
+            // B-deck on-play chapter 1 (B002/B003/B005/B008/B009)
+            CardEffect::OnPlayBuildPasture { spaces } => {
+                handle_on_play_build_pasture(ctx, player, *spaces)?
+            }
+            CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost } => {
+                handle_on_play_draw_play_or_pass_occupation(
+                    ctx,
+                    player,
+                    *food_cost,
+                    all_players.len(),
+                )?
+            }
+            CardEffect::OnPlayGainByHandOccupationCount { bands } => {
+                handle_on_play_gain_by_hand_occupation_count(ctx, player, bands)?
+            }
+            CardEffect::OnPlayExchangeGain {
+                give,
+                give_amount,
+                receive,
+                receive_amount,
+            } => handle_on_play_exchange_gain(
+                ctx,
+                player,
+                give,
+                *give_amount,
+                receive,
+                *receive_amount,
+            )?,
+            CardEffect::OnPlayGainOrExchangeAnimal {
+                gain_good,
+                gain_amount,
+                pay_good,
+                pay_amount,
+                animal,
+            } => handle_on_play_gain_or_exchange_animal(
+                ctx,
+                player,
+                gain_good,
+                *gain_amount,
+                pay_good,
+                *pay_amount,
+                animal,
+            )?,
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1271,7 +1375,11 @@ fn handle_after_worker_gain_if_used(
 /// unfenced stables (cell order), the free pet slot, and discard for any
 /// overflow. Overflow discard is the official rule for animals with no room
 /// (2016 Lookout; 放棄 is one of the five legal destinations).
-fn auto_animal_plan(p: &Player, animal: Animal, amount: u32) -> crate::engine::AnimalPlan {
+pub(crate) fn auto_animal_plan(
+    p: &Player,
+    animal: Animal,
+    amount: u32,
+) -> crate::engine::AnimalPlan {
     let mut plan = crate::engine::AnimalPlan {
         animal,
         to_pastures: vec![],
@@ -1332,6 +1440,204 @@ fn handle_on_play_gain_animal(
     let plan = auto_animal_plan(ctx.player, *animal, amount);
     crate::engine::place_animals(ctx.player, &plan, amount)
         .map_err(|e| format!("on-play animal placement failed: {e}"))?;
+    Ok(EffectResult::Resolved)
+}
+
+/// B002 小牧場 (Mini Pasture): on play, fence `spaces` empty farmyard cell(s)
+/// into a pasture at no wood cost. The printed effect leaves the placement to
+/// the player; the play executor cannot represent a play-time pause (Issue
+/// #268 R2-P0-2), so the cell is picked deterministically: first legal cell in
+/// farm order among empty, unstabled cells touching an existing pasture —
+/// or any empty, unstabled cell when the player owns no pasture yet. No legal
+/// cell: the effect does nothing (the play itself still succeeds).
+fn handle_on_play_build_pasture(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    spaces: u8,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    for _ in 0..spaces {
+        let Some(cell) = crate::engine::free_single_cell_pasture_candidates(p)
+            .into_iter()
+            .next()
+        else {
+            break;
+        };
+        crate::engine::build_free_single_cell_pasture(p, cell)?;
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B003 密造酒 (Moonshine) play/pass decision for the deterministic engine
+/// path. `Auto` pays the printed play cost when affordable and otherwise
+/// passes the drawn occupation to the left neighbour; `Pay`/`Pass` force one
+/// branch (used by the spec test contract, which drives both).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MoonshineDecision {
+    Auto,
+    Pay,
+    Pass,
+}
+
+/// B003 密造酒 (Moonshine): on play, take one occupation from the owner's hand
+/// and either play it immediately by paying `food_cost` food, or pass it to the
+/// left neighbour. Spec leaves the draw random (decision_owner=random); for
+/// deterministic replay the draw takes the ID-sorted-first occupation (same
+/// policy as the A-deck's A003, documented in the PR). The 2-food payment
+/// replaces the drawn occupation's own play cost in this implementation; the
+/// official wording ambiguity is recorded in the PR body.
+///
+/// Hand-dependent: this handler needs `ctx.cards.hands`, so the hand-less
+/// `cards::play` projection path intentionally never fires it.
+fn handle_on_play_draw_play_or_pass_occupation(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    food_cost: u32,
+    num_players: usize,
+) -> Result<EffectResult, String> {
+    handle_moonshine(ctx, food_cost, num_players, MoonshineDecision::Auto)
+}
+
+/// Moonshine resolution shared by the dispatcher path (Auto) and the spec
+/// test contract (explicit Pay/Pass).
+pub fn handle_moonshine(
+    ctx: &mut DispatchContext<'_>,
+    food_cost: u32,
+    num_players: usize,
+    decision: MoonshineDecision,
+) -> Result<EffectResult, String> {
+    let actor = ctx.actor;
+    // 1. Deterministic draw: ID-sorted-first occupation still in hand.
+    let mut occupations: Vec<String> = ctx.cards.hands[actor]
+        .iter()
+        .filter(|id| {
+            ctx.card_set
+                .definition(id)
+                .is_some_and(|c| c.kind == crate::cards::CardKind::Occupation)
+        })
+        .cloned()
+        .collect();
+    if occupations.is_empty() {
+        return Ok(EffectResult::Resolved);
+    }
+    occupations.sort();
+    let chosen = occupations.remove(0);
+    // 2. Resolve the pay-or-pass choice.
+    let pay = match decision {
+        MoonshineDecision::Pay => true,
+        MoonshineDecision::Pass => false,
+        MoonshineDecision::Auto => ctx.player.supply.food >= food_cost,
+    };
+    if pay {
+        ctx.player.supply.pay(Good::Food, food_cost)?;
+        // Zone move: hand -> played (2016 Lookout p.6), then apply the played
+        // card's own Before-phase effects and points.
+        crate::card_zones::hand_to_played(&mut ctx.cards.hands[actor], ctx.player, &chosen)
+            .map_err(|e| e.to_string())?;
+        crate::cards::apply_on_play_effects(ctx.card_set, ctx.player, &chosen)?;
+        if let Some(card) = ctx.card_set.definition(&chosen) {
+            crate::cards::update_card_points_on_play(ctx.player, card.points)?;
+        }
+    } else {
+        // Pass the drawn occupation to the left neighbour's hand.
+        if let Some(pos) = ctx.cards.hands[actor].iter().position(|x| x == &chosen) {
+            ctx.cards.hands[actor].remove(pos);
+        }
+        let left = (actor + 1) % num_players.max(1);
+        ctx.cards.hands[left].push(chosen);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B005 経験の蓄積 (Store of Experience): on play, gain 1 of the good paired
+/// with the first band whose threshold covers the number of occupations still
+/// in the owner's hand. Bands are ascending `(max_count, good)` pairs; a count
+/// above every threshold grants nothing. Hand-dependent: needs
+/// `ctx.cards.hands`, so the hand-less projection path never fires it.
+fn handle_on_play_gain_by_hand_occupation_count(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    bands: &[(u32, Good)],
+) -> Result<EffectResult, String> {
+    let actor = ctx.actor;
+    let count = ctx.cards.hands[actor]
+        .iter()
+        .filter(|id| {
+            ctx.card_set
+                .definition(id)
+                .is_some_and(|c| c.kind == crate::cards::CardKind::Occupation)
+        })
+        .count() as u32;
+    let Some((_, good)) = bands.iter().find(|(max, _)| count <= *max) else {
+        return Ok(EffectResult::Resolved);
+    };
+    let good = *good;
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(good)
+        .checked_add(1)
+        .ok_or("on-play hand-count gain overflow")?;
+    p.supply.set(good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// B008 露店 (Market Stall): on play, exchange `give_amount` of `give` for
+/// `receive_amount` of `receive`. No payment resource: no exchange, and the
+/// play itself still succeeds (the effect-only spec contract expects exactly
+/// that no-op shape).
+fn handle_on_play_exchange_gain(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    give: &Good,
+    give_amount: u32,
+    receive: &Good,
+    receive_amount: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    if p.supply.get(*give) >= give_amount {
+        p.supply.pay(*give, give_amount)?;
+        let next = p
+            .supply
+            .get(*receive)
+            .checked_add(receive_amount)
+            .ok_or("on-play exchange overflow")?;
+        p.supply.set(*receive, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B009 むち (Beating Rod): on play, gain `gain_amount` of `gain_good`, or pay
+/// `pay_amount` of `pay_good` to gain one `animal`. The printed effect is the
+/// owner's choice; the play executor cannot represent a play-time pause, so
+/// the engine deterministically exchanges whenever the payment resource is
+/// available (exchange yields the strictly larger reward) and gains otherwise.
+/// The animal is placed through the derived AnimalPlan (same vocabulary as
+/// C083's OnPlayGainAnimal).
+#[allow(clippy::too_many_arguments)]
+fn handle_on_play_gain_or_exchange_animal(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    gain_good: &Good,
+    gain_amount: u32,
+    pay_good: &Good,
+    pay_amount: u32,
+    animal: &Animal,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    if p.supply.get(*pay_good) >= pay_amount {
+        p.supply.pay(*pay_good, pay_amount)?;
+        let plan = auto_animal_plan(p, *animal, 1);
+        crate::engine::place_animals(p, &plan, 1)
+            .map_err(|e| format!("on-play animal placement failed: {e}"))?;
+    } else {
+        let next = p
+            .supply
+            .get(*gain_good)
+            .checked_add(gain_amount)
+            .ok_or("on-play gain overflow")?;
+        p.supply.set(*gain_good, next);
+    }
     Ok(EffectResult::Resolved)
 }
 
@@ -1816,6 +2122,34 @@ pub fn dispatch_play(
                         p.supply.set(*good, next);
                     }
                 }
+            }
+        }
+    }
+
+    // Post-play destination (2016 Lookout: printed "pass left" cards move to
+    // the left neighbour's hand after play). Runs after every phase so the
+    // card leaves the played area only once its own on-play effects resolved.
+    if let Some(card) = card_set.definition(new_card_id) {
+        if matches!(
+            card.post_play,
+            crate::cards::PostPlayDestination::LeftNeighborHand
+        ) && players.len() >= 2
+        {
+            let left = (player + 1) % players.len();
+            if let Some(pos) = players[player]
+                .played_cards
+                .iter()
+                .position(|x| x == new_card_id)
+            {
+                players[player].played_cards.remove(pos);
+                // The card left the owner's played area, so its printed points
+                // (possibly negative) leave the owner's card_points cache with
+                // it (validate_card_points invariant).
+                players[player].card_points = players[player]
+                    .card_points
+                    .checked_sub(card.points)
+                    .ok_or("card points underflow on pass-left")?;
+                cards.hands[left].push(new_card_id.to_string());
             }
         }
     }
@@ -2687,6 +3021,7 @@ mod tests {
                         good: Good::Wood,
                         amount: 1,
                     }],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 },
                 CardDefinition {
                     use_limit: None,
@@ -2698,6 +3033,7 @@ mod tests {
                         good: Good::Food,
                         amount: 2,
                     }],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 },
             ],
         };
@@ -2756,6 +3092,7 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             }],
         };
         let mut players = vec![Player::new(0, 0)];
@@ -2802,6 +3139,7 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             }],
         };
         let mut players = vec![Player::new(0, 0)];
@@ -2849,6 +3187,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         };
         CardSet {
             definitions: vec![
@@ -2917,6 +3256,7 @@ mod tests {
                         good: Good::Grain,
                         amount: 2,
                     }],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 },
             ],
         }
@@ -3500,6 +3840,7 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2), (Good::Wood, 1)],
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         };
         let set = CardSet {
             definitions: vec![probe("CHOICE_A")],
@@ -3564,6 +3905,7 @@ mod tests {
                     house: None,
                     rooms: None,
                 }],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             }],
         };
         // Two copies of the same card in play, limit 1 per period.
@@ -3613,6 +3955,7 @@ mod tests {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2), (Good::Wood, 1)],
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         };
         let set = CardSet {
             definitions: vec![probe("CHOICE_CARD")],
@@ -3702,6 +4045,7 @@ mod tests {
                     good: Good::Food,
                     amount: 2,
                 }],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             }],
         };
 
@@ -3802,6 +4146,7 @@ mod tests {
                     good: Good::Wood,
                     amount: 3,
                 }],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             }],
         };
 
@@ -3898,6 +4243,7 @@ mod tests {
                     house: Some(House::Stone),
                     rooms: None,
                 }],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             }],
         };
 
@@ -3995,6 +4341,7 @@ mod tests {
                         amount: 1,
                     },
                 ],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             }],
         };
 
@@ -4179,6 +4526,7 @@ mod tests {
                     amount: 1,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         };
         let mut definitions = vec![card];
         for i in 1..=14 {
@@ -4189,6 +4537,7 @@ mod tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             });
         }
         for i in 1..=13 {
@@ -4199,6 +4548,7 @@ mod tests {
                 cost: vec![],
                 points: 1,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             });
         }
         let set = CardSet { definitions };
@@ -4521,6 +4871,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         };
         let filler_minor = |i: usize| CardDefinition {
             use_limit: None,
@@ -4529,6 +4880,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         };
         let mut set = crate::cards::verified_basic_card_set(2).expect("verified basic card set");
         set.definitions.push(CardDefinition {
@@ -4547,6 +4899,7 @@ mod tests {
                     amount: 1,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         set.definitions.push(CardDefinition {
             use_limit: None,
@@ -4566,6 +4919,7 @@ mod tests {
                     amount: 1,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         for i in 0..12 {
             set.definitions.push(filler_occ(i));
@@ -4957,6 +5311,7 @@ mod tests {
             cost: vec![(Good::Food, 2)],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let mut c = Ctx::new();
         // Zone move already applied by the caller: C116 first, new card last.
@@ -5045,6 +5400,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 });
                 defs
             },
@@ -5119,6 +5475,7 @@ mod tests {
             cost: vec![(Good::Wood, 1)],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let mut c = Ctx::new();
         c.players[0].played_cards = vec!["C068".into(), "minor_test".into()];
@@ -5165,6 +5522,7 @@ mod tests {
             cost: vec![(Good::Food, 2)],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let mut c = Ctx::new();
         // Both C068 and C116 played, then an occupation
@@ -5259,6 +5617,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 });
                 defs
             },
@@ -5474,6 +5833,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 });
                 defs.push(CardDefinition {
                     use_limit: None,
@@ -5482,6 +5842,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 });
                 defs
             },

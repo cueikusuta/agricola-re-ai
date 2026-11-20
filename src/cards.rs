@@ -186,6 +186,50 @@ pub enum CardEffect {
         animal: Animal,
         amount: u32,
     },
+    /// B002 小牧場 (Mini Pasture): on play, fence `spaces` empty farmyard
+    /// cell(s) into a pasture at no wood cost. The engine picks the cell
+    /// deterministically (adjacent to an existing pasture when one exists);
+    /// the rule itself lives in `engine::build_free_single_cell_pasture`.
+    OnPlayBuildPasture {
+        spaces: u8,
+    },
+    /// B003 密造酒 (Moonshine): on play, take one occupation from the owner's
+    /// hand and either play it immediately by paying `food_cost` food, or pass
+    /// it to the left neighbour. Hand-dependent: resolved by the play
+    /// dispatcher's handler (`card_events`), not by the hand-less
+    /// `apply_on_play_effects` projection path.
+    OnPlayDrawPlayOrPassOccupation {
+        food_cost: u32,
+    },
+    /// B005 経験の蓄積 (Store of Experience): on play, gain 1 of the good
+    /// paired with the first band whose threshold covers the number of
+    /// occupations still in the owner's hand (bands ascending, e.g.
+    /// `[(4, stone), (5, reed), (6, clay), (7, wood)]`). Hand-dependent:
+    /// resolved by the play dispatcher's handler.
+    OnPlayGainByHandOccupationCount {
+        bands: Vec<(u32, Good)>,
+    },
+    /// B008 露店 (Market Stall): on play, exchange `give_amount` of `give`
+    /// for `receive_amount` of `receive`. If the payment resource is missing,
+    /// the exchange does not fire (no partial exchange, no play failure).
+    OnPlayExchangeGain {
+        give: Good,
+        give_amount: u32,
+        receive: Good,
+        receive_amount: u32,
+    },
+    /// B009 むち (Beating Rod): on play, gain `gain_amount` of `gain_good`,
+    /// or pay `pay_amount` of `pay_good` to gain one `animal`. The engine
+    /// deterministically exchanges whenever the payment resource is available;
+    /// the animal is placed through the derived AnimalPlan (see the dispatcher
+    /// handler for C083's vocabulary).
+    OnPlayGainOrExchangeAnimal {
+        gain_good: Good,
+        gain_amount: u32,
+        pay_good: Good,
+        pay_amount: u32,
+        animal: Animal,
+    },
 }
 
 impl CardEffect {
@@ -230,6 +274,15 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerGain { .. } => "after_any_worker_gain",
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
+            CardEffect::OnPlayBuildPasture { .. } => "on_play_build_pasture",
+            CardEffect::OnPlayDrawPlayOrPassOccupation { .. } => {
+                "on_play_draw_play_or_pass_occupation"
+            }
+            CardEffect::OnPlayGainByHandOccupationCount { .. } => {
+                "on_play_gain_by_hand_occupation_count"
+            }
+            CardEffect::OnPlayExchangeGain { .. } => "on_play_exchange_gain",
+            CardEffect::OnPlayGainOrExchangeAnimal { .. } => "on_play_gain_or_exchange_animal",
         }
     }
 }
@@ -346,6 +399,24 @@ pub enum ScoreBonusRule {
     ExactFamilyMembers,
 }
 
+/// Where a card goes after being played. Defaults to the owner's played area;
+/// the printed "pass left" cards move to the left neighbour's hand instead.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PostPlayDestination {
+    /// Card stays in the owner's played area (default).
+    #[default]
+    PlayedArea,
+    /// Card moves to the left neighbour's hand after play (2016 Lookout:
+    /// the printed card is passed to the player on the left).
+    LeftNeighborHand,
+}
+
+/// Serde skip predicate for the default post-play destination.
+fn post_play_is_played_area(dest: &PostPlayDestination) -> bool {
+    matches!(dest, PostPlayDestination::PlayedArea)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CardDefinition {
     /// A stable programmatic identifier, NOT the card's printed text.
@@ -354,6 +425,12 @@ pub struct CardDefinition {
     pub cost: Vec<(Good, u32)>,
     pub points: i32,
     pub effects: Vec<CardEffect>,
+    /// Where the card goes after being played. `PlayedArea` (the default) is
+    /// skipped when serializing, so existing card sets and saved games keep
+    /// their exact bytes and `content_hash` is unchanged unless a card
+    /// actually passes left.
+    #[serde(default, skip_serializing_if = "post_play_is_played_area")]
+    pub post_play: PostPlayDestination,
     /// Maximum times this card's effects may resolve per round, for cards
     /// printed with a per-round use limit. `None` = no limit (the default), and
     /// it is skipped when serializing, so existing card sets and saved games
@@ -456,6 +533,19 @@ impl CardSet {
                         | CardEffect::AfterAnyWorkerGain { amount, .. }
                         | CardEffect::AfterAnyWorkerOthersGain { amount, .. }
                         | CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
+                        CardEffect::OnPlayBuildPasture { .. } => 1,
+                        CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost } => *food_cost,
+                        CardEffect::OnPlayGainByHandOccupationCount { .. } => 1,
+                        CardEffect::OnPlayExchangeGain {
+                            give_amount,
+                            receive_amount,
+                            ..
+                        } => (*give_amount).max(*receive_amount),
+                        CardEffect::OnPlayGainOrExchangeAnimal {
+                            gain_amount,
+                            pay_amount,
+                            ..
+                        } => (*gain_amount).max(*pay_amount),
                     };
                     amount == 0 || amount > 30
                 })
@@ -904,6 +994,57 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                     .ok_or("on-play card bonus overflow")?;
                 safe_gain(player, *good, bonus)?;
             }
+            // B002 小牧場 (Mini Pasture): free single-cell pasture, cell picked
+            // deterministically from the legal candidates (player state only).
+            CardEffect::OnPlayBuildPasture { spaces } => {
+                for _ in 0..*spaces {
+                    let Some(cell) = crate::engine::free_single_cell_pasture_candidates(player)
+                        .into_iter()
+                        .next()
+                    else {
+                        break;
+                    };
+                    crate::engine::build_free_single_cell_pasture(player, cell)?;
+                }
+            }
+            // B008 露店 (Market Stall): conditional exchange — no payment
+            // resource, no exchange (and never a play failure).
+            CardEffect::OnPlayExchangeGain {
+                give,
+                give_amount,
+                receive,
+                receive_amount,
+            } => {
+                if player.supply.get(*give) >= *give_amount {
+                    player.supply.pay(*give, *give_amount)?;
+                    safe_gain(player, *receive, *receive_amount)?;
+                }
+            }
+            // B009 むち (Beating Rod): gain, or pay to gain one animal.
+            // Deterministic policy: exchange whenever the payment resource is
+            // available; the animal is placed through the derived plan (same
+            // vocabulary as OnPlayGainAnimal, overflow discarded).
+            CardEffect::OnPlayGainOrExchangeAnimal {
+                gain_good,
+                gain_amount,
+                pay_good,
+                pay_amount,
+                animal,
+            } => {
+                if player.supply.get(*pay_good) >= *pay_amount {
+                    player.supply.pay(*pay_good, *pay_amount)?;
+                    let plan = crate::card_events::auto_animal_plan(player, *animal, 1);
+                    crate::engine::place_animals(player, &plan, 1)
+                        .map_err(|e| format!("on-play animal placement failed: {e}"))?;
+                } else {
+                    safe_gain(player, *gain_good, *gain_amount)?;
+                }
+            }
+            // B003 (OnPlayDrawPlayOrPassOccupation) and B005
+            // (OnPlayGainByHandOccupationCount) read the owner's HAND, which
+            // this hand-less projection path cannot see. They are resolved by
+            // the play dispatcher's handlers (card_events.rs) and intentionally
+            // no-op here, exactly like the A-deck's hand-dependent A003.
             CardEffect::Passive { rule } => match rule {
                 PassiveRule::PastureCapacity(n) => player.pasture_capacity_bonus += n,
                 PassiveRule::FenceWoodDiscount(n) => player.free_fence_wood += n,
@@ -967,6 +1108,7 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
             cost,
             points: 0,
             effects: vec![CardEffect::EndGameBonus { rule }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         }
     }
     let mut cards = vec![
@@ -1272,6 +1414,7 @@ mod verified_scoring_card_tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let mut player = Player::new(0, 0);
         player
@@ -1322,6 +1465,7 @@ mod verified_scoring_card_tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         set.definitions.push(CardDefinition {
             use_limit: None,
@@ -1330,6 +1474,7 @@ mod verified_scoring_card_tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let mut player = Player::new(0, 0);
         player.played_cards = vec![
@@ -1354,6 +1499,7 @@ mod card_prerequisite_tests {
             cost: vec![(Good::Wood, 1)],
             points: 0,
             effects: vec![CardEffect::Prerequisite { rule }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         };
         (
             CardSet {
@@ -1374,6 +1520,7 @@ mod card_prerequisite_tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             }));
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
@@ -1439,6 +1586,7 @@ mod card_prerequisite_tests {
             effects: vec![CardEffect::Prerequisite {
                 rule: CardRequirement::MinimumPlayers(3),
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let set = CardSet { definitions: cards };
         assert!(set.validate(2).is_err());
@@ -1470,6 +1618,7 @@ pub fn verified_minor_worker_cards(players: usize) -> Vec<CardDefinition> {
             cost,
             points,
             effects,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         }
     }
     let minor = CardKind::MinorImprovement;
@@ -1597,6 +1746,7 @@ mod verified_minor_worker_tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let card = set.definition("A078").unwrap();
         let mut p = Player::new(0, 0);
@@ -1634,6 +1784,7 @@ mod verified_minor_worker_tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             });
         }
         let card = set.definition("B077").unwrap();
@@ -1776,6 +1927,7 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 good: Good::Clay,
                 amount: 1,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         CardDefinition {
             use_limit: None,
@@ -1803,6 +1955,7 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                     amount: 2,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // A077 Hod (fallback for A072 Calcium Fertilizers): OnPlayGain 1 clay.
         // The spec's second effect (any-player Pig Market clay gain) is not expressible
@@ -1817,6 +1970,7 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 good: Good::Clay,
                 amount: 1,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // E007 Pumpernickel (ライ麦パン): OnPlayGain 4 food, cost 1 grain.
         CardDefinition {
@@ -1829,6 +1983,7 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 good: Good::Food,
                 amount: 4,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // E008 農産物直売所 (Farmers Market): OnPlayGain 1 vegetable, cost 2 food.
         CardDefinition {
@@ -1841,6 +1996,7 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 good: Good::Vegetable,
                 amount: 1,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // D004 Cross-Cut Wood (横挽きの木材): OnPlayGainPerStored wood per stone in supply, cost 1 food.
         CardDefinition {
@@ -1855,6 +2011,7 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 good: Good::Wood,
                 amount: 1,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
     ]
 }
@@ -2000,6 +2157,7 @@ pub fn verified_worker_bonus_cards(_players: usize) -> Vec<CardDefinition> {
             cost: vec![],
             points: 0,
             effects,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         }
     }
     fn gain(space: Space, good: Good, amount: u32) -> CardEffect {
@@ -2050,6 +2208,7 @@ pub fn verified_worker_bonus_cards(_players: usize) -> Vec<CardDefinition> {
                 good: Good::Food,
                 amount: 2,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
     ];
     cards
@@ -2396,6 +2555,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                     amount: 1,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         CardDefinition {
             use_limit: None,
@@ -2409,6 +2569,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 house: Some(House::Wood),
                 rooms: None,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         CardDefinition {
             use_limit: None,
@@ -2421,6 +2582,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 good: Good::Food,
                 amount: 3,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         CardDefinition {
             use_limit: None,
@@ -2434,6 +2596,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 good: Good::Food,
                 amount: 3,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         CardDefinition {
             use_limit: None,
@@ -2447,6 +2610,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 house: None,
                 rooms: Some(2),
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // C141 羊の世話人: AfterAnyWorkerGain SheepMarket -> gain grain 1
         CardDefinition {
@@ -2460,6 +2624,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 good: Good::Grain,
                 amount: 1,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // A050 ミルクがめ: AfterAnyWorkerGain CattleMarket -> gain food 3 (self) + AfterAnyWorkerOthersGain CattleMarket -> gain food 1 (others)
         CardDefinition {
@@ -2480,6 +2645,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                     amount: 1,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // D061 わらのたわら: HarvestStartGainIfFields grain >= 3 -> gain food 2
         CardDefinition {
@@ -2494,6 +2660,7 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 good: Good::Food,
                 amount: 2,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
     ]
 }
@@ -2899,6 +3066,7 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
             cost,
             points: 0,
             effects: vec![CardEffect::Passive { rule: effect }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         }
     }
     vec![
@@ -2922,6 +3090,7 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
                     rule: PassiveRule::ImprovementWoodDiscount(1),
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         card(
             "B013",
@@ -2991,6 +3160,7 @@ mod passive_cards_tests {
             cost: vec![(Good::Wood, 1)],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         play(
             &set,
@@ -3042,6 +3212,7 @@ mod passive_cards_tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             });
         }
         let mut p = Player::new(0, 0);
@@ -3088,6 +3259,7 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
                 good: Good::Food,
                 amount: 3,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         CardDefinition {
             use_limit: None,
@@ -3101,6 +3273,7 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
                 house: Some(House::Stone),
                 rooms: None,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
     ];
     if players == 2 {
@@ -3114,6 +3287,7 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
                 good: Good::Clay,
                 amount: 3,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
     }
     result
@@ -3236,6 +3410,7 @@ pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
             effects: vec![CardEffect::Passive {
                 rule: PassiveRule::HousingSpace(1),
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         CardDefinition {
             use_limit: None,
@@ -3244,6 +3419,7 @@ pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
             cost: vec![(Good::Wood, 2), (Good::Stone, 2)],
             points: 2,
             effects: vec![CardEffect::AfterHarvestBakeGain { amount: 3 }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
     ]
 }
@@ -3271,6 +3447,7 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
             cost,
             points: 0,
             effects,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         }
     }
     let minor = CardKind::MinorImprovement;
@@ -3407,6 +3584,7 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 animal: Animal::Cattle,
                 amount: 2,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // C147 牛の飼育士 (Cowherd): occupation, 0 points, each time owner uses CattleMarket gain 1 cattle.
         card(
@@ -3446,6 +3624,7 @@ mod verified_band_c_tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             },
             CardDefinition {
                 use_limit: None,
@@ -3454,6 +3633,7 @@ mod verified_band_c_tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             },
             CardDefinition {
                 use_limit: None,
@@ -3462,6 +3642,7 @@ mod verified_band_c_tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             },
         ]);
         let card = set.definition("C076").unwrap();
@@ -3621,6 +3802,7 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
             cost,
             points: 0,
             effects,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         }
     }
     let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
@@ -3740,6 +3922,7 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::LargePastures,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // A101 調理器具商 (Cookery Outfitter): 1 bonus point per cooking
         // improvement at scoring time.
@@ -3752,6 +3935,7 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::CookingImprovements,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // A106 液肥散布人 (Slurry Spreader): per field whose last grain is
         // harvested this field phase 2 food, per field whose last vegetable
@@ -3774,6 +3958,7 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                     amount: 1,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // A117 木材調達人 (Wood Carrier): 1 wood per improvement already in
         // front of the owner when playing this card.
@@ -3787,6 +3972,7 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 good: Good::Wood,
                 amount: 1,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // A155 奇術師 (Conjurer): after worker placed on traveling_players,
         // gain 1 wood and 1 grain. Only available at 4 players.
@@ -3803,6 +3989,7 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 gain(Space::TravelingPlayers, Good::Wood, 1),
                 gain(Space::TravelingPlayers, Good::Grain, 1),
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // A008 食材かご (Food Basket): cost 1 reed; prerequisites 2 occupations and
         // 2 improvements in front; on play gain 1 grain and 1 vegetable.
@@ -3828,6 +4015,7 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                     amount: 1,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
     ]
 }
@@ -3858,6 +4046,7 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 gain(Space::WesternQuarry, Good::Clay, 1),
                 gain(Space::EasternQuarry, Good::Clay, 1),
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // B142 八百屋 (Greengrocer): grain_seeds grants 1 vegetable.
         // Only available at 3+ players.
@@ -3873,6 +4062,7 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
                 gain(Space::GrainSeeds, Good::Vegetable, 1),
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // B144 坑夫 (Collier): clay accumulation spaces (clay_pit, hollow) grant
         // 1 wood; clay_pit additionally grants 1 reed.
@@ -3891,6 +4081,7 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 gain(Space::Hollow, Good::Wood, 1),
                 gain(Space::ClayPit, Good::Reed, 1),
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // B006 採石場見学 (Excursion to the Quarry): cost 2 food; prerequisite:
         // at least 1 occupation played; on play gain 1 stone per family member.
@@ -3910,6 +4101,7 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                     amount: 1,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // B007 賃金 (Wages): cost 0 (free); on play gain 2 food + 1 food per
         // major improvement in the bottom row (Joinery / Pottery / Basketry).
@@ -3930,6 +4122,101 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                     amount: 1,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+    ]
+}
+
+/// B-deck chapter 1: bga-checked on-play cards (B002/B003/B005/B008/B009)
+/// whose printed effects map onto the typed effect vocabulary, sourced from
+/// the BGA Agricola card wiki (agricola.cloudfree.jp; B002 p=3255, B003
+/// p=3254, B005 p=3252, B008 p=3249, B009 p=3248, cross-checked against the
+/// English list). Every one of these cards is printed "pass left", expressed
+/// as `post_play: LeftNeighborHand`.
+///
+/// These are deliberately kept OUT of `verified_basic_card_set` (same as the
+/// band pools): the built-in A/B two-player preset must keep its pool size,
+/// distribution digest and recorded replay hashes unchanged, and B003/B005's
+/// hand-dependent effects are not modelled by the hand-less `cards::play`
+/// projection the AI evaluators use.
+pub fn verified_b_onplay_simple_cards() -> Vec<CardDefinition> {
+    let minor = CardKind::MinorImprovement;
+    vec![
+        // B002 小牧場 (Mini Pasture): cost 2 food; on play fence one empty
+        // farmyard cell into a pasture at no wood cost, adjacent to an
+        // existing pasture when the player owns one.
+        CardDefinition {
+            use_limit: None,
+            id: "B002".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayBuildPasture { spaces: 1 }],
+            post_play: PostPlayDestination::LeftNeighborHand,
+        },
+        // B003 密造酒 (Moonshine): no cost; on play take one occupation from
+        // hand and play it for 2 food, or pass it to the left neighbour.
+        CardDefinition {
+            use_limit: None,
+            id: "B003".to_owned(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost: 2 }],
+            post_play: PostPlayDestination::LeftNeighborHand,
+        },
+        // B005 経験の蓄積 (Store of Experience): no cost; on play gain 1 good
+        // by the number of occupations still in hand: 0-4 stone, 5 reed,
+        // 6 clay, 7 wood.
+        CardDefinition {
+            use_limit: None,
+            id: "B005".to_owned(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGainByHandOccupationCount {
+                bands: vec![
+                    (4, Good::Stone),
+                    (5, Good::Reed),
+                    (6, Good::Clay),
+                    (7, Good::Wood),
+                ],
+            }],
+            post_play: PostPlayDestination::LeftNeighborHand,
+        },
+        // B008 露店 (Market Stall): cost 1 grain; on play exchange 1 grain
+        // for 1 vegetable (the printed cost is paid separately by the play).
+        CardDefinition {
+            use_limit: None,
+            id: "B008".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Grain, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayExchangeGain {
+                give: Good::Grain,
+                give_amount: 1,
+                receive: Good::Vegetable,
+                receive_amount: 1,
+            }],
+            post_play: PostPlayDestination::LeftNeighborHand,
+        },
+        // B009 むち (Beating Rod): no cost; on play gain 1 reed, or exchange
+        // 1 reed for 1 cattle (deterministic engine policy: exchange when a
+        // reed is available).
+        CardDefinition {
+            use_limit: None,
+            id: "B009".to_owned(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGainOrExchangeAnimal {
+                gain_good: Good::Reed,
+                gain_amount: 1,
+                pay_good: Good::Reed,
+                pay_amount: 1,
+                animal: Animal::Cattle,
+            }],
+            post_play: PostPlayDestination::LeftNeighborHand,
         },
     ]
 }
@@ -4141,6 +4428,7 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 good: Good::Wood,
                 amount: 2,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // E107 土地調査士 (Land Surveyor): at the field phase, 2/4/6/7 or
         // more plowed fields yield 1/2/3/4 food
@@ -4159,6 +4447,7 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 good: Good::Food,
                 amount: 1,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // E111 世捨て人 (Recluse): with no minor improvements played, 1 food
         // at each round start and 1 wood at the start of each harvest
@@ -4179,6 +4468,7 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                     amount: 1,
                 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // E113 教母 (Godmother): 1 vegetable per family-growth action (the
         // engine's family-growth spaces: with room, without room, and the
@@ -4194,6 +4484,7 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 gain(Space::FamilyGrowthNoRoom, Good::Vegetable, 1),
                 gain(Space::ModestFamilyGrowth, Good::Vegetable, 1),
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // E118 薪切り (Kindling Gatherer): 1 extra wood per food gain from an
         // action space; the BGA wiki lists 日雇い/漁/小劇場/資材市場 as the
@@ -4211,6 +4502,7 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 gain(Space::TravelingPlayers, Good::Wood, 1),
                 gain(Space::ResourceMarket, Good::Wood, 1),
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // E034 登記簿 (Land Register): cost 1 wood; at scoring, +2 points if
         // every farmyard space is used.
@@ -4223,6 +4515,7 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::FarmyardAllUsed,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // E035 人間不信 (Misanthropy): cost 1 wood; at scoring, 2/3/5 points for
         // exactly 4/3/2 family members.
@@ -4235,6 +4528,7 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::ExactFamilyMembers,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
     ]
 }
@@ -4504,6 +4798,7 @@ mod verified_band_d_tests {
                 effects: vec![CardEffect::EndGameBonus {
                     rule: ScoreBonusRule::FieldsGoodsBeforeFinalHarvest(7),
                 }],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             }],
         };
         assert_eq!(end_game_bonus(&d032_set, p), 2);
@@ -4673,6 +4968,7 @@ mod verified_band_e_tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let mut p = Player::new(0, 0);
         p.played_cards.push("E111".into());
@@ -4954,6 +5250,7 @@ mod verified_band_a_tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let mut p = Player::new(0, 0);
         p.supply.wood = 5;
@@ -5058,6 +5355,7 @@ mod verified_band_a_tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         // Test 1: prerequisite fails with 0 occupations
         let mut p = Player::new(0, 5); // 5 food for reed cost
@@ -5171,6 +5469,7 @@ pub fn verified_multiplayer_passive_cards(players: usize) -> Vec<CardDefinition>
                 rule: PassiveRule::StoneDiscount(1),
             },
         ],
+        post_play: crate::cards::PostPlayDestination::PlayedArea,
     }]
 }
 #[cfg(test)]
@@ -5296,6 +5595,7 @@ mod card_set_content_hash_tests {
                 good: Good::Food,
                 amount: 1,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         }
     }
 

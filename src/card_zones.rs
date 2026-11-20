@@ -365,6 +365,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 },
                 CardDefinition {
                     use_limit: None,
@@ -373,6 +374,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 },
             ],
         };
@@ -423,6 +425,7 @@ mod tests {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let err = validate_card_partition(&set, &cards, &players).unwrap_err();
         assert!(err.contains("missing"));
@@ -447,6 +450,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 },
                 CardDefinition {
                     use_limit: None,
@@ -455,6 +459,7 @@ mod tests {
                     cost: vec![],
                     points: 0,
                     effects: vec![],
+                    post_play: crate::cards::PostPlayDestination::PlayedArea,
                 },
             ],
         };
@@ -646,6 +651,7 @@ mod tests {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             }],
         };
         let mut cards = CardState {
