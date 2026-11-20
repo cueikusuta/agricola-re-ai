@@ -309,6 +309,13 @@ impl CardRegistryBuilder {
                     EventKind::WorkerPlaced
                 }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
+                crate::cards::CardEffect::AfterWorkerSpaceBuildStable { .. }
+                | crate::cards::CardEffect::AfterWorkerSpacePlowFields { .. }
+                | crate::cards::CardEffect::AfterWorkerSpaceFamilyGrowth { .. }
+                | crate::cards::CardEffect::AfterWorkerSpaceImprovementAction { .. }
+                | crate::cards::CardEffect::AfterWorkerSpaceBakeBread { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
                 | crate::cards::CardEffect::EndGameBonus { .. } => continue,
@@ -377,46 +384,62 @@ impl CardRegistryBuilder {
                     .any(|(_, quantity)| *quantity == 0 || *quantity > 30)
                 || card.effects.iter().any(|effect| {
                     let amount = match effect {
-                        crate::cards::CardEffect::OnPlayGain { amount, .. }
-                        | crate::cards::CardEffect::AfterWorkerGain { amount, .. } => *amount,
+                        crate::cards::CardEffect::OnPlayGain { amount, .. } => *amount,
+                        crate::cards::CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         crate::cards::CardEffect::EndGameBonus { .. }
                         | crate::cards::CardEffect::Prerequisite { .. }
                         | crate::cards::CardEffect::Passive { .. } => 1,
                         #[cfg(test)]
                         crate::cards::CardEffect::PendingProbe { .. } => 1,
-                        crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
-                        | crate::cards::CardEffect::OnPlayGainIfHouse { amount, .. }
-                        | crate::cards::CardEffect::StartRoundGain { amount, .. }
-                        | crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound {
+                        crate::cards::CardEffect::OnPlayGainPerStored { amount, .. } => *amount,
+                        crate::cards::CardEffect::OnPlayGainIfHouse { amount, .. } => *amount,
+                        crate::cards::CardEffect::StartRoundGain { amount, .. } => *amount,
+                        crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound {
                             amount,
                             ..
-                        }
-                        | crate::cards::CardEffect::StartRoundGainIfNoMinorPlayed {
+                        } => *amount,
+                        crate::cards::CardEffect::StartRoundGainIfNoMinorPlayed {
                             amount, ..
-                        }
-                        | crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed {
+                        } => *amount,
+                        crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed {
                             amount,
                             ..
-                        }
-                        | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed {
+                        } => *amount,
+                        crate::cards::CardEffect::OnPlayGainPerImprovementPlayed {
                             amount, ..
-                        }
-                        | crate::cards::CardEffect::AfterOccupationGainPerFoodCost {
+                        } => *amount,
+                        crate::cards::CardEffect::AfterOccupationGainPerFoodCost {
                             amount, ..
-                        }
-                        | crate::cards::CardEffect::AfterOccupationGain { amount, .. }
-                        | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
-                        | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
-                        | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
-                        | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
-                        | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
-                        | crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
-                        | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
-                        | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
-                        | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
-                        | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. } => {
+                        } => *amount,
+                        crate::cards::CardEffect::AfterOccupationGain { amount, .. } => *amount,
+                        crate::cards::CardEffect::HarvestFieldGain { amount, .. } => *amount,
+                        crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. } => *amount,
+                        crate::cards::CardEffect::AfterClayConstructionGain { amount, .. } => {
                             *amount
                         }
+                        crate::cards::CardEffect::AfterHarvestBakeGain { amount } => *amount,
+                        crate::cards::CardEffect::OnPlayGainPerCount { amount, .. } => *amount,
+                        crate::cards::CardEffect::OnPlayGainAnimal { amount, .. } => *amount,
+                        crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
+                        crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. } => *amount,
+                        crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. } => {
+                            *amount
+                        }
+                        crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. } => {
+                            *amount
+                        }
+                        crate::cards::CardEffect::AfterWorkerSpacePlowFields { amount, .. } => {
+                            *amount
+                        }
+                        crate::cards::CardEffect::AfterWorkerSpaceFamilyGrowth {
+                            food_amount,
+                            ..
+                        } => *food_amount,
+                        crate::cards::CardEffect::AfterWorkerSpaceBuildStable {
+                            wood_cost, ..
+                        } => *wood_cost,
+                        crate::cards::CardEffect::AfterWorkerSpaceImprovementAction { .. }
+                        | crate::cards::CardEffect::AfterWorkerSpaceBakeBread { .. } => 1,
                     };
                     amount == 0 || amount > 30
                 })
@@ -804,6 +827,12 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
     // B-deck band cards with typed effects (kept out of the A/B two-player
     // preset; see verified_band_b_cards).
     builder = add_cards_inner(builder, crate::cards::verified_band_b_cards(), &mut seen)?;
+    // A-deck after_worker_space simple gain cards (A015/A018/A021/A023/A024).
+    builder = add_cards_inner(
+        builder,
+        crate::cards::verified_after_worker_space_cards(),
+        &mut seen,
+    )?;
 
     builder.freeze()
 }
