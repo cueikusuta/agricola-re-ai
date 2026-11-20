@@ -43,7 +43,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "ラウンド9またはその後に出す（ラウンド9以降に出す）"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [

@@ -34,7 +34,14 @@
   "play": {
     "action": "minor_improvement",
     "cost": [],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "未配置の人物1（未配置の人物が1人以上いる）"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
