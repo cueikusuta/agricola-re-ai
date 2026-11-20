@@ -20,13 +20,13 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3275",
         "language": "ja",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "English list page row used to cross-check the card id and name"
       }
     ]
@@ -44,7 +44,7 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "space": "farmland"
+            "space": "traveling_players"
           }
         },
         {
@@ -61,15 +61,15 @@
             "options": [
               {
                 "kind": "action",
-                "action": "cultivation"
-              },
-              {
-                "kind": "action",
                 "action": "fencing"
               },
               {
                 "kind": "action",
                 "action": "build_stables"
+              },
+              {
+                "kind": "action",
+                "action": "build_room"
               }
             ]
           }
@@ -80,7 +80,8 @@
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "owner"
+      "decision_owner": "owner",
+      "notes": "When another player uses the Small Theater accumulation space, may take one of Fencing / Build Stables / Build Room."
     }
   ],
   "post_play": {
@@ -94,8 +95,8 @@
       "A150-not-triggered"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "When another player uses Farmland: may take one of Cultivation/Fencing/Build Stables."
+    "notes": "Another player uses Small Theater (traveling_players): may take one of Fencing / Build Stables / Build Room. The trigger space and action list are corrected from the JA wiki."
   }
 }

@@ -9,7 +9,7 @@
         "grain": 1
       },
       "action": {
-        "other_player_sows": true,
+        "other_player_uses": "fishing",
         "give": true
       },
       "expected": {
@@ -24,7 +24,7 @@
         "grain": 1
       },
       "action": {
-        "other_player_sows": true,
+        "other_player_uses": "fishing",
         "give": false
       },
       "expected": {

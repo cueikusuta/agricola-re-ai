@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2605",
         "language": "ja",
-        "checked_on": "2026-11-14",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -37,7 +37,83 @@
     "prerequisites": [],
     "printed_points": 0
   },
-  "effects": null,
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "place_stable_markers_on_spaces",
+            "spaces": [
+              "grain_seeds",
+              "farmland",
+              "day_laborer",
+              "farm_expansion"
+            ],
+            "max_per_space": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Place at most 1 stable marker on each of Grain Seeds, Farmland, Day Laborer and Farm Expansion."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "grain_seeds",
+              "farmland",
+              "day_laborer",
+              "farm_expansion"
+            ]
+          }
+        },
+        {
+          "predicate": "other_player_only",
+          "params": {}
+        },
+        {
+          "predicate": "stable_marker_on_used_space",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "owner",
+          "params": {
+            "cost_wood": 0,
+            "note": "Build the stable from this card for free."
+          }
+        },
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "remove_stable_marker_from_used_space"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When another player uses a marked space, build that stable for free and remove the marker."
+    }
+  ],
   "post_play": {
     "destination": "unknown",
     "notes": "Destination not confirmed; typical occupation stays in played area."
@@ -45,15 +121,15 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects",
-      "post_play.destination"
+      "effects[0]/[1]: stable markers on action spaces and stable_marker_on_used_space have no established state vocabulary",
+      "post_play.destination: not confirmed"
     ],
     "test_case_ids": [
       "E148-play"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Occupation card. BGA rating 8.00. Goods hint: none. Upgrade hint: none. Effect details unresolved pending official source verification."
+    "notes": "Place up to 1 stable marker on each of Grain Seeds, Farmland, Day Laborer and Farm Expansion. When another player uses a marked space, build that stable for free. Marker state needs formalization."
   }
 }

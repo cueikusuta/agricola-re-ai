@@ -20,13 +20,13 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3267",
         "language": "ja",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "English list page row used to cross-check the card id and name"
       }
     ]
@@ -42,27 +42,52 @@
       "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "other_player_uses",
+          "predicate": "worker_space_used",
           "params": {
-            "space": "forest"
+            "space": "traveling_players"
           }
+        },
+        {
+          "predicate": "other_player_only",
+          "params": {}
         }
       ],
       "steps": [
         {
-          "operation": "exchange",
+          "operation": "other",
           "target": "owner",
           "params": {
-            "give": [
+            "kind": "choice",
+            "options": [
               {
-                "good": "food",
-                "amount": 4
-              }
-            ],
-            "receive": [
+                "give": {
+                  "good": "grain",
+                  "amount": 1
+                },
+                "receive": {
+                  "good": "food",
+                  "amount": 4
+                }
+              },
               {
-                "good": "wood",
-                "amount": 1
+                "give": {
+                  "good": "sheep",
+                  "amount": 1
+                },
+                "receive": {
+                  "good": "food",
+                  "amount": 5
+                }
+              },
+              {
+                "give": {
+                  "good": "vegetable",
+                  "amount": 1
+                },
+                "receive": {
+                  "good": "food",
+                  "amount": 7
+                }
               }
             ]
           }
@@ -73,7 +98,8 @@
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "owner"
+      "decision_owner": "owner",
+      "notes": "When another player uses Small Theater, may exchange 1 grain/sheep/vegetable for 4/5/7 food."
     }
   ],
   "post_play": {
@@ -87,8 +113,8 @@
       "A158-not-triggered"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Another player's Forest use: may exchange 4 food for 1 wood."
+    "notes": "Another player uses Small Theater (traveling_players): may exchange 1 grain / 1 sheep / 1 vegetable for 4 / 5 / 7 food. The previous trigger and exchange direction were wrong."
   }
 }

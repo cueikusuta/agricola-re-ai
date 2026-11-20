@@ -20,13 +20,13 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2842",
         "language": "ja",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "English list page row used to cross-check the card id and name"
       }
     ]
@@ -43,7 +43,14 @@
         "amount": 2
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "round_lte",
+        "params": {
+          "round": 8
+        }
+      }
+    ],
     "printed_points": 2
   },
   "effects": [
@@ -120,8 +127,8 @@
       "D079-not-triggered"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "At the end of rounds 8, 10 and 12: 1 stone per vegetable field and 1 wood per vegetable in supply."
+    "notes": "Prerequisite: play by round 8. At the end of rounds 8, 10 and 12: 1 stone per vegetable field and 1 wood per vegetable in supply. The missing play-by-round-8 prerequisite was added."
   }
 }

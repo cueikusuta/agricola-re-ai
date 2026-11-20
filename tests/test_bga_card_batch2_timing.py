@@ -38,13 +38,19 @@ class Batch2TimingRegression(unittest.TestCase):
         self.assertEqual(overlapping["expected"]["owner_food_delta"], 2)
         self.assertEqual(overlapping["expected"]["food_round_markers_by_card_after"]["A111"], 0)
 
-    def test_unresolved_effects_are_blocked(self) -> None:
-        for card in ("A092", "A103"):
-            with self.subTest(card=card):
-                spec = get(card)
-                self.assertEqual(spec["review"]["status"], "needs_resolution")
-                self.assertTrue(spec["review"]["unresolved_fields"])
-                self.assertIsNone(spec["effects"])
+    def test_resolved_effects_are_filled_and_open_timing_stays_blocked(self) -> None:
+        a092 = get("A092")
+        self.assertEqual(a092["review"]["status"], "needs_resolution")
+        self.assertTrue(a092["review"]["unresolved_fields"])
+        self.assertIsNotNone(a092["effects"])
+        self.assertEqual(a092["effects"][0]["steps"][0]["params"]["good"], "food")
+
+        a103 = get("A103")
+        self.assertEqual(a103["review"]["status"], "bga_checked")
+        self.assertEqual(a103["review"]["unresolved_fields"], [])
+        self.assertEqual(len(a103["effects"]), 3)
+        self.assertEqual([e["steps"][0]["params"]["good"] for e in a103["effects"]],
+                         ["vegetable", "grain", "reed"])
 
 
 if __name__ == "__main__":

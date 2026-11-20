@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2723",
         "language": "ja",
-        "checked_on": "2026-11-14",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -44,7 +44,7 @@
       }
     ],
     "printed_points": 2,
-    "alternative_cost_notes": "1 木/1_レンガ"
+    "alternative_cost_notes": "1 木 / 1 レンガ"
   },
   "effects": [
     {
@@ -82,8 +82,8 @@
       "E030-points"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "During each harvest's feeding phase, each of your newborns needs 2 food instead of 1; printed 2 victory points."
+    "notes": "Cost 1 wood or 1 clay; prerequisite exactly 2 adults; 2 printed points. During each harvest feeding phase, each newborn needs 2 food instead of 1. Choice cost remains unencoded by schema v1."
   }
 }

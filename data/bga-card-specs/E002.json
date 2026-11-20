@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2751",
         "language": "ja",
-        "checked_on": "2026-11-14",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -33,7 +33,16 @@
   },
   "play": {
     "action": "minor_improvement",
-    "cost": null,
+    "cost": [
+      {
+        "good": "clay",
+        "amount": 3
+      },
+      {
+        "good": "reed",
+        "amount": 1
+      }
+    ],
     "prerequisites": [
       {
         "predicate": "house_is",
@@ -43,7 +52,7 @@
       }
     ],
     "printed_points": 0,
-    "alternative_cost_notes": "3 レンガ, 1_葦"
+    "alternative_cost_notes": null
   },
   "effects": [
     {
@@ -72,17 +81,15 @@
     "destination": "left_neighbor_hand"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "play.cost: the wiki shows only the alternative cost (3 clay + 1 reed); the base resource cost is not stated"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
       "E002-normal",
       "E002-rejected"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Immediately renovate to a clay house at no cost; pass left."
+    "notes": "Cost 3 clay + 1 reed (single bundle; the card image has no slash). Immediately renovate a wood house to clay without paying renovation resources; pass the card to the left neighbor."
   }
 }

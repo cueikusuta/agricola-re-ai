@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2954",
         "language": "ja",
-        "checked_on": "2026-11-14",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -38,27 +38,34 @@
     "printed_points": 0
   },
   "effects": [
-    {
-      "trigger": "on_play",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "wood",
-            "amount": 1
+      {
+        "trigger": "on_play",
+        "conditions": [
+          {
+            "predicate": "rounds_remaining",
+            "params": {
+              "min": 1
+            }
           }
-        }
-      ],
-      "optional": false,
-      "frequency": "once_per_play",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none",
-      "notes": "On play: if 1+ rounds remaining, gain 1 wood"
-    },
+        ],
+        "steps": [
+          {
+            "operation": "gain_resource",
+            "target": "owner",
+            "params": {
+              "good": "wood",
+              "amount": 1
+            }
+          }
+        ],
+        "optional": false,
+        "frequency": "once_per_play",
+        "duration": "instant",
+        "snapshot": "after_event",
+        "order": 0,
+        "decision_owner": "none",
+        "notes": "On play: if 1+ rounds remaining, gain 1 wood"
+      },
     {
       "trigger": "on_play",
       "conditions": [
@@ -148,11 +155,13 @@
       "conditions": [],
       "steps": [
         {
-          "operation": "gain_points",
+          "operation": "other",
           "target": "other",
           "params": {
-            "source": "no_negative_points",
-            "points_per_player": 1
+            "kind": "award_no_negative_points_bonus",
+            "points": 3,
+            "scope": "all_players_including_owner",
+            "note": "Every player with no negative points gains 3 bonus points."
           }
         }
       ],
@@ -162,7 +171,7 @@
       "snapshot": "after_event",
       "order": 4,
       "decision_owner": "none",
-      "notes": "At scoring, all players with no negative points gain 1 bonus point"
+      "notes": "At scoring, every player with no negative points gains 3 bonus points."
     }
   ],
   "post_play": {
@@ -171,19 +180,18 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects: exact calculation of 'rounds remaining' at time of play",
-      "effects: whether wood gains are cumulative (1/2/3/4) or separate thresholds",
-      "effects: whether 'no negative points' includes begging cards or just category negatives"
+      "effects[4].conditions: whether \"no negative points\" includes begging-card penalties and other negative categories"
     ],
     "test_case_ids": [
-      "C135-normal",
-      "C135-early-play",
-      "C135-late-play",
-      "C135-scoring-no-negatives"
-    ],
+          "C135-normal",
+          "C135-early-play",
+          "C135-late-play",
+          "C135-zero-rounds",
+          "C135-scoring-no-negatives"
+        ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "On play: gain wood based on rounds remaining (1/2/3/4 for 1+/3+/6+/9+ rounds). At scoring: all players with no negative points gain 1 bonus point. Not available in 2-player games."
+    "notes": "On play: gain 1/2/3/4 wood at 1/3/6/9+ rounds remaining. At scoring: every player with no negative points gains 3 bonus points. The previous scoring step gave 1 point to other players only. The definition of \"no negative points\" remains to be confirmed."
   }
 }

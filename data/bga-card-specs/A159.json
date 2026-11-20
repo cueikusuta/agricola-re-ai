@@ -20,13 +20,13 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3266",
         "language": "ja",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "English list page row used to cross-check the card id and name"
       }
     ]
@@ -42,13 +42,14 @@
       "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "other_player_uses",
+          "predicate": "worker_space_used",
           "params": {
-            "spaces": [
-              "fishing",
-              "clay_pit"
-            ]
+            "space": "fishing"
           }
+        },
+        {
+          "predicate": "other_player_only",
+          "params": {}
         }
       ],
       "steps": [
@@ -58,8 +59,8 @@
           "params": {
             "good": "wood",
             "amount": 1,
-            "source": "other_player",
-            "target": "owner"
+            "source": "owner_supply",
+            "target": "other_player"
           }
         },
         {
@@ -67,9 +68,7 @@
           "target": "owner",
           "params": {
             "good": "food",
-            "amount": 2,
-            "source": "owner_supply",
-            "target": "other_player"
+            "amount": 2
           }
         }
       ],
@@ -78,7 +77,50 @@
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "owner"
+      "decision_owner": "owner",
+      "notes": "When another player uses Fishing, may give them 1 wood to gain 2 food."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "reed_bank"
+          }
+        },
+        {
+          "predicate": "other_player_only",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1,
+            "source": "owner_supply",
+            "target": "other_player"
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 3
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "When another player uses Reed Bank, may give them 1 wood to gain 3 food."
     }
   ],
   "post_play": {
@@ -92,8 +134,8 @@
       "A159-declined"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Another player's Fishing/Clay Pit use: take 1 of their wood for 2 food (Clay Pit: 3 food)."
+    "notes": "Another player uses Fishing / Reed Bank: may give them 1 wood to gain 2 / 3 food. The previous space list and payment direction were reversed."
   }
 }

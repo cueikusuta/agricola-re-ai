@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3049",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page"
       },
       {
@@ -43,52 +43,70 @@
       }
     ],
     "printed_points": 1,
-    "alternative_cost_notes": null
+    "alternative_cost_notes": "1 小麦 / 1 葦"
   },
   "effects": [
     {
-      "trigger": "end_scoring",
+      "trigger": "on_play",
       "conditions": [],
       "steps": [
         {
-          "operation": "gain_points",
+          "operation": "other",
           "target": "owner",
           "params": {
-            "points": {
-              "op": "constant",
-              "args": [
-                1
-              ]
-            }
+            "kind": "payment_dependent_gain",
+            "payments": [
+              {
+                "pay": {
+                  "good": "grain",
+                  "amount": 1
+                },
+                "gain": {
+                  "good": "vegetable",
+                  "amount": 1
+                }
+              },
+              {
+                "pay": {
+                  "good": "reed",
+                  "amount": 1
+                },
+                "gain": {
+                  "good": "wood",
+                  "amount": 4
+                }
+              }
+            ],
+            "note": "The gain depends on which alternative cost was paid."
           }
         }
       ],
       "optional": false,
-      "frequency": "end_of_game",
-      "duration": "permanent",
-      "snapshot": "live_state",
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "decision_owner": "owner",
+      "notes": "When paying the cost with 1 grain, gain 1 vegetable; when paying with 1 reed, gain 4 wood."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
+    "status": "needs_resolution",
     "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility",
-      "play.cost.exact"
+      "play.cost: the choice cost (1 grain / 1 reed) cannot be encoded under schema v1; kept in alternative_cost_notes"
     ],
     "test_case_ids": [
-      "C040-normal",
-      "C040-edge"
-    ],
+          "C040-normal-grain",
+          "C040-normal-reed",
+          "C040-prereq-not-met",
+          "C040-cost-invalid"
+        ],
     "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Cost 1 grain or 1 reed; gain 1 vegetable for grain or 4 wood for reed. The previous end_scoring 1-point effect was wrong. Choice cost remains unencoded by the schema."
   }
 }

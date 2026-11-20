@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3188",
         "language": "ja",
-        "checked_on": "2026-11-14",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -44,28 +44,51 @@
   },
   "effects": [
     {
-      "trigger": "on_play",
+      "trigger": "any_time",
       "conditions": [],
       "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 3
+          }
+        },
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 2
+          }
+        },
         {
           "operation": "other",
           "target": "owner",
           "params": {
-            "description": "Pay 3 clay + 2 food to schedule 1 vegetable gain on each of next 2 round starts"
+            "kind": "place_on_round_spaces",
+            "good": "vegetable",
+            "amount": 1,
+            "offsets": [
+              1,
+              2
+            ]
           }
         }
       ],
-      "optional": false,
-      "frequency": "once",
-      "duration": "permanent",
-      "snapshot": "after_event",
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "instant",
+      "snapshot": "live_state",
       "order": 0,
-      "decision_owner": "none"
+      "decision_owner": "owner",
+      "notes": "Any time: pay 3 clay and 2 food to place 1 vegetable on each of the next 2 round spaces and collect them at those round starts."
     }
   ],
   "post_play": {
-    "destination": "left_neighbor_hand"
-  },
+      "destination": "played_area"
+    },
   "review": {
     "status": "bga_checked",
     "unresolved_fields": [],
@@ -74,8 +97,8 @@
       "B069-not-activated"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "At any time you may pay 3 clay and 2 food. If you do, place 1 vegetable on each of the next 2 round spaces. Gain that vegetable at the start of each round."
+    "notes": "Cost 2 wood, 1 printed point. Any time: pay 3 clay + 2 food to place 1 vegetable on each of the next 2 round spaces. The previous on_play trigger limited an anytime effect to the moment of play."
   }
 }

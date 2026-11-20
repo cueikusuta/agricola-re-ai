@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2758",
         "language": "ja",
-        "checked_on": "2026-11-14",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -37,22 +37,106 @@
     "prerequisites": [],
     "printed_points": 0
   },
-  "effects": null,
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "stone",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "On play: gain 2 stone."
+    },
+    {
+      "trigger": "after_renovation",
+      "conditions": [
+        {
+          "predicate": "other_player_only",
+          "params": {}
+        },
+        {
+          "predicate": "house_is",
+          "params": {
+            "house": "stone"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "stone",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When another player renovates to a stone house, gain 1 stone."
+    },
+    {
+      "trigger": "after_room_construction",
+      "conditions": [
+        {
+          "predicate": "other_player_only",
+          "params": {}
+        },
+        {
+          "predicate": "room_type_is",
+          "params": {
+            "room_type": "stone"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "stone",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When another player builds a stone room, gain 1 stone."
+    }
+  ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "effects"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
       "D163-on-play-stone",
       "D163-other-player-stone-action"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "On-play gain 2 stone. Trigger on other player's stone house renovation or stone room build. Multi-player trigger unresolved. Eligibility per ledger: 2=no, 3=no, 4=yes."
+    "notes": "On play: gain 2 stone. Another player renovates to a stone house or builds a stone room: gain 1 stone. The empty effect was filled from the JA wiki."
   }
 }

@@ -453,3 +453,55 @@ M7 #335 C004 cost → 2赤、M8 #340 C116 自己発動 → **ブランチのみ�
   - CI required: pass — https://github.com/cueikusuta/agricola-re-ai/actions/runs/44465605656/job/135362650774
   - rustfmt / clippy / cargo test / M1・M2・M7 seeded performance: docs のみの変更として skip。
 - 独立レビュー対象（211→204の同定、E075のAND読み、段階3優先、37件の段階4判断）。
+
+## 第9部（2026-11-19）— 仕様データ残件の修正（ブランチ `research/deepai-spec-fixes`）
+
+- 起点: `research/deepai-outband-merged`（PR #377 の HEAD）。PR は #377 に積む（stacked）。
+- 本編: `docs/spec-data-fixes.md`。仕様 JSON のみを変更し、Rust・スキーマ・台帳・テスト・分類文書は触らない。
+- 第0章: 残件を #362 / #370 / #375 / #376 / #377 と過去レビューから ID 単位で統合。
+  S-1 の145枚と、仕様が無い D075/E070/E072/E080/D080/D082/E075/D086/E084/E086/A119 は
+  Hermes の進行中範囲・新規作成のため対象外とした。
+- 第1章（A帯）: 11枚を修正。
+  - A150 は農地→小劇場、耕作→部屋に修正。
+  - A154 は種まき前→食料累積スペースの使用後に修正。
+  - A156 は森林・粘土坑→葦・石材・羊・猪、相手の資源取得→供給から同じ品物に修正。
+  - A158 は森林→小劇場、食料4→木材1→小麦/羊/野菜1→食料4/5/7に修正。
+  - A159 は漁・粘土坑→漁・葦原、支払い方向を修正。
+  - A071/A092/A103 は空効果を文献で補完。A110 は2経路に分割。A111 は任意→必須。A118 は毎収穫・上限2に修正。
+  - A073/A075/A084/A094/A096/A097/A100/A107 は現行値が正しく変更不要。A135/A136 は版差・文言差のため保留。
+- 検証: 変更 JSON の構文・必須キー・operation/target/snapshot を Node で機械確認。
+  Python がローカルに無かったため `scripts/validate_bga_card_specs.py` は当初実行できず Actions に委ねた
+  （後に Python 3.12 を導入し、errors 0 を確認）。
+- 第2章（B帯）: 9枚（B010/B013/B062/B095/B098/B099/B121/B126/B142）の参照 URL が
+  B050 撹乳器を指していたため自カードのページへ修正。B048 は石材の累積を東西両方に、
+  B069 は on_play → any_time に修正。9枚の印刷点0はページ・画像と一致し、#375 の「文献1点」は再現できなかった。
+  B043/B044/B046/B065 の費用は alternative_cost_notes が正しく、スキーマ制約のため変更なし。
+- 第3章（C帯）: 8枚を修正。C038 は end_scoring 2点 → on_play で他家全員に食料1（費用なし・印刷点2）。
+  C040 は費用小麦1/葦1と支払い依存の効果、C044 は (木材2+葦1)/レンガ2 と次の8ラウンド食料1に修正。
+  C070 の harvest_field → harvest_field_phase、C135 の得点を全員3点に修正。
+  C153/C162/C167 の空効果を文献で補完。C038 は分類（end_scoring）が変わるため第7章に記録。
+- 第4章（D帯）: D079 に「ラウンド8以前」の前提を追加。D160（他者の最初の人物の家族増加で小麦1）と
+  D163（出したとき石材2、他者の石の家改築・石の部屋建設で石材1）の空効果を補完。
+  D025/D159 は ERRATA・最大8の数え方が未確定のため修正せず、D083 は費用注記が正しく変更なし。
+- 第5章（E帯）: E002 をレンガ3+葦1の1束に構造化。E030/E052/E053 の「_」区切りと重複を修正し、
+  E052 は選択費用のため cost=null に戻した。E144 はページ0だが台帳 unknown のため仕様は null のまま、E148/E150 の空効果を補完。
+  E144 の効果詳細（複数建材の選択・トリガー検出）は確定できないためチェックリストへ。
+- 第6〜8章: 残件の最終的な扱い、先行文書（#375/#377）と一致しなかった点、分類への影響を整理。
+  C038 は効果のトリガー種別が end_scoring → on_play に変わるため、分類文書の訂正が必要と記録。
+  未決は A135/C135 の「以上」、A136 の版差、D025 の ERRATA、D159 の最大8、E144 の建材選択、
+  D160 の「最初の人物」、E150 の対象スペース、C135 のマイナス点の範囲の8件（SQ-01〜SQ-08）。
+- 第9章: 変更40ファイルの JSON 構文・必須キー・effect/step の enum を Node で確認し全件成功。
+  Python の仕様検証はローカルに Python が無く実行できないため、Actions の pipeline-gates に委ねる。
+- 合計: A 11枚、B 11枚、C 8枚、D 3枚、E 7枚（B050 は URL が正しく変更なし）。
+- CI対応: `bga-spec-contract` の再生成一致のため、`scripts/build_bga_card_specs.py` の
+  A118/A150/A154/A156/A158/A159/D079 の表と `data/bga-card-tests/` の5枚を更新した。Rust は未変更。
+  `validate_bga_card_specs.py` は `errors: []`、ビルダー契約テスト3件は成功。
+- CI対応2: A071/A092/A103 を「効果なし・未解決」に固定していた Python 回帰テスト2本を更新し、
+  全 Python テスト287件が成功。Rust は未変更。
+- CI対応3: 小劇場のキーを A150/A154/A158 で `traveling_players` に統一（A160/C152 と同じ）。
+  B155/E166 の `small_theater` は別残件として第6章に記録。仕様検証 errors 0、Python 287件成功。
+- Actions最終: 最新 HEAD は bga-spec-contract / Pipeline gates / Python 287件 / rustfmt / clippy /
+  cargo test / M1/M2/M7 seeded performance / CI required がすべて pass。ただし同一差分の初回 clippy は
+  src/cards.rs の既存 needless_range_loop で fail した（src の差分は0行、キャッシュ依存の可能性）。
+  土台ブランチが main より26コミット遅れており、rebase 時に既存 lint を確認する。
+  Rust を触らない指示のため未修正。

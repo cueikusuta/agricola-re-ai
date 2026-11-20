@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3315",
         "language": "ja",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -39,8 +39,15 @@
   },
   "effects": [
     {
-      "trigger": "after_clay_construction",
-      "conditions": [],
+      "trigger": "after_room_construction",
+      "conditions": [
+        {
+          "predicate": "room_type_is",
+          "params": {
+            "room_type": "clay"
+          }
+        }
+      ],
       "steps": [
         {
           "operation": "gain_resource",
@@ -53,10 +60,39 @@
       ],
       "optional": false,
       "frequency": "every_use",
-      "duration": "instant",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "none"
+      "decision_owner": "none",
+      "notes": "Whenever a clay room is built, gain 3 food."
+    },
+    {
+      "trigger": "after_renovation",
+      "conditions": [
+        {
+          "predicate": "house_is",
+          "params": {
+            "house": "stone"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 3
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "After renovating to a stone house (which in the 2016 rules is a clay-to-stone renovation), gain 3 food."
     }
   ],
   "post_play": {
@@ -71,8 +107,8 @@
       "A110-not-triggered"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_on": "2026-11-19",
     "implementation_status": "implemented",
-    "notes": "BGA wiki content structured; official verification remains separate."
+    "notes": "Building a clay room or renovating a clay house to a stone house: gain 3 food. The previous single after_clay_construction trigger was split into the two printed cases."
   }
 }

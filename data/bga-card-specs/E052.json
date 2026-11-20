@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2701",
         "language": "ja",
-        "checked_on": "2026-11-14",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
@@ -32,71 +32,88 @@
     ]
   },
   "play": {
-    "action": "minor_improvement",
-    "cost": [
+        "action": "minor_improvement",
+        "cost": null,
+        "prerequisites": [],
+        "printed_points": 1,
+        "alternative_cost_notes": "1 reed + 1 wood OR 1 clay (choice cost; schema v1 does not encode alternatives)"
+      },
+    "effects": [
       {
-        "good": "reed",
-        "amount": 1
+        "trigger": "after_room_construction",
+        "conditions": [
+          {
+            "predicate": "owner_only",
+            "params": {}
+          },
+          {
+            "predicate": "rooms_built_at_once_at_least",
+            "params": {
+              "n": 1
+            }
+          }
+        ],
+        "steps": [
+          {
+            "operation": "gain_resource",
+            "target": "owner",
+            "params": {
+              "good": "food",
+              "amount": 1
+            }
+          }
+        ],
+        "optional": false,
+        "frequency": "every_occurrence",
+        "duration": "permanent",
+        "snapshot": "after_event",
+        "order": 0,
+        "decision_owner": "none",
+        "notes": "Each time the owner builds rooms, place 1 food per built room on this card."
       },
       {
-        "good": "wood",
-        "amount": 1
+        "trigger": "feeding_phase_start",
+        "conditions": [],
+        "steps": [
+          {
+            "operation": "gain_resource",
+            "target": "owner",
+            "params": {
+              "good": "food",
+              "amount": 1,
+              "source": "card_storage"
+            }
+          }
+        ],
+        "optional": false,
+        "frequency": "each_feeding_phase",
+        "duration": "permanent",
+        "snapshot": "live_state",
+        "order": 1,
+        "decision_owner": "none",
+        "notes": "At the start of each feeding phase, gain 1 food per food stored on this card (from rooms built)."
       }
     ],
-    "prerequisites": [],
-    "printed_points": 1,
-    "alternative_cost_notes": "1_葦 + 1 木/レンガ"
-  },
-  "effects": [
-    {
-      "trigger": "after_room_construction",
-      "conditions": [
-        {
-          "predicate": "any_player",
-          "params": {}
-        },
-        {
-          "predicate": "rooms_built_at_once_at_least",
-          "params": {
-            "n": 1
-          }
-        }
-      ],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "food",
-            "amount": 1
-          }
-        }
-      ],
-      "optional": false,
-      "frequency": "every_occurrence",
-      "duration": "permanent",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none",
-      "notes": "Each time any player builds rooms, place 1 food per room on this card. Each feeding phase, gain food equal to food on card."
-    }
-  ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "effect: '食料供給フェイズのはじめに、このカードに置かれたものと同じ数の食料を得る' — the feeding-phase gain is a second trigger not fully captured in a single effect entry",
-      "effect: food placement per room built is tracked on the card; needs persistent state across turns"
-    ],
-    "test_case_ids": [
-      "E052-normal",
-      "E052-feeding"
-    ],
-    "checked_by": "AI source comparison vs BGA wiki",
-    "checked_on": "2026-11-14",
-    "implementation_status": "not_started",
-    "notes": "Third-party BGA wiki cross-check only; not official Lookout verification."
-  }
+        "status": "needs_resolution",
+        "unresolved_fields": [
+          "play.cost: the choice cost (1 reed + 1 wood / 1 clay) cannot be encoded under schema v1; primary cost encoded, alternative in alternative_cost_notes",
+          "effect: feeding_phase_start trigger and card_storage source need formalization"
+        ],
+        "test_case_ids": [
+          "E052-normal",
+          "E052-feeding",
+          "E052-other-player-ignored",
+          "E052-cost-alt-clay",
+          "E052-cost-clay-only-rejected",
+          "E052-cost-reed-wood-partial-rejected"
+        ],
+        "checked_by": "AI source comparison",
+        "checked_on": "2026-11-20",
+        "implementation_status": "not_started",
+        "notes": "Cost (1 reed + 1 wood) or 1 clay. Whenever the owner builds rooms, place 1 food per built room on this card; at the start of each feeding phase gain that much food. The previous any_player trigger and missing feeding-phase gain were corrected."
+      }
 }

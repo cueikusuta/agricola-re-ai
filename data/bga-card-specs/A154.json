@@ -20,13 +20,13 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3271",
         "language": "ja",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-09",
+        "checked_on": "2026-11-19",
         "note": "English list page row used to cross-check the card id and name"
       }
     ]
@@ -39,14 +39,19 @@
   },
   "effects": [
     {
-      "trigger": "before_sow",
+      "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "other_player_only",
-          "params": {}
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "fishing",
+              "traveling_players"
+            ]
+          }
         },
         {
-          "predicate": "sow_unconditional",
+          "predicate": "other_player_only",
           "params": {}
         }
       ],
@@ -74,7 +79,8 @@
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "owner"
+      "decision_owner": "owner",
+      "notes": "After another player uses a food accumulation space (Fishing or Small Theater), may give that player 1 grain from the owner supply to gain 1 bonus point."
     }
   ],
   "post_play": {
@@ -88,8 +94,8 @@
       "A154-declined"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Before another player's unconditional Sow: may give them 1 grain for 1 point."
+    "notes": "Another player uses a food accumulation space: may give them 1 grain for 1 bonus point. The trigger is the food accumulation space, not an unconditional Sow."
   }
 }

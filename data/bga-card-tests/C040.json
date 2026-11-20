@@ -3,46 +3,74 @@
   "card_id": "C040",
   "cases": [
     {
-      "id": "C040-normal",
+      "id": "C040-normal-grain",
       "scope": "effect_only",
       "setup": {
-        "player": {
-          "supply": {},
-          "played_cards": []
-        }
+        "card_played": true,
+        "cost_paid": { "grain": 1 }
       },
       "action": {
         "type": "play_card",
-        "card_id": "C040",
-        "cost_paid": false
+        "card_id": "C040"
       },
       "expected": {
         "effect_applies": true,
         "points_gained": 1,
-        "notes": "Inventory-only test contract"
+        "resources_gained": { "vegetable": 1 }
       },
-      "notes": "Placeholder test case"
+      "notes": "Cost 1 grain paid -> gain 1 vegetable."
     },
     {
-      "id": "C040-edge",
-      "scope": "legal_play",
+      "id": "C040-normal-reed",
+      "scope": "effect_only",
       "setup": {
-        "player": {
-          "supply": {},
-          "played_cards": []
-        }
+        "card_played": true,
+        "cost_paid": { "reed": 1 }
       },
       "action": {
         "type": "play_card",
-        "card_id": "C040",
-        "cost_paid": false
+        "card_id": "C040"
+      },
+      "expected": {
+        "effect_applies": true,
+        "points_gained": 1,
+        "resources_gained": { "wood": 4 }
+      },
+      "notes": "Cost 1 reed paid -> gain 4 wood."
+    },
+    {
+      "id": "C040-prereq-not-met",
+      "scope": "legal_play",
+      "setup": {
+        "card_played": false,
+        "occupations_played": 0
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C040"
       },
       "expected": {
         "effect_applies": false,
-        "error": "insufficient_cost_or_prereq",
-        "notes": "Card should not be playable without meeting cost/prerequisites"
+        "error": "insufficient_prerequisites"
       },
-      "notes": "Placeholder edge case test"
+      "notes": "Prerequisite 'no occupation played' not met -> play rejected."
+    },
+    {
+      "id": "C040-cost-invalid",
+      "scope": "legal_play",
+      "setup": {
+        "card_played": false,
+        "cost_paid": { "wood": 1 }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C040"
+      },
+      "expected": {
+        "effect_applies": false,
+        "error": "insufficient_cost"
+      },
+      "notes": "Cost must be 1 grain OR 1 reed; wood is not a valid cost."
     }
   ]
 }

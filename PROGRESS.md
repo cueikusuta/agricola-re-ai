@@ -138,3 +138,45 @@
 - Actions（HEAD `9c1cdab`）: Detect changed files / Pipeline gates / CI required が pass。
   Rust変更が無いため rustfmt・clippy・cargo test・M1/M2/M7 seeded performance は paths filter で skip。
 - 次の再開位置: 独立レビュー（別セッション）。指摘対応は PR #377 上で行う。
+
+<!-- spec-fixes-progress -->
+### 第9部: 仕様データ（`data/bga-card-specs/`）の残件修正（ブランチ `research/deepai-spec-fixes`）
+
+- 起点: `research/deepai-outband-merged`（PR #377 の HEAD）。PR は #377 の上に積む（stacked）。
+- 範囲: 仕様 JSON のみ。Rust・スキーマ・台帳・テスト・分類文書は変更しない。
+- 成果物: `docs/spec-data-fixes.md`（残件一覧・修正根拠・チェックリスト）。
+- **第0章 完了**: #362 / #370 / #375 / #376 / #377 と過去レビューの残件を ID 単位で統合。
+  S-1（仕様の新規作成145枚）は Hermes の進行中範囲のため対象外。仕様が無い ID も修正対象外。
+- **第1章（A帯）完了**: A071 / A092 / A103 / A110 / A111 / A118 / A150 / A154 / A156 / A158 / A159 を修正。
+  A073 / A075 / A084 / A094 / A096 / A097 / A100 / A107 は変更不要、A135 / A136 はチェックリスト。
+- 次の再開位置: 第2章（B帯）。B010/B013/B050/B062/B095/B098/B099/B121/B126/B142 の参照 URL、
+  B048 の石材累積、B069 の anytime 効果。
+- **第2章（B帯）完了**: 9枚の参照 URL を自カードへ修正。B048 の石材を東西両方に、B069 を anytime に修正。
+  B043/B044/B046/B050/B065 は変更不要（費用はスキーマ制約）。次の再開位置: 第3章（C帯）。
+- **第3章（C帯）完了**: C038 を on_play の他家食料1に、C040/C044 の費用と仮効果を修正。
+  C070 のトリガー名、C135 の得点3点、C153/C162/C167 の空効果を補完。
+  次の再開位置: 第4章（D帯）。D079 の前提、D160/D163 の空効果、D083 の費用確認。
+- **第4章（D帯）完了**: D079 にラウンド8以前の前提を追加。D160/D163 の空効果を補完。
+  D025/D159 は文献だけでは数え方・ERRATA が確定しないためチェックリストへ。D083 は変更不要。
+  次の再開位置: 第5章（E帯）。E002/E030/E052/E053 の費用、E148/E150 の空効果。
+- **第5章（E帯）完了**: E002 の費用を構造化し、E030/E052/E053 の費用表記・重複を修正。
+  E144 は台帳が unknown のため印刷点を変更せず、E148/E150 の空効果を補完。E144 の効果詳細と仕様が無い E075/E080/E084/E086 は
+  チェックリスト／対象外。次の再開位置: 第6〜8章（残件の最終確認・チェックリスト・検証）と PR 作成。
+- **第6〜8章 完了**: 残件の最終的な扱い、先行文書と一致しなかった点、分類への影響（C038 のトリガー変更ほか）、
+  未決質問 SQ-01〜SQ-08 と既存質問の維持を記録。仕様が無い ID・S-1・スキーマ拡張は対象外として分離。
+- **第9章 完了**: 変更40ファイルの JSON・必須キー・operation/target/snapshot を Node で機械確認（全て成功）。
+  Python がローカルに無かったため仕様検証は当初 Actions に委ねた（後に Python 3.12 を導入して実行）。
+  この時点では Rust・スキーマ・台帳・テストは未変更（後に旧回帰テスト2本のみ更新）。
+- 次の再開位置: PR 作成と Actions の確認。マージしない。独立レビューは別セッション。
+- **補足（CI対応）**: `bga-spec-contract` の再生成一致を保つため、`scripts/build_bga_card_specs.py` の
+  A118/A150/A154/A156/A158/A159/D079 の表と、`data/bga-card-tests/` の該当5枚を更新した。
+  Rust は変更していない。`validate_bga_card_specs.py` は errors 0、ビルダー契約テスト3件は成功。
+- **CI対応2**: A071/A092/A103 を「効果なし・未解決」に固定していた Python 回帰テスト2本を、
+  文献で確定した値に合わせて更新。`python -m unittest discover -s tests -p "test_*.py"` は287件成功。
+- **CI対応3**: 小劇場のスペースキーを A150/A154/A158 で `traveling_players` に統一（A160/C152 と同じ）。
+  B155/E166 の `small_theater` は別残件として記録。仕様検証 errors 0、Python 287件成功。
+- **CI最終確認**: 最新 HEAD は `bga-spec-contract` / Pipeline gates / Python 287件 / rustfmt / clippy /
+  cargo test / M1/M2/M7 seeded performance / CI required がすべて pass。ただし同一差分の初回 clippy は
+  `src/cards.rs` の既存 needless_range_loop で fail した（`git diff -- src` は0、キャッシュ依存の可能性）。
+  土台ブランチが main より26コミット遅れているため、スタック rebase 時に既存 lint を確認する。
+  Rust を触らない指示に従い未修正。PR #386 作成済み。

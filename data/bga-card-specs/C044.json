@@ -20,7 +20,7 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3045",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page"
       },
       {
@@ -32,57 +32,72 @@
     ]
   },
   "play": {
-    "action": "minor_improvement",
-    "cost": null,
-    "prerequisites": null,
-    "printed_points": 1,
-    "alternative_cost_notes": null
-  },
+      "action": "minor_improvement",
+      "cost": [
+        {
+          "good": "wood",
+          "amount": 2
+        },
+        {
+          "good": "reed",
+          "amount": 1
+        }
+      ],
+      "prerequisites": [],
+      "printed_points": 1,
+      "alternative_cost_notes": "2 wood + 1 reed OR 2 clay (choice cost; schema v1 does not encode alternatives)"
+    },
   "effects": [
     {
-      "trigger": "end_scoring",
+      "trigger": "on_play",
       "conditions": [],
       "steps": [
         {
-          "operation": "gain_points",
+          "operation": "other",
           "target": "owner",
           "params": {
-            "points": {
-              "op": "constant",
-              "args": [
-                1
-              ]
-            }
+            "kind": "place_on_round_spaces",
+            "good": "food",
+            "amount": 1,
+            "offsets": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ]
           }
         }
       ],
       "optional": false,
-      "frequency": "end_of_game",
+      "frequency": "once_per_play",
       "duration": "permanent",
-      "snapshot": "live_state",
+      "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "notes": "Place 1 food on each of the next 8 round spaces; collect it at the start of those rounds."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility",
-      "play.cost.exact",
-      "play.prerequisites.exact"
-    ],
-    "test_case_ids": [
-      "C044-normal",
-      "C044-edge"
-    ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
-  }
+        "status": "needs_resolution",
+        "unresolved_fields": [
+          "play.cost: the choice cost (2 wood + 1 reed / 2 clay) cannot be encoded under schema v1; primary cost encoded, alternative in alternative_cost_notes"
+        ],
+        "test_case_ids": [
+          "C044-normal",
+          "C044-cost-alt-clay",
+          "C044-cost-clay-only-rejected",
+          "C044-cost-reed-zero-rejected"
+        ],
+        "checked_by": "AI source comparison",
+        "checked_on": "2026-11-20",
+        "implementation_status": "not_started",
+        "notes": "Cost (2 wood + 1 reed) or 2 clay; 1 printed point. Place 1 food on each of the next 8 round spaces and collect it at those round starts. The previous end_scoring 1-point effect was an inventory placeholder."
+      }
 }

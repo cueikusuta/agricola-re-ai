@@ -18,9 +18,9 @@
     },
     "references": [
       {
-        "url": "https://agricola.cloudfree.jp/?p=3207",
+        "url": "https://agricola.cloudfree.jp/?p=3195",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-19",
         "note": "third-party BGA wiki card page; cost, points and effect"
       },
       {
@@ -43,53 +43,56 @@
     "printed_points": 0
   },
   "effects": [
-    {
-      "trigger": "after_worker_space",
-      "conditions": [
-        {
-          "predicate": "worker_space_used",
-          "params": {
-            "space": "grain_seeds"
+      {
+        "trigger": "after_worker_space",
+        "conditions": [
+          {
+            "predicate": "worker_space_used",
+            "params": {
+              "space": "grain_seeds"
+            }
+          },
+          {
+            "predicate": "space_occupied",
+            "params": {
+              "space": "farmland"
+            }
           }
-        },
-        {
-          "predicate": "worker_space_used",
-          "params": {
-            "space": "farmland"
+        ],
+        "steps": [
+          {
+            "operation": "gain_resource",
+            "target": "owner",
+            "params": {
+              "good": "food",
+              "amount": 3
+            }
           }
-        }
-      ],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "food",
-            "amount": 3
-          }
-        }
-      ],
-      "optional": false,
-      "frequency": "every_use",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none"
-    }
-  ],
+        ],
+        "optional": false,
+        "frequency": "every_use",
+        "duration": "instant",
+        "snapshot": "after_event",
+        "order": 0,
+        "decision_owner": "none",
+        "notes": "When owner uses Grain Seeds while Farmland is occupied (by any player), gain 3 food. Wiki: 誰のものでもよい."
+      }
+    ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
-    "test_case_ids": [
-      "B062-normal",
-      "B062-not-triggered"
-    ],
-    "checked_by": "AI source comparison vs Rust CardDefinition",
-    "checked_on": "2026-11-13",
-    "implementation_status": "implemented",
-    "notes": "Verified against Rust CardDefinition in verified_round_and_harvest_cards(): MinorImprovement, cost Wood 1, points 0, AfterWorkerGainIfUsed { space: GrainSeeds, required_space: Farmland, good: Food, amount: 3 }. Zero diff."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "B062-normal-owner-uses-both",
+        "B062-other-player-uses-farmland",
+        "B062-only-grain-seeds-no-farmland",
+        "B062-only-farmland-no-grain-seeds"
+      ],
+      "checked_by": "AI source comparison vs Rust CardDefinition",
+      "checked_on": "2026-11-19",
+      "implementation_status": "implemented",
+      "notes": "Verified against Rust CardDefinition in verified_round_and_harvest_cards(): MinorImprovement, cost Wood 1, points 0, AfterWorkerGainIfUsed { space: GrainSeeds, required_space: Farmland, good: Food, amount: 3 }. Zero diff. The JA reference URL was corrected to this card's own page (the previous URL pointed to B050 Butter Churn). Fixed condition: space_occupied for farmland (any player) instead of worker_space_used for farmland."
+    }
 }

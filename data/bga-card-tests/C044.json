@@ -6,43 +6,71 @@
       "id": "C044-normal",
       "scope": "effect_only",
       "setup": {
-        "player": {
-          "supply": {},
-          "played_cards": []
-        }
+        "card_played": true,
+        "cost_paid": {"wood": 2, "reed": 1}
       },
       "action": {
         "type": "play_card",
-        "card_id": "C044",
-        "cost_paid": false
+        "card_id": "C044"
       },
       "expected": {
         "effect_applies": true,
         "points_gained": 1,
-        "notes": "Inventory-only test contract"
+        "food_on_round_spaces": [1, 1, 1, 1, 1, 1, 1, 1]
       },
-      "notes": "Placeholder test case"
+      "notes": "Cost 2 wood + 1 reed paid; 1 food placed on each of next 8 round spaces."
     },
     {
-      "id": "C044-edge",
+      "id": "C044-cost-alt-clay",
       "scope": "legal_play",
       "setup": {
-        "player": {
-          "supply": {},
-          "played_cards": []
-        }
+        "card_played": true,
+        "cost_paid": {"clay": 2}
       },
       "action": {
         "type": "play_card",
-        "card_id": "C044",
-        "cost_paid": false
+        "card_id": "C044"
+      },
+      "expected": {
+        "effect_applies": true,
+        "points_gained": 1,
+        "food_on_round_spaces": [1, 1, 1, 1, 1, 1, 1, 1]
+      },
+      "notes": "Alternative cost 2 clay paid; same effect."
+    },
+    {
+      "id": "C044-cost-clay-only-rejected",
+      "scope": "legal_play",
+      "setup": {
+        "card_played": false,
+        "cost_paid": {"clay": 1}
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C044"
       },
       "expected": {
         "effect_applies": false,
-        "error": "insufficient_cost_or_prereq",
-        "notes": "Card should not be playable without meeting cost/prerequisites"
+        "error": "insufficient_cost"
       },
-      "notes": "Placeholder edge case test"
+      "notes": "Only 1 clay is not a valid cost (must be 2 clay OR 2 wood + 1 reed)."
+    },
+    {
+      "id": "C044-cost-reed-zero-rejected",
+      "scope": "legal_play",
+      "setup": {
+        "card_played": false,
+        "cost_paid": {"wood": 2}
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C044"
+      },
+      "expected": {
+        "effect_applies": false,
+        "error": "insufficient_cost"
+      },
+      "notes": "2 wood without reed is not a valid cost (must be 2 wood + 1 reed OR 2 clay)."
     }
   ]
 }
