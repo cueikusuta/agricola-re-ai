@@ -223,6 +223,45 @@ PREREQ = {
     "E039": [cond("animal_count_at_least", animal="wild_boar", n=1)],
 }
 
+# Play prerequisites that the ledger and the reference wiki state but that the
+# earlier snapshots dropped.  Simple counts reuse the shared predicates.
+PREREQ.update({
+    "A010": [cond("house_is", house="wood")],
+    "A018": [cond("occupation_count", n=2)],
+    "A034": [cond("occupation_count", n=2)],
+    "A035": [cond("occupation_count", n=2)],
+    "A039": [cond("occupation_count", n=2)],
+    "A044": [cond("occupation_count", n=2)],
+    "A045": [cond("house_is", house="wood")],
+    "A046": [cond("pasture_count", n=1)],
+    "A049": [cond("occupation_count", n=1)],
+    "A052": [cond("round_in", values=[7, 8, 9, 10, 11, 12, 13, 14])],
+    "A061": [cond("has_improvement", type="bake_bread")],
+    "A062": [cond("resource_in_hand", resource="grain", min=2)],
+    "A065": [cond("field_count", n=3)],
+    "A069": [cond("occupation_count", n=2)],
+    "B018": [cond("occupation_count", n=2)],
+    "B019": [cond("occupation_count", n=1)],
+    "B021": [cond("occupation_count", n=1)],
+    "C011": [cond("occupation_count", n=2)],
+    "D004": [cond("occupation_count", n=3)],
+    "D006": [cond("occupation_count", n=2)],
+    "D007": [cond("round_in", values=[3, 6, 9, 12])],
+    "D010": [cond("occupation_count", n=5)],
+    "D019": [cond("occupation_count", n=1)],
+    "D028": [cond("occupation_count", n=2)],
+    "D038": [cond("occupation_count", n=2)],
+    "D047": [cond("cards_in_play_at_least", n=10)],
+    "D052": [cond("occupation_count", n=1)],
+    "D078": [cond("occupation_count", n=3)],
+    "E038": [cond("occupation_count", n=3)],
+    "E041": [cond("cards_in_play_at_least", n=5)],
+    "E042": [cond("has_improvement", kind="well")],
+    "E043": [cond("stable_count", n=1)],
+    "E044": [cond("field_count", n=3)],
+    "E046": [cond("occupation_count", n=2)],
+})
+
 # --- curated card table --------------------------------------------------
 CARDS = {
     "A002": {
@@ -4247,6 +4286,34 @@ CARDS = {
             ],
         },
     }
+
+
+# Play conditions that the current predicate vocabulary cannot express.  They are
+# kept as raw_text and the card is marked needs_resolution instead of silently
+# claiming a resolved prerequisite (see docs/bga-card-effect-vocabulary.md).
+RAW_TEXT_PREREQ = {
+    "A020": "ラウンド3(5)かその前に出す（ラウンド3、版によっては5までに出せる）",
+    "A022": "ストックに柵が1本以上ある",
+    "A036": "ストックの木材≧現在のラウンド数（木材がラウンド数以上）",
+    "A040": "未使用の農場が7スペース以下（未使用の農場スペースが7以下）",
+    "A043": "家畜1（家畜を1匹以上飼っている）",
+    "B018": "ストックに建設資材1以上（建設資材が1以上ある）",
+    "C003": "未配置の人物1（未配置の人物が1人以上いる）",
+    "C010": "大きい進歩2（大きい進歩を2つ出している）",
+    "C020": "ラウンド9またはその後に出す（ラウンド9以降に出す）",
+    "D005": "栽培中の畑1（栽培中の畑が1つ以上ある）",
+    "D021": "家に人物がいない",
+}
+for _card_id, _text in RAW_TEXT_PREREQ.items():
+    PREREQ.setdefault(_card_id, [])
+    PREREQ[_card_id].append(cond("raw_text", text=_text))
+    _entry = CARDS[_card_id]
+    _entry["status"] = "needs_resolution"
+    _unresolved = _entry.setdefault("unresolved", [])
+    if not any(field.startswith("play.prerequisites") for field in _unresolved):
+        _unresolved.append(
+            "play.prerequisites: recorded as raw_text; no predicate in the current vocabulary"
+        )
 
 
 def parse_cost(raw: str):
