@@ -4301,7 +4301,7 @@ mod verified_band_d_tests {
         assert_eq!(end_game_bonus(&set, &p), 0);
         // fields 5 (=4 pts), pastures 4 (=4 pts), fenced stable x4 (=4 pts),
         // grain 8 (=4 pts) -> 4 categories.
-        for i in 1..=5 {
+        for i in [1, 2, 3, 4, 5] {
             p.farm[i].tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
@@ -4315,7 +4315,7 @@ mod verified_band_d_tests {
                 quantity: 0,
             });
         }
-        for i in 10..=13 {
+        for i in [10, 11, 12, 13] {
             p.farm[i].stable = true;
             p.farm[i].tile = Tile::Pasture { id: (10 + i) as u8 };
         }
@@ -4335,7 +4335,7 @@ mod verified_band_d_tests {
         p.played_cards.push("D100".into());
 
         // Test fields boundary: 4 fields = 3 pts, 5 fields = 4 pts
-        for i in 1..=4 {
+        for i in [1, 2, 3, 4] {
             p.farm[i].tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
@@ -4405,7 +4405,7 @@ mod verified_band_d_tests {
         // Reset and test fenced_stables boundary: 3 fenced stables = 3 pts, 4 = 4 pts
         let mut p4 = Player::new(0, 0);
         p4.played_cards.push("D100".into());
-        for i in 10..=12 {
+        for i in [10, 11, 12] {
             p4.farm[i].stable = true;
             p4.farm[i].tile = Tile::Pasture { id: (10 + i) as u8 };
         }
