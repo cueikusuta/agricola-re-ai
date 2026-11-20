@@ -34,7 +34,14 @@
   "play": {
     "action": "minor_improvement",
     "cost": [],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "空の畑1と栽培中の畑2"
+        }
+      }
+    ],
     "printed_points": 0,
     "alternative_cost_notes": null
   },

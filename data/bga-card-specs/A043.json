@@ -34,7 +34,14 @@
   "play": {
     "action": "minor_improvement",
     "cost": [],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "家畜1（家畜を1匹以上飼っている）"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -65,8 +72,10 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: recorded as raw_text; no predicate in the current vocabulary"
+    ],
     "test_case_ids": [
       "A043-normal",
       "A043-not-triggered"

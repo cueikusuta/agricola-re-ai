@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "大きい進歩2（大きい進歩を2つ出している）"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -75,8 +82,10 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.prerequisites: recorded as raw_text; no predicate in the current vocabulary"
+    ],
     "test_case_ids": [
       "C010-normal",
       "C010-not-triggered"

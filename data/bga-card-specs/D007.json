@@ -39,7 +39,19 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "round_in",
+        "params": {
+          "values": [
+            3,
+            6,
+            9,
+            12
+          ]
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [

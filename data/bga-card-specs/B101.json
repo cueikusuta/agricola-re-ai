@@ -43,7 +43,9 @@
       "conditions": [
         {
           "predicate": "any_player_has_card",
-          "params": { "card_name": "家具製作所" }
+          "params": {
+            "card_name": "家具製作所"
+          }
         }
       ],
       "steps": [
@@ -51,7 +53,9 @@
           "operation": "gain_points",
           "target": "owner",
           "params": {
-            "cost": { "food": 2 },
+            "cost": {
+              "food": 2
+            },
             "points": 1,
             "limit_per_harvest": 1
           }
@@ -73,7 +77,8 @@
     "status": "bga_checked",
     "unresolved_fields": [],
     "test_case_ids": [
-      "B101-harvest-furniture-workshop-buy-point"
+      "B101-harvest-furniture-workshop-buy-point",
+      "B101-harvest-no-furniture-workshop"
     ],
     "checked_by": "AI source comparison vs BGA wiki",
     "checked_on": "2026-11-14",

@@ -34,20 +34,19 @@
   "play": {
     "action": "occupation",
     "cost": [],
-    "prerequisites": [
-      {
-        "predicate": "has_person_on_action_space",
-        "params": {
-          "space": "日雇い労働者"
-        }
-      }
-    ],
+    "prerequisites": [],
     "printed_points": 0
   },
   "effects": [
     {
       "trigger": "on_action_space_used",
       "conditions": [
+        {
+          "predicate": "has_person_on_action_space",
+          "params": {
+            "space": "day_laborer"
+          }
+        },
         {
           "predicate": "round_in_range",
           "params": {

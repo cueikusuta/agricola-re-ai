@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "has_improvement",
+        "params": {
+          "kind": "well"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [

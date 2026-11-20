@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "has_improvement",
+        "params": {
+          "type": "bake_bread"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [

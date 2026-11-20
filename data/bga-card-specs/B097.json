@@ -72,7 +72,8 @@
     "status": "bga_checked",
     "unresolved_fields": [],
     "test_case_ids": [
-      "B097-stone-house-round-start-play-card"
+      "B097-stone-house-round-start-play-card",
+      "B097-stone-house-round-start-minor-improvement"
     ],
     "checked_by": "AI source comparison vs BGA wiki",
     "checked_on": "2026-11-14",

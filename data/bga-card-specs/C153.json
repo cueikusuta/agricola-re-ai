@@ -91,11 +91,13 @@
     "status": "bga_checked",
     "unresolved_fields": [],
     "test_case_ids": [
-      "C153-normal"
+      "C153-normal",
+      "C153-declined",
+      "C153-no-renovation"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "Another player renovates: may exchange exactly 2 wood for 1 grain + 1 food + 1 bonus point."
+    "notes": "Another player renovates: may exchange exactly 2 wood for 1 grain + 1 food + 1 bonus point. Tests now assert the exchange instead of a fail-closed placeholder."
   }
 }

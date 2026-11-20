@@ -34,14 +34,7 @@
   "play": {
     "action": "occupation",
     "cost": [],
-    "prerequisites": [
-      {
-        "predicate": "house_is",
-        "params": {
-          "house": "stone"
-        }
-      }
-    ],
+    "prerequisites": [],
     "printed_points": 0
   },
   "effects": [
@@ -57,11 +50,28 @@
       ],
       "steps": [
         {
-          "operation": "gain_resource",
+          "operation": "other",
           "target": "owner",
           "params": {
-            "good": "wood",
-            "amount": 2
+            "kind": "choice",
+            "options": [
+              {
+                "good": "wood",
+                "amount": 2
+              },
+              {
+                "good": "clay",
+                "amount": 2
+              },
+              {
+                "good": "reed",
+                "amount": 1
+              },
+              {
+                "good": "stone",
+                "amount": 1
+              }
+            ]
           }
         }
       ],
@@ -70,104 +80,26 @@
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "owner"
-    },
-    {
-      "trigger": "round_start",
-      "conditions": [
-        {
-          "predicate": "house_is",
-          "params": {
-            "house": "stone"
-          }
-        }
-      ],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "brick",
-            "amount": 2
-          }
-        }
-      ],
-      "optional": true,
-      "frequency": "once_per_round",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "owner"
-    },
-    {
-      "trigger": "round_start",
-      "conditions": [
-        {
-          "predicate": "house_is",
-          "params": {
-            "house": "stone"
-          }
-        }
-      ],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "reed",
-            "amount": 1
-          }
-        }
-      ],
-      "optional": true,
-      "frequency": "once_per_round",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "owner"
-    },
-    {
-      "trigger": "round_start",
-      "conditions": [
-        {
-          "predicate": "house_is",
-          "params": {
-            "house": "stone"
-          }
-        }
-      ],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "stone",
-            "amount": 1
-          }
-        }
-      ],
-      "optional": true,
-      "frequency": "once_per_round",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "owner"
+      "decision_owner": "owner",
+      "notes": "Once in a stone house, each round start choose exactly 1 of the four options."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "effects: whether player chooses ONE of the four options per round, or can take multiple - wiki says '以下の選択肢から1つを選んで獲得できる' meaning choose 1 of the 4 options per round"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "E126-normal"
+      "E126-wood",
+      "E126-clay",
+      "E126-reed",
+      "E126-stone",
+      "E126-not-stone-house"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-14",
     "implementation_status": "not_started",
-    "notes": "Once in stone house: each round start, choose 1 of: 2 wood, 2 brick, 1 reed, or 1 stone. Occupations stay in play area."
+    "notes": "Once in a stone house, each round start choose 1 of: 2 wood, 2 clay, 1 reed, or 1 stone. Occupations stay in play area. The stone house is an effect condition, not a play prerequisite, and the four options are one choice per round."
   }
 }

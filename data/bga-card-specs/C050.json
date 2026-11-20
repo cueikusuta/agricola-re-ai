@@ -33,7 +33,7 @@
   },
   "play": {
     "action": "minor_improvement",
-    "cost": null,
+    "cost": [],
     "prerequisites": [
       {
         "predicate": "custom",
@@ -79,8 +79,7 @@
     "status": "inventory_only",
     "unresolved_fields": [
       "effects.full",
-      "bga.eligibility",
-      "play.cost.exact"
+      "bga.eligibility"
     ],
     "test_case_ids": [
       "C050-normal",

@@ -87,7 +87,8 @@
       "effects[0].conditions: acting_player_first_placement_this_round needs formalization (what counts as the first person)"
     ],
     "test_case_ids": [
-      "D160-other-player-family-growth"
+      "D160-other-player-family-growth",
+      "D160-not-first-placement"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",
