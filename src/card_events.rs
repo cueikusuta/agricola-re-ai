@@ -695,7 +695,8 @@ fn resolve_phase_for_card(
 }
 
 /// Data passed to phase handlers for context-dependent effects.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Supports deserializing legacy format with `event_kind` field.
+#[derive(Debug, Clone, Serialize)]
 pub struct PhaseTriggerData {
     /// The space that was just activated (for worker completion effects).
     pub space: Option<Space>,
@@ -708,8 +709,51 @@ pub struct PhaseTriggerData {
     /// Used spaces in the current round (for AfterWorkerGainIfUsed).
     pub used_spaces: std::collections::BTreeSet<Space>,
     /// The site that triggered this dispatch (for site-specific effects).
-    #[serde(default)]
     pub site: Site,
+}
+
+impl<'de> Deserialize<'de> for PhaseTriggerData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        struct Helper {
+            space: Option<Space>,
+            improvement: Option<crate::model::Improvement>,
+            baked: bool,
+            previous_player: Option<Player>,
+            used_spaces: std::collections::BTreeSet<Space>,
+            #[serde(default)]
+            site: Site,
+            // Legacy field from pre-2-axis format
+            event_kind: Option<crate::registry::EventKind>,
+        }
+
+        let helper = Helper::deserialize(deserializer)?;
+
+        // If site is default (WorkerPlaced) but legacy event_kind is present,
+        // map event_kind to site for backward compatibility.
+        let site = if helper.site == Site::WorkerPlaced {
+            if let Some(ek) = helper.event_kind {
+                Site::from_event_kind(ek)
+            } else {
+                helper.site
+            }
+        } else {
+            helper.site
+        };
+
+        Ok(PhaseTriggerData {
+            space: helper.space,
+            improvement: helper.improvement,
+            baked: helper.baked,
+            previous_player: helper.previous_player,
+            used_spaces: helper.used_spaces,
+            site,
+        })
+    }
 }
 
 /// Check if an effect's trigger condition holds, without consuming budget or card uses.
@@ -763,16 +807,20 @@ fn effect_condition_holds(
         }
         CardEffect::AfterHarvestBakeGain { .. } => trigger.site == Site::Bake && trigger.baked,
         CardEffect::HarvestFieldGain { .. } => trigger.site == Site::Harvest,
-        CardEffect::OnPlayGain { .. } => true,
-        CardEffect::OnPlayGainPerStored { .. } => true,
-        CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
-        CardEffect::OnPlayGainPerCount { .. } => true,
+        // Play-time family (CardPlayed site): fire only when a card is played.
+        CardEffect::OnPlayGain { .. } => trigger.site == Site::CardPlayed,
+        CardEffect::OnPlayGainPerStored { .. } => trigger.site == Site::CardPlayed,
+        CardEffect::OnPlayGainPerImprovementPlayed { .. } => trigger.site == Site::CardPlayed,
+        CardEffect::OnPlayGainPerCount { .. } => trigger.site == Site::CardPlayed,
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
-            player.house == *house && player.rooms() == usize::from(*rooms)
+            trigger.site == Site::CardPlayed
+                && player.house == *house
+                && player.rooms() == usize::from(*rooms)
         }
-        CardEffect::Passive { .. } => true,
+        CardEffect::Passive { .. } => trigger.site == Site::CardPlayed,
         CardEffect::Prerequisite { .. } => true,
-        CardEffect::EndGameBonus { .. } => true,
+        // EndGameBonus is scoring-only; never triggers during the game.
+        CardEffect::EndGameBonus { .. } => false,
         #[cfg(test)]
         CardEffect::PendingProbe { .. } => true,
     }
@@ -6374,6 +6422,126 @@ mod tests {
         assert_eq!(
             c.players[0].supply.wood, 0,
             "E117 must not fire on after_harvest_bake"
+        );
+    }
+
+    /// RED for PR #367 P1-2: an effect that belongs to the CardPlayed site
+    /// must NOT fire when the dispatcher is invoked at the WorkerPlaced site
+    /// (dispatch_before_worker). Resources, budget, card uses and pending
+    /// must all stay untouched on the wrong site.
+    #[test]
+    fn before_worker_does_not_fire_card_played_site_effects() {
+        let card = CardDefinition {
+            use_limit: None,
+            id: "ONPLAY1".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 2,
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![card],
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["ONPLAY1".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = BTreeSet::new();
+        used.insert(Space::Fishing);
+        let mut pending = None;
+        let result = dispatch_before_worker(
+            &set,
+            0,
+            Space::Fishing,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        );
+        assert!(
+            matches!(result, Ok(Transition::Completed)),
+            "wrong-site dispatch must resolve without firing, got: {result:?}"
+        );
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "OnPlayGain (CardPlayed site) must not fire at the WorkerPlaced site"
+        );
+        assert_eq!(c.budget, 64, "no event budget may be consumed");
+        assert!(c.uses.is_empty(), "no card use may be recorded");
+        assert!(pending.is_none(), "no decision may be armed");
+    }
+
+    /// RED for PR #367 P2 (audit P0-1, PR #353): EndGameBonus cards must not
+    /// be collected as After-phase trigger candidates by the generic scan.
+    /// A099 and A101 both carry only an EndGameBonus effect, so a post-work
+    /// dispatch must complete without a ChooseTriggerOrder pause and without
+    /// consuming budget or card uses.
+    #[test]
+    fn endgamebonus_excluded_from_generic_after_scan() {
+        let set = CardSet {
+            definitions: verified_band_a_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["A099".into(), "A101".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        let result = dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            true, // post-work chain: pause permitted
+        );
+        assert!(
+            matches!(result, Ok(Transition::Completed)),
+            "EndGameBonus must not pause the scan, got: {result:?}"
+        );
+        assert_eq!(c.budget, 64, "no budget for scoring-only effects");
+        assert!(c.uses.is_empty(), "no card uses for scoring-only effects");
+        assert!(pending.is_none(), "no decision may be armed");
+    }
+
+    /// RED for PR #367 old-format compatibility: a PhaseTriggerData saved
+    /// before the 2-axis PR carried `event_kind` instead of `site`. It must
+    /// deserialize into the site the old value named (not silently default to
+    /// WorkerPlaced, which would drop Bake/ClayConstruction effects).
+    #[test]
+    fn phase_trigger_data_legacy_event_kind_alias_deserializes() {
+        let legacy = serde_json::json!({
+            "space": null,
+            "improvement": null,
+            "baked": true,
+            "previous_player": null,
+            "used_spaces": [],
+            "event_kind": "bake"
+        });
+        let trigger: PhaseTriggerData =
+            serde_json::from_value(legacy).expect("legacy event_kind must deserialize");
+        assert_eq!(
+            trigger.site,
+            Site::Bake,
+            "old event_kind must map onto the matching Site"
         );
     }
 }
