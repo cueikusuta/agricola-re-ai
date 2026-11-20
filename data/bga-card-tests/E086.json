@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "card_id": "E086",
+  "cases": [
+    {
+      "id": "E086-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 3,
+        "animals_on_card": 0
+      },
+      "action": {
+        "play": "E086",
+        "discard_wood": 2
+      },
+      "expected": {
+        "wood": 1,
+        "animals_on_card_capacity": 4
+      }
+    },
+    {
+      "id": "E086-capacity",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 5,
+        "animals_on_card": 0
+      },
+      "action": {
+        "discard_wood": 1
+      },
+      "expected": {
+        "wood": 4,
+        "animals_on_card_capacity": 2
+      }
+    }
+  ]
+}

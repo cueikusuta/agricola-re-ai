@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "card_id": "E092",
+  "cases": [
+    {
+      "id": "E092-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house": "2_rooms",
+        "surrounded_by_4_fields": true,
+        "has_room_for_growth": false
+      },
+      "action": {
+        "play": "E092",
+        "use_family_growth": true
+      },
+      "expected": {
+        "family_growth_succeeded": true,
+        "room_not_required": true
+      }
+    },
+    {
+      "id": "E092-wrong-house",
+      "scope": "effect_only",
+      "setup": {
+        "house": "3_rooms",
+        "surrounded_by_4_fields": true,
+        "has_room_for_growth": false
+      },
+      "action": {
+        "use_family_growth": true
+      },
+      "expected": {
+        "family_growth_succeeded": false,
+        "room_required": true
+      }
+    },
+    {
+      "id": "E092-used-once",
+      "scope": "effect_only",
+      "setup": {
+        "house": "2_rooms",
+        "surrounded_by_4_fields": true,
+        "already_used": true
+      },
+      "action": {
+        "use_family_growth": true
+      },
+      "expected": {
+        "family_growth_succeeded": false,
+        "once_per_game": true
+      }
+    }
+  ]
+}

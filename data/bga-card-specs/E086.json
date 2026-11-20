@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "E086",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "檻作り",
+    "name_en": "Pen Builder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2667",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "any_time",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "discard_1_wood_from_supply"
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "card_can_hold_2x_discarded_wood_as_animals"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params.action: Japanese says '木1を捨てる' (discard 1 wood), English says 'place on card irretrievably'. Classification MQ-06: unclear whether wood is discarded or placed on card, and whether animal capacity is 2x number of cards or 2x wood discarded."
+    ],
+    "test_case_ids": [
+      "E086-normal",
+      "E086-capacity"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Anytime, discard 1 wood from supply; card can hold 2x that many animals of any type. Japanese/English discrepancy on wood destination and capacity calculation (MQ-06). Stays in played area."
+  }
+}

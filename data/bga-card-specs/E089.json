@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "card_id": "E089",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "厩大工",
+    "name_en": "Stallwright"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2664",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_play_occupation",
+      "conditions": [
+        {
+          "predicate": "occupation_count_is",
+          "params": {
+            "n": 2
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "board",
+          "params": {
+            "amount": 1,
+            "cost": 0
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_trigger",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    },
+    {
+      "trigger": "after_play_occupation",
+      "conditions": [
+        {
+          "predicate": "occupation_count_is",
+          "params": {
+            "n": 3
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "board",
+          "params": {
+            "amount": 1,
+            "cost": 0
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_trigger",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner"
+    },
+    {
+      "trigger": "after_play_occupation",
+      "conditions": [
+        {
+          "predicate": "occupation_count_is",
+          "params": {
+            "n": 5
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "board",
+          "params": {
+            "amount": 1,
+            "cost": 0
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_trigger",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 2,
+      "decision_owner": "owner"
+    },
+    {
+      "trigger": "after_play_occupation",
+      "conditions": [
+        {
+          "predicate": "occupation_count_is",
+          "params": {
+            "n": 7
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "board",
+          "params": {
+            "amount": 1,
+            "cost": 0
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_trigger",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 3,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E089-2nd-occupation",
+      "E089-3rd-occupation",
+      "E089-5th-occupation",
+      "E089-7th-occupation"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "After playing 2nd, 3rd, 5th, 7th occupation (including this), build 1 stable for free. Stays in played area."
+  }
+}

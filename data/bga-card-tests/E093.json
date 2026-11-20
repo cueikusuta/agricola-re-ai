@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "card_id": "E093",
+  "cases": [
+    {
+      "id": "E093-normal",
+      "scope": "effect_only",
+      "setup": {
+        "unused_farm_spaces": 0,
+        "people_in_supply": 2
+      },
+      "action": {
+        "play": "E093",
+        "first_turn_of_round": true,
+        "place_person": true
+      },
+      "expected": {
+        "people_in_supply": 1,
+        "person_placed": true
+      }
+    },
+    {
+      "id": "E093-spaces-available",
+      "scope": "effect_only",
+      "setup": {
+        "unused_farm_spaces": 3,
+        "people_in_supply": 2
+      },
+      "action": {
+        "first_turn_of_round": true
+      },
+      "expected": {
+        "people_in_supply": 2,
+        "person_placed": false
+      }
+    },
+    {
+      "id": "E093-multiple-rounds",
+      "scope": "effect_only",
+      "setup": {
+        "unused_farm_spaces": 0,
+        "people_in_supply": 3
+      },
+      "action": {
+        "play": "E093",
+        "round_1_first_turn": true,
+        "place_person": true,
+        "round_2_first_turn": true,
+        "place_person": true
+      },
+      "expected": {
+        "people_in_supply": 1,
+        "total_placed": 2
+      }
+    }
+  ]
+}

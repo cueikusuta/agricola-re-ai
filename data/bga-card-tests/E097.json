@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "card_id": "E097",
+  "cases": [
+    {
+      "id": "E097-3rd-occupation",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 2,
+        "food": 2,
+        "minor_improvements_in_hand": 1
+      },
+      "action": {
+        "play": "E097",
+        "play_another_occupation_for_1_food": true,
+        "play_minor_improvement": true
+      },
+      "expected": {
+        "occupations_played": 3,
+        "food": 1,
+        "minor_improvements_played": 1
+      }
+    },
+    {
+      "id": "E097-not-3rd",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 1,
+        "food": 2
+      },
+      "action": {
+        "play": "E097"
+      },
+      "expected": {
+        "occupations_played": 2,
+        "food": 2,
+        "extra_actions": false
+      }
+    },
+    {
+      "id": "E097-both",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 2,
+        "food": 3,
+        "minor_improvements_in_hand": 2
+      },
+      "action": {
+        "play": "E097",
+        "play_another_occupation_for_1_food": true,
+        "play_minor_improvement": true
+      },
+      "expected": {
+        "occupations_played": 3,
+        "food": 2,
+        "minor_improvements_played": 1
+      }
+    }
+  ]
+}
