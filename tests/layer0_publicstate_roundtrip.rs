@@ -132,7 +132,6 @@ fn observation_projection_preserves_public_state() {
     play_random_actions(&mut game, 3, 0x51EED);
 
     // 井戸購入と同等の公開状態 (予約: round 3 の全ラウンド分) を正本へ直接注入。
-    game.delayed_well.entry(3).or_default().push(0);
     game.public.well_food_schedule.entry(3).or_default().push(0);
     // カード使用台帳も正本へ直接注入 (プレイは公開行動なので公開状態)。
     game.public.card_uses.insert("TEST_CARD".into(), 2);
@@ -150,9 +149,11 @@ fn observation_projection_preserves_public_state() {
         reconstructed.public, game.public,
         "Observation から再構築したゲームの公開状態が正本と不一致 — 射影が情報を損失している"
     );
+    // delayed_well フィールドは削除され、well_food_schedule が単一正本になった。
+    // 再構築されたゲームの well_food_schedule が一致することを確認。
     assert_eq!(
-        reconstructed.delayed_well, game.delayed_well,
-        "公開ミラー (well_food_schedule) から delayed_well が復元できる"
+        reconstructed.public.well_food_schedule, game.public.well_food_schedule,
+        "公開正本 (well_food_schedule) が再構築時に保持される"
     );
 
     // 旧観測ミラー欄は Observation に存在しない (単一正本)。use limits は
@@ -164,10 +165,14 @@ fn observation_projection_preserves_public_state() {
     );
 }
 
-/// 受け入れ条件 3 (v5 ピン): 集約欄の値は `state_hash` に反映されず、
-/// `integrity_hash` には反映される。
+/// 受け入れ条件 3 (v5 ピン): `state_hash` は v5 と同一の 7-field タプルをハッシュする。
+/// 従来は 5 番目に `delayed_well` が含まれていたが、これが削除され
+/// `well_food_schedule` が単一正本になったため、同一位置に `well_food_schedule` を
+/// 含めることで v5 fixture とバイト同一のハッシュ値を維持する。
+/// `card_uses` 等の他の集約欄は引き続き state_hash から除外され、
+/// `integrity_hash` で保護される。
 #[test]
-fn state_hash_ignores_aggregated_public_mirrors() {
+fn state_hash_includes_well_food_schedule_for_v5_compatibility() {
     let mut game = Game::new(Config {
         players: 2,
         seed: 9,
@@ -176,18 +181,31 @@ fn state_hash_ignores_aggregated_public_mirrors() {
     let base_state_hash = game.state_hash();
     let base_integrity = game.integrity_hash();
 
+    // card_uses は state_hash に影響しない (v5 互換)
     game.public.card_uses.insert("A001".into(), 1);
-    game.public.well_food_schedule.entry(4).or_default().push(1);
-
     assert_eq!(
         game.state_hash(),
         base_state_hash,
-        "集約欄の変更が state_hash に影響した — v5 ピンが壊れている"
+        "card_uses 変更が state_hash に影響した — 除外されるべき"
     );
     assert_ne!(
         game.integrity_hash(),
         base_integrity,
-        "集約欄の変更が integrity_hash に反映されていない"
+        "card_uses 変更が integrity_hash に反映されていない"
+    );
+
+    // well_food_schedule は v5 互換のため state_hash に含まれる (旧 delayed_well 位置)
+    let hash_before_well = game.state_hash();
+    game.public.well_food_schedule.entry(4).or_default().push(1);
+    assert_ne!(
+        game.state_hash(),
+        hash_before_well,
+        "well_food_schedule 変更が state_hash に影響しなかった — v5 互換のため含まれるべき"
+    );
+    assert_ne!(
+        game.integrity_hash(),
+        base_integrity,
+        "well_food_schedule 変更が integrity_hash に反映されていない"
     );
 }
 

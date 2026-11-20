@@ -672,10 +672,9 @@ pub struct Game {
     /// Private: never expose these to policies.
     pub hidden_round_deck: Vec<RoundCard>,
     pub rng: RngStreams,
-    pub delayed_well: BTreeMap<u8, Vec<usize>>,
-    /// The public mirror of `delayed_well` lives in
-    /// [`PublicState::well_food_schedule`] (Layer-0 aggregation): one single
-    /// canonical copy instead of separate `Game` and `Observation` mirrors.
+    /// The canonical well food schedule lives in [`PublicState::well_food_schedule`]
+    /// (Layer-0 aggregation). The private `delayed_well` field was removed;
+    /// all access goes through the public schedule.
     #[serde(
         default,
         serialize_with = "serialize_arc",
@@ -914,7 +913,6 @@ impl Game {
             public,
             hidden_round_deck: deck,
             rng,
-            delayed_well: BTreeMap::new(),
             card_set,
             cards,
             log,
@@ -963,12 +961,16 @@ impl Game {
         // decisions are excluded from the hash; their integrity is enforced by
         // PendingDecision::state_hash_before checks in the resume path, and the
         // aggregated fields by `integrity_hash` below.
+        // For v5 compatibility, the 5th tuple field was `delayed_well`; now that
+        // delayed_well is removed and well_food_schedule is the single source of
+        // truth, we include well_food_schedule in the same tuple position to
+        // maintain byte-identical hash values with v5 fixtures.
         let data = serde_json::to_vec(&(
             &self.config,
             &self.public.hash_material_v5(),
             &self.hidden_round_deck,
             &self.rng,
-            &self.delayed_well,
+            &self.public.well_food_schedule,
             &*self.card_set,
             &self.cards,
         ))
@@ -1031,7 +1033,6 @@ impl Game {
             public: self.public.clone(),
             hidden_round_deck: self.hidden_round_deck.clone(),
             rng: self.rng.clone(),
-            delayed_well: self.delayed_well.clone(),
             card_set: self.card_set.clone(),
             cards: self.cards.clone(),
             log: GameLog {
@@ -1068,7 +1069,6 @@ impl Game {
         public: PublicState,
         hidden_round_deck: Vec<RoundCard>,
         rng: RngStreams,
-        delayed_well: BTreeMap<u8, Vec<usize>>,
         card_set: Arc<CardSet>,
         cards: CardState,
         pending: Option<PendingDecision>,
@@ -1084,7 +1084,6 @@ impl Game {
             public,
             hidden_round_deck,
             rng,
-            delayed_well,
             card_set: card_set.clone(),
             cards,
             log: GameLog {
@@ -1199,6 +1198,15 @@ impl Game {
         if replayed.state_hash() != result.state_hash() {
             return Err("saved game differs from logged action replay".into());
         }
+        // Verify that public Layer-0 aggregated fields match the replayed state.
+        // These fields are excluded from state_hash for LOG_VERSION=5 compatibility,
+        // but must still be consistent with the replayed action history.
+        if replayed.public.well_food_schedule != result.public.well_food_schedule {
+            return Err("saved game well_food_schedule differs from logged action replay".into());
+        }
+        if replayed.public.card_uses != result.public.card_uses {
+            return Err("saved game card_uses differs from logged action replay".into());
+        }
         // Step 3 bookkeeping is outside state_hash (LOG_VERSION=5 keeps that
         // tuple fixed), so verify it against the hash stamped at save time.
         // Absent for pre-Step3 saves, which therefore keep loading unchanged.
@@ -1262,19 +1270,17 @@ impl Game {
             }
         }
         // Consume any delayed well for this round and grant the food. The
-        // schedule mirror entry is removed UNCONDITIONALLY: delayed_well is the
-        // source of truth, but a legacy save can carry a well_food_schedule
-        // entry whose delayed_well entry is already gone, and dropping the
-        // grant inside `if let` left such orphan schedule entries behind
-        // forever (P1-4 + PR #341 review P3).
+        // schedule entry is removed UNCONDITIONALLY: well_food_schedule is the
+        // single source of truth, but a legacy save can carry a well_food_schedule
+        // entry for a round that was already consumed, and we must drop it.
         for id in self
-            .delayed_well
+            .public
+            .well_food_schedule
             .remove(&self.public.round)
             .unwrap_or_default()
         {
             self.public.players[id].supply.food += 1;
         }
-        self.public.well_food_schedule.remove(&self.public.round);
         // Round-start triggers go through the phase dispatcher so the event
         // budget and per-card use limits apply here too. The budget is reset
         // for a new round: a round boundary is not part of one action's chain.
@@ -1286,7 +1292,7 @@ impl Game {
                 &mut self.public.players,
                 &mut self.cards,
                 &mut self.public.improvement_market,
-                &mut self.delayed_well,
+                &mut self.public.well_food_schedule,
                 self.public.round,
                 &self.public.used,
                 &mut self.event_budget,
@@ -1654,7 +1660,7 @@ impl Game {
         let mut cards = next.cards.clone();
         let mut players = next.public.players.clone();
         let mut improvement_market = next.public.improvement_market.clone();
-        let mut delayed_well = next.delayed_well.clone();
+        let mut well_food_schedule = next.public.well_food_schedule.clone();
         let round = next.public.round;
         let used_spaces = next.public.used.clone();
         let mut event_budget = next.event_budget;
@@ -1692,7 +1698,7 @@ impl Game {
                             player: &mut players[player],
                             cards: &mut cards,
                             improvement_market: &mut improvement_market,
-                            delayed_well: &mut delayed_well,
+                            well_food_schedule: &mut well_food_schedule,
                             round,
                             used_spaces: &used_spaces,
                             event_budget: &mut event_budget,
@@ -1750,7 +1756,7 @@ impl Game {
                             next.public.players = players;
                             next.cards = cards;
                             next.public.improvement_market = improvement_market;
-                            next.delayed_well = delayed_well;
+                            next.public.well_food_schedule = well_food_schedule;
                             next.event_budget = event_budget;
                             next.public.card_uses = card_uses;
                             return self.commit_second_pause(
@@ -1800,7 +1806,7 @@ impl Game {
                             next.public.players = players;
                             next.cards = cards;
                             next.public.improvement_market = improvement_market;
-                            next.delayed_well = delayed_well;
+                            next.public.well_food_schedule = well_food_schedule;
                             next.event_budget = event_budget;
                             next.public.card_uses = card_uses;
                             return self.commit_second_pause(
@@ -1826,7 +1832,7 @@ impl Game {
                         player: &mut players[player],
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
-                        delayed_well: &mut delayed_well,
+                        well_food_schedule: &mut well_food_schedule,
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -1881,7 +1887,7 @@ impl Game {
                         next.public.players = players;
                         next.cards = cards;
                         next.public.improvement_market = improvement_market;
-                        next.delayed_well = delayed_well;
+                        next.public.well_food_schedule = well_food_schedule;
                         next.event_budget = event_budget;
                         next.public.card_uses = card_uses;
                         return self.commit_second_pause(
@@ -1935,7 +1941,7 @@ impl Game {
                         player: &mut players[player],
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
-                        delayed_well: &mut delayed_well,
+                        well_food_schedule: &mut well_food_schedule,
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -1990,7 +1996,7 @@ impl Game {
                         next.public.players = players;
                         next.cards = cards;
                         next.public.improvement_market = improvement_market;
-                        next.delayed_well = delayed_well;
+                        next.public.well_food_schedule = well_food_schedule;
                         next.event_budget = event_budget;
                         next.public.card_uses = card_uses;
                         return self.commit_second_pause(
@@ -2045,7 +2051,7 @@ impl Game {
         next.public.players = players;
         next.cards = cards;
         next.public.improvement_market = improvement_market;
-        next.delayed_well = delayed_well;
+        next.public.well_food_schedule = well_food_schedule;
         next.event_budget = event_budget;
         next.public.card_uses = card_uses;
         next.pending = pending; // Should remain None
@@ -2283,7 +2289,7 @@ impl Game {
                     player: &mut self.public.players[card_owner],
                     cards: &mut self.cards,
                     improvement_market: &mut self.public.improvement_market,
-                    delayed_well: &mut self.delayed_well,
+                    well_food_schedule: &mut self.public.well_food_schedule,
                     round: self.public.round,
                     used_spaces: &self.public.used,
                     event_budget: &mut self.event_budget,

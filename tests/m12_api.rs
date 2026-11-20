@@ -58,13 +58,7 @@ fn cardless_two_player_episode_replays_and_scores() {
     // The public observation must not carry hidden decks, seeds or RNG state.
     let obs = episode.observe(0).unwrap();
     let json = serde_json::to_string(&obs).unwrap();
-    for secret in [
-        "hidden_round_deck",
-        "round_seed",
-        "action_seed",
-        "delayed_well",
-        "\"rng\"",
-    ] {
+    for secret in ["hidden_round_deck", "round_seed", "action_seed", "\"rng\""] {
         assert!(!json.contains(secret), "observation leaked {secret}");
     }
 }

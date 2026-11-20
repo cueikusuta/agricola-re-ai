@@ -137,8 +137,8 @@ pub enum PendingKind {
         options: Vec<PaymentOption>,
     },
     /// Delayed well relief choice (public information per rules).
-    /// Finding A from PR #265: delayed_well is hidden ledger but well purchases
-    /// are PUBLIC actions. The schedule is mirrored in Observation.
+    /// The well food schedule is public state (Layer-0 aggregation). The schedule
+    /// is mirrored in Observation.
     DelayedWellRelief {
         /// Round when food is granted.
         round: u8,

@@ -402,7 +402,7 @@ impl Game {
                 &mut self.cards,
                 &mut self.public.players,
                 &mut self.public.improvement_market,
-                &mut self.delayed_well,
+                &mut self.public.well_food_schedule,
                 self.public.round,
                 &self.public.used,
                 &mut self.event_budget,
@@ -431,7 +431,7 @@ impl Game {
             &mut self.cards,
             &mut self.public.players,
             &mut self.public.improvement_market,
-            &mut self.delayed_well,
+            &mut self.public.well_food_schedule,
             self.public.round,
             &self.public.used,
             &mut self.event_budget,
@@ -455,7 +455,7 @@ impl Game {
             &mut self.cards,
             &mut self.public.players,
             &mut self.public.improvement_market,
-            &mut self.delayed_well,
+            &mut self.public.well_food_schedule,
             self.public.round,
             &self.public.used,
             &mut self.event_budget,
@@ -1552,7 +1552,7 @@ impl Game {
                             &mut self.cards,
                             &mut self.public.players,
                             &mut self.public.improvement_market,
-                            &mut self.delayed_well,
+                            &mut self.public.well_food_schedule,
                             self.public.round,
                             &self.public.used,
                             &mut self.event_budget,
@@ -1621,7 +1621,7 @@ impl Game {
                     &mut self.cards,
                     &mut self.public.players,
                     &mut self.public.improvement_market,
-                    &mut self.delayed_well,
+                    &mut self.public.well_food_schedule,
                     self.public.round,
                     &self.public.used,
                     &mut self.event_budget,
@@ -1733,7 +1733,7 @@ impl Game {
                         &mut self.cards,
                         &mut self.public.players,
                         &mut self.public.improvement_market,
-                        &mut self.delayed_well,
+                        &mut self.public.well_food_schedule,
                         self.public.round,
                         &self.public.used,
                         &mut self.event_budget,
@@ -1818,7 +1818,7 @@ impl Game {
                         &mut self.cards,
                         &mut self.public.players,
                         &mut self.public.improvement_market,
-                        &mut self.delayed_well,
+                        &mut self.public.well_food_schedule,
                         self.public.round,
                         &self.public.used,
                         &mut self.event_budget,
@@ -1841,7 +1841,6 @@ impl Game {
                     buy_improvement(
                         p,
                         &mut self.public.improvement_market,
-                        &mut self.delayed_well,
                         &mut self.public.well_food_schedule,
                         self.public.round,
                         *improvement,
@@ -1860,7 +1859,6 @@ impl Game {
                     buy_improvement(
                         p,
                         &mut self.public.improvement_market,
-                        &mut self.delayed_well,
                         &mut self.public.well_food_schedule,
                         self.public.round,
                         *improvement,
@@ -1880,7 +1878,6 @@ impl Game {
                     buy_improvement(
                         p,
                         &mut self.public.improvement_market,
-                        &mut self.delayed_well,
                         &mut self.public.well_food_schedule,
                         self.public.round,
                         *improvement,
@@ -1907,7 +1904,6 @@ impl Game {
                         buy_improvement(
                             p,
                             &mut self.public.improvement_market,
-                            &mut self.delayed_well,
                             &mut self.public.well_food_schedule,
                             self.public.round,
                             *i,
@@ -1936,7 +1932,6 @@ impl Game {
                         buy_improvement(
                             p,
                             &mut self.public.improvement_market,
-                            &mut self.delayed_well,
                             &mut self.public.well_food_schedule,
                             self.public.round,
                             *improvement,
@@ -2264,7 +2259,6 @@ struct PurchaseArgs<'a> {
 fn buy_improvement(
     p: &mut Player,
     market: &mut Vec<Improvement>,
-    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
     well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     item: Improvement,
@@ -2315,7 +2309,6 @@ fn buy_improvement(
     p.improvements.push(item);
     if item == Improvement::Well {
         for r in round + 1..=14u8.min(round.saturating_add(5)) {
-            delayed_well.entry(r).or_default().push(p.id);
             well_food_schedule.entry(r).or_default().push(p.id);
         }
     }

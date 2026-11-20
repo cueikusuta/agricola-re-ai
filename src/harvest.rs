@@ -134,7 +134,7 @@ impl Game {
                     &mut self.cards,
                     &mut self.public.players,
                     &mut self.public.improvement_market,
-                    &mut self.delayed_well,
+                    &mut self.public.well_food_schedule,
                     self.public.round,
                     &self.public.used,
                     &mut self.event_budget,
