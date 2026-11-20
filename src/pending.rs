@@ -1586,4 +1586,45 @@ mod tests {
         assert_eq!(trigger.site, EventKind::Bake);
         assert_eq!(trigger.event_kind, EventKind::Bake); // synced to site
     }
+
+    /// PhaseTriggerData: the `site` field wins by presence even when its value
+    /// is the WorkerPlaced default, matching the documented "site takes
+    /// precedence when present" behavior (review P3-2).
+    #[test]
+    fn phase_trigger_data_site_present_wins_over_event_kind() {
+        use crate::registry::EventKind;
+
+        let json = r#"{
+                    "space": null,
+                    "improvement": null,
+                    "baked": false,
+                    "previous_player": null,
+                    "used_spaces": [],
+                    "site": "worker_placed",
+                    "event_kind": "bake"
+                }"#;
+
+        let trigger: crate::card_events::PhaseTriggerData = serde_json::from_str(json).unwrap();
+        assert_eq!(trigger.site, EventKind::WorkerPlaced);
+        assert_eq!(trigger.event_kind, EventKind::WorkerPlaced); // synced to site
+    }
+
+    /// PhaseTriggerData: when both `site` and legacy `event_kind` are absent,
+    /// the site defaults to WorkerPlaced.
+    #[test]
+    fn phase_trigger_data_missing_site_fields_default_to_worker_placed() {
+        use crate::registry::EventKind;
+
+        let json = r#"{
+                    "space": null,
+                    "improvement": null,
+                    "baked": false,
+                    "previous_player": null,
+                    "used_spaces": []
+                }"#;
+
+        let trigger: crate::card_events::PhaseTriggerData = serde_json::from_str(json).unwrap();
+        assert_eq!(trigger.site, EventKind::WorkerPlaced);
+        assert_eq!(trigger.event_kind, EventKind::WorkerPlaced);
+    }
 }

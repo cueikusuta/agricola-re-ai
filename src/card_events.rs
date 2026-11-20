@@ -692,10 +692,11 @@ pub struct PhaseTriggerData {
     /// Used spaces in the current round (for AfterWorkerGainIfUsed).
     pub used_spaces: std::collections::BTreeSet<Space>,
     /// The trigger site (event kind) where this dispatch originated.
-    /// Defaults to WorkerPlaced for backward compatibility with saves
-    /// that lack this field; resume-time validation ensures the site
-    /// matches the actual execution context.
-    #[serde(default = "EventKind::default")]
+    /// Saves that lack this field default to WorkerPlaced via the custom
+    /// `Deserialize` impl below (`Helper`); this struct only derives
+    /// `Serialize`, so no struct-level `#[serde(default)]` belongs here.
+    /// Resume-time validation ensures the site matches the actual
+    /// execution context.
     pub site: EventKind,
     /// Legacy field for deserializing saves that used `event_kind` instead of `site`.
     /// Not serialized; only used during deserialization to populate `site`.
@@ -715,20 +716,15 @@ impl<'de> Deserialize<'de> for PhaseTriggerData {
             baked: bool,
             previous_player: Option<Player>,
             used_spaces: std::collections::BTreeSet<Space>,
-            #[serde(default = "EventKind::default")]
-            site: EventKind,
-            #[serde(default = "EventKind::default")]
-            event_kind: EventKind,
+            site: Option<EventKind>,
+            event_kind: Option<EventKind>,
         }
 
         let h = Helper::deserialize(deserializer)?;
-        // Prefer `site` if present (new format), otherwise fall back to legacy `event_kind`.
-        // Both default to WorkerPlaced, so missing fields are handled symmetrically.
-        let site = if h.site != EventKind::WorkerPlaced || h.event_kind == EventKind::WorkerPlaced {
-            h.site
-        } else {
-            h.event_kind
-        };
+        // Presence-based precedence: a `site` field (new format) always wins,
+        // legacy saves carrying only `event_kind` fall back to it, and when
+        // both are absent the site defaults to WorkerPlaced.
+        let site = h.site.or(h.event_kind).unwrap_or_default();
 
         Ok(PhaseTriggerData {
             space: h.space,
