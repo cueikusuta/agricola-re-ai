@@ -141,6 +141,9 @@ pub enum PendingKind {
         /// The phase in which triggers fire.
         phase: TriggerPhase,
         /// The site at which triggers fire.
+        /// Defaults to WorkerPlaced so legacy saves (pre-2-axis format, site key absent)
+        /// still deserialize.
+        #[serde(default)]
         site: crate::card_events::Site,
         /// The triggerable effects: (card_id, effect_index, effect_description).
         triggers: Vec<(String, usize, String)>,
@@ -288,6 +291,7 @@ pub trait PendingExt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::card_events::{Site, TriggerPhase};
     use crate::model::{Config, Game, Good};
 
     #[test]
@@ -1388,5 +1392,40 @@ mod tests {
             "the choice must not be applied"
         );
         assert!(game.has_pending(), "the decision must stay resolvable");
+    }
+
+    /// RED for PR #367 P2-3a: ChooseTriggerOrder.site must deserialize from
+    /// legacy saves where the `site` key is absent, defaulting to Site::WorkerPlaced.
+    #[test]
+    fn choose_trigger_order_site_defaults_when_absent() {
+        let legacy = serde_json::json!({
+            "kind": "choose_trigger_order",
+            "phase": "after",
+            "triggers": [
+                ["TEST_CARD", 0, "OnPlayGain { food: 1 }"]
+            ]
+        });
+        let kind: PendingKind = serde_json::from_value(legacy)
+            .expect("legacy ChooseTriggerOrder without site key must deserialize");
+        match kind {
+            PendingKind::ChooseTriggerOrder { site, .. } => {
+                assert_eq!(site, Site::WorkerPlaced, "absent site must default to WorkerPlaced");
+            }
+            other => panic!("expected ChooseTriggerOrder, got: {other:?}"),
+        }
+    }
+
+    /// RED for PR #367 P2-3a: ChooseTriggerOrder with an explicit site still round-trips.
+    #[test]
+    fn choose_trigger_order_site_explicit_roundtrips() {
+        let kind = PendingKind::ChooseTriggerOrder {
+            phase: TriggerPhase::After,
+            site: Site::CardPlayed,
+            triggers: vec![("TEST_CARD".into(), 0, "OnPlayGain".into())],
+        };
+        let json = serde_json::to_value(&kind).expect("serialize must succeed");
+        let decoded: PendingKind = serde_json::from_value(json)
+            .expect("deserialize must succeed");
+        assert_eq!(kind, decoded, "explicit site must round-trip");
     }
 }
