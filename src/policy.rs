@@ -855,13 +855,84 @@ pub fn play_to_end_with_budget(
         )?;
         on_decision(outcome);
         let chosen = action.space;
-        game.apply_with_harvest_policy(action, harvest_policy)
+        crate::policy::apply_for_ai(game, action, harvest_policy)
             .map_err(|e| format!("policy action {:?} failed: {}", chosen, e))?;
     }
     if game.public.finished {
         Ok(())
     } else {
         Err("move limit exceeded".into())
+    }
+}
+
+/// AI-side automatic resolution for a paused pending decision.
+///
+/// The rule engine (Issue #268) pauses the post-work card chain on a
+/// `PendingKind::ChooseAnimalPlacement` (C147 牛の飼育師: taking CattleMarket
+/// with the occupation played grants 1 cattle that must be placed). The
+/// engine deliberately exposes the decision instead of choosing; the AI
+/// policy layer is the production side that decides. This derives the
+/// placement from public state only — pastures with capacity, empty
+/// unfenced stables, then the free pet slot, discard overflow — by reusing
+/// the same `auto_animal_plan` derivation the no-pause C083 (OnPlayGainAnimal)
+/// path applies, so both paths agree for identical farms.
+///
+/// Only kinds the AI can decide from public information are auto-resolved;
+/// anything else returns `None` and the caller surfaces the pause as an
+/// error (the previous production behaviour).
+pub fn auto_pending_resolution(
+    game: &Game,
+    pending: &crate::pending::PendingDecision,
+) -> Option<crate::pending::PendingResolution> {
+    match &pending.kind {
+        crate::pending::PendingKind::ChooseAnimalPlacement { animal, amount, .. } => {
+            let p = &game.public.players[pending.player];
+            let plan = crate::card_events::auto_animal_plan(p, *animal, *amount);
+            Some(crate::pending::PendingResolution::ChooseAnimalPlacement { plan })
+        }
+        _ => None,
+    }
+}
+
+/// Apply one AI action, auto-resolving the pending decisions it pauses on.
+///
+/// This is the production AI's apply path. The one-shot
+/// `Game::apply_with_harvest_policy` rejects a pause before any commit
+/// (R2-P0-2); the play loop, MCTS playouts and self-play episodes never had a
+/// resolver, so a C147 owner taking CattleMarket stopped the whole episode
+/// with `Err("action paused on a pending decision; ...")`. This helper keeps
+/// the no-pause contract byte-identical — the fast path is still a plain
+/// `apply_with_harvest_policy` call — and only when that call raises the
+/// pause error does it re-run the action on the pause-allowing
+/// `apply_with_plans` path (state is still untouched at that point, by the
+/// R2-P0-2 no-commit contract) and drives the committed pause through
+/// resolution and resume using [`auto_pending_resolution`]. Pause-capable
+/// kinds loop until the action completes; unresolvable kinds return the
+/// original pause error.
+pub fn apply_for_ai(
+    game: &mut Game,
+    action: Action,
+    harvest_policy: &dyn HarvestDetailPolicy,
+) -> Result<(), String> {
+    const PAUSE_ERR: &str = "action paused on a pending decision";
+    match game.apply_with_harvest_policy(action.clone(), harvest_policy) {
+        Ok(()) => Ok(()),
+        Err(e) if e.contains(PAUSE_ERR) => {
+            let mut transition = game
+                .apply_with_plans(action, None, None, harvest_policy)
+                .map_err(|e2| format!("{} (retry: {})", e, e2))?;
+            loop {
+                match transition {
+                    crate::pending::Transition::Completed => return Ok(()),
+                    crate::pending::Transition::Paused(pending) => {
+                        let resolution =
+                            auto_pending_resolution(game, &pending).ok_or_else(|| e.clone())?;
+                        transition = game.resolve_pending_and_resume(resolution)?;
+                    }
+                }
+            }
+        }
+        Err(e) => Err(e),
     }
 }
 
@@ -953,6 +1024,10 @@ pub fn resolve_decision(
         },
     ))
 }
+
+#[cfg(test)]
+#[path = "policy_c147_pending_tests.rs"]
+mod c147_pending_tests;
 
 #[cfg(test)]
 mod card_choice_tests {

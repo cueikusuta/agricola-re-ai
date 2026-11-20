@@ -402,7 +402,9 @@ pub fn rollout(
         let action = details
             .produce(&obs, space)
             .ok_or("rollout detail failed")?;
-        game.apply(action)?;
+        // Production AI apply path: auto-resolves C147-style
+        // ChooseAnimalPlacement pauses so a playout cannot die on them.
+        crate::policy::apply_for_ai(game, action, &crate::harvest::SimpleHarvestDetails)?;
     }
     Err("rollout move limit reached".into())
 }
@@ -630,7 +632,13 @@ impl MctsPolicy {
                     valid = false;
                     break;
                 };
-                if game.apply(action).is_err() {
+                if crate::policy::apply_for_ai(
+                    &mut game,
+                    action,
+                    &crate::harvest::SimpleHarvestDetails,
+                )
+                .is_err()
+                {
                     valid = false;
                     break;
                 }

@@ -8,7 +8,7 @@ use crate::draft::{
 use crate::draft_ai::{decision_rng, DraftAiKind};
 use crate::draft_game::{card_catalog, pool_from_card_set, start_game_from_draft};
 use crate::engine::{Action, Detail, FreeAction};
-use crate::harvest::{FeedingPlan, HarvestDetailPolicy};
+use crate::harvest::{FeedingPlan, HarvestDetailPolicy, SimpleHarvestDetails};
 
 use crate::evaluation::{DetailAwareEvaluationPolicy, WeightedEvaluationPolicy};
 use crate::mcts::MctsPolicy;
@@ -110,6 +110,22 @@ impl Session {
         Ok(())
     }
 
+    /// CPU-side apply: identical to [`Self::queue_or_apply`] except the
+    /// apply goes through `policy::apply_for_ai`, so CPU seats auto-resolve
+    /// their own pause-capable card effects (C147 牛の飼育師
+    /// ChooseAnimalPlacement) instead of dying on the engine's pause Err.
+    /// The human seat keeps the precise Err: exposing
+    /// ChooseAnimalPlacement to the human UI is a separate work item.
+    fn cpu_apply(&mut self, action: Action) -> Result<(), String> {
+        if self.game.will_harvest_after_work() {
+            self.game.preview_harvest(&action, None)?;
+            self.pending = Some(PendingHarvest::Feeding(action));
+        } else {
+            crate::policy::apply_for_ai(&mut self.game, action, &SimpleHarvestDetails)?;
+        }
+        Ok(())
+    }
+
     pub fn advance_cpu(&mut self) -> Result<(), String> {
         let details: &dyn DetailPolicy = if self.game.card_set.enabled() {
             &CardChoiceDetails
@@ -149,7 +165,7 @@ impl Session {
             let action = details
                 .produce(&obs, space)
                 .ok_or("CPU could not make action details")?;
-            self.queue_or_apply(action)?;
+            self.cpu_apply(action)?;
         }
         Err("CPU turn count exceeded".into())
     }
