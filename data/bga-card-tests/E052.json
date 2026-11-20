@@ -6,25 +6,103 @@
       "id": "E052-normal",
       "scope": "effect_only",
       "setup": {
-        "rooms_built": 2
+        "card_played": true,
+        "cost_paid": {"reed": 1, "wood": 1}
       },
-      "action": {},
+      "action": {
+        "type": "build_rooms",
+        "rooms_built": 2,
+        "by_owner": true
+      },
       "expected": {
-        "food_delta": 2
-      }
+        "effect_applies": true,
+        "food_on_card": 2
+      },
+      "notes": "Owner builds 2 rooms -> 2 food placed on card."
     },
     {
       "id": "E052-feeding",
       "scope": "effect_only",
       "setup": {
+        "card_played": true,
         "food_on_card": 3
       },
       "action": {
-        "run_harvest": true
+        "type": "feeding_phase_start"
       },
       "expected": {
-        "food_delta": 3
-      }
+        "effect_applies": true,
+        "food_gained": 3
+      },
+      "notes": "3 food on card -> gain 3 food at feeding phase start."
+    },
+    {
+      "id": "E052-other-player-ignored",
+      "scope": "effect_only",
+      "setup": {
+        "card_played": true
+      },
+      "action": {
+        "type": "build_rooms",
+        "rooms_built": 2,
+        "by_owner": false
+      },
+      "expected": {
+        "effect_applies": false,
+        "food_on_card": 0
+      },
+      "notes": "Other player builds rooms -> no food placed (owner_only condition)."
+    },
+    {
+      "id": "E052-cost-alt-clay",
+      "scope": "legal_play",
+      "setup": {
+        "card_played": true,
+        "cost_paid": {"clay": 1}
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "E052"
+      },
+      "expected": {
+        "effect_applies": true,
+        "points_gained": 1
+      },
+      "notes": "Alternative cost 1 clay paid; same effect."
+    },
+    {
+      "id": "E052-cost-clay-only-rejected",
+      "scope": "legal_play",
+      "setup": {
+        "card_played": false,
+        "cost_paid": {}
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "E052"
+      },
+      "expected": {
+        "effect_applies": false,
+        "error": "insufficient_cost"
+      },
+      "notes": "No cost paid -> rejected."
+    },
+    {
+      "id": "E052-cost-reed-wood-partial-rejected",
+      "scope": "legal_play",
+      "setup": {
+        "card_played": false,
+        "cost_paid": {"reed": 1}
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "E052"
+      },
+      "expected": {
+        "effect_applies": false,
+        "error": "insufficient_cost"
+      },
+      "notes": "Only 1 reed without wood -> rejected (must be 1 reed + 1 wood OR 1 clay)."
     }
   ]
 }

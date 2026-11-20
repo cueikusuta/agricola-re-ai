@@ -38,107 +38,107 @@
     "printed_points": 0
   },
   "effects": [
-    {
-      "trigger": "on_take_from_accumulation",
-      "conditions": [
-        {
-          "predicate": "food_taken_from_accumulation_at_least",
-          "params": {
-            "n": 1
+      {
+        "trigger": "on_take_from_accumulation",
+        "conditions": [
+          {
+            "predicate": "food_taken_from_accumulation_exactly",
+            "params": {
+              "n": 1
+            }
           }
-        }
-      ],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "vegetable",
-            "amount": 1
+        ],
+        "steps": [
+          {
+            "operation": "gain_resource",
+            "target": "owner",
+            "params": {
+              "good": "vegetable",
+              "amount": 1
+            }
           }
-        }
-      ],
-      "optional": false,
-      "frequency": "each_time",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none",
-      "notes": "When taking at least 1 food from a food accumulation space, additionally gain 1 vegetable."
-    },
-    {
-      "trigger": "on_take_from_accumulation",
-      "conditions": [
-        {
-          "predicate": "food_taken_from_accumulation_at_least",
-          "params": {
-            "n": 2
+        ],
+        "optional": false,
+        "frequency": "each_time",
+        "duration": "instant",
+        "snapshot": "after_event",
+        "order": 0,
+        "decision_owner": "none",
+        "notes": "When taking exactly 1 food from a food accumulation space, additionally gain 1 vegetable."
+      },
+      {
+        "trigger": "on_take_from_accumulation",
+        "conditions": [
+          {
+            "predicate": "food_taken_from_accumulation_exactly",
+            "params": {
+              "n": 2
+            }
           }
-        }
-      ],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "grain",
-            "amount": 1
+        ],
+        "steps": [
+          {
+            "operation": "gain_resource",
+            "target": "owner",
+            "params": {
+              "good": "grain",
+              "amount": 1
+            }
           }
-        }
-      ],
-      "optional": false,
-      "frequency": "each_time",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none",
-      "notes": "When taking at least 2 food from a food accumulation space, additionally gain 1 grain."
-    },
-    {
-      "trigger": "on_take_from_accumulation",
-      "conditions": [
-        {
-          "predicate": "food_taken_from_accumulation_at_least",
-          "params": {
-            "n": 3
+        ],
+        "optional": false,
+        "frequency": "each_time",
+        "duration": "instant",
+        "snapshot": "after_event",
+        "order": 1,
+        "decision_owner": "none",
+        "notes": "When taking exactly 2 food from a food accumulation space, additionally gain 1 grain."
+      },
+      {
+        "trigger": "on_take_from_accumulation",
+        "conditions": [
+          {
+            "predicate": "food_taken_from_accumulation_at_least",
+            "params": {
+              "n": 3
+            }
           }
-        }
-      ],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "reed",
-            "amount": 1
+        ],
+        "steps": [
+          {
+            "operation": "gain_resource",
+            "target": "owner",
+            "params": {
+              "good": "reed",
+              "amount": 1
+            }
           }
-        }
-      ],
-      "optional": false,
-      "frequency": "each_time",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none",
-      "notes": "When taking at least 3 food from a food accumulation space, additionally gain 1 reed."
-    }
-  ],
+        ],
+        "optional": false,
+        "frequency": "each_time",
+        "duration": "instant",
+        "snapshot": "after_event",
+        "order": 2,
+        "decision_owner": "none",
+        "notes": "When taking 3 or more food from a food accumulation space, additionally gain 1 reed."
+      }
+    ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
-    "test_case_ids": [
-      "A103-normal",
-      "A103-boundary-two",
-      "A103-boundary-three",
-      "A103-not-triggered",
-      "A103-tier-contract-pending"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-19",
-    "implementation_status": "not_started",
-    "notes": "Each time you take 1/2/3+ food from a food accumulation space, additionally gain 1 vegetable/wheat/reed. Tier reading fixed by the literature (MR-03)."
-  }
+      "status": "bga_checked",
+      "unresolved_fields": [],
+      "test_case_ids": [
+        "A103-normal",
+        "A103-boundary-two",
+        "A103-boundary-three",
+        "A103-exclusive-tiers",
+        "A103-not-triggered"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-20",
+      "implementation_status": "not_started",
+      "notes": "Each time you take exactly 1/2 food from a food accumulation space, additionally gain 1 vegetable/grain. When taking 3+ food, additionally gain 1 reed. Exclusive tiers fixed per official rules (MR-03)."
+    }
 }

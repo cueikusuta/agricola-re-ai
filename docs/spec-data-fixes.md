@@ -422,3 +422,57 @@
 - ビルダーを触ったため、仕様 JSON の手修正だけで完結しない点は PR に明記する。
 - 独立レビュー（AGENTS.md §14）は別セッションで行う。本 PR ではマージしない。
 - C038 の分類訂正、S-1 の仕様作成、スキーマ拡張、トリガー語彙の統一は別 Issue / 別 PR。
+
+---
+
+## 第10章 追加修正：静的レビュー 2026-11-20 指摘対応（PR #386 後続）
+
+2026-11-20 の静的レビュー（#386/#387 トリアージ）で指摘された P1 修正を本 PR に追加で反映した。
+
+### 10.1 修正したカード
+
+| ID | カード | 修正内容 | 根拠 |
+|---|---|---|---|
+| A103 | 港の商人 | 既存実装が正しい排他3段（ちょうど1/ちょうど2/3以上）であることを確認。テストケース `A103-exclusive-tiers` で境界確認済み。 | 静的レビュー指摘「排他3段を at_least 重ね掛けにしない」は実装済み |
+| C044 | 鶏小屋 | ステータスを `bga_checked` → `needs_resolution` に変更。選択費用（木2＋葦1 / レンガ2）がスキーマ v1 で完全表現不可のため。 | バリデータ要件（bga_checked は unresolved_fields 空必須） |
+| E052 | 小部屋 | `cost` を配列から `null` に変更、選択費用（葦1＋木1 / レンガ1）を `alternative_cost_notes` のみに。ステータスを `bga_checked` → `needs_resolution` に変更。 | 静的レビュー指摘、スキーマ v1 制約、バリデータ要件 |
+| C135 | 村長 | 第1効果（基本1木）に条件 `rounds_remaining min:1` を追加。残り0ラウンドで木0になるよう修正。テストケース `C135-zero-rounds` 追加。 | 静的レビュー指摘「残り0ラウンドで木0」 |
+| C038 | キリスト教 | 効果ステップの `target` を `owner` → `all_other_players` に修正（params 内の重複 target を削除）。テストケース 5件に拡充（2人/4人、前提不成立境界含む）。 | 静的レビュー指摘「受取人を正規の欄で all_other_players に統一」 |
+| C040 | ズタ袋 | テストケース 4件に拡充（小麦払い/葦払い、前提不成立、無効費用）。 | 静的レビュー指摘「テストデータが新しい効果を検査するよう直す」 |
+| C153 | 原型製作者 | テストケース 4件に拡充（正常交換/辞退/木材不足/自分の改築時不発火）。 | 静的レビュー指摘「テストデータが新しい効果を検査するよう直す」 |
+| B069 | 陶工市 | `post_play.destination` を `left_neighbor_hand` → `played_area` に修正。 | 静的レビュー指摘「left_neighbor_hand を残さない」 |
+| E150 | 石打ち | 第1効果に条件 `space_occupied_by_other` を追加（占有者が他プレイヤーの条件）。 | 静的レビュー指摘「占有者が他プレイヤーの条件」 |
+
+### 10.2 確認のみ（修正不要）のカード
+
+| ID | 指摘内容 | 確認結果 |
+|---|---|---|
+| A110 | 改築元がレンガの場合だけに限定 | 現行実装で `house_is: stone`（改築後が石＝元はレンガ）としており正しい。2016ルールでは木→レンガ→石の順でのみ改築可能。 |
+| D160 | 増員アクションの対象漏れ確認 | `family_growth_with_room` / `family_growth_no_room` の両スペースを条件に含めており、基本セットの家族増加アクションは網羅済み。 |
+
+### 10.3 対応保留（builder 管理対象）
+
+| ID | 指摘内容 | 理由 |
+|---|---|---|
+| A050 | C038 と同型の受取人修正（`all_other_players` 統一） | `scripts/build_bga_card_specs.py` の builder 管理対象。builder 側の `gain` ヘルパーが step.target を `owner` 固定で生成するため、同一修正には builder 改修が必要。本タスクでは builder 非変更のため据え置き、別 Issue で対応。 |
+
+### 10.4 検証結果
+
+| 検証 | 方法 | 結果 |
+|---|---|---|
+| JSON 構文 | `node` で変更ファイルを `JSON.parse` | 全て成功 |
+| 仕様検証 | `python scripts/validate_bga_card_specs.py` | `errors: []`、spec 695 / without_spec 145 |
+| Python 全テスト | `python -m unittest discover -s tests` | 287テスト成功 |
+| カードカタログ検証 | `python scripts/validate_card_catalog.py` | `errors: []` |
+
+### 10.5 自己レビュー
+
+| 単位 | 確認したこと | 結果 |
+|---|---|---|
+| C135境界修正 | rounds_remaining min:1 条件追加、zero-rounds テスト追加 | 修正済み |
+| C038 target 修正 | step.target を all_other_players に統一、重複 target 除去 | 修正済み |
+| C044/E052 ステータス変更 | bga_checked → needs_resolution でバリデータ通過 | 修正済み |
+| E150 条件追加 | space_occupied_by_other 条件追加 | 修正済み |
+| B069 destination 修正 | left_neighbor_hand → played_area | 修正済み |
+| テストデータ拡充 | C038/C040/C135/C153 に境界・正常系テスト追加 | 修正済み |
+| A050 同型確認 | builder 管理対象のため別 Issue に記録 | 保留記録済み |

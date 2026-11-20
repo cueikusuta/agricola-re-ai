@@ -32,12 +32,21 @@
     ]
   },
   "play": {
-    "action": "minor_improvement",
-    "cost": null,
-    "prerequisites": [],
-    "printed_points": 1,
-    "alternative_cost_notes": "2 木 + 1 葦 / 2 レンガ"
-  },
+      "action": "minor_improvement",
+      "cost": [
+        {
+          "good": "wood",
+          "amount": 2
+        },
+        {
+          "good": "reed",
+          "amount": 1
+        }
+      ],
+      "prerequisites": [],
+      "printed_points": 1,
+      "alternative_cost_notes": "2 wood + 1 reed OR 2 clay (choice cost; schema v1 does not encode alternatives)"
+    },
   "effects": [
     {
       "trigger": "on_play",
@@ -76,17 +85,19 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "play.cost: the choice cost (2 wood + 1 reed / 2 clay) cannot be encoded under schema v1; kept in alternative_cost_notes"
-    ],
-    "test_case_ids": [
-      "C044-normal",
-      "C044-edge"
-    ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-19",
-    "implementation_status": "not_started",
-    "notes": "Cost (2 wood + 1 reed) or 2 clay; 1 printed point. Place 1 food on each of the next 8 round spaces and collect it at those round starts. The previous end_scoring 1-point effect was an inventory placeholder."
-  }
+        "status": "needs_resolution",
+        "unresolved_fields": [
+          "play.cost: the choice cost (2 wood + 1 reed / 2 clay) cannot be encoded under schema v1; primary cost encoded, alternative in alternative_cost_notes"
+        ],
+        "test_case_ids": [
+          "C044-normal",
+          "C044-cost-alt-clay",
+          "C044-cost-clay-only-rejected",
+          "C044-cost-reed-zero-rejected"
+        ],
+        "checked_by": "AI source comparison",
+        "checked_on": "2026-11-20",
+        "implementation_status": "not_started",
+        "notes": "Cost (2 wood + 1 reed) or 2 clay; 1 printed point. Place 1 food on each of the next 8 round spaces and collect it at those round starts. The previous end_scoring 1-point effect was an inventory placeholder."
+      }
 }

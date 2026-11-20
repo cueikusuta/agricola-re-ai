@@ -87,8 +87,8 @@
     }
   ],
   "post_play": {
-    "destination": "left_neighbor_hand"
-  },
+      "destination": "played_area"
+    },
   "review": {
     "status": "bga_checked",
     "unresolved_fields": [],

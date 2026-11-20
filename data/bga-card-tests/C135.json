@@ -51,7 +51,23 @@
       "notes": "Round 13: 1 round remaining, 1+ rounds = 1 wood"
     },
     {
-      "id": "C135-scoring-no-negatives",
+          "id": "C135-zero-rounds",
+          "scope": "effect_only",
+          "setup": {
+            "round": 14
+          },
+          "action": {
+            "play": "C135"
+          },
+          "expected": {
+            "resources_gained": {
+              "wood": 0
+            }
+          },
+          "notes": "Round 14: 0 rounds remaining, no wood gained (condition min:1 not met)"
+        },
+        {
+          "id": "C135-scoring-no-negatives",
       "scope": "effect_only",
       "setup": {
         "player_scores": {

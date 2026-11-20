@@ -91,8 +91,11 @@
     "status": "bga_checked",
     "unresolved_fields": [],
     "test_case_ids": [
-      "C153-normal"
-    ],
+          "C153-normal",
+          "C153-declined",
+          "C153-insufficient-wood",
+          "C153-owner-renovates"
+        ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",
     "implementation_status": "not_started",

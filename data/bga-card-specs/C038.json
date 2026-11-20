@@ -46,29 +46,28 @@
     "alternative_cost_notes": null
   },
   "effects": [
-    {
-      "trigger": "on_play",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "food",
-            "amount": 1,
-            "target": "all_other_players"
+      {
+        "trigger": "on_play",
+        "conditions": [],
+        "steps": [
+          {
+            "operation": "gain_resource",
+            "target": "all_other_players",
+            "params": {
+              "good": "food",
+              "amount": 1
+            }
           }
-        }
-      ],
-      "optional": false,
-      "frequency": "once_per_play",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none",
-      "notes": "When this card is played, every other player gains 1 food."
-    }
-  ],
+        ],
+        "optional": false,
+        "frequency": "once_per_play",
+        "duration": "instant",
+        "snapshot": "after_event",
+        "order": 0,
+        "decision_owner": "none",
+        "notes": "When this card is played, every other player gains 1 food."
+      }
+    ],
   "post_play": {
     "destination": "played_area"
   },
@@ -76,9 +75,12 @@
     "status": "bga_checked",
     "unresolved_fields": [],
     "test_case_ids": [
-      "C038-normal",
-      "C038-edge"
-    ],
+          "C038-normal",
+          "C038-two-player",
+          "C038-four-player",
+          "C038-prereq-not-met",
+          "C038-prereq-exceeded"
+        ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",
     "implementation_status": "not_started",

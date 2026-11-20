@@ -99,9 +99,11 @@
       "play.cost: the choice cost (1 grain / 1 reed) cannot be encoded under schema v1; kept in alternative_cost_notes"
     ],
     "test_case_ids": [
-      "C040-normal",
-      "C040-edge"
-    ],
+          "C040-normal-grain",
+          "C040-normal-reed",
+          "C040-prereq-not-met",
+          "C040-cost-invalid"
+        ],
     "checked_by": "AI ledger import",
     "checked_on": "2026-11-19",
     "implementation_status": "not_started",

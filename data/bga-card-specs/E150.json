@@ -38,15 +38,19 @@
     "printed_points": 0
   },
   "effects": [
-    {
-      "trigger": "passive",
-      "conditions": [
-        {
-          "predicate": "space_yields_stone_and_other_building_material",
-          "params": {}
-        }
-      ],
-      "steps": [
+      {
+        "trigger": "passive",
+        "conditions": [
+          {
+            "predicate": "space_yields_stone_and_other_building_material",
+            "params": {}
+          },
+          {
+            "predicate": "space_occupied_by_other",
+            "params": {}
+          }
+        ],
+        "steps": [
         {
           "operation": "other",
           "target": "owner",
