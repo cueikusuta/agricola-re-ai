@@ -10,6 +10,7 @@
 //! Each resolution site carries a comment citing the 2016 Lookout rulebook.
 //! Source: docs/bga-card-specification.md and existing repo citations.
 
+use crate::card_zones::{move_card, CardMoveCtx, CardZone};
 use crate::cards::{CardEffect, CardSet};
 use crate::model::{Animal, Crop, Good, House, Player, Space, Tile, FARM_CELLS};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
@@ -1540,11 +1541,14 @@ pub fn handle_moonshine(
         }
     } else {
         // Pass the drawn occupation to the left neighbour's hand.
-        if let Some(pos) = ctx.cards.hands[actor].iter().position(|x| x == &chosen) {
-            ctx.cards.hands[actor].remove(pos);
+        // In a 1-player game, there is no left neighbour; the card stays in hand.
+        if num_players >= 2 {
+            if let Some(pos) = ctx.cards.hands[actor].iter().position(|x| x == &chosen) {
+                ctx.cards.hands[actor].remove(pos);
+            }
+            let left = (actor + 1) % num_players;
+            ctx.cards.hands[left].push(chosen);
         }
-        let left = (actor + 1) % num_players.max(1);
-        ctx.cards.hands[left].push(chosen);
     }
     Ok(EffectResult::Resolved)
 }
@@ -2126,6 +2130,12 @@ pub fn dispatch_play(
         }
     }
 
+    // Update card points for the newly played card before post-play destination handling.
+    // This ensures points are added before they might be subtracted for pass-left cards.
+    if let Some(card) = card_set.definition(new_card_id) {
+        crate::cards::update_card_points_on_play(&mut players[player], card.points)?;
+    }
+
     // Post-play destination (2016 Lookout: printed "pass left" cards move to
     // the left neighbour's hand after play). Runs after every phase so the
     // card leaves the played area only once its own on-play effects resolved.
@@ -2136,21 +2146,26 @@ pub fn dispatch_play(
         ) && players.len() >= 2
         {
             let left = (player + 1) % players.len();
-            if let Some(pos) = players[player]
-                .played_cards
-                .iter()
-                .position(|x| x == new_card_id)
-            {
-                players[player].played_cards.remove(pos);
-                // The card left the owner's played area, so its printed points
-                // (possibly negative) leave the owner's card_points cache with
-                // it (validate_card_points invariant).
-                players[player].card_points = players[player]
-                    .card_points
-                    .checked_sub(card.points)
-                    .ok_or("card points underflow on pass-left")?;
-                cards.hands[left].push(new_card_id.to_string());
-            }
+            // Use canonical move_card API for zone transition (Issue #266).
+            let mut move_ctx = CardMoveCtx {
+                cards,
+                players,
+                improvement_market,
+            };
+            move_card(
+                &mut move_ctx,
+                new_card_id,
+                CardZone::Played { player },
+                CardZone::Hand { player: left },
+            )?;
+            // The card left the owner's played area, so its printed points
+            // (possibly negative) leave the owner's card_points cache with
+            // it (validate_card_points invariant). Points were already added
+            // above, so this subtraction is now safe.
+            players[player].card_points = players[player]
+                .card_points
+                .checked_sub(card.points)
+                .ok_or("card points underflow on pass-left")?;
         }
     }
     Ok(())
@@ -3810,8 +3825,6 @@ mod tests {
                 &mut pending,
             )
             .unwrap();
-            let card = set.definition("M1").unwrap();
-            crate::cards::update_card_points_on_play(&mut ctx.players[0], card.points).unwrap();
         }
 
         assert_eq!(
@@ -5916,8 +5929,6 @@ mod tests {
                 &mut pending,
             )
             .unwrap();
-            let card = set.definition("A117").unwrap();
-            crate::cards::update_card_points_on_play(&mut ctx.players[0], card.points).unwrap();
         }
         let dispatcher_wood = players[0].supply.wood;
 
