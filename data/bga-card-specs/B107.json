@@ -79,6 +79,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "implemented",
-    "notes": "BGA wiki content structured; official verification remains separate."
+    "notes": "Place 1 food on each of the next round spaces (current+1..14); collect it at the start of those rounds. The food is goods on round spaces, so B106 Clean-Minded Person also triggers on it; losing the card loses the remaining claim; goods cannot be declined. The current StartRoundGain shape is equivalent only for the food amount; a round-space goods model is a separate issue."
   }
 }
