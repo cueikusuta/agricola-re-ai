@@ -320,6 +320,9 @@ pub enum ScoreBonusRule {
     HouseMaterial,
     UnfencedStables,
     ImprovementCount,
+    /// A031 担保 (Debt Security): 1 bonus point per major improvement, capped at
+    /// the number of unused farmyard spaces (empty cells without a stable).
+    MajorImprovementsCappedByUnusedFarmyardSpaces,
     SparePastureCapacity,
     LaterOccupations,
     /// D100 君主 (Sovereign): 1 bonus point per scoring category that has
@@ -971,6 +974,12 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
     }
     let mut cards = vec![
         scoring(
+            "A031",
+            CardKind::MinorImprovement,
+            vec![(Good::Food, 2)],
+            ScoreBonusRule::MajorImprovementsCappedByUnusedFarmyardSpaces,
+        ),
+        scoring(
             "A032",
             CardKind::MinorImprovement,
             vec![(Good::Wood, 2)],
@@ -1078,6 +1087,15 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         9 => 7,
                         _ => 9,
                     }
+                }
+                ScoreBonusRule::MajorImprovementsCappedByUnusedFarmyardSpaces => {
+                    let major_improvements = player.improvements.len() as i32;
+                    let unused_farmyard_spaces = player
+                        .farm
+                        .iter()
+                        .filter(|cell| matches!(cell.tile, Tile::Empty) && !cell.stable)
+                        .count() as i32;
+                    major_improvements.min(unused_farmyard_spaces)
                 }
                 ScoreBonusRule::SparePastureCapacity => player
                     .pastures
@@ -1339,6 +1357,120 @@ mod verified_scoring_card_tests {
             "after_occ".into(),
         ];
         assert_eq!(end_game_bonus(&set, &player), 1);
+    }
+
+    #[test]
+    fn a031_major_improvements_capped_by_unused_farmyard_spaces() {
+        // Default farm: 15 cells, 2 rooms -> 13 unused spaces; 3 major improvements -> 3 points.
+        assert_eq!(
+            score_card("A031", |p| {
+                p.improvements.push(Improvement::Fireplace2);
+                p.improvements.push(Improvement::Fireplace3);
+                p.improvements.push(Improvement::Hearth4);
+            }),
+            3
+        );
+        // 5 major improvements but only 2 unused spaces -> capped at 2.
+        assert_eq!(
+            score_card("A031", |p| {
+                p.improvements.push(Improvement::Fireplace2);
+                p.improvements.push(Improvement::Fireplace3);
+                p.improvements.push(Improvement::Hearth4);
+                p.improvements.push(Improvement::Hearth5);
+                p.improvements.push(Improvement::ClayOven);
+                p.farm.truncate(3); // [Room, Empty, Empty] -> 2 unused spaces
+            }),
+            2
+        );
+    }
+
+    #[test]
+    fn a032_pasture_area_boundaries() {
+        assert_eq!(score_card("A032", |_| {}), 0);
+        assert_eq!(
+            score_card("A032", |p| {
+                p.pastures.push(Pasture {
+                    id: 0,
+                    cells: (0..5).collect(),
+                    animal: None,
+                    quantity: 0,
+                })
+            }),
+            0
+        );
+        assert_eq!(
+            score_card("A032", |p| {
+                p.pastures.push(Pasture {
+                    id: 0,
+                    cells: (0..6).collect(),
+                    animal: None,
+                    quantity: 0,
+                })
+            }),
+            1
+        );
+        assert_eq!(
+            score_card("A032", |p| {
+                p.pastures.push(Pasture {
+                    id: 0,
+                    cells: (0..10).collect(),
+                    animal: None,
+                    quantity: 0,
+                })
+            }),
+            4
+        );
+    }
+
+    #[test]
+    fn a098_unfenced_stables_count() {
+        assert_eq!(score_card("A098", |_| {}), 0);
+        assert_eq!(
+            score_card("A098", |p| {
+                p.farm[2].stable = true;
+                p.farm[4].stable = true;
+            }),
+            2
+        );
+    }
+
+    #[test]
+    fn a133_improvement_count_boundaries() {
+        let mut set = CardSet {
+            definitions: verified_scoring_cards(3),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "test_minor".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        });
+        // 4 total improvements (0 minors + 4 built) -> 0 points.
+        let mut player = Player::new(0, 0);
+        player.played_cards.push("A133".into());
+        player.improvements.extend([
+            Improvement::Fireplace2,
+            Improvement::Fireplace3,
+            Improvement::Hearth4,
+            Improvement::Hearth5,
+        ]);
+        assert_eq!(end_game_bonus(&set, &player), 0);
+        // 5 total -> 2 points.
+        player.played_cards.push("test_minor".into());
+        assert_eq!(end_game_bonus(&set, &player), 2);
+        // 6 total -> 3 points.
+        player.improvements.push(Improvement::ClayOven);
+        assert_eq!(end_game_bonus(&set, &player), 3);
+        // 9 total (1 minor + 7 built) -> 7 points.
+        player.improvements.extend([
+            Improvement::StoneOven,
+            Improvement::Joinery,
+            Improvement::Pottery,
+        ]);
+        assert_eq!(end_game_bonus(&set, &player), 7);
+        assert!(!verified_scoring_cards(2).iter().any(|c| c.id == "A133"));
     }
 }
 
@@ -1626,16 +1758,14 @@ mod verified_minor_worker_tests {
         let mut set = CardSet {
             definitions: verified_minor_worker_cards(2),
         };
-        for i in 1..=3 {
-            set.definitions.push(CardDefinition {
-                use_limit: None,
-                id: format!("occ{i}"),
-                kind: CardKind::Occupation,
-                cost: vec![],
-                points: 0,
-                effects: vec![],
-            });
-        }
+        set.definitions.extend((1..=3).map(|i| CardDefinition {
+            use_limit: None,
+            id: format!("occ{i}"),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        }));
         let card = set.definition("B077").unwrap();
         let mut p = Player::new(0, 1);
         p.played_cards.extend(["occ1".into(), "occ2".into()]);
@@ -3034,16 +3164,14 @@ mod passive_cards_tests {
         let mut set = CardSet {
             definitions: verified_round_and_harvest_cards(),
         };
-        for i in 0..4 {
-            set.definitions.push(CardDefinition {
-                use_limit: None,
-                id: format!("occ{i}"),
-                kind: CardKind::Occupation,
-                cost: vec![],
-                points: 0,
-                effects: vec![],
-            });
-        }
+        set.definitions.extend((0..4).map(|i| CardDefinition {
+            use_limit: None,
+            id: format!("occ{i}"),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        }));
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
         assert!(can_play(&set, set.definition("B050").unwrap(), &p, 0));
@@ -3206,13 +3334,13 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 39);
+        assert_eq!(set.definitions.len(), 40);
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::MinorImprovement)
                 .count(),
-            22
+            23
         );
         assert_eq!(
             set.definitions
@@ -4301,23 +4429,21 @@ mod verified_band_d_tests {
         assert_eq!(end_game_bonus(&set, &p), 0);
         // fields 5 (=4 pts), pastures 4 (=4 pts), fenced stable x4 (=4 pts),
         // grain 8 (=4 pts) -> 4 categories.
-        for i in 1..=5 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(5 + 1).skip(1) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
         }
-        for i in 0..4 {
-            p.pastures.push(crate::model::Pasture {
-                id: i,
-                cells: vec![10, 11],
-                animal: None,
-                quantity: 0,
-            });
-        }
-        for i in 10..=13 {
-            p.farm[i].stable = true;
-            p.farm[i].tile = Tile::Pasture { id: (10 + i) as u8 };
+        p.pastures.extend((0..4).map(|i| crate::model::Pasture {
+            id: i,
+            cells: vec![10, 11],
+            animal: None,
+            quantity: 0,
+        }));
+        for (i, cell) in p.farm.iter_mut().enumerate().take(13 + 1).skip(10) {
+            cell.stable = true;
+            cell.tile = Tile::Pasture { id: (10 + i) as u8 };
         }
         for _ in 0..8 {
             p.supply.grain += 1;
@@ -4335,8 +4461,8 @@ mod verified_band_d_tests {
         p.played_cards.push("D100".into());
 
         // Test fields boundary: 4 fields = 3 pts, 5 fields = 4 pts
-        for i in 1..=4 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(4 + 1).skip(1) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
@@ -4359,14 +4485,12 @@ mod verified_band_d_tests {
         // Reset and test pastures boundary: 3 pastures = 3 pts, 4 pastures = 4 pts
         let mut p2 = Player::new(0, 0);
         p2.played_cards.push("D100".into());
-        for i in 0..3 {
-            p2.pastures.push(crate::model::Pasture {
-                id: i,
-                cells: vec![(10 + i * 2) as usize, (11 + i * 2) as usize],
-                animal: None,
-                quantity: 0,
-            });
-        }
+        p2.pastures.extend((0..3).map(|i| crate::model::Pasture {
+            id: i,
+            cells: vec![(10 + i * 2) as usize, (11 + i * 2) as usize],
+            animal: None,
+            quantity: 0,
+        }));
         assert_eq!(
             end_game_bonus(&set, &p2),
             0,
@@ -4405,9 +4529,9 @@ mod verified_band_d_tests {
         // Reset and test fenced_stables boundary: 3 fenced stables = 3 pts, 4 = 4 pts
         let mut p4 = Player::new(0, 0);
         p4.played_cards.push("D100".into());
-        for i in 10..=12 {
-            p4.farm[i].stable = true;
-            p4.farm[i].tile = Tile::Pasture { id: (10 + i) as u8 };
+        for (i, cell) in p4.farm.iter_mut().enumerate().take(12 + 1).skip(10) {
+            cell.stable = true;
+            cell.tile = Tile::Pasture { id: (10 + i) as u8 };
         }
         assert_eq!(
             end_game_bonus(&set, &p4),
@@ -4740,8 +4864,8 @@ mod verified_band_e_tests {
         // Default farm has two Room cells and 13 Empty cells -> not all used.
         assert_eq!(end_game_bonus(&set, &p), 0);
         // Fill most cells but leave one Empty -> still 0 (boundary: 14 of 15).
-        for i in 0..14 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(14) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
@@ -4758,11 +4882,11 @@ mod verified_band_e_tests {
         q.played_cards.push("E034".into());
         q.farm[0].tile = Tile::Room;
         q.farm[5].tile = Tile::Room;
-        for i in 1..5 {
-            q.farm[i].tile = Tile::Pasture { id: 0 };
+        for cell in q.farm.iter_mut().take(5).skip(1) {
+            cell.tile = Tile::Pasture { id: 0 };
         }
-        for i in 6..15 {
-            q.farm[i].tile = Tile::Pasture { id: 0 };
+        for cell in q.farm.iter_mut().take(15).skip(6) {
+            cell.tile = Tile::Pasture { id: 0 };
         }
         assert_eq!(end_game_bonus(&set, &q), 2);
     }
@@ -4778,14 +4902,14 @@ mod verified_band_e_tests {
         p.played_cards.push("E034".into());
         p.farm[0].tile = Tile::Room;
         p.farm[5].tile = Tile::Room;
-        for i in 1..=4 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(4 + 1).skip(1) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
         }
-        for i in 6..=13 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(13 + 1).skip(6) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Vegetable),
                 remaining: 1,
             };

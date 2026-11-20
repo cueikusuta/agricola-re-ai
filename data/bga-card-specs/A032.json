@@ -97,7 +97,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "implemented",
-    "notes": "BGA wiki content structured; official verification remains separate."
+    "implementation_status": "tested",
+    "notes": "BGA wiki content structured; official verification remains separate. Rust end-game bonus covers the pasture_area threshold table (6/7/8/10 -> 1/2/3/4 points)."
   }
 }

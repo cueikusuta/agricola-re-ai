@@ -76,7 +76,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "implemented",
-    "notes": "BGA wiki content structured; official verification remains separate."
+    "implementation_status": "tested",
+    "notes": "BGA wiki content structured; official verification remains separate. Rust end-game bonus counts unfenced stables (stable on non-pasture cell) only."
   }
 }

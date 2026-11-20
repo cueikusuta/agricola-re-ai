@@ -95,6 +95,6 @@
   "checked_by": "BGA wiki cross-check (JA and EN pages)",
   "checked_on": "2026-11-14",
   "implementation_status": "not_started",
-  "notes": "Min of counts of major_improvement (A031), minor_improvement (new count name, noted), and occupation (C004). Count names are data-level strings. Third-party BGA wiki check only; not official Lookout verification."
+  "notes": "Min of counts of major_improvement (A031), minor_improvement (new count name, noted), and occupation (C004). Count names are data-level strings. Third-party BGA wiki check only; not official Lookout verification. Not implemented in Chapter 1: end_scoring in this engine resolves to bonus points via ScoreBonusRule, while this card grants a vegetable resource; a literal resource delivery needs an end-game state hook and is deferred to a later chapter."
  }
 }

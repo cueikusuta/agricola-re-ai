@@ -2851,6 +2851,7 @@ CARDS = {
                    freq="end_of_game", dur="permanent", snap="live_state"),
         ],
         "notes": "At scoring: 1 point per major improvement, capped at the number of unused farmyard spaces.",
+        "implementation_status": "implemented",
         "tests": [
             case("A031-normal", {"major_improvements": 3, "unused_farmyard_spaces": 5},
                  {"end_scoring": True}, {"points_delta": 3}),

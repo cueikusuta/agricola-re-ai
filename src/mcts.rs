@@ -1189,8 +1189,9 @@ mod tests {
         // Updated: added A121 Brick Stamping to verified_minor_worker_cards (pool size 34->35)
         // Updated: added B064 Waterwheel + C141 Sheep Provider + A050 Milk Jug + D061 Bale of Straw
         // to the verified pools (worker_bonus + round_and_harvest, pool size 35->39)
+        // Updated: added A031 to verified_scoring_cards (pool size 39->40)
         assert_eq!(
-            digest, "26895709ce7d07c170a1cefdf39dfe53a2d04b8a1e18bcb5a7e6c9adcb9151f0",
+            digest, "b0a2027f816496826ed2b3af15fddb2f970ed0568320821b3e3a4237e08dff51",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
