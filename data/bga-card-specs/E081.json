@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "card_id": "E081",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "錬金術師の研究室",
+    "name_en": "Alchemists Lab"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2672",
+        "language": "ja",
+        "checked_on": "2026-11-19",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-19",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
+    "printed_points": 1
+  },
+  "effects": [
+    {
+      "trigger": "on_use_this_card",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "other",
+          "params": {
+            "action": "user_gains_one_of_each_present_building_resource_type",
+            "goods": [
+              "wood",
+              "clay",
+              "reed",
+              "stone"
+            ],
+            "recipient": "player_using_this_card",
+            "amount_per_type": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "The player who uses this card gets 1 building resource of each type they already have in stock."
+    },
+    {
+      "trigger": "on_use_this_card",
+      "conditions": [
+        {
+          "predicate": "user_is_not_owner",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "charge_user_food",
+            "amount": 1,
+            "recipient": "card_owner",
+            "timing": "before_use"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "If another player uses this card, they must first pay 1 food to the card owner. Enforcement when the user cannot pay is undecided (BQ-13)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: no established modeling for a card acting as a universal action space usable by every player (not a farmyard space)",
+      "effects.1: whether a non-owner user who cannot pay 1 food may still use the card (or the payment is waived) is undecided (BQ-13, same class as #370 H-1b)"
+    ],
+    "test_case_ids": [
+      "E081-owner-use",
+      "E081-other-pays-food",
+      "E081-other-cannot-pay"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-19",
+    "implementation_status": "not_started",
+    "notes": "This card is an action space usable by everyone. The user gets 1 building resource of each type they already have; a non-owner user must first pay the card owner 1 food."
+  }
+}

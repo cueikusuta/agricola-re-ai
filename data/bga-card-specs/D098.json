@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "card_id": "D098",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "交渉使節",
+    "name_en": "Transactor"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2823",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "before_final_harvest",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "take_from_accumulations",
+            "action": "take_all_building_resources_from_board",
+            "resources": ["wood", "clay", "reed", "stone"],
+            "notes": "ラウンド14の最後の収穫の直前に、ゲームボード上に残っている建設資材をすべて取る"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: ラウンド14最後の収穫直前にボード上の建設資材（木材・レンガ・葦・石）を全て獲得"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: before_final_harvest は語彙に無い。round_number=14 かつ after_harvest 直前のタイミングをどう表現するか",
+      "effects[0].steps[0].params.kind=other: take_from_accumulations で『ゲームボード上の建設資材』の範囲（累積スペースのみか、アクションスペース上の資源も含むか、全プレイヤー分か自分のみか）が未確定",
+      "classification: 段階外（単一サイト: 最終収穫の直前/ボード上の資材獲得）だが、トリガータイミングと対象資源のスコープが語彙外"
+    ],
+    "test_case_ids": [
+      "D098-final-harvest-take-board-resources",
+      "D098-round-13-no-effect",
+      "D098-empty-accumulations"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: Just before the final harvest (round 14), take all building resources (wood/clay/reed/stone) remaining on the game board. Trigger: before final harvest. Unresolved: exact trigger timing, scope of 'board resources' (accumulation spaces only? all spaces?), all players or self only."
+  }
+}

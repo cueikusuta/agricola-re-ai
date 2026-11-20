@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "card_id": "D099",
+  "cases": [
+    {
+      "id": "D099-play-round-4-then-final-harvest-score",
+      "scope": "effect_only",
+      "setup": {
+        "round_played": 4,
+        "round": 14,
+        "people": 3,
+        "clay": 3
+      },
+      "action": {
+        "trigger": "on_play",
+        "round": 4
+      },
+      "expected": {
+        "marker_placed": true
+      },
+      "notes": "Played in round 4 (<=4), marker placed for end-game scoring."
+    },
+    {
+      "id": "D099-play-round-5-no-score",
+      "scope": "effect_only",
+      "setup": {
+        "round_played": 5,
+        "round": 14,
+        "people": 3,
+        "clay": 3
+      },
+      "action": {
+        "trigger": "on_play",
+        "round": 5
+      },
+      "expected": {
+        "marker_placed": false,
+        "reason": "played after round 4"
+      },
+      "notes": "Played in round 5 (>4), no marker, no end-game scoring."
+    },
+    {
+      "id": "D099-final-harvest-insufficient-clay",
+      "scope": "effect_only",
+      "setup": {
+        "round_played": 4,
+        "round": 14,
+        "people": 4,
+        "clay": 2
+      },
+      "action": {
+        "trigger": "after_final_harvest",
+        "buy_points_with_clay": 2
+      },
+      "expected": {
+        "points_gained": 2,
+        "clay_spent": 2,
+        "notes": "Only 2 clay available, can buy 2 points (limited by clay, not by person count 4)"
+      },
+      "notes": "After final harvest, pay clay for points up to person count. With 2 clay and 4 people, max 2 points."
+    }
+  ]
+}

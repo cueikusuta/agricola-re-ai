@@ -333,11 +333,13 @@ fn start_round_rejects_pending_and_preserves_state_hash() {
     // 手動で pending decision を注入 (ChooseTriggerOrder を模倣)
     use agricola_re_ai::card_events::TriggerPhase;
     use agricola_re_ai::pending::{PendingDecision, PendingKind};
+    use agricola_re_ai::registry::EventKind;
     let decision = PendingDecision::new(
         1, // id
         0, // player
         PendingKind::ChooseTriggerOrder {
             phase: TriggerPhase::After,
+            site: EventKind::WorkerPlaced,
             triggers: vec![("fake_card".into(), 0, "fake_trigger".into())],
         },
         hash_before.clone(), // state_hash_before は現在の hash と一致

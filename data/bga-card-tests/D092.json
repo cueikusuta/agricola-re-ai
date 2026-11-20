@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "card_id": "D092",
+  "cases": [
+    {
+      "id": "D092-family-growth-with-empty-room",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "rooms": 3,
+        "people": 2,
+        "food": 2
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "person_index": 0,
+        "choose_family_growth": true
+      },
+      "expected": {
+        "family_growth_allowed": true,
+        "people_delta": 1,
+        "food_delta": -2,
+        "points_delta": -2
+      },
+      "notes": "Round 5+, empty room exists (3 rooms, 2 people). After person's action, may do family growth paying 2 food, gaining newborn person, -2 points."
+    },
+    {
+      "id": "D092-no-empty-room",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "rooms": 2,
+        "people": 2,
+        "food": 2
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "person_index": 0,
+        "choose_family_growth": true
+      },
+      "expected": {
+        "family_growth_allowed": false,
+        "reason": "no empty room (rooms == people)"
+      },
+      "notes": "No empty room (2 rooms, 2 people). Family growth not offered."
+    },
+    {
+      "id": "D092-before-round-5",
+      "scope": "effect_only",
+      "setup": {
+        "round": 4,
+        "rooms": 3,
+        "people": 2,
+        "food": 2
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "person_index": 0,
+        "choose_family_growth": true
+      },
+      "expected": {
+        "family_growth_allowed": false,
+        "reason": "round < 5"
+      },
+      "notes": "Round 4, even with empty room, effect not active yet (starts round 5)."
+    }
+  ]
+}

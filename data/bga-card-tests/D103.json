@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "card_id": "D103",
+  "cases": [
+    {
+      "id": "D103-fishing-place-person-gain-stone",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2,
+        "unplaced_people": 1
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space_used": "fishing",
+        "pay_food": 1,
+        "place_person_on_card": true,
+        "choose_reward": "stone_3"
+      },
+      "expected": {
+        "person_on_card": 1,
+        "stone_gained": 3,
+        "food_spent": 1,
+        "unplaced_people_delta": -1
+      },
+      "notes": "Use Fishing, pay 1 food, place person on card, choose 3 stone reward."
+    },
+    {
+      "id": "D103-reed-bank-place-person-gain-grain-veg",
+      "scope": "effect_only",
+      "setup": {
+        "food": 2,
+        "unplaced_people": 1
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space_used": "reed_bank",
+        "pay_food": 1,
+        "place_person_on_card": true,
+        "choose_reward": "grain_1_veg_1"
+      },
+      "expected": {
+        "person_on_card": 1,
+        "grain_gained": 1,
+        "vegetable_gained": 1,
+        "food_spent": 1
+      },
+      "notes": "Use Reed Bank, pay 1 food, place person on card, choose 1 grain + 1 vegetable reward."
+    },
+    {
+      "id": "D103-no-food-cannot-use",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0,
+        "unplaced_people": 1
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space_used": "fishing",
+        "pay_food": 1
+      },
+      "expected": {
+        "effect_allowed": false,
+        "reason": "insufficient food"
+      },
+      "notes": "No food to pay. Cannot use effect."
+    }
+  ]
+}
