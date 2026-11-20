@@ -704,3 +704,213 @@ fn spec_cost_parity_with_verified_cards() {
         );
     }
 }
+
+// ---------------- pass-left regression test ----------------
+
+#[test]
+fn pass_left_zone_transition_and_card_points() {
+    // Test that pass-left cards (B003) correctly transition from owner's
+    // played area to left neighbor's hand via the canonical move_card API,
+    // and that card_points is updated correctly (points added then subtracted).
+    // This verifies the fix for P1-1 (regression test) and P1-2 (move_card API).
+
+    let set = new_set(vec![
+        CardDefinition {
+            use_limit: None,
+            id: "B003".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0, // B003 has 0 points, but test the mechanism
+            effects: vec![CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost: 2 }],
+            post_play: PostPlayDestination::LeftNeighborHand,
+        },
+        occ_def("test_occ"),
+    ]);
+    let mut player = Player::new(0, 0);
+    player.supply.food = 0; // Force pass branch
+                            // B003 is already in played_cards (simulating state after hand->played move)
+    let hand = vec!["test_occ".to_owned()]; // B003 NOT in hand
+
+    // Need a proper CardState with two hands to test left-neighbor transfer
+    let mut cards = agricola_re_ai::cards::CardState {
+        hands: vec![hand.clone(), vec![]], // player 0 hand, player 1 hand
+        ..Default::default()
+    };
+    let mut players = vec![player.clone(), Player::new(1, 0)];
+    // Pre-place B003 in played_cards as dispatch_play expects
+    players[0].played_cards.push("B003".to_owned());
+    let mut market = vec![];
+    let mut well = std::collections::BTreeMap::new();
+    let mut budget = 64u32;
+    let mut uses = std::collections::BTreeMap::new();
+    let limits = std::collections::BTreeMap::new();
+    let mut pending = None;
+
+    // Call dispatch_play directly to test the post-play block
+    dispatch_play(
+        &set,
+        0,
+        "B003",
+        0,
+        &mut cards,
+        &mut players,
+        &mut market,
+        &mut well,
+        1,
+        &std::collections::BTreeSet::new(),
+        &mut budget,
+        &mut uses,
+        &limits,
+        &mut pending,
+    )
+    .expect("dispatch_play B003");
+
+    // Verify the pass-left card left player 0's played area
+    assert!(
+        !players[0].played_cards.contains(&"B003".to_string()),
+        "B003 should leave player 0's played area"
+    );
+    // Verify it reached player 1's hand (left neighbor)
+    assert!(
+        cards.hands[1].contains(&"B003".to_string()),
+        "B003 should reach left neighbor's hand"
+    );
+    // Verify card_points: B003 has 0 points, so no change expected
+    // but the mechanism should not panic
+    assert_eq!(
+        players[0].card_points, 0,
+        "card_points should be 0 for B003"
+    );
+
+    // Verify card partition invariant (no duplicates, no missing cards)
+    agricola_re_ai::card_zones::validate_card_partition(&set, &cards, &players)
+        .expect("card partition must remain valid after pass-left");
+}
+
+#[test]
+fn pass_left_with_nonzero_points_subtraction() {
+    // Test that a pass-left card with non-zero points correctly adds
+    // then subtracts points from card_points. This prevents the
+    // potential underflow bug described in P2-1.
+    let set = new_set(vec![CardDefinition {
+        use_limit: None,
+        id: "TEST_PASS_LEFT".to_owned(),
+        kind: CardKind::MinorImprovement,
+        cost: vec![],
+        points: 2, // Non-zero points
+        effects: vec![],
+        post_play: PostPlayDestination::LeftNeighborHand,
+    }]);
+    let player = Player::new(0, 0);
+    // Card NOT in hand - already in played_cards
+    let mut cards = agricola_re_ai::cards::CardState {
+        hands: vec![vec![], vec![]],
+        ..Default::default()
+    };
+    let mut players = vec![player.clone(), Player::new(1, 0)];
+    players[0].played_cards.push("TEST_PASS_LEFT".to_owned());
+    let mut market = vec![];
+    let mut well = std::collections::BTreeMap::new();
+    let mut budget = 64u32;
+    let mut uses = std::collections::BTreeMap::new();
+    let limits = std::collections::BTreeMap::new();
+    let mut pending = None;
+
+    dispatch_play(
+        &set,
+        0,
+        "TEST_PASS_LEFT",
+        0,
+        &mut cards,
+        &mut players,
+        &mut market,
+        &mut well,
+        1,
+        &std::collections::BTreeSet::new(),
+        &mut budget,
+        &mut uses,
+        &limits,
+        &mut pending,
+    )
+    .expect("dispatch_play TEST_PASS_LEFT");
+
+    // Card has 2 points: added on play, then subtracted on pass-left
+    // Net should be 0
+    assert_eq!(
+        players[0].card_points, 0,
+        "card_points should be 0 after add+subtract for pass-left card with points"
+    );
+    assert!(
+        !players[0]
+            .played_cards
+            .contains(&"TEST_PASS_LEFT".to_string()),
+        "card should leave played area"
+    );
+    assert!(
+        cards.hands[1].contains(&"TEST_PASS_LEFT".to_string()),
+        "card should reach left neighbor"
+    );
+
+    agricola_re_ai::card_zones::validate_card_partition(&set, &cards, &players)
+        .expect("card partition must remain valid");
+}
+
+#[test]
+fn pass_left_requires_two_players() {
+    // Test that pass-left is a no-op in 1-player games (P2-4 guard).
+    // The card should stay in the owner's played area.
+    let set = new_set(vec![CardDefinition {
+        use_limit: None,
+        id: "B003".to_owned(),
+        kind: CardKind::MinorImprovement,
+        cost: vec![],
+        points: 0,
+        effects: vec![CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost: 2 }],
+        post_play: PostPlayDestination::LeftNeighborHand,
+    }]);
+    let mut player = Player::new(0, 0);
+    player.supply.food = 0; // Force pass branch
+                            // B003 NOT in hand - already in played_cards
+    let mut cards = agricola_re_ai::cards::CardState {
+        hands: vec![vec!["test_occ".to_owned()]], // Only 1 hand, B003 not in it
+        ..Default::default()
+    };
+    let mut players = vec![player.clone()]; // Only 1 player
+    players[0].played_cards.push("B003".to_owned());
+    let mut market = vec![];
+    let mut well = std::collections::BTreeMap::new();
+    let mut budget = 64u32;
+    let mut uses = std::collections::BTreeMap::new();
+    let limits = std::collections::BTreeMap::new();
+    let mut pending = None;
+
+    // Should not panic with 1 player
+    dispatch_play(
+        &set,
+        0,
+        "B003",
+        0,
+        &mut cards,
+        &mut players,
+        &mut market,
+        &mut well,
+        1,
+        &std::collections::BTreeSet::new(),
+        &mut budget,
+        &mut uses,
+        &limits,
+        &mut pending,
+    )
+    .expect("dispatch_play B003 in 1-player game");
+
+    // In 1-player game, card should stay in played area
+    assert!(
+        players[0].played_cards.contains(&"B003".to_string()),
+        "B003 should stay in played area in 1-player game"
+    );
+    // No left neighbor hand exists, so no transfer
+    assert_eq!(cards.hands.len(), 1, "only 1 hand in 1-player game");
+
+    agricola_re_ai::card_zones::validate_card_partition(&set, &cards, &players)
+        .expect("card partition must remain valid");
+}

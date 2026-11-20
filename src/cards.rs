@@ -413,7 +413,7 @@ pub enum PostPlayDestination {
 }
 
 /// Serde skip predicate for the default post-play destination.
-fn post_play_is_played_area(dest: &PostPlayDestination) -> bool {
+pub fn post_play_is_played_area(dest: &PostPlayDestination) -> bool {
     matches!(dest, PostPlayDestination::PlayedArea)
 }
 

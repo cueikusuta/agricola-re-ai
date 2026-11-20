@@ -7,7 +7,9 @@
 //! - `CardSet` compat adapter — preserves existing API for saves/replays/observations
 
 use crate::card_pool::{CardReview, Eligibility, ReviewStatus};
-use crate::cards::{CardDefinition, CardKind, CardSet, PostPlayDestination};
+use crate::cards::{
+    post_play_is_played_area, CardDefinition, CardKind, CardSet, PostPlayDestination,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -105,6 +107,7 @@ pub struct RegisteredCard {
     /// Where the card goes after being played (pass-left support). Preserved
     /// losslessly through `to_card_definition` so pool-derived card sets keep
     /// the printed "pass left" behaviour.
+    #[serde(default, skip_serializing_if = "post_play_is_played_area")]
     pub post_play: PostPlayDestination,
     /// Review metadata (official verification status, player-count eligibility)
     pub review: CardReview,
