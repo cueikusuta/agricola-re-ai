@@ -103,7 +103,7 @@ python scripts/validate_bga_card_specs.py           # 既存スキーマ検証�
 | A062 | 仕様の前提が空 | 台帳=文献=「ストックに小麦2」。文献: https://agricola.cloudfree.jp/?p=3363 | `resource_in_hand grain min=2` を追加 |
 | A065 | 仕様の前提が空 | 台帳=文献=「畑3」。文献: https://agricola.cloudfree.jp/?p=3360 | `field_count 3` を追加 |
 | A069 | 仕様の前提が空 | 台帳=文献=「職業2」。文献: https://agricola.cloudfree.jp/?p=3356 | `occupation_count 2` を追加 |
-| A103 | 仕様は `bga_checked` だがテストに「自動実行不可」ケースが残る | 段の読み（位置対応か累積か）が日英とも曖昧で確定不能。文献: https://agricola.cloudfree.jp/?p=3322 | `needs_resolution` へ戻し未解決項目を記録（テストは fail-closed のまま） |
+| A103 | 仕様は `bga_checked` だがテストに「自動実行不可」ケースが残る | 段の読み（位置対応か累積か）が日英とも曖昧で確定不能。文献: https://agricola.cloudfree.jp/?p=3322 | `needs_resolution` へ戻し `unresolved_fields` に曖昧さを記録。A103 を `bga_checked` 固定で検査していた `tests/test_bga_card_batch2_timing.py` も、3段構造は維持したまま status のみ更新 |
 
 ### B帯（001–168）
 

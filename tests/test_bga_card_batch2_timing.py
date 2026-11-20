@@ -46,8 +46,12 @@ class Batch2TimingRegression(unittest.TestCase):
         self.assertEqual(a092["effects"][0]["steps"][0]["params"]["good"], "food")
 
         a103 = get("A103")
-        self.assertEqual(a103["review"]["status"], "bga_checked")
-        self.assertEqual(a103["review"]["unresolved_fields"], [])
+        # 2026-11 audit: positional vs cumulative tier reading is ambiguous in both the
+        # Japanese and English wording, so the card stays fail-closed until it is decided
+        # (see docs/card-data-3way-audit.md Q-03). The three-tier structure itself is fixed.
+        self.assertEqual(a103["review"]["status"], "needs_resolution")
+        self.assertEqual(len(a103["review"]["unresolved_fields"]), 1)
+        self.assertIn("cumulative", a103["review"]["unresolved_fields"][0])
         self.assertEqual(len(a103["effects"]), 3)
         self.assertEqual([e["steps"][0]["params"]["good"] for e in a103["effects"]],
                          ["vegetable", "grain", "reed"])

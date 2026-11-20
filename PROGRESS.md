@@ -223,3 +223,7 @@
 - **第9章（検証）完了**: `validate_bga_card_specs.py` は errors 0、ビルダー単体テストは OK、
   `git status` に Rust 変更なし、台帳は BOM+CRLF 維持で差分2行のみ。E144 のテスト期待値も 0 点へ。
   PR 作成まで。マージしない。
+- **CI対応（A103）**: `tests/test_bga_card_batch2_timing.py` が A103 を `bga_checked` 固定で検査していたため、
+  3段構造は維持しつつ status=`needs_resolution` と `unresolved_fields`（位置対応/累積の曖昧さ）を検査する形に更新。
+  ローカル Python 287件は成功（`test_bga_card_spec_cost_gate.py` は仕様を実データへ一時書き込みして復元するため、
+  実行後に A001/A002/A004 の末尾改行が落ちる既知の癖がある。復元してコミットには含めない）。
