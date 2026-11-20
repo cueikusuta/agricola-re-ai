@@ -34,7 +34,14 @@
   "play": {
     "action": "minor_improvement",
     "cost": [],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "stable_count",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
     "printed_points": 1
   },
   "effects": [

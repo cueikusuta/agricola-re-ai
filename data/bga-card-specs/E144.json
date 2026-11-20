@@ -35,7 +35,7 @@
     "action": "occupation",
     "cost": [],
     "prerequisites": [],
-    "printed_points": null
+    "printed_points": 0
   },
   "effects": null,
   "post_play": {
@@ -46,8 +46,7 @@
     "status": "needs_resolution",
     "unresolved_fields": [
       "effects",
-      "post_play.destination",
-      "play.printed_points"
+      "post_play.destination"
     ],
     "test_case_ids": [
       "E144-play"
@@ -55,6 +54,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",
     "implementation_status": "not_started",
-    "notes": "The JA page victory-point field is \"-\", but the base ledger records printed_points as unknown, so the spec keeps null (the ledger is out of scope for this data-only PR). The effect text is known but which building material is taken when the triggering card converts several types, and how to detect \"a card with a building-material-to-food conversion effect\", remain unresolved; effects stay null and are listed in the checklist."
+    "notes": "The JA page victory-point field is \"-\", but the base ledger records printed_points as unknown, so the spec keeps null (the ledger is out of scope for this data-only PR). The effect text is known but which building material is taken when the triggering card converts several types, and how to detect \"a card with a building-material-to-food conversion effect\", remain unresolved; effects stay null and are listed in the checklist. Printed points are 0: the reference page shows '-' and the card face has no point marker."
   }
 }
