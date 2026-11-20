@@ -4130,6 +4130,7 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
         amount,
     };
     vec![
+        // E117 パイプ喫煙家 (Pipe Smoker): harvest gain 2 wood if wheat field present.
         CardDefinition {
             use_limit: None,
             id: "E117".to_owned(),
