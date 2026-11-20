@@ -1758,16 +1758,14 @@ mod verified_minor_worker_tests {
         let mut set = CardSet {
             definitions: verified_minor_worker_cards(2),
         };
-        for i in 1..=3 {
-            set.definitions.push(CardDefinition {
-                use_limit: None,
-                id: format!("occ{i}"),
-                kind: CardKind::Occupation,
-                cost: vec![],
-                points: 0,
-                effects: vec![],
-            });
-        }
+        set.definitions.extend((1..=3).map(|i| CardDefinition {
+            use_limit: None,
+            id: format!("occ{i}"),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        }));
         let card = set.definition("B077").unwrap();
         let mut p = Player::new(0, 1);
         p.played_cards.extend(["occ1".into(), "occ2".into()]);
@@ -3166,16 +3164,14 @@ mod passive_cards_tests {
         let mut set = CardSet {
             definitions: verified_round_and_harvest_cards(),
         };
-        for i in 0..4 {
-            set.definitions.push(CardDefinition {
-                use_limit: None,
-                id: format!("occ{i}"),
-                kind: CardKind::Occupation,
-                cost: vec![],
-                points: 0,
-                effects: vec![],
-            });
-        }
+        set.definitions.extend((0..4).map(|i| CardDefinition {
+            use_limit: None,
+            id: format!("occ{i}"),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        }));
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
         assert!(can_play(&set, set.definition("B050").unwrap(), &p, 0));
@@ -4439,14 +4435,12 @@ mod verified_band_d_tests {
                 remaining: 1,
             };
         }
-        for i in 0..4 {
-            p.pastures.push(crate::model::Pasture {
-                id: i,
-                cells: vec![10, 11],
-                animal: None,
-                quantity: 0,
-            });
-        }
+        p.pastures.extend((0..4).map(|i| crate::model::Pasture {
+            id: i,
+            cells: vec![10, 11],
+            animal: None,
+            quantity: 0,
+        }));
         for (i, cell) in p.farm.iter_mut().enumerate().take(13 + 1).skip(10) {
             cell.stable = true;
             cell.tile = Tile::Pasture { id: (10 + i) as u8 };
@@ -4491,14 +4485,12 @@ mod verified_band_d_tests {
         // Reset and test pastures boundary: 3 pastures = 3 pts, 4 pastures = 4 pts
         let mut p2 = Player::new(0, 0);
         p2.played_cards.push("D100".into());
-        for i in 0..3 {
-            p2.pastures.push(crate::model::Pasture {
-                id: i,
-                cells: vec![(10 + i * 2) as usize, (11 + i * 2) as usize],
-                animal: None,
-                quantity: 0,
-            });
-        }
+        p2.pastures.extend((0..3).map(|i| crate::model::Pasture {
+            id: i,
+            cells: vec![(10 + i * 2) as usize, (11 + i * 2) as usize],
+            animal: None,
+            quantity: 0,
+        }));
         assert_eq!(
             end_game_bonus(&set, &p2),
             0,
