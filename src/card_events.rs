@@ -61,6 +61,11 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterWorkerGain { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainIfUsed { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainAnimal { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerSpendPlowField { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerScheduleFood { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerGainPerAnimal { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerPayToScheduleFood { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerOptionalExchange { .. } => TriggerPhase::After,
         // Round start — After phase (happens after round begins)
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
@@ -536,6 +541,53 @@ fn resolve_phase_scan(
                     animal,
                     amount,
                 } => handle_after_worker_gain_animal(ctx, space, animal, *amount, trigger_data)?,
+                CardEffect::AfterWorkerSpendPlowField {
+                    space,
+                    good,
+                    amount,
+                    plow,
+                } => handle_after_worker_spend_plow_field(
+                    ctx,
+                    space,
+                    good,
+                    *amount,
+                    *plow,
+                    trigger_data,
+                )?,
+                CardEffect::AfterWorkerScheduleFood { space, rounds } => {
+                    handle_after_worker_schedule_food(ctx, space, *rounds, trigger_data)?
+                }
+                CardEffect::AfterWorkerGainPerAnimal { space, good, per } => {
+                    handle_after_worker_gain_per_animal(ctx, space, good, *per, trigger_data)?
+                }
+                CardEffect::AfterWorkerPayToScheduleFood {
+                    space,
+                    pay_good,
+                    pay_amount,
+                    rounds,
+                } => handle_after_worker_pay_to_schedule_food(
+                    ctx,
+                    space,
+                    pay_good,
+                    *pay_amount,
+                    *rounds,
+                    trigger_data,
+                )?,
+                CardEffect::AfterWorkerOptionalExchange {
+                    space,
+                    give,
+                    give_amount,
+                    receive,
+                    receive_amount,
+                } => handle_after_worker_optional_exchange(
+                    ctx,
+                    space,
+                    give,
+                    *give_amount,
+                    receive,
+                    *receive_amount,
+                    trigger_data,
+                )?,
                 CardEffect::StartRoundGain {
                     good,
                     amount,
@@ -810,6 +862,21 @@ fn effect_condition_holds(
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
+        CardEffect::AfterWorkerSpendPlowField { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
+        CardEffect::AfterWorkerScheduleFood { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
+        CardEffect::AfterWorkerGainPerAnimal { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
+        CardEffect::AfterWorkerPayToScheduleFood { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
+        CardEffect::AfterWorkerOptionalExchange { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
@@ -955,6 +1022,53 @@ pub fn execute_chosen_triggers(
                 animal,
                 amount,
             } => handle_after_worker_gain_animal(ctx, space, animal, *amount, trigger_data)?,
+            CardEffect::AfterWorkerSpendPlowField {
+                space,
+                good,
+                amount,
+                plow,
+            } => handle_after_worker_spend_plow_field(
+                ctx,
+                space,
+                good,
+                *amount,
+                *plow,
+                trigger_data,
+            )?,
+            CardEffect::AfterWorkerScheduleFood { space, rounds } => {
+                handle_after_worker_schedule_food(ctx, space, *rounds, trigger_data)?
+            }
+            CardEffect::AfterWorkerGainPerAnimal { space, good, per } => {
+                handle_after_worker_gain_per_animal(ctx, space, good, *per, trigger_data)?
+            }
+            CardEffect::AfterWorkerPayToScheduleFood {
+                space,
+                pay_good,
+                pay_amount,
+                rounds,
+            } => handle_after_worker_pay_to_schedule_food(
+                ctx,
+                space,
+                pay_good,
+                *pay_amount,
+                *rounds,
+                trigger_data,
+            )?,
+            CardEffect::AfterWorkerOptionalExchange {
+                space,
+                give,
+                give_amount,
+                receive,
+                receive_amount,
+            } => handle_after_worker_optional_exchange(
+                ctx,
+                space,
+                give,
+                *give_amount,
+                receive,
+                *receive_amount,
+                trigger_data,
+            )?,
             CardEffect::StartRoundGain {
                 good,
                 amount,
@@ -1124,6 +1238,7 @@ fn handle_prerequisite(
         crate::cards::CardRequirement::MinimumImprovements(min) => {
             crate::cards::improvement_count_in_front(ctx.card_set, p) >= u32::from(*min)
         }
+        crate::cards::CardRequirement::MinimumRound(min) => ctx.round >= *min,
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
     };
 
@@ -1399,6 +1514,156 @@ fn handle_after_worker_gain_animal(
             serde_json::json!({ "card": "C147", "space": space, "auto_plan": plan }),
         );
         return Ok(EffectResult::Pending(decision));
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B017 森林鋤 / B060 仕込み水: after using the trigger space, may pay cost
+/// to gain a resource or perform an action (plow field).
+fn handle_after_worker_spend_plow_field(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    good: &Good,
+    amount: u32,
+    plow: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        let p = &mut ctx.player;
+        // Check if player has enough resources to pay
+        if p.supply.get(*good) >= amount {
+            // Spend the resource
+            let next = p
+                .supply
+                .get(*good)
+                .checked_sub(amount)
+                .ok_or("resource underflow")?;
+            p.supply.set(*good, next);
+            // Plow the field(s)
+            for _ in 0..plow {
+                p.plow_field().map_err(|e| format!("plow failed: {e}"))?;
+            }
+        }
+        // If player cannot pay, nothing happens (optional effect)
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B047 ニシン鍋: after using the trigger space, schedule food on the next N round spaces.
+fn handle_after_worker_schedule_food(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    rounds: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        let current_round = ctx.round;
+        let beneficiary = ctx.beneficiary;
+        for i in 1..=rounds {
+            let target_round = current_round + i as u8;
+            if target_round <= 14 {
+                ctx.delayed_well
+                    .entry(target_round)
+                    .or_default()
+                    .push(beneficiary);
+            }
+        }
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B051 採掘シャベル: after using the trigger space, gain food equal to the
+/// number of wild boars on your farm.
+fn handle_after_worker_gain_per_animal(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    good: &Good,
+    per: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        let p = &mut ctx.player;
+        let animal_count = p.animal_count(Animal::Boar);
+        let gain = animal_count.checked_mul(per).ok_or("gain overflow")?;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(gain)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B060 仕込み水: after using the trigger space, may pay grain to schedule food
+/// on the next N round spaces.
+fn handle_after_worker_pay_to_schedule_food(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    pay_good: &Good,
+    pay_amount: u32,
+    rounds: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        let p = &mut ctx.player;
+        // Check if player has enough resources to pay
+        if p.supply.get(*pay_good) >= pay_amount {
+            // Spend the resource
+            let next = p
+                .supply
+                .get(*pay_good)
+                .checked_sub(pay_amount)
+                .ok_or("resource underflow")?;
+            p.supply.set(*pay_good, next);
+            // Schedule food
+            let current_round = ctx.round;
+            let beneficiary = ctx.beneficiary;
+            for i in 1..=rounds {
+                let target_round = current_round + i as u8;
+                if target_round <= 14 {
+                    ctx.delayed_well
+                        .entry(target_round)
+                        .or_default()
+                        .push(beneficiary);
+                }
+            }
+        }
+        // If player cannot pay, nothing happens (optional effect)
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B063 味見: after using the trigger space, optionally exchange 1 grain for 4 food.
+fn handle_after_worker_optional_exchange(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    give: &Good,
+    give_amount: u32,
+    receive: &Good,
+    receive_amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        let p = &mut ctx.player;
+        // Check if player has enough resources to give
+        if p.supply.get(*give) >= give_amount {
+            // Spend the resource
+            let next = p
+                .supply
+                .get(*give)
+                .checked_sub(give_amount)
+                .ok_or("resource underflow")?;
+            p.supply.set(*give, next);
+            // Receive the resource
+            let next = p
+                .supply
+                .get(*receive)
+                .checked_add(receive_amount)
+                .ok_or("resource overflow")?;
+            p.supply.set(*receive, next);
+        }
+        // If player cannot pay, nothing happens (optional effect)
     }
     Ok(EffectResult::Resolved)
 }
@@ -3465,6 +3730,7 @@ mod tests {
             &mut legacy[0],
             "M1",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -3493,6 +3759,7 @@ mod tests {
                 &mut ctx.players[0],
                 "M1",
                 CardKind::MinorImprovement,
+                1,
                 0,
             )
             .unwrap();
@@ -5553,6 +5820,7 @@ mod tests {
             &mut legacy,
             "A117",
             CardKind::Occupation,
+            1,
             0,
         )
         .unwrap();
@@ -5582,6 +5850,7 @@ mod tests {
                 &mut ctx.players[0],
                 "A117",
                 CardKind::Occupation,
+                1,
                 0,
             )
             .unwrap();
@@ -7317,6 +7586,7 @@ mod tests {
             &mut ctx.players[0],
             "C083",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();

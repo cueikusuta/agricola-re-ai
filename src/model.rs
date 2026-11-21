@@ -254,6 +254,28 @@ impl Player {
             .filter(|c| matches!(c.tile, Tile::Field { .. }))
             .count()
     }
+    /// Plow one field on the first valid empty tile.
+    /// Returns Ok(()) on success, Err if no valid spot.
+    pub fn plow_field(&mut self) -> Result<(), String> {
+        // Find first empty tile that can be a field (adjacent to existing field or any if no fields)
+        let has_fields = self.fields() > 0;
+        for i in 0..FARM_CELLS {
+            if matches!(self.farm[i].tile, Tile::Empty)
+                && !self.farm[i].stable
+                && (!has_fields
+                    || neighbors(i)
+                        .iter()
+                        .any(|&j| matches!(self.farm[j].tile, Tile::Field { .. })))
+            {
+                self.farm[i].tile = Tile::Field {
+                    crop: None,
+                    remaining: 0,
+                };
+                return Ok(());
+            }
+        }
+        Err("no valid field spot".into())
+    }
     pub fn occupied_stables(&self) -> usize {
         self.farm.iter().filter(|c| c.stable).count()
     }

@@ -434,12 +434,12 @@ fn b006_prerequisite_unmet_cannot_play() {
     let mut player = Player::new(0, 10);
     // No occupations -> prerequisite unmet -> cannot play
     assert!(
-        !can_play(&set, card, &player, 0),
+        !can_play(&set, card, &player, 1, 0),
         "0 occupations -> B006 unplayable"
     );
     let mut hand = vec!["B006".to_owned()];
     assert!(
-        play(&set, &mut hand, &mut player, "B006", card.kind, 0).is_err(),
+        play(&set, &mut hand, &mut player, "B006", card.kind, 0, 0).is_err(),
         "play must fail when prerequisite unmet"
     );
     assert_eq!(player.supply.stone, 0, "no gain when unplayable");
@@ -466,7 +466,7 @@ fn b006_prerequisite_met_can_play() {
     let mut player = Player::new(0, 10);
     player.played_cards.push("occ1".into());
     assert!(
-        can_play(&set, card, &player, 0),
+        can_play(&set, card, &player, 1, 0),
         "1 occupation -> B006 playable"
     );
 }
@@ -695,10 +695,13 @@ fn c004_cost_food_1_pinned() {
     let card = real_card(&defs, "C004");
     assert_eq!(card.cost, vec![(Good::Food, 1)], "C004 cost must be food 1");
     let mut player = player_with_food(1);
-    assert!(can_play(&set, card, &player, 0), "food 1 -> C004 playable");
+    assert!(
+        can_play(&set, card, &player, 1, 0),
+        "food 1 -> C004 playable"
+    );
     player.supply.food = 0;
     assert!(
-        !can_play(&set, card, &player, 0),
+        !can_play(&set, card, &player, 1, 0),
         "food 0 -> C004 unplayable"
     );
 }
@@ -710,10 +713,13 @@ fn c005_cost_food_1_pinned() {
     let card = real_card(&defs, "C005");
     assert_eq!(card.cost, vec![(Good::Food, 1)], "C005 cost must be food 1");
     let mut player = player_with_food(1);
-    assert!(can_play(&set, card, &player, 0), "food 1 -> C005 playable");
+    assert!(
+        can_play(&set, card, &player, 1, 0),
+        "food 1 -> C005 playable"
+    );
     player.supply.food = 0;
     assert!(
-        !can_play(&set, card, &player, 0),
+        !can_play(&set, card, &player, 1, 0),
         "food 0 -> C005 unplayable"
     );
 }
@@ -725,10 +731,13 @@ fn d005_cost_food_1_pinned() {
     let card = real_card(&defs, "D005");
     assert_eq!(card.cost, vec![(Good::Food, 1)], "D005 cost must be food 1");
     let mut player = player_with_food(1);
-    assert!(can_play(&set, card, &player, 0), "food 1 -> D005 playable");
+    assert!(
+        can_play(&set, card, &player, 1, 0),
+        "food 1 -> D005 playable"
+    );
     player.supply.food = 0;
     assert!(
-        !can_play(&set, card, &player, 0),
+        !can_play(&set, card, &player, 1, 0),
         "food 0 -> D005 unplayable"
     );
 }
@@ -754,20 +763,20 @@ fn b006_cost_and_prerequisite_pinned() {
     let mut player = player_with_food(2);
     // cost met, prerequisite unmet -> cannot play
     assert!(
-        !can_play(&set, card, &player, 0),
+        !can_play(&set, card, &player, 1, 0),
         "0 occupations -> B006 unplayable"
     );
     // prerequisite met, cost unmet -> cannot play
     player.played_cards.push("occ1".into());
     player.supply.food = 1;
     assert!(
-        !can_play(&set, card, &player, 0),
+        !can_play(&set, card, &player, 1, 0),
         "food 1 -> B006 unplayable (cost 2)"
     );
     // both met -> playable
     player.supply.food = 2;
     assert!(
-        can_play(&set, card, &player, 0),
+        can_play(&set, card, &player, 1, 0),
         "food 2 + 1 occupation -> B006 playable"
     );
 }
@@ -780,7 +789,7 @@ fn b007_cost_zero_pinned() {
     assert_eq!(card.cost, vec![], "B007 cost must be free");
     let player = player_with_food(0);
     assert!(
-        can_play(&set, card, &player, 0),
+        can_play(&set, card, &player, 1, 0),
         "food 0 -> B007 playable (cost 0)"
     );
 }

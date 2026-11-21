@@ -186,6 +186,47 @@ pub enum CardEffect {
         animal: Animal,
         amount: u32,
     },
+
+    /// B017 森林鋤 / B060 仕込み水: after using the trigger space, may pay cost
+    /// to gain a resource or perform an action.
+    AfterWorkerSpendPlowField {
+        space: Space,
+        good: Good,
+        amount: u32,
+        plow: u32,
+    },
+
+    /// B047 ニシン鍋: after using the trigger space, schedule food on the next N round spaces.
+    AfterWorkerScheduleFood {
+        space: Space,
+        rounds: u32,
+    },
+
+    /// B051 採掘シャベル: after using the trigger space, gain food equal to the
+    /// number of wild boars on your farm.
+    AfterWorkerGainPerAnimal {
+        space: Space,
+        good: Good,
+        per: u32,
+    },
+
+    /// B060 仕込み水: after using the trigger space, may pay grain to schedule food
+    /// on the next N round spaces.
+    AfterWorkerPayToScheduleFood {
+        space: Space,
+        pay_good: Good,
+        pay_amount: u32,
+        rounds: u32,
+    },
+
+    /// B063 味見: after using the trigger space, optionally exchange 1 grain for 4 food.
+    AfterWorkerOptionalExchange {
+        space: Space,
+        give: Good,
+        give_amount: u32,
+        receive: Good,
+        receive_amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -227,6 +268,11 @@ impl CardEffect {
             CardEffect::OnPlayGainPerCount { .. } => "on_play_gain_per_count",
             CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
             CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
+            CardEffect::AfterWorkerSpendPlowField { .. } => "after_worker_spend_plow_field",
+            CardEffect::AfterWorkerScheduleFood { .. } => "after_worker_schedule_food",
+            CardEffect::AfterWorkerGainPerAnimal { .. } => "after_worker_gain_per_animal",
+            CardEffect::AfterWorkerPayToScheduleFood { .. } => "after_worker_pay_to_schedule_food",
+            CardEffect::AfterWorkerOptionalExchange { .. } => "after_worker_optional_exchange",
             CardEffect::AfterAnyWorkerGain { .. } => "after_any_worker_gain",
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
@@ -310,6 +356,7 @@ pub enum CardRequirement {
     MinimumCropFields { crop: Crop, number: u8 },
     MinimumPlayers(u8),
     MinimumImprovements(u8),
+    MinimumRound(u8),
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -433,10 +480,20 @@ impl CardSet {
                         CardEffect::OnPlayGain { amount, .. }
                         | CardEffect::AfterWorkerGain { amount, .. }
                         | CardEffect::OnPlayGainAnimal { amount, .. }
-                        | CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
+                        | CardEffect::AfterWorkerGainAnimal { amount, .. }
+                        | CardEffect::AfterWorkerSpendPlowField { amount, .. }
+                        | CardEffect::AfterWorkerGainPerAnimal { per: amount, .. }
+                        | CardEffect::AfterWorkerPayToScheduleFood {
+                            pay_amount: amount, ..
+                        }
+                        | CardEffect::AfterWorkerOptionalExchange {
+                            give_amount: amount,
+                            ..
+                        } => *amount,
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
-                        | CardEffect::Passive { .. } => 1,
+                        | CardEffect::Passive { .. }
+                        | CardEffect::AfterWorkerScheduleFood { .. } => 1,
                         #[cfg(test)]
                         CardEffect::PendingProbe { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
@@ -466,6 +523,13 @@ impl CardSet {
                             CardEffect::HarvestFieldGain {
                                 rule: HarvestFieldRule::Animals { sheep_per: 0, .. }
                                     | HarvestFieldRule::Animals { cattle_per: 0, .. },
+                                ..
+                            }
+                        )
+                        || matches!(
+                            effect,
+                            CardEffect::AfterWorkerOptionalExchange {
+                                receive_amount: 0,
                                 ..
                             }
                         )
@@ -760,26 +824,51 @@ pub(crate) fn sown_field_count(player: &Player) -> usize {
         .count()
 }
 
-pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_food: u32) -> bool {
+/// Check if a player can play a card (costs and prerequisites).
+pub fn can_play(
+    set: &CardSet,
+    card: &CardDefinition,
+    player: &Player,
+    round: u8,
+    extra_food: u32,
+) -> bool {
     if !affordable(card, player, extra_food) {
         return false;
     }
     let occupations = occupation_count(set, player);
     card.effects.iter().all(|effect| {
-            let CardEffect::Prerequisite { rule } = effect else { return true; };
-            match rule {
-                CardRequirement::MinimumOccupations(min) => occupations >= usize::from(*min),
-                CardRequirement::MaximumOccupations(max) => occupations <= usize::from(*max),
-                CardRequirement::MinimumAnimals { animal, number } => player.animal_count(*animal) >= *number,
-                CardRequirement::MinimumCropFields { crop, number } => player.farm.iter().filter(|cell| {
-                    matches!(cell.tile, Tile::Field { crop: Some(found), .. } if found == *crop)
-                }).count() >= usize::from(*number),
-                crate::cards::CardRequirement::MinimumImprovements(min) => {
-                                improvement_count_in_front(set, player) >= u32::from(*min)
-                            }
-                CardRequirement::MinimumPlayers(_) => true,
+        let CardEffect::Prerequisite { rule } = effect else {
+            return true;
+        };
+        match rule {
+            CardRequirement::MinimumOccupations(min) => occupations >= usize::from(*min),
+            CardRequirement::MaximumOccupations(max) => occupations <= usize::from(*max),
+            CardRequirement::MinimumAnimals { animal, number } => {
+                player.animal_count(*animal) >= *number
             }
-        })
+            CardRequirement::MinimumCropFields { crop, number } => {
+                player
+                    .farm
+                    .iter()
+                    .filter(|cell| {
+                        matches!(
+                            cell.tile,
+                            Tile::Field {
+                                crop: Some(found),
+                                ..
+                            } if found == *crop
+                        )
+                    })
+                    .count()
+                    >= usize::from(*number)
+            }
+            CardRequirement::MinimumImprovements(min) => {
+                improvement_count_in_front(set, player) >= u32::from(*min)
+            }
+            CardRequirement::MinimumRound(min) => round >= *min,
+            CardRequirement::MinimumPlayers(_) => true,
+        }
+    })
 }
 
 fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String> {
@@ -802,13 +891,14 @@ pub fn play(
     player: &mut Player,
     id: &str,
     kind: CardKind,
+    round: u8,
     extra_food: u32,
 ) -> Result<(), String> {
     let card = set.definition(id).ok_or("unknown card")?;
     if card.kind != kind || !hand.iter().any(|x| x == id) {
         return Err("card is not in the player's hand or is the wrong kind".into());
     }
-    if !can_play(set, card, player, extra_food) {
+    if !can_play(set, card, player, round, extra_food) {
         return Err("cannot pay card costs or prerequisites are unmet".into());
     }
     for (good, amount) in card_costs(card, player, extra_food) {
@@ -835,13 +925,14 @@ pub(crate) fn play_validate_pay(
     player: &mut Player,
     id: &str,
     kind: CardKind,
+    round: u8,
     extra_food: u32,
 ) -> Result<(), String> {
     let card = set.definition(id).ok_or("unknown card")?;
     if card.kind != kind || !hand.iter().any(|x| x == id) {
         return Err("card is not in the player's hand or is the wrong kind".into());
     }
-    if !can_play(set, card, player, extra_food) {
+    if !can_play(set, card, player, round, extra_food) {
         return Err("cannot pay card costs or prerequisites are unmet".into());
     }
     for (good, amount) in card_costs(card, player, extra_food) {
@@ -1378,11 +1469,11 @@ mod card_prerequisite_tests {
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
         p.played_cards.push("one".into());
-        assert!(!can_play(&set, &card, &p, 0));
+        assert!(!can_play(&set, &card, &p, 1, 0));
         p.played_cards.push("two".into());
-        assert!(can_play(&set, &card, &p, 0));
+        assert!(can_play(&set, &card, &p, 1, 0));
         let (_, too_many) = prerequisite_card(CardRequirement::MaximumOccupations(1));
-        assert!(!can_play(&set, &too_many, &p, 0));
+        assert!(!can_play(&set, &too_many, &p, 1, 0));
     }
 
     #[test]
@@ -1393,14 +1484,14 @@ mod card_prerequisite_tests {
         let card = set.definition("A038").unwrap();
         let mut p = Player::new(0, 0);
         p.pet = Some(Animal::Sheep);
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         p.pastures.push(crate::model::Pasture {
             id: 0,
             cells: vec![2, 3, 4],
             animal: Some(Animal::Sheep),
             quantity: 4,
         });
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
     }
 
     #[test]
@@ -1419,12 +1510,12 @@ mod card_prerequisite_tests {
             crop: Some(Crop::Vegetable),
             remaining: 1,
         };
-        assert!(!can_play(&set, &card, &p, 0));
+        assert!(!can_play(&set, &card, &p, 1, 0));
         p.farm[3].tile = Tile::Field {
             crop: Some(Crop::Grain),
             remaining: 1,
         };
-        assert!(can_play(&set, &card, &p, 0));
+        assert!(can_play(&set, &card, &p, 1, 0));
     }
 
     #[test]
@@ -1601,9 +1692,9 @@ mod verified_minor_worker_tests {
         let card = set.definition("A078").unwrap();
         let mut p = Player::new(0, 0);
         p.supply.wood = 2;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         p.played_cards.push("test_occ".into());
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         assert_eq!(card.points, 1);
     }
     #[test]
@@ -1639,9 +1730,9 @@ mod verified_minor_worker_tests {
         let card = set.definition("B077").unwrap();
         let mut p = Player::new(0, 1);
         p.played_cards.extend(["occ1".into(), "occ2".into()]);
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         p.played_cards.push("occ3".into());
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         assert_eq!(card.points, 1);
     }
     #[test]
@@ -1674,9 +1765,9 @@ mod verified_minor_worker_tests {
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
         p.supply.reed = 0;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         p.supply.reed = 1;
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         assert_eq!(card.points, 1);
     }
     #[test]
@@ -1707,12 +1798,12 @@ mod verified_minor_worker_tests {
         let card = set.definition("A042").unwrap();
         let mut p = Player::new(0, 0);
         p.supply.clay = 1;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         let old = p.clone();
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         assert_eq!(p, old);
         p.supply.clay = 2;
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         assert_eq!(card.points, 1);
     }
     #[test]
@@ -1726,7 +1817,7 @@ mod verified_minor_worker_tests {
         assert_eq!(card.points, 0);
         let mut p = Player::new(0, 0);
         let mut hand = vec!["A121".to_string()];
-        play(&set, &mut hand, &mut p, "A121", CardKind::Occupation, 0).unwrap();
+        play(&set, &mut hand, &mut p, "A121", CardKind::Occupation, 1, 0).unwrap();
         assert_eq!(p.supply.clay, 1);
         assert_eq!(p.played_cards, vec!["A121"]);
     }
@@ -1868,7 +1959,7 @@ mod verified_immediate_resource_tests {
         };
         let mut hand = vec![id.to_string()];
         let kind = set.definition(id).unwrap().kind;
-        play(&set, &mut hand, player, id, kind, 0)
+        play(&set, &mut hand, player, id, kind, 1, 0)
     }
 
     #[test]
@@ -2148,7 +2239,7 @@ mod verified_worker_bonus_tests {
         assert_eq!(card.points, 0);
         let set = CardSet { definitions };
         let player = Player::new(0, 0);
-        assert!(can_play(&set, &card, &player, 0));
+        assert!(can_play(&set, &card, &player, 1, 0));
     }
 
     // B064 水車の輪: AfterWorkerGainIfUsed grain_utilization if fishing used -> food 2
@@ -2192,9 +2283,9 @@ mod verified_worker_bonus_tests {
         assert_eq!(card.points, 1);
         let set = CardSet { definitions };
         let mut player = Player::new(0, 0);
-        assert!(!can_play(&set, &card, &player, 0));
+        assert!(!can_play(&set, &card, &player, 1, 0));
         player.supply.wood = 2;
-        assert!(can_play(&set, &card, &player, 0));
+        assert!(can_play(&set, &card, &player, 1, 0));
     }
 }
 
@@ -2958,7 +3049,7 @@ mod passive_cards_tests {
         };
         let mut hand = vec![id.into()];
         let kind = set.definition(id).unwrap().kind;
-        play(&set, &mut hand, p, id, kind, 0).unwrap();
+        play(&set, &mut hand, p, id, kind, 1, 0).unwrap();
     }
     #[test]
     fn a012_pasture_extra_two_including_stable() {
@@ -2998,6 +3089,7 @@ mod passive_cards_tests {
             &mut p,
             "sample",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -3046,9 +3138,9 @@ mod passive_cards_tests {
         }
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
-        assert!(can_play(&set, set.definition("B050").unwrap(), &p, 0));
+        assert!(can_play(&set, set.definition("B050").unwrap(), &p, 1, 0));
         p.played_cards.extend((0..4).map(|i| format!("occ{i}")));
-        assert!(!can_play(&set, set.definition("B050").unwrap(), &p, 0));
+        assert!(!can_play(&set, set.definition("B050").unwrap(), &p, 1, 0));
     }
 }
 
@@ -3195,6 +3287,7 @@ mod simple_occupation_tests {
             &mut p,
             "B102",
             CardKind::Occupation,
+            1,
             0,
         )
         .unwrap();
@@ -3470,13 +3563,13 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut p = Player::new(0, 0);
         p.supply.wood = 3;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         p.played_cards
             .extend(["occ1".to_string(), "occ2".to_string(), "occ3".to_string()]);
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         // 支払えなければ出せない。
         p.supply.wood = 2;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
     }
 
     #[test]
@@ -3506,7 +3599,7 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut hand = vec!["C106".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "C106", CardKind::Occupation, 0).unwrap();
+        play(&set, &mut hand, &mut p, "C106", CardKind::Occupation, 1, 0).unwrap();
         assert_eq!(p.supply.food, 3);
         assert_eq!(p.played_cards, vec!["C106"]);
     }
@@ -3540,7 +3633,7 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut hand = vec!["C111".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "C111", CardKind::Occupation, 0).unwrap();
+        play(&set, &mut hand, &mut p, "C111", CardKind::Occupation, 1, 0).unwrap();
         assert_eq!(p.played_cards, vec!["C111"]);
     }
 
@@ -3553,7 +3646,7 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut hand = vec!["C116".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "C116", CardKind::Occupation, 0).unwrap();
+        play(&set, &mut hand, &mut p, "C116", CardKind::Occupation, 1, 0).unwrap();
         assert_eq!(p.supply.wood, 1);
         assert_eq!(p.played_cards, vec!["C116"]);
     }
@@ -3934,6 +4027,642 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
     ]
 }
 
+/// B-deck chapter 1: after_worker_space simple gain cards (B017, B047, B051, B060, B063).
+/// These are minor improvements with bga_checked after_worker_space triggers.
+/// Kept out of the A/B two-player preset, same as the band pools.
+pub fn verified_b_afterworker_simple_cards() -> Vec<CardDefinition> {
+    let minor = CardKind::MinorImprovement;
+    vec![
+        // B017 森林鋤 (Forest Plow): cost 1 wood; after using Forest/Copse/Grove,
+        // may pay 2 wood to plow 1 field. The wood stays on the accumulation space.
+        CardDefinition {
+            use_limit: None,
+            id: "B017".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterWorkerSpendPlowField {
+                    space: Space::Forest,
+                    good: Good::Wood,
+                    amount: 2,
+                    plow: 1,
+                },
+                CardEffect::AfterWorkerSpendPlowField {
+                    space: Space::Copse,
+                    good: Good::Wood,
+                    amount: 2,
+                    plow: 1,
+                },
+                CardEffect::AfterWorkerSpendPlowField {
+                    space: Space::Grove,
+                    good: Good::Wood,
+                    amount: 2,
+                    plow: 1,
+                },
+            ],
+        },
+        // B047 ニシン鍋 (Herring Pot): cost 1 clay; after using Fishing,
+        // place 1 food on each of the next 3 round spaces.
+        CardDefinition {
+            use_limit: None,
+            id: "B047".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Clay, 1)],
+            points: 0,
+            effects: vec![CardEffect::AfterWorkerScheduleFood {
+                space: Space::Fishing,
+                rounds: 3,
+            }],
+        },
+        // B051 採掘シャベル (Digging Spade): cost 1 wood; playable from round 7;
+        // after using Clay Pit, gain food equal to the number of wild boars.
+        CardDefinition {
+            use_limit: None,
+            id: "B051".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumRound(7),
+                },
+                CardEffect::AfterWorkerGainPerAnimal {
+                    space: Space::ClayPit,
+                    good: Good::Food,
+                    per: 1,
+                },
+            ],
+        },
+        // B060 仕込み水 (Brewing Water): free cost; after using Fishing,
+        // may pay 1 grain to place 1 food on each of the next 6 round spaces.
+        CardDefinition {
+            use_limit: None,
+            id: "B060".to_owned(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterWorkerPayToScheduleFood {
+                space: Space::Fishing,
+                pay_good: Good::Grain,
+                pay_amount: 1,
+                rounds: 6,
+            }],
+        },
+        // B063 味見 (Tasting): cost 2 wood; 1 point; after using Lessons,
+        // optionally exchange 1 grain for 4 food.
+        CardDefinition {
+            use_limit: None,
+            id: "B063".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Wood, 2)],
+            points: 1,
+            effects: vec![CardEffect::AfterWorkerOptionalExchange {
+                space: Space::Lessons,
+                give: Good::Grain,
+                give_amount: 1,
+                receive: Good::Food,
+                receive_amount: 4,
+            }],
+        },
+    ]
+}
+
+/// Test module for verified_b_afterworker_simple_cards (B017, B047, B051, B060, B063).
+#[cfg(test)]
+mod verified_b_afterworker_simple_tests {
+    use super::*;
+    use crate::card_events::dispatch_after_worker;
+    use crate::cards::CardState;
+    use std::collections::BTreeMap;
+
+    fn set() -> CardSet {
+        CardSet {
+            definitions: verified_b_afterworker_simple_cards(),
+        }
+    }
+
+    fn after_worker_simple(set: &CardSet, player: &mut Player, space: Space) {
+        let mut cards = CardState::default();
+        let mut players = vec![player.clone()];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            set,
+            0,
+            space,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut BTreeMap::new(),
+            1,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+        )
+        .unwrap();
+        *player = players[0].clone();
+    }
+
+    // B017 森林鋤 (Forest Plow): cost 1 wood; after using Forest/Copse/Grove,
+    // may pay 2 wood to plow 1 field. The wood stays on the accumulation space.
+    #[test]
+    fn b017_plows_field_on_forest_when_paying_wood() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 3; // 2 for effect + 1 to have some
+        after_worker_simple(&s, &mut p, Space::Forest);
+        assert_eq!(p.supply.wood, 1); // 3 - 2 paid
+                                      // Field should be plowed
+        assert!(p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+    }
+
+    #[test]
+    fn b017_plows_field_on_copse_when_paying_wood() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 3;
+        after_worker_simple(&s, &mut p, Space::Copse);
+        assert_eq!(p.supply.wood, 1);
+        assert!(p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+    }
+
+    #[test]
+    fn b017_plows_field_on_grove_when_paying_wood() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 3;
+        after_worker_simple(&s, &mut p, Space::Grove);
+        assert_eq!(p.supply.wood, 1);
+        assert!(p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+    }
+
+    #[test]
+    fn b017_declined_when_insufficient_wood() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 1; // Not enough to pay 2
+        after_worker_simple(&s, &mut p, Space::Forest);
+        assert_eq!(p.supply.wood, 1); // No wood spent
+                                      // No field plowed
+        assert!(!p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+    }
+
+    #[test]
+    fn b017_not_triggered_by_other_spaces() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 5;
+        after_worker_simple(&s, &mut p, Space::ClayPit);
+        after_worker_simple(&s, &mut p, Space::Fishing);
+        after_worker_simple(&s, &mut p, Space::DayLaborer);
+        assert_eq!(p.supply.wood, 5); // No wood spent
+        assert!(!p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+    }
+
+    #[test]
+    fn b017_cost_and_points() {
+        let s = set();
+        let card = s.definition("B017").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+    }
+
+    // B047 ニシン鍋 (Herring Pot): cost 1 clay; after using Fishing,
+    // place 1 food on each of the next 3 round spaces.
+    #[test]
+    fn b047_schedules_food_on_next_three_rounds() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B047".into());
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![p];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5, // round 5
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+        )
+        .unwrap();
+        // Food scheduled on rounds 6, 7, 8
+        assert_eq!(well.get(&6), Some(&vec![0]));
+        assert_eq!(well.get(&7), Some(&vec![0]));
+        assert_eq!(well.get(&8), Some(&vec![0]));
+        assert_eq!(well.get(&9), None);
+    }
+
+    #[test]
+    fn b047_twice_accumulates() {
+        let s = set();
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("B047".into());
+        let mut used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        // First Fishing at round 5
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+        )
+        .unwrap();
+        used_spaces.clear();
+        // Second Fishing at round 5 (same round)
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+        )
+        .unwrap();
+        // Each use schedules 3 food, so 2 uses = 6 food on each of rounds 6,7,8
+        assert_eq!(well.get(&6), Some(&vec![0, 0]));
+        assert_eq!(well.get(&7), Some(&vec![0, 0]));
+        assert_eq!(well.get(&8), Some(&vec![0, 0]));
+    }
+
+    #[test]
+    fn b047_not_triggered_by_other_spaces() {
+        let s = set();
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("B047".into());
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Forest,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+        )
+        .unwrap();
+        assert!(well.is_empty());
+    }
+
+    #[test]
+    fn b047_cost_and_points() {
+        let s = set();
+        let card = s.definition("B047").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Clay, 1)]);
+        assert_eq!(card.points, 0);
+    }
+
+    // B051 採掘シャベル (Digging Spade): cost 1 wood; playable from round 7;
+    // after using Clay Pit, gain food equal to the number of wild boars.
+    #[test]
+    fn b051_gains_food_per_boar_on_clay_pit() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B051".into());
+        // Add 3 wild boars
+        p.pastures.push(crate::model::Pasture {
+            id: 0,
+            cells: vec![2, 3, 4],
+            animal: Some(Animal::Boar),
+            quantity: 3,
+        });
+        after_worker_simple(&s, &mut p, Space::ClayPit);
+        assert_eq!(p.supply.food, 3); // 3 boars * 1
+    }
+
+    #[test]
+    fn b051_zero_when_no_boars() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B051".into());
+        after_worker_simple(&s, &mut p, Space::ClayPit);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn b051_round_prerequisite_enforced() {
+        let s = set();
+        let card = s.definition("B051").unwrap();
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        // Round 6 -> cannot play (minimum round 7)
+        assert!(!can_play(&s, card, &p, 6, 0));
+        // Round 7 -> can play
+        assert!(can_play(&s, card, &p, 7, 0));
+    }
+
+    #[test]
+    fn b051_too_early_cannot_play() {
+        let s = set();
+        let card = s.definition("B051").unwrap();
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        // Round 1 -> cannot play
+        assert!(!can_play(&s, card, &p, 1, 0));
+    }
+
+    #[test]
+    fn b051_not_triggered_by_other_spaces() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B051".into());
+        p.pastures.push(crate::model::Pasture {
+            id: 0,
+            cells: vec![2, 3, 4],
+            animal: Some(Animal::Boar),
+            quantity: 2,
+        });
+        after_worker_simple(&s, &mut p, Space::Forest);
+        after_worker_simple(&s, &mut p, Space::Fishing);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn b051_cost_and_points() {
+        let s = set();
+        let card = s.definition("B051").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+    }
+
+    // B060 仕込み水 (Brewing Water): free cost; after using Fishing,
+    // may pay 1 grain to place 1 food on each of the next 6 round spaces.
+    #[test]
+    fn b060_schedules_food_on_next_six_rounds_when_paying_grain() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B060".into());
+        p.supply.grain = 1;
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![p];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5, // round 5
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+        )
+        .unwrap();
+        // Food scheduled on rounds 6, 7, 8, 9, 10, 11
+        for r in 6..=11 {
+            assert_eq!(well.get(&r), Some(&vec![0]), "round {r} should have food");
+        }
+        assert_eq!(well.get(&12), None);
+        // Grain should be spent
+        assert_eq!(players[0].supply.grain, 0);
+    }
+
+    #[test]
+    fn b060_declined_when_insufficient_grain() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B060".into());
+        p.supply.grain = 0; // Cannot pay
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![p];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+        )
+        .unwrap();
+        assert!(well.is_empty(), "no food scheduled when grain not paid");
+    }
+
+    #[test]
+    fn b060_late_round_schedules_only_up_to_14() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B060".into());
+        p.supply.grain = 1;
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![p];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        // Round 12 -> schedules on 13, 14 only (15+ don't exist)
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            12,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+        )
+        .unwrap();
+        assert_eq!(well.get(&13), Some(&vec![0]));
+        assert_eq!(well.get(&14), Some(&vec![0]));
+        assert_eq!(well.get(&15), None);
+        assert_eq!(well.get(&16), None);
+    }
+
+    #[test]
+    fn b060_not_triggered_by_other_spaces() {
+        let s = set();
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("B060".into());
+        players[0].supply.grain = 1;
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Forest,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+        )
+        .unwrap();
+        assert!(well.is_empty());
+    }
+
+    #[test]
+    fn b060_cost_and_points() {
+        let s = set();
+        let card = s.definition("B060").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+    }
+
+    // B063 味見 (Tasting): cost 2 wood; 1 point; after using Lessons,
+    // optionally exchange 1 grain for 4 food.
+    #[test]
+    fn b063_exchanges_grain_for_food_on_lessons() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B063".into());
+        p.supply.grain = 1;
+        after_worker_simple(&s, &mut p, Space::Lessons);
+        assert_eq!(p.supply.grain, 0);
+        assert_eq!(p.supply.food, 4);
+    }
+
+    #[test]
+    fn b063_declined_when_no_grain() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B063".into());
+        p.supply.grain = 0;
+        after_worker_simple(&s, &mut p, Space::Lessons);
+        assert_eq!(p.supply.grain, 0);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn b063_not_triggered_by_other_spaces() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B063".into());
+        p.supply.grain = 5;
+        after_worker_simple(&s, &mut p, Space::Forest);
+        after_worker_simple(&s, &mut p, Space::ClayPit);
+        after_worker_simple(&s, &mut p, Space::Fishing);
+        assert_eq!(p.supply.grain, 5);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn b063_cost_and_points() {
+        let s = set();
+        let card = s.definition("B063").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 2)]);
+        assert_eq!(card.points, 1);
+    }
+
+    #[test]
+    fn afterworker_simple_cards_absent_from_two_player_preset() {
+        let preset = verified_basic_card_set(2).unwrap();
+        for id in ["B017", "B047", "B051", "B060", "B063"] {
+            assert!(
+                preset.definition(id).is_none(),
+                "{id} must stay out of the A/B two-player preset"
+            );
+        }
+    }
+}
+
 /// Test module for verified_band_b_cards.
 #[cfg(test)]
 mod verified_band_b_tests {
@@ -3995,7 +4724,7 @@ mod verified_band_b_tests {
         for players in [2, 3, 4] {
             let p = Player::new(0, 0);
             assert!(
-                can_play(&set, card, &p, 0),
+                can_play(&set, card, &p, 1, 0),
                 "B122 should be playable at {players} players"
             );
         }
@@ -4048,7 +4777,7 @@ mod verified_band_b_tests {
         );
         let p = Player::new(0, 0);
         assert!(
-            can_play(&set, card, &p, 0),
+            can_play(&set, card, &p, 1, 0),
             "B142 should be playable via can_play"
         );
     }
@@ -4099,7 +4828,7 @@ mod verified_band_b_tests {
         );
         let p = Player::new(0, 0);
         assert!(
-            can_play(&set, card, &p, 0),
+            can_play(&set, card, &p, 1, 0),
             "B144 should be playable via can_play"
         );
     }
@@ -4280,7 +5009,7 @@ mod verified_band_d_tests {
         let set = set();
         let mut hand = vec!["D109".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "D109", CardKind::Occupation, 0).unwrap();
+        play(&set, &mut hand, &mut p, "D109", CardKind::Occupation, 1, 0).unwrap();
         assert_eq!(p.supply.wood, 1);
         for space in [
             Space::GrainSeeds,
@@ -4967,6 +5696,7 @@ mod verified_band_a_tests {
             &mut p,
             "A117",
             CardKind::Occupation,
+            1,
             0,
         )
         .unwrap();
@@ -5040,7 +5770,7 @@ mod verified_band_a_tests {
         );
         let p = Player::new(0, 0);
         assert!(
-            can_play(&set, card, &p, 0),
+            can_play(&set, card, &p, 1, 0),
             "A155 should be playable via can_play"
         );
     }
@@ -5069,6 +5799,7 @@ mod verified_band_a_tests {
             &mut p,
             "A008",
             CardKind::MinorImprovement,
+            1,
             1, // reed cost
         );
         assert!(result.is_err(), "Should fail with 0 occupations");
@@ -5084,6 +5815,7 @@ mod verified_band_a_tests {
             &mut p,
             "A008",
             CardKind::MinorImprovement,
+            1,
             1,
         );
         assert!(result.is_err(), "Should fail with 1 occupation");
@@ -5101,6 +5833,7 @@ mod verified_band_a_tests {
             &mut p,
             "A008",
             CardKind::MinorImprovement,
+            1,
             1,
         );
         assert!(
@@ -5123,6 +5856,7 @@ mod verified_band_a_tests {
             "A008",
             CardKind::MinorImprovement,
             1,
+            1,
         )
         .unwrap();
         // Fixed 1 grain + 1 vegetable regardless of improvement count
@@ -5144,6 +5878,7 @@ mod verified_band_a_tests {
             &mut p,
             "A008",
             CardKind::MinorImprovement,
+            1,
             1,
         )
         .unwrap();
@@ -5190,6 +5925,7 @@ mod m6_extra_passive_tests {
             &mut p,
             "B010",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -5209,6 +5945,7 @@ mod m6_extra_passive_tests {
             &mut p,
             "A143",
             CardKind::Occupation,
+            1,
             0,
         )
         .unwrap();
@@ -5272,6 +6009,7 @@ mod a063_baking_tests {
             &mut player,
             "A063",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();

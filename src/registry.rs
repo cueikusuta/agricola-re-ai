@@ -304,6 +304,19 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterWorkerSpendPlowField { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterWorkerScheduleFood { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterWorkerGainPerAnimal { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterWorkerPayToScheduleFood { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterWorkerOptionalExchange { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::AfterAnyWorkerGain { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
                     EventKind::WorkerPlaced
@@ -378,10 +391,23 @@ impl CardRegistryBuilder {
                 || card.effects.iter().any(|effect| {
                     let amount = match effect {
                         crate::cards::CardEffect::OnPlayGain { amount, .. }
-                        | crate::cards::CardEffect::AfterWorkerGain { amount, .. } => *amount,
+                        | crate::cards::CardEffect::AfterWorkerGain { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerSpendPlowField { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainPerAnimal {
+                            per: amount, ..
+                        }
+                        | crate::cards::CardEffect::AfterWorkerPayToScheduleFood {
+                            pay_amount: amount,
+                            ..
+                        }
+                        | crate::cards::CardEffect::AfterWorkerOptionalExchange {
+                            give_amount: amount,
+                            ..
+                        } => *amount,
                         crate::cards::CardEffect::EndGameBonus { .. }
                         | crate::cards::CardEffect::Prerequisite { .. }
-                        | crate::cards::CardEffect::Passive { .. } => 1,
+                        | crate::cards::CardEffect::Passive { .. }
+                        | crate::cards::CardEffect::AfterWorkerScheduleFood { .. } => 1,
                         #[cfg(test)]
                         crate::cards::CardEffect::PendingProbe { .. } => 1,
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
@@ -804,6 +830,14 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
     // B-deck band cards with typed effects (kept out of the A/B two-player
     // preset; see verified_band_b_cards).
     builder = add_cards_inner(builder, crate::cards::verified_band_b_cards(), &mut seen)?;
+    // B-deck chapter 1: after_worker_space simple gain cards (B017, B047, B051, B060, B063).
+    // Minor improvements with bga_checked after_worker_space triggers. Kept out of the A/B
+    // two-player preset, same as the band pools.
+    builder = add_cards_inner(
+        builder,
+        crate::cards::verified_b_afterworker_simple_cards(),
+        &mut seen,
+    )?;
 
     builder.freeze()
 }
