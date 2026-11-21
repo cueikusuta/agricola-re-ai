@@ -73,7 +73,7 @@
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "owner",
-      "notes": "Each time using Major Improvement action space, gain 1 grain then perform sow action. Wiki: '大きい進歩' = major improvement action space."
+      "notes": "Each time using Major Improvement action space, gain 1 grain then perform sow action."
     }
   ],
   "post_play": {
@@ -89,6 +89,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-20",
     "implementation_status": "not_started",
-    "notes": "Classification: stage外 (single site: space use / gain + sow). Uses TR-SITE. Only triggers on '大きい進歩' (major improvement) action space, not minor improvement."
+    "notes": "Classification: stage外 (single site: space use / gain + sow). Uses TR-SITE. Only triggers on major improvement action space, not minor improvement."
   }
 }
