@@ -29,15 +29,22 @@
 | 第1章 | E099–E109 | 11 | `research/freebuff-eband-spec-create-ch01` |
 | 第2章 | E110–E120 | 11 | `research/freebuff-eband-spec-create-ch02` |
 
-### 第1章 E099–E109（完了）
+### 第1章 E099–E109（PR #416：本ベースブランチにマージ済み @ 3eb8afc）
 
-- ブランチ `research/freebuff-eband-spec-create-ch01`。仕様JSON 11枚＋テスト契約11枚（33ケース）を追加。
-- 内訳: `bga_checked` 9枚、`needs_resolution` 2枚（E101 ステージ境界、E109 交換回数）。テスト契約は既存バッチと同じ
-  `effect_only` の3ケース／枚。
-- 追加語彙は `docs/bga-card-effect-vocabulary.md` の「2026-11-21追補：E帯 099–120」。
-- 記録: `docs/eband-spec-create-ch01.md`（カード一覧・質問Q-1/Q-2・検証）。
+- ブランチ `research/freebuff-eband-spec-create-ch01`。仕様JSON 11枚＋テスト契約11枚（33ケース）。
+- `bga_checked` 9枚、`needs_resolution` 2枚（E101 ステージ境界、E109 交換回数）。記録は `docs/eband-spec-create-ch01.md`。
+- PR #416 はマージ済み。Round 1 指摘のP1修正（E100 bga_checked→needs_resolution、E102 不可購入時の food_delta 修正）はフォローアップ PR #490（`fix/eband-round1-post-merge`）で別途対応。
+- 検証: `validate_bga_card_specs.py` exit 0（errors 空）、ビルダー unittest 3 OK。`src/`・台帳・既存仕様は未変更。
+
+### 第2章 E110–E120（PR #417：作成・レビュー待ち、マージしない）
+
+- ブランチ `research/freebuff-eband-spec-create-ch02`。仕様JSON 11枚＋テスト契約11枚（33ケース）を追加。
+- 内訳: `bga_checked` 9枚、`needs_resolution` 2枚（E118 Q-3 実装差分、`unresolved_fields` に注記・status は needs_resolution；E120 終盤プレイ時の端数 Q-4）。実装済み4枚（E111/E113/E117/E118）は `implementation_status=implemented`（E118 は Q-3 の実装差分を `unresolved_fields` に注記済み）。
+- 記録: `docs/eband-spec-create-ch02.md`（カード一覧・Q-3/Q-4・検証）。
 - 検証: `validate_bga_card_specs.py` exit 0（errors 空）、ビルダー unittest 3 OK。`src/`・台帳・既存仕様は未変更。
 
 ### 現在地
 
-- 第1章の仕様・テスト・文書を作成済み。PRを作成して停止する（マージしない）。次は第2章 E110–E120。
+- 第1章（E099–E109）＝ PR #416、本ベースにマージ済み。第2章（E110–E120）＝ PR #417 を作成して停止。**マージしない。**
+- 独立レビュー待ち（`AGENTS.md` §14）。E084–E098 は他担当ブランチ（PR未作成）にあり対象外。
+- 再開はこの節から。

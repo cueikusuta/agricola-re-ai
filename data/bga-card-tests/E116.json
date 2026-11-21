@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "card_id": "E116",
+  "cases": [
+    {
+      "id": "E116-first-worker",
+      "scope": "effect_only",
+      "setup": {
+        "placement_index": 1
+      },
+      "action": {
+        "play": "E116",
+        "use_space": "sheep_market"
+      },
+      "expected": {
+        "wood_delta": 1,
+        "food_delta": 1
+      },
+      "notes": "The first worker of the round gains 1 wood."
+    },
+    {
+      "id": "E116-third-worker",
+      "scope": "effect_only",
+      "setup": {
+        "placement_index": 3
+      },
+      "action": {
+        "play": "E116",
+        "use_space": "pig_market"
+      },
+      "expected": {
+        "wood_delta": 2
+      },
+      "notes": "The third worker gains 2 wood."
+    },
+    {
+      "id": "E116-non-animal-space",
+      "scope": "effect_only",
+      "setup": {
+        "placement_index": 3
+      },
+      "action": {
+        "play": "E116",
+        "use_space": "forest"
+      },
+      "expected": {
+        "wood_delta": 0
+      },
+      "notes": "Non-animal spaces do not trigger the wood."
+    }
+  ]
+}

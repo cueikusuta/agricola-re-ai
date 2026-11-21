@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "E114",
+  "cases": [
+    {
+      "id": "E114-first-stable",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 0
+      },
+      "action": {
+        "play": "E114",
+        "build_stables": 1
+      },
+      "expected": {
+        "grain_delta": 1,
+        "vegetable_delta": 0
+      },
+      "notes": "The first stable gives grain."
+    },
+    {
+      "id": "E114-third-stable",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 2
+      },
+      "action": {
+        "play": "E114",
+        "build_stables": 1
+      },
+      "expected": {
+        "grain_delta": 0,
+        "vegetable_delta": 1
+      },
+      "notes": "The third stable gives a vegetable."
+    },
+    {
+      "id": "E114-stables-built-before",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 2
+      },
+      "action": {
+        "play": "E114",
+        "build_stables": 0
+      },
+      "expected": {
+        "grain_delta": 0,
+        "vegetable_delta": 0
+      },
+      "notes": "Stables built before this card do not count."
+    }
+  ]
+}
