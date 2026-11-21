@@ -39,34 +39,39 @@
   },
   "effects": [
     {
-      "trigger": "before_sow",
+      "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "other_player_only",
-          "params": {}
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "fishing",
+              "traveling_players"
+            ]
+          }
         },
         {
-          "predicate": "sow_unconditional",
+          "predicate": "other_player_only",
           "params": {}
         }
       ],
       "steps": [
         {
           "operation": "spend_resource",
-          "target": "owner",
           "params": {
             "good": "grain",
             "amount": 1,
             "source": "owner_supply",
             "target": "other_player"
-          }
+          },
+          "target": "owner"
         },
         {
           "operation": "gain_points",
-          "target": "owner",
           "params": {
             "points": 1
-          }
+          },
+          "target": "owner"
         }
       ],
       "optional": true,
@@ -87,8 +92,8 @@
       "A154-normal",
       "A154-declined"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Before another player's unconditional Sow: may give them 1 grain for 1 point."
   }

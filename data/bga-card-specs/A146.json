@@ -44,7 +44,10 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "space": "fishing"
+            "spaces": [
+              "fishing",
+              "traveling_players"
+            ]
           }
         },
         {
@@ -62,7 +65,6 @@
       "steps": [
         {
           "operation": "gain_resource",
-          "target": "owner",
           "params": {
             "good": {
               "op": "table",
@@ -77,7 +79,8 @@
               ]
             },
             "amount": 1
-          }
+          },
+          "target": "owner"
         }
       ],
       "optional": false,
@@ -99,8 +102,8 @@
       "A146-five",
       "A146-six"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Taking exactly 2/3/4/5 food from a food accumulation also gives 1 stone/reed/clay/wood (not at 6+)."
   }

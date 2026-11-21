@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 2
+        }
+      }
+    ],
     "printed_points": 1
   },
   "effects": [
@@ -76,8 +83,8 @@
       "A044-normal",
       "A044-late"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Place 1 food on each of the next 3 round spaces."
   }

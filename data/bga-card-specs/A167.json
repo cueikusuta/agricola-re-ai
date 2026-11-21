@@ -39,34 +39,27 @@
   },
   "effects": [
     {
-      "trigger": "after_stable_construction",
+      "trigger": "after_room_construction",
       "conditions": [
         {
-          "predicate": "stables_at_least",
-          "params": {
-            "n": 1
-          }
+          "predicate": "room_built_and_stable_built_same_turn",
+          "params": {}
         },
         {
-          "predicate": "house_is",
+          "predicate": "rooms_built_on_own_turn",
           "params": {
-            "house": [
-              "wood",
-              "clay",
-              "stone"
-            ]
+            "min": 1
           }
         }
       ],
       "steps": [
         {
           "operation": "gain_resource",
-          "target": "owner",
           "params": {
             "good": {
               "op": "table",
               "args": [
-                "house",
+                "room_material_built",
                 {
                   "wood": "sheep",
                   "clay": "wild_boar",
@@ -75,7 +68,8 @@
               ]
             },
             "amount": 1
-          }
+          },
+          "target": "owner"
         }
       ],
       "optional": false,
@@ -97,8 +91,8 @@
       "A167-stone",
       "A167-no-material"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Building a stable while owning at least 1 of the house material: 1 sheep/boar/cattle."
   }

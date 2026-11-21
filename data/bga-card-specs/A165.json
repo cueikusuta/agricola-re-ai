@@ -44,11 +44,11 @@
       "steps": [
         {
           "operation": "gain_resource",
-          "target": "owner",
           "params": {
-            "good": "food",
+            "good": "wild_boar",
             "amount": 1
-          }
+          },
+          "target": "owner"
         }
       ],
       "optional": false,
@@ -73,10 +73,11 @@
       "steps": [
         {
           "operation": "other",
-          "target": "owner",
           "params": {
-            "kind": "free_breeding_if_room"
-          }
+            "kind": "free_breeding_if_room",
+            "animal": "wild_boar"
+          },
+          "target": "owner"
         }
       ],
       "optional": false,
@@ -98,8 +99,8 @@
       "A165-breed",
       "A165-not-triggered"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Gain 1 food on play; at the end of round 12 breed for free if there is room."
   }

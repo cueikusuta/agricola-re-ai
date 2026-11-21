@@ -39,12 +39,22 @@
   },
   "effects": [
     {
-      "trigger": "passive",
-      "conditions": [],
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "forest",
+              "copse",
+              "grove"
+            ]
+          }
+        }
+      ],
       "steps": [
         {
           "operation": "exchange",
-          "target": "owner",
           "params": {
             "give": [
               {
@@ -54,11 +64,13 @@
             ],
             "receive": [
               {
-                "good": "reed",
+                "good": "sheep",
                 "amount": 1
               }
-            ]
-          }
+            ],
+            "return_to": "accumulation_space"
+          },
+          "target": "owner"
         }
       ],
       "optional": true,
@@ -66,8 +78,7 @@
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "owner",
-      "notes": "the exchanged wood stays on the accumulation space"
+      "decision_owner": "owner"
     }
   ],
   "post_play": {
@@ -80,8 +91,8 @@
       "A164-normal",
       "A164-declined"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "When taking wood from an accumulation: may exchange 1 wood for 1 reed; the wood stays there."
   }

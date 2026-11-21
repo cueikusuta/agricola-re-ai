@@ -44,22 +44,21 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "space": "traveling_players"
+            "space": "building_resource_market"
           }
         }
       ],
       "steps": [
         {
           "operation": "gain_resource",
-          "target": "owner",
           "params": {
             "good": {
               "op": "table",
               "args": [
-                "person_number",
+                "own_person_number",
                 {
-                  "1": "clay",
-                  "2": "wood",
+                  "1": "wood",
+                  "2": "clay",
                   "3": "reed",
                   "4": "stone",
                   "5": "stone"
@@ -67,7 +66,8 @@
               ]
             },
             "amount": 1
-          }
+          },
+          "target": "owner"
         }
       ],
       "optional": false,
@@ -88,8 +88,8 @@
       "A163-first",
       "A163-fifth"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Traveling Players use: 1 clay/wood/reed/stone/stone as the owner's 1st/2nd/3rd/4th/5th person."
   }

@@ -44,31 +44,24 @@
         {
           "predicate": "has_improvement",
           "params": {
-            "kind": "joinery"
-          }
-        },
-        {
-          "predicate": "has_improvement",
-          "params": {
-            "kind": "pottery"
-          }
-        },
-        {
-          "predicate": "has_improvement",
-          "params": {
-            "kind": "basketmakers_workshop"
+            "kind": [
+              "joinery",
+              "pottery",
+              "basketmakers_workshop"
+            ],
+            "any_of": true
           }
         }
       ],
       "steps": [
         {
           "operation": "grant_action",
-          "target": "owner",
           "params": {
             "action": "play_occupation",
             "free": true,
             "max_count": 2
-          }
+          },
+          "target": "owner"
         }
       ],
       "optional": true,
@@ -89,8 +82,8 @@
       "A131-normal",
       "A131-incomplete"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "After building Joinery, Pottery and Basketmaker's Workshop: up to 2 free occupations."
   }

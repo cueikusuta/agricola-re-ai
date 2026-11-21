@@ -45,11 +45,11 @@
           "predicate": "other_player_uses",
           "params": {
             "spaces": [
-              "forest",
-              "clay_pit",
               "reed_bank",
               "western_quarry",
-              "eastern_quarry"
+              "eastern_quarry",
+              "sheep_market",
+              "pig_market"
             ]
           }
         }
@@ -57,20 +57,22 @@
       "steps": [
         {
           "operation": "spend_resource",
-          "target": "owner",
           "params": {
             "good": "food",
             "amount": 1,
             "source": "owner_supply",
             "target": "other_player"
-          }
+          },
+          "target": "owner"
         },
         {
           "operation": "other",
-          "target": "owner",
           "params": {
-            "kind": "gain_from_other_supply"
-          }
+            "kind": "gain_from_common_stock",
+            "take_same_good": true,
+            "max": 1
+          },
+          "target": "owner"
         }
       ],
       "optional": true,
@@ -91,8 +93,8 @@
       "A156-normal",
       "A156-declined"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Another player's building-resource accumulation: may give them 1 food to take 1 of that resource."
   }

@@ -34,7 +34,14 @@
   "play": {
     "action": "minor_improvement",
     "cost": [],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "animal_count_at_least",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -71,8 +78,8 @@
       "A043-normal",
       "A043-not-triggered"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Each turn building at least 1 stable places 1 food on each of the next 3 round spaces."
   }

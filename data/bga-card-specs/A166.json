@@ -39,44 +39,41 @@
   },
   "effects": [
     {
-      "trigger": "harvest_end",
+      "trigger": "harvest_start",
       "conditions": [],
       "steps": [
         {
           "operation": "spend_resource",
-          "target": "owner",
           "params": {
             "good": "food",
             "amount": {
-              "op": "table",
+              "op": "max",
               "args": [
-                "animal_price",
                 {
-                  "sheep": 4,
-                  "wild_boar": 4,
-                  "cattle": 4
-                }
+                  "op": "subtract",
+                  "args": [
+                    4,
+                    {
+                      "op": "count",
+                      "args": [
+                        "pasture"
+                      ]
+                    }
+                  ]
+                },
+                0
               ]
             }
-          }
+          },
+          "target": "owner"
         },
         {
           "operation": "gain_resource",
-          "target": "owner",
           "params": {
-            "good": {
-              "op": "table",
-              "args": [
-                "market_animal",
-                {
-                  "sheep": "sheep",
-                  "pig": "wild_boar",
-                  "cattle": "cattle"
-                }
-              ]
-            },
+            "good": "cattle",
             "amount": 1
-          }
+          },
+          "target": "owner"
         }
       ],
       "optional": true,
@@ -85,7 +82,7 @@
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "owner",
-      "notes": "food cost is capped by the number of animals already owned (minimum 0)"
+      "notes": "Pay 4 food minus 1 per pasture (minimum 0) to buy 1 cattle before each harvest."
     }
   ],
   "post_play": {
@@ -98,8 +95,8 @@
       "A166-normal",
       "A166-free"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "At harvest end: may buy 1 animal for 4 food minus the number already owned (minimum 0)."
   }

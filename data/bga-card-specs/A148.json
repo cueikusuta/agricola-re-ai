@@ -44,12 +44,17 @@
       "steps": [
         {
           "operation": "modify_capacity",
-          "target": "board",
           "params": {
             "scope": "card",
-            "animal_capacity": "unlimited",
-            "until": "feeding_phase_of_harvest"
-          }
+            "animal": "sheep",
+            "animal_capacity": {
+              "op": "count",
+              "args": [
+                "completed_harvest"
+              ]
+            }
+          },
+          "target": "board"
         }
       ],
       "optional": false,
@@ -57,26 +62,8 @@
       "duration": "permanent",
       "snapshot": "live_state",
       "order": 0,
-      "decision_owner": "none"
-    },
-    {
-      "trigger": "harvest_feeding",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "other",
-          "target": "owner",
-          "params": {
-            "kind": "move_card_animals_to_fields"
-          }
-        }
-      ],
-      "optional": false,
-      "frequency": "every_harvest",
-      "duration": "permanent",
-      "snapshot": "after_event",
-      "order": 1,
-      "decision_owner": "none"
+      "decision_owner": "none",
+      "notes": "Capacity equals the number of completed feeding phases (one per completed harvest)."
     }
   ],
   "post_play": {
@@ -89,8 +76,8 @@
       "A148-normal",
       "A148-harvest"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Animals may be kept on the card until the feeding phase of the next harvest."
   }

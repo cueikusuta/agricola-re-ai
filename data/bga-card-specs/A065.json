@@ -34,7 +34,14 @@
   "play": {
     "action": "minor_improvement",
     "cost": [],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "field_count",
+        "params": {
+          "n": 3
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -74,8 +81,8 @@
       "A065-normal",
       "A065-not-triggered"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Before each unconditional Sow action: gain 1 grain."
   }

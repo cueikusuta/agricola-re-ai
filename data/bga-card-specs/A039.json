@@ -48,43 +48,33 @@
   },
   "effects": [
     {
-      "trigger": "after_worker_space",
-      "conditions": [
-        {
-          "predicate": "worker_space_used",
-          "params": {
-            "space": "this_card"
-          }
-        },
-        {
-          "predicate": "other_player_only",
-          "params": {}
-        }
-      ],
+      "trigger": "passive",
+      "conditions": [],
       "steps": [
         {
-          "operation": "gain_resource",
-          "target": "owner",
+          "operation": "other",
           "params": {
-            "good": "grain",
-            "amount": 1,
-            "target": "owner"
-          }
-        },
-        {
-          "operation": "gain_points",
-          "target": "owner",
-          "params": {
-            "points": 3
-          }
+            "kind": "shared_action_space",
+            "space": "this_card",
+            "points": 3,
+            "other_player_cost": [
+              {
+                "good": "grain",
+                "amount": 1
+              }
+            ],
+            "cost_goes_to": "owner"
+          },
+          "target": "owner"
         }
       ],
       "optional": false,
-      "frequency": "every_use",
+      "frequency": "always",
       "duration": "permanent",
-      "snapshot": "after_event",
+      "snapshot": "live_state",
       "order": 0,
-      "decision_owner": "none"
+      "decision_owner": "none",
+      "notes": "Any player may use the card as an action space for 3 points; other players first give the owner 1 grain."
     }
   ],
   "post_play": {
@@ -97,8 +87,8 @@
       "A039-normal",
       "A039-owner"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Shared action space: users gain 3 points; other players must first pay the owner 1 grain."
   }

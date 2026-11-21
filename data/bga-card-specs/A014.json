@@ -44,7 +44,7 @@
   },
   "effects": [
     {
-      "trigger": "after_room_construction",
+      "trigger": "when_buying",
       "conditions": [
         {
           "predicate": "rooms_built_at_once_at_least",
@@ -112,8 +112,8 @@
       "A014-stone",
       "A014-not-triggered"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Building at least 2 rooms at once: 2 reed and 2 wood/3 clay/4 stone cheaper."
   }

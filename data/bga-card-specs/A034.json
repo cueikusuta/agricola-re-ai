@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 2
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -92,8 +99,8 @@
       "A034-normal",
       "A034-declined"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "After building fences: may exchange 1 wood and 1 fence for 2 food and 1 point."
   }

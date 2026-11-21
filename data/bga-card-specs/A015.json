@@ -77,7 +77,7 @@
       "optional": true,
       "frequency": "every_use",
       "duration": "permanent",
-      "snapshot": "after_event",
+      "snapshot": "before_event",
       "order": 0,
       "decision_owner": "owner"
     }
@@ -92,8 +92,8 @@
       "A015-normal",
       "A015-not-triggered"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-09",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "After a wood accumulation space with at least 7 wood in supply: build 1 stable for 1 wood."
   }
