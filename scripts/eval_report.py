@@ -385,7 +385,11 @@ def _validate_row(
     for field in ("focus_pick_max_ms", "focus_pick_p95_ms"):
         value = row.get(field)
         _require(finite_number(value) and value >= 0, f"{label}: invalid {field}")
-    for field in ("pick_timeout_count", "pick_illegal_fallback_count"):
+    for field in (
+        "pick_timeout_count",
+        "pick_over_budget_ms_count",
+        "pick_illegal_fallback_count",
+    ):
         value = row.get(field)
         _require(type(value) is int and value >= 0, f"{label}: invalid {field}")
     if draft_mode == "none":
@@ -393,15 +397,19 @@ def _validate_row(
             row.get("draft_pick_budget_enforced") is None,
             f"{label}: a cardless game has no draft pick budget",
         )
+        _require(
+            row.get("focus_observed_all_picks_within_budget") is None,
+            f"{label}: a cardless game has no pick-budget flag",
+        )
     else:
         _require(
             row.get("draft_pick_budget_enforced") is False,
             f"{label}: this harness observes the draft pick time but does not enforce a deadline",
         )
-    _require(
-        type(row.get("focus_observed_all_picks_within_budget")) is bool,
-        f"{label}: pick-budget flag must be a boolean",
-    )
+        _require(
+            row.get("focus_observed_all_picks_within_budget") is None,
+            f"{label}: a non-enforced pick deadline has no pass/fail flag",
+        )
 
 
 def _uniform(rows: list[dict], field: str) -> object:
@@ -513,6 +521,58 @@ def manifest_head_to_head(manifest: dict) -> bool:
         )
         return design["head_to_head"]
     return inferred
+
+
+def comparison_signature(manifest: dict) -> tuple[str, list[str]]:
+    """The kind of difference the two arms actually measure.
+
+    `game_policy` = a different policy name; `puct_config` = the same PUCT
+    policy with a different frozen config; `draft_contribution` = the game
+    policy is identical and only the draft policy differs; `full_stack` changes
+    both layers; `common_opponent` is not head-to-head.
+    """
+    arms = manifest["arms"]
+    candidate = arms["candidate"]
+    baseline = arms["baseline"]
+    factors: list[str] = []
+    if candidate.get("policy") != baseline.get("policy"):
+        factors.append("game_policy")
+    candidate_puct = candidate.get("puct_config_id")
+    baseline_puct = baseline.get("puct_config_id")
+    if (
+        candidate_puct is not None
+        and baseline_puct is not None
+        and candidate_puct != baseline_puct
+    ):
+        factors.append("puct_config")
+    candidate_draft = candidate.get("draft_policy_id")
+    baseline_draft = baseline.get("draft_policy_id")
+    if candidate_draft is not None and candidate_draft != baseline_draft:
+        factors.append("draft_policy")
+    head_to_head = manifest_head_to_head(manifest)
+    if not head_to_head:
+        kind = "common_opponent"
+    elif "game_policy" in factors and "draft_policy" in factors:
+        kind = "full_stack"
+    elif "draft_policy" in factors and not (
+        "game_policy" in factors or "puct_config" in factors
+    ):
+        kind = "draft_contribution"
+    else:
+        kind = "game_policy"
+    design = manifest.get("comparison_design")
+    if isinstance(design, dict):
+        if "comparison_kind" in design:
+            _require(
+                design["comparison_kind"] == kind,
+                "manifest.comparison_design.comparison_kind disagrees with the arms",
+            )
+        if "changed_factors" in design:
+            _require(
+                design["changed_factors"] == factors,
+                "manifest.comparison_design.changed_factors disagrees with the arms",
+            )
+    return kind, factors
 
 
 def validate_rows(manifest: dict, rows: list[dict]) -> dict[tuple[int, str, int], dict]:
@@ -676,6 +736,7 @@ def validate_and_report(
                 "Observed, not OS-guaranteed. A simulation-capped run is not evidence."
             ),
         }
+    comparison_kind, changed_factors = comparison_signature(manifest)
     blocked = manifest.get("official_final_mode_blocked_by")
     blocked = blocked if isinstance(blocked, list) else []
 
@@ -822,6 +883,8 @@ def validate_and_report(
         "comparison_design": {
             "head_to_head": head_to_head,
             "mirror_baseline": head_to_head,
+            "comparison_kind": comparison_kind,
+            "changed_factors": changed_factors,
             "note": (
                 "head_to_head=true means the fixed opponent is the baseline policy, so the "
                 "candidate focus seat meets it directly and the baseline arm is a mirror "
