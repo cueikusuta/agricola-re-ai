@@ -53,15 +53,32 @@
 - C088 は費用軽減の順序記録 (LOG) が前提。
 - 基盤が main にないまま近似実装しない方針のため、**本 PR では実装せず**、記録に「仕様未作成のため実装不可」と理由を記載し、PR 本文の残件欄に送る。
 
-## ゲート確認
+## ゲート確認（HEAD `39d9b19` 実測）
 
 - `cargo fmt --check` ✅
 - `cargo clippy --all-targets --all-features --locked -- -D warnings` ✅
-- 追加テスト `cargo test --test ch04_after_improvement_played` ✅ (8/8 passed)
-- 既存テスト `cargo test --lib` ✅ (414/414 passed)
+- 追加テスト `cargo test --test ch04_after_improvement_played` ✅ (10/10 passed: 8 dispatch-level + 2 engine-level)
+- 既存テスト `cargo test --lib` ✅ (442/442 passed)
 - `cargo test --test m6_verified_pool` ✅ (プール数・MCTS ダイジェスト・`state_hash` 不変)
 - `cargo test --lib mcts::tests::sample_game_distribution_digest_is_stable` ✅
 - `band_a_cards_are_absent_from_the_two_player_preset` ✅ (A109 は 2 人用プリセットに入らない)
+
+## Actions チェック結果（HEAD `39d9b19`、`gh api repos/cueikusuta/agricola-re-ai/commits/39d9b19ee6b2f323242a4fda7180db483659249e/check-runs` 実測）
+
+| チェック名 | 結論 | Run URL |
+|---|---|---|
+| CI required (aggregate) | skipped | — |
+| cargo test | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741648/job/136713344499 |
+| rustfmt | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741648/job/136713344511 |
+| clippy | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741648/job/136713344555 |
+| M1/M2/M7 seeded performance | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741648/job/136713344496 |
+| Pipeline gates (spec/catalog/blockers) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741682/job/136713297671 |
+| Detect changed files | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741648/job/136713297643 |
+| Python unittest discovery | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741650/job/136713297464 |
+| test (aggregate) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741658/job/136713297340 |
+| shard | skipped | — |
+
+**全必須ゲート緑**。ローカル測定値のみではなく Actions の実測値・URL を記録。
 
 ## 残件
 
