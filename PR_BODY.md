@@ -79,6 +79,6 @@
 - PR #375: open, head=176c9400, base=main
 - PR #376: open, head=6d97269a, base=research/deepai-allstages-merged (stacked on #370)
 - PR #371: **merged 2026-11-19T06:20Z**, merge commit `181253d4e179239c6b3128d60b242dcdd68095fb` (card_accumulations)
-- いずれも main 未マージ。本 PR が触るファイル (`src/cards.rs`, `src/card_events.rs`, `src/registry.rs`, `tests/`) に触る同一関心の open PR はなし。
+- #370/#375/#376 は open。本 PR が触るファイル (`src/cards.rs`, `src/card_events.rs`, `src/registry.rs`, `tests/`) に触る同一関心の open PR はなし。
 
 **マージしない。レビュー待ちで完了。**

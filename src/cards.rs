@@ -187,10 +187,10 @@ pub enum CardEffect {
         amount: u32,
     },
     /// A109 小商人 (Small Trader): when an improvement is played from hand
-    /// via a Major/Minor Improvement action (including renovation-combined),
-    /// gain `amount` of `good`. Fired from the play dispatcher's after-play
-    /// scan for improvements; the legacy `cards::play` helper does not re-scan
-    /// earlier cards and therefore never fires it.
+    /// via a Major or Minor Improvement action, gain `amount` of `good`.
+    /// Fired from the play dispatcher's after-play scan for improvements;
+    /// the legacy `cards::play` helper does not re-scan earlier cards
+    /// and therefore never fires it.
     AfterImprovementPlayedGain {
         good: Good,
         amount: u32,
@@ -3816,8 +3816,7 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
             ],
         },
         // A109 小商人 (Small Trader): when an improvement is played from hand
-        // via a Major/Minor Improvement action (including renovation-combined),
-        // gain 3 food.
+        // via a Major or Minor Improvement action, gain 3 food.
         CardDefinition {
             use_limit: None,
             id: "A109".to_owned(),

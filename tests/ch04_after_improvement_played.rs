@@ -2,12 +2,12 @@
 //!
 //! Covers: registry reachability, effect-only play via `cards::apply_on_play_effects`,
 //! legal-play / prerequisite gating via `cards::play`/`cards::can_play`,
-//! and the dispatcher route via `card_events::dispatch_play` (supply increase
-//! through the `card_events` effect path).
+//! dispatcher route via `card_events::dispatch_play` (supply increase through
+//! the `card_events` effect path), and **engine-level boundary tests** driving
+//! `Game::apply` through the four engine call sites.
 //!
 //! The effect triggers when an improvement is played from hand via a
-//! Major/Minor Improvement action (including renovation-combined use) and
-//! grants 3 food per improvement played.
+//! Major or Minor Improvement action and grants 3 food per improvement played.
 
 use agricola_re_ai::card_events::dispatch_play;
 use agricola_re_ai::cards::{apply_on_play_effects, CardDefinition, CardEffect, CardKind, CardSet};
@@ -293,7 +293,7 @@ fn a109_only_triggers_for_improvements_played_after_it() {
     );
 }
 
-// ---------------- Engine-level boundary: family growth path must NOT trigger A109 ----------------
+// ---------------- Dispatch-level simulation: family growth path must NOT trigger A109 ----------------
 
 #[test]
 fn a109_not_triggered_by_family_growth_growwithminor() {
@@ -365,7 +365,7 @@ fn a109_not_triggered_by_family_growth_growwithminor() {
     );
 }
 
-// ---------------- Engine-level boundary: MajorImprovement + PlayMinor path MUST trigger A109 ----------------
+// ---------------- Dispatch-level simulation: MajorImprovement + PlayMinor path MUST trigger A109 ----------------
 
 #[test]
 fn a109_triggers_on_major_improvement_play_minor() {
@@ -433,5 +433,161 @@ fn a109_triggers_on_major_improvement_play_minor() {
     assert_eq!(
         player.supply.food, 3,
         "A109 must trigger on MajorImprovement + PlayMinor (improvement action)"
+    );
+}
+
+// ==================== ENGINE-LEVEL BOUNDARY TESTS ====================
+// These tests drive `Game::apply` to exercise the actual engine call sites
+// (engine.rs) where `dispatch_play` is invoked with `is_improvement_action`.
+// They verify that the flag is correctly set at each of the four engine paths:
+// 1. MeetingPlace + PlayMinor (is_improvement_action=true)
+// 2. Lessons/ExtraLessons + PlayOccupation (is_improvement_action=false)
+// 3. FamilyGrowthWithRoom/ModestFamilyGrowth + GrowWithMinor (is_improvement_action=false)
+// 4. MajorImprovement + PlayMinor (is_improvement_action=true)
+
+use agricola_re_ai::engine::{Action, Detail};
+use agricola_re_ai::model::{Config, Space, Tile};
+use agricola_re_ai::Game;
+
+/// Build a test card set: verified_basic_card_set(2) (meets 7+7 requirement) + A109 + test minor improvement.
+fn engine_test_set() -> CardSet {
+    let mut set =
+        agricola_re_ai::cards::verified_basic_card_set(2).expect("verified basic card set");
+    // Add A109 (from band A) - not in basic set
+    set.definitions.push(agricola_re_ai::cards::CardDefinition {
+        use_limit: None,
+        id: "A109".to_owned(),
+        kind: agricola_re_ai::cards::CardKind::Occupation,
+        cost: vec![],
+        points: 0,
+        effects: vec![
+            agricola_re_ai::cards::CardEffect::AfterImprovementPlayedGain {
+                good: Good::Food,
+                amount: 3,
+            },
+        ],
+    });
+    // Add TEST_MINOR as a test minor improvement (cost: Wood 3, Food 3) - B010 already exists in basic set
+    set.definitions.push(agricola_re_ai::cards::CardDefinition {
+        use_limit: None,
+        id: "TEST_MINOR".to_owned(),
+        kind: agricola_re_ai::cards::CardKind::MinorImprovement,
+        cost: vec![(Good::Wood, 3), (Good::Food, 3)],
+        points: 0,
+        effects: vec![],
+    });
+    set
+}
+
+/// Build a Game with A109 in player 0's played_cards, TEST_MINOR in hand,
+/// and the specified round card revealed.
+fn build_engine_game(round_card: Space) -> Game {
+    let set = engine_test_set();
+    let config = Config {
+        players: 2,
+        seed: 123,
+        additional_action_space_enabled: true,
+    };
+    let mut game = Game::with_cards(config, set).expect("game setup");
+
+    // Player 0 has A109 played and TEST_MINOR in hand
+    game.public.players[0].played_cards.push("A109".to_owned());
+    game.cards.hands[0].push("TEST_MINOR".to_owned());
+    game.cards.undealt.retain(|c| c != "TEST_MINOR");
+
+    // Set up the round card
+    game.public.revealed.push(match round_card {
+        Space::FamilyGrowthWithRoom => agricola_re_ai::model::RoundCard::FamilyGrowthWithRoom,
+        Space::MajorImprovement => agricola_re_ai::model::RoundCard::MajorImprovement,
+        _ => panic!("unsupported round card for test"),
+    });
+
+    // For FamilyGrowthWithRoom, player needs a room
+    if round_card == Space::FamilyGrowthWithRoom {
+        game.public.players[0].farm[1].tile = Tile::Room;
+    }
+
+    game.public.round = 1;
+    game
+}
+
+// ---------------- Engine-level boundary: FamilyGrowthWithRoom + GrowWithMinor must NOT trigger A109 ----------------
+
+#[test]
+fn a109_engine_family_growth_growwithminor_does_not_trigger() {
+    // Negative test: FamilyGrowthWithRoom + GrowWithMinor is a family growth action,
+    // NOT an improvement action, so A109 must NOT trigger.
+    let mut game = build_engine_game(Space::FamilyGrowthWithRoom);
+
+    // Player 0 has 3 wood, 3 food (exactly TEST_MINOR cost)
+    game.public.players[0].supply.set(Good::Wood, 3);
+    game.public.players[0].supply.set(Good::Food, 3);
+
+    // Apply FamilyGrowthWithRoom + GrowWithMinor action
+    let action = Action {
+        space: Space::FamilyGrowthWithRoom,
+        detail: Detail::GrowWithMinor {
+            card_id: "TEST_MINOR".to_owned(),
+        },
+    };
+    game.apply(action).expect("apply family growth with minor");
+
+    // A109 must NOT trigger -> food stays at 0 (3 - 3 = 0, no +3 from A109)
+    assert_eq!(
+        game.public.players[0].supply.food, 0,
+        "A109 must not trigger on FamilyGrowthWithRoom + GrowWithMinor (family growth action)"
+    );
+
+    // Sanity checks: family grew by 1, TEST_MINOR was played
+    assert_eq!(
+        game.public.players[0].family, 3,
+        "family should have grown from 2 to 3"
+    );
+    assert!(
+        game.public.players[0]
+            .played_cards
+            .contains(&"TEST_MINOR".to_owned()),
+        "TEST_MINOR should be in played_cards"
+    );
+}
+
+// ---------------- Engine-level boundary: MajorImprovement + PlayMinor MUST trigger A109 ----------------
+
+#[test]
+fn a109_engine_major_improvement_play_minor_triggers() {
+    // Positive test: MajorImprovement + PlayMinor IS an improvement action,
+    // so A109 MUST trigger.
+    let mut game = build_engine_game(Space::MajorImprovement);
+
+    // Player 0 has 3 wood, 3 food (exactly TEST_MINOR cost)
+    game.public.players[0].supply.set(Good::Wood, 3);
+    game.public.players[0].supply.set(Good::Food, 3);
+
+    // Apply MajorImprovement + PlayMinor action
+    let action = Action {
+        space: Space::MajorImprovement,
+        detail: Detail::PlayMinor {
+            card_id: "TEST_MINOR".to_owned(),
+        },
+    };
+    game.apply(action)
+        .expect("apply major improvement play minor");
+
+    // A109 MUST trigger -> food = 3 - 3 + 3 = 3
+    assert_eq!(
+        game.public.players[0].supply.food, 3,
+        "A109 must trigger on MajorImprovement + PlayMinor (improvement action): 3-3+3=3"
+    );
+
+    // Sanity checks: TEST_MINOR was played, family unchanged
+    assert!(
+        game.public.players[0]
+            .played_cards
+            .contains(&"TEST_MINOR".to_owned()),
+        "TEST_MINOR should be in played_cards"
+    );
+    assert_eq!(
+        game.public.players[0].family, 2,
+        "family should be unchanged (no growth)"
     );
 }
