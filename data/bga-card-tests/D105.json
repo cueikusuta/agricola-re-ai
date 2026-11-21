@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "D105",
+  "cases": [
+    {
+      "id": "D105-clay-accumulation-gain-food",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_worker_space",
+        "space_used": "clay_accumulation"
+      },
+      "expected": {
+        "food_gained": 1,
+        "grain_gained": 0
+      },
+      "notes": "Use Clay Accumulation space -> gain 1 food."
+    },
+    {
+      "id": "D105-stone-accumulation-gain-grain",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_worker_space",
+        "space_used": "stone_accumulation"
+      },
+      "expected": {
+        "food_gained": 0,
+        "grain_gained": 1
+      },
+      "notes": "Use Stone Accumulation space -> gain 1 grain."
+    },
+    {
+      "id": "D105-other-accumulation-no-effect",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_worker_space",
+        "space_used": "wood_accumulation"
+      },
+      "expected": {
+        "food_gained": 0,
+        "grain_gained": 0
+      },
+      "notes": "Use Wood Accumulation space -> no effect (only clay and stone)."
+    }
+  ]
+}

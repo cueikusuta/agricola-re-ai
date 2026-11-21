@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "E078",
+  "cases": [
+    {
+      "id": "E078-exchange-4",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4
+      },
+      "action": {
+        "play": "E078",
+        "exchange": {
+          "give": {
+            "wood": 4
+          },
+          "receive": {
+            "clay": 4
+          }
+        }
+      },
+      "expected": {
+        "wood": 0,
+        "clay": 4
+      },
+      "notes": "Up to 4 building resources may be swapped 1-for-1 on play."
+    },
+    {
+      "id": "E078-exchange-partial",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 2,
+        "stone": 1
+      },
+      "action": {
+        "play": "E078",
+        "exchange": {
+          "give": {
+            "wood": 2
+          },
+          "receive": {
+            "reed": 2
+          }
+        }
+      },
+      "expected": {
+        "reed": 2,
+        "stone": 1,
+        "wood": 0
+      },
+      "notes": "Fewer than 4 may be exchanged; untouched goods stay."
+    }
+  ]
+}
