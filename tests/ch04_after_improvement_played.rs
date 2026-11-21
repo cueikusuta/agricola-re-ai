@@ -88,6 +88,7 @@ fn dispatch_card(
         &mut uses,
         &limits,
         &mut pending,
+        true, // is_improvement_action: tests simulate improvement action path
     )
     .unwrap_or_else(|e| panic!("dispatch_play {id}: {e}"));
     *player = players[0].clone();
@@ -289,5 +290,148 @@ fn a109_only_triggers_for_improvements_played_after_it() {
     assert_eq!(
         player.supply.food, 3,
         "A109 should trigger for MI2 played after it"
+    );
+}
+
+// ---------------- Engine-level boundary: family growth path must NOT trigger A109 ----------------
+
+#[test]
+fn a109_not_triggered_by_family_growth_growwithminor() {
+    // Play A109, then play a minor improvement via FamilyGrowthWithRoom/ModestFamilyGrowth + GrowWithMinor.
+    // This is a family growth action, NOT an improvement action, so A109 must NOT trigger.
+    // We simulate this by calling dispatch_play with is_improvement_action=false.
+    let set = new_set(vec![
+        CardDefinition {
+            use_limit: None,
+            id: "A109".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterImprovementPlayedGain {
+                good: Good::Food,
+                amount: 3,
+            }],
+        },
+        minor_def("MI1"),
+    ]);
+
+    let mut player = Player::new(0, 0);
+    player.supply.set(Good::Food, 0);
+
+    // Play A109 (occupation) via normal improvement action path
+    dispatch_card(&set, &mut player, &mut ["A109".into()], "A109", 0);
+    assert_eq!(player.supply.food, 0, "A109 play itself grants no food");
+
+    // Play a minor improvement via family growth path (is_improvement_action=false)
+    // This simulates FamilyGrowthWithRoom/ModestFamilyGrowth + GrowWithMinor
+    let mut cards = agricola_re_ai::cards::CardState {
+        hands: vec![vec!["MI1".to_string()], vec![]],
+        ..Default::default()
+    };
+    let mut players = vec![player.clone(), Player::new(1, 0)];
+    players[0].played_cards.push("MI1".to_owned());
+    let mut market = vec![];
+    let mut well = BTreeMap::new();
+    let mut budget = 64u32;
+    let mut uses = BTreeMap::new();
+    let limits = BTreeMap::new();
+    let mut pending = None;
+
+    agricola_re_ai::card_events::dispatch_play(
+        &set,
+        0,
+        "MI1",
+        0,
+        &mut cards,
+        &mut players,
+        &mut market,
+        &mut well,
+        1,
+        &BTreeSet::new(),
+        &mut budget,
+        &mut uses,
+        &limits,
+        &mut pending,
+        false, // is_improvement_action: family growth path
+    )
+    .unwrap_or_else(|e| panic!("dispatch_play MI1: {e}"));
+
+    player = players[0].clone();
+
+    // A109 must NOT trigger on family growth path
+    assert_eq!(
+        player.supply.food, 0,
+        "A109 must not trigger on FamilyGrowthWithRoom/ModestFamilyGrowth + GrowWithMinor (family growth action)"
+    );
+}
+
+// ---------------- Engine-level boundary: MajorImprovement + PlayMinor path MUST trigger A109 ----------------
+
+#[test]
+fn a109_triggers_on_major_improvement_play_minor() {
+    // Play A109, then play a minor improvement via MajorImprovement + PlayMinor.
+    // This IS an improvement action (Minor Improvement action on Major Improvement space),
+    // so A109 MUST trigger. We simulate this by calling dispatch_play with is_improvement_action=true.
+    let set = new_set(vec![
+        CardDefinition {
+            use_limit: None,
+            id: "A109".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterImprovementPlayedGain {
+                good: Good::Food,
+                amount: 3,
+            }],
+        },
+        minor_def("MI1"),
+    ]);
+
+    let mut player = Player::new(0, 0);
+    player.supply.set(Good::Food, 0);
+
+    // Play A109 (occupation) via normal improvement action path
+    dispatch_card(&set, &mut player, &mut ["A109".into()], "A109", 0);
+    assert_eq!(player.supply.food, 0, "A109 play itself grants no food");
+
+    // Play a minor improvement via MajorImprovement + PlayMinor path (is_improvement_action=true)
+    let mut cards = agricola_re_ai::cards::CardState {
+        hands: vec![vec!["MI1".to_string()], vec![]],
+        ..Default::default()
+    };
+    let mut players = vec![player.clone(), Player::new(1, 0)];
+    players[0].played_cards.push("MI1".to_owned());
+    let mut market = vec![];
+    let mut well = BTreeMap::new();
+    let mut budget = 64u32;
+    let mut uses = BTreeMap::new();
+    let limits = BTreeMap::new();
+    let mut pending = None;
+
+    agricola_re_ai::card_events::dispatch_play(
+        &set,
+        0,
+        "MI1",
+        0,
+        &mut cards,
+        &mut players,
+        &mut market,
+        &mut well,
+        1,
+        &BTreeSet::new(),
+        &mut budget,
+        &mut uses,
+        &limits,
+        &mut pending,
+        true, // is_improvement_action: MajorImprovement + PlayMinor is an improvement action
+    )
+    .unwrap_or_else(|e| panic!("dispatch_play MI1: {e}"));
+
+    player = players[0].clone();
+
+    // A109 MUST trigger on MajorImprovement + PlayMinor path
+    assert_eq!(
+        player.supply.food, 3,
+        "A109 must trigger on MajorImprovement + PlayMinor (improvement action)"
     );
 }

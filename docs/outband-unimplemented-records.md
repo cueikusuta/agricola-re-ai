@@ -32,11 +32,11 @@
 - **仕様データ残件**: なし（仕様JSON は完成、印刷点・種別・前提は台帳・wikiと一致）
 
 ### 実装状況（実測）
-- **src/ 実装**: なし (`git grep "A109" src/` = 0 件)
-- **カードプール**: `verified_band_a_cards()` に未登録
-- **テスト**: なし
+- **src/ 実装**: **あり** (本 PR `12dc2018` にて実装済み: `EventKind::ImprovementPlayed`, `CardEffect::AfterImprovementPlayedGain`, `dispatch_play` Phase 4b スキャン, `verified_band_a_cards()` 登録)
+- **カードプール**: `verified_band_a_cards()` に登録済み
+- **テスト**: `tests/ch04_after_improvement_played.rs` に 8 件 (正系・不発・境界・家族成長経路不発・MajorImprovement経路発火)
 
-### 未実装の理由
+### 未実装の理由（base 時点）
 1. **トリガーイベントが main に存在しない**: `EventKind` に「進歩プレイ」に相当するイベントがない（現状: `WorkerPlaced` / `CardPlayed` / `RoundStart` / `Harvest` / `ClayConstruction` / `Bake` のみ）。
 2. **仕様のトリガー**: `after_improvement` / `improvement_played_from_hand` / `via_major_or_minor_action: true` が必要。
 3. **保留理由の個別記録がない**: PR #312 等の「難易度3 残り21枚は保留記録」のようなカテゴリ単位の記録のみで、A109 固有の保留理由は DEEPAI_PROGRESS.md / 実装状況文書 / PR #311〜#318 / #376 いずれにも記載なし。
@@ -44,19 +44,14 @@
 ### 実装に必要な前提
 | 前提 | 状態 | 備考 |
 |---|---|---|
-| `EventKind::ImprovementPlayed` (新規) または `CardPlayed` への payload 追加 | **未整備** | どちらかが必要。既存 variant の serde 形状は変えない方針。 |
-| `CardEffect::AfterImprovementPlayedGain { good, amount }` (新規 variant) | **未整備** | enum 最後尾に追加、`#[serde(rename_all = "snake_case")]` 継承 |
-| `effect_phase` / `effect_condition_holds` への対応 | **未整備** | After phase で発火 |
-| `dispatch_play` への後処理スキャン追加 | **未整備** | `AfterOccupationGainPerFoodCost` と同様の位置で改進歩プレイ時に走査 |
+| `EventKind::ImprovementPlayed` (新規) または `CardPlayed` への payload 追加 | **済 (本 PR)** | enum 最後尾に追加、`CardPlayed` payload 拡張なし方針 |
+| `CardEffect::AfterImprovementPlayedGain { good, amount }` (新規 variant) | **済 (本 PR)** | enum 最後尾に追加、`#[serde(rename_all = "snake_case")]` 継承 |
+| `effect_phase` / `effect_condition_holds` への対応 | **済 (本 PR)** | After phase で発火、`trigger.event_kind == EventKind::ImprovementPlayed` 判定 |
+| `dispatch_play` への後処理スキャン追加 | **済 (本 PR)** | Phase 4b で改進歩プレイ時に走査、`is_improvement_action` フラグで経路限定 |
+| `verified_band_a_cards()` への A109 定義追加 | **済 (本 PR)** | Band A プールに登録 |
 
 ### 次の一手
-**最優先で実装する**。A109 は仕様 JSON が `bga_checked` かつ `effects` が完全に定義済み（food 3 獲得）であり、必要なのはイベント基盤の追加とディスパッチャへの接続のみ。実装手順:
-1. `src/registry.rs`: `EventKind` に `ImprovementPlayed` を enum 最後尾に追加
-2. `src/cards.rs`: `CardEffect` に `AfterImprovementPlayedGain { good: Good, amount: u32 }` を enum 最後尾に追加、`public_tag()` 対応
-3. `src/card_events.rs`: `effect_phase` で `TriggerPhase::After` を返す、`effect_condition_holds` で `trigger.event_kind == EventKind::ImprovementPlayed` を判定
-4. `src/card_events.rs`: `dispatch_play` の after-play 専用スキャン部（C116 相当の位置）に、改進歩プレイ時に全 played_cards を走査して発火するロジックを追加
-5. `src/cards.rs`: `verified_band_a_cards()` に A109 定義を追加
-6. テスト追加: `dispatch_play` 経由の正系・不発（進歩でないカードプレイ・手札からでない進歩プレイ）・境界（改築併用・大進歩/小進歩両方）3 件以上
+**本 PR で実装完了**。`A109.json` の `implementation_status` を `not_started` → `implemented` に更新するのは補完2 (`t_28256d65`, PR #370 付録A) の担当。本 PR では spec の更新は行わない（Issue #390 で人間の決定待ち）。
 
 ---
 
@@ -82,9 +77,10 @@
 - **src/ 実装**: なし (`git grep "A118" src/` = 0 件)
 - **カードプール**: `verified_band_a_cards()` に未登録
 - **テスト**: なし
+- **関連 PR**: **PR #385** (created 2026-11-19T12:48:28Z, branch `m10/hermes-ch-harvest-followup`, A118/A145/C066) が存在し、`t_49f032aa` は done。
 
 ### 未実装の理由
-1. **既存カード `t_49f032aa` が担当**: ボード上の「実装: A118/A145/C066 収穫系追従3枚」（`t_49f032aa`, worker-kilo, ready）が A118/A145/C066 を1章で扱う実装カード。PR は未作成。
+1. **別カード担当（スケジュール）**: ボード上の「実装: A118/A145/C066 収穫系追従3枚」（`t_49f032aa`, worker-kilo, ready）が A118/A145/C066 を1章で扱う実装カード。PR #385 で実装済み、`t_49f032aa` は done。
 2. **仕様 JSON の修正が前提**: `frequency` 修正と購入上限の表現追加が必要。`A118.json` は `scripts/build_bga_card_specs.py` の curated 対象のため、単独編集すると `bga-spec-contract` が赤くなる（builder 側も同時修正が必要）。
 3. **基盤**: `EventKind::Harvest` と既存 `PendingKind::ChooseGain`/`Custom` で実装可能（`t_49f032aa` の設計どおり）。新規イベントは不要。
 
@@ -96,7 +92,7 @@
 | 任意交換の決定フロー (`PendingKind::ChooseGain` 優先) | 既存 | 再利用可能 |
 
 ### 次の一手
-**本カードでは実装しない**（`t_49f032aa` の担当）。本カードでは記録のみを行う。`t_49f032aa` が unblock されて実装を完了・PR 作成するまで待機。
+**本カードでは実装しない**（`t_49f032aa` / PR #385 の担当）。本カードでは記録のみを行う。PR #385 (A118/A145/C066) の完了を以て実装済みとする。
 
 ---
 
@@ -140,11 +136,11 @@
 
 ---
 
-## C115 播種人
+## C115 種まき人
 
 ### 基本情報
 - **ID**: C115
-- **名称**: 播種人 / Sower
+- **名称**: 種まき人 / Sower
 - **種別**: 職業
 - **デッキ**: C
 - **難易度**: 3
@@ -164,19 +160,19 @@
 
 ### 未実装の理由
 1. **仕様 JSON が存在しない**: 仕様が正本である以上、仕様作成が前提。
-2. **カード上在庫 (`card_accumulations`) が前提**: PR #371 (open, `feat/card-accumulation-state`) で追加予定、**未マージ**。main に在庫状態がない。
+2. **カード上在庫 (`card_accumulations`) が前提**: PR #371 (merged 2026-11-19T06:20Z, `feat/card-accumulation-state`) で追加済み、**main マージ済み**。main に在庫状態がある。
 3. **基盤が main にないまま近似実装しない方針**: 近似で通すと後で作り直しになる。
 
 ### 実装に必要な前提
 | 前提 | 状態 | 備考 |
 |---|---|---|
 | 仕様 JSON 作成 (`data/bga-card-specs/C115.json`) | **未済** |  |
-| `PublicState.card_accumulations` (PR #371) マージ | **未済** | カード上の蓄積リソース台帳 |
+| `PublicState.card_accumulations` (PR #371) マージ | **済 (2026-11-19T06:20Z)** | カード上の蓄積リソース台帳 |
 | `TR-SITE(ImprovementBuilt)` イベント拡張 | **未済** | 大進歩建設時のトリガー |
 | `GRANT(Sow)` 種まきアクション付与 | **未済** | 既存の種まきアクション付与機構があれば再利用可 |
 
 ### 次の一手
-**仕様 JSON 作成と PR #371 マージが完了するまで実装しない**。本カードの記録に「仕様未作成のため実装不可（仕様作成が前提）・カード上在庫基盤 (PR #371) 未マージ」と理由を書き、PR 本文の残件欄に送る。
+**仕様 JSON 作成が完了するまで実装しない**。本カードの記録に「仕様未作成のため実装不可（仕様作成が前提）・カード上在庫基盤 (PR #371) は 2026-11-19T06:20Z に main マージ済み」と理由を書き、PR 本文の残件欄に送る。
 
 ---
 

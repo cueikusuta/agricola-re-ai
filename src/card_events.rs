@@ -1677,6 +1677,13 @@ fn handle_gain_if_no_minor_played(
 /// resume contract covers the post-work chain.
 /// Only the newly played card's Replace/Before effects are resolved (prerequisites gate the play,
 /// on-play gains/passives apply once). Already-played cards' effects are NOT re-fired.
+///
+/// `is_improvement_action` indicates whether this play originates from a "Major or Minor
+/// Improvement" action (2016 Lookout p.8: "Each time you take a 'Major or Minor Improvement'
+/// action to play an improvement from your hand, you also get 3 food."). Only when true does
+/// the Phase 4b scan for `AfterImprovementPlayedGain` (A109 小商人) run. This excludes
+/// FamilyGrowthWithRoom/ModestFamilyGrowth + GrowWithMinor (family growth action) and
+/// Lessons/ExtraLessons + PlayOccupation (occupation action).
 #[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_play(
     card_set: &CardSet,
@@ -1693,6 +1700,7 @@ pub fn dispatch_play(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    is_improvement_action: bool,
 ) -> Result<(), String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
@@ -1832,37 +1840,42 @@ pub fn dispatch_play(
     }
 
     // Phase 4b: After — improvement-play dependent triggers owned by EARLIER played
-    // cards. A109 小商人 (`AfterImprovementPlayedGain`): each time the owner plays
-    // an improvement from hand (MinorImprovement or MajorImprovement via
-    // renovation-combined action), it grants food. The new card is already last in
+    // cards. A109 小商人 (`AfterImprovementPlayedGain`): each time the owner takes a
+    // "Major or Minor Improvement" action to play an improvement from hand (official
+    // 2016 Lookout wording), it grants food. The new card is already last in
     // `played_cards` (the caller ran the zone move), so the scan covers exactly
-    // the cards played "before this one".
-    if let Some(new_card) = card_set.definition(new_card_id) {
-        if new_card.kind == crate::cards::CardKind::MinorImprovement {
-            let played = ctx.player.played_cards.clone();
-            let owned = played.len().saturating_sub(1); // exclude the new card
-            for id in &played[..owned] {
-                let Some(card) = card_set.definition(id) else {
-                    continue;
-                };
-                for effect in &card.effects {
-                    let CardEffect::AfterImprovementPlayedGain { good, amount } = effect else {
+    // the cards played "before this one". This scan ONLY runs for improvement
+    // action paths (MeetingPlace+PlayMinor, MajorImprovement+PlayMinor), not for
+    // FamilyGrowthWithRoom/ModestFamilyGrowth+GrowWithMinor (family growth action)
+    // or Lessons/ExtraLessons+PlayOccupation (occupation action).
+    if is_improvement_action {
+        if let Some(new_card) = card_set.definition(new_card_id) {
+            if new_card.kind == crate::cards::CardKind::MinorImprovement {
+                let played = ctx.player.played_cards.clone();
+                let owned = played.len().saturating_sub(1); // exclude the new card
+                for id in &played[..owned] {
+                    let Some(card) = card_set.definition(id) else {
                         continue;
                     };
-                    consume_budget(ctx.event_budget)?;
-                    let limit = ctx
-                        .card_use_limits
-                        .get(id.as_str())
-                        .copied()
-                        .unwrap_or(u32::MAX);
-                    check_card_use(ctx.card_uses, id, limit)?;
-                    let p = &mut ctx.player;
-                    let next = p
-                        .supply
-                        .get(*good)
-                        .checked_add(*amount)
-                        .ok_or("resource overflow")?;
-                    p.supply.set(*good, next);
+                    for effect in &card.effects {
+                        let CardEffect::AfterImprovementPlayedGain { good, amount } = effect else {
+                            continue;
+                        };
+                        consume_budget(ctx.event_budget)?;
+                        let limit = ctx
+                            .card_use_limits
+                            .get(id.as_str())
+                            .copied()
+                            .unwrap_or(u32::MAX);
+                        check_card_use(ctx.card_uses, id, limit)?;
+                        let p = &mut ctx.player;
+                        let next = p
+                            .supply
+                            .get(*good)
+                            .checked_add(*amount)
+                            .ok_or("resource overflow")?;
+                        p.supply.set(*good, next);
+                    }
                 }
             }
         }
@@ -3516,6 +3529,7 @@ mod tests {
                 &mut uses,
                 &limits,
                 &mut pending,
+                true, // is_improvement_action: M1 is MinorImprovement
             )
             .unwrap();
             let card = set.definition("M1").unwrap();
@@ -5030,6 +5044,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            false, // is_improvement_action: occ_food2 is Occupation
         )
         .unwrap();
         assert_eq!(
@@ -5053,6 +5068,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            false, // is_improvement_action: C111 is Occupation with fee
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 5, "fee 3 + cost 0 -> 3 wood");
@@ -5073,6 +5089,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            true, // is_improvement_action: C106 is MinorImprovement
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 5, "no food paid -> no gain");
@@ -5121,6 +5138,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            false, // is_improvement_action: occ_food0 is Occupation
         )
         .unwrap();
         assert_eq!(
@@ -5145,6 +5163,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            false, // is_improvement_action: C111 is Occupation
         )
         .unwrap();
         assert_eq!(
@@ -5191,6 +5210,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            true, // is_improvement_action: minor_test is MinorImprovement
         )
         .unwrap();
         assert_eq!(
@@ -5240,6 +5260,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            false, // is_improvement_action: occ_food2 is Occupation
         )
         .unwrap();
         // C068: 1 vegetable (fixed)
@@ -5282,6 +5303,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            true, // is_improvement_action: C068 is MinorImprovement
         )
         .unwrap();
         // Playing C068 (a minor improvement) should not trigger its own effect
@@ -5336,6 +5358,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            false, // is_improvement_action: A117 is Occupation
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 5, "no improvements -> 0 wood");
@@ -5366,6 +5389,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            false, // is_improvement_action: A117 is Occupation
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 7, "1 minor + 1 base -> 2 wood");
@@ -5397,6 +5421,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            false, // is_improvement_action: A117 is Occupation
         )
         .unwrap();
         assert_eq!(
@@ -5601,6 +5626,7 @@ mod tests {
                 &mut uses,
                 &limits,
                 &mut pending,
+                false, // is_improvement_action: A117 is Occupation
             )
             .unwrap();
             let card = set.definition("A117").unwrap();
@@ -7336,6 +7362,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            true, // is_improvement_action: C083 is MinorImprovement
         )
         .unwrap();
 

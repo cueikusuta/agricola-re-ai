@@ -1544,6 +1544,7 @@ impl Game {
                         };
                         play_from_hand(&mut ctx, id, card_id)?;
                         // Dispatch Replace/Before phases for the new card only
+                        // MeetingPlace + PlayMinor is a "Minor Improvement" action → improvement action path
                         dispatch_play(
                             &self.card_set,
                             id,
@@ -1559,6 +1560,7 @@ impl Game {
                             &mut self.public.card_uses,
                             &self.card_use_limits,
                             &mut self.pending,
+                            true, // is_improvement_action
                         )?;
                         // Update card points
                         let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1613,6 +1615,7 @@ impl Game {
                 };
                 play_from_hand(&mut ctx, id, card_id)?;
                 // Dispatch Replace/Before phases for the new card only
+                // Lessons/ExtraLessons + PlayOccupation is an occupation action → NOT improvement action path
                 dispatch_play(
                     &self.card_set,
                     id,
@@ -1628,6 +1631,7 @@ impl Game {
                     &mut self.public.card_uses,
                     &self.card_use_limits,
                     &mut self.pending,
+                    false, // is_improvement_action
                 )?;
                 // Update card points
                 let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1725,6 +1729,7 @@ impl Game {
                     };
                     play_from_hand(&mut ctx, id, card_id)?;
                     // Dispatch Replace/Before phases
+                    // FamilyGrowthWithRoom/ModestFamilyGrowth + GrowWithMinor is a family growth action → NOT improvement action path
                     dispatch_play(
                         &self.card_set,
                         id,
@@ -1740,6 +1745,7 @@ impl Game {
                         &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
+                        false, // is_improvement_action
                     )?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1810,6 +1816,7 @@ impl Game {
                     };
                     play_from_hand(&mut ctx, id, card_id)?;
                     // Dispatch Replace/Before phases
+                    // MajorImprovement + PlayMinor is a "Minor Improvement" action (on Major Improvement space) → improvement action path
                     dispatch_play(
                         &self.card_set,
                         id,
@@ -1825,6 +1832,7 @@ impl Game {
                         &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
+                        true, // is_improvement_action
                     )?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;

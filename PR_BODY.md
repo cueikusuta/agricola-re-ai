@@ -8,10 +8,10 @@
 
 | ID | (a) src/実装 | (b) spec JSON | (c) 保留記録 | (d) 台帳/一覧表 | 判定 | 根拠 |
 |---|---|---|---|---|---|---|
-| **A109 小商人** | なし | あり (`bga_checked`, `not_started`) | なし | あり (ledger, catalog) | **実在** | `git grep A109 src/` = 0; `data/bga-card-specs/A109.json` 存在・status確認; ledger行あり; catalog行あり (難易度3) |
+| **A109 小商人** | **あり** (本 PR) | あり (`bga_checked`, `not_started`) | なし | あり (ledger, catalog) | **実在** | `git grep A109 src/` = 0; `data/bga-card-specs/A109.json` 存在・status確認; ledger行あり; catalog行あり (難易度3) |
 | **A118 樹木庭師** | なし | あり (`bga_checked`, `not_started`) | なし | あり (ledger, catalog) | **実在** | `git grep A118 src/` = 0; `data/bga-card-specs/A118.json` 存在・status確認; ledger行あり; catalog行あり (難易度3) |
 | **C088 見習い大工** | なし | **なし** (spec JSON 存在せず) | なし | あり (ledger, catalog) | **実在** | `git grep C088 src/` = 0; `data/bga-card-specs/` に C088.json なし; ledger行あり; catalog行あり (難易度3) |
-| **C115 播種人** | なし | **なし** (spec JSON 存在せず) | なし | あり (ledger, catalog) | **実在** | `git grep C115 src/` = 0; `data/bga-card-specs/` に C115.json なし; ledger行あり; catalog行あり (難易度3) |
+| **C115 種まき人** | なし | **なし** (spec JSON 存在せず) | なし | あり (ledger, catalog) | **実在** | `git grep C115 src/` = 0; `data/bga-card-specs/` に C115.json なし; ledger行あり; catalog行あり (難易度3) |
 | **A088 生け垣管理人** | あり (`PassiveRule::FenceWoodDiscount(3)`) | あり (`implemented`) | なし | あり (ledger, catalog) | **一部実在** (実装済み・記録欠落) | spec.implementation_status=implemented, ledger.implementation_status=implemented; 「文書に未記載」は実装欠落ではなく記録側の欠落 |
 | **A110 仕立屋** | あり (`AfterClayConstructionGain { food, 3 }`) | あり (`implemented`) | なし | あり (ledger, catalog) | **一部実在** (実装済み・記録欠落) | 同上 |
 
@@ -49,7 +49,7 @@
 ## C088 / C115 の扱い
 
 - いずれも **spec JSON が存在しない** ため、仕様作成 (`data/bga-card-specs/<ID>.json` + tests JSON、`scripts/validate_bga_card_specs.py` 緑) が前提。
-- C115 はカード上在庫 (`card_accumulations`, PR #371 未マージ) が前提。
+- C115 はカード上在庫 (`card_accumulations`, PR #371 **merged 2026-11-19T06:20Z**) が前提（**main マージ済み**）。
 - C088 は費用軽減の順序記録 (LOG) が前提。
 - 基盤が main にないまま近似実装しない方針のため、**本 PR では実装せず**、記録に「仕様未作成のため実装不可」と理由を記載し、PR 本文の残件欄に送る。
 
@@ -57,7 +57,7 @@
 
 - `cargo fmt --check` ✅
 - `cargo clippy --all-targets --all-features --locked -- -D warnings` ✅
-- 追加テスト `cargo test --test ch04_after_improvement_played` ✅ (6/6 passed)
+- 追加テスト `cargo test --test ch04_after_improvement_played` ✅ (8/8 passed)
 - 既存テスト `cargo test --lib` ✅ (414/414 passed)
 - `cargo test --test m6_verified_pool` ✅ (プール数・MCTS ダイジェスト・`state_hash` 不変)
 - `cargo test --lib mcts::tests::sample_game_distribution_digest_is_stable` ✅
@@ -67,9 +67,9 @@
 
 | カード | 状態 | ブロッカー |
 |---|---|---|
-| A118 | 記録のみ | `t_49f032aa` 担当、仕様 JSON 修正（`frequency`, 購入上限）が前提 |
+| A118 | 記録のみ | `t_49f032aa` / PR #385 担当、仕様 JSON 修正（`frequency`, 購入上限）が前提 |
 | C088 | 未実装 | 仕様 JSON なし、LOG 基盤なし |
-| C115 | 未実装 | 仕様 JSON なし、カード上在庫 (PR #371) 未マージ |
+| C115 | 未実装 | 仕様 JSON なし（カード上在庫 PR #371 は 2026-11-19T06:20Z に main マージ済み） |
 | A088 | 記録補正のみ | 実装済み・テスト済み |
 | A110 | 記録補正のみ | 実装済み・テスト済み (仕様データ残件 R-A4 は別 PR) |
 
@@ -78,7 +78,7 @@
 - PR #370: open, head=7204d1f, base=research/deepai-allstages-readiness
 - PR #375: open, head=176c9400, base=main
 - PR #376: open, head=6d97269a, base=research/deepai-allstages-merged (stacked on #370)
-- PR #371: open, head=d3b6919, base=main (card_accumulations)
+- PR #371: **merged 2026-11-19T06:20Z**, merge commit `181253d4e179239c6b3128d60b242dcdd68095fb` (card_accumulations)
 - いずれも main 未マージ。本 PR が触るファイル (`src/cards.rs`, `src/card_events.rs`, `src/registry.rs`, `tests/`) に触る同一関心の open PR はなし。
 
 **マージしない。レビュー待ちで完了。**
