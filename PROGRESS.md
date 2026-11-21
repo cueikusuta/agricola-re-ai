@@ -11,7 +11,7 @@
 | 章1 実行基盤 | **完了**（`feat/deepai-eval-harness-01-run`） |
 | 章2 集計 | **完了**（`feat/deepai-eval-harness-02-report`） |
 | 章3 比較・判定 | **完了**（`feat/deepai-eval-harness-03-compare`） |
-| 章1〜3 独立レビュー対応 | **完了**（P0なし。P1-1・P2-1〜P2-8・主要P3を修正し、修正差分は再レビュー待ち） |
+| 章1〜3 独立レビュー対応 | **完了**（初回P0なし・P1/P2/P3修正。再レビューでP0/P1なし、P2 N-1とP3局所を追加修正） |
 | PR | 章ごとに1本（#418/#419/#420）。**作成まで。マージしない** |
 
 ## 1. 設計書の要点（本作業の前提）
@@ -97,7 +97,7 @@
 - 判定: §3.3 の第一層区分（adopted/improvement/hold/rejected）を**シグナル**として実装。事前登録が無い Run は
   `final=undetermined`。§3.4 のガードを一覧化し、未解決ガードを列挙。
 - 実測: カードなし4人スモーク（8試合）と fixture 10-7 スモーク（8試合）で `report.json`/`report.md` を生成。
-- テスト: `python -m unittest tests.test_eval_report` 23件成功（レビュー対応で7件追加）。ローカル全Python 309件成功。
+- テスト: `python -m unittest tests.test_eval_report` 26件成功。`tests.test_eval_compare` 6件。全PythonスイートはActionsで確認。
 
 ### 独立レビュー対応（2026-11-22）
 
@@ -116,3 +116,16 @@
 - 主要P3: seedオーバーフロー事前検査、予算0拒否、schema 2、`rustc_version` の取得元明示、`pool_gate_snapshot` の
   キー名・定数再利用・測定SHA、`official_pool_ready` の実測化、`rounds_completed`/`start_player`/`initial_state_hash`、
   `draft_wall_ms`、`interference_proxy: null`、固定seed再現テスト・キー一意性・seed算術・fixture単独拒否テストを追加。
+
+### 独立再レビュー（round 2, 2026-11-22）
+
+- 対象: #418 head `2d888a3`。判定 **P0 0件 / P1 0件 / P2 1件（N-1） / P3 13件**。追加の独立再レビューは不要と判断。
+- N-1（P2）: 比較の種類を記録。`comparison_design.comparison_kind`（`game_policy` / `draft_contribution` / `full_stack` / `common_opponent`）と
+  `changed_factors` を harness・report・compare に追加。PUCT config差は `game_policy`、ゲーム方策同一＋ドラフト差は `draft_contribution`。
+- N-2: `pick_timeout_count` を期限強制時のみ計上し、生値は `pick_over_budget_ms_count`、未強制時は `focus_observed_all_picks_within_budget=null`。
+- N-3: 相手席の停止規則を MCTS/PUCT の実シミュレーション数つきで記録。
+- N-4: `engine_version` を crate version に戻し、`engine_sha` を追加。
+- N-5/N-6/N-7/N-8/N-9/N-10/N-13/N-14: preファイル上書き防止、code SHA形式検査、予算文字列の `reserve=none`/`draft_pick=none`、
+  sharding未実装の明記、`_4p` キーの4人限定、pool SHAテストの決定化、candidate=opponent の拒否、PUCTスカラー/PUCT比較種別/未登録モードの回帰テスト。
+- N-12: 設計書 §5.2/§5.3 のフィールド名改訂は実装PRから分離し、Issue #421 に起票。
+- 残: N-11a（ゲームイベント列そのものは行に含めない。`replay_verified` は実行時検証）、N-11b は `game.log.initial_state_hash` に変更、破棄カード席帰属・§4.6観測投影は未実装として記録。

@@ -92,3 +92,22 @@
   - 両方 `run_mode=smoke`、`official_pool_ready=false`、`g1_met=false`、`preregistration_sha256` 一致、全行 replay verified。
 - スクリプト: `tests/test_eval_report.py` 23件、`tests/test_eval_compare.py` 6件成功。`cargo clippy -D warnings` 成功。
 - 残: P2-6 の期限強制（観測のみ）と P3-9 の破棄カード席帰属は未実装として記録。U1/U2/U5/U6/U10 は決めていない。
+
+
+## 独立再レビュー round 2（2026-11-22）
+
+- 対象: PR #418 head `2d888a3`。判定 P0/P1なし、P2 1件（N-1）、P3 13件。追加の独立再レビュー不要。
+- 修正: `comparison_kind` / `changed_factors`（harness・report・compare）、ピック予算の強制/観測分離、
+  相手席停止規則の実数記録、`engine_version`/`engine_sha` 分離、pre上書き防止、code SHA形式検査、
+  予算文字列の未強制表示、sharding未実装の明記、`_4p` キーの4人限定、candidate=opponent拒否。
+- 追加テスト: PUCT config差の比較種別、未登録モード、code SHAなし拒否、opponent=candidate拒否、
+  pool SHAの決定化、ピック予算の未強制表現。
+- 設計書 §5.2/§5.3 のフィールド名改訂は Issue #421 に分離（実装PRでは設計を変更しない）。
+- スモーク（再レビュー後・`--smoke`）:
+  - draft寄与arm（candidate/baselineとも `eval`、draft `synergy` vs `card_value`）: 8試合、condition `57ecaa22…`、
+    `comparison_kind=draft_contribution`、`changed_factors=["draft_policy"]`、`pick_over_budget_ms_count=0`、
+    `focus_observed_all_picks_within_budget=null`。
+  - PUCT比較（2人・candidate configのみ変更）: 4試合、`comparison_kind=game_policy`、`changed_factors=["puct_config"]`、
+    baseline arm の `focus_puct_config_id` が baseline、`puct_simulations_config` が candidate。
+  - A/B比較（同一seed・draft方策のみ差し替え）: `comparison_kind=draft_contribution` を `compare.json`/`compare.md` に表示。
+- テスト: `tests.test_eval_report` 26件、`tests.test_eval_compare` 6件、Rust smoke 11件、bin 9件、lib 10件成功。
