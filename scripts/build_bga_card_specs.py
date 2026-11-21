@@ -2976,10 +2976,10 @@ CARDS = {
                    cond=[cond("worker_space_used", space="fishing")],
                    freq="every_use", dur="permanent"),
             effect("after_worker_space", [gain("food", 1)],
-                   cond=[cond("worker_space_used", spaces=["forest", "copse", "grove"])],
+                   cond=[cond("worker_space_used", space="forest")],
                    freq="every_use", dur="permanent", order=1),
         ],
-        "notes": "Fishing gives 1 extra wood; the wood accumulation spaces give 1 extra food.",
+        "notes": "Fishing gives 1 extra wood; the Forest space (not the other wood accumulation spaces) gives 1 extra food.",
         "tests": [
             case("A042-fishing", {"wood": 0}, {"use_space": "fishing"},
                  {"wood_delta": 1}),
@@ -2987,6 +2987,9 @@ CARDS = {
                  {"food_delta": 1}),
             case("A042-not-triggered", {"wood": 0}, {"use_space": "clay_pit"},
                  {"wood_delta": 0}),
+            case("A042-copse-not-triggered", {"food": 0}, {"use_space": "copse"},
+                 {"food_delta": 0},
+                 notes="The card names Forest only; Copse/Grove are different spaces (A116 is worded 'wood accumulation space')."),
         ],
     },
     "A043": {

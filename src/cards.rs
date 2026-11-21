@@ -1474,6 +1474,11 @@ pub fn verified_minor_worker_cards(players: usize) -> Vec<CardDefinition> {
     }
     let minor = CardKind::MinorImprovement;
     let mut result = vec![
+        // A042 森の湖畔荘 (Forest Lake Hut): the printed effect names the
+        // "Forest" accumulation space, not "wood accumulation spaces". The
+        // JA card page and the EN list both say Forest only, while A116
+        // (木こり) is worded "wood accumulation space" and covers
+        // Forest/Copse/Grove. Keep A042 on Forest alone (audit chapter A).
         card(
             "A042",
             minor,
@@ -1482,8 +1487,6 @@ pub fn verified_minor_worker_cards(players: usize) -> Vec<CardDefinition> {
             vec![
                 gain(Space::Fishing, Good::Wood, 1),
                 gain(Space::Forest, Good::Food, 1),
-                gain(Space::Copse, Good::Food, 1),
-                gain(Space::Grove, Good::Food, 1),
             ],
         ),
         card(
@@ -1685,9 +1688,13 @@ mod verified_minor_worker_tests {
         assert_eq!(p.supply.wood, 2);
     }
     #[test]
-    fn a042_wood_spaces_grant_food() {
-        let p = owner("A042", 2, &[Space::Forest, Space::Copse, Space::Grove]);
-        assert_eq!(p.supply.food, 3);
+    fn a042_forest_grants_food_but_copse_and_grove_do_not() {
+        // 文献は「森林（Forest）」のみ。木材の累積スペース全体（A116 の表現）とは
+        // 書き分けられているため、小森・林は対象外（監査 第1章）。
+        let p = owner("A042", 2, &[Space::Forest]);
+        assert_eq!(p.supply.food, 1);
+        let p = owner("A042", 2, &[Space::Copse, Space::Grove]);
+        assert_eq!(p.supply.food, 0);
     }
     #[test]
     fn a042_only_triggers_on_listed_spaces() {
@@ -1804,19 +1811,28 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
-        // A077 Hod (fallback for A072 Calcium Fertilizers): OnPlayGain 1 clay.
-        // The spec's second effect (any-player Pig Market clay gain) is not expressible
-        // with current CardEffect variants (no any-player condition on AfterWorkerGain).
+        // A077 背負いかご (Hod): on play gain 1 clay, and each time ANY player
+        // uses the Pig Market accumulation space gain 2 clay. The any-player
+        // half is expressible with `AfterAnyWorkerGain`, which was added after
+        // this card (C141/A050 use the same variant); the earlier comment that
+        // it was inexpressible is stale (audit chapter A).
         CardDefinition {
             use_limit: None,
             id: "A077".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Wood, 1)],
             points: 0,
-            effects: vec![CardEffect::OnPlayGain {
-                good: Good::Clay,
-                amount: 1,
-            }],
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Clay,
+                    amount: 1,
+                },
+                CardEffect::AfterAnyWorkerGain {
+                    space: Space::PigMarket,
+                    good: Good::Clay,
+                    amount: 2,
+                },
+            ],
         },
         // E007 Pumpernickel (ライ麦パン): OnPlayGain 4 food, cost 1 grain.
         CardDefinition {
@@ -1912,6 +1928,51 @@ mod verified_immediate_resource_tests {
         assert_eq!(player.supply.clay, 1);
         assert_eq!(player.supply.wood, 0);
         assert_eq!(player.played_cards, vec!["A077"]);
+    }
+
+    #[test]
+    fn a077_any_player_pig_market_grants_two_clay() {
+        // 第二効果: いずれかのプレイヤー（自分を含む）が「猪市場」を使うたびにレンガ2。
+        use std::collections::BTreeMap as Map;
+        let set = CardSet {
+            definitions: verified_immediate_resource_cards(),
+        };
+        let mut players = vec![Player::new(0, 0), Player::new(1, 1)];
+        players[0].played_cards.push("A077".into());
+        let mut cards = crate::cards::CardState::default();
+        let mut run = |players: &mut [Player], actor: usize, space: Space| {
+            let mut market = vec![];
+            let mut well = Map::new();
+            let mut budget = 64u32;
+            let mut uses = Map::new();
+            let limits = Map::new();
+            let mut pending = None;
+            crate::card_events::dispatch_after_worker(
+                &set,
+                actor,
+                space,
+                &mut cards,
+                players,
+                &mut market,
+                &mut well,
+                8,
+                &BTreeSet::new(),
+                &mut budget,
+                &mut uses,
+                &limits,
+                &mut pending,
+                false,
+            )
+            .unwrap();
+        };
+        // 自分が使っても、他のプレイヤーが使っても、所有者がレンガ2を得る。
+        run(&mut players, 0, Space::PigMarket);
+        assert_eq!(players[0].supply.clay, 2);
+        run(&mut players, 1, Space::PigMarket);
+        assert_eq!(players[0].supply.clay, 4);
+        // 猪市場以外の累積スペースでは発動しない。
+        run(&mut players, 0, Space::SheepMarket);
+        assert_eq!(players[0].supply.clay, 4);
     }
 
     #[test]

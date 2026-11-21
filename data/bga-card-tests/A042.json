@@ -40,6 +40,20 @@
       "expected": {
         "wood_delta": 0
       }
+    },
+    {
+      "id": "A042-copse-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "use_space": "copse"
+      },
+      "expected": {
+        "food_delta": 0
+      },
+      "notes": "The card names Forest only; Copse/Grove are different spaces (A116 is worded 'wood accumulation space')."
     }
   ]
 }
