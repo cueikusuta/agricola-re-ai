@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "E105",
+  "cases": [
+    {
+      "id": "E105-on-play",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "E105",
+        "choose": "reed"
+      },
+      "expected": {
+        "food_delta": 1,
+        "reed_delta": 1
+      },
+      "notes": "Playing the card gives 1 food and one chosen resource."
+    },
+    {
+      "id": "E105-latest-space",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "latest_space": "eastern_quarry"
+      },
+      "action": {
+        "play": "E105",
+        "use_space": "eastern_quarry",
+        "choose": "stone"
+      },
+      "expected": {
+        "food_delta": 1,
+        "stone_delta": 1
+      },
+      "notes": "Using the newest space also triggers the pair."
+    },
+    {
+      "id": "E105-older-space",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "latest_space": "eastern_quarry"
+      },
+      "action": {
+        "play": "E105",
+        "use_space": "forest",
+        "choose": "wood"
+      },
+      "expected": {
+        "food_delta": 0,
+        "bonus_wood_delta": 0
+      },
+      "notes": "An older space does not trigger the bonus."
+    }
+  ]
+}

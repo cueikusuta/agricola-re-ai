@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "card_id": "E100",
+  "cases": [
+    {
+      "id": "E100-grain-in-stock",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0,
+        "clay": 0,
+        "reed": 0,
+        "stone": 0,
+        "grain": 1,
+        "vegetable": 0
+      },
+      "action": {
+        "play": "E100",
+        "phase": "work_phase_start"
+      },
+      "expected": {
+        "points_delta": 1
+      },
+      "notes": "One grain is enough."
+    },
+    {
+      "id": "E100-empty-stock",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0,
+        "clay": 0,
+        "reed": 0,
+        "stone": 0,
+        "grain": 0,
+        "vegetable": 0
+      },
+      "action": {
+        "play": "E100",
+        "phase": "work_phase_start"
+      },
+      "expected": {
+        "points_delta": 0
+      },
+      "notes": "No listed good in stock; no point."
+    },
+    {
+      "id": "E100-animals-only",
+      "scope": "effect_only",
+      "setup": {
+        "sheep": 2,
+        "wild_boar": 1,
+        "cattle": 1
+      },
+      "action": {
+        "play": "E100",
+        "phase": "work_phase_start"
+      },
+      "expected": {
+        "points_delta": 0
+      },
+      "notes": "Animals are not included in the listed goods."
+    }
+  ]
+}

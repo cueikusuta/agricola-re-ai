@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "card_id": "E105",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "開拓者",
+    "name_en": "Pioneer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2648",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "gain_good",
+                "good": "wood",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "clay",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "reed",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "stone",
+                "amount": 1
+              }
+            ],
+            "choose_one": true,
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Gain 1 food and one building resource of the owner's choice."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "latest_revealed_space_used",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "gain_good",
+                "good": "wood",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "clay",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "reed",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "stone",
+                "amount": 1
+              }
+            ],
+            "choose_one": true,
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Each time the owner uses the most recently revealed action space, gain 1 food and one building resource of their choice."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E105-on-play",
+      "E105-latest-space",
+      "E105-older-space"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "On play and on each use of the most recently revealed space: 1 food plus 1 chosen building resource."
+  }
+}

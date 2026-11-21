@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "E099",
+  "cases": [
+    {
+      "id": "E099-stone-house",
+      "scope": "effect_only",
+      "setup": {
+        "house": "stone"
+      },
+      "action": {
+        "play": "E099",
+        "harvest": "end"
+      },
+      "expected": {
+        "points_delta": 1
+      },
+      "notes": "A stone house qualifies."
+    },
+    {
+      "id": "E099-wood-house",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood"
+      },
+      "action": {
+        "play": "E099",
+        "harvest": "end"
+      },
+      "expected": {
+        "points_delta": 0
+      },
+      "notes": "A wooden house does not qualify."
+    },
+    {
+      "id": "E099-clay-house",
+      "scope": "effect_only",
+      "setup": {
+        "house": "clay"
+      },
+      "action": {
+        "play": "E099",
+        "harvest": "end"
+      },
+      "expected": {
+        "points_delta": 0
+      },
+      "notes": "A clay house does not qualify."
+    }
+  ]
+}

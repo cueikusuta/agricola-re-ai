@@ -279,3 +279,40 @@
 ### 未解決・保留
 - `A071` と `C018` と `C057` の「いつでも（anytime）」トリガーは語彙未定義のため `needs_resolution` のまま。フリーアクションAPI（手番境界・連続実行・取消・再演ハッシュ）が定義されるまで実装禁止。
 - `C020` のラウンド依存プレイ制限（ラウンド9以降）、`C054` の厩返却コスト、柵支払い、after_field_phase トリガー、`C056` の last-stable 判定と per-build 代替支払い、`C003` の未配置人物前提、`C009` の購入時間窓は語彙外のため `needs_resolution` 保持。推測で確定しない。
+
+## 2026-11-21追補：E帯 099–120 の追加語彙
+
+E帯の未作成仕様（E099–E120）で使う語彙。本節はデータ契約であり、Rustエンジンでの実装完了を意味しない。
+各カードの `review.status=needs_resolution` は実装停止ゲートとして優先する。
+
+### 新しいtrigger
+| trigger | 意味・参照時点 |
+|---|---|
+| `after_gain_good` | 品物を1つ得た直後（通常アクション・カード効果を問わない）。獲得した品物そのものを条件で参照する。E103。 |
+| `feeding_phase` | 収穫の食料供給フェイズ。E110。 |
+
+### 新しいpredicate
+| predicate | params・評価 |
+|---|---|
+| `resource_at_least_any` | `goods[], n`：列挙した品物のうち1種類でも `n` 以上あれば真。E100。 |
+| `latest_revealed_space_used` | —：今回使用したスペースが最も新しく公開されたラウンドスペースなら真。E105。 |
+| `gained_good_is_card_top` | `any_gain=true`：当該イベントで得た品物がカードの最上段と一致。`after_gain_good` と併用。E103。 |
+| `gained_food_from_this_space` | —：今回のスペース使用で食料を得た（カードスペースを含む）。E118。 |
+| `minor_improvement_count` | `n`：自分の前に出ている小さい進歩の数。E111。 |
+| `stable_count_in` | `values`：厩の総数がいずれか。E114。 |
+
+### 数量のカウント源
+| source | 意味 |
+|---|---|
+| `remaining_stages` | まだ開始していないステージ数（公式の6ステージ 4/3/2/2/2/1 区切り）。E101は定義確認まで保留。 |
+| `fences_built_this_event` | 当該の柵建設イベントで建てた柵の本数。E108。 |
+| `own_placement_index_this_round` | そのラウンドで自分が置いた人物の順番（1始まり）。E116。 |
+
+### 新しい `operation:other` のkind
+| kind | params・意味 |
+|---|---|
+| `forbid_occupation` | 以後、職業カードを出せない継続効果。E101。 |
+| `exchange_building_resources_for_food` | `rates, max_total, allow_mixed`。建築資材を食料へ交換する権限。`max_total` は家族数など。E106。 |
+| `move_top_good_to_supply` | カード最上段の品物1つを所有者のストックへ移す。E103。 |
+| `harvest_grain_without_removing_field_goods` | `good=grain, per_field, amount`。畑の小麦を残したまま共通ストックから得る。畑ごとに選択。E112。 |
+| `place_on_round_spaces`（拡張） | `amounts` に交互の品物列、`rounds` に `"next_6_after_current"` を許す。E120は端数時の扱いが未確定のため `needs_resolution`。 |

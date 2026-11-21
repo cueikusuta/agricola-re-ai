@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "card_id": "E100",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "博物館の館長",
+    "name_en": "Museum Caretaker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2653",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "work_phase_start",
+      "conditions": [
+        {
+          "predicate": "resource_at_least_any",
+          "params": {
+            "goods": [
+              "wood",
+              "clay",
+              "reed",
+              "stone",
+              "grain",
+              "vegetable"
+            ],
+            "n": 1
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At the start of each work phase, gain 1 bonus point if the stock holds at least one wood, clay, reed, stone, grain or vegetable."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E100-grain-in-stock",
+      "E100-empty-stock",
+      "E100-animals-only"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "At the start of each work phase, 1 bonus point if at least one wood, clay, reed, stone, grain or vegetable is in stock."
+  }
+}

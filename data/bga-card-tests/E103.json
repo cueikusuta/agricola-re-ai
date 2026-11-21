@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "card_id": "E103",
+  "cases": [
+    {
+      "id": "E103-stack",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "E103"
+      },
+      "expected": {
+        "card_goods": [
+          "clay",
+          "wood",
+          "grain"
+        ],
+        "top_good": "grain"
+      },
+      "notes": "The three goods are stacked in the printed order."
+    },
+    {
+      "id": "E103-matching-gain",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "E103",
+        "gain_good": "grain",
+        "take_boar": true
+      },
+      "expected": {
+        "card_goods": [
+          "clay",
+          "wood"
+        ],
+        "grain_delta": 1,
+        "wild_boar_delta": 1
+      },
+      "notes": "A gained grain matches the top good: it moves to the supply and 1 boar may be taken."
+    },
+    {
+      "id": "E103-non-matching-gain",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "E103",
+        "gain_good": "wood"
+      },
+      "expected": {
+        "card_goods": [
+          "clay",
+          "wood",
+          "grain"
+        ],
+        "wood_delta": 1,
+        "wild_boar_delta": 0
+      },
+      "notes": "A gained wood does not match the top grain; nothing moves and no boar is available."
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "card_id": "E108",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "ブラックベリー農家",
+    "name_en": "Blackberry Farmer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2645",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_fence_build",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "food",
+            "amount": {
+              "op": "custom",
+              "args": [
+                "fences_built_this_event"
+              ]
+            },
+            "rounds": "remaining"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each fence build places 1 food on each remaining round space, up to the number of fences just built."
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "take_all_goods_from_round_space",
+            "good": "food",
+            "source": "this_card_round_markers",
+            "consume_markers": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "At the start of each round the owner takes the food placed on that round's space."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E108-small-pasture",
+      "E108-remaining-cap",
+      "E108-collect"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "Each fence build puts 1 food per remaining round space (up to the fences built); collect at each round start."
+  }
+}
