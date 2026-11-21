@@ -76,3 +76,24 @@
 - 第二層（期待順位）の統計規約は U5 未決定のため記述的参照のみ。
 - 事前登録・locked test seed・追加上限は未実装（`registered=false` を明示）。
 - 鏡像対称性の合否しきい値は設計書に無いため `descriptive`（判断しない）。
+
+## 章3: 比較・判定（`feat/deepai-eval-harness-03-compare`）
+
+### できること
+
+- `scripts/eval_compare.py --a <runA> --b <runB>` が、同一条件の2 Runを seedブロックで対応させて比較する。
+- 比較可能性を fail closed で検査: `condition_id`・人数・カード・ドラフト・探索モード・予算・基準/相手・seed範囲・
+  head-to-head。1つでも違えば比較せずエラー。
+- 出力: 各Runの candidate−baseline、A−B の首位率/期待順位/得点差（95%CI）、第一層シグナル、`compare.json` と
+  `compare.md`。最終は `undetermined`（採用判定ではない）。
+- harness マニフェストに `preregistration.registered=false` を追加し、未登録Runが採用判定にならないことを明示。
+
+### スモーク実行結果
+
+- カードなし4人・2ブロック・同一seed（700300）。A=`eval_veg`、B=`eval`。
+- 比較可能性 true。A−B 首位率 0.000 pp（CI [0.000, 0.000]）、期待順位 −0.125、得点差 +0.375。
+- `python -m unittest tests.test_eval_compare tests.test_eval_report` 22件成功。
+
+### 未実装で残した部分
+
+- 事前登録された採用判定、多重比較補正、seedレジストリ照合、`dataset_split`/G0束縛、公式最終モード（G1/U1）。
