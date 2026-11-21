@@ -17,6 +17,7 @@ margin is a reward/diagnostic, never the adoption yardstick.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -113,6 +114,16 @@ def load_run(root: Path) -> tuple[dict, list[dict]]:
         raise RunError(f"run-manifest.json is not valid JSON: {error}") from error
     if not isinstance(manifest, dict):
         raise RunError("run-manifest.json must be an object")
+    pre_sha = manifest.get("preregistration_sha256")
+    if pre_sha is not None:
+        _require(is_hash(pre_sha), "manifest.preregistration_sha256 must be sha256")
+        pre_path = root / "run-manifest.pre.json"
+        _require(pre_path.is_file(), "manifest binds a pre-registration but the file is missing")
+        actual = hashlib.sha256(pre_path.read_bytes()).hexdigest()
+        _require(
+            actual == pre_sha,
+            "run-manifest.pre.json does not match the manifest's preregistration_sha256",
+        )
     paths = sorted(root.glob("shard-*/matches.jsonl"))
     if not paths:
         raise RunError("no shard-*/matches.jsonl files")
@@ -138,7 +149,7 @@ def _require(condition: bool, message: str) -> None:
 
 
 def _manifest_shape(manifest: dict) -> None:
-    _require(manifest.get("schema_version") == 1, "unsupported manifest schema_version")
+    _require(manifest.get("schema_version") == 2, "unsupported manifest schema_version")
     _require(manifest.get("harness") == "eval_harness", "manifest is not from eval_harness")
     artifact = manifest.get("artifact")
     _require(isinstance(artifact, dict), "manifest.artifact is missing")
@@ -152,8 +163,8 @@ def _manifest_shape(manifest: dict) -> None:
     _require(is_hash(manifest.get("card_set_hash")), "manifest.card_set_hash must be sha256")
     _require(type(manifest.get("card_set_count")) is int, "manifest.card_set_count must be int")
     _require(
-        manifest.get("run_mode") in ("smoke", "full"),
-        "manifest.run_mode must be smoke or full",
+        manifest.get("run_mode") in ("smoke", "unregistered", "full"),
+        "manifest.run_mode must be smoke, unregistered or full",
     )
     _require(
         manifest.get("strength_claim_allowed") is False,
@@ -374,9 +385,19 @@ def _validate_row(
     for field in ("focus_pick_max_ms", "focus_pick_p95_ms"):
         value = row.get(field)
         _require(finite_number(value) and value >= 0, f"{label}: invalid {field}")
-    for field in ("pick_timeout_count", "pick_fallback_count"):
+    for field in ("pick_timeout_count", "pick_illegal_fallback_count"):
         value = row.get(field)
         _require(type(value) is int and value >= 0, f"{label}: invalid {field}")
+    if draft_mode == "none":
+        _require(
+            row.get("draft_pick_budget_enforced") is None,
+            f"{label}: a cardless game has no draft pick budget",
+        )
+    else:
+        _require(
+            row.get("draft_pick_budget_enforced") is False,
+            f"{label}: this harness observes the draft pick time but does not enforce a deadline",
+        )
     _require(
         type(row.get("focus_observed_all_picks_within_budget")) is bool,
         f"{label}: pick-budget flag must be a boolean",
@@ -473,6 +494,25 @@ def is_head_to_head(arms: dict) -> bool:
         and baseline_draft is not None
         and candidate_draft != baseline_draft
     )
+
+
+def manifest_head_to_head(manifest: dict) -> bool:
+    """Read the comparison design the harness measured, not a re-guess.
+
+    The harness records `comparison_design.head_to_head`; if the field is
+    present it must agree with the arm identities. Older manifests fall back to
+    inferring it from the arms.
+    """
+    arms = manifest["arms"]
+    inferred = is_head_to_head(arms)
+    design = manifest.get("comparison_design")
+    if isinstance(design, dict) and isinstance(design.get("head_to_head"), bool):
+        _require(
+            design["head_to_head"] == inferred,
+            "manifest.comparison_design disagrees with the recorded arms",
+        )
+        return design["head_to_head"]
+    return inferred
 
 
 def validate_rows(manifest: dict, rows: list[dict]) -> dict[tuple[int, str, int], dict]:
@@ -602,7 +642,7 @@ def validate_and_report(
     )
     ceiling = max(candidate_metrics["first_credit"], baseline_metrics["first_credit"])
     arms = manifest["arms"]
-    head_to_head = is_head_to_head(arms)
+    head_to_head = manifest_head_to_head(manifest)
     credit_interval = intervals["first_credit"]
     credit_point, credit_lower, credit_upper = (
         credit_interval["block_delta_mean"],
@@ -681,6 +721,10 @@ def validate_and_report(
         "smoke_mode": guard(
             "fail" if manifest["run_mode"] == "smoke" else "pass",
             "a smoke run is a wiring check, not a measurement",
+        ),
+        "unregistered_mode": guard(
+            "fail" if manifest["run_mode"] == "unregistered" else "pass",
+            "an unregistered run cannot carry a strength claim (design §3.3)",
         ),
     }
     unresolved_guards = [

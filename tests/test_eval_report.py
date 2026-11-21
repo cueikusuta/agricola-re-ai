@@ -28,7 +28,7 @@ def make_run(
 ):
     opponent_policy = opponent or "greedy"
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "harness": "eval_harness",
         "experiment_id": "eval-test",
         "run_id": "run-test",
@@ -125,7 +125,8 @@ def make_run(
                     "focus_pick_max_ms": None,
                     "focus_pick_p95_ms": None,
                     "pick_timeout_count": None,
-                    "pick_fallback_count": None,
+                    "pick_illegal_fallback_count": None,
+                    "draft_pick_budget_enforced": None,
                     "focus_observed_all_picks_within_budget": None,
                 }
                 if draft:
@@ -155,7 +156,8 @@ def make_run(
                         "focus_pick_max_ms": 1.5,
                         "focus_pick_p95_ms": 1.0,
                         "pick_timeout_count": 0,
-                        "pick_fallback_count": 0,
+                        "pick_illegal_fallback_count": 0,
+                        "draft_pick_budget_enforced": False,
                         "focus_observed_all_picks_within_budget": True,
                     }
                 mean_other = (sum(scores) - scores[seat]) / (players - 1)
@@ -176,6 +178,7 @@ def make_run(
                     "card_set_hash": HEX_B,
                     "candidate_puct_config_id": "puct-default",
                     "baseline_puct_config_id": "puct-default",
+                    "puct_config_id": "puct-default",
                     "focus_puct_config_id": None,
                     "game_policy_id_by_seat": [
                         focus_id if other == seat else opponent_id
@@ -191,6 +194,7 @@ def make_run(
                     "first_place_credit": 1.0 if ranks[seat] == 1 else 0.0,
                     "expected_rank_observation": ranks[seat],
                     "score_margin": scores[seat] - mean_other,
+                    "interference_proxy": None,
                     "decisions": 70,
                     "focus_decisions": 30,
                     "decision_budget_ms": 10000,
@@ -433,6 +437,44 @@ class EvalReportTests(unittest.TestCase):
         self.assertFalse(is_head_to_head(arms))
         arms["opponent"]["policy"] = "greedy"
         self.assertFalse(is_head_to_head(arms))
+
+    def test_recorded_comparison_design_must_match_the_arms(self):
+        manifest, rows = make_run(opponent="eval")
+        manifest["comparison_design"] = {"head_to_head": True}
+        with self.assertRaisesRegex(RunError, "comparison_design"):
+            validate_and_report(manifest, rows)
+
+    def test_recorded_comparison_design_is_used_when_consistent(self):
+        manifest, rows = make_run(opponent="eval")
+        manifest["comparison_design"] = {"head_to_head": False}
+        report = validate_and_report(manifest, rows)
+        self.assertFalse(report["comparison_design"]["head_to_head"])
+
+    def test_unregistered_run_mode_is_accepted(self):
+        manifest, rows = make_run(run_mode="unregistered")
+        report = validate_and_report(manifest, rows)
+        self.assertEqual(report["source"]["measurement_mode"], "unregistered")
+
+    def test_draft_only_difference_stays_head_to_head(self):
+        manifest, rows = make_run(
+            draft=True, candidate_policy="eval", opponent="eval"
+        )
+        manifest["arms"]["baseline"]["game_policy_id"] = "eval"
+        manifest["arms"]["baseline"]["policy"] = "eval"
+        for row in rows:
+            if row["arm_id"] == "baseline":
+                row["focus_policy"] = "eval"
+            row["game_policy_id_by_seat"] = ["eval"] * 4
+        report = validate_and_report(manifest, rows)
+        self.assertTrue(report["comparison_design"]["head_to_head"])
+
+    def test_draft_pick_budget_must_be_explicitly_unenforced(self):
+        manifest, rows = make_run(draft=True)
+        for row in rows:
+            row["draft_pick_budget_enforced"] = True
+        with self.assertRaisesRegex(RunError, "draft pick"):
+            validate_and_report(manifest, rows)
+
 
 if __name__ == "__main__":
     unittest.main()
