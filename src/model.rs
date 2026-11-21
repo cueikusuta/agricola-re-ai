@@ -1456,12 +1456,25 @@ impl Game {
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&decision)?;
+        // P1-1 FIX: the standalone API must not accept a paused WORK action.
+        // Resolving a PostWork decision here would apply the choice but never
+        // run the continuation (the paused work chain), so the state would stay
+        // mid-action while the recorded `pending_resolution` event claims the
+        // decision is complete — a replay would then run the continuation and
+        // diverge (poststate hash mismatch). Only `resolve_pending_and_resume`
+        // can complete a PostWork decision, and it records `from_resume: true`.
+        if let crate::pending::Continuation::PostWork { .. } = pending.continuation {
+            return Err(
+                "paused work action requires resolve_pending_and_resume, not resolve_pending"
+                    .into(),
+            );
+        }
         // Only now remove the decision. The steps below are individually
         // atomic (see `apply_pending_resolution`); if one still fails the
         // decision is put back so it stays resolvable.
         let pending = self.pending.take().expect("checked above");
         match self.apply_pending_resolution(&pending, &decision) {
-            Ok(()) => self.record_pending_resolution(&pending, &decision),
+            Ok(()) => self.record_pending_resolution(&pending, &decision, false),
             Err(err) => {
                 self.pending = Some(pending);
                 Err(err)
@@ -1567,13 +1580,22 @@ impl Game {
                 ));
             }
         }
-        // Take the decision and its continuation
+        // P1-2 FIX: Atomicity - snapshot the ENTIRE game (including the still-
+        // stored pending decision) before any fallible operation, so any Err
+        // in the resume chain restores pending, state, and log completely.
+        let state_snapshot = self.clone();
         let pending = self.pending.take().expect("checked above");
         let continuation = pending.continuation.clone();
+
         // Apply the resolution WITHOUT logging it: the pending_resolution event
         // must chain from the paused state to the FINAL state (after the
         // continuation), so it is appended at the end of this method.
-        self.apply_pending_resolution(&pending, &resolution)?;
+        let apply_result = self.apply_pending_resolution(&pending, &resolution);
+        if let Err(err) = apply_result {
+            // Restore all state on error (pending was already restored by *self)
+            *self = state_snapshot;
+            return Err(err);
+        }
         let transition = match continuation {
             crate::pending::Continuation::None => Transition::Completed,
             crate::pending::Continuation::PostWork {
@@ -1584,13 +1606,27 @@ impl Game {
                 // The `work` event for the paused action was already recorded at
                 // pause time (with `after` = the paused hash), so only the
                 // resolution event is appended here; it spans the whole resume.
-                self.resume_post_work(player, resume, *completion)?
+                // A second pause during the resume returns Ok(Transition::Paused)
+                // (commit_second_pause), which must propagate unchanged.
+                match self.resume_post_work(player, resume, *completion) {
+                    Err(err) => {
+                        // Restore all state on error
+                        *self = state_snapshot;
+                        return Err(err);
+                    }
+                    Ok(t) => t,
+                }
             }
         };
         // The resolution event spans the whole resume, so it is logged last:
         // before == the paused hash the event chain already reached, after ==
         // the final (resumed) state.
-        self.record_pending_resolution(&pending, &resolution)?;
+        let record_result = self.record_pending_resolution(&pending, &resolution, true);
+        if let Err(err) = record_result {
+            // Restore all state on error
+            *self = state_snapshot;
+            return Err(err);
+        }
         Ok(transition)
     }
 
@@ -2339,6 +2375,7 @@ impl Game {
         &mut self,
         pending: &PendingDecision,
         resolution: &PendingResolution,
+        from_resume: bool,
     ) -> Result<(), String> {
         if !self.record_events {
             return Ok(());
@@ -2347,6 +2384,7 @@ impl Game {
             player: pending.player,
             decision_id: pending.id,
             resolution: resolution.clone(),
+            from_resume,
         })
         .map_err(|e| e.to_string())?;
         self.log.events.push(Event {
