@@ -765,15 +765,19 @@ fn effect_condition_holds(
         // (A145/C066): they fire from dispatch_after_harvest_complete at the
         // harvest tail, NOT from the field-phase trigger. On EventKind::Harvest
         // (fired before the fields yield) they must stay dormant — that early
-        // firing was review finding (a) of PR #385.
+        // firing was review finding (a) of PR #385. Additionally, they must only
+        // fire during actual harvest rounds (4, 7, 9, 11, 13, 14).
         CardEffect::AfterHarvestGain { .. } => {
             trigger.event_kind == EventKind::AfterHarvestComplete
+                && crate::model::HARVEST_ROUNDS.contains(&round)
         }
         CardEffect::AfterHarvestGainIfAtLeast { .. } => {
             trigger.event_kind == EventKind::AfterHarvestComplete
+                && crate::model::HARVEST_ROUNDS.contains(&round)
         }
         CardEffect::AfterHarvestChooseGainIfAtLeast { .. } => {
             trigger.event_kind == EventKind::AfterHarvestComplete
+                && crate::model::HARVEST_ROUNDS.contains(&round)
         }
         // The A118 exchange is executed plan-driven by the engine's field
         // phase (FeedingPlan::a118_wood_buys, capped at 2). The dispatcher
@@ -7118,5 +7122,378 @@ mod tests {
             c.players[0].supply.wood, 0,
             "E117 must not fire on after_harvest_bake"
         );
+    }
+
+    // --- A118/A145/C066 dispatch tests (PR #385 review) ---
+
+    /// A118: fixed 1 wood per harvest field phase fires; optional exchange is plan-driven
+    /// and does NOT create a pending decision in the dispatcher.
+    #[test]
+    fn a118_harvest_field_fixed_wood_fires_and_no_pending() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["A118".into()];
+        c.players[0].supply.food = 0; // no food for exchange
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 1,
+            "A118 fixed HarvestFieldGain: 1 wood per harvest field phase"
+        );
+        assert!(
+            pending.is_none(),
+            "A118 optional exchange must not create a pending decision in dispatcher (plan-driven)"
+        );
+    }
+
+    /// A118 with food available: fixed wood fires, no pending (exchange is plan-driven via FeedingPlan).
+    #[test]
+    fn a118_harvest_field_with_food_no_pending() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["A118".into()];
+        c.players[0].supply.food = 5; // food available for exchange
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 1,
+            "A118 fixed wood still fires"
+        );
+        assert_eq!(
+            c.players[0].supply.food, 5,
+            "food unchanged in field phase (exchange happens in feeding via plan)"
+        );
+        assert!(
+            pending.is_none(),
+            "A118 optional exchange must not create a pending decision in dispatcher"
+        );
+    }
+
+    /// A145: reed 1 fires at harvest tail (AfterHarvestComplete), not at field phase.
+    #[test]
+    fn a145_reed_fires_at_harvest_tail_not_field() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        // Field phase: must not fire
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["A145".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.reed, 0,
+            "A145 reed must not fire during field phase"
+        );
+        assert!(pending.is_none());
+
+        // Harvest tail: must fire
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["A145".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_complete(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false, // c066_take_food_instead
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.reed, 1,
+            "A145 reed must fire at harvest tail (AfterHarvestComplete)"
+        );
+        assert!(pending.is_none());
+    }
+
+    /// A145 in non-harvest round: no fire.
+    #[test]
+    fn a145_no_fire_in_non_harvest_round() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["A145".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_complete(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            3, // round 3 is not a harvest round
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.reed, 0,
+            "A145 must not fire in non-harvest round"
+        );
+    }
+
+    /// C066: grain 0/1 -> no gain.
+    #[test]
+    fn c066_grain_zero_one_no_gain() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        for grain in [0, 1] {
+            let mut c = Ctx::new();
+            c.players[0].played_cards = vec!["C066".into()];
+            c.players[0].supply.grain = grain;
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            dispatch_after_harvest_complete(
+                &set,
+                0,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                4,
+                &std::collections::BTreeSet::new(),
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                false, // take_food_instead
+            )
+            .unwrap();
+            assert_eq!(
+                c.players[0].supply.food, 0,
+                "C066 grain={grain}: no food gain below threshold"
+            );
+            assert_eq!(
+                c.players[0].supply.grain, grain,
+                "C066 grain={grain}: no grain change"
+            );
+            assert!(pending.is_none());
+        }
+    }
+
+    /// C066: grain 2 -> food 1 only.
+    #[test]
+    fn c066_grain_two_food_one() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C066".into()];
+        c.players[0].supply.grain = 2;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_complete(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false, // take_food_instead = false (default: take grain instead at >=3)
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 1,
+            "C066 grain=2: food 1"
+        );
+        assert_eq!(
+            c.players[0].supply.grain, 2,
+            "C066 grain=2: grain unchanged"
+        );
+        assert!(pending.is_none());
+    }
+
+    /// C066: grain 3 -> grain 1 instead of food (default).
+    #[test]
+    fn c066_grain_three_grain_instead_default() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C066".into()];
+        c.players[0].supply.grain = 3;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_complete(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false, // take_food_instead = false -> take grain instead
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "C066 grain=3 default: no food (grain instead)"
+        );
+        assert_eq!(
+            c.players[0].supply.grain, 4,
+            "C066 grain=3 default: +1 grain (3 -> 4)"
+        );
+        assert!(pending.is_none());
+    }
+
+    /// C066: grain 3 -> food 1 if take_food_instead = true.
+    #[test]
+    fn c066_grain_three_food_if_opt_in() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C066".into()];
+        c.players[0].supply.grain = 3;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_complete(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            true, // take_food_instead = true -> opt into food
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 1,
+            "C066 grain=3 with take_food_instead: food 1"
+        );
+        assert_eq!(
+            c.players[0].supply.grain, 3,
+            "C066 grain=3 with take_food_instead: grain unchanged"
+        );
+        assert!(pending.is_none());
+    }
+
+    /// C066: grain 5 -> still only food 1 + grain 1 (second trigger doesn't fire again).
+    #[test]
+    fn c066_grain_five_capped() {
+        let set = CardSet {
+            definitions: crate::cards::verified_round_and_harvest_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["C066".into()];
+        c.players[0].supply.grain = 5;
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_harvest_complete(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &std::collections::BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "C066 grain=5 default: no food (grain instead)"
+        );
+        assert_eq!(
+            c.players[0].supply.grain, 6,
+            "C066 grain=5 default: +1 grain only (5 -> 6), not +2"
+        );
+        assert!(pending.is_none());
     }
 }
