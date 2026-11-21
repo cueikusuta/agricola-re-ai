@@ -43,7 +43,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "house_is",
+        "params": {
+          "house": "wood"
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [

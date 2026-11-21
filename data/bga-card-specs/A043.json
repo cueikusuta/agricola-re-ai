@@ -34,7 +34,14 @@
   "play": {
     "action": "minor_improvement",
     "cost": [],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "animal_count_at_least",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [

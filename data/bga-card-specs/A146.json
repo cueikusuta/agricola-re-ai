@@ -44,7 +44,10 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "space": "fishing"
+            "spaces": [
+              "fishing",
+              "traveling_players"
+            ]
           }
         },
         {

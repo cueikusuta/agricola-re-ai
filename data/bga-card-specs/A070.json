@@ -41,7 +41,7 @@
     ],
     "prerequisites": [
       {
-        "predicate": "at_least_fields",
+        "predicate": "field_count",
         "params": {
           "n": 3
         }

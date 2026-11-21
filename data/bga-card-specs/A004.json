@@ -41,12 +41,7 @@
   "effects": [
     {
       "trigger": "on_play",
-      "conditions": [
-        {
-          "predicate": "rooms_exceed_people",
-          "params": {}
-        }
-      ],
+      "conditions": [],
       "steps": [
         {
           "operation": "gain_resource",
@@ -66,7 +61,24 @@
               ]
             }
           }
-        },
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "rooms_exceed_people",
+          "params": {}
+        }
+      ],
+      "steps": [
         {
           "operation": "gain_resource",
           "target": "owner",
