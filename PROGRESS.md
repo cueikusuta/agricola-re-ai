@@ -8,7 +8,7 @@
 |---|---|
 | 設計書 | PR #400（`research/qwen-ai-eval-design` の `docs/ai-evaluation-design.md`）。**未マージ**。本書はその §1.7・§2・§3・§5 を実装対象にする |
 | 基盤ブランチ | `feat/deepai-eval-harness`（origin/main `c4a4ba6` から作成） |
-| 章1 実行基盤 | 未着手 |
+| 章1 実行基盤 | **完了**（`feat/deepai-eval-harness-01-run`） |
 | 章2 集計 | 未着手 |
 | 章3 比較・判定 | 未着手 |
 | PR | 章ごとに1本。**作成まで。マージしない** |
@@ -65,3 +65,23 @@
 1. `PROGRESS.md` の「現在地」と直近の `result-deepai-eval-harness.md` を読む。
 2. 未完了章のブランチで `git log --oneline -5` と `git status` を確認する。
 3. 章の残作業は同ファイル末尾の「章メモ」に追記されている。無ければ PR 本文の「未実装で残した部分」を見る。
+
+---
+
+## 章メモ
+
+### 章1 実行基盤（`feat/deepai-eval-harness-01-run`）
+
+- 追加: `src/eval_harness.rs`（共通の `Ai` / `SeatSelector` / `SearchSettings` / `first_credit` を `bin/paired_eval.rs` から移設。挙動不変）、
+  `src/bin/eval_harness.rs`（新CLI）、`tests/eval_harness_smoke.rs`。
+- 新CLIの出力: `<out>/run-manifest.json` と `<out>/shard-0/matches.jsonl`（schema_version 2）。
+  失敗時は `<out>/errors.jsonl` に1行残して非0終了。既存の出力ディレクトリへの追記は拒否（fail closed）。
+- `--draft-mode draft_10_7_simultaneous` は `--cards fixture_4p`（4人・FIX 40+40）とだけ組み合わせられる。
+  公式verified 4人プール（G1 40+40）が0枚のため、フィクスチャは機能検証専用で、マニフェストに
+  `official_final_mode=false` と理由を記録する。
+- `--smoke` は4ブロック上限。マニフェストの `run_mode` は `smoke`/`full`。
+- スモーク実測（ローカル・release）:
+  - カードなし4人: 8試合 0.22〜0.44s、condition `616db47c…`。
+  - フィクスチャ10-7ドラフト4人: 8試合 0.93〜1.04s、condition `6dafd41f…`。
+- 章1で**やらない**こと: 集計・判定・ガード・Run間比較（章2/章3）。`interference_proxy` はU2未決定のため未実装、
+  マニフェストの `unimplemented` に明記。
