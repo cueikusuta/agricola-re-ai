@@ -125,6 +125,7 @@ def make_run(
                     "focus_pick_max_ms": None,
                     "focus_pick_p95_ms": None,
                     "pick_timeout_count": None,
+                    "pick_over_budget_ms_count": None,
                     "pick_illegal_fallback_count": None,
                     "draft_pick_budget_enforced": None,
                     "focus_observed_all_picks_within_budget": None,
@@ -156,9 +157,10 @@ def make_run(
                         "focus_pick_max_ms": 1.5,
                         "focus_pick_p95_ms": 1.0,
                         "pick_timeout_count": 0,
+                        "pick_over_budget_ms_count": 0,
                         "pick_illegal_fallback_count": 0,
                         "draft_pick_budget_enforced": False,
-                        "focus_observed_all_picks_within_budget": True,
+                        "focus_observed_all_picks_within_budget": None,
                     }
                 mean_other = (sum(scores) - scores[seat]) / (players - 1)
                 row = {
@@ -475,6 +477,53 @@ class EvalReportTests(unittest.TestCase):
         with self.assertRaisesRegex(RunError, "draft pick"):
             validate_and_report(manifest, rows)
 
+
+    def test_comparison_kind_is_derived_from_the_arms(self):
+        manifest, rows = make_run(draft=True, candidate_policy="eval", opponent="eval")
+        manifest["arms"]["baseline"]["game_policy_id"] = "eval"
+        manifest["arms"]["baseline"]["policy"] = "eval"
+        for row in rows:
+            if row["arm_id"] == "baseline":
+                row["focus_policy"] = "eval"
+            row["game_policy_id_by_seat"] = ["eval"] * 4
+        report = validate_and_report(manifest, rows)
+        self.assertEqual(
+            report["comparison_design"]["comparison_kind"], "draft_contribution"
+        )
+        self.assertEqual(
+            report["comparison_design"]["changed_factors"], ["draft_policy"]
+        )
+
+    def test_a_puct_config_difference_is_a_game_policy_comparison(self):
+        manifest, rows = make_run(candidate_policy="puct", opponent="puct")
+        manifest["arms"]["candidate"]["game_policy_id"] = "puct-a"
+        manifest["arms"]["baseline"]["game_policy_id"] = "puct-b"
+        manifest["arms"]["baseline"]["policy"] = "puct"
+        manifest["arms"]["opponent"]["game_policy_id"] = "puct"
+        manifest["arms"]["candidate"]["puct_config_id"] = "puct-a"
+        manifest["arms"]["baseline"]["puct_config_id"] = "puct-b"
+        for row in rows:
+            focus_id = "puct-a" if row["arm_id"] == "candidate" else "puct-b"
+            row["focus_policy"] = "puct"
+            row["game_policy_id_by_seat"] = [
+                focus_id if other == row["candidate_seat"] else "puct"
+                for other in range(4)
+            ]
+        report = validate_and_report(manifest, rows)
+        self.assertEqual(report["comparison_design"]["comparison_kind"], "game_policy")
+        self.assertEqual(
+            report["comparison_design"]["changed_factors"], ["puct_config"]
+        )
+
+    def test_recorded_comparison_kind_must_match_the_arms(self):
+        manifest, rows = make_run()
+        manifest["comparison_design"] = {
+            "head_to_head": True,
+            "comparison_kind": "draft_contribution",
+            "changed_factors": ["draft_policy"],
+        }
+        with self.assertRaisesRegex(RunError, "comparison_kind|changed_factors"):
+            validate_and_report(manifest, rows)
 
 if __name__ == "__main__":
     unittest.main()
