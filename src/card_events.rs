@@ -4352,14 +4352,65 @@ mod tests {
         use crate::model::{Config, Game, Space};
         use crate::pending::{PendingResolution, Transition};
 
+        // Seed-independent setup (PR #385 review R-P1-2): the random seed-1
+        // deal stopped seating B121 and A078 in seat 0 together once this
+        // batch changed the card-set composition, so the hands are forced
+        // through `with_cards_and_hands`. The game RNG streams are derived
+        // from the seed alone (`from_card_state`), so the round deck and
+        // every other expectation below are unchanged; only the hand
+        // contents differ.
         let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
-        let mut game = Game::with_cards(
+        let mut occs: Vec<String> = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == crate::cards::CardKind::Occupation)
+            .map(|c| c.id.clone())
+            .collect();
+        occs.sort();
+        let mut minors: Vec<String> = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == crate::cards::CardKind::MinorImprovement)
+            .map(|c| c.id.clone())
+            .collect();
+        minors.sort();
+        let mut seat0_occ = vec!["B121".to_string()];
+        seat0_occ.extend(occs.iter().filter(|id| *id != "B121").take(6).cloned());
+        let mut seat0_minor = vec!["A078".to_string()];
+        seat0_minor.extend(minors.iter().filter(|id| *id != "A078").take(6).cloned());
+        let seat1_occ: Vec<String> = occs
+            .iter()
+            .filter(|id| !seat0_occ.contains(id))
+            .take(7)
+            .cloned()
+            .collect();
+        let seat1_minor: Vec<String> = minors
+            .iter()
+            .filter(|id| !seat0_minor.contains(id))
+            .take(7)
+            .cloned()
+            .collect();
+        assert_eq!(
+            (seat0_occ.len(), seat0_minor.len()),
+            (7, 7),
+            "seat 0 must hold seven occupations and seven minors"
+        );
+        assert_eq!(
+            (seat1_occ.len(), seat1_minor.len()),
+            (7, 7),
+            "seat 1 must hold seven occupations and seven minors"
+        );
+        let mut game = Game::with_cards_and_hands(
             Config {
                 players: 2,
-                seed: 1, // seed 1 gives player 0 both A078 and an occupation (B121)
+                seed: 1,
                 additional_action_space_enabled: false,
             },
             set,
+            vec![
+                [seat0_occ, seat0_minor].concat(),
+                [seat1_occ, seat1_minor].concat(),
+            ],
         )
         .expect("game creation must succeed");
 
