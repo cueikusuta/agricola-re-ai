@@ -44,26 +44,29 @@
       "steps": [
         {
           "operation": "other",
-          "target": "owner",
           "params": {
-            "kind": "remove_stables",
+            "kind": "remove_stables_from_stock",
             "count": 3
-          }
+          },
+          "target": "owner"
         },
         {
           "operation": "spend_resource",
-          "target": "owner",
           "params": {
             "good": "wood",
             "amount": 2
-          }
+          },
+          "target": "owner"
         },
         {
-          "operation": "build_stable",
-          "target": "board",
+          "operation": "other",
           "params": {
-            "count": 1
-          }
+            "kind": "fence_pasture",
+            "spaces": 2,
+            "wood_cost": 2,
+            "pay_only_fence_wood": true
+          },
+          "target": "owner"
         }
       ],
       "optional": false,
@@ -71,8 +74,7 @@
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "none",
-      "notes": "On play: remove 3 stables from stock, fence 2 farm spaces (wood 2 total), build 1 pasture."
+      "decision_owner": "none"
     }
   ],
   "post_play": {
@@ -81,9 +83,11 @@
   "review": {
     "status": "bga_checked",
     "unresolved_fields": [],
-    "test_case_ids": ["B149-normal"],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "test_case_ids": [
+      "B149-normal"
+    ],
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "On play: remove 3 stables from stock, pay wood 2, build 1 pasture. Eligibility 2=no, 3=no, 4=yes (from ledger). bga_checked is third-party BGA wiki cross-check, not official Lookout verification."
   }

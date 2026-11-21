@@ -39,16 +39,28 @@
   },
   "effects": [
     {
-      "trigger": "on_use_cultivation",
-      "conditions": [],
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "farmland"
+          }
+        },
+        {
+          "predicate": "space_occupied",
+          "params": {
+            "space": "grain_seeds"
+          }
+        }
+      ],
       "steps": [
         {
           "operation": "plow_field",
-          "target": "owner",
           "params": {
-            "condition": "grain_seeds_occupied",
-            "extra_fields": 1
-          }
+            "amount": 1
+          },
+          "target": "board"
         }
       ],
       "optional": false,
@@ -69,8 +81,8 @@
       "B090-grain-seeds-occupied",
       "B090-grain-seeds-free"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "While the Grain Seeds action space is occupied, each time you use the Cultivation action space, you may plow 1 additional field."
   }

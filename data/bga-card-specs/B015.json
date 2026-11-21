@@ -33,61 +33,67 @@
   },
   "play": {
     "action": "minor_improvement",
-    "cost": [ { "good": "wood", "amount": 1 } ],
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
     "prerequisites": [],
     "printed_points": 0,
     "alternative_cost_notes": null
   },
   "effects": [
     {
-      "trigger": "on_play",
-      "conditions": [],
-      "steps": [
+      "trigger": "after_worker_space",
+      "conditions": [
         {
-          "operation": "discount_cost",
-          "target": "owner",
-          "params": { "cost_type": "wooden_room", "amount": 2 }
-        }
-      ],
-      "optional": false,
-      "frequency": "once",
-      "duration": "persistent",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none",
-      "notes": "Wooden room cost reduced by 2 wood (persistent)"
-    },
-    {
-      "trigger": "on_use_wood_accumulation",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "other",
-          "target": "owner",
+          "predicate": "worker_space_used",
           "params": {
-            "description": "After using a wood accumulation space, may build exactly 1 pasture using only the wood gained from that space."
+            "spaces": [
+              "forest",
+              "copse",
+              "grove"
+            ]
           }
         }
       ],
+      "steps": [
+        {
+          "operation": "other",
+          "params": {
+            "kind": "fence_pasture",
+            "spaces": 1,
+            "wood_cost": 0,
+            "pay_only_with_wood_gained_this_use": true,
+            "free_segments": 1
+          },
+          "target": "owner"
+        }
+      ],
       "optional": true,
-      "frequency": "each_time",
-      "duration": "instant",
+      "frequency": "every_use",
+      "duration": "permanent",
       "snapshot": "after_event",
-      "order": 1,
-      "decision_owner": "owner",
-      "notes": "After using wood accumulation space, can build 1 pasture with that wood only"
+      "order": 0,
+      "decision_owner": "owner"
     }
   ],
-  "post_play": { "destination": "played_area", "notes": "Stays in play area with persistent effects" },
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Stays in play area with persistent effects"
+  },
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects[1].trigger: on_use_wood_accumulation needs formal trigger definition",
-      "effects[1].steps[0].operation: building pasture with only newly gained wood needs precise rules"
+      "effects.0.steps.0.params.pay_only_with_wood_gained_this_use"
     ],
-    "test_case_ids": ["B015-wooden-room-discount", "B015-pasture-from-wood"],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "test_case_ids": [
+      "B015-wooden-room-discount",
+      "B015-pasture-from-wood"
+    ],
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Cost: 1 wood. 0 points. Strong ban status. Effects: (1) Wooden room cost -2 wood persistent. (2) After using wood accumulation space, may build 1 pasture using only that wood. Second effect needs formalization."
   }

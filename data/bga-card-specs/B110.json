@@ -42,8 +42,31 @@
       "trigger": "setup_phase_end",
       "conditions": [
         {
-          "predicate": "has_stone_in_stock",
-          "params": { "minimum": 1 }
+          "predicate": "round_in",
+          "params": {
+            "values": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13
+            ]
+          }
+        },
+        {
+          "predicate": "resource_at_least",
+          "params": {
+            "good": "stone",
+            "n": 1
+          }
         }
       ],
       "steps": [
@@ -68,12 +91,19 @@
       "trigger": "setup_phase_end",
       "conditions": [
         {
-          "predicate": "round_is",
-          "params": { "round": 14 }
+          "predicate": "round_in",
+          "params": {
+            "values": [
+              14
+            ]
+          }
         },
         {
-          "predicate": "has_stone_in_stock",
-          "params": { "minimum": 1 }
+          "predicate": "resource_at_least",
+          "params": {
+            "good": "stone",
+            "n": 1
+          }
         }
       ],
       "steps": [
@@ -105,8 +135,8 @@
       "B110-setup-phase-end-stone-food",
       "B110-round14-setup-phase-end-stone-vegetable"
     ],
-    "checked_by": "AI source comparison vs BGA wiki",
-    "checked_on": "2026-11-14",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Verified against BGA wiki card page. Each setup phase end with stone: gain 1 food. Round 14: gain 1 vegetable instead."
   }

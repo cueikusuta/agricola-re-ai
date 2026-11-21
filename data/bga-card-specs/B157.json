@@ -39,35 +39,30 @@
   },
   "effects": [
     {
-      "trigger": "anytime",
+      "trigger": "passive",
       "conditions": [],
       "steps": [
         {
           "operation": "other",
-          "target": "owner",
           "params": {
-            "kind": "pay_animal",
-            "animals": ["sheep", "boar", "cattle"],
-            "count": 1
-          }
-        },
-        {
-          "operation": "other",
-          "target": "board",
-          "params": {
-            "kind": "place_food_on_future_rounds",
-            "rounds": [3, 5, 7],
-            "food_per_round": 1
-          }
+            "kind": "pay_animal_for_round_food",
+            "animal_rounds": {
+              "sheep": 3,
+              "wild_boar": 5,
+              "cattle": 7
+            },
+            "food_per_round": 1,
+            "choose_animal": true
+          },
+          "target": "owner"
         }
       ],
       "optional": true,
-      "frequency": "once_per_play",
+      "frequency": "always",
       "duration": "permanent",
       "snapshot": "live_state",
       "order": 0,
-      "decision_owner": "owner",
-      "notes": "Anytime: pay 1 sheep/boar/cattle. Then place food 1 on each of next 3/5/7 round spaces; receive food at each round start."
+      "decision_owner": "owner"
     }
   ],
   "post_play": {
@@ -76,9 +71,11 @@
   "review": {
     "status": "bga_checked",
     "unresolved_fields": [],
-    "test_case_ids": ["B157-normal"],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "test_case_ids": [
+      "B157-normal"
+    ],
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Anytime: pay animal 1, place food 1 on rounds 3/5/7, receive at round starts. bga_checked is third-party BGA wiki cross-check, not official Lookout verification."
   }

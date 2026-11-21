@@ -64,7 +64,11 @@
         {
           "predicate": "all_cumulative_spaces_occupied",
           "params": {
-            "spaces": ["forest", "clay_pit", "reed_field"]
+            "spaces": [
+              "forest",
+              "clay_pit",
+              "reed_bank"
+            ]
           }
         }
       ],
@@ -93,9 +97,12 @@
   "review": {
     "status": "bga_checked",
     "unresolved_fields": [],
-    "test_case_ids": ["B160-normal", "B160-not-triggered"],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "test_case_ids": [
+      "B160-normal",
+      "B160-not-triggered"
+    ],
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "On play: gain grain 1. End of work phase: Forest/Clay Pit/Reed Field all occupied => gain grain 1. bga_checked is third-party BGA wiki cross-check, not official Lookout verification."
   }

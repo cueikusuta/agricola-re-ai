@@ -49,11 +49,16 @@
       "steps": [
         {
           "operation": "gain_resource",
-          "target": "owner",
           "params": {
             "good": "grain",
-            "amount": 1
-          }
+            "amount": {
+              "op": "count",
+              "args": [
+                "own_persons_on_accumulation_spaces"
+              ]
+            }
+          },
+          "target": "owner"
         }
       ],
       "optional": false,
@@ -76,8 +81,8 @@
       "B067-none",
       "B067-not-triggered"
     ],
-    "checked_by": "AI source comparison",
-    "checked_on": "2026-11-14",
+    "checked_by": "Freebuff AB-band literature cross-check",
+    "checked_on": "2026-11-21",
     "implementation_status": "not_started",
     "notes": "Cost 1 wood. Before each Bake Bread, gain 1 grain per own family member on an accumulation space. bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
   }
