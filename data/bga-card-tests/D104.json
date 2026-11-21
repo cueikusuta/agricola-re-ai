@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "D104",
+  "cases": [
+    {
+      "id": "D104-gain-field-via-plow",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_field_gained",
+        "source": "plow_action",
+        "fields_gained": 1
+      },
+      "expected": {
+        "wood_gained": 1,
+        "food_gained": 1
+      },
+      "notes": "Gain 1 field via Plow action -> gain 1 wood, 1 food."
+    },
+    {
+      "id": "D104-gain-field-via-action",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_field_gained",
+        "source": "field_action",
+        "fields_gained": 1
+      },
+      "expected": {
+        "wood_gained": 1,
+        "food_gained": 1
+      },
+      "notes": "Gain 1 field via field-gaining action (e.g., Farm Expansion) -> gain 1 wood, 1 food."
+    },
+    {
+      "id": "D104-multiple-fields-at-once",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_field_gained",
+        "source": "major_improvement",
+        "fields_gained": 2
+      },
+      "expected": {
+        "wood_gained": 2,
+        "food_gained": 2
+      },
+      "notes": "Gain 2 fields at once (e.g., via major improvement) -> gain 2 wood, 2 food (1 per field)."
+    }
+  ]
+}

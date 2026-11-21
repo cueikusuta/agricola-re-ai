@@ -186,6 +186,15 @@ pub enum CardEffect {
         animal: Animal,
         amount: u32,
     },
+    /// A109 小商人 (Small Trader): when an improvement is played from hand
+    /// via a Major or Minor Improvement action, gain `amount` of `good`.
+    /// Fired from the play dispatcher's after-play scan for improvements;
+    /// the legacy `cards::play` helper does not re-scan earlier cards
+    /// and therefore never fires it.
+    AfterImprovementPlayedGain {
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -230,6 +239,7 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerGain { .. } => "after_any_worker_gain",
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
+            CardEffect::AfterImprovementPlayedGain { .. } => "after_improvement_played_gain",
         }
     }
 }
@@ -455,7 +465,8 @@ impl CardSet {
                         | CardEffect::OnPlayGainPerCount { amount, .. }
                         | CardEffect::AfterAnyWorkerGain { amount, .. }
                         | CardEffect::AfterAnyWorkerOthersGain { amount, .. }
-                        | CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
+                        | CardEffect::HarvestStartGainIfFields { amount, .. }
+                        | CardEffect::AfterImprovementPlayedGain { amount, .. } => *amount,
                     };
                     amount == 0 || amount > 30
                 })
@@ -3804,6 +3815,19 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 gain(Space::TravelingPlayers, Good::Grain, 1),
             ],
         },
+        // A109 小商人 (Small Trader): when an improvement is played from hand
+        // via a Major or Minor Improvement action, gain 3 food.
+        CardDefinition {
+            use_limit: None,
+            id: "A109".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterImprovementPlayedGain {
+                good: Good::Food,
+                amount: 3,
+            }],
+        },
         // A008 食材かご (Food Basket): cost 1 reed; prerequisites 2 occupations and
         // 2 improvements in front; on play gain 1 grain and 1 vegetable.
         CardDefinition {
@@ -4301,7 +4325,7 @@ mod verified_band_d_tests {
         assert_eq!(end_game_bonus(&set, &p), 0);
         // fields 5 (=4 pts), pastures 4 (=4 pts), fenced stable x4 (=4 pts),
         // grain 8 (=4 pts) -> 4 categories.
-        for cell in p.farm.iter_mut().skip(1).take(5) {
+        for cell in p.farm.iter_mut().take(6).skip(1) {
             cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
@@ -4315,7 +4339,7 @@ mod verified_band_d_tests {
                 quantity: 0,
             });
         }
-        for (i, cell) in p.farm.iter_mut().enumerate().skip(10).take(4) {
+        for (i, cell) in p.farm.iter_mut().enumerate().take(14).skip(10) {
             cell.stable = true;
             cell.tile = Tile::Pasture { id: (10 + i) as u8 };
         }
@@ -4335,7 +4359,7 @@ mod verified_band_d_tests {
         p.played_cards.push("D100".into());
 
         // Test fields boundary: 4 fields = 3 pts, 5 fields = 4 pts
-        for cell in p.farm.iter_mut().skip(1).take(4) {
+        for cell in p.farm.iter_mut().take(5).skip(1) {
             cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
@@ -4405,7 +4429,7 @@ mod verified_band_d_tests {
         // Reset and test fenced_stables boundary: 3 fenced stables = 3 pts, 4 = 4 pts
         let mut p4 = Player::new(0, 0);
         p4.played_cards.push("D100".into());
-        for (i, cell) in p4.farm.iter_mut().enumerate().skip(10).take(3) {
+        for (i, cell) in p4.farm.iter_mut().enumerate().take(13).skip(10) {
             cell.stable = true;
             cell.tile = Tile::Pasture { id: (10 + i) as u8 };
         }
@@ -4758,10 +4782,10 @@ mod verified_band_e_tests {
         q.played_cards.push("E034".into());
         q.farm[0].tile = Tile::Room;
         q.farm[5].tile = Tile::Room;
-        for cell in q.farm.iter_mut().skip(1).take(4) {
+        for cell in q.farm.iter_mut().take(5).skip(1) {
             cell.tile = Tile::Pasture { id: 0 };
         }
-        for cell in q.farm.iter_mut().skip(6).take(9) {
+        for cell in q.farm.iter_mut().take(15).skip(6) {
             cell.tile = Tile::Pasture { id: 0 };
         }
         assert_eq!(end_game_bonus(&set, &q), 2);
@@ -4778,13 +4802,13 @@ mod verified_band_e_tests {
         p.played_cards.push("E034".into());
         p.farm[0].tile = Tile::Room;
         p.farm[5].tile = Tile::Room;
-        for cell in p.farm.iter_mut().skip(1).take(4) {
+        for cell in p.farm.iter_mut().take(5).skip(1) {
             cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
         }
-        for cell in p.farm.iter_mut().skip(6).take(8) {
+        for cell in p.farm.iter_mut().take(14).skip(6) {
             cell.tile = Tile::Field {
                 crop: Some(Crop::Vegetable),
                 remaining: 1,

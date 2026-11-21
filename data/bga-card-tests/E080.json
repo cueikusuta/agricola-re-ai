@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "card_id": "E080",
+  "cases": [
+    {
+      "id": "E080-sow-stone",
+      "scope": "effect_only",
+      "setup": {
+        "stone_in_supply": 9
+      },
+      "action": {
+        "play": "E080",
+        "sow": "stone_as_vegetables"
+      },
+      "expected": {
+        "planted_on_card": "stone",
+        "planting_capacity": 3
+      },
+      "notes": "Stone is sown on this card as if it were 3 fields."
+    },
+    {
+      "id": "E080-counts-as-one-field",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E080",
+        "count": "fields"
+      },
+      "expected": {
+        "field_count_contribution": 1
+      },
+      "notes": "The card counts as exactly 1 field for field-count purposes."
+    },
+    {
+      "id": "E080-harvest-stone",
+      "scope": "effect_only",
+      "setup": {
+        "stone_on_card": 3
+      },
+      "action": {
+        "play": "E080",
+        "harvest": "stone_as_vegetables"
+      },
+      "expected": {
+        "harvested_stone": 3
+      },
+      "notes": "Stone on this card is harvested as vegetables would be."
+    }
+  ]
+}

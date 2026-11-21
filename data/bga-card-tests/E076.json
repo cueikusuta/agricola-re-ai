@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "E076",
+  "cases": [
+    {
+      "id": "E076-return-2",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 2
+      },
+      "action": {
+        "play": "E076",
+        "return_stables": 2
+      },
+      "expected": {
+        "wood_delta": 6,
+        "stables": 0
+      },
+      "notes": "Each returned stable yields 3 wood."
+    },
+    {
+      "id": "E076-return-max-3",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 5
+      },
+      "action": {
+        "play": "E076",
+        "return_stables": 4
+      },
+      "expected": {
+        "wood_delta": 9,
+        "stables": 2
+      },
+      "notes": "At most 3 stables may be returned for wood."
+    }
+  ]
+}

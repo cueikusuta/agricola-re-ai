@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "card_id": "D097",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "無心する学生",
+    "name_en": "Begging Student"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2824",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          },
+          "notes": "物乞い1（食料1）"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "harvest_start",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "action": "play_occupation_without_cost",
+                "notes": "各収穫の開始時に、職業コストなしで職業を1枚出せる"
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "出した時食料1。継続効果: 各収穫開始時に職業コストなしで職業1枚出せる（BAN: strong）"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[1].steps[0].params.kind=other: play_occupation_without_cost の詳細仕様（手札からのみか市場からも可か、コスト『なし』の正確な意味（食料・資源両方免除か）、同一収穫で複数回不可の制御）",
+      "effects[1].trigger: harvest_start で『各収穫の開始時』のタイミングと、収穫のないラウンドでの扱い",
+      "classification: 段階4（P1 出したとき＋収穫の開始）だが、職業コスト免除の範囲と手札/市場の区別が文献で確定できない"
+    ],
+    "test_case_ids": [
+      "D097-on-play-gain-food",
+      "D097-harvest-start-play-occupation-free",
+      "D097-harvest-start-no-occupation-in-hand"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Ban: strong. Effect: On play, gain 1 food. Ongoing: at start of each harvest, may play 1 occupation without paying its cost. Trigger: on_play + harvest_start. Unresolved: occupation cost scope (food + resources?), hand vs market source, once per harvest enforcement."
+  }
+}

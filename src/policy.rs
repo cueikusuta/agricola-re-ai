@@ -607,7 +607,10 @@ fn card_priority(
                                                                 | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
                                                                     card_animal_value(*animal) * i64::from(*amount) * horizon
                                                                 }
-                                                            };
+                                CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                }
+                            };
     }
     Some(value)
 }
