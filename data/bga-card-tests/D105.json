@@ -8,13 +8,27 @@
       "setup": {},
       "action": {
         "trigger": "after_worker_space",
-        "space_used": "clay_accumulation"
+        "space_used": "clay_pit"
       },
       "expected": {
         "food_gained": 1,
         "grain_gained": 0
       },
-      "notes": "Use Clay Accumulation space -> gain 1 food."
+      "notes": "Use Clay Pit (clay accumulation) -> gain 1 food."
+    },
+    {
+      "id": "D105-hollow-gain-food",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_worker_space",
+        "space_used": "hollow"
+      },
+      "expected": {
+        "food_gained": 1,
+        "grain_gained": 0
+      },
+      "notes": "Hollow is also a clay accumulation space (3+ players) -> gain 1 food."
     },
     {
       "id": "D105-stone-accumulation-gain-grain",
@@ -22,13 +36,13 @@
       "setup": {},
       "action": {
         "trigger": "after_worker_space",
-        "space_used": "stone_accumulation"
+        "space_used": "western_quarry"
       },
       "expected": {
         "food_gained": 0,
         "grain_gained": 1
       },
-      "notes": "Use Stone Accumulation space -> gain 1 grain."
+      "notes": "Use Western Quarry (stone accumulation) -> gain 1 grain."
     },
     {
       "id": "D105-other-accumulation-no-effect",
@@ -36,13 +50,13 @@
       "setup": {},
       "action": {
         "trigger": "after_worker_space",
-        "space_used": "wood_accumulation"
+        "space_used": "forest"
       },
       "expected": {
         "food_gained": 0,
         "grain_gained": 0
       },
-      "notes": "Use Wood Accumulation space -> no effect (only clay and stone)."
+      "notes": "Wood accumulation spaces give neither food nor grain."
     }
   ]
 }

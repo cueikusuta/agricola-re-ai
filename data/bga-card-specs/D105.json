@@ -45,7 +45,10 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "spaces": ["clay_accumulation", "stone_accumulation"]
+            "spaces": [
+              "clay_pit",
+              "hollow"
+            ]
           }
         }
       ],
@@ -72,7 +75,10 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "spaces": ["stone_accumulation"]
+            "spaces": [
+              "western_quarry",
+              "eastern_quarry"
+            ]
           }
         }
       ],
@@ -99,20 +105,17 @@
     "notes": "継続効果: レンガ累積スペース利用で食料1、石材累積スペース利用で小麦1追加獲得（実装済: cards.rs）"
   },
   "review": {
-    "status": "needs_resolution",
-    "unresolved_fields": [
-      "effects[0].conditions / effects[1].conditions: worker_space_used で 'clay_accumulation'（レンガ累積）と 'stone_accumulation'（石材累積）スペースをどう特定するか",
-      "effects: レンガ累積で食料、石材累積で小麦という区別は実装済み（cards.rs）だが、仕様JSONでのスペース識別が語彙に依存する",
-      "classification: 実装済（cards.rs）。#375 の段階は「外」だが実装済を独立区分。TR-WS 基盤記号"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
       "D105-clay-accumulation-gain-food",
+      "D105-hollow-gain-food",
       "D105-stone-accumulation-gain-grain",
       "D105-other-accumulation-no-effect"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-20",
+    "checked_on": "2026-11-21",
     "implementation_status": "implemented",
-    "notes": "Cost: none. Prereq: none. Points: 0. Effect: Using Clay Accumulation space -> +1 food. Using Stone Accumulation space -> +1 grain. Implemented in cards.rs. Trigger: after_worker_space (Clay/Stone accumulation). Unresolved: exact space identification in vocabulary."
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: clay accumulation spaces (clay pit, hollow) grant 1 food per use; stone accumulation spaces (western/eastern quarry) grant 1 grain per use. Space identification resolved to the explicit space lists used by B122/B144 (audit chapter D)."
   }
 }
