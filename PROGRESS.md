@@ -1,0 +1,67 @@
+# PROGRESS — 対戦AI評価基盤（feat/deepai-eval-harness）
+
+最終更新: 2026-11-20。担当: DeepAI。作業worktree: `C:/Users/agent/work/deepai/wt-eval-harness`。
+
+## 0. 現在地
+
+| 項目 | 状態 |
+|---|---|
+| 設計書 | PR #400（`research/qwen-ai-eval-design` の `docs/ai-evaluation-design.md`）。**未マージ**。本書はその §1.7・§2・§3・§5 を実装対象にする |
+| 基盤ブランチ | `feat/deepai-eval-harness`（origin/main `c4a4ba6` から作成） |
+| 章1 実行基盤 | 未着手 |
+| 章2 集計 | 未着手 |
+| 章3 比較・判定 | 未着手 |
+| PR | 章ごとに1本。**作成まで。マージしない** |
+
+## 1. 設計書の要点（本作業の前提）
+
+- 最終形は4人戦・`draft_10_7_simultaneous`。物差しは辞書式「首位率 → 期待順位」、探索・学習の報酬は `score_margin = 自分の得点 − 相手全員の平均得点`（設計書 §1.3・§3.1）。
+- 一次比較は「候補1席 vs 凍結基準3席＋基準鏡像arm」。独立標本は seed ブロックで、差はブロック・ブートストラップ（percentile, 10,000反復, seed 20261106）（§2.2・§3.2）。
+- 判定は事前登録した辞書式二層。得点差・コストは補助記録で採用根拠にしない（§3.3）。
+- 条件は fail closed。`condition_id`・config ID・デッキ・予算・provenance が違えば合算しない（§3.4・§5.5）。
+- 未決定 U1〜U15 は決めない。特に **U1（10-7同時ドラフトの残る慣行）** と **G1 40+40（公式照合済み4人プール）** が未達のうちは、最終モードの正式評価をしない。フィクスチャは機能検証専用（§1.5・§4.1）。
+
+## 2. 現状の実装を読んだ結果（足りない部品）
+
+既存の再利用対象:
+
+- `src/bin/paired_eval.rs` — 座席ローテーション付きA/B評価。4人戦・再演検証・首位クレジット・期待順位・得点差の行出力（schema v1）は既にある。
+- `scripts/paired_eval_stats.py` — 首位クレジット差のブロック・ブートストラップ、飽和・head_to_head・config ID検証・時間指標。schema v1 専用。
+- `src/draft.rs` / `src/draft_ai.rs` / `src/draft_game.rs` — 10-7同時ドラフト（2〜4人）と、完成ドラフトから `Game` を開始する橋渡し。
+- `src/card_pool.rs` — 4人適格・公式verifiedのプールゲート。現状は **verified 0枚**（`card_pool_report` 実測）。
+- `src/dataset_split.rs` — seed分割ManifestとG0検査（本作業では未接続）。
+
+足りない部品（実装順）:
+
+1. **ドラフト→対戦の評価実行**: `paired_eval` はドラフトを回さない。ドラフト方策を席ごとに指定し、完成手札から `start_game_from_draft` で対戦へ接続する経路が無い。
+2. **4人ドラフト用プール**: 4人10-7は職業40＋小進歩40を配る。実装済みカードは職業18＋小進歩22で足りず、公式verifiedは0。設計書 §4.1 に従い、機能検証専用の `test_fixture` プール（40+40）を用意し、正式評価とは表示を分ける。
+3. **実行マニフェスト**: `condition_id`・事前登録・arms・予算・seed範囲・環境を機械可読に残す出力が無い。
+4. **スモークと本測定の分離**: 短い確認実行を明示するフラグと、マニフェスト上の `run_mode` が無い。
+5. **ドラフト計測**: 1ピック時間・フォールバック・ドラフト再演ハッシュ・`start_player`・最終手札/破棄（コーディネータ側のみ）を行に残せない。
+6. **集計**: 期待順位差・得点差差のブロック区間、得点差分布、人間可読要約、判定区分（§3.3）、ガード一覧（§3.4）、マニフェストとの条件一致検証が無い。
+7. **比較可能性**: 2つのRunの `condition_id` 一致を検査して比較可否を出す仕組みが無い。
+
+## 3. 章立て（1章 = 1ブランチ = 1PR）
+
+| 章 | ブランチ | 内容 | 主な成果物 | PR base |
+|---|---|---|---|---|
+| 1 | `feat/deepai-eval-harness-01-run` | 実行基盤。共通の選択・探索コードを `src/eval_harness.rs` へ抽出し、`eval_harness` バイナリで4人・ドラフト・スモーク/本測定・マニフェスト・schema v2 行を出す | `src/eval_harness.rs`, `src/bin/eval_harness.rs`, `src/bin/paired_eval.rs`（抽出のみ）, tests | `feat/deepai-eval-harness` |
+| 2 | `feat/deepai-eval-harness-02-report` | 集計。マニフェスト＋行を検証し、首位率・期待順位・得点差の点推定/差/95%CI・分布・人間可読要約を出す | `scripts/eval_report.py`, `tests/test_eval_report.py` | 章1 |
+| 3 | `feat/deepai-eval-harness-03-compare` | 比較・判定。辞書式二層の判定区分、ガード、Run間の `condition_id` 一致検査、ベースライン差し替え手順 | `scripts/eval_compare.py`, 追記, tests | 章2 |
+
+各章で `cargo fmt` / `cargo clippy --all-targets --all-features --locked -- -D warnings` / 追加テストを確認し、全件は Actions に任せる（AGENTS.md 18）。PR本文に設計書の対応節・未実装・スモーク出力を記す。
+
+## 4. 決めないこと（設計書 §6 の未決定を固定しない）
+
+- U1（10-7同時ドラフトの残る慣行）: 既定は `draft_10_7_simultaneous`＋右回り固定＋既存 `DraftRuleset`。**新規の慣行を発明しない**。マニフェストに「未確定」と記録する。
+- U2（自損妨害の強制機構）: 実装しない。`interference_proxy` は未実装として記録する。
+- U4（標準時間予算値）: 既定値は既存 `paired_eval` と同じ 10,000ms を「明示指定可能な値」として維持し、標準予算の決定とは書かない。
+- U6（seed範囲）: 新規範囲を割り当てない。スモークは 700000 台（既存のローカル小規模域）を使い、正式レジストリと衝突させない。
+- U10/U11（ドラフト代理指標・参照方策）: L1の代理指標や参照方策の強化は本作業の範囲外。L2（対戦）のみ実装する。
+- U12（40+40の現況）: 実行時に `card_pool_report` 相当を実測し、`pool_gate_snapshot` に記録する。公式verified 0枚なら `official_final_mode=false`。
+
+## 5. 再開方法
+
+1. `PROGRESS.md` の「現在地」と直近の `result-deepai-eval-harness.md` を読む。
+2. 未完了章のブランチで `git log --oneline -5` と `git status` を確認する。
+3. 章の残作業は同ファイル末尾の「章メモ」に追記されている。無ければ PR 本文の「未実装で残した部分」を見る。
