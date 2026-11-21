@@ -186,6 +186,15 @@ pub enum CardEffect {
         animal: Animal,
         amount: u32,
     },
+    /// A109 小商人 (Small Trader): when an improvement is played from hand
+    /// via a Major or Minor Improvement action, gain `amount` of `good`.
+    /// Fired from the play dispatcher's after-play scan for improvements;
+    /// the legacy `cards::play` helper does not re-scan earlier cards
+    /// and therefore never fires it.
+    AfterImprovementPlayedGain {
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -230,6 +239,7 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerGain { .. } => "after_any_worker_gain",
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
+            CardEffect::AfterImprovementPlayedGain { .. } => "after_improvement_played_gain",
         }
     }
 }
@@ -455,7 +465,8 @@ impl CardSet {
                         | CardEffect::OnPlayGainPerCount { amount, .. }
                         | CardEffect::AfterAnyWorkerGain { amount, .. }
                         | CardEffect::AfterAnyWorkerOthersGain { amount, .. }
-                        | CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
+                        | CardEffect::HarvestStartGainIfFields { amount, .. }
+                        | CardEffect::AfterImprovementPlayedGain { amount, .. } => *amount,
                     };
                     amount == 0 || amount > 30
                 })
@@ -3803,6 +3814,19 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 gain(Space::TravelingPlayers, Good::Wood, 1),
                 gain(Space::TravelingPlayers, Good::Grain, 1),
             ],
+        },
+        // A109 小商人 (Small Trader): when an improvement is played from hand
+        // via a Major or Minor Improvement action, gain 3 food.
+        CardDefinition {
+            use_limit: None,
+            id: "A109".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterImprovementPlayedGain {
+                good: Good::Food,
+                amount: 3,
+            }],
         },
         // A008 食材かご (Food Basket): cost 1 reed; prerequisites 2 occupations and
         // 2 improvements in front; on play gain 1 grain and 1 vegetable.
