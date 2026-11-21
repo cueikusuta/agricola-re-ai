@@ -39,14 +39,7 @@
         "amount": 2
       }
     ],
-    "prerequisites": [
-      {
-        "predicate": "occupation_count",
-        "params": {
-          "n": 1
-        }
-      }
-    ],
+    "prerequisites": [],
     "printed_points": 0
   },
   "effects": [
@@ -108,8 +101,8 @@
       "B019-normal",
       "B019-exhausted"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "2 field tiles on the card; twice per game, Farmland also plows 1 from the card."
   }

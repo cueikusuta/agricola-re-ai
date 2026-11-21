@@ -11,120 +11,50 @@
     "playable": "yes",
     "ban_status": "none",
     "base_2016": "yes",
-    "eligibility": {
-      "2": "yes",
-      "3": "yes",
-      "4": "yes"
-    },
+    "eligibility": { "2": "yes", "3": "yes", "4": "yes" },
     "references": [
-      {
-        "url": "https://agricola.cloudfree.jp/?p=3218",
-        "language": "ja",
-        "checked_on": "2026-11-14",
-        "note": "third-party BGA wiki card page"
-      },
-      {
-        "url": "https://agricola.cloudfree.jp/cardlist_en/",
-        "language": "en",
-        "checked_on": "2026-11-14",
-        "note": "English list page row"
-      }
+      { "url": "https://agricola.cloudfree.jp/?p=3218", "language": "ja", "checked_on": "2026-11-14", "note": "third-party BGA wiki card page" },
+      { "url": "https://agricola.cloudfree.jp/cardlist_en/", "language": "en", "checked_on": "2026-11-14", "note": "English list page row" }
     ]
   },
   "play": {
     "action": "minor_improvement",
-    "cost": [
-      {
-        "good": "wood",
-        "amount": 1
-      }
-    ],
-    "prerequisites": [
-      {
-        "predicate": "occupation_count",
-        "params": {
-          "n": 2
-        },
-        "negate": false
-      }
-    ],
+    "cost": [ { "good": "wood", "amount": 1 } ],
+    "prerequisites": [ { "predicate": "occupation_count_gte", "params": { "count": 2 }, "negate": false } ],
     "printed_points": 1,
     "alternative_cost_notes": null
   },
   "effects": [
     {
-      "trigger": "harvest_field_phase",
+      "trigger": "each_field_phase",
       "conditions": [],
       "steps": [
-        {
-          "operation": "gain_resource",
-          "params": {
-            "good": "food",
-            "amount": {
-              "op": "custom",
-              "args": [
-                "threshold_table",
-                "sheep",
-                {
-                  "threshold": 7,
-                  "amount": 3
-                },
-                {
-                  "threshold": 4,
-                  "amount": 2
-                },
-                {
-                  "threshold": 1,
-                  "amount": 1
-                }
-              ]
-            }
-          },
-          "target": "owner"
-        }
+        { "operation": "gain_resource", "target": "owner", "params": { "good": "food", "amount": 1 } }
       ],
       "optional": false,
-      "frequency": "every_harvest",
-      "duration": "permanent",
+      "frequency": "each_time",
+      "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "none"
+      "decision_owner": "none",
+      "notes": "Each field phase: if 1/4/7 sheep -> gain 1/2/3 food"
     },
     {
-      "trigger": "end_scoring",
+      "trigger": "scoring",
       "conditions": [],
       "steps": [
-        {
-          "operation": "gain_points",
-          "params": {
-            "points": {
-              "op": "floor_div",
-              "args": [
-                {
-                  "op": "count",
-                  "args": [
-                    "sheep"
-                  ]
-                },
-                3
-              ]
-            }
-          },
-          "target": "owner"
-        }
+        { "operation": "gain_resource", "target": "owner", "params": { "good": "bonus_points", "amount": 1 } }
       ],
       "optional": false,
-      "frequency": "end_of_game",
-      "duration": "permanent",
-      "snapshot": "live_state",
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
       "order": 1,
-      "decision_owner": "none"
+      "decision_owner": "none",
+      "notes": "At scoring: 1 bonus point per 3 sheep"
     }
   ],
-  "post_play": {
-    "destination": "played_area",
-    "notes": "Stays in play area"
-  },
+  "post_play": { "destination": "played_area", "notes": "Stays in play area" },
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
@@ -133,13 +63,9 @@
       "effects[0].steps[0].params: food amount scales with sheep count (1/4/7 sheep -> 1/2/3 food) needs formalization",
       "effects[1].steps[0].params: 1 bonus point per 3 sheep needs formalization"
     ],
-    "test_case_ids": [
-      "B039-field-phase-1-sheep",
-      "B039-field-phase-4-sheep",
-      "B039-scoring"
-    ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "test_case_ids": ["B039-field-phase-1-sheep", "B039-field-phase-4-sheep", "B039-scoring"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
     "implementation_status": "not_started",
     "notes": "Cost: 1 wood. Prereq: 2+ occupations. 1 printed point. Effects: (1) Each field phase: 1/4/7 sheep -> 1/2/3 food. (2) Scoring: 1 pt per 3 sheep. Sheep-count scaling needs formalization."
   }

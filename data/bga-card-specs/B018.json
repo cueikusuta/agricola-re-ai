@@ -39,20 +39,7 @@
         "amount": 2
       }
     ],
-    "prerequisites": [
-      {
-        "predicate": "occupation_count",
-        "params": {
-          "n": 2
-        }
-      },
-      {
-        "predicate": "has_building_resource",
-        "params": {
-          "n": 1
-        }
-      }
-    ],
+    "prerequisites": [],
     "printed_points": 0
   },
   "effects": [
@@ -113,8 +100,8 @@
       "B018-normal",
       "B018-round"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Place 1 field tile on the round (current + building resources); plow it at that round's start."
   }

@@ -39,14 +39,7 @@
         "amount": 3
       }
     ],
-    "prerequisites": [
-      {
-        "predicate": "occupation_count",
-        "params": {
-          "n": 1
-        }
-      }
-    ],
+    "prerequisites": [],
     "printed_points": 0
   },
   "effects": [
@@ -76,7 +69,7 @@
         {
           "predicate": "resource_at_least",
           "params": {
-            "good": "grain",
+            "good": "wood",
             "n": 1
           }
         }
@@ -136,8 +129,8 @@
       "B021-gain",
       "B021-family"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "4 food on the card; gaining wood takes 1 card food; once the card is empty: Family Growth without room."
   }

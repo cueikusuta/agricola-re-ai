@@ -65,7 +65,7 @@
                 ],
                 "receive": [
                   {
-                    "good": "wild_boar",
+                    "good": "boar",
                     "amount": 1
                   }
                 ]
@@ -89,12 +89,9 @@
   "review": {
     "status": "bga_checked",
     "unresolved_fields": [],
-    "test_case_ids": [
-      "B147-normal",
-      "B147-not-triggered"
-    ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "test_case_ids": ["B147-normal", "B147-not-triggered"],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-14",
     "implementation_status": "not_started",
     "notes": "Wood cumulative space used: pay grain 1 to gain boar 1. Ban status weak (from ledger). bga_checked is third-party BGA wiki cross-check, not official Lookout verification."
   }
