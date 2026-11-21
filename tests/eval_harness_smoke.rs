@@ -486,6 +486,14 @@ fn baseline_arm_keeps_candidate_puct_scalars() {
         .as_str()
         .unwrap();
     assert_ne!(candidate_id, baseline_id);
+    assert_eq!(
+        manifest["comparison_design"]["comparison_kind"],
+        "game_policy"
+    );
+    assert_eq!(
+        manifest["comparison_design"]["changed_factors"],
+        serde_json::json!(["puct_config"])
+    );
     for row in read_rows(&dir) {
         assert_eq!(
             row["puct_simulations_config"], 8,
