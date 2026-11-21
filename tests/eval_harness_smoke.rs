@@ -79,11 +79,18 @@ fn cardless_four_player_smoke_writes_schema_two_rows_and_a_manifest() {
     assert_eq!(manifest["official_final_mode"], false);
     assert_eq!(manifest["official_pool_ready"], false);
     assert_eq!(manifest["pool_gate_snapshot"]["g1_met"], false);
-    assert_eq!(
-        manifest["pool_gate_snapshot"]["measured_at_sha"],
-        serde_json::Value::Null,
-        "a smoke run without a code SHA must not pretend to be measured at one"
-    );
+    if manifest["code_sha"] == "unknown" {
+        assert_eq!(
+            manifest["pool_gate_snapshot"]["measured_at_sha"],
+            serde_json::Value::Null,
+            "a smoke run without a code SHA must not pretend to be measured at one"
+        );
+    } else {
+        assert_eq!(
+            manifest["pool_gate_snapshot"]["measured_at_sha"], manifest["code_sha"],
+            "the pool gate must be measured at the run's code identity"
+        );
+    }
     assert_eq!(manifest["strength_claim_allowed"], false);
     assert_eq!(
         manifest["comparison_design"]["head_to_head"], true,
