@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "card_id": "D104",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "耕作者",
+    "name_en": "Cultivator"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2817",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_field_gained",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: 新しい畑タイル1枚獲得ごとに木材1・食料1獲得"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: after_field_gained は語彙に追加されたが、『新しい畑タイル1枚につき』が畑獲得アクション・耕作アクションの両方をカバーするか、また畑タイルの種類（通常/特殊）による違いはないか",
+      "classification: 段階外（単一サイト: 畑の獲得/獲得）だが、after_field_gained トリガーの発火条件（獲得手段・畑タイル種別）が要確認"
+    ],
+    "test_case_ids": [
+      "D104-gain-field-via-plow",
+      "D104-gain-field-via-action",
+      "D104-multiple-fields-at-once"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: Each time you gain a new field tile, gain 1 wood and 1 food. Trigger: after_field_gained. Unresolved: trigger scope (plow action, field-gaining actions, field types)."
+  }
+}

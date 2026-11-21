@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "card_id": "D102",
+  "cases": [
+    {
+      "id": "D102-home-phase-return-stable-gain-resources",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 2,
+        "wood": 0,
+        "grain": 0,
+        "food": 0
+      },
+      "action": {
+        "trigger": "returning_home_phase",
+        "return_stable": 1
+      },
+      "expected": {
+        "stables_delta": -1,
+        "wood_gained": 1,
+        "grain_gained": 1,
+        "food_gained": 1,
+        "minor_improvement_action_granted": 1
+      },
+      "notes": "At home phase start, return 1 stable -> gain 1 wood, 1 grain, 1 food, 1 minor improvement action."
+    },
+    {
+      "id": "D102-home-phase-no-stable",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 0
+      },
+      "action": {
+        "trigger": "returning_home_phase",
+        "return_stable": 1
+      },
+      "expected": {
+        "action_allowed": false,
+        "reason": "no stable to return"
+      },
+      "notes": "No stables to return. Effect cannot be used."
+    },
+    {
+      "id": "D102-home-phase-stable-with-animals",
+      "scope": "effect_only",
+      "setup": {
+        "stables": 1,
+        "stable_has_animals": true
+      },
+      "action": {
+        "trigger": "returning_home_phase",
+        "return_stable": 1
+      },
+      "expected": {
+        "action_allowed": null,
+        "notes": "Unresolved: whether a stable containing animals can be returned. Test documents ambiguity."
+      },
+      "notes": "Stable has animals. Ambiguity: can it be returned? If returned, what happens to animals?"
+    }
+  ]
+}

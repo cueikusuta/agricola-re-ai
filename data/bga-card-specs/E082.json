@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "card_id": "E082",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "不当利得",
+    "name_en": "Profiteering"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2671",
+        "language": "ja",
+        "checked_on": "2026-11-19",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-19",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When you play this card, you immediately get 1 food."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "day_laborer"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "building_resource",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "building_resource",
+                "amount": 1
+              }
+            ],
+            "constraint": "receive_must_differ_type"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Each time after you use the Day Laborer action space, you may exchange 1 building resource for a different building resource."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E082-on-play-food",
+      "E082-exchange-on-day-laborer"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-19",
+    "implementation_status": "not_started",
+    "notes": "On play gain 1 food. Each time you use the Day Laborer action space, you may exchange 1 building resource for a different one."
+  }
+}

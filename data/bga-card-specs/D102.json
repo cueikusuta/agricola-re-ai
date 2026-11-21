@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "D102",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "厩の見本作り",
+    "name_en": "Sample Stable Maker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2819",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "returning_home_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "action": "return_stable_for_resources_and_action",
+                "cost": {
+                  "stable": 1
+                },
+                "gain": {
+                  "wood": 1,
+                  "grain": 1,
+                  "food": 1,
+                  "minor_improvement_action": 1
+                },
+                "notes": "各帰宅フェイズの開始時に、厩1つを手元へ戻すと木材1・小麦1・食料1と小進歩アクションを得る"
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: 各帰宅フェイズ開始時、厩1つを返却して木材1・小麦1・食料1・小進歩アクション獲得"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: returning_home_phase は語彙に追加されたが、『各帰宅フェイズの開始時』の正確なタイミング（収穫のないラウンドも含むか、人物帰還前か後か）",
+      "effects[0].steps[0].params.kind=other: return_stable_for_resources_and_action の詳細仕様（厩の選択・既に動物がいる厩は返却不可か・小進歩アクションの即時実行か保留か）",
+      "classification: 段階3（帰宅フェイズ・はじめ）だが、厩返却の制約条件と小進歩アクション付与のメカニクスが語彙外"
+    ],
+    "test_case_ids": [
+      "D102-home-phase-return-stable-gain-resources",
+      "D102-home-phase-no-stable",
+      "D102-home-phase-stable-with-animals"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: At start of each home phase, may return 1 stable to gain 1 wood, 1 grain, 1 food, and 1 minor improvement action. Trigger: returning_home_phase. Unresolved: stable selection constraints (animals?), home phase timing (rounds without harvest?), minor improvement action execution timing."
+  }
+}

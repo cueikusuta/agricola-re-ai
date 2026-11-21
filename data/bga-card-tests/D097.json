@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "D097",
+  "cases": [
+    {
+      "id": "D097-on-play-gain-food",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "trigger": "on_play",
+        "play_card": "D097"
+      },
+      "expected": {
+        "play_allowed": true,
+        "food_delta": 1
+      },
+      "notes": "On play, gain 1 food (begging)."
+    },
+    {
+      "id": "D097-harvest-start-play-occupation-free",
+      "scope": "effect_only",
+      "setup": {
+        "hand_occupations": ["D001", "D002"],
+        "food": 0,
+        "wood": 0
+      },
+      "action": {
+        "trigger": "harvest_start",
+        "play_occupation_from_hand": "D001",
+        "pay_cost": false
+      },
+      "expected": {
+        "occupation_played": true,
+        "food_delta": 0,
+        "wood_delta": 0
+      },
+      "notes": "At harvest start, play occupation from hand without paying its cost (food/resources)."
+    },
+    {
+      "id": "D097-harvest-start-no-occupation-in-hand",
+      "scope": "effect_only",
+      "setup": {
+        "hand_occupations": [],
+        "food": 0
+      },
+      "action": {
+        "trigger": "harvest_start",
+        "play_occupation_from_hand": null
+      },
+      "expected": {
+        "occupation_played": false,
+        "reason": "no occupation in hand"
+      },
+      "notes": "No occupation in hand to play for free."
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "card_id": "D105",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "彫刻家",
+    "name_en": "Sculptor"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2816",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": ["clay_accumulation", "stone_accumulation"]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": ["stone_accumulation"]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: レンガ累積スペース利用で食料1、石材累積スペース利用で小麦1追加獲得（実装済: cards.rs）"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions / effects[1].conditions: worker_space_used で 'clay_accumulation'（レンガ累積）と 'stone_accumulation'（石材累積）スペースをどう特定するか",
+      "effects: レンガ累積で食料、石材累積で小麦という区別は実装済み（cards.rs）だが、仕様JSONでのスペース識別が語彙に依存する",
+      "classification: 実装済（cards.rs）。#375 の段階は「外」だが実装済を独立区分。TR-WS 基盤記号"
+    ],
+    "test_case_ids": [
+      "D105-clay-accumulation-gain-food",
+      "D105-stone-accumulation-gain-grain",
+      "D105-other-accumulation-no-effect"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "implemented",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: Using Clay Accumulation space -> +1 food. Using Stone Accumulation space -> +1 grain. Implemented in cards.rs. Trigger: after_worker_space (Clay/Stone accumulation). Unresolved: exact space identification in vocabulary."
+  }
+}
