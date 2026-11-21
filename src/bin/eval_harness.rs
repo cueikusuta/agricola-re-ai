@@ -707,7 +707,7 @@ fn run(options: &Options) -> Result<(), String> {
         options.draft.id(),
         &condition_id[..12]
     );
-    let game_policy_changed = candidate_id != baseline_id;
+    let game_policy_changed = options.candidate != options.baseline;
     let draft_policy_changed =
         options.draft.enabled() && options.candidate_draft_ai != options.baseline_draft_ai;
     let puct_policy_changed = options.candidate == Ai::Puct
