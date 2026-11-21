@@ -3,7 +3,12 @@ import copy
 import json
 import unittest
 
-from scripts.eval_report import RunError, load_run, validate_and_report
+from scripts.eval_report import (
+    RunError,
+    is_head_to_head,
+    load_run,
+    validate_and_report,
+)
 
 HEX_A = "a" * 64
 HEX_B = "b" * 64
@@ -402,5 +407,33 @@ class EvalReportTests(unittest.TestCase):
         )
         self.assertEqual(report["decision"]["final"], "undetermined")
 
+    def test_score_margin_histogram_is_never_empty(self):
+        manifest, rows = make_run()
+        report = validate_and_report(manifest, rows)
+        # The fixture's candidate margins are all equal, which used to produce
+        # an empty histogram and hid the actual distribution.
+        self.assertGreaterEqual(len(report["metrics"]["candidate"]["score_margin"]["histogram"]), 1)
+
+    def test_draft_only_difference_is_still_head_to_head(self):
+        arms = {
+            "candidate": {
+                "policy": "eval",
+                "puct_config_id": None,
+                "draft_policy_id": "synergy",
+            },
+            "baseline": {
+                "policy": "eval",
+                "puct_config_id": None,
+                "draft_policy_id": "card_value",
+            },
+            "opponent": {"policy": "eval"},
+        }
+        self.assertTrue(is_head_to_head(arms))
+        arms["baseline"]["draft_policy_id"] = "synergy"
+        self.assertFalse(is_head_to_head(arms))
+        arms["opponent"]["policy"] = "greedy"
+        self.assertFalse(is_head_to_head(arms))
+
 if __name__ == "__main__":
     unittest.main()
+

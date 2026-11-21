@@ -411,6 +411,10 @@ def _arm_metrics(games: list[dict], players: int) -> dict:
     ]
     lower = math.floor(min(margins) / 5.0) * 5.0
     upper = math.ceil(max(margins) / 5.0) * 5.0
+    if upper <= lower:
+        # A degenerate distribution (every margin equal) must still yield one
+        # bin, otherwise the histogram is empty and hides the actual value.
+        upper = lower + 5.0
     histogram = []
     for start in range(int(lower), int(upper), 5):
         count = sum(1 for margin in margins if start <= margin < start + 5)
@@ -440,6 +444,35 @@ def _arm_metrics(games: list[dict], players: int) -> dict:
         "first_credit_seat_spread": max(by_seat) - min(by_seat),
         "seat_credit_expected_if_symmetric": 1.0 / players,
     }
+
+
+def is_head_to_head(arms: dict) -> bool:
+    """Direct comparison test (design §2.2, §4.4).
+
+    The opponent must be the baseline policy. With the same policy name, the
+    arms must still be provably distinct: a different PUCT configuration id or
+    a different draft policy id is enough (the draft-contribution arm in §4.4
+    keeps the game policy fixed and changes only the draft).
+    """
+    if arms["opponent"]["policy"] != arms["baseline"]["policy"]:
+        return False
+    if arms["candidate"]["policy"] != arms["opponent"]["policy"]:
+        return True
+    candidate_puct = arms["candidate"].get("puct_config_id")
+    baseline_puct = arms["baseline"].get("puct_config_id")
+    if (
+        candidate_puct is not None
+        and baseline_puct is not None
+        and candidate_puct != baseline_puct
+    ):
+        return True
+    candidate_draft = arms["candidate"].get("draft_policy_id")
+    baseline_draft = arms["baseline"].get("draft_policy_id")
+    return (
+        candidate_draft is not None
+        and baseline_draft is not None
+        and candidate_draft != baseline_draft
+    )
 
 
 def validate_rows(manifest: dict, rows: list[dict]) -> dict[tuple[int, str, int], dict]:
@@ -569,16 +602,7 @@ def validate_and_report(
     )
     ceiling = max(candidate_metrics["first_credit"], baseline_metrics["first_credit"])
     arms = manifest["arms"]
-    candidate_id = arms["candidate"].get("puct_config_id")
-    baseline_id = arms["baseline"].get("puct_config_id")
-    head_to_head = arms["opponent"]["policy"] == arms["baseline"]["policy"] and (
-        arms["candidate"]["policy"] != arms["opponent"]["policy"]
-        or (
-            candidate_id is not None
-            and baseline_id is not None
-            and candidate_id != baseline_id
-        )
-    )
+    head_to_head = is_head_to_head(arms)
     credit_interval = intervals["first_credit"]
     credit_point, credit_lower, credit_upper = (
         credit_interval["block_delta_mean"],
