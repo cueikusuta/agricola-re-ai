@@ -76,11 +76,7 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "spaces": [
-              "forest",
-              "copse",
-              "grove"
-            ]
+            "space": "forest"
           }
         }
       ],
@@ -111,11 +107,12 @@
     "test_case_ids": [
       "A042-fishing",
       "A042-forest",
-      "A042-not-triggered"
+      "A042-not-triggered",
+      "A042-copse-not-triggered"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Fishing gives 1 extra wood; the wood accumulation spaces give 1 extra food."
+    "notes": "Fishing gives 1 extra wood; the Forest space (not the other wood accumulation spaces) gives 1 extra food."
   }
 }
