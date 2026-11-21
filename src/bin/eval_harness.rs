@@ -800,6 +800,7 @@ fn run(options: &Options) -> Result<(), String> {
             "bootstrap": {"method": "percentile-block", "iterations": 10000, "seed": 20261106},
         },
         "preregistration": {
+            "registered": false,
             "primary_comparison": "candidate focus seat vs baseline opponents (head-to-head) + baseline mirror arm",
             "decision_rule_version": "lexicographic-first-v1 (design §3.3)",
             "interim_plan": "not registered: smoke / exploratory run only",
