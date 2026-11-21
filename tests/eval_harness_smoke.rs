@@ -50,7 +50,9 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[test]
 fn cardless_four_player_smoke_writes_schema_two_rows_and_a_manifest() {
     let dir = unique_dir("cardless");
+    let code_sha = "e".repeat(40);
     let status = harness()
+        .env("EVAL_CODE_SHA", &code_sha)
         .args([
             "--output",
             dir.to_str().unwrap(),
@@ -79,18 +81,11 @@ fn cardless_four_player_smoke_writes_schema_two_rows_and_a_manifest() {
     assert_eq!(manifest["official_final_mode"], false);
     assert_eq!(manifest["official_pool_ready"], false);
     assert_eq!(manifest["pool_gate_snapshot"]["g1_met"], false);
-    if manifest["code_sha"] == "unknown" {
-        assert_eq!(
-            manifest["pool_gate_snapshot"]["measured_at_sha"],
-            serde_json::Value::Null,
-            "a smoke run without a code SHA must not pretend to be measured at one"
-        );
-    } else {
-        assert_eq!(
-            manifest["pool_gate_snapshot"]["measured_at_sha"], manifest["code_sha"],
-            "the pool gate must be measured at the run's code identity"
-        );
-    }
+    assert_eq!(manifest["code_sha"], code_sha);
+    assert_eq!(
+        manifest["pool_gate_snapshot"]["measured_at_sha"], code_sha,
+        "the pool gate must be measured at the run's code identity"
+    );
     assert_eq!(manifest["strength_claim_allowed"], false);
     assert_eq!(
         manifest["comparison_design"]["head_to_head"], true,
@@ -208,6 +203,14 @@ fn draft_fixture_smoke_records_the_coordinator_only_draft_fields() {
     let manifest = read_manifest(&dir);
     assert_eq!(manifest["draft"]["mode"], "draft_10_7_simultaneous");
     assert_eq!(manifest["cards"], "fixture_4p");
+    assert_eq!(
+        manifest["comparison_design"]["comparison_kind"],
+        "full_stack"
+    );
+    assert_eq!(
+        manifest["comparison_design"]["changed_factors"],
+        serde_json::json!(["game_policy", "draft_policy"])
+    );
     assert!(
         manifest["official_final_mode_blocked_by"]
             .as_array()
@@ -232,6 +235,12 @@ fn draft_fixture_smoke_records_the_coordinator_only_draft_fields() {
         assert_eq!(row["pick_timeout_count"], 0);
         assert_eq!(row["pick_illegal_fallback_count"], 0);
         assert_eq!(row["draft_pick_budget_enforced"], false);
+        assert_eq!(row["pick_over_budget_ms_count"], 0);
+        assert_eq!(
+            row["focus_observed_all_picks_within_budget"],
+            serde_json::Value::Null,
+            "a simulation-capped run does not enforce a pick deadline"
+        );
         assert_eq!(
             row["draft_actions"].as_array().unwrap().len(),
             28,
@@ -395,6 +404,179 @@ fn fixture_cards_without_the_draft_mode_are_rejected() {
             "greedy",
             "--cards",
             "fixture_4p",
+            "--smoke",
+        ])
+        .status()
+        .unwrap();
+    assert!(!status.success());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn draft_only_arm_is_recorded_as_a_draft_contribution() {
+    let dir = unique_dir("draft-contribution");
+    let status = harness()
+        .args([
+            "--output",
+            dir.to_str().unwrap(),
+            "--players",
+            "4",
+            "--seed-start",
+            "700160",
+            "--blocks",
+            "1",
+            "--candidate",
+            "eval",
+            "--baseline",
+            "eval",
+            "--draft-mode",
+            "draft_10_7_simultaneous",
+            "--cards",
+            "fixture_4p",
+            "--candidate-draft-ai",
+            "synergy",
+            "--baseline-draft-ai",
+            "card_value",
+            "--smoke",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let manifest = read_manifest(&dir);
+    assert_eq!(
+        manifest["comparison_design"]["comparison_kind"],
+        "draft_contribution"
+    );
+    assert_eq!(
+        manifest["comparison_design"]["changed_factors"],
+        serde_json::json!(["draft_policy"])
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn baseline_arm_keeps_candidate_puct_scalars() {
+    let dir = unique_dir("puct-scalars");
+    let status = harness()
+        .args([
+            "--output",
+            dir.to_str().unwrap(),
+            "--players",
+            "2",
+            "--seed-start",
+            "700170",
+            "--blocks",
+            "1",
+            "--candidate",
+            "puct",
+            "--baseline",
+            "puct",
+            "--puct-simulations",
+            "8",
+            "--smoke",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let manifest = read_manifest(&dir);
+    let candidate_id = manifest["arms"]["candidate"]["puct_config_id"]
+        .as_str()
+        .unwrap();
+    let baseline_id = manifest["arms"]["baseline"]["puct_config_id"]
+        .as_str()
+        .unwrap();
+    assert_ne!(candidate_id, baseline_id);
+    for row in read_rows(&dir) {
+        assert_eq!(
+            row["puct_simulations_config"], 8,
+            "scalars describe the candidate"
+        );
+        assert_eq!(row["puct_config_id"], candidate_id);
+        if row["arm_id"] == "baseline" {
+            assert_eq!(row["focus_puct_config_id"], baseline_id);
+        }
+    }
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_non_smoke_run_is_unregistered_and_keeps_the_code_sha() {
+    let dir = unique_dir("unregistered");
+    let code_sha = "f".repeat(64);
+    let status = harness()
+        .args([
+            "--output",
+            dir.to_str().unwrap(),
+            "--players",
+            "4",
+            "--seed-start",
+            "700180",
+            "--blocks",
+            "1",
+            "--candidate",
+            "eval_veg",
+            "--baseline",
+            "greedy",
+            "--code-sha",
+            &code_sha,
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let manifest = read_manifest(&dir);
+    assert_eq!(manifest["run_mode"], "unregistered");
+    assert_eq!(manifest["code_sha"], code_sha);
+    assert_eq!(manifest["engine_sha"], code_sha);
+    assert_eq!(manifest["strength_claim_allowed"], false);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_non_smoke_run_without_a_code_sha_is_rejected() {
+    let dir = unique_dir("no-code-sha");
+    let status = harness()
+        .env_remove("EVAL_CODE_SHA")
+        .env_remove("GITHUB_SHA")
+        .args([
+            "--output",
+            dir.to_str().unwrap(),
+            "--players",
+            "4",
+            "--seed-start",
+            "700190",
+            "--blocks",
+            "1",
+            "--candidate",
+            "eval_veg",
+            "--baseline",
+            "greedy",
+        ])
+        .status()
+        .unwrap();
+    assert!(!status.success());
+    assert!(!dir.join("run-manifest.json").exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn an_opponent_equal_to_the_candidate_is_rejected() {
+    let dir = unique_dir("candidate-opponent");
+    let status = harness()
+        .args([
+            "--output",
+            dir.to_str().unwrap(),
+            "--players",
+            "4",
+            "--seed-start",
+            "700200",
+            "--blocks",
+            "1",
+            "--candidate",
+            "eval_veg",
+            "--baseline",
+            "greedy",
+            "--opponent",
+            "eval_veg",
             "--smoke",
         ])
         .status()

@@ -411,6 +411,12 @@ fn validate(options: &Options) -> Result<(), String> {
             "a smoke run is capped at {MAX_SMOKE_BLOCKS} blocks; use a full run for more"
         ));
     }
+    if options.opponent == options.candidate && options.candidate != options.baseline {
+        return Err(
+            "--opponent must differ from --candidate unless candidate and baseline are the same policy; an all-candidate arm has no contrast"
+                .into(),
+        );
+    }
     let baseline_puct = PuctConfig::default();
     let same_game_policy = options.candidate == options.baseline;
     let same_draft_policy = options.candidate_draft_ai == options.baseline_draft_ai;
@@ -469,6 +475,10 @@ fn policy_id(ai: Ai, config: &PuctConfig) -> String {
     game_policy_id(ai, config)
 }
 
+fn is_code_sha(value: &str) -> bool {
+    matches!(value.len(), 40 | 64) && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn write_error(dir: &Path, block: usize, arm: &str, seat: usize, message: &str) {
     let path = dir.join("errors.jsonl");
     let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) else {
@@ -488,7 +498,10 @@ fn run(options: &Options) -> Result<(), String> {
     fs::create_dir_all(options.output.join("shard-0")).map_err(|error| error.to_string())?;
     let matches_path = options.output.join("shard-0").join("matches.jsonl");
     let manifest_path = options.output.join("run-manifest.json");
-    if matches_path.exists() || manifest_path.exists() {
+    if matches_path.exists()
+        || manifest_path.exists()
+        || options.output.join("run-manifest.pre.json").exists()
+    {
         return Err(format!(
             "output directory already contains a run: {}",
             options.output.display()
@@ -524,28 +537,39 @@ fn run(options: &Options) -> Result<(), String> {
         .code_sha
         .clone()
         .or_else(|| std::env::var("EVAL_CODE_SHA").ok())
-        .or_else(|| std::env::var("GITHUB_SHA").ok());
+        .or_else(|| std::env::var("GITHUB_SHA").ok())
+        .filter(|value| !value.trim().is_empty());
     let provenance_incomplete = code_sha.is_none();
-    if !options.smoke && provenance_incomplete {
-        return Err(
-            "a non-smoke run needs an immutable code identity: pass --code-sha or set EVAL_CODE_SHA / GITHUB_SHA"
-                .into(),
-        );
-    }
     let code_sha_value = code_sha.clone().unwrap_or_else(|| "unknown".into());
-    let budget_description = format!(
-        "{}:{}ms:reserve={}:mcts={}x{}:puct={}:max_sims={}:draft_pick={}ms",
-        options.search_mode,
-        options.decision_budget_ms,
+    if !options.smoke {
+        if provenance_incomplete {
+            return Err(
+                "a non-smoke run needs an immutable code identity: pass --code-sha or set EVAL_CODE_SHA / GITHUB_SHA"
+                    .into(),
+            );
+        }
+        if !is_code_sha(&code_sha_value) {
+            return Err("code identity must be a 40- or 64-character hex SHA".into());
+        }
+    }
+    let deadline_enforced = options.search_mode == "time-budgeted";
+    let reserve_text = if deadline_enforced {
         options
             .detail_reserve_ms
             .map(|value| value.to_string())
-            .unwrap_or_else(|| "derived".into()),
+            .unwrap_or_else(|| "derived".into())
+    } else {
+        "none".into()
+    };
+    let budget_description = format!(
+        "{}:{}ms:reserve={}:mcts={}x{}:puct={}:max_sims={}:draft_pick=none(observed)",
+        options.search_mode,
+        options.decision_budget_ms,
+        reserve_text,
         options.mcts_simulations,
         options.mcts_tree_depth,
         puct_config_id(&candidate_puct),
         DEFAULT_TIME_BUDGET_MAX_SIMULATIONS,
-        options.decision_budget_ms
     );
     let condition_parts = BTreeMap::from([
         ("players".to_string(), options.players.to_string()),
@@ -566,7 +590,10 @@ fn run(options: &Options) -> Result<(), String> {
         ("opponent_profile".to_string(), opponent_id.clone()),
         ("baseline_policy".to_string(), baseline_id.clone()),
         ("compute_budget".to_string(), budget_description.clone()),
-        ("engine_version".to_string(), code_sha_value.clone()),
+        (
+            "engine_version".to_string(),
+            env!("CARGO_PKG_VERSION").to_string(),
+        ),
         ("code_sha".to_string(), code_sha_value.clone()),
     ]);
     let condition_id = condition_id(&condition_parts);
@@ -637,7 +664,6 @@ fn run(options: &Options) -> Result<(), String> {
     let eval_room = VariantEvaluationPolicy {
         variant: EvaluationVariant::GrowthRoomPriority,
     };
-    let deadline_enforced = options.search_mode == "time-budgeted";
     let budget_spec = if deadline_enforced {
         let limit = Duration::from_millis(options.decision_budget_ms);
         Some(match options.detail_reserve_ms {
@@ -681,6 +707,40 @@ fn run(options: &Options) -> Result<(), String> {
         options.draft.id(),
         &condition_id[..12]
     );
+    let game_policy_changed = candidate_id != baseline_id;
+    let draft_policy_changed =
+        options.draft.enabled() && options.candidate_draft_ai != options.baseline_draft_ai;
+    let puct_policy_changed = options.candidate == Ai::Puct
+        && options.baseline == Ai::Puct
+        && puct_config_id(&candidate_puct) != puct_config_id(&baseline_puct);
+    let mut changed_factors = Vec::new();
+    if game_policy_changed {
+        changed_factors.push("game_policy");
+    }
+    if draft_policy_changed {
+        changed_factors.push("draft_policy");
+    }
+    if puct_policy_changed {
+        changed_factors.push("puct_config");
+    }
+    let comparison_kind = if !head_to_head {
+        "common_opponent"
+    } else if changed_factors.len() > 1 {
+        "full_stack"
+    } else if draft_policy_changed {
+        "draft_contribution"
+    } else {
+        "game_policy"
+    };
+    let opponent_simulations = match options.opponent {
+        Ai::Mcts => Some(options.mcts_simulations),
+        Ai::Puct => Some(baseline_puct.simulations),
+        _ => None,
+    };
+    let opponent_stopping_rule = match opponent_simulations {
+        Some(simulations) => format!("policy default (fixed {simulations} simulations)"),
+        None => "policy default (no search)".into(),
+    };
     let arms_json = json!({
         "candidate": {
             "game_policy_id": candidate_id,
@@ -715,7 +775,9 @@ fn run(options: &Options) -> Result<(), String> {
         "opponent": {
             "game_policy_id": opponent_id,
             "policy": options.opponent.name(),
-            "stopping_rule": "policy default (fixed simulations); not time-budgeted",
+            "stopping_rule": opponent_stopping_rule,
+            "simulation_count": opponent_simulations,
+            "time_budgeted": false,
             "note": if head_to_head {
                 "opponent seats use the frozen baseline configuration"
             } else {
@@ -735,7 +797,8 @@ fn run(options: &Options) -> Result<(), String> {
         "draft_pick_budget_ms": options.decision_budget_ms,
         "draft_pick_budget_enforced": false,
         "opponent_seats_time_budgeted": false,
-        "opponent_stopping_rule": "policy default (fixed simulations)",
+        "opponent_stopping_rule": opponent_stopping_rule,
+        "opponent_simulations": opponent_simulations,
         "budget_description": budget_description,
     });
     let seeds_json = json!({
@@ -793,6 +856,8 @@ fn run(options: &Options) -> Result<(), String> {
         } else {
             "common-opponent benchmark (NOT head-to-head; no mirror control)"
         },
+        "comparison_kind": comparison_kind,
+        "changed_factors": changed_factors,
         "decision_rule_version": "lexicographic-first-v1 (design §3.3)",
         "interim_plan": "not registered: smoke / exploratory run only",
         "max_blocks": null,
@@ -825,6 +890,8 @@ fn run(options: &Options) -> Result<(), String> {
             "head_to_head": head_to_head,
             "mirror_baseline": head_to_head,
             "opponent_is_baseline": opponent_is_baseline,
+            "comparison_kind": comparison_kind,
+            "changed_factors": changed_factors,
         },
         "started_at_unix": started_at,
     });
@@ -919,7 +986,8 @@ fn run(options: &Options) -> Result<(), String> {
         "condition_parts": condition_parts,
         "code_sha": code_sha_value,
         "provenance_incomplete": provenance_incomplete,
-        "engine_version": code_sha_value,
+        "engine_version": env!("CARGO_PKG_VERSION"),
+        "engine_sha": code_sha_value,
         "package_version": env!("CARGO_PKG_VERSION"),
         "official_pool_ready": official_pool_ready,
         "players": options.players,
@@ -944,6 +1012,8 @@ fn run(options: &Options) -> Result<(), String> {
             "head_to_head": head_to_head,
             "mirror_baseline": head_to_head,
             "opponent_is_baseline": opponent_is_baseline,
+            "comparison_kind": comparison_kind,
+            "changed_factors": changed_factors,
         },
         "environment": environment_json,
         "started_at_unix": started_at,
@@ -962,7 +1032,8 @@ fn run(options: &Options) -> Result<(), String> {
             "draft pick deadline enforcement (design §3.5): observed only, not enforced",
             "L1 draft-only proxy metrics (design §4.3/U10): out of scope for this chapter",
             "dataset_split / G0 binding (design §2.3): not wired into the harness yet",
-            "seed registry collision check (design §2.3/U6): requires a registered range"
+            "seed registry collision check (design §2.3/U6): requires a registered range",
+            "multi-shard execution (design §2.3/§2.7): single shard-0 only"
         ],
         "row_count": options.blocks * options.players * 2,
     });
@@ -1204,10 +1275,19 @@ fn run_one_game(
                 json!({
                     "focus_pick_max_ms": focus_max_ms,
                     "focus_pick_p95_ms": percentile_ms(focus_ns, 0.95),
-                    "pick_timeout_count": focus_timeouts,
+                    "pick_timeout_count": if deadline_enforced {
+                        focus_timeouts
+                    } else {
+                        0
+                    },
+                    "pick_over_budget_ms_count": focus_timeouts,
                     "pick_illegal_fallback_count": draft_run.fallbacks_by_seat[seat],
                     "draft_pick_budget_enforced": false,
-                    "focus_observed_all_picks_within_budget": focus_timeouts == 0,
+                    "focus_observed_all_picks_within_budget": if deadline_enforced {
+                        json!(focus_timeouts == 0)
+                    } else {
+                        Value::Null
+                    },
                 }),
             )
         }
@@ -1229,6 +1309,7 @@ fn run_one_game(
                 "focus_pick_max_ms": Value::Null,
                 "focus_pick_p95_ms": Value::Null,
                 "pick_timeout_count": Value::Null,
+                "pick_over_budget_ms_count": Value::Null,
                 "pick_illegal_fallback_count": Value::Null,
                 "draft_pick_budget_enforced": Value::Null,
                 "focus_observed_all_picks_within_budget": Value::Null,
@@ -1344,12 +1425,7 @@ fn run_one_game(
         "mcts_tree_depth": options.mcts_tree_depth,
         "policy_select_only": true,
         "game_start_player": game.public.start_player,
-        "initial_state_hash": game
-            .log
-            .events
-            .first()
-            .map(|event| event.before.clone())
-            .unwrap_or_else(|| hash.clone()),
+        "initial_state_hash": game.log.initial_state_hash.clone(),
         "draft_wall_ms": draft_wall_ms,
         "total_wall_ms": game_start.elapsed().as_secs_f64() * 1000.0,
         "replay_hash": hash,
@@ -1524,6 +1600,15 @@ mod tests {
         ]);
         let options = parse_options_from(args.into_iter()).unwrap();
         assert!(validate(&options).is_err());
+    }
+
+    #[test]
+    fn code_sha_requires_a_full_hex_digest() {
+        assert!(is_code_sha(&"a".repeat(40)));
+        assert!(is_code_sha(&"A".repeat(64)));
+        assert!(!is_code_sha("foo"));
+        assert!(!is_code_sha(&"a".repeat(39)));
+        assert!(!is_code_sha(&"g".repeat(40)));
     }
 
     #[test]
