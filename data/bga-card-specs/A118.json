@@ -102,7 +102,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
-    "notes": "Field phase: 1 wood; may buy up to 2 more wood for 1 food each."
+    "implementation_status": "tested",
+    "notes": "Field phase: 1 wood; may buy up to 2 more wood for 1 food each. The optional exchange is engine-plan-driven (FeedingPlan::a118_wood_buys, capped at 2) and never surfaces a PendingDecision during the harvest (PR #385 review fix)."
   }
 }

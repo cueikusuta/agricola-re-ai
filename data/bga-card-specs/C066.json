@@ -118,7 +118,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-13",
-    "implementation_status": "not_started",
-    "notes": "After each harvest, if you have 2 grain in your supply, gain 1 food; with 3 or more, gain 1 additional grain instead."
+    "implementation_status": "tested",
+    "notes": "After each harvest, if you have 2 grain in your supply, gain 1 food; with 3 or more, gain 1 additional grain instead (owner may opt back into the food via the FeedingPlan flag). Fires at the harvest tail, not the field phase (PR #385 review fix)."
   }
 }
