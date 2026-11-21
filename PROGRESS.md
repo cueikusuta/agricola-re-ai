@@ -11,7 +11,8 @@
 | 章1 実行基盤 | **完了**（`feat/deepai-eval-harness-01-run`） |
 | 章2 集計 | **完了**（`feat/deepai-eval-harness-02-report`） |
 | 章3 比較・判定 | **完了**（`feat/deepai-eval-harness-03-compare`） |
-| PR | 章ごとに1本。**作成まで。マージしない** |
+| 章1〜3 独立レビュー対応 | **完了**（P0なし。P1-1・P2-1〜P2-8・主要P3を修正し、修正差分は再レビュー待ち） |
+| PR | 章ごとに1本（#418/#419/#420）。**作成まで。マージしない** |
 
 ## 1. 設計書の要点（本作業の前提）
 
@@ -96,7 +97,7 @@
 - 判定: §3.3 の第一層区分（adopted/improvement/hold/rejected）を**シグナル**として実装。事前登録が無い Run は
   `final=undetermined`。§3.4 のガードを一覧化し、未解決ガードを列挙。
 - 実測: カードなし4人スモーク（8試合）と fixture 10-7 スモーク（8試合）で `report.json`/`report.md` を生成。
-- テスト: `python -m unittest tests.test_eval_report` 16件成功。ローカル全Python 309件成功。
+- テスト: `python -m unittest tests.test_eval_report` 23件成功（レビュー対応で7件追加）。ローカル全Python 309件成功。
 
 ### 章3 比較・判定（`feat/deepai-eval-harness-03-compare`）
 
@@ -113,3 +114,23 @@
 - 正式な採用判定には、事前登録されたマニフェスト（`registered=true`、追加上限、locked test seed）と
   公式最終モード（G1 40+40・U1確定）が必要。本ハーネスはそれを偽装しない。
 - 複数候補の多重比較補正、seedレジストリ照合（U6）、`dataset_split`/G0束縛、L1代理指標（U10）は未実装。
+
+- テスト: `python -m unittest tests.test_eval_report` 23件成功（レビュー対応で7件追加）。ローカル全Python 309件成功。
+
+### 独立レビュー対応（2026-11-22）
+
+- P1-1: マニフェストに実測の `comparison_design`（`head_to_head` / `mirror_baseline` / `opponent_is_baseline`）を追加。
+  `primary_comparison` と `arms.opponent.note` を `--opponent` の実値で分岐。共通相手Runを直接対戦として表示しない。
+- P2-1: ゲーム方策が同一でもドラフト方策だけ異なる寄与armを許可（同一ゲーム・同一ドラフトのみ拒否）。
+- P2-2: `condition_parts` に実測 `code_sha` を追加し、`compute_budget` に MCTS sims/depth・PUCT config id・
+  max simulations・draft pick 時間を含めた。非スモークは code identity 無しを拒否。
+- P2-3: 行の `puct_*` スカラーを v1 と同じ「常に候補側」に統一し、`focus_puct_config_id` で焦点席を表す。
+  `puct_tree_depth` 等の欠落フィールドと `baseline_puct_*` 8個、`search_deadline_active` 等を追加。
+- P2-4: 行に `draft_actions` / `draft_event_count` / `draft_state_hash` を追加し、第三者がドラフトを再演できるようにした。
+- P2-5: 試合前に `run-manifest.pre.json` を書き、終了マニフェストに SHA-256 を記録。非スモークは `run_mode=unregistered`。
+- P2-6: ピック期限は未強制であることを `draft_pick_budget_enforced=false` と `pick_illegal_fallback_count` で明示。
+- P2-7: `draft_policy_id` を `name@draft-ai-v1` に版付けし、`details_policy_id` を実型名に。
+- P2-8: 相手席の停止規則（固定シミュレーション・time-budget対象外）を `arms`/`compute_budget` に明記。
+- 主要P3: seedオーバーフロー事前検査、予算0拒否、schema 2、`rustc_version` の取得元明示、`pool_gate_snapshot` の
+  キー名・定数再利用・測定SHA、`official_pool_ready` の実測化、`rounds_completed`/`start_player`/`initial_state_hash`、
+  `draft_wall_ms`、`interference_proxy: null`、固定seed再現テスト・キー一意性・seed算術・fixture単独拒否テストを追加。
