@@ -97,3 +97,19 @@
   `final=undetermined`。§3.4 のガードを一覧化し、未解決ガードを列挙。
 - 実測: カードなし4人スモーク（8試合）と fixture 10-7 スモーク（8試合）で `report.json`/`report.md` を生成。
 - テスト: `python -m unittest tests.test_eval_report` 16件成功。ローカル全Python 309件成功。
+
+### 章3 比較・判定（`feat/deepai-eval-harness-03-compare`）
+
+- 追加: `scripts/eval_compare.py`、`tests/test_eval_compare.py`。harness マニフェストに `preregistration.registered=false` を明示。
+- 同一 `condition_id`・同一 seed ブロック・同一予算・head-to-head の2 Runだけを対応差で比較。条件が違えば拒否。
+- A−B の首位率・期待順位・得点差のブロック対応差と 95%CI を出し、第一層シグナルを記録。最終は
+  `undetermined`（探索的比較であり採用判定ではない）。
+- 実測: カードなし4人・2ブロック・同一seedで candidate `eval_veg` と `eval` を比較。A−B 首位率 0.000 pp
+  （CI [0.000, 0.000]）、比較可能性 true。
+- テスト: `python -m unittest tests.test_eval_compare tests.test_eval_report` 22件成功。
+
+### 章3の後に残るもの
+
+- 正式な採用判定には、事前登録されたマニフェスト（`registered=true`、追加上限、locked test seed）と
+  公式最終モード（G1 40+40・U1確定）が必要。本ハーネスはそれを偽装しない。
+- 複数候補の多重比較補正、seedレジストリ照合（U6）、`dataset_split`/G0束縛、L1代理指標（U10）は未実装。
