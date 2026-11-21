@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "card_id": "E109",
+  "cases": [
+    {
+      "id": "E109-exchange-reed",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 2,
+        "food": 0
+      },
+      "action": {
+        "play": "E109",
+        "harvest": true,
+        "exchange": true
+      },
+      "expected": {
+        "reed_delta": -1,
+        "food_delta": 2
+      },
+      "notes": "One reed becomes two food at the harvest."
+    },
+    {
+      "id": "E109-no-reed",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 0,
+        "food": 0
+      },
+      "action": {
+        "play": "E109",
+        "harvest": true,
+        "exchange": true
+      },
+      "expected": {
+        "reed_delta": 0,
+        "food_delta": 0,
+        "exchange_allowed": false
+      },
+      "notes": "Without a reed the exchange is not legal."
+    },
+    {
+      "id": "E109-basket-workshop",
+      "scope": "effect_only",
+      "setup": {
+        "reed": 1,
+        "stone": 1,
+        "action": "minor_improvement"
+      },
+      "action": {
+        "play": "E109",
+        "build": "basketmakers_workshop"
+      },
+      "expected": {
+        "basketmakers_workshop": true,
+        "reed_delta": -1,
+        "stone_delta": -1
+      },
+      "notes": "The major improvement is buildable with a minor improvement action for reed 1 and stone 1."
+    }
+  ]
+}

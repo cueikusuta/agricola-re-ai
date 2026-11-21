@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "card_id": "E103",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "狼",
+    "name_en": "Wolf"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2650",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "stack_goods_on_card",
+            "goods": [
+              "clay",
+              "wood",
+              "grain"
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Stack clay, wood and grain from bottom to top; the top good is grain."
+    },
+    {
+      "trigger": "after_gain_good",
+      "conditions": [
+        {
+          "predicate": "gained_good_is_card_top",
+          "params": {
+            "any_gain": true
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "move_top_good_to_supply"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Whenever the owner gains a good equal to the top good of this card, move that good from the card to the supply. One top good per matching gain event."
+    },
+    {
+      "trigger": "after_gain_good",
+      "conditions": [
+        {
+          "predicate": "gained_good_is_card_top",
+          "params": {
+            "any_gain": true
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wild_boar",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 2,
+      "decision_owner": "owner",
+      "notes": "After the matching top good is moved, the owner may take 1 wild boar."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E103-stack",
+      "E103-matching-gain",
+      "E103-non-matching-gain"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "Stack clay/wood/grain; each gain matching the top good moves it to the supply and may give 1 boar."
+  }
+}

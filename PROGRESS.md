@@ -29,6 +29,15 @@
 | 第1章 | E099–E109 | 11 | `research/freebuff-eband-spec-create-ch01` |
 | 第2章 | E110–E120 | 11 | `research/freebuff-eband-spec-create-ch02` |
 
+### 第1章 E099–E109（完了）
+
+- ブランチ `research/freebuff-eband-spec-create-ch01`。仕様JSON 11枚＋テスト契約11枚（33ケース）を追加。
+- 内訳: `bga_checked` 9枚、`needs_resolution` 2枚（E101 ステージ境界、E109 交換回数）。テスト契約は既存バッチと同じ
+  `effect_only` の3ケース／枚。
+- 追加語彙は `docs/bga-card-effect-vocabulary.md` の「2026-11-21追補：E帯 099–120」。
+- 記録: `docs/eband-spec-create-ch01.md`（カード一覧・質問Q-1/Q-2・検証）。
+- 検証: `validate_bga_card_specs.py` exit 0（errors 空）、ビルダー unittest 3 OK。`src/`・台帳・既存仕様は未変更。
+
 ### 現在地
 
-- 棚卸しまで完了。第1章から着手する。再開はこの節から。
+- 第1章の仕様・テスト・文書を作成済み。PRを作成して停止する（マージしない）。次は第2章 E110–E120。

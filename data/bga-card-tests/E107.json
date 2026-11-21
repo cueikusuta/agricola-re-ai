@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "E107",
+  "cases": [
+    {
+      "id": "E107-two-fields",
+      "scope": "effect_only",
+      "setup": {
+        "fields": 2
+      },
+      "action": {
+        "play": "E107",
+        "harvest": "field_phase"
+      },
+      "expected": {
+        "food_delta": 1
+      },
+      "notes": "Two fields give 1 food."
+    },
+    {
+      "id": "E107-six-fields",
+      "scope": "effect_only",
+      "setup": {
+        "fields": 6
+      },
+      "action": {
+        "play": "E107",
+        "harvest": "field_phase"
+      },
+      "expected": {
+        "food_delta": 3
+      },
+      "notes": "Six fields give 3 food."
+    },
+    {
+      "id": "E107-one-field",
+      "scope": "effect_only",
+      "setup": {
+        "fields": 1
+      },
+      "action": {
+        "play": "E107",
+        "harvest": "field_phase"
+      },
+      "expected": {
+        "food_delta": 0
+      },
+      "notes": "A single field is below the first threshold."
+    }
+  ]
+}
