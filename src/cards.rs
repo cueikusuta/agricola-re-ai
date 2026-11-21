@@ -6181,8 +6181,8 @@ mod p1_2_repro_tests {
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
             preset.content_hash(),
-            "22fdb72f481bc6fcfc49f781dbd3452a20b9c408ec518711b65a1a6f5276a79b",
-            "2-player preset content hash (実測 @ b10a61a)"
+            "323dbecb47d8cd86d3c3c32ad68479d99b046c6c702e4e432ed349d43f474948",
+            "2-player preset content hash (PR #385: re-measured after d3c237c9 main merge + A145 2p exclusion; b10a61a baseline 22fdb72f)"
         );
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
