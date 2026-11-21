@@ -66,6 +66,23 @@ pub enum Good {
     Grain,
     Vegetable,
 }
+
+/// Decode a `Good` from the `{:?}` (Debug) name card payloads carry, such
+/// as the A118 exchange context written by the dispatcher. Unknown names
+/// are a hard error so a mismatch can never silently drop a payment
+/// (PR #385 review P3).
+fn good_from_debug_name(name: &str) -> Result<Good, String> {
+    match name {
+        "Wood" => Ok(Good::Wood),
+        "Clay" => Ok(Good::Clay),
+        "Reed" => Ok(Good::Reed),
+        "Stone" => Ok(Good::Stone),
+        "Food" => Ok(Good::Food),
+        "Grain" => Ok(Good::Grain),
+        "Vegetable" => Ok(Good::Vegetable),
+        other => Err(format!("unknown good '{other}' in card payload")),
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Animal {
@@ -2215,27 +2232,13 @@ impl Game {
                             .and_then(|v| v.as_u64())
                             .unwrap_or(0) as u32;
 
-                        // Parse Good from string
-                        let cost_good = cost_str.and_then(|s| match s {
-                            "Food" => Some(Good::Food),
-                            "Wood" => Some(Good::Wood),
-                            "Clay" => Some(Good::Clay),
-                            "Reed" => Some(Good::Reed),
-                            "Stone" => Some(Good::Stone),
-                            "Grain" => Some(Good::Grain),
-                            "Vegetable" => Some(Good::Vegetable),
-                            _ => None,
-                        });
-                        let gain_good = gain_str.and_then(|s| match s {
-                            "Food" => Some(Good::Food),
-                            "Wood" => Some(Good::Wood),
-                            "Clay" => Some(Good::Clay),
-                            "Reed" => Some(Good::Reed),
-                            "Stone" => Some(Good::Stone),
-                            "Grain" => Some(Good::Grain),
-                            "Vegetable" => Some(Good::Vegetable),
-                            _ => None,
-                        });
+                        // Parse Good from the Debug name the payload
+                        // carries. An unknown name is a hard error, not a
+                        // silent drop (PR #385 review P3): the payload is
+                        // engine-written, so failure means tampering or an
+                        // untaught variant.
+                        let cost_good = cost_str.map(good_from_debug_name).transpose()?;
+                        let gain_good = gain_str.map(good_from_debug_name).transpose()?;
 
                         if let (Some(cost_good), Some(gain_good)) = (cost_good, gain_good) {
                             let player = &mut self.public.players[pending.player];
