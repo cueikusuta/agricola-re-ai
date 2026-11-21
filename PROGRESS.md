@@ -9,8 +9,8 @@
 | 設計書 | PR #400（`research/qwen-ai-eval-design` の `docs/ai-evaluation-design.md`）。**未マージ**。本書はその §1.7・§2・§3・§5 を実装対象にする |
 | 基盤ブランチ | `feat/deepai-eval-harness`（origin/main `c4a4ba6` から作成） |
 | 章1 実行基盤 | **完了**（`feat/deepai-eval-harness-01-run`） |
-| 章2 集計 | 未着手 |
-| 章3 比較・判定 | 未着手 |
+| 章2 集計 | **完了**（`feat/deepai-eval-harness-02-report`） |
+| 章3 比較・判定 | **完了**（`feat/deepai-eval-harness-03-compare`） |
 | PR | 章ごとに1本。**作成まで。マージしない** |
 
 ## 1. 設計書の要点（本作業の前提）
@@ -85,3 +85,15 @@
   - フィクスチャ10-7ドラフト4人: 8試合 0.93〜1.04s、condition `6dafd41f…`。
 - 章1で**やらない**こと: 集計・判定・ガード・Run間比較（章2/章3）。`interference_proxy` はU2未決定のため未実装、
   マニフェストの `unimplemented` に明記。
+
+### 章2 集計（`feat/deepai-eval-harness-02-report`）
+
+- 追加: `scripts/eval_report.py`、`tests/test_eval_report.py`。
+- `run-manifest.json` と schema2 行を突合し、欠落・重複・条件不一致・再演未検証・credit/marginの改竄を fail closed で拒否。
+- 指標: 首位率（1/k）・単独1位率・首位到達率・期待順位・得点差（平均/分位/ヒストグラム）・席別首位率。
+- 差: seedブロック単位の対応差（首位率・期待順位・得点差）と percentile bootstrap 95%CI（10,000反復・seed 20261106）。
+- 出力: `report.json`（機械可読）と `report.md`（人間可読）。スモーク/フィクスチャ/公式プール未達を明示。
+- 判定: §3.3 の第一層区分（adopted/improvement/hold/rejected）を**シグナル**として実装。事前登録が無い Run は
+  `final=undetermined`。§3.4 のガードを一覧化し、未解決ガードを列挙。
+- 実測: カードなし4人スモーク（8試合）と fixture 10-7 スモーク（8試合）で `report.json`/`report.md` を生成。
+- テスト: `python -m unittest tests.test_eval_report` 16件成功。ローカル全Python 309件成功。

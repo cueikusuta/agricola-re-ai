@@ -46,3 +46,33 @@
   seedレジストリ照合（U6）。マニフェストの `unimplemented` に列挙。
 - 公式4人プールは `card_pool_report` 実測で verified 0 枚のため、正式な最終モードは実行不可。
   フィクスチャを正式評価の代わりにしない。
+
+## 章2: 集計（`feat/deepai-eval-harness-02-report`）
+
+### できること
+
+- `scripts/eval_report.py --root <run>` が `run-manifest.json` と `shard-*/matches.jsonl`（schema2）を検証し、
+  `report.json`（機械可読）と `report.md`（人間可読）を出す。
+- 指標: 首位率（1/k）・単独1位率・首位到達率・同率試合率・期待順位・得点差（平均/分位/ヒストグラム）・席別首位率。
+- 差: seedブロック対応差（首位率・期待順位・得点差）と percentile bootstrap 95%CI
+  （10,000反復・seed 20261106）。必要ブロック数（5pp/80%）も算出。
+- 判定材料: §3.3 の第一層区分を「シグナル」として記録。§3.4 のガード（完全性・条件一様性・直接対戦・飽和・
+  鏡像・10秒・公式最終モード・スモーク）を一覧化。
+- fail closed: 欠落/重複/条件不一致/seed不一致/再演未検証/credit・margin不一致は集計拒否。
+
+### スモーク実行結果
+
+| 条件 | 試合 | 首位率 cand/base | 期待順位 cand/base | 差（credit） |
+|---|---|---|---|---|
+| カードなし4人・eval_veg vs greedy | 8 | 75.00 / 25.00 pp | 1.250 / 2.500 | +50.00 pp（1ブロックのためCIは点と同じ） |
+| fixture 10-7・eval vs greedy | 8 | 100.00 / 25.00 pp | 1.000 / 2.500 | +75.00 pp |
+
+- 両方とも `run_mode=smoke`、`strength_claim_allowed=false`、`final=undetermined`。
+- fixture は「TEST FIXTURE CARDS: functional verification only」を明示。
+- `python -m unittest tests.test_eval_report` 16件成功、ローカル全Python 309件成功。
+
+### 未実装で残した部分
+
+- 第二層（期待順位）の統計規約は U5 未決定のため記述的参照のみ。
+- 事前登録・locked test seed・追加上限は未実装（`registered=false` を明示）。
+- 鏡像対称性の合否しきい値は設計書に無いため `descriptive`（判断しない）。
