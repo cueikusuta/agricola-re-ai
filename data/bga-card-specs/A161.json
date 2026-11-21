@@ -44,22 +44,22 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "accumulated_goods": true
+            "space": "grain_seeds"
           }
         },
         {
-          "predicate": "same_good_accumulation_already_used_this_work_phase",
+          "predicate": "same_good_already_taken_this_work_phase",
           "params": {}
         }
       ],
       "steps": [
         {
           "operation": "gain_resource",
+          "target": "owner",
           "params": {
-            "good": "vegetable",
+            "good": "grain",
             "amount": 1
-          },
-          "target": "owner"
+          }
         }
       ],
       "optional": false,
@@ -80,8 +80,8 @@
       "A161-normal",
       "A161-not-triggered"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Taking a good from an accumulation that was already taken from this work phase: 1 grain."
   }

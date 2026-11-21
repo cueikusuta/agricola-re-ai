@@ -13,12 +13,15 @@
 
 ## Freebuff — A帯・B帯仕様データの文献照合（ブランチ `research/freebuff-ab-spec-check`）
 
-- 基点: `origin/main` = `be4ee45`。仕様データは文献と一致しない箇所だけ修正し、決まらないものは質問に分離する。
-- 既照合の除外: #387（A29・B21）、#394（A/B 0）、#402（D帯46・B008は校正用例）。よってA帯139枚・B帯147枚。
-- A帯: 判定 一致84・食い違い35・表現不足11・未確定9。**43枚を修正**。質問 Q-1〜Q-9。
-  成果物 `docs/aband-spec-check.md`、ログ `result-freebuff-aband-spec-check.md`。
-- B帯: 判定 一致50・表現不足70・食い違い17・未確定10。**22枚を修正**。質問 Q-1〜Q-5。
-  成果物 `docs/bband-spec-check.md`、ログ `result-freebuff-bband-spec-check.md`。
-- 検証: `scripts/validate_bga_card_specs.py` exit 0（errors 空）。`src/`・テスト・台帳・語彙文書は無変更。
+- 基点: `origin/main` = `be4ee45`。既照合の除外: #387（A29・B21）、#394（A/B 0）、#402（D帯46・B008は校正用例）。
+  対象はA帯139枚・B帯147枚。
+- 仕様JSONは `scripts/build_bga_card_specs.py` の生成物で、`tests/test_bga_card_specs_builder.py` が
+  再生成一致を要求する（Actions の `bga-spec-contract` で確認）。また各カードに `data/bga-card-tests/` の契約がある。
+  このため修正はビルダーの表＋再生成で行い、テスト契約が旧読みのカードは「保留」として文献の読みを残す。
+- A帯: 一致86・食い違い33・表現不足11・未確定9。**修正19枚**（前提13・語彙名3・効果3）、**保留25枚**、質問Q-1〜Q-9。
+  成果物 `docs/aband-spec-check.md`、ログ `result-freebuff-aband-spec-check.md`。PR #409。
+- B帯: 一致50・表現不足70・食い違い17・未確定10。**データは変更しない**（食い違い17はすべてテスト契約の再設計が前提）。
+  修正案・語彙不足・質問Q-1〜Q-5を `docs/bband-spec-check.md` に記録。ログ `result-freebuff-bband-spec-check.md`。PR #410。
+- 検証: ビルダー再生成一致・unittest 3 OK・`validate_bga_card_specs.py` exit 0。`src/`・テスト・台帳は無変更。
 - 現在地: A帯PR・B帯PRを作成して停止。**マージしない。** 独立レビュー待ち（`AGENTS.md` §14）。
 - 再開はこの節の「現在地」から。

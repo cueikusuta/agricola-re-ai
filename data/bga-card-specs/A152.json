@@ -39,7 +39,7 @@
   },
   "effects": [
     {
-      "trigger": "returning_home_phase",
+      "trigger": "round_start",
       "conditions": [
         {
           "predicate": "lessons_used_by_fewer_players",
@@ -83,8 +83,8 @@
       "A152-normal",
       "A152-not-triggered"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "If Lessons was used by fewer players than the others: pay 1 food to play an occupation."
   }

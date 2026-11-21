@@ -117,8 +117,8 @@
       "A062-three",
       "A062-not-enough"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Feeding phase: exchange 1/2/3 grain for exactly 3 food and 0/1/2 points."
   }

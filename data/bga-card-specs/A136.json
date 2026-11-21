@@ -44,29 +44,22 @@
       "steps": [
         {
           "operation": "gain_resource",
+          "target": "owner",
           "params": {
             "good": "wood",
             "amount": {
-              "op": "custom",
+              "op": "table",
               "args": [
-                "threshold_table",
                 "remaining_rounds",
                 {
-                  "threshold": 9,
-                  "amount": 4
-                },
-                {
-                  "threshold": 6,
-                  "amount": 3
-                },
-                {
-                  "threshold": 3,
-                  "amount": 2
+                  "1": 1,
+                  "3": 2,
+                  "6": 3,
+                  "9": 4
                 }
               ]
             }
-          },
-          "target": "owner"
+          }
         }
       ],
       "optional": false,
@@ -82,28 +75,20 @@
       "steps": [
         {
           "operation": "gain_points",
+          "target": "owner",
           "params": {
             "points": {
-              "op": "custom",
+              "op": "table",
               "args": [
-                "threshold_table",
-                "all_building_resource_types_count",
+                "all_resource_threshold",
                 {
-                  "threshold": 3,
-                  "amount": 5
-                },
-                {
-                  "threshold": 2,
-                  "amount": 3
-                },
-                {
-                  "threshold": 1,
-                  "amount": 1
+                  "1": 1,
+                  "2": 3,
+                  "3": 5
                 }
               ]
             }
-          },
-          "target": "all_other_players"
+          }
         }
       ],
       "optional": false,
@@ -124,8 +109,8 @@
       "A136-normal",
       "A136-score"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "1/2/3/4 wood for 1/3/6/9 rounds left; at scoring 1/3/5 points for 1+/2+/3+ of each building resource."
   }

@@ -44,7 +44,7 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "space": "traveling_players"
+            "space": "farmland"
           }
         },
         {
@@ -55,24 +55,24 @@
       "steps": [
         {
           "operation": "other",
+          "target": "owner",
           "params": {
             "kind": "choice",
             "options": [
               {
                 "kind": "action",
-                "action": "build_fences"
+                "action": "cultivation"
+              },
+              {
+                "kind": "action",
+                "action": "fencing"
               },
               {
                 "kind": "action",
                 "action": "build_stables"
-              },
-              {
-                "kind": "action",
-                "action": "build_room"
               }
             ]
-          },
-          "target": "owner"
+          }
         }
       ],
       "optional": true,
@@ -93,8 +93,8 @@
       "A150-normal",
       "A150-not-triggered"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "When another player uses Farmland: may take one of Cultivation/Fencing/Build Stables."
   }

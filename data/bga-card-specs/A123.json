@@ -39,24 +39,26 @@
   },
   "effects": [
     {
-      "trigger": "when_buying",
+      "trigger": "after_room_construction",
       "conditions": [],
       "steps": [
         {
-          "operation": "other",
+          "operation": "exchange",
+          "target": "owner",
           "params": {
-            "kind": "substitute_cost",
-            "material_from": [
-              "clay",
-              "stone"
+            "give": [
+              {
+                "good": "clay_or_stone",
+                "amount": 2
+              }
             ],
-            "material_to": "wood",
-            "amount": 2,
-            "replacement": 1,
-            "scope": "renovation_and_room_building",
-            "limit": "once_per_room_or_action"
-          },
-          "target": "owner"
+            "receive": [
+              {
+                "good": "wood",
+                "amount": 1
+              }
+            ]
+          }
         }
       ],
       "optional": true,
@@ -64,7 +66,8 @@
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "owner"
+      "decision_owner": "owner",
+      "notes": "once per room or action"
     }
   ],
   "post_play": {
@@ -77,8 +80,8 @@
       "A123-normal",
       "A123-once-per-room"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Each room built or renovation: once, may replace 2 clay or 2 stone with 1 wood."
   }
