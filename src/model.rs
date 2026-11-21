@@ -809,6 +809,11 @@ impl Game {
         if !(2..=4).contains(&config.players) {
             return Err("players must be 2..=4".into());
         }
+        // Player-count projection happens exactly once, here at the game
+        // entry point: every game owns a set already projected for its
+        // player count, and raw/unprojectable sets are rejected instead of
+        // being treated as validated (PR #368 close verdict).
+        let card_set = card_set.projected_for_players(config.players)?;
         card_set.validate(config.players)?;
         let cards = CardState::deal(&card_set, config.seed, config.players);
         Self::from_card_state(config, Arc::new(card_set), cards, None, None)
@@ -826,6 +831,9 @@ impl Game {
         if !(2..=4).contains(&config.players) {
             return Err("players must be 2..=4".into());
         }
+        // Projection happens exactly once at this game entry point, matching
+        // Game::with_cards (PR #368 close verdict).
+        let card_set = card_set.projected_for_players(config.players)?;
         card_set.validate(config.players)?;
         if hands.len() != config.players {
             return Err("explicit hands must match the player count".into());
@@ -844,6 +852,9 @@ impl Game {
         if !(2..=4).contains(&config.players) || start_player >= config.players {
             return Err("invalid drafted start player or player count".into());
         }
+        // Projection happens exactly once at this game entry point, matching
+        // Game::with_cards (PR #368 close verdict).
+        let card_set = card_set.projected_for_players(config.players)?;
         card_set.validate(config.players)?;
         if hands.len() != config.players {
             return Err("explicit hands must match the player count".into());

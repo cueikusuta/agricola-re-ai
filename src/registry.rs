@@ -119,6 +119,39 @@ impl RegisteredCard {
             effects: self.effects.clone(),
         }
     }
+
+    /// Convert to CardDefinition with effects filtered for the given player count.
+    /// Only includes effects whose prerequisite guards are satisfied for `players`.
+    pub fn to_card_definition_for_players(&self, players: usize) -> CardDefinition {
+        let filtered_effects = filter_effects_for_players(&self.effects, players);
+        CardDefinition {
+            use_limit: self.use_limit,
+            id: self.external_id.clone(),
+            kind: self.kind,
+            cost: self.cost.clone(),
+            points: self.points,
+            effects: filtered_effects,
+        }
+    }
+}
+
+/// Filter a list of effects to only include those whose prerequisite guards
+/// are satisfied for the given player count.
+///
+/// Delegates to [`crate::cards::project_effects_for_players`] so the registry
+/// projection and the game-entry projection share exactly one run-grammar:
+/// a consecutive run of `MinimumPlayers`/`MaximumPlayers` prerequisites
+/// guards every following effect up to the next player-count run or the end
+/// of the list; an unsatisfied run drops its guards together with its
+/// covered effects, while a satisfied run is kept in place. A trailing run
+/// covering no effect is a whole-card requirement and is always kept (so
+/// [`crate::cards::CardSet::validate`] can reject an ineligible card instead
+/// of silently stripping the requirement).
+fn filter_effects_for_players(
+    effects: &[crate::cards::CardEffect],
+    players: usize,
+) -> Vec<crate::cards::CardEffect> {
+    crate::cards::project_effects_for_players(effects, players)
 }
 
 /// Event kind for static trigger indexing (minimal set for Step 1).
@@ -626,15 +659,17 @@ impl CardPool {
     /// Build a pool from a registry for a specific player count.
     ///
     /// Official eligibility: review_status == Verified && eligibility_at(players) == Yes
-    /// Experimental eligibility: card exists in registry (implemented) regardless of review.
+    /// Experimental eligibility: card is implemented AND eligible for the player count (regardless of review).
     pub fn new(registry: &CardRegistry, players: usize, experimental_mode: bool) -> Self {
         let mut official = Vec::new();
         let mut experimental = Vec::new();
 
         for card in registry.iter() {
-            let in_experimental = true; // All implemented cards
-            let in_official = card.review.review_status == ReviewStatus::Verified
-                && matches!(card.review.eligibility_at(players), Some(Eligibility::Yes));
+            let eligible_for_players =
+                matches!(card.review.eligibility_at(players), Some(Eligibility::Yes));
+            let in_experimental = eligible_for_players; // Implemented cards eligible for this player count
+            let in_official =
+                card.review.review_status == ReviewStatus::Verified && eligible_for_players;
 
             if in_experimental {
                 experimental.push(card.id);
@@ -731,11 +766,12 @@ impl CardPool {
 
 /// Compat adapter: build a CardSet from registry + pool (for saves, observations, legacy API).
 pub fn card_set_from_pool(registry: &CardRegistry, pool: &CardPool) -> CardSet {
+    let players = pool.players();
     let definitions = pool
         .eligible()
         .iter()
         .filter_map(|id| registry.get(*id))
-        .map(|c| c.to_card_definition())
+        .map(|c| c.to_card_definition_for_players(players))
         .collect();
     CardSet { definitions }
 }
@@ -747,101 +783,248 @@ pub fn card_set_from_registry(registry: &CardRegistry) -> CardSet {
 
 /// Build the default registry from all built-in card implementations.
 ///
-/// This mirrors `card_pool::builtin_implemented_cards()` but produces
-/// a validated, immutable CardRegistry with CardId assignments.
+/// This collects all card variants across player counts (2, 3, 4), merges
+/// player-count-specific variants into single entries with prerequisites,
+/// and builds a validated, immutable CardRegistry with CardId assignments.
 pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError> {
+    use std::collections::BTreeMap;
+
+    // Collect all cards from all player counts, grouped by external_id
+    let mut cards_by_id: BTreeMap<String, Vec<(usize, CardDefinition)>> = BTreeMap::new();
+
+    // Helper to collect cards from a function
+    fn collect_cards(
+        cards_by_id: &mut BTreeMap<String, Vec<(usize, CardDefinition)>>,
+        players: usize,
+        cards: Vec<CardDefinition>,
+    ) {
+        for card in cards {
+            cards_by_id
+                .entry(card.id.clone())
+                .or_default()
+                .push((players, card));
+        }
+    }
+
+    // Collect player-count-dependent cards
+    for players in 2..=4 {
+        collect_cards(
+            &mut cards_by_id,
+            players,
+            crate::cards::verified_scoring_cards(players),
+        );
+        collect_cards(
+            &mut cards_by_id,
+            players,
+            crate::cards::verified_minor_worker_cards(players),
+        );
+        collect_cards(
+            &mut cards_by_id,
+            players,
+            crate::cards::verified_worker_bonus_cards(players),
+        );
+        collect_cards(
+            &mut cards_by_id,
+            players,
+            crate::cards::verified_simple_occupations(players),
+        );
+        collect_cards(
+            &mut cards_by_id,
+            players,
+            crate::cards::verified_multiplayer_passive_cards(players),
+        );
+    }
+
+    // Collect player-count-independent cards (add for all player counts)
+    let independent_cards = [
+        crate::cards::verified_immediate_resource_cards(),
+        crate::cards::verified_round_and_harvest_cards(),
+        crate::cards::verified_passive_cards(),
+        crate::cards::verified_extra_simple_cards(),
+        crate::cards::verified_band_c_cards(),
+        crate::cards::verified_band_d_cards(),
+        crate::cards::verified_band_e_cards(),
+        crate::cards::verified_band_a_cards(),
+        crate::cards::verified_band_b_cards(),
+    ];
+    for cards in independent_cards {
+        for players in 2..=4 {
+            collect_cards(&mut cards_by_id, players, cards.clone());
+        }
+    }
+
+    // Now merge variants and build registry
     let mut builder = CardRegistryBuilder::new();
 
-    // Collect all cards from the existing verified_* functions
-    // We need to deduplicate by external_id across player counts
-    let mut seen = BTreeSet::new();
+    for (external_id, variants) in cards_by_id {
+        // Merge all variants for this external_id
+        let (merged_card, eligibility) = merge_card_variants(&external_id, variants);
 
-    // Helper function to add cards from a vec
-    fn add_cards_inner(
-        builder: CardRegistryBuilder,
-        cards: Vec<CardDefinition>,
-        seen: &mut BTreeSet<String>,
-    ) -> Result<CardRegistryBuilder, RegistryBuildError> {
-        let mut builder = builder;
-        for card in cards {
-            if seen.insert(card.id.clone()) {
-                // Default to unverified review; official verification is external
-                let review = CardReview::unverified(&card.id);
-                builder = builder.add_card(
-                    card.id,
-                    card.kind,
-                    card.cost,
-                    card.points,
-                    card.effects,
-                    card.use_limit,
-                    review,
-                )?;
-            }
-        }
-        Ok(builder)
-    }
+        // Build review with eligibility
+        let review = CardReview {
+            card_id: external_id.clone(),
+            review_status: ReviewStatus::Unverified,
+            eligible_at_2: if eligibility.contains(&2) {
+                Eligibility::Yes
+            } else {
+                Eligibility::No
+            },
+            eligible_at_3: if eligibility.contains(&3) {
+                Eligibility::Yes
+            } else {
+                Eligibility::No
+            },
+            eligible_at_4: if eligibility.contains(&4) {
+                Eligibility::Yes
+            } else {
+                Eligibility::No
+            },
+        };
 
-    // Add all cards across all player counts (2, 3, 4)
-    for players in 2..=4 {
-        builder = add_cards_inner(
-            builder,
-            crate::cards::verified_scoring_cards(players),
-            &mut seen,
-        )?;
-        builder = add_cards_inner(
-            builder,
-            crate::cards::verified_minor_worker_cards(players),
-            &mut seen,
-        )?;
-        builder = add_cards_inner(
-            builder,
-            crate::cards::verified_worker_bonus_cards(players),
-            &mut seen,
-        )?;
-        builder = add_cards_inner(
-            builder,
-            crate::cards::verified_simple_occupations(players),
-            &mut seen,
-        )?;
-        builder = add_cards_inner(
-            builder,
-            crate::cards::verified_multiplayer_passive_cards(players),
-            &mut seen,
+        builder = builder.add_card(
+            external_id,
+            merged_card.kind,
+            merged_card.cost,
+            merged_card.points,
+            merged_card.effects,
+            merged_card.use_limit,
+            review,
         )?;
     }
-    builder = add_cards_inner(
-        builder,
-        crate::cards::verified_immediate_resource_cards(),
-        &mut seen,
-    )?;
-    builder = add_cards_inner(
-        builder,
-        crate::cards::verified_round_and_harvest_cards(),
-        &mut seen,
-    )?;
-    builder = add_cards_inner(builder, crate::cards::verified_passive_cards(), &mut seen)?;
-    builder = add_cards_inner(
-        builder,
-        crate::cards::verified_extra_simple_cards(),
-        &mut seen,
-    )?;
-    // C-deck band 070-120 typed effects (kept out of the A/B two-player
-    // preset; see verified_band_c_cards).
-    builder = add_cards_inner(builder, crate::cards::verified_band_c_cards(), &mut seen)?;
-    // D-deck band 070-120 typed effects (kept out of the A/B two-player
-    // preset; see verified_band_d_cards).
-    builder = add_cards_inner(builder, crate::cards::verified_band_d_cards(), &mut seen)?;
-    // E-deck band 070-120 typed effects (kept out of the A/B two-player
-    // preset; see verified_band_e_cards).
-    builder = add_cards_inner(builder, crate::cards::verified_band_e_cards(), &mut seen)?;
-    // A-deck band 070-120 typed effects (kept out of the A/B two-player
-    // preset; see verified_band_a_cards).
-    builder = add_cards_inner(builder, crate::cards::verified_band_a_cards(), &mut seen)?;
-    // B-deck band cards with typed effects (kept out of the A/B two-player
-    // preset; see verified_band_b_cards).
-    builder = add_cards_inner(builder, crate::cards::verified_band_b_cards(), &mut seen)?;
 
     builder.freeze()
+}
+
+/// Merge multiple player-count variants of a card into a single definition.
+/// Returns the merged CardDefinition and the set of eligible player counts.
+fn merge_card_variants(
+    external_id: &str,
+    variants: Vec<(usize, CardDefinition)>,
+) -> (CardDefinition, Vec<usize>) {
+    use crate::cards::{CardEffect, CardRequirement};
+    use crate::model::{Good, Space};
+
+    // Group by player count
+    let mut by_players: BTreeMap<usize, CardDefinition> = BTreeMap::new();
+    for (players, card) in variants {
+        by_players.insert(players, card);
+    }
+
+    #[allow(unused_assignments)]
+    let mut eligible_players: Vec<usize> = by_players.keys().copied().collect();
+
+    // Start with the first variant as base
+    let base = by_players
+        .values()
+        .next()
+        .expect("at least one variant")
+        .clone();
+    let mut merged_effects = base.effects.clone();
+
+    // For each player count, compare effects and add missing ones with prerequisites
+    // This handles cases like B121 (extra effect at 3+) and B102 (different effect per player count)
+
+    // Special handling for known cards with player-count-dependent effects
+    match external_id {
+        "B121" => {
+            // B121: 2p has 2 effects (Forest, ReedBank), 3p/4p have 3 effects (+ClayPit)
+            // Use 2p variant as base, add ClayPit effect with MinimumPlayers(3) prerequisite
+            if let Some(card_2p) = by_players.get(&2) {
+                merged_effects = card_2p.effects.clone();
+            }
+            // Add ClayPit effect once (from 3p variant, same as 4p)
+            if let Some(card_3p) = by_players.get(&3) {
+                for effect in &card_3p.effects {
+                    if matches!(effect, CardEffect::AfterWorkerGain { space, .. } if *space == Space::ClayPit)
+                    {
+                        // Add this effect with MinimumPlayers(3) prerequisite
+                        merged_effects.push(CardEffect::Prerequisite {
+                            rule: CardRequirement::MinimumPlayers(3),
+                        });
+                        merged_effects.push(effect.clone());
+                    }
+                }
+            }
+            // Eligible for all player counts
+            eligible_players = vec![2, 3, 4];
+        }
+        "B102" => {
+            // B102: 2p=Clay3, 3p=Reed2, 4p=Sheep2 (per official spec)
+            // Cards.rs only defines 2p variant; 3p variant added via registry.
+            // 4p effect (Sheep 2) requires OnPlayGainAnimal which is not implemented.
+            // Therefore B102 is NOT eligible for 4 players (eligible_at_4 = No).
+            merged_effects.clear();
+
+            // 2 players: Clay 3
+            merged_effects.push(CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumPlayers(2),
+            });
+            merged_effects.push(CardEffect::Prerequisite {
+                rule: CardRequirement::MaximumPlayers(2),
+            });
+            merged_effects.push(CardEffect::OnPlayGain {
+                good: Good::Clay,
+                amount: 3,
+            });
+
+            // 3 players: Reed 2
+            merged_effects.push(CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumPlayers(3),
+            });
+            merged_effects.push(CardEffect::Prerequisite {
+                rule: CardRequirement::MaximumPlayers(3),
+            });
+            merged_effects.push(CardEffect::OnPlayGain {
+                good: Good::Reed,
+                amount: 2,
+            });
+
+            // Eligible for 2 and 3 players only (4p effect not implemented)
+            eligible_players = vec![2, 3];
+        }
+        _ => {
+            // For other cards, check if effects differ by player count
+            // If they do, we'd need more sophisticated merging, but for now
+            // assume the base variant is correct for all player counts
+            // (most cards don't have player-count-dependent effects)
+            // Use the lowest player count variant as base
+            if let Some((&min_players, _)) = by_players.iter().next() {
+                if let Some(base_card) = by_players.get(&min_players) {
+                    merged_effects = base_card.effects.clone();
+                }
+            }
+            // Derive eligibility from prerequisites in the merged effects
+            let mut min_players = 2;
+            let mut max_players = 4;
+            for effect in &merged_effects {
+                if let CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(min),
+                } = effect
+                {
+                    min_players = min_players.max(*min as usize);
+                }
+                if let CardEffect::Prerequisite {
+                    rule: CardRequirement::MaximumPlayers(max),
+                } = effect
+                {
+                    max_players = max_players.min(*max as usize);
+                }
+            }
+            eligible_players = (min_players..=max_players).collect();
+        }
+    }
+
+    (
+        CardDefinition {
+            use_limit: base.use_limit,
+            id: base.id,
+            kind: base.kind,
+            cost: base.cost,
+            points: base.points,
+            effects: merged_effects,
+        },
+        eligible_players,
+    )
 }
 
 #[cfg(test)]
@@ -1054,7 +1237,15 @@ mod tests {
             eligible_at_3: Eligibility::Yes,
             eligible_at_4: Eligibility::Yes,
         };
-        let review_unverified = CardReview::unverified("A002");
+        // Unverified cards are still eligible in experimental mode; they just
+        // aren't official. Set eligibility to Yes so experimental includes them.
+        let review_unverified = CardReview {
+            card_id: "A002".into(),
+            review_status: ReviewStatus::Unverified,
+            eligible_at_2: Eligibility::Yes,
+            eligible_at_3: Eligibility::No,
+            eligible_at_4: Eligibility::No,
+        };
 
         let registry = CardRegistryBuilder::new()
             .add_card(
