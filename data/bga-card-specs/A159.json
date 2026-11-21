@@ -46,7 +46,7 @@
           "params": {
             "spaces": [
               "fishing",
-              "reed_bank"
+              "clay_pit"
             ]
           }
         }
@@ -54,30 +54,23 @@
       "steps": [
         {
           "operation": "spend_resource",
+          "target": "owner",
           "params": {
             "good": "wood",
             "amount": 1,
-            "source": "owner_supply",
-            "target": "other_player"
-          },
-          "target": "owner"
+            "source": "other_player",
+            "target": "owner"
+          }
         },
         {
           "operation": "gain_resource",
+          "target": "owner",
           "params": {
             "good": "food",
-            "amount": {
-              "op": "table",
-              "args": [
-                "space",
-                {
-                  "fishing": 2,
-                  "reed_bank": 3
-                }
-              ]
-            }
-          },
-          "target": "owner"
+            "amount": 2,
+            "source": "owner_supply",
+            "target": "other_player"
+          }
         }
       ],
       "optional": true,
@@ -98,8 +91,8 @@
       "A159-fishing",
       "A159-declined"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Another player's Fishing/Clay Pit use: take 1 of their wood for 2 food (Clay Pit: 3 food)."
   }

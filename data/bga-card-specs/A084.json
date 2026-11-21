@@ -93,8 +93,8 @@
       "A084-not-triggered",
       "A084-boundary"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "In each returning-home phase of a harvest-free round, pay exactly 1 grain to breed exactly one animal type."
   }

@@ -44,15 +44,10 @@
       "steps": [
         {
           "operation": "other",
+          "target": "owner",
           "params": {
-            "kind": "combine_forest_and_clay_pit",
-            "spaces": [
-              "forest",
-              "clay_pit"
-            ],
-            "requires_both_occupied": true
-          },
-          "target": "owner"
+            "kind": "combine_reed_bank_and_clay_pit"
+          }
         }
       ],
       "optional": false,
@@ -68,26 +63,26 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "space": "combined_forest_clay_pit"
+            "space": "combined_reed_clay"
           }
         }
       ],
       "steps": [
         {
           "operation": "gain_resource",
+          "target": "owner",
           "params": {
             "good": "clay",
             "amount": 2
-          },
-          "target": "owner"
+          }
         },
         {
           "operation": "gain_resource",
+          "target": "owner",
           "params": {
             "good": "wood",
             "amount": 3
-          },
-          "target": "owner"
+          }
         }
       ],
       "optional": false,
@@ -107,8 +102,8 @@
     "test_case_ids": [
       "A162-normal"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Reed Bank and Clay Pit merge into one space giving 2 clay and 3 wood."
   }

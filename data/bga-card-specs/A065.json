@@ -81,8 +81,8 @@
       "A065-normal",
       "A065-not-triggered"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Before each unconditional Sow action: gain 1 grain."
   }

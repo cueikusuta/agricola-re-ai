@@ -44,24 +44,18 @@
         {
           "predicate": "worker_space_used",
           "params": {
-            "space": "traveling_players"
+            "space": "farmland"
           }
         }
       ],
       "steps": [
         {
           "operation": "grant_action",
+          "target": "owner",
           "params": {
-            "action": "build_room",
-            "discount": [
-              {
-                "good": "reed",
-                "amount": 1
-              }
-            ],
-            "per_room": true
-          },
-          "target": "owner"
+            "action": "cultivation",
+            "one_field_only": true
+          }
         }
       ],
       "optional": false,
@@ -82,8 +76,8 @@
       "A149-normal",
       "A149-not-triggered"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Each Farmland use also grants a Cultivation action limited to 1 field."
   }

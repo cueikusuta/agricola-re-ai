@@ -95,8 +95,8 @@
       "A049-normal",
       "A049-not-triggered"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Preparation phase: 1 food whenever 1 reed is placed on a non-empty Reed Bank."
   }

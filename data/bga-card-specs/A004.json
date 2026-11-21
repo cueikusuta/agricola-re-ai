@@ -45,6 +45,7 @@
       "steps": [
         {
           "operation": "gain_resource",
+          "target": "owner",
           "params": {
             "good": "wood",
             "amount": {
@@ -59,8 +60,7 @@
                 1
               ]
             }
-          },
-          "target": "owner"
+          }
         }
       ],
       "optional": false,
@@ -68,8 +68,7 @@
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "none",
-      "notes": "1 room = 1 wood, unconditional."
+      "decision_owner": "none"
     },
     {
       "trigger": "on_play",
@@ -82,11 +81,11 @@
       "steps": [
         {
           "operation": "gain_resource",
+          "target": "owner",
           "params": {
             "good": "wood",
             "amount": 1
-          },
-          "target": "owner"
+          }
         }
       ],
       "optional": false,
@@ -109,8 +108,8 @@
       "A004-normal",
       "A004-no-bonus"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Gain 1 wood per room; if rooms exceed people, gain 1 extra wood; pass left."
   }

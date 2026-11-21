@@ -124,8 +124,8 @@
       "A010-renovation",
       "A010-wrong-action"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Playable only via a Major Improvement action; houses 1 person; may no longer renovate."
   }

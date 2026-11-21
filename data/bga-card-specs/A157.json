@@ -39,10 +39,10 @@
   },
   "effects": [
     {
-      "trigger": "returning_home_phase",
+      "trigger": "round_start",
       "conditions": [
         {
-          "predicate": "lessons_empty_seats_at_least",
+          "predicate": "lessons_occupants_at_least",
           "params": {
             "n": 1
           }
@@ -51,11 +51,11 @@
       "steps": [
         {
           "operation": "gain_resource",
+          "target": "owner",
           "params": {
             "good": "food",
             "amount": 1
-          },
-          "target": "owner"
+          }
         }
       ],
       "optional": false,
@@ -76,8 +76,8 @@
       "A157-normal",
       "A157-not-triggered"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "At the start of each round: 1 food if Lessons holds at least 1 person."
   }

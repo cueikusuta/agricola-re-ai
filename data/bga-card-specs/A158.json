@@ -44,64 +44,28 @@
         {
           "predicate": "other_player_uses",
           "params": {
-            "space": "traveling_players"
+            "space": "forest"
           }
         }
       ],
       "steps": [
         {
-          "operation": "other",
+          "operation": "exchange",
+          "target": "owner",
           "params": {
-            "kind": "choice",
-            "options": [
+            "give": [
               {
-                "kind": "exchange",
-                "give": [
-                  {
-                    "good": "grain",
-                    "amount": 1
-                  }
-                ],
-                "receive": [
-                  {
-                    "good": "food",
-                    "amount": 4
-                  }
-                ]
-              },
+                "good": "food",
+                "amount": 4
+              }
+            ],
+            "receive": [
               {
-                "kind": "exchange",
-                "give": [
-                  {
-                    "good": "sheep",
-                    "amount": 1
-                  }
-                ],
-                "receive": [
-                  {
-                    "good": "food",
-                    "amount": 5
-                  }
-                ]
-              },
-              {
-                "kind": "exchange",
-                "give": [
-                  {
-                    "good": "vegetable",
-                    "amount": 1
-                  }
-                ],
-                "receive": [
-                  {
-                    "good": "food",
-                    "amount": 7
-                  }
-                ]
+                "good": "wood",
+                "amount": 1
               }
             ]
-          },
-          "target": "owner"
+          }
         }
       ],
       "optional": true,
@@ -122,8 +86,8 @@
       "A158-normal",
       "A158-not-triggered"
     ],
-    "checked_by": "Freebuff AB-band literature cross-check",
-    "checked_on": "2026-11-21",
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
     "implementation_status": "not_started",
     "notes": "Another player's Forest use: may exchange 4 food for 1 wood."
   }
