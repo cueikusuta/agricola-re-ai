@@ -574,18 +574,21 @@ pub fn pool_gate_snapshot(players: usize, measured_at_sha: Option<&str>) -> Valu
     let registry = builtin_review_registry();
     let occupations = usable_occupations(&set, &registry, players);
     let minors = usable_minor_improvements(&set, &registry, players);
-    json!({
+    let mut snapshot = json!({
         "players": players,
         "usable_occupations_verified": occupations,
         "usable_minor_improvements_verified": minors,
-        "usable_occupations_4p": occupations,
-        "usable_minor_improvements_4p": minors,
         "g1_required_per_kind": crate::card_pool::G1_MIN_PER_KIND,
         "g1_met": occupations >= crate::card_pool::G1_MIN_PER_KIND
             && minors >= crate::card_pool::G1_MIN_PER_KIND,
         "measured_from": "src/card_pool.rs builtin_review_registry (fail closed: absent or unverified = not usable)",
         "measured_at_sha": measured_at_sha,
-    })
+    });
+    if players == 4 {
+        snapshot["usable_occupations_4p"] = json!(occupations);
+        snapshot["usable_minor_improvements_4p"] = json!(minors);
+    }
+    snapshot
 }
 
 /// Versioned draft policy identity (design §2.5, §4.6, U11). The heuristic is
@@ -599,6 +602,16 @@ pub fn draft_policy_id(ai: DraftAiKind) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pool_gate_4p_keys_only_appear_for_four_players() {
+        let four = pool_gate_snapshot(4, None);
+        assert!(four.get("usable_occupations_4p").is_some());
+        assert_eq!(four["measured_at_sha"], Value::Null);
+        let two = pool_gate_snapshot(2, None);
+        assert!(two.get("usable_occupations_4p").is_none());
+        assert!(two.get("usable_minor_improvements_4p").is_none());
+    }
 
     #[test]
     fn dealt_per_kind_matches_the_engine() {
