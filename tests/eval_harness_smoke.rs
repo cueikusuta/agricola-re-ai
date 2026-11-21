@@ -169,3 +169,45 @@ fn draft_fixture_smoke_records_the_coordinator_only_draft_fields() {
     }
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn common_opponent_runs_keep_the_opponent_in_the_non_focus_seats() {
+    let dir = unique_dir("common-opponent");
+    let status = harness()
+        .args([
+            "--output",
+            dir.to_str().unwrap(),
+            "--players",
+            "4",
+            "--seed-start",
+            "700120",
+            "--blocks",
+            "1",
+            "--candidate",
+            "eval_veg",
+            "--baseline",
+            "greedy",
+            "--opponent",
+            "eval",
+            "--smoke",
+        ])
+        .status()
+        .unwrap();
+    assert!(status.success(), "harness failed");
+    for row in read_rows(&dir) {
+        assert_eq!(row["opponent_policy"], "eval");
+        let policies = row["game_policy_id_by_seat"].as_array().unwrap();
+        let seat = row["candidate_seat"].as_u64().unwrap() as usize;
+        for (other, policy) in policies.iter().enumerate() {
+            if other == seat {
+                assert_eq!(
+                    policy.as_str().unwrap(),
+                    row["focus_policy"].as_str().unwrap()
+                );
+            } else {
+                assert_eq!(policy.as_str().unwrap(), "eval");
+            }
+        }
+    }
+    let _ = fs::remove_dir_all(&dir);
+}

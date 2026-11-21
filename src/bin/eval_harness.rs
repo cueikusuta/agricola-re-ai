@@ -1014,11 +1014,16 @@ fn run_one_game(
     };
     let game_policy_by_seat = (0..options.players)
         .map(|other| {
-            if arm_is_candidate && other == seat {
-                candidate_id.to_string()
-            } else if !arm_is_candidate {
-                baseline_id.to_string()
+            if other == seat {
+                if arm_is_candidate {
+                    candidate_id.to_string()
+                } else {
+                    baseline_id.to_string()
+                }
             } else {
+                // Non-focus seats are the fixed opponent in both arms. When the
+                // opponent is the baseline (the mirror design) this equals the
+                // baseline id; a common-opponent run keeps its own profile.
                 opponent_id.to_string()
             }
         })
