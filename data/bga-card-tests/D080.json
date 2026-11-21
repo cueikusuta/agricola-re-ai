@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "card_id": "D080",
+  "cases": [
+    {
+      "id": "D080-pay-wood-build-clay-improvement",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 1,
+        "food": 0
+      },
+      "action": {
+        "play": "D080",
+        "pay": { "good": "wood", "amount": 1 }
+      },
+      "expected": {
+        "play_allowed": true,
+        "wood_delta": -1
+      },
+      "notes": "Pay 1 wood for OR cost"
+    },
+    {
+      "id": "D080-pay-food-build-clay-improvement",
+      "scope": "legal_play",
+      "setup": {
+        "wood": 0,
+        "food": 1
+      },
+      "action": {
+        "play": "D080",
+        "pay": { "good": "food", "amount": 1 }
+      },
+      "expected": {
+        "play_allowed": true,
+        "food_delta": -1
+      },
+      "notes": "Pay 1 food for OR cost"
+    },
+    {
+      "id": "D080-build-non-clay-improvement-no-stone",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_improvement",
+        "improvement_cost": { "wood": 2 },
+        "clay_cost": 0
+      },
+      "expected": {
+        "stone_delta": 0,
+        "reason": "improvement does not cost 2+ clay"
+      },
+      "notes": "Only improvements costing 2+ clay trigger the stone gain"
+    }
+  ]
+}

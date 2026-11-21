@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "card_id": "D074",
+  "cases": [
+    {
+      "id": "D074-farm-expansion-refund",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4
+      },
+      "action": {
+        "trigger": "end_of_turn",
+        "action_taken": "farm_expansion",
+        "wood_paid": 4
+      },
+      "expected": {
+        "wood_refunded": 2,
+        "wood_final": 2
+      },
+      "notes": "Farm expansion paid 4 wood -> refund 2 wood (1 per 2 paid)"
+    },
+    {
+      "id": "D074-improvement-build-refund",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 3
+      },
+      "action": {
+        "trigger": "end_of_turn",
+        "action_taken": "build_improvement",
+        "wood_paid": 3
+      },
+      "expected": {
+        "wood_refunded": 1,
+        "wood_final": 1
+      },
+      "notes": "Improvement paid 3 wood -> refund 1 wood (floor(3/2))"
+    },
+    {
+      "id": "D074-odd-wood-no-refund",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1
+      },
+      "action": {
+        "trigger": "end_of_turn",
+        "action_taken": "farm_expansion",
+        "wood_paid": 1
+      },
+      "expected": {
+        "wood_refunded": 0,
+        "wood_final": 0
+      },
+      "notes": "Paid 1 wood -> no refund (floor(1/2) = 0)"
+    }
+  ]
+}

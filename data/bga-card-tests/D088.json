@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "card_id": "D088",
+  "cases": [
+    {
+      "id": "D088-on-play-gain-grain",
+      "scope": "legal_play",
+      "setup": {
+        "grain": 0
+      },
+      "action": {
+        "play": "D088"
+      },
+      "expected": {
+        "play_allowed": true,
+        "grain_delta": 1
+      },
+      "notes": "On play, gain 1 grain"
+    },
+    {
+      "id": "D088-substitute-fence-1-grain",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2,
+        "wood": 0
+      },
+      "action": {
+        "trigger": "when_buying",
+        "context": "build_fence",
+        "original_cost": { "wood": 2 },
+        "substitute": { "material": "grain", "count": 1 }
+      },
+      "expected": {
+        "effective_cost": { "wood": 1, "grain": 1 },
+        "grain_delta": -1
+      },
+      "notes": "Build fence: substitute 1 wood with 1 grain (max 2 substitutions)"
+    },
+    {
+      "id": "D088-substitute-stable-2-grain",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2,
+        "wood": 0,
+        "clay": 0
+      },
+      "action": {
+        "trigger": "when_buying",
+        "context": "build_stable",
+        "original_cost": { "wood": 2, "clay": 1 },
+        "substitute": { "material": "grain", "count": 2 }
+      },
+      "expected": {
+        "effective_cost": { "clay": 1, "grain": 2 },
+        "grain_delta": -2
+      },
+      "notes": "Build stable: substitute up to 2 building resources with grain"
+    },
+    {
+      "id": "D088-substitute-room-2-grain-max",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 3,
+        "wood": 0,
+        "clay": 0,
+        "stone": 0
+      },
+      "action": {
+        "trigger": "when_buying",
+        "context": "build_room",
+        "original_cost": { "wood": 2, "clay": 2, "stone": 1 },
+        "substitute": { "material": "grain", "count": 3 }
+      },
+      "expected": {
+        "effective_cost": { "stone": 1, "grain": 2 },
+        "grain_delta": -2,
+        "substitutions_limited": 2
+      },
+      "notes": "Build room: max 2 substitutions even if 3+ resources in cost"
+    },
+    {
+      "id": "D088-substitute-renovation-2-grain-max",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2
+      },
+      "action": {
+        "trigger": "when_buying",
+        "context": "renovation",
+        "original_cost": { "clay": 3, "stone": 2 },
+        "substitute": { "material": "grain", "count": 2 }
+      },
+      "expected": {
+        "effective_cost": { "clay": 1, "stone": 2, "grain": 2 },
+        "substitutions_limited": 2
+      },
+      "notes": "Renovation: max 2 substitutions"
+    }
+  ]
+}
