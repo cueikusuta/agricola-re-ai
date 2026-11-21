@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "card_id": "D116",
+  "cases": [
+    {
+      "id": "D116-accumulate-wood",
+      "scope": "effect_only",
+      "setup": {
+        "round": 1,
+        "card_wood": 0
+      },
+      "action": {
+        "trigger": "round_start",
+        "round": 2
+      },
+      "expected": {
+        "card_wood": 1,
+        "notes": "Personal accumulation space adds 1 wood per round"
+      }
+    },
+    {
+      "id": "D116-quarry-revealed-discard",
+      "scope": "effect_only",
+      "setup": {
+        "card_wood": 4,
+        "quarry_revealed": true
+      },
+      "action": {
+        "trigger": "stone_accumulation_space_revealed"
+      },
+      "expected": {
+        "card_wood": 0,
+        "wood_discarded": 4,
+        "notes": "Quarry revealed, all wood on card discarded"
+      }
+    },
+    {
+      "id": "D116-owner-only-access",
+      "scope": "legal_play",
+      "setup": {
+        "player_count": 2,
+        "round": 2,
+        "accumulation_spaces": {"wood_1_D116": 1}
+      },
+      "action": {
+        "player": "other",
+        "use_space": "wood_1_D116"
+      },
+      "expected": {
+        "action_rejected": true,
+        "notes": "Personal accumulation space only usable by owner"
+      }
+    }
+  ]
+}

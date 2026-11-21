@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "card_id": "D113",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "食料商人",
+    "name_en": "Food Merchant"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2808",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "BGA wiki card page; effect: per grain harvested, buy 1 vegetable for 3 food (2 food for last grain)"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_field_phase",
+      "conditions": [
+        {
+          "predicate": "grain_harvested_at_least",
+          "params": {
+            "n": 1
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "repeat_per": "grain_harvested",
+                "steps": [
+                  {
+                    "operation": "spend_resource",
+                    "target": "owner",
+                    "params": {
+                      "good": "food",
+                      "amount": 3
+                    }
+                  },
+                  {
+                    "operation": "gain_resource",
+                    "target": "owner",
+                    "params": {
+                      "good": "vegetable",
+                      "amount": 1
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Per grain harvested from fields, may buy 1 vegetable for 3 food. If last grain harvested, cost is 2 food. Complex conditional pricing not fully expressible in vocabulary - marked needs_resolution."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: per-grain purchase with tiered pricing (3 food normally, 2 food for last grain) not expressible with current vocabulary; requires custom logic for 'last grain' detection"
+    ],
+    "test_case_ids": [
+      "D113-buy-veg-per-grain",
+      "D113-last-grain-discount",
+      "D113-no-grain-harvested"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Classification: stage外 (single site: harvest/fields / purchase). Uses TR-SITE. Per grain harvested from fields, may buy 1 vegetable for 3 food; last grain costs 2 food."
+  }
+}
