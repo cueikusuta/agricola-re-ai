@@ -542,10 +542,10 @@ fn card_priority(
         value += match effect {
                 // Exact gains and discounted costs were simulated above.
                 CardEffect::OnPlayGain { .. }
-                | CardEffect::OnPlayGainPerStored { .. }
-                | CardEffect::OnPlayGainIfHouse { .. }
-                | CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | CardEffect::Prerequisite { .. } => 0,
+                                | CardEffect::OnPlayGainPerStored { .. }
+                                | CardEffect::OnPlayGainIfHouse { .. }
+                                | CardEffect::OnPlayGainPerImprovementPlayed { .. }
+                                | CardEffect::Prerequisite { .. } => 0,
                 #[cfg(test)]
                 // Test-only probe; never part of a real evaluated pool.
                 CardEffect::PendingProbe { .. } => 0,
