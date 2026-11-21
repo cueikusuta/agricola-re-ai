@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "card_id": "E114",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "物置小屋作り",
+    "name_en": "Shed Builder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2639",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_stable_built",
+      "conditions": [
+        {
+          "predicate": "stable_count_in",
+          "params": {
+            "values": [
+              1,
+              2
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When this build makes the 1st or 2nd stable, gain 1 grain."
+    },
+    {
+      "trigger": "after_stable_built",
+      "conditions": [
+        {
+          "predicate": "stable_count_in",
+          "params": {
+            "values": [
+              3,
+              4
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "vegetable",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "each_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "When this build makes the 3rd or 4th stable, gain 1 vegetable."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E114-first-stable",
+      "E114-third-stable",
+      "E114-stables-built-before"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "Stables 1-2 built after this card give 1 grain each; stables 3-4 give 1 vegetable each."
+  }
+}

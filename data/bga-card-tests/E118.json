@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "E118",
+  "cases": [
+    {
+      "id": "E118-fishing",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "E118",
+        "use_space": "fishing"
+      },
+      "expected": {
+        "wood_delta": 1,
+        "food_delta": 1
+      },
+      "notes": "Fishing yields food, so one wood is added."
+    },
+    {
+      "id": "E118-no-food-space",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "E118",
+        "use_space": "farmland"
+      },
+      "expected": {
+        "wood_delta": 0
+      },
+      "notes": "A space without food gain does not trigger the wood."
+    },
+    {
+      "id": "E118-resource-market",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "play": "E118",
+        "use_space": "resource_market",
+        "take_food": true
+      },
+      "expected": {
+        "wood_delta": 1,
+        "food_delta": 1
+      },
+      "notes": "Choosing food at the resource market triggers the wood."
+    }
+  ]
+}

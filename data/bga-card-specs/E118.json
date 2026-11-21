@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "card_id": "E118",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "薪切り",
+    "name_en": "Kindling Gatherer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2635",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "gained_food_from_this_space",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Whenever the owner gains food from an action space (including card spaces), additionally gain 1 wood."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E118-fishing",
+      "E118-no-food-space",
+      "E118-resource-market"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "implemented",
+    "notes": "Any action space that gives food also gives 1 wood. The current engine implements only the four printed list spaces (day laborer, fishing, small theater, resource market); the wiki commentary also names card spaces such as the archway and the forest inn, so the implementation is narrower (Q-3)."
+  }
+}

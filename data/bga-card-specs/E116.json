@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "card_id": "E116",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "もみの木切り",
+    "name_en": "Fir Cutter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2637",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "When played, gain 1 food."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "sheep_market",
+              "pig_market",
+              "cattle_market"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": {
+              "op": "custom",
+              "args": [
+                "table",
+                "own_placement_index_this_round",
+                {
+                  "1": 1,
+                  "2": 1,
+                  "3": 2,
+                  "4": 2,
+                  "5": 3
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Each time the owner uses an animal accumulation space, gain wood by the order of the person placed this round: 1st/2nd -> 1, 3rd/4th -> 2, 5th -> 3."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E116-first-worker",
+      "E116-third-worker",
+      "E116-non-animal-space"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "On play 1 food; animal accumulation spaces give 1/1/2/2/3 wood by the 1st-5th placement."
+  }
+}

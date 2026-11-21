@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "card_id": "E119",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "土地相続人",
+    "name_en": "Land Heir"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2634",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "round_number",
+          "params": {
+            "max": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "wood",
+            "amount": 4,
+            "rounds": [
+              9
+            ]
+          }
+        },
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "clay",
+            "amount": 4,
+            "rounds": [
+              9
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Only when played in round 4 or earlier: place 4 wood and 4 clay on the round-9 space."
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "round_number",
+          "params": {
+            "n": 9
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "take_all_goods_from_round_space",
+            "good": "wood",
+            "source": "this_card_round_markers",
+            "consume_markers": true
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "take_all_goods_from_round_space",
+            "good": "clay",
+            "source": "this_card_round_markers",
+            "consume_markers": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "At the start of round 9 the owner takes the placed wood and clay."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E119-played-early",
+      "E119-played-late",
+      "E119-collect-round-9"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "Played by round 4: 4 wood and 4 clay on the round-9 space, collected at the start of round 9."
+  }
+}
