@@ -2382,7 +2382,9 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             id: "B050".into(),
             kind: minor,
             cost: vec![(Good::Wood, 1)],
-            points: 0,
+            // Printed 1 point (JA card page and base ledger); the definition
+            // previously carried 0 (audit chapter B).
+            points: 1,
             effects: vec![
                 CardEffect::Prerequisite {
                     rule: CardRequirement::MaximumOccupations(3),
@@ -2416,11 +2418,19 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
             kind: minor,
             cost: vec![],
             points: 0,
-            effects: vec![CardEffect::HarvestFieldGain {
-                rule: HarvestFieldRule::MixedFields,
-                good: Good::Food,
-                amount: 3,
-            }],
+            effects: vec![
+                // Printed prerequisite: 3 occupations played (JA page 条件=職業3).
+                // It was missing from the definition while the spec JSON had
+                // it (audit chapter B).
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(3),
+                },
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::MixedFields,
+                    good: Good::Food,
+                    amount: 3,
+                },
+            ],
         },
         CardDefinition {
             use_limit: None,
@@ -2535,6 +2545,47 @@ mod round_and_harvest_card_tests {
         start_round_rewards(&set(), &mut p).unwrap();
         assert_eq!(p.supply.food, 1);
     }
+    #[test]
+    fn b050_printed_point_is_one() {
+        // 文献と台帳の印刷点は1（旧定義は0だった。監査 第2章）。
+        let definitions = set();
+        let card = definitions.definition("B050").unwrap();
+        assert_eq!(card.points, 1);
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        let mut set = definitions.clone();
+        set.definitions.retain(|card| card.id == "B050");
+        card_play_b050(&set, &mut p);
+        assert_eq!(p.card_points, 1, "printed point must be added on play");
+    }
+
+    fn card_play_b050(set: &CardSet, p: &mut Player) {
+        let mut hand = vec!["B050".to_string()];
+        crate::cards::play(set, &mut hand, p, "B050", CardKind::MinorImprovement, 0).unwrap();
+    }
+
+    #[test]
+    fn b061_requires_three_occupations_before_play() {
+        // 文献の前提は「職業3」（監査 第2章で実装に追加）。
+        let mut definitions = set();
+        for i in 1..=3 {
+            definitions.definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("occ{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        let card = definitions.definition("B061").unwrap().clone();
+        let mut p = Player::new(0, 0);
+        p.played_cards.extend(["occ1".into(), "occ2".into()]);
+        assert!(!can_play(&definitions, &card, &p, 0));
+        p.played_cards.push("occ3".into());
+        assert!(can_play(&definitions, &card, &p, 0));
+    }
+
     #[test]
     fn b061_requires_three_different_field_states() {
         let mut p = Player::new(0, 0);
