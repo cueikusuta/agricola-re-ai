@@ -16,8 +16,8 @@
       }
     },
     {
-      "id": "D005-zero",
-      "scope": "effect_only",
+      "id": "D005-prerequisite",
+      "scope": "legal_play",
       "setup": {
         "sown_fields": 0
       },
@@ -25,8 +25,9 @@
         "play": "D005"
       },
       "expected": {
-        "clay_delta": 0
-      }
+        "play_rejected": true
+      },
+      "notes": "The printed prerequisite is at least 1 planted field."
     }
   ]
 }

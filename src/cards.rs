@@ -306,10 +306,19 @@ pub enum HarvestFieldRule {
 pub enum CardRequirement {
     MinimumOccupations(u8),
     MaximumOccupations(u8),
-    MinimumAnimals { animal: Animal, number: u32 },
-    MinimumCropFields { crop: Crop, number: u8 },
+    MinimumAnimals {
+        animal: Animal,
+        number: u32,
+    },
+    MinimumCropFields {
+        crop: Crop,
+        number: u8,
+    },
     MinimumPlayers(u8),
     MinimumImprovements(u8),
+    /// D005 畑の粘土 (Clay from Fields): at least `n` fields are sown (a field
+    /// with a crop planted). The printed prerequisite is "1 planted field".
+    MinimumSownFields(u8),
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -778,6 +787,9 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
                                 improvement_count_in_front(set, player) >= u32::from(*min)
                             }
                 CardRequirement::MinimumPlayers(_) => true,
+                CardRequirement::MinimumSownFields(min) => {
+                    sown_field_count(player) as u32 >= u32::from(*min)
+                }
             }
         })
 }
@@ -1842,19 +1854,26 @@ pub fn verified_immediate_resource_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         },
-        // D004 Cross-Cut Wood (横挽きの木材): OnPlayGainPerStored wood per stone in supply, cost 1 food.
+        // D004 Cross-Cut Wood (横挽きの木材): OnPlayGainPerStored wood per stone in supply,
+        // cost 1 food, prerequisite 3 occupations (JA page 条件=職業3). The
+        // prerequisite was missing from the definition (audit chapter D).
         CardDefinition {
             use_limit: None,
             id: "D004".into(),
             kind: CardKind::MinorImprovement,
             cost: vec![(Good::Food, 1)],
             points: 0,
-            effects: vec![CardEffect::OnPlayGainPerStored {
-                stored: Good::Stone,
-                divisor: 1,
-                good: Good::Wood,
-                amount: 1,
-            }],
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(3),
+                },
+                CardEffect::OnPlayGainPerStored {
+                    stored: Good::Stone,
+                    divisor: 1,
+                    good: Good::Wood,
+                    amount: 1,
+                },
+            ],
         },
     ]
 }
@@ -1958,16 +1977,66 @@ mod verified_immediate_resource_tests {
         assert_eq!(player, old);
     }
 
+    fn d004_set_with_occupations(n: usize) -> CardSet {
+        let mut set = CardSet {
+            definitions: verified_immediate_resource_cards(),
+        };
+        for i in 1..=n {
+            set.definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("occ{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        set
+    }
+
     #[test]
     fn d004_on_play_gains_wood_per_stone() {
+        let set = d004_set_with_occupations(3);
         let mut player = Player::new(0, 0);
+        // 前提は職業3（監査 第4章で実装に追加）。
+        player
+            .played_cards
+            .extend(["occ1".into(), "occ2".into(), "occ3".into()]);
         player.supply.food = 1;
         player.supply.stone = 3;
-        play_card("D004", &mut player).unwrap();
+        let mut hand = vec!["D004".to_string()];
+        play(
+            &set,
+            &mut hand,
+            &mut player,
+            "D004",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
         assert_eq!(player.supply.wood, 3);
         assert_eq!(player.supply.food, 0);
         assert_eq!(player.supply.stone, 3);
-        assert_eq!(player.played_cards, vec!["D004"]);
+        assert_eq!(player.played_cards.last().map(String::as_str), Some("D004"));
+    }
+
+    #[test]
+    fn d004_requires_three_occupations() {
+        let set = d004_set_with_occupations(3);
+        let card = set.definition("D004").unwrap();
+        let mut player = Player::new(0, 0);
+        player.supply.food = 1;
+        player.supply.stone = 2;
+        player.played_cards.extend(["occ1".into(), "occ2".into()]);
+        assert!(
+            !can_play(&set, card, &player, 0),
+            "2 occupations is not enough"
+        );
+        player.played_cards.push("occ3".into());
+        assert!(
+            can_play(&set, card, &player, 0),
+            "3 occupations unlocks D004"
+        );
     }
 
     #[test]
@@ -3641,14 +3710,17 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
             }],
         ),
         // D105 彫刻家 (Sculptor): no cost; each use of a clay accumulation
-        // space grants 1 food, each use of a stone accumulation space grants
-        // 1 grain.
+        // space (Clay Pit, and Hollow where it exists) grants 1 food, each use
+        // of a stone accumulation space grants 1 grain. Hollow was missing from
+        // the definition although B122/B144 include it for "clay accumulation"
+        // (audit chapter D).
         card(
             "D105",
             CardKind::Occupation,
             vec![],
             vec![
                 gain(Space::ClayPit, Good::Food, 1),
+                gain(Space::Hollow, Good::Food, 1),
                 gain(Space::WesternQuarry, Good::Grain, 1),
                 gain(Space::EasternQuarry, Good::Grain, 1),
             ],
@@ -3670,16 +3742,24 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 gain(Space::Cultivation, Good::Food, 2),
             ],
         ),
-        // D005 畑の粘土 (Clay from Fields): cost 1 food; on play gain 1 clay per sown field.
+        // D005 畑の粘土 (Clay from Fields): cost 1 food; on play gain 1 clay per
+        // sown field. The printed prerequisite is "at least 1 planted field"
+        // (JA page 条件=栽培中の畑1); it was missing from both the spec and the
+        // definition (audit chapter D).
         card(
             "D005",
             CardKind::MinorImprovement,
             vec![(Good::Food, 1)],
-            vec![CardEffect::OnPlayGainPerCount {
-                count_kind: CountKind::SownFields,
-                good: Good::Clay,
-                amount: 1,
-            }],
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumSownFields(1),
+                },
+                CardEffect::OnPlayGainPerCount {
+                    count_kind: CountKind::SownFields,
+                    good: Good::Clay,
+                    amount: 1,
+                },
+            ],
         ),
         // D032 木のくまで (Wood Rake): cost 1 wood; at scoring, +2 points if at least
         // 7 goods stood in fields before the final harvest.
@@ -4265,13 +4345,13 @@ mod verified_band_d_tests {
             "D105",
             &[
                 Space::ClayPit,
-                Space::ClayPit,
+                Space::Hollow,
                 Space::WesternQuarry,
                 Space::EasternQuarry,
                 Space::Forest,
             ],
         );
-        assert_eq!(p.supply.food, 2);
+        assert_eq!(p.supply.food, 2, "clay pit + hollow -> 2 food");
         assert_eq!(p.supply.grain, 2);
     }
 

@@ -724,8 +724,29 @@ fn d005_cost_food_1_pinned() {
     let set = new_set(defs.clone());
     let card = real_card(&defs, "D005");
     assert_eq!(card.cost, vec![(Good::Food, 1)], "D005 cost must be food 1");
+    // 文献の前提「栽培中の畑1」（監査 第4章で実装・仕様へ追加）。
+    assert!(
+        card.effects.iter().any(|e| matches!(
+            e,
+            CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumSownFields(1)
+            }
+        )),
+        "D005 must carry MinimumSownFields(1)"
+    );
     let mut player = player_with_food(1);
-    assert!(can_play(&set, card, &player, 0), "food 1 -> D005 playable");
+    assert!(
+        !can_play(&set, card, &player, 0),
+        "no sown field -> D005 unplayable"
+    );
+    player.farm[1].tile = Tile::Field {
+        crop: Some(Crop::Grain),
+        remaining: 1,
+    };
+    assert!(
+        can_play(&set, card, &player, 0),
+        "1 sown field + food 1 -> D005 playable"
+    );
     player.supply.food = 0;
     assert!(
         !can_play(&set, card, &player, 0),
@@ -825,7 +846,20 @@ fn spec_cost_prereq_parity_with_verified_cards() {
         let prerequisites = spec["play"]["prerequisites"]
             .as_array()
             .unwrap_or_else(|| panic!("{id} spec prerequisites must be an array"));
-        if id == "B006" {
+        if id == "D005" {
+            assert_eq!(prerequisites.len(), 1, "D005: exactly one prerequisite");
+            assert_eq!(
+                prerequisites[0]["predicate"].as_str().unwrap(),
+                "sown_field_count"
+            );
+            assert_eq!(prerequisites[0]["params"]["n"].as_u64().unwrap(), 1);
+            assert!(card.effects.iter().any(|e| matches!(
+                e,
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumSownFields(1)
+                }
+            )));
+        } else if id == "B006" {
             assert_eq!(prerequisites.len(), 1, "B006: exactly one prerequisite");
             assert_eq!(
                 prerequisites[0]["predicate"].as_str().unwrap(),

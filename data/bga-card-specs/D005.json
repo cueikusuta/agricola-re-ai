@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "sown_field_count",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
@@ -83,11 +90,11 @@
     "unresolved_fields": [],
     "test_case_ids": [
       "D005-normal",
-      "D005-zero"
+      "D005-prerequisite"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "tested",
-    "notes": "Gain 1 clay per planted field; pass left."
+    "notes": "Prerequisite: at least 1 planted field. Gain 1 clay per planted field; pass left."
   }
 }

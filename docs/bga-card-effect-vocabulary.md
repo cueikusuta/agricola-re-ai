@@ -110,7 +110,14 @@
 `person_on_accumulation_space` `hand_occupation_count` `remaining_rounds` `fence`
 `vegetable_taken_from_field` `sheep` `wild_boar` `cattle` `completed_harvest`
 `grain_in_supply` `unused_farmyard_space` `sown_field` `stone_in_supply`
-`column_with_room` `wood_on_card`
+`column_with_room` `wood_on_card` `scoring_categories_at_max`
+
+補足:
+- `improvement` は「プレイヤーの前にある進歩」（プレイ済み小進歩カード＋所有大進歩）。
+  大進歩だけを数える語は未定義で、C005 の語義は Issue #349 が人間決定待ち。
+- `clay_room` は現実装ではレンガ家・石家の部屋数。石の家の部屋を数えるかは #349 で併せて確認する。
+- `scoring_categories_at_max` は得点表（`score.rs`）の8カテゴリのうち4点上限に達した数。
+  各カテゴリは最大4点なので「4点に達している」は `>= 4` で判定する（D100）。
 
 ## 条件（`effects[].conditions[]`）
 
@@ -128,6 +135,7 @@
 | `grain_field_count` | `n` | 小麦畑の数 |
 | `field_count` | `n` | 畑タイル数 |
 | `empty_field_count` | `n` | 何も植えていない畑の数 |
+| `sown_field_count` | `n` | 作物が植わっている畑（栽培中の畑）の数。D005 の前提「栽培中の畑1」で使用 |
 | `pasture_count` | `n` | 牧場の数 |
 | `stable_count` | `n` | 厩の数 |
 | `farmyard_all_used` | — | 農場スペースが全て使用済み |

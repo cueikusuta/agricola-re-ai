@@ -190,6 +190,7 @@ PREREQ = {
     "A054": [cond("occupation_count", max=3)],
     "A068": [cond("empty_field_count", n=1)],
     "B006": [cond("occupation_count", n=1)],
+    "D005": [cond("sown_field_count", n=1)],
     "B033": [cond("house_is", house=["clay", "stone"])],
     "B037": [cond("field_count", n=6), cond("all_animal_types")],
     "B073": [cond("occupation_count", n=3)],
@@ -1334,11 +1335,14 @@ CARDS = {
     "D005": {
         "post": "left_neighbor_hand",
         "effects": [effect("on_play", [gain("clay", per(count("sown_field"), 1))])],
-        "notes": "Gain 1 clay per planted field; pass left.",
+        "notes": "Prerequisite: at least 1 planted field. Gain 1 clay per planted field; pass left.",
         "implementation_status": "tested",
         "tests": [
             case("D005-normal", {"sown_fields": 2}, {"play": "D005"}, {"clay_delta": 2}),
-            case("D005-zero", {"sown_fields": 0}, {"play": "D005"}, {"clay_delta": 0}),
+            case("D005-prerequisite", {"sown_fields": 0}, {"play": "D005"},
+                 {"play_rejected": True},
+                 scope="legal_play",
+                 notes="The printed prerequisite is at least 1 planted field."),
         ],
     },
     "D006": {
