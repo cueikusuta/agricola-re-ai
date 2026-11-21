@@ -197,6 +197,11 @@ pub enum RecordedAction {
         player: usize,
         decision_id: u64,
         resolution: crate::pending::PendingResolution,
+        /// Whether this resolution came from `resolve_pending_and_resume` (true)
+        /// or `resolve_pending` (false). This distinguishes the two APIs for
+        /// replay integrity (P1-1 fix).
+        #[serde(default)]
+        from_resume: bool,
     },
 }
 
@@ -891,6 +896,9 @@ impl Game {
             Transition::Paused(mut pending) => {
                 // P0-1: Commit the mid-action state (worker action + partial card effects applied)
                 // so resume does not lose mid-action modifications.
+                // P1-3 FIX: Capture previous_player BEFORE committing state, so ClayConstruction
+                // trigger sees the pre-action player state (without the new improvement).
+                let previous_player = self.public.players[player].clone();
                 *self = next;
                 // Stamp the decision with engine-level metadata (Issue #268):
                 // - decision ID
@@ -947,7 +955,7 @@ impl Game {
                 };
                 let completion = Box::new(crate::pending::WorkCompletion {
                     action: action.clone(),
-                    previous_player: self.public.players[player].clone(),
+                    previous_player,
                     harvest_plans: forced.clone(),
                     breeding_plans: forced_breeding.clone(),
                     logged_before: if record {
@@ -1289,6 +1297,7 @@ impl Game {
                 player,
                 decision_id,
                 resolution,
+                ..
             } => {
                 if event.kind != "pending_resolution" || event.player != Some(player) {
                     return Err("replay pending_resolution metadata/player mismatch".into());
@@ -1544,6 +1553,7 @@ impl Game {
                         };
                         play_from_hand(&mut ctx, id, card_id)?;
                         // Dispatch Replace/Before phases for the new card only
+                        // MeetingPlace + PlayMinor is a "Minor Improvement" action → improvement action path
                         dispatch_play(
                             &self.card_set,
                             id,
@@ -1559,6 +1569,7 @@ impl Game {
                             &mut self.public.card_uses,
                             &self.card_use_limits,
                             &mut self.pending,
+                            true, // is_improvement_action
                         )?;
                         // Update card points
                         let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1613,6 +1624,7 @@ impl Game {
                 };
                 play_from_hand(&mut ctx, id, card_id)?;
                 // Dispatch Replace/Before phases for the new card only
+                // Lessons/ExtraLessons + PlayOccupation is an occupation action → NOT improvement action path
                 dispatch_play(
                     &self.card_set,
                     id,
@@ -1628,6 +1640,7 @@ impl Game {
                     &mut self.public.card_uses,
                     &self.card_use_limits,
                     &mut self.pending,
+                    false, // is_improvement_action
                 )?;
                 // Update card points
                 let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1725,6 +1738,7 @@ impl Game {
                     };
                     play_from_hand(&mut ctx, id, card_id)?;
                     // Dispatch Replace/Before phases
+                    // FamilyGrowthWithRoom/ModestFamilyGrowth + GrowWithMinor is a family growth action → NOT improvement action path
                     dispatch_play(
                         &self.card_set,
                         id,
@@ -1740,6 +1754,7 @@ impl Game {
                         &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
+                        false, // is_improvement_action
                     )?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1810,6 +1825,7 @@ impl Game {
                     };
                     play_from_hand(&mut ctx, id, card_id)?;
                     // Dispatch Replace/Before phases
+                    // MajorImprovement + PlayMinor is a "Minor Improvement" action (on Major Improvement space) → improvement action path
                     dispatch_play(
                         &self.card_set,
                         id,
@@ -1825,6 +1841,7 @@ impl Game {
                         &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
+                        true, // is_improvement_action
                     )?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -2891,7 +2908,7 @@ fn take_animals(
     }
     Ok(())
 }
-fn place_animals(p: &mut Player, plan: &AnimalPlan, n: u32) -> Result<()> {
+pub fn place_animals(p: &mut Player, plan: &AnimalPlan, n: u32) -> Result<()> {
     let assigned: u32 = plan.to_pastures.iter().map(|x| x.1).sum::<u32>()
         + plan.to_stables.len() as u32
         + u32::from(plan.pet)
@@ -3588,73 +3605,73 @@ mod grow_with_minor_regression_tests {
     #[test]
     fn grow_with_minor_b010_order_preplayed_allows_growth() {
         // (c) PREVIOUSLY played B010 DOES provide room (existing behavior preserved)
-                // Use verified_basic_card_set which has the full 14 cards per player (7 occupations + 7 minors)
-                // Seed-independent setup (PR #385 review R-P1-2): the seed search
-                // adopted whichever seed first seats B010 in player 0's hand, and
-                // that seed's start player shifted with this batch's card-set
-                // composition (the apply then landed on the B010-less opponent).
-                // Hands are forced and seat 0 is the explicit start player instead.
-                let set = verified_basic_card_set(2).unwrap();
-                let mut occs: Vec<String> = set
-                    .definitions
-                    .iter()
-                    .filter(|c| c.kind == CardKind::Occupation)
-                    .map(|c| c.id.clone())
-                    .collect();
-                occs.sort();
-                let mut minors: Vec<String> = set
-                    .definitions
-                    .iter()
-                    .filter(|c| c.kind == CardKind::MinorImprovement)
-                    .map(|c| c.id.clone())
-                    .collect();
-                minors.sort();
-                let seat0_occ: Vec<String> = occs.iter().take(7).cloned().collect();
-                let mut seat0_minor = vec!["B010".to_string(), "A063".to_string()];
-                seat0_minor.extend(
-                    minors
-                        .iter()
-                        .filter(|id| *id != "B010" && *id != "A063")
-                        .take(5)
-                        .cloned(),
-                );
-                let seat1_occ: Vec<String> = occs
-                    .iter()
-                    .filter(|id| !seat0_occ.contains(id))
-                    .take(7)
-                    .cloned()
-                    .collect();
-                let seat1_minor: Vec<String> = minors
-                    .iter()
-                    .filter(|id| !seat0_minor.contains(id))
-                    .take(7)
-                    .cloned()
-                    .collect();
-                assert_eq!(
-                    (seat0_occ.len(), seat0_minor.len()),
-                    (7, 7),
-                    "seat 0 must hold seven occupations and seven minors"
-                );
-                assert_eq!(
-                    (seat1_occ.len(), seat1_minor.len()),
-                    (7, 7),
-                    "seat 1 must hold seven occupations and seven minors"
-                );
-                let config = Config {
-                    players: 2,
-                    seed: 1,
-                    additional_action_space_enabled: false,
-                };
-                let mut game = Game::with_cards_and_hands_with_start_player(
-                    config,
-                    set.clone(),
-                    vec![
-                        [seat0_occ, seat0_minor].concat(),
-                        [seat1_occ, seat1_minor].concat(),
-                    ],
-                    0,
-                )
-                .expect("forced hands must build a valid game");
+        // Use verified_basic_card_set which has the full 14 cards per player (7 occupations + 7 minors)
+        // Seed-independent setup (PR #385 review R-P1-2): the seed search
+        // adopted whichever seed first seats B010 in player 0's hand, and
+        // that seed's start player shifted with this batch's card-set
+        // composition (the apply then landed on the B010-less opponent).
+        // Hands are forced and seat 0 is the explicit start player instead.
+        let set = verified_basic_card_set(2).unwrap();
+        let mut occs: Vec<String> = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::Occupation)
+            .map(|c| c.id.clone())
+            .collect();
+        occs.sort();
+        let mut minors: Vec<String> = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::MinorImprovement)
+            .map(|c| c.id.clone())
+            .collect();
+        minors.sort();
+        let seat0_occ: Vec<String> = occs.iter().take(7).cloned().collect();
+        let mut seat0_minor = vec!["B010".to_string(), "A063".to_string()];
+        seat0_minor.extend(
+            minors
+                .iter()
+                .filter(|id| *id != "B010" && *id != "A063")
+                .take(5)
+                .cloned(),
+        );
+        let seat1_occ: Vec<String> = occs
+            .iter()
+            .filter(|id| !seat0_occ.contains(id))
+            .take(7)
+            .cloned()
+            .collect();
+        let seat1_minor: Vec<String> = minors
+            .iter()
+            .filter(|id| !seat0_minor.contains(id))
+            .take(7)
+            .cloned()
+            .collect();
+        assert_eq!(
+            (seat0_occ.len(), seat0_minor.len()),
+            (7, 7),
+            "seat 0 must hold seven occupations and seven minors"
+        );
+        assert_eq!(
+            (seat1_occ.len(), seat1_minor.len()),
+            (7, 7),
+            "seat 1 must hold seven occupations and seven minors"
+        );
+        let config = Config {
+            players: 2,
+            seed: 1,
+            additional_action_space_enabled: false,
+        };
+        let mut game = Game::with_cards_and_hands_with_start_player(
+            config,
+            set.clone(),
+            vec![
+                [seat0_occ, seat0_minor].concat(),
+                [seat1_occ, seat1_minor].concat(),
+            ],
+            0,
+        )
+        .expect("forced hands must build a valid game");
         game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
         game.public.round = 1;
         // Give player 0 resources to play B010 (wood3, food3)
@@ -4705,4 +4722,9 @@ mod audit_p2_1_exhaustive_tests {
             );
         }
     }
+}
+
+#[cfg(test)]
+mod p1_tests {
+    include!("p1_tests.rs");
 }

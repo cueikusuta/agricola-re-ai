@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "D094",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "恐妻家",
+    "name_en": "Henpecked Husband"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2827",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_room_construction",
+      "conditions": [
+        {
+          "predicate": "worker_on_space",
+          "params": {
+            "space": "second_person_this_round"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_unplaced_person",
+            "action": "return_first_person_from_meeting_place",
+            "notes": "そのラウンドの2人目で部屋を建てると、集会所にいない1人目を家へ戻す"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: 2人目の人物で部屋建設時に1人目を集会所から帰宅"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: worker_on_space に 'second_person_this_round' という述語は語彙に無い。ラウンド内の行動順序（1人目/2人目）をどう判定するか",
+      "effects[0].steps[0].params.kind=other: place_unplaced_person / return_first_person_from_meeting_place の詳細仕様（集会所にいる人物の特定・他プレイヤーの影響・部屋建設アクションの種類）が未確定",
+      "classification: 段階3（部屋・建設イベント）だが、『そのラウンドの2人目』という条件の実装要件（人物配置順序の記録）が語彙外"
+    ],
+    "test_case_ids": [
+      "D094-second-person-build-room-returns-first",
+      "D094-first-person-build-room-no-effect",
+      "D094-third-person-build-room-no-effect"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: When building a room with your 2nd person this round, return your 1st person from the meeting place home. Trigger: after_room_construction with condition on action order. Unresolved: how to track '1st/2nd person this round', meeting place definition, scope of room-building actions."
+  }
+}

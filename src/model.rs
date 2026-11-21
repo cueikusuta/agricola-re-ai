@@ -219,6 +219,12 @@ pub struct Player {
     #[serde(default)]
     pub extra_housing: u8,
     pub begging: u32,
+    /// Snapshot of total crop goods in fields at the end of the final harvest
+    /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
+    /// if at least 7 goods were in fields before final harvest. Absent in v5
+    /// saves; defaults to None so scoring treats it as 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_goods_before_final_harvest: Option<u32>,
 }
 impl Player {
     pub fn new(id: usize, food: u32) -> Self {
@@ -250,6 +256,7 @@ impl Player {
             stone_cost_discount: 0,
             extra_housing: 0,
             begging: 0,
+            field_goods_before_final_harvest: None,
         }
     }
     pub fn rooms(&self) -> usize {
@@ -589,6 +596,14 @@ pub struct PublicState {
     /// boundary; `serde(default)` keeps pre-aggregation saves loading.
     #[serde(default)]
     pub card_uses: BTreeMap<String, u32>,
+    /// Per-card resource accumulations on played cards. Cards that place
+    /// resources on themselves (e.g., "place 1 wood on this card each round")
+    /// store their accumulations here. Keyed by player index, then card ID,
+    /// then resource type. `serde(default)` keeps pre-aggregation saves loading.
+    /// `skip_serializing_if = "BTreeMap::is_empty"` keeps empty ledger out of
+    /// JSON so pre-card_accumulations saves stay byte-identical (PR #327 pattern).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub card_accumulations: BTreeMap<usize, BTreeMap<String, BTreeMap<Good, u32>>>,
 }
 
 /// The exact `PublicState` field set the LOG_VERSION=5 `state_hash` tuple
@@ -596,8 +611,8 @@ pub struct PublicState {
 /// byte-identical JSON to serializing the 13-field v5 `PublicState`, so
 /// `state_hash` VALUES are unchanged by the Layer-0 aggregation even though
 /// `PublicState` grew. The aggregated fields (`well_food_schedule`,
-/// `card_uses`) are deliberately excluded here — their integrity is enforced
-/// by `integrity_hash` instead. Do not reorder or add fields.
+/// `card_uses`, `card_accumulations`) are deliberately excluded here — their
+/// integrity is enforced by `integrity_hash` instead. Do not reorder or add fields.
 #[derive(Serialize)]
 pub(crate) struct PublicStateHashMaterialV5<'a> {
     round: &'a u8,
@@ -893,6 +908,7 @@ impl Game {
             finished: false,
             well_food_schedule: BTreeMap::new(),
             card_uses: BTreeMap::new(),
+            card_accumulations: BTreeMap::new(),
         };
         let log = GameLog {
             log_version: LOG_VERSION,
@@ -954,10 +970,10 @@ impl Game {
         // Event log is intentionally omitted; this is the full game state, including hidden cards and RNG.
         // LOG_VERSION=5 compatibility: the hash tuple MUST stay identical to the
         // v5 format (7 fields, tests/fixtures/v5/*). New bookkeeping fields
-        // (well_food_schedule, pending, event_budget, card_uses, next_decision_id)
+        // (well_food_schedule, pending, event_budget, card_uses, card_accumulations, next_decision_id)
         // are serialized into saves via serde defaults, but are deliberately
         // EXCLUDED from the hash so legacy v5 fixtures keep verifying.
-        // well_food_schedule and card_uses are Layer-0 public state and are
+        // well_food_schedule, card_uses, and card_accumulations are Layer-0 public state and are
         // serialized into saves inside `public`; for the hash the public state
         // is projected onto its v5 field set (`hash_material_v5`), so hash
         // VALUES stay identical to the pre-aggregation format. Pending
@@ -979,7 +995,7 @@ impl Game {
 
     /// Full integrity hash covering the whole `Game`, including the Step 3
     /// bookkeeping fields (`well_food_schedule`, `pending`, `event_budget`,
-    /// `card_uses`, `next_decision_id`) that `state_hash` deliberately omits for
+    /// `card_uses`, `card_accumulations`, `next_decision_id`) that `state_hash` deliberately omits for
     /// LOG_VERSION=5 compatibility.
     ///
     /// Use this for save/restore/resume integrity checks on NEW saves:
@@ -987,16 +1003,38 @@ impl Game {
     /// that an interrupted PendingDecision survives a save/load round-trip
     /// byte-for-byte (Issue #266 acceptance: "PendingDecision save/restore/resume
     /// with a consistent state hash").
+    ///
+    /// `card_accumulations` is included only when non-empty (PR #371 backward
+    /// compatibility): empty ledger uses the 7-element tuple (same as pre-PR
+    /// #371) so existing saves keep their integrity_hash. Non-empty ledger uses
+    /// the 8-element tuple and any tampering is detected.
     pub fn integrity_hash(&self) -> String {
-        let data = serde_json::to_vec(&(
-            self.state_hash(),
-            &self.public.well_food_schedule,
-            &self.pending,
-            self.event_budget,
-            &self.public.card_uses,
-            &self.card_use_limits,
-            self.next_decision_id,
-        ))
+        // Backward compatibility: when card_accumulations is empty, compute hash
+        // from 7-element tuple (same as before card_accumulations was added).
+        // This matches PR #327's bonus_points pattern: skip domain separator
+        // append for empty ledger so pre-existing saves keep same integrity_hash.
+        let data = if self.public.card_accumulations.is_empty() {
+            serde_json::to_vec(&(
+                self.state_hash(),
+                &self.public.well_food_schedule,
+                &self.pending,
+                self.event_budget,
+                &self.public.card_uses,
+                &self.card_use_limits,
+                self.next_decision_id,
+            ))
+        } else {
+            serde_json::to_vec(&(
+                self.state_hash(),
+                &self.public.well_food_schedule,
+                &self.pending,
+                self.event_budget,
+                &self.public.card_uses,
+                &self.public.card_accumulations,
+                &self.card_use_limits,
+                self.next_decision_id,
+            ))
+        }
         .expect("integrity serialization");
         format!("{:x}", Sha256::digest(&data))
     }
@@ -1373,6 +1411,30 @@ impl Game {
         if all_cards != RoundCard::ALL.into_iter().collect() {
             return Err("round deck contains duplicate or missing cards".into());
         }
+        // Validate card_accumulations: player index must be valid, card must be played by that player.
+        for (player_idx, card_map) in &p.card_accumulations {
+            if *player_idx >= p.players.len() {
+                return Err(format!(
+                    "card_accumulations: invalid player index {player_idx}"
+                ));
+            }
+            let player = &p.players[*player_idx];
+            for (card_id, resource_map) in card_map {
+                if !player.played_cards.contains(card_id) {
+                    return Err(format!(
+                                "card_accumulations: player {player_idx} has accumulation on unplayed card {card_id}"
+                            ));
+                }
+                // Resource amounts are u32 (non-negative by type), but check for zero entries that shouldn't exist.
+                for &amount in resource_map.values() {
+                    if amount == 0 {
+                        return Err(format!(
+                                            "card_accumulations: player {player_idx} card {card_id} has zero amount"
+                                        ));
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1411,12 +1473,25 @@ impl Game {
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&decision)?;
+        // P1-1 FIX: the standalone API must not accept a paused WORK action.
+        // Resolving a PostWork decision here would apply the choice but never
+        // run the continuation (the paused work chain), so the state would stay
+        // mid-action while the recorded `pending_resolution` event claims the
+        // decision is complete — a replay would then run the continuation and
+        // diverge (poststate hash mismatch). Only `resolve_pending_and_resume`
+        // can complete a PostWork decision, and it records `from_resume: true`.
+        if let crate::pending::Continuation::PostWork { .. } = pending.continuation {
+            return Err(
+                "paused work action requires resolve_pending_and_resume, not resolve_pending"
+                    .into(),
+            );
+        }
         // Only now remove the decision. The steps below are individually
         // atomic (see `apply_pending_resolution`); if one still fails the
         // decision is put back so it stays resolvable.
         let pending = self.pending.take().expect("checked above");
         match self.apply_pending_resolution(&pending, &decision) {
-            Ok(()) => self.record_pending_resolution(&pending, &decision),
+            Ok(()) => self.record_pending_resolution(&pending, &decision, false),
             Err(err) => {
                 self.pending = Some(pending);
                 Err(err)
@@ -1444,6 +1519,55 @@ impl Game {
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&resolution)?;
+        // Site validation for ChooseTriggerOrder (Dispatcher 2-axis rebuild):
+        // Ensure ChooseTriggerOrder.site, PhaseTriggerData.site, and execution
+        // context site all match. A mismatch indicates a corrupted/incompatible save.
+        if let crate::pending::PendingKind::ChooseTriggerOrder {
+            site: pending_site, ..
+        } = &pending.kind
+        {
+            // Get site from trigger_data in context
+            let trigger_data_site = pending
+                .context
+                .get("trigger_data")
+                .cloned()
+                .and_then(|v| {
+                    serde_json::from_value::<crate::card_events::PhaseTriggerData>(v).ok()
+                })
+                .map(|td| td.site)
+                .unwrap_or(crate::registry::EventKind::WorkerPlaced);
+            // Get execution context site from continuation (PostWork) or context
+            let execution_site = if let crate::pending::Continuation::PostWork { resume, .. } =
+                &pending.continuation
+            {
+                match resume.step {
+                    crate::pending::ChainStep::AfterHarvestBake => crate::registry::EventKind::Bake,
+                    crate::pending::ChainStep::AfterClayConstruction => {
+                        crate::registry::EventKind::ClayConstruction
+                    }
+                    crate::pending::ChainStep::AfterWorker => {
+                        crate::registry::EventKind::WorkerPlaced
+                    }
+                }
+            } else {
+                // Non-post-work continuations: try to get from context phase
+                pending
+                    .context
+                    .get("phase")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| match s {
+                        "After" => Some(crate::registry::EventKind::WorkerPlaced), // Default for non-post-work
+                        _ => None,
+                    })
+                    .unwrap_or(crate::registry::EventKind::WorkerPlaced)
+            };
+            if *pending_site != trigger_data_site || *pending_site != execution_site {
+                return Err(format!(
+                            "site mismatch on resume: ChooseTriggerOrder.site={:?}, trigger_data.site={:?}, execution_site={:?}",
+                            pending_site, trigger_data_site, execution_site
+                        ));
+            }
+        }
         // R2-P1-1 (+ Round 2 P1-1): a paused work action's space must still be
         // revealed/available at resume time. Check it BEFORE taking the
         // decision so a stale or tampered save is refused atomically — nothing
@@ -1473,13 +1597,22 @@ impl Game {
                 ));
             }
         }
-        // Take the decision and its continuation
+        // P1-2 FIX: Atomicity - snapshot the ENTIRE game (including the still-
+        // stored pending decision) before any fallible operation, so any Err
+        // in the resume chain restores pending, state, and log completely.
+        let state_snapshot = self.clone();
         let pending = self.pending.take().expect("checked above");
         let continuation = pending.continuation.clone();
+
         // Apply the resolution WITHOUT logging it: the pending_resolution event
         // must chain from the paused state to the FINAL state (after the
         // continuation), so it is appended at the end of this method.
-        self.apply_pending_resolution(&pending, &resolution)?;
+        let apply_result = self.apply_pending_resolution(&pending, &resolution);
+        if let Err(err) = apply_result {
+            // Restore all state on error (pending was already restored by *self)
+            *self = state_snapshot;
+            return Err(err);
+        }
         let transition = match continuation {
             crate::pending::Continuation::None => Transition::Completed,
             crate::pending::Continuation::PostWork {
@@ -1490,13 +1623,27 @@ impl Game {
                 // The `work` event for the paused action was already recorded at
                 // pause time (with `after` = the paused hash), so only the
                 // resolution event is appended here; it spans the whole resume.
-                self.resume_post_work(player, resume, *completion)?
+                // A second pause during the resume returns Ok(Transition::Paused)
+                // (commit_second_pause), which must propagate unchanged.
+                match self.resume_post_work(player, resume, *completion) {
+                    Err(err) => {
+                        // Restore all state on error
+                        *self = state_snapshot;
+                        return Err(err);
+                    }
+                    Ok(t) => t,
+                }
             }
         };
         // The resolution event spans the whole resume, so it is logged last:
         // before == the paused hash the event chain already reached, after ==
         // the final (resumed) state.
-        self.record_pending_resolution(&pending, &resolution)?;
+        let record_result = self.record_pending_resolution(&pending, &resolution, true);
+        if let Err(err) = record_result {
+            // Restore all state on error
+            *self = state_snapshot;
+            return Err(err);
+        }
         Ok(transition)
     }
 
@@ -1615,6 +1762,7 @@ impl Game {
                             baked: true,
                             previous_player: None,
                             used_spaces: used_spaces.clone(),
+                            site: crate::registry::EventKind::Bake,
                             event_kind: crate::registry::EventKind::Bake,
                             c066_take_food_instead: false,
                         };
@@ -1749,6 +1897,7 @@ impl Game {
                         baked: false,
                         previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
+                        site: crate::registry::EventKind::ClayConstruction,
                         event_kind: crate::registry::EventKind::ClayConstruction,
                         c066_take_food_instead: false,
                     };
@@ -1858,6 +2007,7 @@ impl Game {
                         baked: false,
                         previous_player: None,
                         used_spaces: used_spaces.clone(),
+                        site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
                         c066_take_food_instead: false,
                     };
@@ -2127,7 +2277,11 @@ impl Game {
                 Ok(())
             }
             (
-                PendingKind::ChooseTriggerOrder { phase, triggers },
+                PendingKind::ChooseTriggerOrder {
+                    phase,
+                    site: _site,
+                    triggers,
+                },
                 PendingResolution::ChooseTriggerOrder { chosen_order },
             ) => {
                 // Execute the triggers in the chosen order
@@ -2259,6 +2413,22 @@ impl Game {
                     Ok(())
                 }
             }
+            (
+                PendingKind::ChooseAnimalPlacement { .. },
+                PendingResolution::ChooseAnimalPlacement { plan },
+            ) => {
+                let player = &mut self.public.players[pending.player];
+                crate::engine::place_animals(
+                    player,
+                    plan,
+                    plan.to_pastures.iter().map(|x| x.1).sum::<u32>()
+                        + plan.to_stables.len() as u32
+                        + u32::from(plan.pet)
+                        + plan.cook
+                        + plan.discard,
+                )
+                .map_err(|e| format!("animal placement failed: {e}"))
+            }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
     }
@@ -2271,6 +2441,7 @@ impl Game {
         &mut self,
         pending: &PendingDecision,
         resolution: &PendingResolution,
+        from_resume: bool,
     ) -> Result<(), String> {
         if !self.record_events {
             return Ok(());
@@ -2279,6 +2450,7 @@ impl Game {
             player: pending.player,
             decision_id: pending.id,
             resolution: resolution.clone(),
+            from_resume,
         })
         .map_err(|e| e.to_string())?;
         self.log.events.push(Event {

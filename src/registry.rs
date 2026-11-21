@@ -145,6 +145,8 @@ pub enum EventKind {
     /// Fires once per player at the harvest tail (A145 「各収穫の終わりに」,
     /// C066 「各収穫の後に」). Added in the PR #385 review-fix round.
     AfterHarvestComplete,
+    /// Improvement played from hand (Major/Minor Improvement action, including renovation-combined)
+    ImprovementPlayed,
 }
 
 impl EventKind {
@@ -157,6 +159,7 @@ impl EventKind {
             EventKind::ClayConstruction,
             EventKind::Bake,
             EventKind::AfterHarvestComplete,
+            EventKind::ImprovementPlayed,
         ]
     }
 }
@@ -301,6 +304,7 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterOccupationGainPerFoodCost { .. } => {
                     EventKind::CardPlayed
                 }
+                crate::cards::CardEffect::AfterOccupationGain { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::HarvestFieldGain { .. } => EventKind::Harvest,
                 crate::cards::CardEffect::AfterHarvestGain { .. } => {
                     EventKind::AfterHarvestComplete
@@ -317,6 +321,16 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
+                crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterAnyWorkerGain { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
+                crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
+                    EventKind::ImprovementPlayed
+                }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
                 | crate::cards::CardEffect::EndGameBonus { .. } => continue,
@@ -412,6 +426,7 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterOccupationGainPerFoodCost {
                             amount, ..
                         }
+                        | crate::cards::CardEffect::AfterOccupationGain { amount, .. }
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
@@ -430,6 +445,14 @@ impl CardRegistryBuilder {
                             gain_amount,
                             ..
                         } => *gain_amount,
+                        crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
+                        | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
+                        | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. }
+                        | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
+                            *amount
+                        }
                     };
                     amount == 0 || amount > 30
                 })

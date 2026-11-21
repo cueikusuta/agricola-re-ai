@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "card_id": "D090",
+  "cases": [
+    {
+      "id": "D090-use-plow-land-pay-food-plow",
+      "scope": "effect_only",
+      "setup": {
+        "food": 1
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "plow_land",
+        "choose_option": "extra_plow"
+      },
+      "expected": {
+        "food_delta": -1,
+        "fields_plowed": 1,
+        "passes_to_left_neighbor": false
+      },
+      "notes": "After plow land, pay 1 food for 1 extra plow"
+    },
+    {
+      "id": "D090-use-cultivation-pay-food-plow",
+      "scope": "effect_only",
+      "setup": {
+        "food": 1
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "cultivation",
+        "choose_option": "extra_plow"
+      },
+      "expected": {
+        "food_delta": -1,
+        "fields_plowed": 1
+      },
+      "notes": "After cultivation, pay 1 food for 1 extra plow"
+    },
+    {
+      "id": "D090-decline",
+      "scope": "effect_only",
+      "setup": {
+        "food": 1
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "plow_land",
+        "choose_option": "decline"
+      },
+      "expected": {
+        "food_unchanged": true,
+        "no_extra_plow": true
+      },
+      "notes": "Player may decline the optional extra plow"
+    },
+    {
+      "id": "D090-insufficient-food",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "plow_land",
+        "choose_option": "extra_plow"
+      },
+      "expected": {
+        "effect_rejected": true,
+        "reason": "insufficient food to pay cost"
+      },
+      "notes": "Cannot pay 1 food if player has none"
+    }
+  ]
+}

@@ -1191,7 +1191,7 @@ mod tests {
         // Updated: PR #385 review fix (e) — A145 removed from the two-player
         // preset (spec eligibility "2": "no"), pool size 38->37.
         assert_eq!(
-            digest, "c3561c61929915f3f45408b3447068c8cf73d358658a4770a34f751e0184474e",
+            digest, "e56fd942d6faa56e269926ec1fa9f16bf2eb3b0ac0b7cc98b5664f108ba6aaa8",
             "sample_game distribution changed — update this test only if intentional"
         );
     }

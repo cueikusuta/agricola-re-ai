@@ -316,6 +316,15 @@ fn validate_incremental_impl(post: &Game, pre: &Game, expect: DeltaExpectation) 
     if post.public.accumulations.len() > pre.public.accumulations.len() {
         return Verdict::Unsure;
     }
+    // 11b. `card_accumulations`: card effects may legally modify per-card
+    //      stored resources mid-round, and the cheap checks cannot prove the
+    //      delta sound (which card, which resource, which amount). Any change
+    //      therefore downgrades to Unsure so the full validator arbitrates —
+    //      mirroring the soundness contract applied to other bookkeeping
+    //      ledgers (PR #327's bonus_points pattern).
+    if post.public.card_accumulations != pre.public.card_accumulations {
+        return Verdict::Unsure;
+    }
     // 12. post.cards: mid-round checks.
     //     - hands.len() must equal player count (full validator rejects otherwise).
     if post.cards.hands.len() != n {
@@ -697,6 +706,13 @@ pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
     }
     if post.public.animal_accumulations.len() > pre.public.animal_accumulations.len() {
         return Verdict::Unsure;
+    }
+    // 11b. `card_accumulations` must not change in a free action: the free
+    //      executor has no card-effect dispatch (same certainty as
+    //      `card_uses`/`bonus_points` in PR #327's free-action contract),
+    //      so any difference is a definite violation.
+    if post.public.card_accumulations != pre.public.card_accumulations {
+        return Verdict::Fail("card_accumulations changed in free action".into());
     }
     // 12. active_player must not change in a free action.
     if post.public.active_player != pre.public.active_player {
@@ -1882,5 +1898,90 @@ mod tests {
         // Forest is a regular space (BASE). The added space in mid_round_pair
         // should already be valid, so just verify Pass.
         assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+    }
+
+    /// Regression (card accumulation state, PR #357-series follow-up): a work
+    /// move whose `card_accumulations` ledger changed must never return
+    /// `Pass` — card effects can legally modify it mid-round, but the cheap
+    /// checks cannot prove the delta, so the transition must downgrade to
+    /// `Unsure` and fall back to full validation.
+    #[test]
+    fn tampered_card_accumulations_decline_incremental() {
+        let (pre, mut post) = mid_round_pair();
+        // Add an entry for the actor's own played card (or any card id — the
+        // cheap layer cannot prove legality either way).
+        post.public
+            .card_accumulations
+            .entry(post.public.active_player)
+            .or_default()
+            .entry("B118".to_string())
+            .or_default()
+            .insert(crate::model::Good::Wood, 1);
+        let verdict = validate_incremental(&post, &pre);
+        assert_ne!(
+            verdict,
+            Verdict::Pass,
+            "changed card_accumulations must not Pass (got {verdict:?})"
+        );
+        assert!(matches!(verdict, Verdict::Unsure));
+    }
+
+    /// Regression (card accumulation state): a free action that changes
+    /// `card_accumulations` must be a definite `Fail` — the free executor has
+    /// no card-effect dispatch, so the ledger cannot legally change there.
+    #[test]
+    fn tampered_card_accumulations_decline_free_action() {
+        let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
+        let game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 61,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .expect("card game");
+        let mut rng = ChaCha8Rng::seed_from_u64(0xFADE);
+        let mut game = game;
+        for _ in 0..8 {
+            let id = game.public.active_player;
+            let obs = game.observation(id).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            game.apply(action).unwrap();
+        }
+        let pre = game.clone();
+        let actor = pre.public.active_player;
+        let mut post = pre.clone();
+        post.public.players[actor].supply.food = 3;
+        post.apply_free(
+            actor,
+            crate::engine::FreeAction::DiscardGood {
+                good: crate::model::Good::Food,
+                quantity: 1,
+            },
+        )
+        .expect("free action must apply");
+        // Sanity: the legitimate free action passes.
+        assert_eq!(validate_free_action(&post, &pre, actor), Verdict::Pass);
+        // Now tamper: add a card accumulation entry.
+        post.public
+            .card_accumulations
+            .entry(actor)
+            .or_default()
+            .entry("X000".to_string())
+            .or_default()
+            .insert(crate::model::Good::Clay, 2);
+        let verdict = validate_free_action(&post, &pre, actor);
+        assert!(
+            matches!(verdict, Verdict::Fail(_)),
+            "changed card_accumulations in free action must be definite Fail (got {verdict:?})"
+        );
+        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
     }
 }

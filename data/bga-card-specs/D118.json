@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "card_id": "D118",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "唐変木",
+    "name_en": "Bonehead"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2803",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "BGA wiki card page; effect: on play stack 6 wood on card; each card played from hand (including this), take 1 wood from card"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "stack_goods_on_card",
+            "goods": [
+              {"good": "wood", "amount": 6}
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "after_improvement",
+      "conditions": [
+        {
+          "predicate": "improvement_played_from_hand",
+          "params": {
+            "via_major_or_minor_action": true,
+            "include_this_card": true
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "take_top_good_from_card",
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "Each time a card is played from hand (occupation or improvement, including this card), take 1 wood from this card."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "D118-on-play-stack",
+      "D118-play-occupation-take-wood",
+      "D118-play-improvement-take-wood",
+      "D118-stock-exhausted"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Classification: stage 4 P6 (accumulation + retrieval). Uses PS, TR-SITE, STACK. On play: stack 6 wood on card. after_improvement (including occupations via improvement_played_from_hand): take 1 wood from card. Stack depletes after 6 cards played."
+  }
+}

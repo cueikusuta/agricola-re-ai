@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "card_id": "E080",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "石の庭",
+    "name_en": "Rock Garden"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2673",
+        "language": "ja",
+        "checked_on": "2026-11-19",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-19",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "this_card_is_a_field",
+            "card_field": true,
+            "crops": [
+              "stone"
+            ],
+            "counts_as_fields": 1,
+            "plants_as_fields": 3,
+            "sown_like": "vegetable",
+            "harvested_like": "vegetable"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "This card is a field. Only stone can be planted on it; it behaves as 3 fields for planting/harvesting but counts as 1 field; stone is sown and harvested as vegetables."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: card-as-field modeling is not covered by the vocabulary (R-C1)",
+      "effects.0.granularity: 'counts as 1 field but plants like 3 fields' — how many stone tokens per sow/harvest and how the field is counted are undecided (BQ-8, same class as D075)"
+    ],
+    "test_case_ids": [
+      "E080-sow-stone",
+      "E080-counts-as-one-field",
+      "E080-harvest-stone"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-19",
+    "implementation_status": "not_started",
+    "notes": "This card is a field (1 field) on which only stone can be planted, planted and harvested as vegetables, Behaving as 3 fields for planting."
+  }
+}

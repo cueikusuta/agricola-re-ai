@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "card_id": "D113",
+  "cases": [
+    {
+      "id": "D113-buy-veg-per-grain",
+      "scope": "effect_only",
+      "setup": {
+        "food": 10,
+        "vegetable": 0,
+        "grain_harvested_this_phase": 3
+      },
+      "action": {
+        "trigger": "harvest_field_phase",
+        "buy_count": 3
+      },
+      "expected": {
+        "food_delta": -9,
+        "vegetable_delta": 3,
+        "notes": "3 grain harvested, buy 3 veg at 3 food each = 9 food"
+      }
+    },
+    {
+      "id": "D113-last-grain-discount",
+      "scope": "effect_only",
+      "setup": {
+        "food": 5,
+        "vegetable": 0,
+        "grain_harvested_this_phase": 1,
+        "is_last_grain": true
+      },
+      "action": {
+        "trigger": "harvest_field_phase",
+        "buy_count": 1
+      },
+      "expected": {
+        "food_delta": -2,
+        "vegetable_delta": 1,
+        "notes": "Last grain harvested, buy 1 veg at 2 food discount"
+      }
+    },
+    {
+      "id": "D113-no-grain-harvested",
+      "scope": "effect_only",
+      "setup": {
+        "food": 10,
+        "vegetable": 0,
+        "grain_harvested_this_phase": 0
+      },
+      "action": {
+        "trigger": "harvest_field_phase"
+      },
+      "expected": {
+        "food_delta": 0,
+        "vegetable_delta": 0,
+        "effect_not_triggered": true
+      },
+      "notes": "No grain harvested, cannot buy vegetables"
+    }
+  ]
+}

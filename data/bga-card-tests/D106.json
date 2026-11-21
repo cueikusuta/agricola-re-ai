@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "card_id": "D106",
+  "cases": [
+    {
+      "id": "D106-basic-reservation",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "grain": 1,
+        "food": 0
+      },
+      "action": {
+        "use_free_action": "D106",
+        "spend": {"grain": 1},
+        "target_round": 7
+      },
+      "expected": {
+        "round_7_markers": {"food": 4},
+        "grain_delta": -1,
+        "food_delta_at_round_7_start": 4
+      },
+      "notes": "Pay 1 grain at round 5, place 4 food on round 7 space, gain at start of round 7"
+    },
+    {
+      "id": "D106-round-boundary-14",
+      "scope": "effect_only",
+      "setup": {
+        "round": 13,
+        "grain": 1,
+        "food": 0
+      },
+      "action": {
+        "use_free_action": "D106",
+        "spend": {"grain": 1},
+        "target_round": 15
+      },
+      "expected": {
+        "round_15_markers": null,
+        "resolution": "clamped_to_14_or_discarded",
+        "notes": "MQ-08: round 14+ handling unresolved; test documents expected behavior once resolved"
+      },
+      "notes": "Round 13 + 2 = 15 > 14; per MQ-08 resolution pending"
+    }
+  ]
+}
