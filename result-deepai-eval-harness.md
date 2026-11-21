@@ -76,3 +76,19 @@
 - 第二層（期待順位）の統計規約は U5 未決定のため記述的参照のみ。
 - 事前登録・locked test seed・追加上限は未実装（`registered=false` を明示）。
 - 鏡像対称性の合否しきい値は設計書に無いため `descriptive`（判断しない）。
+
+
+## 章1〜3 レビュー対応（2026-11-22）
+
+- 対象: PR #418（章1）の独立レビュー結果 P0なし / P1-1 / P2-1〜P2-8 / P3 群。
+- 修正: 直接対戦表示の実測化、ドラフト寄与armの許可、condition_id への code_sha と全予算の反映、
+  行の候補PUCTスカラー統一と欠落フィールド追加、ドラフトイベント列の記録、試合前マニフェスト＋SHA-256、
+  ピック期限未強制の明示、版付きドラフト方策ID、相手席停止規則の明記。
+- 追加テスト: 固定seedの2回実行一致、`--block-start`/`--draft-seed-start` の算術とキー一意性、
+  fixture単独拒否、ドラフト寄与armの許可/同一方策拒否、seedオーバーフロー、予算0、fixtureカードの無効果。
+- スモーク再実行（新マニフェスト、`--smoke`）:
+  - カードなし: `eval_veg` vs `greedy` 8試合、condition `1df1ad20…`、cand 75.00pp / base 25.00pp、期待順位 1.250 / 2.500。
+  - fixture 10-7: `eval_veg` vs `greedy`、draft `synergy` vs `card_value` 8試合、condition `cc0417cc…`、cand 100.00pp / base 25.00pp。
+  - 両方 `run_mode=smoke`、`official_pool_ready=false`、`g1_met=false`、`preregistration_sha256` 一致、全行 replay verified。
+- スクリプト: `tests/test_eval_report.py` 23件、`tests/test_eval_compare.py` 6件成功。`cargo clippy -D warnings` 成功。
+- 残: P2-6 の期限強制（観測のみ）と P3-9 の破棄カード席帰属は未実装として記録。U1/U2/U5/U6/U10 は決めていない。
