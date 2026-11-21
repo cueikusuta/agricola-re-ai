@@ -320,11 +320,12 @@ fn parse_options_from(args: impl Iterator<Item = String>) -> Result<Options, Str
             default_puct.value_temperature,
             "invalid puct-value-temp",
         )?,
-        leaf_mode: match values
-            .get("puct-leaf")
-            .map(String::as_str)
-            .unwrap_or("terminal")
-        {
+        leaf_mode: match values.get("puct-leaf").map(String::as_str).unwrap_or(
+            match default_puct.leaf_mode {
+                LeafMode::Heuristic => "heuristic",
+                LeafMode::Terminal => "terminal",
+            },
+        ) {
             "heuristic" => LeafMode::Heuristic,
             "terminal" => LeafMode::Terminal,
             _ => return Err("puct-leaf must be heuristic or terminal".into()),
@@ -379,15 +380,28 @@ fn validate(options: &Options) -> Result<(), String> {
     if options.blocks < 1 {
         return Err("blocks must be positive".into());
     }
+    let last_block = (options.blocks - 1) as u64;
     if options
         .seed_start
         .checked_add(options.block_start as u64)
+        .and_then(|start| start.checked_add(last_block))
         .is_none()
     {
-        return Err("seed-start + block-start overflows u64".into());
+        return Err("seed-start + block-start + blocks - 1 overflows u64".into());
+    }
+    if options
+        .draft_seed_start
+        .checked_add(options.block_start as u64)
+        .and_then(|start| start.checked_add(last_block))
+        .is_none()
+    {
+        return Err("draft-seed-start + block-start + blocks - 1 overflows u64".into());
     }
     if options.puct.simulations == 0 || options.mcts_simulations == 0 {
         return Err("simulation counts must be positive".into());
+    }
+    if !(1..=60_000).contains(&options.decision_budget_ms) {
+        return Err("decision-budget-ms must be in 1..=60000".into());
     }
     if options.search_mode != "simulation-capped" && options.search_mode != "time-budgeted" {
         return Err(format!("unsupported search mode: {}", options.search_mode));
@@ -398,13 +412,17 @@ fn validate(options: &Options) -> Result<(), String> {
         ));
     }
     let baseline_puct = PuctConfig::default();
-    let same_policy = options.candidate == options.baseline;
+    let same_game_policy = options.candidate == options.baseline;
+    let same_draft_policy = options.candidate_draft_ai == options.baseline_draft_ai;
     let distinct_puct = options.candidate == Ai::Puct
         && options.baseline == Ai::Puct
         && puct_config_id(&options.puct) != puct_config_id(&baseline_puct);
-    if same_policy && !distinct_puct {
+    // A draft-contribution arm (design §4.4) keeps the game policy fixed and
+    // changes only the draft policy, so "same game policy" alone is not an
+    // identical-condition error.
+    if same_game_policy && (!options.draft.enabled() || same_draft_policy) && !distinct_puct {
         return Err(
-            "candidate and baseline must differ; a PUCT-vs-PUCT run needs a candidate --puct-* override"
+            "candidate and baseline must differ: change the game policy, a candidate --puct-* override, or the draft policy"
                 .into(),
         );
     }
@@ -424,11 +442,6 @@ fn validate(options: &Options) -> Result<(), String> {
         }
         if options.players != 4 {
             return Err("draft_10_7_simultaneous is evaluated at four players".into());
-        }
-        if options.candidate_draft_ai == options.baseline_draft_ai
-            && options.candidate == options.baseline
-        {
-            return Err("candidate and baseline are identical for both draft and game".into());
         }
     } else if options.cards == Cards::Fixture4p {
         return Err(
@@ -502,7 +515,38 @@ fn run(options: &Options) -> Result<(), String> {
     let candidate_id = policy_id(options.candidate, &candidate_puct);
     let baseline_id = policy_id(options.baseline, &baseline_puct);
     let opponent_id = policy_id(options.opponent, &baseline_puct);
+    let opponent_is_baseline = options.opponent == options.baseline;
+    let head_to_head = opponent_is_baseline;
 
+    // Environment and gate snapshots (design §3.5, §5.2, U12). The code SHA is
+    // resolved before the condition hash so the identity can include it.
+    let code_sha = options
+        .code_sha
+        .clone()
+        .or_else(|| std::env::var("EVAL_CODE_SHA").ok())
+        .or_else(|| std::env::var("GITHUB_SHA").ok());
+    let provenance_incomplete = code_sha.is_none();
+    if !options.smoke && provenance_incomplete {
+        return Err(
+            "a non-smoke run needs an immutable code identity: pass --code-sha or set EVAL_CODE_SHA / GITHUB_SHA"
+                .into(),
+        );
+    }
+    let code_sha_value = code_sha.clone().unwrap_or_else(|| "unknown".into());
+    let budget_description = format!(
+        "{}:{}ms:reserve={}:mcts={}x{}:puct={}:max_sims={}:draft_pick={}ms",
+        options.search_mode,
+        options.decision_budget_ms,
+        options
+            .detail_reserve_ms
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "derived".into()),
+        options.mcts_simulations,
+        options.mcts_tree_depth,
+        puct_config_id(&candidate_puct),
+        DEFAULT_TIME_BUDGET_MAX_SIMULATIONS,
+        options.decision_budget_ms
+    );
     let condition_parts = BTreeMap::from([
         ("players".to_string(), options.players.to_string()),
         (
@@ -521,37 +565,27 @@ fn run(options: &Options) -> Result<(), String> {
         ),
         ("opponent_profile".to_string(), opponent_id.clone()),
         ("baseline_policy".to_string(), baseline_id.clone()),
-        (
-            "compute_budget".to_string(),
-            format!(
-                "{}:{}ms:reserve={}:{}",
-                options.search_mode,
-                options.decision_budget_ms,
-                options
-                    .detail_reserve_ms
-                    .map(|value| value.to_string())
-                    .unwrap_or_else(|| "derived".into()),
-                options.puct.simulations
-            ),
-        ),
-        (
-            "engine_version".to_string(),
-            env!("CARGO_PKG_VERSION").to_string(),
-        ),
+        ("compute_budget".to_string(), budget_description.clone()),
+        ("engine_version".to_string(), code_sha_value.clone()),
+        ("code_sha".to_string(), code_sha_value.clone()),
     ]);
     let condition_id = condition_id(&condition_parts);
 
-    // Environment and gate snapshots (design §3.5, §5.2, U12).
-    let code_sha = options
-        .code_sha
-        .clone()
-        .or_else(|| std::env::var("EVAL_CODE_SHA").ok())
-        .or_else(|| std::env::var("GITHUB_SHA").ok());
-    let pool_gate = pool_gate_snapshot(options.players);
+    let pool_gate = pool_gate_snapshot(options.players, code_sha.as_deref());
     let g1_met = pool_gate
         .get("g1_met")
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    // The final mode is a measurement, not a constant: it becomes available
+    // only when the official 4-player pool exists and the fixture is not in use.
+    // U1 still blocks the official protocol, so the status is reported as
+    // unavailable rather than silently claimed.
+    let official_pool_ready =
+        options.players == 4 && options.draft.enabled() && !options.cards.is_fixture() && g1_met;
+    // U1 (#155) is an open protocol decision, not a threshold: even with the
+    // official pool the final mode stays unavailable until a human decides it.
+    let draft_protocol_decided = false;
+    let official_final_mode = official_pool_ready && draft_protocol_decided;
     let official_blockers = {
         let mut blockers = Vec::new();
         if options.players != 4 || !options.draft.enabled() {
@@ -563,7 +597,9 @@ fn run(options: &Options) -> Result<(), String> {
         if !g1_met {
             blockers.push("G1 40+40 official verified pool is not met");
         }
-        blockers.push("U1 (#155) 10-7 draft conventions remain undecided");
+        if !draft_protocol_decided {
+            blockers.push("U1 (#155) 10-7 draft conventions remain undecided");
+        }
         blockers
     };
     let this_run = format!(
@@ -629,9 +665,180 @@ fn run(options: &Options) -> Result<(), String> {
     };
 
     let started_at = unix_now();
+    let experiment_start = Instant::now();
+
+    // Pre-registration is written **before** any game. The final manifest
+    // carries its SHA-256, so a later edit to the plan cannot pass unnoticed.
+    let details_policy_id = if card_set.enabled() {
+        "card_choice_details"
+    } else {
+        "simple_details"
+    };
+    let experiment_id = format!(
+        "eval-{}-{}-{}-{}",
+        options.players,
+        options.cards.name(),
+        options.draft.id(),
+        &condition_id[..12]
+    );
+    let arms_json = json!({
+        "candidate": {
+            "game_policy_id": candidate_id,
+            "policy": options.candidate.name(),
+            "puct_config_id": if options.candidate == Ai::Puct {
+                Some(puct_config_id(&candidate_puct))
+            } else {
+                None
+            },
+            "draft_policy_id": if options.draft.enabled() {
+                Some(draft_policy_id(options.candidate_draft_ai))
+            } else {
+                None
+            },
+            "details_policy_id": details_policy_id,
+        },
+        "baseline": {
+            "game_policy_id": baseline_id,
+            "policy": options.baseline.name(),
+            "puct_config_id": if options.baseline == Ai::Puct {
+                Some(puct_config_id(&baseline_puct))
+            } else {
+                None
+            },
+            "draft_policy_id": if options.draft.enabled() {
+                Some(draft_policy_id(options.baseline_draft_ai))
+            } else {
+                None
+            },
+            "details_policy_id": details_policy_id,
+        },
+        "opponent": {
+            "game_policy_id": opponent_id,
+            "policy": options.opponent.name(),
+            "stopping_rule": "policy default (fixed simulations); not time-budgeted",
+            "note": if head_to_head {
+                "opponent seats use the frozen baseline configuration"
+            } else {
+                "common-opponent benchmark: this run is NOT head-to-head"
+            },
+        },
+    });
+    let compute_budget_json = json!({
+        "search_mode": options.search_mode,
+        "decision_budget_ms": options.decision_budget_ms,
+        "detail_reserve_ms": detail_reserve_ms,
+        "mcts_simulations": options.mcts_simulations,
+        "mcts_tree_depth": options.mcts_tree_depth,
+        "puct_simulations": options.puct.simulations,
+        "puct_config_id": puct_config_id(&candidate_puct),
+        "time_budget_max_simulations": DEFAULT_TIME_BUDGET_MAX_SIMULATIONS,
+        "draft_pick_budget_ms": options.decision_budget_ms,
+        "draft_pick_budget_enforced": false,
+        "opponent_seats_time_budgeted": false,
+        "opponent_stopping_rule": "policy default (fixed simulations)",
+        "budget_description": budget_description,
+    });
+    let seeds_json = json!({
+        "seed_start": options.seed_start,
+        "draft_seed_start": options.draft_seed_start,
+        "first_block": options.block_start,
+        "blocks": options.blocks,
+        "shards": 1,
+        "split_version": null,
+        "test_range_locked": null,
+        "block_seed": "seed_start + block_index",
+        "draft_block_seed": "draft_seed_start + block_index",
+        "bootstrap": {"method": "percentile-block", "iterations": 10000, "seed": 20261106},
+    });
+    let draft_json = json!({
+        "mode": options.draft.id(),
+        "ruleset_id": if options.draft.enabled() {
+            Some("eval-4p-10-7-right-v1")
+        } else {
+            None
+        },
+        "deck_version": if options.draft.enabled() {
+            Some("eval-fixture-4p-v1")
+        } else {
+            None
+        },
+        "draft_ruleset": if options.draft.enabled() {
+            json!({
+                "direction_occupation": "right",
+                "direction_minor": "right",
+                "start_player_stream": "independent (draft seed xor constant)",
+                "pick_order": "not decided (U1 / #155)",
+            })
+        } else {
+            Value::Null
+        },
+        "protocol_open_items": if options.draft.enabled() {
+            vec!["U1: #155 simultaneous-pick order/timeout conventions are not decided"]
+        } else {
+            Vec::new()
+        },
+    });
+    let environment_json = json!({
+        "host_os": std::env::consts::OS,
+        "cpu_model": std::env::var("EVAL_CPU_MODEL").ok(),
+        "build_profile": if cfg!(debug_assertions) { "debug" } else { "release" },
+        "rustc_version": option_env!("RUSTC_VERSION"),
+        "rustc_version_source": "captured only when the build sets RUSTC_VERSION",
+        "measurement_started_at_unix": started_at,
+    });
+    let preregistration = json!({
+        "registered": false,
+        "primary_comparison": if head_to_head {
+            "candidate focus seat vs baseline opponents (head-to-head) + baseline mirror arm"
+        } else {
+            "common-opponent benchmark (NOT head-to-head; no mirror control)"
+        },
+        "decision_rule_version": "lexicographic-first-v1 (design §3.3)",
+        "interim_plan": "not registered: smoke / exploratory run only",
+        "max_blocks": null,
+        "note": "This harness records the plan; a strength claim needs an experiment registered before the run."
+    });
+    let pre_manifest = json!({
+        "schema_version": 2,
+        "harness": "eval_harness",
+        "experiment_id": experiment_id.clone(),
+        "run_id": this_run.clone(),
+        "status": "running",
+        "condition_id": condition_id.clone(),
+        "condition_parts": condition_parts.clone(),
+        "code_sha": code_sha_value.clone(),
+        "provenance_incomplete": provenance_incomplete,
+        "players": options.players,
+        "cards": options.cards.name(),
+        "card_set_count": card_set_count,
+        "card_set_hash": card_set_hash.clone(),
+        "draft": draft_json.clone(),
+        "arms": arms_json.clone(),
+        "compute_budget": compute_budget_json.clone(),
+        "seeds": seeds_json.clone(),
+        "preregistration": preregistration.clone(),
+        "pool_gate_snapshot": pool_gate.clone(),
+        "official_final_mode": official_final_mode,
+        "official_final_mode_blocked_by": official_blockers.clone(),
+        "environment": environment_json.clone(),
+        "comparison_design": {
+            "head_to_head": head_to_head,
+            "mirror_baseline": head_to_head,
+            "opponent_is_baseline": opponent_is_baseline,
+        },
+        "started_at_unix": started_at,
+    });
+    let preregistration_bytes =
+        serde_json::to_vec_pretty(&pre_manifest).map_err(|error| error.to_string())?;
+    let preregistration_sha256 = agricola_re_ai::dataset_split::sha256_hex(&preregistration_bytes);
+    fs::write(
+        options.output.join("run-manifest.pre.json"),
+        &preregistration_bytes,
+    )
+    .map_err(|error| error.to_string())?;
+
     let file = File::create(&matches_path).map_err(|error| error.to_string())?;
     let mut writer = BufWriter::new(file);
-    let experiment_start = Instant::now();
 
     for relative_block in 0..options.blocks {
         let block_index = options.block_start + relative_block;
@@ -703,121 +910,47 @@ fn run(options: &Options) -> Result<(), String> {
     writer.flush().map_err(|error| error.to_string())?;
 
     let manifest = json!({
-        "schema_version": 1,
+        "schema_version": 2,
         "harness": "eval_harness",
-        "experiment_id": format!(
-            "eval-{}-{}-{}-{}",
-            options.players,
-            options.cards.name(),
-            options.draft.id(),
-            &condition_id[..12]
-        ),
+        "experiment_id": experiment_id,
         "run_id": this_run,
+        "status": "finished",
         "condition_id": condition_id,
         "condition_parts": condition_parts,
-        "code_sha": code_sha,
-        "engine_version": env!("CARGO_PKG_VERSION"),
+        "code_sha": code_sha_value,
+        "provenance_incomplete": provenance_incomplete,
+        "engine_version": code_sha_value,
+        "package_version": env!("CARGO_PKG_VERSION"),
+        "official_pool_ready": official_pool_ready,
         "players": options.players,
         "additional_action_space": options.additional_action_space,
-        "run_mode": if options.smoke { "smoke" } else { "full" },
+        "run_mode": if options.smoke { "smoke" } else { "unregistered" },
         "smoke_blocks_cap": MAX_SMOKE_BLOCKS,
         "strength_claim_allowed": false,
         "cards": options.cards.name(),
         "card_set_count": card_set_count,
         "card_set_hash": card_set_hash,
-        "draft": {
-            "mode": options.draft.id(),
-            "ruleset_id": if options.draft.enabled() {
-                Some("eval-4p-10-7-right-v1")
-            } else {
-                None
-            },
-            "deck_version": if options.draft.enabled() {
-                Some("eval-fixture-4p-v1")
-            } else {
-                None
-            },
-            "protocol_open_items": if options.draft.enabled() {
-                vec!["U1: #155 simultaneous-pick order/timeout conventions are not decided"]
-            } else {
-                Vec::new()
-            },
-        },
-        "arms": {
-            "candidate": {
-                "game_policy_id": candidate_id,
-                "policy": options.candidate.name(),
-                "puct_config_id": if options.candidate == Ai::Puct {
-                    Some(puct_config_id(&candidate_puct))
-                } else {
-                    None
-                },
-                "draft_policy_id": if options.draft.enabled() {
-                    Some(draft_policy_id(options.candidate_draft_ai))
-                } else {
-                    None
-                },
-                "details_policy_id": "engine_default",
-            },
-            "baseline": {
-                "game_policy_id": baseline_id,
-                "policy": options.baseline.name(),
-                "puct_config_id": if options.baseline == Ai::Puct {
-                    Some(puct_config_id(&baseline_puct))
-                } else {
-                    None
-                },
-                "draft_policy_id": if options.draft.enabled() {
-                    Some(draft_policy_id(options.baseline_draft_ai))
-                } else {
-                    None
-                },
-                "details_policy_id": "engine_default",
-            },
-            "opponent": {
-                "game_policy_id": opponent_id,
-                "policy": options.opponent.name(),
-                "note": "opponent seats use the frozen baseline configuration",
-            },
-        },
-        "compute_budget": {
-            "search_mode": options.search_mode,
-            "decision_budget_ms": options.decision_budget_ms,
-            "detail_reserve_ms": detail_reserve_ms,
-            "mcts_simulations": options.mcts_simulations,
-            "mcts_tree_depth": options.mcts_tree_depth,
-            "puct_simulations": options.puct.simulations,
-            "time_budget_max_simulations": DEFAULT_TIME_BUDGET_MAX_SIMULATIONS,
-            "draft_pick_budget_ms": options.decision_budget_ms,
-        },
-        "seeds": {
-            "seed_start": options.seed_start,
-            "draft_seed_start": options.draft_seed_start,
-            "first_block": options.block_start,
-            "blocks": options.blocks,
-            "block_seed": "seed_start + block_index",
-            "draft_block_seed": "draft_seed_start + block_index",
-            "bootstrap": {"method": "percentile-block", "iterations": 10000, "seed": 20261106},
-        },
-        "preregistration": {
-            "registered": false,
-            "primary_comparison": "candidate focus seat vs baseline opponents (head-to-head) + baseline mirror arm",
-            "decision_rule_version": "lexicographic-first-v1 (design §3.3)",
-            "interim_plan": "not registered: smoke / exploratory run only",
-            "max_blocks": null,
-            "note": "This harness records the plan; a strength claim needs an experiment registered before the run."
-        },
+        "draft": draft_json,
+        "arms": arms_json,
+        "compute_budget": compute_budget_json,
+        "seeds": seeds_json,
+        "preregistration": preregistration,
+        "preregistration_file": "run-manifest.pre.json",
+        "preregistration_sha256": preregistration_sha256,
         "pool_gate_snapshot": pool_gate,
-        "official_final_mode": false,
+        "official_final_mode": official_final_mode,
         "official_final_mode_blocked_by": official_blockers,
-        "environment": {
-            "host_os": std::env::consts::OS,
-            "cpu_model": std::env::var("EVAL_CPU_MODEL").ok(),
-            "build_profile": if cfg!(debug_assertions) { "debug" } else { "release" },
+        "comparison_design": {
+            "head_to_head": head_to_head,
+            "mirror_baseline": head_to_head,
+            "opponent_is_baseline": opponent_is_baseline,
         },
+        "environment": environment_json,
         "started_at_unix": started_at,
         "finished_at_unix": unix_now(),
         "elapsed_seconds": experiment_start.elapsed().as_secs_f64(),
+        "attempt": 1,
+        "artifact_url": null,
         "artifact": {
             "matches": "shard-0/matches.jsonl",
             "row_schema_version": 2,
@@ -825,6 +958,8 @@ fn run(options: &Options) -> Result<(), String> {
         },
         "unimplemented": [
             "interference_proxy (design §1.4/U2): operational definition undecided",
+            "discarded_private_ids_seat_attribution (design §5.3): flat list, engine change needed",
+            "draft pick deadline enforcement (design §3.5): observed only, not enforced",
             "L1 draft-only proxy metrics (design §4.3/U10): out of scope for this chapter",
             "dataset_split / G0 binding (design §2.3): not wired into the harness yet",
             "seed registry collision check (design §2.3/U6): requires a registered range"
@@ -888,6 +1023,7 @@ fn run_one_game(
         seed,
         additional_action_space_enabled: options.additional_action_space,
     };
+    let mut draft_wall_ms = 0.0;
     let (mut game, draft_record) = if options.draft.enabled() {
         let setup = fixture_draft_setup(draft_seed)?;
         let seat_ais = (0..options.players)
@@ -903,7 +1039,9 @@ fn run_one_game(
                 }
             })
             .collect::<Vec<_>>();
-        let draft_run = play_draft(&setup, &seat_ais, options.decision_budget_ms)?;
+        let draft_started = Instant::now();
+        let draft_run = play_draft(&setup, &seat_ais)?;
+        draft_wall_ms = draft_started.elapsed().as_secs_f64() * 1000.0;
         let state = draft_run.state.clone();
         let game = start_game_from_draft(&state, card_set.clone(), config.clone())?;
         let hands = state.final_hands();
@@ -1050,6 +1188,9 @@ fn run_one_game(
                     "draft_deck_version": state.deck_version,
                     "draft_policy_id_by_seat": draft_policy_by_seat,
                     "draft_replay_hash": draft_run.replay_hash.clone(),
+                    "draft_state_hash": state.state_hash(),
+                    "draft_actions": &state.actions,
+                    "draft_event_count": state.actions.len() as u64,
                     "start_player": state.start_player,
                     "final_hands_by_seat": hands
                         .iter()
@@ -1064,7 +1205,8 @@ fn run_one_game(
                     "focus_pick_max_ms": focus_max_ms,
                     "focus_pick_p95_ms": percentile_ms(focus_ns, 0.95),
                     "pick_timeout_count": focus_timeouts,
-                    "pick_fallback_count": draft_run.fallbacks_by_seat[seat],
+                    "pick_illegal_fallback_count": draft_run.fallbacks_by_seat[seat],
+                    "draft_pick_budget_enforced": false,
                     "focus_observed_all_picks_within_budget": focus_timeouts == 0,
                 }),
             )
@@ -1076,6 +1218,9 @@ fn run_one_game(
                 "draft_deck_version": Value::Null,
                 "draft_policy_id_by_seat": Value::Null,
                 "draft_replay_hash": Value::Null,
+                "draft_state_hash": Value::Null,
+                "draft_actions": Value::Null,
+                "draft_event_count": Value::Null,
                 "start_player": Value::Null,
                 "final_hands_by_seat": Value::Null,
                 "discarded_private_ids": Value::Null,
@@ -1084,7 +1229,8 @@ fn run_one_game(
                 "focus_pick_max_ms": Value::Null,
                 "focus_pick_p95_ms": Value::Null,
                 "pick_timeout_count": Value::Null,
-                "pick_fallback_count": Value::Null,
+                "pick_illegal_fallback_count": Value::Null,
+                "draft_pick_budget_enforced": Value::Null,
                 "focus_observed_all_picks_within_budget": Value::Null,
             }),
         ),
@@ -1106,28 +1252,55 @@ fn run_one_game(
         "card_set_hash": card_set.content_hash(),
         "candidate_puct_config_id": puct_config_id(&options.puct),
         "baseline_puct_config_id": puct_config_id(&PuctConfig::default()),
+        "puct_config_id": puct_config_id(&options.puct),
         "focus_puct_config_id": if focus_ai == Ai::Puct {
             json!(puct_config_id(&focus_puct_config))
         } else {
             Value::Null
         },
+        // The scalar puct_* fields always describe the **candidate** config,
+        // matching schema v1. The focus seat's actual config is identified by
+        // `focus_puct_config_id`, and the frozen baseline by `baseline_puct_*`.
+        "puct_simulations_config": options.puct.simulations,
+        "puct_tree_depth": options.puct.tree_depth,
+        "puct_c": options.puct.c_puct,
+        "puct_prior_temperature": options.puct.prior_temperature,
+        "puct_value_temperature": options.puct.value_temperature,
+        "puct_leaf": match options.puct.leaf_mode {
+            LeafMode::Heuristic => "heuristic",
+            LeafMode::Terminal => "terminal",
+        },
+        "puct_root_limit": options.puct.root_candidate_limit,
+        "puct_final_prior_weight": options.puct.final_prior_weight,
+        "baseline_puct_simulations": PuctConfig::default().simulations,
+        "baseline_puct_tree_depth": PuctConfig::default().tree_depth,
+        "baseline_puct_c": PuctConfig::default().c_puct,
+        "baseline_puct_prior_temperature": PuctConfig::default().prior_temperature,
+        "baseline_puct_value_temperature": PuctConfig::default().value_temperature,
+        "baseline_puct_leaf": match PuctConfig::default().leaf_mode {
+            LeafMode::Heuristic => "heuristic",
+            LeafMode::Terminal => "terminal",
+        },
+        "baseline_puct_root_limit": PuctConfig::default().root_candidate_limit,
+        "baseline_puct_final_prior": PuctConfig::default().final_prior_weight,
         "game_policy_id_by_seat": game_policy_by_seat,
         "finished": true,
-        "rounds_completed": 14,
+        "rounds_completed": game.public.round as usize,
         "scores_by_seat": scores,
         "ranks_by_seat": summary.rank,
         "first_place_credit": first_credit(&summary.rank, seat)?,
         "expected_rank_observation": summary.rank[seat],
         "score_margin": own_score as f64 - others_mean,
+        "interference_proxy": Value::Null,
         "decisions": decision_ns.len(),
         "focus_decisions": timings.count(),
         "decision_budget_ms": options.decision_budget_ms,
         "whole_decision_budget_enforced": deadline_enforced,
         "detail_reserve_ms": detail_reserve_ms,
         "mcts_deadline_active": focus_ai.is_search() && deadline_enforced,
+        "search_deadline_active": focus_ai.is_search() && deadline_enforced,
         "search_mode": options.search_mode,
         "mcts_simulations_cap": options.mcts_simulations,
-        "puct_simulations_config": focus_puct_config.simulations,
         "time_budget_max_simulations": DEFAULT_TIME_BUDGET_MAX_SIMULATIONS,
         "search_budget_enforced": deadline_enforced,
         "deterministic_policy_selection": !(focus_ai.is_search() && deadline_enforced),
@@ -1160,6 +1333,7 @@ fn run_one_game(
         "timeout_count": outcomes.timeouts,
         "fallback_count": outcomes.fallbacks,
         "mcts_simulations_completed": outcomes.simulations,
+        "search_simulations_completed": outcomes.simulations,
         "mcts_simulations_per_decision": if timings.count() == 0 {
             0.0
         } else {
@@ -1168,11 +1342,15 @@ fn run_one_game(
         "max_deadline_overshoot_ms": outcomes.overshoot_ms,
         "max_search_elapsed_ms": outcomes.elapsed_ms,
         "mcts_tree_depth": options.mcts_tree_depth,
-        "puct_leaf": match focus_puct_config.leaf_mode {
-            LeafMode::Heuristic => "heuristic",
-            LeafMode::Terminal => "terminal",
-        },
         "policy_select_only": true,
+        "game_start_player": game.public.start_player,
+        "initial_state_hash": game
+            .log
+            .events
+            .first()
+            .map(|event| event.before.clone())
+            .unwrap_or_else(|| hash.clone()),
+        "draft_wall_ms": draft_wall_ms,
         "total_wall_ms": game_start.elapsed().as_secs_f64() * 1000.0,
         "replay_hash": hash,
         "replay_verified": true,
@@ -1305,6 +1483,68 @@ mod tests {
         args.extend(["--puct-prior-temp".into(), "3".into()]);
         let options = parse_options_from(args.into_iter()).unwrap();
         validate(&options).unwrap();
+    }
+
+    #[test]
+    fn a_draft_only_candidate_is_a_valid_contribution_arm() {
+        // Design §4.4: the game policy stays fixed and only the draft policy
+        // changes, so the same-game-policy rejection must not fire.
+        let mut args = base_args();
+        args.extend([
+            "--draft-mode".into(),
+            "draft_10_7_simultaneous".into(),
+            "--cards".into(),
+            "fixture_4p".into(),
+            "--candidate-draft-ai".into(),
+            "synergy".into(),
+            "--baseline-draft-ai".into(),
+            "card_value".into(),
+        ]);
+        let options = parse_options_from(args.into_iter()).unwrap();
+        validate(&options).unwrap();
+    }
+
+    #[test]
+    fn identical_draft_and_game_policies_are_rejected() {
+        let mut args = base_args();
+        for index in (0..args.len()).step_by(2) {
+            if args[index] == "--baseline" {
+                args[index + 1] = "eval".into();
+            }
+        }
+        args.extend([
+            "--draft-mode".into(),
+            "draft_10_7_simultaneous".into(),
+            "--cards".into(),
+            "fixture_4p".into(),
+            "--candidate-draft-ai".into(),
+            "synergy".into(),
+            "--baseline-draft-ai".into(),
+            "synergy".into(),
+        ]);
+        let options = parse_options_from(args.into_iter()).unwrap();
+        assert!(validate(&options).is_err());
+    }
+
+    #[test]
+    fn seed_overflow_is_rejected_before_any_game() {
+        let mut args = base_args();
+        for index in (0..args.len()).step_by(2) {
+            if args[index] == "--seed-start" {
+                args[index + 1] = u64::MAX.to_string();
+            }
+        }
+        args.extend(["--block-start".into(), "1".into()]);
+        let options = parse_options_from(args.into_iter()).unwrap();
+        assert!(validate(&options).is_err());
+    }
+
+    #[test]
+    fn a_zero_decision_budget_is_rejected() {
+        let mut args = base_args();
+        args.extend(["--decision-budget-ms".into(), "0".into()]);
+        let options = parse_options_from(args.into_iter()).unwrap();
+        assert!(validate(&options).is_err());
     }
 
     #[test]

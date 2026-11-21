@@ -22,7 +22,7 @@ use crate::evaluation::{EvaluationPolicy, VariantEvaluationPolicy};
 use crate::mcts::{MctsOutcome, MctsPolicy, SearchLimit, SearchMode};
 use crate::mcts_puct::{LeafMode, PuctConfig, PuctPolicy};
 use crate::model::{Observation, Space};
-use crate::policy::{GreedyPolicy, RandomPolicy, SimpleDetails, SpacePolicy};
+use crate::policy::{GreedyPolicy, RandomPolicy, SpacePolicy};
 use rand_chacha::ChaCha8Rng;
 use serde_json::{json, Value};
 use std::cell::RefCell;
@@ -446,12 +446,10 @@ pub struct DraftRun {
     pub state: DraftState,
     /// One lifetime in nanoseconds per pick decision, keyed by seat.
     pub pick_ns_by_seat: Vec<Vec<u64>>,
-    /// Fallbacks per seat, so a row never attributes another seat's fallback to
-    /// the focus seat.
+    /// Illegal-pick fallbacks per seat, so a row never attributes another
+    /// seat's fallback to the focus seat. This is **not** a deadline fallback:
+    /// the draft AI has no enforced deadline yet.
     pub fallbacks_by_seat: Vec<u32>,
-    pub timeouts_by_seat: Vec<u32>,
-    pub max_pick_ms: f64,
-    pub p95_pick_ms: f64,
     pub replay_hash: String,
 }
 
@@ -462,30 +460,27 @@ pub struct DraftRun {
 /// `cpu_pick` fallback for that decision; the fallback is counted, never hidden.
 /// The completed draft is replayed from its action log and must reproduce the
 /// same state hash before the harness starts a game from it.
-pub fn play_draft(
-    setup: &DraftSetup,
-    seat_ais: &[DraftAiKind],
-    pick_budget_ms: u64,
-) -> Result<DraftRun, String> {
+pub fn play_draft(setup: &DraftSetup, seat_ais: &[DraftAiKind]) -> Result<DraftRun, String> {
     if seat_ais.len() != setup.player_count {
         return Err("draft seat policy list must match the player count".into());
+    }
+    // This runner is only valid for the harness fixture deck. The catalog is
+    // rebuilt from that deck, so accepting another setup would silently score
+    // its cards against the wrong catalog.
+    if setup.deck_version != "eval-fixture-4p-v1" {
+        return Err("play_draft only supports the eval fixture deck".into());
     }
     let set = fixture_4p_card_set()?;
     let catalog = card_catalog(&set);
     let mut state = setup.start()?;
     let mut pick_ns_by_seat = vec![Vec::new(); setup.player_count];
     let mut fallbacks_by_seat = vec![0u32; setup.player_count];
-    let mut timeouts_by_seat = vec![0u32; setup.player_count];
-    let budget_ns = pick_budget_ms.saturating_mul(1_000_000);
     if state.mode == DraftMode::Deal7 {
         return Ok(DraftRun {
             replay_hash: state.log_hash(),
             state,
             pick_ns_by_seat,
             fallbacks_by_seat,
-            timeouts_by_seat,
-            max_pick_ms: 0.0,
-            p95_pick_ms: 0.0,
         });
     }
     let mut guard = 0;
@@ -520,9 +515,6 @@ pub fn play_draft(
             if used_fallback {
                 fallbacks_by_seat[seat] += 1;
             }
-            if budget_ns > 0 && ns > budget_ns {
-                timeouts_by_seat[seat] += 1;
-            }
         }
     }
     for (occupations, minors) in state.final_hands() {
@@ -534,19 +526,11 @@ pub fn play_draft(
     if replay.state_hash() != state.state_hash() {
         return Err("draft replay mismatch".into());
     }
-    let all_ns = pick_ns_by_seat
-        .iter()
-        .flatten()
-        .copied()
-        .collect::<Vec<_>>();
     Ok(DraftRun {
         replay_hash: state.log_hash(),
         state,
         pick_ns_by_seat,
         fallbacks_by_seat,
-        timeouts_by_seat,
-        max_pick_ms: all_ns.iter().copied().max().unwrap_or(0) as f64 / 1_000_000.0,
-        p95_pick_ms: crate::decision_budget::percentile_ms(&all_ns, 0.95),
     })
 }
 
@@ -579,7 +563,7 @@ pub fn condition_id(parts: &BTreeMap<String, String>) -> String {
 
 /// The 4-player official gate snapshot recorded in the manifest (design U12).
 /// Counts are measured from the code-side registry, never copied from docs.
-pub fn pool_gate_snapshot(players: usize) -> Value {
+pub fn pool_gate_snapshot(players: usize, measured_at_sha: Option<&str>) -> Value {
     use crate::card_pool::{
         builtin_implemented_cards, builtin_review_registry, usable_minor_improvements,
         usable_occupations,
@@ -594,31 +578,35 @@ pub fn pool_gate_snapshot(players: usize) -> Value {
         "players": players,
         "usable_occupations_verified": occupations,
         "usable_minor_improvements_verified": minors,
-        "g1_required_per_kind": 40,
-        "g1_met": occupations >= 40 && minors >= 40,
+        "usable_occupations_4p": occupations,
+        "usable_minor_improvements_4p": minors,
+        "g1_required_per_kind": crate::card_pool::G1_MIN_PER_KIND,
+        "g1_met": occupations >= crate::card_pool::G1_MIN_PER_KIND
+            && minors >= crate::card_pool::G1_MIN_PER_KIND,
         "measured_from": "src/card_pool.rs builtin_review_registry (fail closed: absent or unverified = not usable)",
-        "measured_at_sha": std::env::var("EVAL_CODE_SHA").ok(),
+        "measured_at_sha": measured_at_sha,
     })
 }
 
-/// Cheap helper for the fixtures: a seat's draft policy id.
-pub fn draft_policy_id(ai: DraftAiKind) -> String {
-    ai.id().to_string()
-}
+/// Versioned draft policy identity (design §2.5, §4.6, U11). The heuristic is
+/// fixed for now; if it changes, this version must change with it.
+pub const DRAFT_POLICY_VERSION: &str = "draft-ai-v1";
 
-/// Re-exported so the harness can build a detail policy for card games without
-/// importing the whole `policy` module in its CLI layer.
-pub fn default_detail_policy(cards_enabled: bool) -> Box<dyn crate::policy::DetailPolicy> {
-    if cards_enabled {
-        Box::new(crate::policy::CardChoiceDetails)
-    } else {
-        Box::new(SimpleDetails)
-    }
+pub fn draft_policy_id(ai: DraftAiKind) -> String {
+    format!("{}@{DRAFT_POLICY_VERSION}", ai.id())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dealt_per_kind_matches_the_engine() {
+        assert_eq!(
+            DRAFT_107_DEALT_PER_KIND,
+            crate::draft::DraftMode::Draft10_7Simultaneous.dealt_per_kind()
+        );
+    }
 
     #[test]
     fn fixture_pool_has_the_four_player_10_7_supply() {
@@ -650,7 +638,7 @@ mod tests {
         assert_eq!(setup.player_count, 4);
         assert_eq!(setup.mode, DraftMode::Draft10_7Simultaneous);
         let ais = [DraftAiKind::CardValue; 4];
-        let run = play_draft(&setup, &ais, 10_000).unwrap();
+        let run = play_draft(&setup, &ais).unwrap();
         assert!(run.state.is_complete());
         assert_eq!(run.pick_ns_by_seat.len(), 4);
         assert_eq!(run.fallbacks_by_seat, vec![0, 0, 0, 0]);
@@ -670,8 +658,8 @@ mod tests {
             DraftAiKind::Synergy,
             DraftAiKind::CardValue,
         ];
-        let first = play_draft(&setup, &ais, 10_000).unwrap();
-        let second = play_draft(&setup, &ais, 10_000).unwrap();
+        let first = play_draft(&setup, &ais).unwrap();
+        let second = play_draft(&setup, &ais).unwrap();
         assert_eq!(first.state.state_hash(), second.state.state_hash());
         assert_eq!(first.state.final_hands(), second.state.final_hands());
     }
@@ -705,5 +693,32 @@ mod tests {
             game_policy_id(Ai::Puct, &default),
             game_policy_id(Ai::Puct, &changed)
         );
+    }
+}
+
+#[cfg(test)]
+mod fixture_contract_tests {
+    use super::*;
+
+    #[test]
+    fn fixture_cards_have_no_cost_points_or_effects() {
+        let set = fixture_4p_card_set().unwrap();
+        assert!(set.definitions.iter().all(|card| card.cost.is_empty()));
+        assert!(set.definitions.iter().all(|card| card.points == 0));
+        assert!(set.definitions.iter().all(|card| card.effects.is_empty()));
+    }
+
+    #[test]
+    fn fixture_deck_setup_is_the_only_accepted_draft_deck() {
+        let mut setup = fixture_draft_setup(1).unwrap();
+        assert!(play_draft(&setup, &[DraftAiKind::CardValue; 4]).is_ok());
+        setup.deck_version = "some-other-deck".into();
+        assert!(play_draft(&setup, &[DraftAiKind::CardValue; 4]).is_err());
+    }
+
+    #[test]
+    fn draft_policy_ids_carry_their_version() {
+        assert_eq!(draft_policy_id(DraftAiKind::Synergy), "synergy@draft-ai-v1");
+        assert_eq!(draft_policy_id(DraftAiKind::Random), "random@draft-ai-v1");
     }
 }
