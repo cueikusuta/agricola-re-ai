@@ -150,6 +150,16 @@ def compare_runs(
                 "candidate_game_policy_id": a_manifest["arms"]["candidate"][
                     "game_policy_id"
                 ],
+                "candidate_draft_policy_id": a_manifest["arms"]["candidate"].get(
+                    "draft_policy_id"
+                ),
+                "candidate_puct_config_id": a_manifest["arms"]["candidate"].get(
+                    "puct_config_id"
+                ),
+                "comparison_kind": a_report["comparison_design"].get("comparison_kind"),
+                "changed_factors": a_report["comparison_design"].get(
+                    "changed_factors", []
+                ),
                 "candidate_deltas": a_report["deltas"],
             },
             "b": {
@@ -158,6 +168,16 @@ def compare_runs(
                 "candidate_game_policy_id": b_manifest["arms"]["candidate"][
                     "game_policy_id"
                 ],
+                "candidate_draft_policy_id": b_manifest["arms"]["candidate"].get(
+                    "draft_policy_id"
+                ),
+                "candidate_puct_config_id": b_manifest["arms"]["candidate"].get(
+                    "puct_config_id"
+                ),
+                "comparison_kind": b_report["comparison_design"].get("comparison_kind"),
+                "changed_factors": b_report["comparison_design"].get(
+                    "changed_factors", []
+                ),
                 "candidate_deltas": b_report["deltas"],
             },
         },
@@ -217,8 +237,16 @@ def render_markdown(result: dict) -> str:
         "# 候補どうしの比較（同一条件・seedブロック対応）",
         "",
         f"- condition_id: `{result['condition_id']}`",
-        f"- A: `{runs['a']['candidate_game_policy_id']}`（{runs['a']['run_mode']}）",
-        f"- B: `{runs['b']['candidate_game_policy_id']}`（{runs['b']['run_mode']}）",
+        f"- A: game=`{runs['a']['candidate_game_policy_id']}`"
+        f" draft=`{runs['a']['candidate_draft_policy_id']}`"
+        f" puct=`{runs['a']['candidate_puct_config_id']}`"
+        f"（{runs['a']['run_mode']} / {runs['a']['comparison_kind']};"
+        f" changed={', '.join(runs['a']['changed_factors']) or '-'}）",
+        f"- B: game=`{runs['b']['candidate_game_policy_id']}`"
+        f" draft=`{runs['b']['candidate_draft_policy_id']}`"
+        f" puct=`{runs['b']['candidate_puct_config_id']}`"
+        f"（{runs['b']['run_mode']} / {runs['b']['comparison_kind']};"
+        f" changed={', '.join(runs['b']['changed_factors']) or '-'}）",
         f"- seed: {result['seeds']['seed_start']} から {result['seeds']['blocks']} ブロック",
         f"- 比較可能性: {result['comparability']['comparable']}"
         f" — {result['comparability']['reason']}",
