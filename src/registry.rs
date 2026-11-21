@@ -137,51 +137,21 @@ impl RegisteredCard {
 
 /// Filter a list of effects to only include those whose prerequisite guards
 /// are satisfied for the given player count.
-/// Prerequisites immediately preceding a non-prerequisite effect guard that effect.
-/// Prerequisites that are satisfied are included alongside their effect.
-/// Unpaired prerequisites (whole-card requirements) are always included.
+///
+/// Delegates to [`crate::cards::project_effects_for_players`] so the registry
+/// projection and the game-entry projection share exactly one run-grammar:
+/// a consecutive run of `MinimumPlayers`/`MaximumPlayers` prerequisites
+/// guards every following effect up to the next player-count run or the end
+/// of the list; an unsatisfied run drops its guards together with its
+/// covered effects, while a satisfied run is kept in place. A trailing run
+/// covering no effect is a whole-card requirement and is always kept (so
+/// [`crate::cards::CardSet::validate`] can reject an ineligible card instead
+/// of silently stripping the requirement).
 fn filter_effects_for_players(
     effects: &[crate::cards::CardEffect],
     players: usize,
 ) -> Vec<crate::cards::CardEffect> {
-    let mut result = Vec::new();
-    let mut prereq_buffer: Vec<crate::cards::CardEffect> = Vec::new();
-
-    for effect in effects {
-        if let crate::cards::CardEffect::Prerequisite { .. } = effect {
-            prereq_buffer.push(effect.clone());
-        } else {
-            // Check if all guards in buffer are satisfied
-            let guards_satisfied = prereq_buffer.iter().all(|prereq| {
-                if let crate::cards::CardEffect::Prerequisite { rule } = prereq {
-                    match rule {
-                        crate::cards::CardRequirement::MinimumPlayers(min) => {
-                            *min != 0 && *min as usize <= players
-                        }
-                        crate::cards::CardRequirement::MaximumPlayers(max) => {
-                            *max != 0 && *max as usize >= players
-                        }
-                        _ => true,
-                    }
-                } else {
-                    true
-                }
-            });
-
-            if guards_satisfied {
-                // Include the guards and the effect
-                result.append(&mut prereq_buffer);
-                result.push(effect.clone());
-            } else {
-                // Effect not active for this player count; discard its guards
-                prereq_buffer.clear();
-            }
-        }
-    }
-
-    // Any remaining prerequisites are unpaired (whole-card requirements) - always include
-    result.extend(prereq_buffer);
-    result
+    crate::cards::project_effects_for_players(effects, players)
 }
 
 /// Event kind for static trigger indexing (minimal set for Step 1).

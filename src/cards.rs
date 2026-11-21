@@ -5644,9 +5644,9 @@ mod p1_2_repro_tests {
 
     #[test]
     fn debug_four_player_minor_improvements() {
-        // Informational: the implemented catalog has 28 minor improvements, so
-        // the 4-player experimental pool legitimately deals partial hands.
-        // This test documents the current count without enforcing a specific number.
+        // Informational: the 4-player experimental pool deals partial hands because
+        // the minor improvement count is below 7*4=28. This test documents the
+        // current count without enforcing a specific number (which would brittle).
         let registry = default_registry();
         let pool = crate::registry::CardPool::new(&registry, 4, true);
         let minor_ids: Vec<_> = pool.eligible_kind(&registry, CardKind::MinorImprovement);
@@ -5800,5 +5800,270 @@ mod p1_2_repro_tests {
                 }
             }
         }
+    }
+
+    /// Registry-merge forms (B121/B102 via `merge_card_variants`) carry
+    /// player-count prerequisite guards that the cards.rs raw variants do not,
+    /// so their projected effects are pinned per player count instead of being
+    /// compared against the raw catalog.
+    fn pinned_registry_effects(players: usize, id: &str) -> Option<Vec<CardEffect>> {
+        let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
+            space,
+            good,
+            amount,
+        };
+        match id {
+            "B102" => match players {
+                2 => Some(vec![
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MinimumPlayers(2),
+                    },
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MaximumPlayers(2),
+                    },
+                    CardEffect::OnPlayGain {
+                        good: Good::Clay,
+                        amount: 3,
+                    },
+                ]),
+                3 => Some(vec![
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MinimumPlayers(3),
+                    },
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MaximumPlayers(3),
+                    },
+                    CardEffect::OnPlayGain {
+                        good: Good::Reed,
+                        amount: 2,
+                    },
+                ]),
+                _ => None,
+            },
+            "B121" => Some({
+                let mut effects = vec![
+                    gain(Space::Forest, Good::Clay, 1),
+                    gain(Space::ReedBank, Good::Clay, 1),
+                ];
+                if players >= 3 {
+                    effects.push(CardEffect::Prerequisite {
+                        rule: CardRequirement::MinimumPlayers(3),
+                    });
+                    effects.push(gain(Space::ClayPit, Good::Clay, 1));
+                }
+                effects
+            }),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn repro_all_cards_per_player_count_parity() {
+        use std::collections::BTreeMap;
+
+        let registry = default_registry();
+        // 実測 @ b10a61a (クリーン export 時点): デフォルトレジストリは 77 枚。
+        // main へのカード追加で変動しうるが、変動はこのテストの失敗を伴うよう意図的に硬ピンする。
+        assert_eq!(registry.len(), 77, "default registry catalog size");
+
+        // cards.rs 生カタログ: external_id -> (person count -> raw CardDefinition)
+        let mut catalog: BTreeMap<String, BTreeMap<usize, CardDefinition>> = BTreeMap::new();
+        let mut insert_cards = |players: usize, cards: &[CardDefinition]| {
+            for card in cards {
+                let entry = catalog.entry(card.id.clone()).or_default();
+                assert!(
+                    entry.insert(players, card.clone()).is_none(),
+                    "cards.rs catalog duplicate: {} at {players} players",
+                    card.id
+                );
+            }
+        };
+        for players in [2usize, 3, 4] {
+            insert_cards(players, &verified_scoring_cards(players));
+            insert_cards(players, &verified_minor_worker_cards(players));
+            insert_cards(players, &verified_worker_bonus_cards(players));
+            insert_cards(players, &verified_simple_occupations(players));
+            insert_cards(players, &verified_multiplayer_passive_cards(players));
+        }
+        let count_independent: [Vec<CardDefinition>; 9] = [
+            verified_immediate_resource_cards(),
+            verified_round_and_harvest_cards(),
+            verified_passive_cards(),
+            verified_extra_simple_cards(),
+            verified_band_a_cards(),
+            verified_band_b_cards(),
+            verified_band_c_cards(),
+            verified_band_d_cards(),
+            verified_band_e_cards(),
+        ];
+        for cards in count_independent {
+            for players in [2usize, 3, 4] {
+                insert_cards(players, &cards);
+            }
+        }
+
+        for players in [2usize, 3, 4] {
+            let pool = CardPool::new(&registry, players, true);
+            let set = card_set_for_game(players, true);
+            assert!(
+                set.validate(players).is_ok(),
+                "card_set_for_game({players}, true) must validate"
+            );
+
+            let occ = set
+                .definitions
+                .iter()
+                .filter(|c| c.kind == CardKind::Occupation)
+                .count();
+            let minor = set
+                .definitions
+                .iter()
+                .filter(|c| c.kind == CardKind::MinorImprovement)
+                .count();
+            let (expected_total, expected_occ, expected_minor) = match players {
+                2 => (72, 34, 38),
+                3 => (76, 38, 38),
+                4 => (76, 38, 38),
+                _ => unreachable!(),
+            };
+            // 実測 @ b10a61a。main のカード追加で変動しうるが、内訳の欠落/過剰を検出するため硬ピンする。
+            assert_eq!(
+                set.definitions.len(),
+                expected_total,
+                "{players}p experimental total (実測: {expected_total})"
+            );
+            assert_eq!(
+                occ, expected_occ,
+                "{players}p experimental occupations (実測: {expected_occ})"
+            );
+            assert_eq!(
+                minor, expected_minor,
+                "{players}p experimental minor improvements (実測: {expected_minor})"
+            );
+
+            // --- cards.rs 生定義 vs registry 投影 (id, kind, cost, points, effects) ---
+            for (id, raw_by_count) in &catalog {
+                let Some(raw) = raw_by_count.get(&players) else {
+                    continue;
+                };
+                let reg = registry.get_by_external(id).unwrap_or_else(|| {
+                    panic!("{id} is in the cards.rs catalog but missing from the default registry")
+                });
+                let def = reg.to_card_definition();
+                assert_eq!(def.kind, raw.kind, "{id} kind mismatch at {players}p");
+                assert_eq!(def.cost, raw.cost, "{id} cost mismatch at {players}p");
+                assert_eq!(def.points, raw.points, "{id} points mismatch at {players}p");
+
+                if pool.contains(reg.id) {
+                    let expected_effects =
+                        pinned_registry_effects(players, id).unwrap_or_else(|| raw.effects.clone());
+                    let actual_effects = reg.to_card_definition_for_players(players).effects;
+                    assert_eq!(
+                        actual_effects, expected_effects,
+                        "{id} effects at {players}p diverge from the cards.rs raw definition \
+                     (registry-merge forms B121/B102 are pinned exceptions)"
+                    );
+                }
+            }
+
+            // --- registry プール eligibility vs cards.rs カタログ ---
+            let mut unexpected_eligible = Vec::new();
+            for reg in registry.iter() {
+                let in_catalog = catalog
+                    .get(&reg.external_id)
+                    .map(|raw_by_count| raw_by_count.contains_key(&players))
+                    .unwrap_or(false);
+                if pool.contains(reg.id)
+                    && !in_catalog
+                    && !(reg.external_id == "B102" && players == 3)
+                {
+                    // B102 at 3 players is by design: registry-only, absent from cards.rs catalog
+                    unexpected_eligible.push(reg.external_id.clone());
+                }
+            }
+            assert!(
+            unexpected_eligible.is_empty(),
+            "registry-eligible but absent from cards.rs catalog at {players}p: {unexpected_eligible:?}"
+        );
+
+            let ineligible: Vec<_> = registry
+                .iter()
+                .filter(|c| !pool.contains(c.id))
+                .map(|c| c.external_id.clone())
+                .collect();
+            println!("{players}p pool-ineligible cards: {ineligible:?}");
+        }
+
+        // 修正1: `filter_effects_for_players` を run-grammar に統一後の 2p 投影。
+        // 統一前は A155 -> [Grain@TravelingPlayers]、B144 -> [Wood@Hollow, Reed@ClayPit] と
+        // 守衛直後の1効果のみを守衛して無防備化する設計欠陥があった。正しくは全員 []。
+        for id in ["A155", "B142", "B144"] {
+            let effects = registry
+                .get_by_external(id)
+                .unwrap_or_else(|| panic!("{id} missing from registry"))
+                .to_card_definition_for_players(2)
+                .effects;
+            assert!(
+            effects.is_empty(),
+            "{id} 2-player projection must be [] after unifying with the run grammar, got {effects:?}"
+        );
+        }
+
+        // 2p プリセットのハッシュは変更不可（39 defs、content_hash 不変条件）
+        let preset = verified_basic_card_set(2).unwrap();
+        assert_eq!(
+            preset.content_hash(),
+            "22fdb72f481bc6fcfc49f781dbd3452a20b9c408ec518711b65a1a6f5276a79b",
+            "2-player preset content hash (実測 @ b10a61a)"
+        );
+
+        // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
+        // 2p: A133/A143 は 3人+ のカード、A155 は 4人のみ、B142/B144 は 3人+ のみ
+        // （Round 2 指摘対象は A155/B142/B144）。欠落/過剰ゼロを硬ピンする。
+        let pool2 = CardPool::new(&registry, 2, true);
+        let ineligible_2: Vec<_> = registry
+            .iter()
+            .filter(|c| !pool2.contains(c.id))
+            .map(|c| c.external_id.clone())
+            .collect();
+        assert_eq!(
+            ineligible_2,
+            ["A133", "A143", "A155", "B142", "B144"],
+            "2p pool-ineligible set (実測 @ b10a61a)"
+        );
+        let pool3 = CardPool::new(&registry, 3, true);
+        let ineligible_3: Vec<_> = registry
+            .iter()
+            .filter(|c| !pool3.contains(c.id))
+            .map(|c| c.external_id.clone())
+            .collect();
+        assert_eq!(
+            ineligible_3,
+            ["A155"],
+            "3p pool-ineligible set (実測 @ b10a61a: A155 のみ)"
+        );
+        let pool4 = CardPool::new(&registry, 4, true);
+        let ineligible_4: Vec<_> = registry
+            .iter()
+            .filter(|c| !pool4.contains(c.id))
+            .map(|c| c.external_id.clone())
+            .collect();
+        assert_eq!(
+            ineligible_4,
+            ["B102"],
+            "4p pool-ineligible set (実測 @ b10a61a: B102 のみ)"
+        );
+        assert!(
+            pool2.contains(
+                registry
+                    .card_id("B102")
+                    .expect("B102 is in the default registry")
+            ) && pool3.contains(
+                registry
+                    .card_id("B102")
+                    .expect("B102 is in the default registry")
+            ),
+            "B102 must be pool-eligible at 2 and 3 players (registry-only at 3 players)"
+        );
     }
 }
