@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "card_id": "D096",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "家具調達人",
+    "name_en": "Furnisher"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2825",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "after_room_construction",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1,
+            "scope": "minor_improvement",
+            "segment_cap": 1,
+            "notes": "部屋を建てるたび、進歩1つを木材1安く出せる"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "出した時木材2。継続効果: 部屋建設ごとに小進歩1つを木材1安く出せる"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[1].steps[0].params: discount_cost で『進歩1つを木材1安く出せる』が小進歩のみか大進歩も含むか（日語: 進歩=大小進歩両方の可能性、英語版確認要）",
+      "effects[1].steps[0].params.segment_cap: 『1つ』が部屋建設1回につき1回のみか、累積上限があるか",
+      "classification: 段階3（部屋・建設イベント）だが、割引対象が小進歩のみか大進歩も含むかが文献で要確認"
+    ],
+    "test_case_ids": [
+      "D096-on-play-gain-wood-2",
+      "D096-build-room-discount-minor-improvement",
+      "D096-build-room-discount-major-improvement"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: On play, gain 2 wood. Ongoing: each time you build a room, you may play 1 improvement (minor/major?) at 1 wood discount. Trigger: on_play + after_room_construction. Unresolved: improvement scope (minor only or both), discount cap per room build."
+  }
+}

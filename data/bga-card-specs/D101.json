@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "D101",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "菓子職人",
+    "name_en": "Sugar Baker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2820",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "grain_utilization"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "action": "buy_point_with_food",
+                "cost_food": 1,
+                "place_food_on_space": true,
+                "notes": "穀物活用を使った後、食料1で1点を買える。払った食料はそのスペースに置く"
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: 穀物活用アクション後、食料1で1点購入可（食料はスペースに置く）。Ban: weak"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: worker_space_used で 'grain_utilization'（穀物活用）スペースをどう特定するか",
+      "effects[0].steps[0].params.kind=other: buy_point_with_food で『食料はそのスペースに置く』という挙動（累積スペースのように食料がスペースに残る仕様）の実装詳細",
+      "classification: 段階外（単一サイト: スペース使用/点数購入）だが、穀物活用スペースの識別と食料配置のメカニクスが語彙外"
+    ],
+    "test_case_ids": [
+      "D101-after-grain-util-buy-point",
+      "D101-after-other-space-no-effect",
+      "D101-multiple-uses-accumulate-food-on-space"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Ban: weak. Effect: After using Grain Utilization space, may pay 1 food to gain 1 point. Paid food is placed on that space. Trigger: after_worker_space with condition on Grain Utilization. Unresolved: space identification, food placement mechanics (accumulates on space?)."
+  }
+}

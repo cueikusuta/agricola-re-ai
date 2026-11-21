@@ -47,7 +47,7 @@ fn private_deal_is_deterministic_and_observer_scoped() {
             assert_eq!(obs.hand.len(), 14);
             assert_eq!(obs.hand_counts, vec![14; players]);
             assert_eq!(obs.hand, game.cards.hands[id]);
-            for opponent in 0..players {
+            for (opponent, _) in game.cards.hands.iter().enumerate().take(players) {
                 if opponent != id {
                     assert_ne!(obs.hand, game.cards.hands[opponent]);
                 }
