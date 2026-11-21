@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "E110",
+  "cases": [
+    {
+      "id": "E110-place-wood",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 2,
+        "card_wood": 0
+      },
+      "action": {
+        "play": "E110",
+        "harvest": "start",
+        "place": true
+      },
+      "expected": {
+        "wood_delta": -1,
+        "card_wood": 1
+      },
+      "notes": "One wood moves from the stock onto the card."
+    },
+    {
+      "id": "E110-decline",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 2,
+        "card_wood": 0
+      },
+      "action": {
+        "play": "E110",
+        "harvest": "start",
+        "decline": true
+      },
+      "expected": {
+        "wood_delta": 0,
+        "card_wood": 0
+      },
+      "notes": "Placing the wood is optional."
+    },
+    {
+      "id": "E110-feeding",
+      "scope": "effect_only",
+      "setup": {
+        "card_wood": 3,
+        "food": 0
+      },
+      "action": {
+        "play": "E110",
+        "harvest": "feeding_phase"
+      },
+      "expected": {
+        "food_delta": 3,
+        "card_wood": 3
+      },
+      "notes": "Three wood on the card give three food; the wood stays."
+    }
+  ]
+}

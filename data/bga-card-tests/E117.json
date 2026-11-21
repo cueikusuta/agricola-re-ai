@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "E117",
+  "cases": [
+    {
+      "id": "E117-sown-grain-field",
+      "scope": "effect_only",
+      "setup": {
+        "grain_fields": [
+          {
+            "grain": 1
+          }
+        ]
+      },
+      "action": {
+        "play": "E117",
+        "harvest": "start"
+      },
+      "expected": {
+        "wood_delta": 2
+      },
+      "notes": "A sown grain field is enough."
+    },
+    {
+      "id": "E117-no-grain-field",
+      "scope": "effect_only",
+      "setup": {
+        "grain_fields": []
+      },
+      "action": {
+        "play": "E117",
+        "harvest": "start"
+      },
+      "expected": {
+        "wood_delta": 0
+      },
+      "notes": "Without a grain field nothing is gained."
+    },
+    {
+      "id": "E117-vegetable-field-only",
+      "scope": "effect_only",
+      "setup": {
+        "vegetable_fields": [
+          {
+            "vegetable": 1
+          }
+        ]
+      },
+      "action": {
+        "play": "E117",
+        "harvest": "start"
+      },
+      "expected": {
+        "wood_delta": 0
+      },
+      "notes": "A vegetable field is not a grain field."
+    }
+  ]
+}

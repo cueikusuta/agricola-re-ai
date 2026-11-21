@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "card_id": "E119",
+  "cases": [
+    {
+      "id": "E119-played-early",
+      "scope": "effect_only",
+      "setup": {
+        "round": 2
+      },
+      "action": {
+        "play": "E119"
+      },
+      "expected": {
+        "round_9_wood": 4,
+        "round_9_clay": 4
+      },
+      "notes": "Played in round 2, both resources are placed."
+    },
+    {
+      "id": "E119-played-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "E119"
+      },
+      "expected": {
+        "round_9_wood": 0,
+        "round_9_clay": 0
+      },
+      "notes": "Played after round 4, nothing is placed."
+    },
+    {
+      "id": "E119-collect-round-9",
+      "scope": "effect_only",
+      "setup": {
+        "round": 9,
+        "round_9_wood": 4,
+        "round_9_clay": 4
+      },
+      "action": {
+        "play": "E119",
+        "round_start": true
+      },
+      "expected": {
+        "wood_delta": 4,
+        "clay_delta": 4,
+        "round_9_wood": 0,
+        "round_9_clay": 0
+      },
+      "notes": "Both resources are collected at the start of round 9."
+    }
+  ]
+}

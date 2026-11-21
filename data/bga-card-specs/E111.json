@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "card_id": "E111",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "世捨て人",
+    "name_en": "Recluse"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2642",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "minor_improvement_count",
+          "params": {
+            "n": 0
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At each round start, with no minor improvement in front of the owner, gain 1 food."
+    },
+    {
+      "trigger": "harvest_start",
+      "conditions": [
+        {
+          "predicate": "minor_improvement_count",
+          "params": {
+            "n": 0
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "At the start of each harvest, under the same condition, gain 1 wood."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E111-round-start",
+      "E111-harvest-start",
+      "E111-with-minor"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "implemented",
+    "notes": "With no minor improvement played: 1 food at each round start and 1 wood at each harvest start. The engine resolves the harvest half at the field phase, which is equivalent because no state changes between the harvest start and that phase."
+  }
+}

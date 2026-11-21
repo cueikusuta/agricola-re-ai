@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "card_id": "E117",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "パイプ喫煙家",
+    "name_en": "Pipe Smoker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2636",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_start",
+      "conditions": [
+        {
+          "predicate": "grain_field_count",
+          "params": {
+            "n": 1
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At the start of each harvest, with at least one sown grain field, gain 2 wood."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E117-sown-grain-field",
+      "E117-no-grain-field",
+      "E117-vegetable-field-only"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "implemented",
+    "notes": "At each harvest start, 2 wood while at least one field holds grain."
+  }
+}

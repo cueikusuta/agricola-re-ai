@@ -29,6 +29,22 @@
 | 第1章 | E099–E109 | 11 | `research/freebuff-eband-spec-create-ch01` |
 | 第2章 | E110–E120 | 11 | `research/freebuff-eband-spec-create-ch02` |
 
+### 第1章 E099–E109（PR #416）
+
+- ブランチ `research/freebuff-eband-spec-create-ch01`。仕様JSON 11枚＋テスト契約11枚（33ケース）。
+- `bga_checked` 9枚、`needs_resolution` 2枚（E101・E109）。記録は `docs/eband-spec-create-ch01.md`。
+- PR作成済み。**マージしない。** 独立レビュー待ち。
+
+### 第2章 E110–E120（完了・PR作成）
+
+- ブランチ `research/freebuff-eband-spec-create-ch02`。仕様JSON 11枚＋テスト契約11枚（33ケース）を追加。
+- 内訳: `bga_checked` 10枚、`needs_resolution` 1枚（E120 終盤プレイ時の端数）。実装済み4枚
+  （E111/E113/E117/E118）は `implementation_status=implemented`。
+- 記録: `docs/eband-spec-create-ch02.md`（カード一覧・Q-3/Q-4・検証）。
+- 検証: `validate_bga_card_specs.py` exit 0（errors 空）、ビルダー unittest 3 OK。
+
 ### 現在地
 
-- 棚卸しまで完了。第1章から着手する。再開はこの節から。
+- 第1章（E099–E109）= PR #416、第2章（E110–E120）= 本章PRを作成して停止。**マージしない。**
+- 独立レビュー待ち（`AGENTS.md` §14）。E084–E098 は他担当ブランチ（PR未作成）にあり対象外。
+- 再開はこの節から。
