@@ -319,6 +319,7 @@ pub enum CardRequirement {
     MinimumAnimals { animal: Animal, number: u32 },
     MinimumCropFields { crop: Crop, number: u8 },
     MinimumPlayers(u8),
+    MaximumPlayers(u8),
     MinimumImprovements(u8),
 }
 
@@ -486,30 +487,210 @@ impl CardSet {
             }
         }
         for card in &self.definitions {
-            for effect in &card.effects {
-                if let CardEffect::Prerequisite {
-                    rule: CardRequirement::MinimumPlayers(min),
-                } = effect
-                {
-                    if *min == 0 || *min as usize > players {
-                        return Err(format!(
-                            "card {} is not eligible for this player count",
-                            card.id
-                        ));
-                    }
-                }
-            }
+            // Parse effects to find prerequisite guards for each effect.
+            // A consecutive run of player-count prerequisites
+            // (MinimumPlayers/MaximumPlayers) guards every following effect
+            // UP TO the next player-count run or the end of the list. A
+            // trailing run with no following effect is a whole-card
+            // requirement. Non-player prerequisites (occupation/animal/field
+            // counts) guard only the immediately following effect and are
+            // evaluated at play time, not here.
+            let Some(strict_err) = players_guarded_effects_valid(&card.id, &card.effects, players)
+            else {
+                continue;
+            };
+            return Err(strict_err);
         }
         for kind in [CardKind::Occupation, CardKind::MinorImprovement] {
             let count = self.definitions.iter().filter(|c| c.kind == kind).count();
+            // Minimum: one complete 7-card hand of each kind per player.
+            // The 2-player verified preset (16 occ / 19 minor >= 14) meets the full
+            // 7*players requirement. 3-4 player catalogs must have sufficient cards
+            // to deal full hands; if they don't, the deck is invalid without new
+            // card implementations (P1-2 scope excludes adding cards).
             if count < 7 * players {
                 return Err(
-                    "implemented card set needs seven cards of each kind per player".into(),
+                    "implemented card set needs at least seven cards of each kind per player"
+                        .into(),
                 );
             }
         }
         Ok(())
     }
+
+    /// Project this card set to a specific player count, exactly once, at a
+    /// game entry point (PR #368 close verdict: 人数投影を全ゲーム入口で固定し
+    /// 未投影セットを拒否).
+    ///
+    /// A consecutive run of player-count prerequisites guards every following
+    /// effect up to the next player-count run or the end of the list, and a
+    /// trailing run is a whole-card requirement — the same grammar
+    /// `CardSet::validate` enforces. Effects guarded for a different player
+    /// count are removed. A card that originally had effects but would lose
+    /// ALL of them for this player count is not playable here: the set is
+    /// unprojectable and rejected rather than silently kept as a dead card
+    /// (raw A155 in a 2-player game is the motivating case).
+    ///
+    /// The projection is idempotent: a set already projected for its player
+    /// count (the verified 2-player preset, the v5 save fixtures, every
+    /// `card_set_for_game` set) has no unsatisfied guards and passes through
+    /// unchanged, so content hashes and recorded replays are preserved.
+    pub fn projected_for_players(&self, players: usize) -> Result<CardSet, String> {
+        let mut definitions = Vec::with_capacity(self.definitions.len());
+        for card in &self.definitions {
+            let effects = project_effects_for_players(&card.effects, players);
+            if !card.effects.is_empty() && effects.is_empty() {
+                return Err(format!(
+                    "card {} has no active effects at {players} players",
+                    card.id
+                ));
+            }
+            definitions.push(CardDefinition {
+                use_limit: card.use_limit,
+                id: card.id.clone(),
+                kind: card.kind,
+                cost: card.cost.clone(),
+                points: card.points,
+                effects,
+            });
+        }
+        Ok(CardSet { definitions })
+    }
+}
+
+/// Whether a player-count requirement player guard is satisfied for `players`.
+fn players_guard_satisfied(rule: &CardRequirement, players: usize) -> bool {
+    match rule {
+        CardRequirement::MinimumPlayers(min) => *min != 0 && usize::from(*min) <= players,
+        CardRequirement::MaximumPlayers(max) => *max != 0 && usize::from(*max) >= players,
+        _ => true,
+    }
+}
+
+/// One segment of the player-count guard grammar: a consecutive run of
+/// MinimumPlayers/MaximumPlayers prerequisites (`guards`) plus everything that
+/// run covers (`covered`): every following effect up to the next player-count
+/// run or the end of the list, including non-player play-time prerequisites
+/// that stay attached to the effect they precede. The leading segment before
+/// any player-count prerequisite has no guards.
+#[derive(Default)]
+struct PlayerGuardSegment {
+    guards: Vec<CardEffect>,
+    covered: Vec<CardEffect>,
+}
+
+impl PlayerGuardSegment {
+    fn has_player_guard(&self) -> bool {
+        !self.guards.is_empty()
+    }
+
+    fn guards_satisfied(&self, players: usize) -> bool {
+        self.guards.iter().all(|effect| match effect {
+            CardEffect::Prerequisite { rule } => players_guard_satisfied(rule, players),
+            _ => true,
+        })
+    }
+
+    fn regular_effect_count(&self) -> usize {
+        self.covered
+            .iter()
+            .filter(|effect| !matches!(effect, CardEffect::Prerequisite { .. }))
+            .count()
+    }
+}
+
+/// Segment a card's effect list into player-count guard runs: consecutive
+/// player-count prerequisites merge into one run, and a run ends at the next
+/// player-count prerequisite once it has covered at least one effect.
+fn player_guard_segments(effects: &[CardEffect]) -> Vec<PlayerGuardSegment> {
+    let is_player_guard = |rule: &CardRequirement| {
+        matches!(
+            rule,
+            CardRequirement::MinimumPlayers(_) | CardRequirement::MaximumPlayers(_)
+        )
+    };
+    let mut segments: Vec<PlayerGuardSegment> = Vec::new();
+    let mut current = PlayerGuardSegment {
+        guards: Vec::new(),
+        covered: Vec::new(),
+    };
+    for effect in effects {
+        if let CardEffect::Prerequisite { rule } = effect {
+            if is_player_guard(rule) {
+                if !current.covered.is_empty() {
+                    segments.push(std::mem::take(&mut current));
+                }
+                current.guards.push(effect.clone());
+                continue;
+            }
+            // Non-player prerequisite: play-time guard on the next effect;
+            // stays with the effect it precedes.
+            current.covered.push(effect.clone());
+            continue;
+        }
+        current.covered.push(effect.clone());
+    }
+    segments.push(current);
+    segments
+}
+
+/// Strict player-count guard check for `CardSet::validate` (PR #368 close
+/// verdict: 人数投影を全ゲーム入口で固定し未投影セットを拒否). A set handed to
+/// a game entry is projected by [`CardSet::projected_for_players`] first, so
+/// an unsatisfied player-count guard at validation time means an unprojected
+/// (raw) set reached validation and must be rejected instead of being treated
+/// as validated.
+///
+/// Grammar, shared with the entry projection: a consecutive run of
+/// MinimumPlayers/MaximumPlayers prerequisites guards every following effect
+/// up to the next player-count run or the end of the list; effects before the
+/// first player-count run are unguarded; a trailing run with no following
+/// regular effect is a whole-card requirement. Non-player prerequisites are
+/// play-time checks on the effect they precede and are ignored here.
+fn players_guarded_effects_valid(
+    card_id: &str,
+    effects: &[CardEffect],
+    players: usize,
+) -> Option<String> {
+    for segment in player_guard_segments(effects) {
+        if !segment.has_player_guard() || segment.guards_satisfied(players) {
+            continue;
+        }
+        if segment.regular_effect_count() > 0 {
+            return Some(format!(
+                "card {card_id} carries an effect guarded for a different player count"
+            ));
+        }
+        return Some(format!(
+            "card {card_id} is not eligible for this player count"
+        ));
+    }
+    None
+}
+
+/// Project a card's effects to `players` with the shared guard grammar
+/// (PR #368: every game entry projects exactly once). A run whose guards are
+/// unsatisfied loses its covered effects together with the run itself;
+/// satisfied runs stay in place, so the projection is idempotent on sets that
+/// were already projected (the verified 2-player preset, v5 save fixtures,
+/// `card_set_for_game` output). A trailing run covering no effect is a
+/// whole-card requirement: it is kept so [`CardSet::validate`] rejects the
+/// set instead of silently stripping the requirement.
+pub(crate) fn project_effects_for_players(
+    effects: &[CardEffect],
+    players: usize,
+) -> Vec<CardEffect> {
+    let mut result: Vec<CardEffect> = Vec::with_capacity(effects.len());
+    for segment in player_guard_segments(effects) {
+        let keep = !segment.has_player_guard()
+            || segment.guards_satisfied(players)
+            || segment.regular_effect_count() == 0;
+        if keep {
+            result.extend(segment.guards);
+            result.extend(segment.covered);
+        }
+    }
+    result
 }
 
 /// Private: must never be serialized into a player's Observation.
@@ -777,20 +958,21 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
     }
     let occupations = occupation_count(set, player);
     card.effects.iter().all(|effect| {
-            let CardEffect::Prerequisite { rule } = effect else { return true; };
-            match rule {
-                CardRequirement::MinimumOccupations(min) => occupations >= usize::from(*min),
-                CardRequirement::MaximumOccupations(max) => occupations <= usize::from(*max),
-                CardRequirement::MinimumAnimals { animal, number } => player.animal_count(*animal) >= *number,
-                CardRequirement::MinimumCropFields { crop, number } => player.farm.iter().filter(|cell| {
-                    matches!(cell.tile, Tile::Field { crop: Some(found), .. } if found == *crop)
-                }).count() >= usize::from(*number),
-                crate::cards::CardRequirement::MinimumImprovements(min) => {
-                                improvement_count_in_front(set, player) >= u32::from(*min)
-                            }
-                CardRequirement::MinimumPlayers(_) => true,
+        let CardEffect::Prerequisite { rule } = effect else { return true };
+        match rule {
+            CardRequirement::MinimumOccupations(min) => occupations >= usize::from(*min),
+            CardRequirement::MaximumOccupations(max) => occupations <= usize::from(*max),
+            CardRequirement::MinimumAnimals { animal, number } => player.animal_count(*animal) >= *number,
+            CardRequirement::MinimumCropFields { crop, number } => player.farm.iter().filter(|cell| {
+                matches!(cell.tile, Tile::Field { crop: Some(found), .. } if found == *crop)
+            }).count() >= usize::from(*number),
+            CardRequirement::MinimumImprovements(min) => {
+                improvement_count_in_front(set, player) >= u32::from(*min)
             }
-        })
+            CardRequirement::MinimumPlayers(_) => true,
+            CardRequirement::MaximumPlayers(_) => true,
+        }
+    })
 }
 
 fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String> {
@@ -4325,7 +4507,7 @@ mod verified_band_d_tests {
         assert_eq!(end_game_bonus(&set, &p), 0);
         // fields 5 (=4 pts), pastures 4 (=4 pts), fenced stable x4 (=4 pts),
         // grain 8 (=4 pts) -> 4 categories.
-        for cell in p.farm.iter_mut().take(6).skip(1) {
+        for cell in p.farm.iter_mut().skip(1).take(5) {
             cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
@@ -4339,7 +4521,7 @@ mod verified_band_d_tests {
                 quantity: 0,
             });
         }
-        for (i, cell) in p.farm.iter_mut().enumerate().take(14).skip(10) {
+        for (i, cell) in p.farm.iter_mut().enumerate().skip(10).take(4) {
             cell.stable = true;
             cell.tile = Tile::Pasture { id: (10 + i) as u8 };
         }
@@ -4359,7 +4541,7 @@ mod verified_band_d_tests {
         p.played_cards.push("D100".into());
 
         // Test fields boundary: 4 fields = 3 pts, 5 fields = 4 pts
-        for cell in p.farm.iter_mut().take(5).skip(1) {
+        for cell in p.farm.iter_mut().skip(1).take(4) {
             cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
@@ -4429,7 +4611,7 @@ mod verified_band_d_tests {
         // Reset and test fenced_stables boundary: 3 fenced stables = 3 pts, 4 = 4 pts
         let mut p4 = Player::new(0, 0);
         p4.played_cards.push("D100".into());
-        for (i, cell) in p4.farm.iter_mut().enumerate().take(13).skip(10) {
+        for (i, cell) in p4.farm.iter_mut().enumerate().skip(10).take(3) {
             cell.stable = true;
             cell.tile = Tile::Pasture { id: (10 + i) as u8 };
         }
@@ -4782,10 +4964,10 @@ mod verified_band_e_tests {
         q.played_cards.push("E034".into());
         q.farm[0].tile = Tile::Room;
         q.farm[5].tile = Tile::Room;
-        for cell in q.farm.iter_mut().take(5).skip(1) {
+        for cell in q.farm.iter_mut().skip(1).take(4) {
             cell.tile = Tile::Pasture { id: 0 };
         }
-        for cell in q.farm.iter_mut().take(15).skip(6) {
+        for cell in q.farm.iter_mut().skip(6).take(9) {
             cell.tile = Tile::Pasture { id: 0 };
         }
         assert_eq!(end_game_bonus(&set, &q), 2);
@@ -4802,13 +4984,13 @@ mod verified_band_e_tests {
         p.played_cards.push("E034".into());
         p.farm[0].tile = Tile::Room;
         p.farm[5].tile = Tile::Room;
-        for cell in p.farm.iter_mut().take(5).skip(1) {
+        for cell in p.farm.iter_mut().skip(1).take(4) {
             cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
         }
-        for cell in p.farm.iter_mut().take(14).skip(6) {
+        for cell in p.farm.iter_mut().skip(6).take(8) {
             cell.tile = Tile::Field {
                 crop: Some(Crop::Vegetable),
                 remaining: 1,
@@ -5440,4 +5622,466 @@ pub fn card_id_to_external(card_id: CardId) -> Option<String> {
     default_registry()
         .external_id(card_id)
         .map(|s| s.to_string())
+}
+
+#[cfg(test)]
+mod p1_2_repro_tests {
+    use super::*;
+    use crate::card_pool::builtin_implemented_cards;
+    use crate::model::Good;
+
+    #[test]
+    fn repro_builtin_vs_registry_count() {
+        let builtin = builtin_implemented_cards();
+        let registry = default_registry();
+
+        println!("builtin_implemented_cards count: {}", builtin.len());
+        println!("registry count: {}", registry.len());
+
+        let builtin_ids: std::collections::BTreeSet<_> =
+            builtin.iter().map(|c| c.id.clone()).collect();
+        let registry_ids: std::collections::BTreeSet<_> =
+            registry.iter().map(|c| c.external_id.clone()).collect();
+
+        let missing: Vec<_> = registry_ids.difference(&builtin_ids).collect();
+        let extra: Vec<_> = builtin_ids.difference(&registry_ids).collect();
+
+        println!("Missing from builtin: {:?}", missing);
+        println!("Extra in builtin: {:?}", extra);
+
+        // Both must carry exactly the same catalog. The hard count is
+        // intentionally not pinned: the implemented catalog grows as cards
+        // land on main (65 at the original P1-2 audit, 75 after the M7-C
+        // implementation wave merged there); what must not drift is the
+        // builtin/registry identity itself.
+        assert_eq!(
+            builtin.len(),
+            registry.len(),
+            "builtin_implemented_cards and registry must cover the same cards"
+        );
+        assert!(
+            missing.is_empty(),
+            "builtin should not miss any registry cards"
+        );
+        assert!(extra.is_empty(), "builtin should not have extra cards");
+    }
+
+    #[test]
+    fn debug_four_player_minor_improvements() {
+        // Informational: the 4-player experimental pool deals partial hands because
+        // the minor improvement count is below 7*4=28. This test documents the
+        // current count without enforcing a specific number (which would brittle).
+        let registry = default_registry();
+        let pool = crate::registry::CardPool::new(&registry, 4, true);
+        let minor_ids: Vec<_> = pool.eligible_kind(&registry, CardKind::MinorImprovement);
+        println!(
+            "4p experimental minors (implemented catalog): {}",
+            minor_ids.len()
+        );
+        // No assertion - this is an informational test only
+    }
+
+    #[test]
+    fn repro_card_set_for_game_validate() {
+        for players in [2, 3, 4] {
+            for experimental in [false, true] {
+                let set = card_set_for_game(players, experimental);
+                let occ = set
+                    .definitions
+                    .iter()
+                    .filter(|c| c.kind == CardKind::Occupation)
+                    .count();
+                let minor = set
+                    .definitions
+                    .iter()
+                    .filter(|c| c.kind == CardKind::MinorImprovement)
+                    .count();
+                let result = set.validate(players);
+                println!(
+                    "card_set_for_game({}, {}): {} ({} cards, occ={}, minor={})",
+                    players,
+                    experimental,
+                    if result.is_ok() { "OK" } else { "FAIL" },
+                    set.definitions.len(),
+                    occ,
+                    minor
+                );
+                if let Err(e) = &result {
+                    println!("  Error: {}", e);
+                }
+                // After fix, all should pass
+                assert!(
+                    result.is_ok(),
+                    "card_set_for_game({}, {}) should validate: {}",
+                    players,
+                    experimental,
+                    result.unwrap_err()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn repro_b121_effects_per_player_count() {
+        for players in [2, 3, 4] {
+            let set = card_set_for_game(players, true);
+            if let Some(b121) = set.definition("B121") {
+                let active: Vec<_> = b121
+                    .effects
+                    .iter()
+                    .filter(|e| !matches!(e, CardEffect::Prerequisite { .. }))
+                    .collect();
+                let has_claypit = b121.effects.iter().any(|e| matches!(e, CardEffect::AfterWorkerGain { space, .. } if *space == Space::ClayPit));
+                println!(
+                    "B121 at {} players: {} total effects ({} active), has ClayPit: {}",
+                    players,
+                    b121.effects.len(),
+                    active.len(),
+                    has_claypit
+                );
+
+                if players == 2 {
+                    assert_eq!(
+                        active.len(),
+                        2,
+                        "B121 at 2 players should have 2 active effects"
+                    );
+                    assert!(!has_claypit, "B121 at 2 players should NOT have ClayPit");
+                } else {
+                    assert_eq!(
+                        active.len(),
+                        3,
+                        "B121 at {} players should have 3 active effects",
+                        players
+                    );
+                    assert!(
+                        has_claypit,
+                        "B121 at {} players should have ClayPit",
+                        players
+                    );
+                }
+            } else {
+                panic!("B121 at {} players: NOT FOUND", players);
+            }
+        }
+    }
+
+    #[test]
+    fn repro_b102_per_player_count() {
+        for players in [2, 3, 4] {
+            let set = card_set_for_game(players, true);
+            if let Some(b102) = set.definition("B102") {
+                let active: Vec<_> = b102
+                    .effects
+                    .iter()
+                    .filter(|e| !matches!(e, CardEffect::Prerequisite { .. }))
+                    .collect();
+                println!(
+                    "B102 at {} players: {} total effects ({} active)",
+                    players,
+                    b102.effects.len(),
+                    active.len()
+                );
+
+                match players {
+                    2 => {
+                        assert_eq!(active.len(), 1);
+                        assert!(matches!(
+                            &active[0],
+                            CardEffect::OnPlayGain {
+                                good: Good::Clay,
+                                amount: 3
+                            }
+                        ));
+                    }
+                    3 => {
+                        assert_eq!(active.len(), 1);
+                        assert!(matches!(
+                            &active[0],
+                            CardEffect::OnPlayGain {
+                                good: Good::Reed,
+                                amount: 2
+                            }
+                        ));
+                    }
+                    4 => {
+                        // B102 is not eligible for 4 players (OnPlayGainAnimal not implemented)
+                        panic!("B102 at 4 players should not be eligible");
+                    }
+                    _ => {}
+                }
+            } else {
+                if players == 2 {
+                    panic!("B102 at 2 players: NOT FOUND (should exist)");
+                } else if players == 4 {
+                    // Expected: B102 not eligible for 4 players
+                } else {
+                    println!("B102 at {} players: NOT FOUND (unexpected)", players);
+                    panic!(
+                        "B102 at {} players should exist (eligible for all counts)",
+                        players
+                    );
+                }
+            }
+        }
+    }
+
+    /// Registry-merge forms (B121/B102 via `merge_card_variants`) carry
+    /// player-count prerequisite guards that the cards.rs raw variants do not,
+    /// so their projected effects are pinned per player count instead of being
+    /// compared against the raw catalog.
+    fn pinned_registry_effects(players: usize, id: &str) -> Option<Vec<CardEffect>> {
+        let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
+            space,
+            good,
+            amount,
+        };
+        match id {
+            "B102" => match players {
+                2 => Some(vec![
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MinimumPlayers(2),
+                    },
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MaximumPlayers(2),
+                    },
+                    CardEffect::OnPlayGain {
+                        good: Good::Clay,
+                        amount: 3,
+                    },
+                ]),
+                3 => Some(vec![
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MinimumPlayers(3),
+                    },
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MaximumPlayers(3),
+                    },
+                    CardEffect::OnPlayGain {
+                        good: Good::Reed,
+                        amount: 2,
+                    },
+                ]),
+                _ => None,
+            },
+            "B121" => Some({
+                let mut effects = vec![
+                    gain(Space::Forest, Good::Clay, 1),
+                    gain(Space::ReedBank, Good::Clay, 1),
+                ];
+                if players >= 3 {
+                    effects.push(CardEffect::Prerequisite {
+                        rule: CardRequirement::MinimumPlayers(3),
+                    });
+                    effects.push(gain(Space::ClayPit, Good::Clay, 1));
+                }
+                effects
+            }),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn repro_all_cards_per_player_count_parity() {
+        use std::collections::BTreeMap;
+
+        let registry = default_registry();
+        // 実測 @ b10a61a: デフォルトレジストリ = 77 枚
+        // (2026-11-21 の Actions main+A109 マージビルドでは 78 枚)。
+        // 総数は main のカード追加で変動しうるためここでは固定しない: 主アサーションは下の
+        // field-parity ループ（cards.rs 生定義 vs registry 投影の id/kind/cost/points/effects、
+        // 欠落・過剰ゼロ）であり、レジストリ組込自体は repro_builtin_vs_registry_count で
+        // builtin_implemented_cards との一致を別途保証する。
+        let _ = registry.len();
+
+        // cards.rs 生カタログ: external_id -> (person count -> raw CardDefinition)
+        let mut catalog: BTreeMap<String, BTreeMap<usize, CardDefinition>> = BTreeMap::new();
+        let mut insert_cards = |players: usize, cards: &[CardDefinition]| {
+            for card in cards {
+                let entry = catalog.entry(card.id.clone()).or_default();
+                assert!(
+                    entry.insert(players, card.clone()).is_none(),
+                    "cards.rs catalog duplicate: {} at {players} players",
+                    card.id
+                );
+            }
+        };
+        for players in [2usize, 3, 4] {
+            insert_cards(players, &verified_scoring_cards(players));
+            insert_cards(players, &verified_minor_worker_cards(players));
+            insert_cards(players, &verified_worker_bonus_cards(players));
+            insert_cards(players, &verified_simple_occupations(players));
+            insert_cards(players, &verified_multiplayer_passive_cards(players));
+        }
+        let count_independent: [Vec<CardDefinition>; 9] = [
+            verified_immediate_resource_cards(),
+            verified_round_and_harvest_cards(),
+            verified_passive_cards(),
+            verified_extra_simple_cards(),
+            verified_band_a_cards(),
+            verified_band_b_cards(),
+            verified_band_c_cards(),
+            verified_band_d_cards(),
+            verified_band_e_cards(),
+        ];
+        for cards in count_independent {
+            for players in [2usize, 3, 4] {
+                insert_cards(players, &cards);
+            }
+        }
+
+        for players in [2usize, 3, 4] {
+            let pool = CardPool::new(&registry, players, true);
+            let set = card_set_for_game(players, true);
+            assert!(
+                set.validate(players).is_ok(),
+                "card_set_for_game({players}, true) must validate"
+            );
+
+            let occ = set
+                .definitions
+                .iter()
+                .filter(|c| c.kind == CardKind::Occupation)
+                .count();
+            let minor = set
+                .definitions
+                .iter()
+                .filter(|c| c.kind == CardKind::MinorImprovement)
+                .count();
+            // 実測 @ b10a61a: 2p = 72 枚 (occ 34 / minor 38)、3p = 76 枚 (occ 38 / minor 38)、
+            // 4p = 76 枚 (occ 38 / minor 38)。main のカード追加（2026-11-21 の Actions マージ
+            // ビルドでは A109 により 73/77/77）で変動しうるため、ここでは総数を固定しない。
+            // 主アサーションは下の field-parity ループ（cards.rs 生定義 vs registry 投影の
+            // id/kind/cost/points/effects、欠落・過剰ゼロ）であり、数はコメントの
+            // 実測値を参照する。
+            let _ = (occ, minor);
+
+            // --- cards.rs 生定義 vs registry 投影 (id, kind, cost, points, effects) ---
+            for (id, raw_by_count) in &catalog {
+                let Some(raw) = raw_by_count.get(&players) else {
+                    continue;
+                };
+                let reg = registry.get_by_external(id).unwrap_or_else(|| {
+                    panic!("{id} is in the cards.rs catalog but missing from the default registry")
+                });
+                let def = reg.to_card_definition();
+                assert_eq!(def.kind, raw.kind, "{id} kind mismatch at {players}p");
+                assert_eq!(def.cost, raw.cost, "{id} cost mismatch at {players}p");
+                assert_eq!(def.points, raw.points, "{id} points mismatch at {players}p");
+
+                if pool.contains(reg.id) {
+                    let expected_effects =
+                        pinned_registry_effects(players, id).unwrap_or_else(|| raw.effects.clone());
+                    let actual_effects = reg.to_card_definition_for_players(players).effects;
+                    assert_eq!(
+                        actual_effects, expected_effects,
+                        "{id} effects at {players}p diverge from the cards.rs raw definition \
+                     (registry-merge forms B121/B102 are pinned exceptions)"
+                    );
+                }
+            }
+
+            // --- registry プール eligibility vs cards.rs カタログ ---
+            let mut unexpected_eligible = Vec::new();
+            for reg in registry.iter() {
+                let in_catalog = catalog
+                    .get(&reg.external_id)
+                    .map(|raw_by_count| raw_by_count.contains_key(&players))
+                    .unwrap_or(false);
+                if pool.contains(reg.id)
+                    && !in_catalog
+                    && !(reg.external_id == "B102" && players == 3)
+                {
+                    // B102 at 3 players is by design: registry-only, absent from cards.rs catalog
+                    unexpected_eligible.push(reg.external_id.clone());
+                }
+            }
+            assert!(
+            unexpected_eligible.is_empty(),
+            "registry-eligible but absent from cards.rs catalog at {players}p: {unexpected_eligible:?}"
+        );
+
+            let ineligible: Vec<_> = registry
+                .iter()
+                .filter(|c| !pool.contains(c.id))
+                .map(|c| c.external_id.clone())
+                .collect();
+            println!("{players}p pool-ineligible cards: {ineligible:?}");
+        }
+
+        // 修正1: `filter_effects_for_players` を run-grammar に統一後の 2p 投影。
+        // 統一前は A155 -> [Grain@TravelingPlayers]、B144 -> [Wood@Hollow, Reed@ClayPit] と
+        // 守衛直後の1効果のみを守衛して無防備化する設計欠陥があった。正しくは全員 []。
+        for id in ["A155", "B142", "B144"] {
+            let effects = registry
+                .get_by_external(id)
+                .unwrap_or_else(|| panic!("{id} missing from registry"))
+                .to_card_definition_for_players(2)
+                .effects;
+            assert!(
+            effects.is_empty(),
+            "{id} 2-player projection must be [] after unifying with the run grammar, got {effects:?}"
+        );
+        }
+
+        // 2p プリセットのハッシュは変更不可（39 defs、content_hash 不変条件）
+        let preset = verified_basic_card_set(2).unwrap();
+        assert_eq!(
+            preset.content_hash(),
+            "22fdb72f481bc6fcfc49f781dbd3452a20b9c408ec518711b65a1a6f5276a79b",
+            "2-player preset content hash (実測 @ b10a61a)"
+        );
+
+        // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
+        // 2p: [A133, A143, A155, B142, B144]（A133/A143 は 3人+、A155 は 4人のみ、B142/B144 は 3人+ のみ；
+        // Round 2 指摘対象は A155/B142/B144）。3p: [A155] のみ。4p: [B102] のみ。
+        // A109（main 2026-11-21 追加）は全人数 eligible なのでいずれの不適格セットにも入らない。
+        // 主アサーションは「cards.rs カタログと registry の person-count 整合」の欠落/過剰ゼロ
+        //（上のループの field-parity チェック）であり、総数・不適格セットの厳密な列挙は
+        // コメントの実測値を参照する。
+        let pool2 = CardPool::new(&registry, 2, true);
+        let ineligible_2: Vec<_> = registry
+            .iter()
+            .filter(|c| !pool2.contains(c.id))
+            .map(|c| c.external_id.clone())
+            .collect();
+        for id in ["A133", "A143", "A155", "B142", "B144"] {
+            assert!(
+                ineligible_2.contains(&id.to_string()),
+                "{id} must be pool-ineligible at 2 players"
+            );
+        }
+        let pool3 = CardPool::new(&registry, 3, true);
+        let ineligible_3: Vec<_> = registry
+            .iter()
+            .filter(|c| !pool3.contains(c.id))
+            .map(|c| c.external_id.clone())
+            .collect();
+        assert!(
+            ineligible_3.contains(&"A155".to_string()),
+            "A155 must be pool-ineligible at 3 players"
+        );
+        let pool4 = CardPool::new(&registry, 4, true);
+        let ineligible_4: Vec<_> = registry
+            .iter()
+            .filter(|c| !pool4.contains(c.id))
+            .map(|c| c.external_id.clone())
+            .collect();
+        assert!(
+            ineligible_4.contains(&"B102".to_string()),
+            "B102 must be pool-ineligible at 4 players"
+        );
+        assert!(
+            pool2.contains(
+                registry
+                    .card_id("B102")
+                    .expect("B102 is in the default registry")
+            ) && pool3.contains(
+                registry
+                    .card_id("B102")
+                    .expect("B102 is in the default registry")
+            ),
+            "B102 must be pool-eligible at 2 and 3 players (registry-only at 3 players)"
+        );
+    }
 }
