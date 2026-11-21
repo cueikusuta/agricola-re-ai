@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "card_id": "D110",
+  "cases": [
+    {
+      "id": "D110-reed-1-food",
+      "scope": "effect_only",
+      "setup": {
+        "accumulation": {"fishing": 1, "reed_bank": 3},
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "reed_bank"
+      },
+      "expected": {
+        "food_delta": 2,
+        "notes": "Fishing has 1+ food, Reed Bank used -> +2 food"
+      }
+    },
+    {
+      "id": "D110-clay-2-food",
+      "scope": "effect_only",
+      "setup": {
+        "accumulation": {"fishing": 2, "clay_pit": 3},
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "clay_pit"
+      },
+      "expected": {
+        "food_delta": 2,
+        "notes": "Fishing has 2+ food, Clay Pit used -> +2 food"
+      }
+    },
+    {
+      "id": "D110-forest-3-food",
+      "scope": "effect_only",
+      "setup": {
+        "accumulation": {"fishing": 3, "forest": 3},
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "forest"
+      },
+      "expected": {
+        "food_delta": 2,
+        "notes": "Fishing has 3+ food, Forest used -> +2 food"
+      }
+    },
+    {
+      "id": "D110-threshold-not-met",
+      "scope": "effect_only",
+      "setup": {
+        "accumulation": {"fishing": 1, "clay_pit": 3},
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "clay_pit"
+      },
+      "expected": {
+        "food_delta": 0,
+        "effect_not_triggered": true,
+        "notes": "Fishing has only 1 food, Clay Pit needs 2+ -> no bonus"
+      }
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "card_id": "D120",
+  "cases": [
+    {
+      "id": "D120-on-play-place-bricks",
+      "scope": "effect_only",
+      "setup": {
+        "round": 1,
+        "brick": 0
+      },
+      "action": {
+        "play": "D120"
+      },
+      "expected": {
+        "round_markers": {
+          "6": {"brick": 1},
+          "7": {"brick": 1},
+          "8": {"brick": 1},
+          "9": {"brick": 1},
+          "10": {"brick": 1},
+          "11": {"brick": 1},
+          "12": {"brick": 1},
+          "13": {"brick": 1},
+          "14": {"brick": 1}
+        },
+        "notes": "Play at round 1, place 1 brick on each round 6-14 (9 bricks total)"
+      }
+    },
+    {
+      "id": "D120-gain-bricks-round-start",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5,
+        "brick": 0,
+        "round_markers": {"6": {"brick": 1}}
+      },
+      "action": {
+        "trigger": "round_start",
+        "round": 6
+      },
+      "expected": {
+        "brick_delta": 1,
+        "round_6_markers_cleared": true,
+        "notes": "At start of round 6, gain 1 brick from marker"
+      }
+    },
+    {
+      "id": "D120-played-late-rounds",
+      "scope": "effect_only",
+      "setup": {
+        "round": 10,
+        "brick": 0
+      },
+      "action": {
+        "play": "D120"
+      },
+      "expected": {
+        "round_markers": {
+          "11": {"brick": 1},
+          "12": {"brick": 1},
+          "13": {"brick": 1},
+          "14": {"brick": 1}
+        },
+        "notes": "Play at round 10, rounds 6-10 already played, only place on rounds 11-14 (4 bricks)"
+      }
+    }
+  ]
+}
