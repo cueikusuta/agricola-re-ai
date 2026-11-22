@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "card_id": "C102",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "森林保護者",
+    "name_en": "Tree Guard"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2987",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; effect rephrased in own words, no verbatim text kept"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list row used to cross-check the card id, name and effect summary"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "forest",
+              "copse",
+              "grove"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "wood",
+                "amount": 4
+              }
+            ],
+            "receive": [
+              {
+                "good": "stone",
+                "amount": 2
+              },
+              {
+                "good": "clay",
+                "amount": 1
+              },
+              {
+                "good": "reed",
+                "amount": 1
+              },
+              {
+                "good": "grain",
+                "amount": 1
+              }
+            ],
+            "return_to": "accumulation_space"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each time the owner uses a wood accumulation space, they may afterwards return 4 wood from their own supply onto that same space and receive 2 stone, 1 clay, 1 reed and 1 grain. The wood lands on the space that was just used, so it stays available for later takes (A056 exchange + return_to pattern)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C102-forest-return",
+      "C102-insufficient-wood",
+      "C102-not-triggered"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Printed points: 0. Ban: strong. Own-word summary of the third-party wiki effect: after each use of a wood accumulation space, the owner may put 4 wood from their supply back onto that space to gain 2 stone, 1 clay, 1 reed and 1 grain. Space names follow the A056 wood-accumulation triple (forest / copse / grove). Classification (docs/all-cards-classification-final.md, PR #377 source): stage outside, single site: space use / payment plus gain, TR-SITE. Sources: BGA wiki JA page and English list row, cross-checked; not official Lookout verification."
+  }
+}
