@@ -353,6 +353,18 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// B073 贈り物かご (Gift Basket): on play, if the owner has exactly
+    /// `rooms` rooms, gain `amount` of `good`. The printed table
+    /// (2 -> vegetable, 3 -> food, 4 -> grain, 5 -> vegetable; 1 each) is
+    /// expressed as four effects of this variant, and only the one row whose
+    /// room count matches the owner exactly resolves. A dedicated variant
+    /// (instead of widening `OnPlayGainIfHouse`) keeps the serialized shape
+    /// of existing variants byte-identical for saves and content hashes.
+    OnPlayGainIfRoomCount {
+        rooms: u8,
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -436,6 +448,7 @@ impl CardEffect {
             CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
                 "start_round_gain_if_no_harvest_and_animals"
             }
+            CardEffect::OnPlayGainIfRoomCount { .. } => "on_play_gain_if_room_count",
         }
     }
 }
@@ -677,7 +690,8 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfFamilyAndRooms { amount, .. }
                         | CardEffect::StartRoundGainIfLessonsOccupants { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
-                        | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. } => *amount,
+                        | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
+                        | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -1299,6 +1313,16 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 good,
                 amount,
             } if player.house == *house && player.rooms() == usize::from(*rooms) => {
+                safe_gain(player, *good, *amount)?;
+            }
+            // B073 贈り物かご: only the table row whose room count matches the
+            // owner exactly resolves; a non-matching row falls through to the
+            // catch-all below and grants nothing.
+            CardEffect::OnPlayGainIfRoomCount {
+                rooms,
+                good,
+                amount,
+            } if player.rooms() == usize::from(*rooms) => {
                 safe_gain(player, *good, *amount)?;
             }
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
@@ -4997,6 +5021,44 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 CardEffect::OnPlayGainPerCount {
                     count_kind: CountKind::MajorImprovementsBottomRow,
                     good: Good::Food,
+                    amount: 1,
+                },
+            ],
+        },
+        // B073 贈り物かご (Gift Basket): cost 1 reed, 1 VP; prerequisite: at
+        // least 3 occupations played. On play, if the owner has exactly
+        // 2/3/4/5 rooms, gain 1 vegetable/food/grain/vegetable. Each table
+        // row is one OnPlayGainIfRoomCount effect; only the row matching the
+        // current room count exactly resolves. Eligible at all player counts
+        // (spec eligibility 2/3/4 = yes).
+        CardDefinition {
+            use_limit: None,
+            id: "B073".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Reed, 1)],
+            points: 1,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(3),
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 2,
+                    good: Good::Vegetable,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 3,
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 4,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 5,
+                    good: Good::Vegetable,
                     amount: 1,
                 },
             ],
