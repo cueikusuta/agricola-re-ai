@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "card_id": "C104",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "コレクター",
+    "name_en": "Collector"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2985",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; effect rephrased in own words, no verbatim text kept"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list row used to cross-check the card id, name and effect summary"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "board",
+          "params": {
+            "kind": "grant_private_action_space",
+            "space": "collector",
+            "owner_only": true,
+            "notes": "the card itself becomes an action space that only its owner may use"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "collector"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "gain_begging_marker",
+            "amount": 1,
+            "notes": "each use hands the owner one begging marker (a negative scoring token)"
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "gain_distinct_goods_by_use_count",
+            "table": {
+              "1": 6,
+              "2": 7,
+              "3": 8,
+              "4": 9
+            },
+            "distinct_types": true,
+            "notes": "on the 1st/2nd/3rd/4th use of this space the owner gains 6/7/8/9 goods of mutually different types, chosen by the owner; 5th and later uses are not covered by either source"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].params.kind 'grant_private_action_space': an owner-only card action space has no established encoding (E161 and D023 stay needs_resolution for the same reason; B042 covers a public space only)",
+      "effects[1].steps[0]: gaining a begging marker directly has no encoding precedent (A054 only models begging_marker as the spend_resource otherwise fallback)",
+      "effects[1].steps[1].params: no count source or predicate expresses 'how many times this space has been used this game', so the 6/7/8/9 distinct-goods table keyed by use count is provisional; 'different goods' (別種) is read as mutually different types per the English row 'different good of your choice'",
+      "effects[1]: what happens on the 5th and later uses is stated by neither source; the classification record MQ-13 provisional default (begging marker only, no goods) is not an official ruling"
+    ],
+    "test_case_ids": [
+      "C104-first-use-six-goods",
+      "C104-second-use-seven-goods",
+      "C104-fourth-use-nine-goods",
+      "C104-fifth-use-unresolved",
+      "C104-owner-only-space"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Printed points: 0. Ban: none. Own-word summary of the third-party wiki effect: the card becomes an action space usable only by its owner; on the 1st/2nd/3rd/4th use the owner receives 1 begging marker and 6/7/8/9 goods of mutually different types of their choice. Classification (docs/all-cards-classification-final.md, PR #377 source): stage 4, P9 own private space plus use count, TR-SITE / STACK / DEC; MQ-13 (5th-and-later use behavior) is an open question with a provisional default only. Sources: BGA wiki JA page and English list row, cross-checked; not official Lookout verification."
+  }
+}
