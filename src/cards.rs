@@ -4404,8 +4404,11 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
             ],
         ),
         // D109 種まきの達人 (Sow Master): no cost; on play gain 1 wood, and
-        // each use of an action space with the sow action (grain seeds,
-        // vegetable seeds, cultivation) grants 2 food.
+        // each use of an action space with the sow action (grain utilization,
+        // cultivation) grants 2 food. Grain Seeds and Vegetable Seeds are
+        // take-only spaces in this engine's action model (engine.rs applies
+        // them as Detail::None single-goods takes), so they do not carry the
+        // sow action and must not trigger the 2-food gain.
         card(
             "D109",
             CardKind::Occupation,
@@ -4415,8 +4418,7 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                     good: Good::Wood,
                     amount: 1,
                 },
-                gain(Space::GrainSeeds, Good::Food, 2),
-                gain(Space::VegetableSeeds, Good::Food, 2),
+                gain(Space::GrainUtilization, Good::Food, 2),
                 gain(Space::Cultivation, Good::Food, 2),
             ],
         ),
@@ -5038,6 +5040,159 @@ mod verified_band_d_tests {
         assert_eq!(p.supply.grain, 2);
     }
 
+    // D109 boundary cases (static review 2026-11-20, D109): the action spaces
+    // that carry the "sow" action in this engine's model are Grain Utilization
+    // and Cultivation. Grain Seeds and Vegetable Seeds are take-only spaces and
+    // must not trigger the 2-food gain.
+
+    #[test]
+    fn d109_grain_seeds_space_does_not_grant_food() {
+        let p = applied("D109", &[Space::GrainSeeds]);
+        assert_eq!(
+            p.supply.food, 0,
+            "Grain Seeds is a take-only space (no sow action) -> D109 must not fire"
+        );
+    }
+
+    #[test]
+    fn d109_vegetable_seeds_space_does_not_grant_food() {
+        let p = applied("D109", &[Space::VegetableSeeds]);
+        assert_eq!(
+            p.supply.food, 0,
+            "Vegetable Seeds is a take-only space (no sow action) -> D109 must not fire"
+        );
+    }
+
+    #[test]
+    fn d109_grain_utilization_space_grants_food_two() {
+        let p = applied("D109", &[Space::GrainUtilization]);
+        assert_eq!(
+            p.supply.food, 2,
+            "Grain Utilization carries the sow action -> D109 fires once for 2 food"
+        );
+    }
+
+    #[test]
+    fn d109_cultivation_space_grants_food_two() {
+        let p = applied("D109", &[Space::Cultivation]);
+        assert_eq!(
+            p.supply.food, 2,
+            "Cultivation carries the sow action -> D109 fires once for 2 food"
+        );
+    }
+
+    #[test]
+    fn d109_farmland_space_does_not_grant_food() {
+        let p = applied("D109", &[Space::Farmland]);
+        assert_eq!(
+            p.supply.food, 0,
+            "Farmland only plows, it does not sow -> D109 must not fire"
+        );
+    }
+
+    #[test]
+    fn d109_owner_receives_food_on_space_use_not_on_play() {
+        let set = set();
+        let mut hand = vec!["D109".to_string()];
+        let mut owner_p = Player::new(0, 0);
+        play(
+            &set,
+            &mut hand,
+            &mut owner_p,
+            "D109",
+            CardKind::Occupation,
+            0,
+        )
+        .unwrap();
+        // Destination: the card moves from hand into the played area.
+        assert!(
+            !hand.iter().any(|c| c == "D109"),
+            "D109 must leave the hand on play"
+        );
+        assert!(
+            owner_p.played_cards.iter().any(|c| c == "D109"),
+            "D109 must land in the played area"
+        );
+        // Fire timing: only the on-play wood arrives here; food waits for a
+        // worker action on a sow space.
+        assert_eq!(owner_p.supply.wood, 1);
+        assert_eq!(
+            owner_p.supply.food, 0,
+            "D109 food must not be granted on play"
+        );
+        // Recipient: a player without the card gains nothing on the same space.
+        let mut other = Player::new(1, 0);
+        after_worker(&set, &mut other, Space::GrainUtilization).unwrap();
+        assert_eq!(
+            other.supply.food, 0,
+            "only the card owner receives the D109 food"
+        );
+        // The owner receives it at the moment the sow space is used.
+        after_worker(&set, &mut owner_p, Space::GrainUtilization).unwrap();
+        assert_eq!(owner_p.supply.food, 2);
+    }
+
+    // D109 dispatcher route (card_events AfterWorkerGain) must show the
+    // same boundary as the legacy cards::after_worker helper: the sow-space
+    // fire on Grain Utilization and Cultivation, never on take-only seeds
+    // spaces, and the owner is the recipient.
+    #[test]
+    fn d109_dispatcher_route_matches_boundary() {
+        use crate::card_events::dispatch_after_worker;
+        use crate::cards::CardState;
+        use std::collections::BTreeMap;
+
+        let set = set();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0), Player::new(1, 0)];
+        players[0].played_cards.push("D109".into());
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+
+        let mut run = |space: Space, players: &mut Vec<Player>| {
+            dispatch_after_worker(
+                &set,
+                0,
+                space,
+                &mut cards,
+                players,
+                &mut vec![],
+                &mut BTreeMap::new(),
+                1,
+                &used_spaces,
+                &mut event_budget,
+                &mut card_uses,
+                &card_use_limits,
+                &mut pending,
+                true,
+            )
+            .unwrap();
+        };
+
+        run(Space::GrainSeeds, &mut players);
+        assert_eq!(
+            players[0].supply.food, 0,
+            "dispatcher route must not fire on the take-only Grain Seeds space"
+        );
+        run(Space::GrainUtilization, &mut players);
+        assert_eq!(
+            players[0].supply.food, 2,
+            "dispatcher route fires once for 2 food on Grain Utilization"
+        );
+        run(Space::Cultivation, &mut players);
+        assert_eq!(
+            players[0].supply.food, 4,
+            "dispatcher route fires once for 2 food on Cultivation"
+        );
+        assert_eq!(
+            players[1].supply.food, 0,
+            "only the card owner receives the D109 food"
+        );
+    }
+
     #[test]
     fn d109_wood_on_play_and_food_per_sow_space() {
         let set = set();
@@ -5048,12 +5203,16 @@ mod verified_band_d_tests {
         for space in [
             Space::GrainSeeds,
             Space::VegetableSeeds,
-            Space::Cultivation,
             Space::Farmland,
+            Space::GrainUtilization,
+            Space::Cultivation,
         ] {
             after_worker(&set, &mut p, space).unwrap();
         }
-        assert_eq!(p.supply.food, 6, "three sow spaces -> 3 x 2 food");
+        assert_eq!(
+            p.supply.food, 4,
+            "two sow spaces (grain utilization, cultivation) -> 2 x 2 food"
+        );
     }
 
     #[test]
