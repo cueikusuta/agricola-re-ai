@@ -624,9 +624,15 @@ fn card_priority(
                                     card_good_value(*good) * i64::from(*amount) * horizon / 4
                                 }
                                 CardEffect::HarvestStartGainIfFields { good, amount, .. } => {
-                                    // Conditional on field count; optimistic half-weight
-                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
-                                }
+                                                                    // Conditional on field count; optimistic half-weight
+                                                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                                                }
+                                                                CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { good, amount, .. } => {
+                                                                    // D065 麦ふるい: conditional on harvesting 2+ grain this
+                                                                    // field phase; optimistic half-weight like the sibling
+                                                                    // conditional arms.
+                                                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                                                }
                                 CardEffect::OnPlayGainAnimal { animal, amount, .. }
                                 | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
                                     card_animal_value(*animal) * i64::from(*amount) * horizon
