@@ -49,6 +49,9 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::OnPlayGain { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerStored { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainIfHouse { .. } => TriggerPhase::Before,
+        // B073 贈り物かご's room-count table is an instantaneous play-time
+        // effect — Before phase, same as the other on-play gains.
+        CardEffect::OnPlayGainIfRoomCount { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerCount { .. } => TriggerPhase::Before,
         // On-play animal gain is an instantaneous play-time effect — Before
@@ -539,6 +542,11 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms,
+                    good,
+                    amount,
+                } => handle_on_play_gain_if_room_count(ctx, player, *rooms, good, *amount)?,
                 CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                     handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
                 }
@@ -1075,6 +1083,10 @@ fn effect_condition_holds(
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
+        // B073 贈り物かご: only the table row matching the owner's current
+        // room count exactly resolves; rows for other room counts grant
+        // nothing (no double grant, no rounding).
+        CardEffect::OnPlayGainIfRoomCount { rooms, .. } => player.rooms() == usize::from(*rooms),
         CardEffect::OnPlayGainAnimal { .. } => true,
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
@@ -1215,6 +1227,13 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_on_play_gain_if_house(ctx, player, house, *rooms, good, *amount)?,
+            // B073 贈り物かご: the condition scan already routed only the row
+            // whose room count matches the owner exactly.
+            CardEffect::OnPlayGainIfRoomCount {
+                rooms,
+                good,
+                amount,
+            } => handle_on_play_gain_if_room_count(ctx, player, *rooms, good, *amount)?,
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
             }
@@ -1647,6 +1666,32 @@ fn handle_on_play_gain_if_house(
             .ok_or("resource overflow")?;
         p.supply.set(*good, next);
     }
+    Ok(EffectResult::Resolved)
+}
+
+/// B073 贈り物かご (Gift Basket): one table row of the on-play room-count
+/// gain. The generic scan (effect_condition_holds) only routes the row whose
+/// `rooms` matches the owner exactly, so this handler applies the gain
+/// unconditionally for the routed row and the other rows never reach it.
+fn handle_on_play_gain_if_room_count(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    rooms: u8,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    debug_assert_eq!(
+        p.rooms(),
+        usize::from(rooms),
+        "handler must only run for the row matching the room count"
+    );
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(amount)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
 }
 
@@ -3490,6 +3535,21 @@ pub mod legacy {
                     good,
                     amount,
                 } if player.house == *house && player.rooms() == usize::from(*rooms) => {
+                    let next = player
+                        .supply
+                        .get(*good)
+                        .checked_add(*amount)
+                        .ok_or("resource overflow")?;
+                    player.supply.set(*good, next);
+                }
+                // B073 贈り物かご: only the table row whose room count matches
+                // the owner exactly resolves; other rows grant nothing, so the
+                // legacy path keeps parity with the dispatcher scan.
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms,
+                    good,
+                    amount,
+                } if player.rooms() == usize::from(*rooms) => {
                     let next = player
                         .supply
                         .get(*good)

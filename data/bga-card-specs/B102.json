@@ -87,11 +87,12 @@
     "unresolved_fields": [],
     "test_case_ids": [
       "B102-normal-two-players",
-      "B102-normal-three-players"
+      "B102-normal-three-players",
+      "B102-normal-four-players"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "implemented",
-    "notes": "The wiki gives a separate reward for each player count; the Rust pool only builds the two-player variant."
+    "notes": "The wiki gives a separate reward for each player count; the Rust engine builds one variant per player count (2p clay 3 / 3p reed 2 / 4p sheep 2, the 4p sheep through the existing OnPlayGainAnimal on-play auto-placement path)."
   }
 }

@@ -378,6 +378,18 @@ pub enum CardEffect {
     /// no-op. No new CardZone or saved field is introduced: the move reuses
     /// the production hand/played zone backing.
     PostPlayPassLeft,
+    /// B073 贈り物かご (Gift Basket): on play, if the owner has exactly
+    /// `rooms` rooms, gain `amount` of `good`. The printed table
+    /// (2 -> vegetable, 3 -> food, 4 -> grain, 5 -> vegetable; 1 each) is
+    /// expressed as four effects of this variant, and only the one row whose
+    /// room count matches the owner exactly resolves. A dedicated variant
+    /// (instead of widening `OnPlayGainIfHouse`) keeps the serialized shape
+    /// of existing variants byte-identical for saves and content hashes.
+    OnPlayGainIfRoomCount {
+        rooms: u8,
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -463,6 +475,7 @@ impl CardEffect {
             }
             CardEffect::OnPlayGainIfRound { .. } => "on_play_gain_if_round",
             CardEffect::PostPlayPassLeft => "post_play_pass_left",
+            CardEffect::OnPlayGainIfRoomCount { .. } => "on_play_gain_if_room_count",
         }
     }
 }
@@ -707,7 +720,8 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfLessonsOccupants { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
-                        | CardEffect::OnPlayGainIfRound { amount, .. } => *amount,
+                        | CardEffect::OnPlayGainIfRound { amount, .. }
+                        | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -1329,6 +1343,16 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 good,
                 amount,
             } if player.house == *house && player.rooms() == usize::from(*rooms) => {
+                safe_gain(player, *good, *amount)?;
+            }
+            // B073 贈り物かご: only the table row whose room count matches the
+            // owner exactly resolves; a non-matching row falls through to the
+            // catch-all below and grants nothing.
+            CardEffect::OnPlayGainIfRoomCount {
+                rooms,
+                good,
+                amount,
+            } if player.rooms() == usize::from(*rooms) => {
                 safe_gain(player, *good, *amount)?;
             }
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
@@ -3950,7 +3974,6 @@ pub fn after_clay_construction(
 }
 
 /// Additional A/B occupations with unambiguous fixed, public-state effects.
-/// Consultant's immediate option here applies to the two-player starter pool.
 pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
     let mut result = vec![
         CardDefinition {
@@ -3978,8 +4001,15 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
             }],
         },
     ];
-    if players == 2 {
-        result.push(CardDefinition {
+    // B102 女性顧問 (Consultant): on play, gain the printed per-player-count
+    // reward — 2 players 3 clay, 3 players 2 reed, 4 players 2 sheep. Each
+    // variant is a plain unguarded effect; the registry merge
+    // (`merge_card_variants` "B102") guards every variant behind paired
+    // Minimum/MaximumPlayers prerequisites so exactly one series projects at
+    // any given player count. Source: data/bga-card-specs/B102.json
+    // (player_count_table 2=clay/3, 3=reed/2, 4=sheep/2).
+    match players {
+        2 => result.push(CardDefinition {
             use_limit: None,
             id: "B102".into(),
             kind: CardKind::Occupation,
@@ -3989,7 +4019,30 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
                 good: Good::Clay,
                 amount: 3,
             }],
-        });
+        }),
+        3 => result.push(CardDefinition {
+            use_limit: None,
+            id: "B102".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Reed,
+                amount: 2,
+            }],
+        }),
+        4 => result.push(CardDefinition {
+            use_limit: None,
+            id: "B102".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGainAnimal {
+                animal: Animal::Sheep,
+                amount: 2,
+            }],
+        }),
+        _ => {}
     }
     result
 }
@@ -4082,9 +4135,36 @@ mod simple_occupation_tests {
         )
         .unwrap();
         assert_eq!(p.supply.clay, 3);
-        assert!(!verified_simple_occupations(3)
+        // The 3-player subset carries its own Reed 2 variant and the
+        // 4-player subset the Sheep 2 OnPlayGainAnimal variant, so the
+        // two-player clay variant is the only one that can fire here.
+        let three = verified_simple_occupations(3);
+        let b102_3 = three
             .iter()
-            .any(|c| c.id == "B102"));
+            .find(|c| c.id == "B102")
+            .expect("B102 3-player variant must exist");
+        assert_eq!(
+            b102_3.effects,
+            vec![CardEffect::OnPlayGain {
+                good: Good::Reed,
+                amount: 2
+            }]
+        );
+        let four = verified_simple_occupations(4);
+        let b102_4 = four
+            .iter()
+            .find(|c| c.id == "B102")
+            .expect("B102 4-player variant must exist");
+        assert_eq!(
+            b102_4.effects,
+            vec![CardEffect::OnPlayGainAnimal {
+                animal: Animal::Sheep,
+                amount: 2
+            }]
+        );
+        assert!(verified_simple_occupations(5)
+            .iter()
+            .all(|c| c.id != "B102"));
     }
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
@@ -5004,6 +5084,44 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 CardEffect::OnPlayGainPerCount {
                     count_kind: CountKind::MajorImprovementsBottomRow,
                     good: Good::Food,
+                    amount: 1,
+                },
+            ],
+        },
+        // B073 贈り物かご (Gift Basket): cost 1 reed, 1 VP; prerequisite: at
+        // least 3 occupations played. On play, if the owner has exactly
+        // 2/3/4/5 rooms, gain 1 vegetable/food/grain/vegetable. Each table
+        // row is one OnPlayGainIfRoomCount effect; only the row matching the
+        // current room count exactly resolves. Eligible at all player counts
+        // (spec eligibility 2/3/4 = yes).
+        CardDefinition {
+            use_limit: None,
+            id: "B073".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Reed, 1)],
+            points: 1,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(3),
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 2,
+                    good: Good::Vegetable,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 3,
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 4,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 5,
+                    good: Good::Vegetable,
                     amount: 1,
                 },
             ],
@@ -7067,23 +7185,21 @@ mod p1_2_repro_tests {
                         ));
                     }
                     4 => {
-                        // B102 is not eligible for 4 players (OnPlayGainAnimal not implemented)
-                        panic!("B102 at 4 players should not be eligible");
+                        // 4 players: Sheep 2 through the existing OnPlayGainAnimal
+                        // on-play auto-placement path (C083's vocabulary).
+                        assert_eq!(active.len(), 1);
+                        assert!(matches!(
+                            &active[0],
+                            CardEffect::OnPlayGainAnimal {
+                                animal: Animal::Sheep,
+                                amount: 2
+                            }
+                        ));
                     }
                     _ => {}
                 }
             } else {
-                if players == 2 {
-                    panic!("B102 at 2 players: NOT FOUND (should exist)");
-                } else if players == 4 {
-                    // Expected: B102 not eligible for 4 players
-                } else {
-                    println!("B102 at {} players: NOT FOUND (unexpected)", players);
-                    panic!(
-                        "B102 at {} players should exist (eligible for all counts)",
-                        players
-                    );
-                }
+                panic!("B102 at {players} players: NOT FOUND (must exist at 2/3/4)");
             }
         }
     }
@@ -7121,6 +7237,18 @@ mod p1_2_repro_tests {
                     },
                     CardEffect::OnPlayGain {
                         good: Good::Reed,
+                        amount: 2,
+                    },
+                ]),
+                4 => Some(vec![
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MinimumPlayers(4),
+                    },
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MaximumPlayers(4),
+                    },
+                    CardEffect::OnPlayGainAnimal {
+                        animal: Animal::Sheep,
                         amount: 2,
                     },
                 ]),
@@ -7252,11 +7380,7 @@ mod p1_2_repro_tests {
                     .get(&reg.external_id)
                     .map(|raw_by_count| raw_by_count.contains_key(&players))
                     .unwrap_or(false);
-                if pool.contains(reg.id)
-                    && !in_catalog
-                    && !(reg.external_id == "B102" && players == 3)
-                {
-                    // B102 at 3 players is by design: registry-only, absent from cards.rs catalog
+                if pool.contains(reg.id) && !in_catalog {
                     unexpected_eligible.push(reg.external_id.clone());
                 }
             }
@@ -7298,7 +7422,8 @@ mod p1_2_repro_tests {
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
         // 2p: [A133, A143, A155, B142, B144]（A133/A143 は 3人+、A155 は 4人のみ、B142/B144 は 3人+ のみ；
-        // Round 2 指摘対象は A155/B142/B144）。3p: [A155] のみ。4p: [B102] のみ。
+        // Round 2 指摘対象は A155/B142/B144）。3p: [A155] のみ。4p: B102 は sheep2
+        // 実装により eligible になり不適格セットから外れた。
         // A109（main 2026-11-21 追加）は全人数 eligible なのでいずれの不適格セットにも入らない。
         // 主アサーションは「cards.rs カタログと registry の person-count 整合」の欠落/過剰ゼロ
         //（上のループの field-parity チェック）であり、総数・不適格セットの厳密な列挙は
@@ -7331,21 +7456,19 @@ mod p1_2_repro_tests {
             .filter(|c| !pool4.contains(c.id))
             .map(|c| c.external_id.clone())
             .collect();
+        // B102 女性顧問 is now eligible at 4 players too (4p = Sheep 2 via the
+        // existing OnPlayGainAnimal on-play auto-placement path), so it appears
+        // in every player-count pool instead of being the only 4p dropout.
+        let b102_id = registry
+            .card_id("B102")
+            .expect("B102 is in the default registry");
         assert!(
-            ineligible_4.contains(&"B102".to_string()),
-            "B102 must be pool-ineligible at 4 players"
+            !ineligible_4.contains(&"B102".to_string()),
+            "B102 must be pool-eligible at 4 players (4p = sheep 2)"
         );
         assert!(
-            pool2.contains(
-                registry
-                    .card_id("B102")
-                    .expect("B102 is in the default registry")
-            ) && pool3.contains(
-                registry
-                    .card_id("B102")
-                    .expect("B102 is in the default registry")
-            ),
-            "B102 must be pool-eligible at 2 and 3 players (registry-only at 3 players)"
+            pool2.contains(b102_id) && pool3.contains(b102_id) && pool4.contains(b102_id),
+            "B102 must be pool-eligible at 2, 3 and 4 players"
         );
     }
 }
