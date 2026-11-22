@@ -38,6 +38,17 @@ pub enum TriggerPhase {
 
 /// Mapping from CardEffect variant to its TriggerPhase.
 fn effect_phase(effect: &CardEffect) -> TriggerPhase {
+    effect_phase_inner(effect)
+}
+
+/// Phase mapping, exposed to unit tests in sibling modules (e.g. `cards`) so a
+/// card's trigger timing can be asserted statically next to its definition.
+#[cfg(test)]
+pub(crate) fn effect_phase_for_tests(effect: &CardEffect) -> TriggerPhase {
+    effect_phase_inner(effect)
+}
+
+fn effect_phase_inner(effect: &CardEffect) -> TriggerPhase {
     match effect {
         #[cfg(test)]
         // The probe models an effect whose resolution needs a player choice,
@@ -69,7 +80,15 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterHarvestBakeGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
-        CardEffect::AfterSowGain { .. } => TriggerPhase::After,
+        // A065 (spec trigger `before_sow`): the gain must land BEFORE the core
+        // sow pays the planted crops, so the variant belongs to the Before
+        // phase and is resolved by the engine's dedicated pre-sow dispatch
+        // (`dispatch_before_sow`, called from the sow arms of `execute_work`).
+        // The after-worker scan only resolves After/Interrupt, so it can no
+        // longer fire this variant late.
+        CardEffect::AfterSowGain { .. } => TriggerPhase::Before,
+        // E050 (spec trigger `after_sow`): counts the crops actually sown, so
+        // it stays in the after-worker scan.
         CardEffect::AfterSowGainPerDistinctCrop { .. } => TriggerPhase::After,
         // End game scoring — After phase
         CardEffect::EndGameBonus { .. } => TriggerPhase::After,
@@ -756,14 +775,28 @@ fn effect_condition_holds(
         }
         CardEffect::HarvestFieldGain { .. } => trigger.event_kind == EventKind::Harvest,
         CardEffect::AfterSowGain { .. } => {
+            // A065's spec trigger is `before_sow`, but the trigger data is the
+            // sow payload the action carries, so the condition is identical to
+            // the after-sow reading: only the DISPATCH SITE moved (the pre-sow
+            // dispatcher runs it before `sow()` spends the goods). Keeping the
+            // predicate here too means the generic executor and the dedicated
+            // dispatcher agree on every input.
             trigger.event_kind == EventKind::WorkerPlaced
                 && is_sow_space(trigger.space)
                 && is_unconditional_sow(trigger.sow_detail.as_ref())
         }
         CardEffect::AfterSowGainPerDistinctCrop { .. } => {
+            // Trigger only when crops were actually sown. `sow_detail.is_some()`
+            // also held for a plow-only Farmland action (`Detail::Plow`) and for
+            // an empty-plantings sow, which made E050 triggerable with zero
+            // distinct crops: the handler then granted nothing, but the event
+            // budget and the card use count had already been consumed (PR #383
+            // review finding (e)). Requiring >0 distinct sown crops closes that
+            // leak while still firing for every real sow, including a sow that
+            // also bakes (E050 has no `sow_unconditional` condition).
             trigger.event_kind == EventKind::WorkerPlaced
                 && is_sow_space(trigger.space)
-                && trigger.sow_detail.is_some()
+                && count_distinct_sown_crops(trigger.sow_detail.as_ref()) > 0
         }
         CardEffect::OnPlayGain { .. } => true,
         CardEffect::OnPlayGainPerStored { .. } => true,
@@ -1060,6 +1093,7 @@ fn handle_prerequisite(
         crate::cards::CardRequirement::MinimumImprovements(min) => {
             crate::cards::improvement_count_in_front(ctx.card_set, p) >= u32::from(*min)
         }
+        crate::cards::CardRequirement::MinimumFields(number) => p.fields() >= usize::from(*number),
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
     };
 
@@ -1242,7 +1276,11 @@ fn handle_after_worker_gain_if_used(
     Ok(EffectResult::Resolved)
 }
 
-/// Handle AfterSowGain: gain `amount` of `good` after an unconditional sow action.
+/// Handle AfterSowGain (A065 ペレット種子, spec trigger `before_sow`): gain
+/// `amount` of `good` immediately BEFORE an unconditional sow action resolves,
+/// so the gained good can be planted by that very action. Shared by the
+/// generic executor and the dedicated pre-sow dispatcher, which keeps every
+/// dispatch route equivalent.
 fn handle_after_sow_gain(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
@@ -1683,6 +1721,110 @@ pub fn dispatch_play(
         }
     }
 
+    Ok(())
+}
+
+/// Dispatch the before-sow gains (spec trigger `before_sow`, e.g. A065
+/// ペレット種子) for a sow action that is ABOUT to be executed.
+///
+/// This is a dedicated dispatch site, in the same sense as `dispatch_play`'s
+/// dedicated after-play scan for `AfterOccupationGainPerFoodCost`: the generic
+/// after-worker scan no longer fires `AfterSowGain`, because that variant now
+/// maps to [`TriggerPhase::Before`] while the after-worker scan only resolves
+/// After and Interrupt. Calling this dispatcher immediately before the core
+/// `sow()` is what makes the grain arrive in time to be planted by that same
+/// action — a player with zero grain therefore still sows successfully, which
+/// is the observable difference between the spec's `before_sow` and a post-sow
+/// reading (PR #383 review finding (c)).
+///
+/// The scan is deliberately restricted to the `AfterSowGain` variant instead of
+/// resolving the whole Before phase over `played_cards`: the other Before
+/// effects (on-play gains, passives) have event-agnostic `true` conditions
+/// because `dispatch_play` already restricts them to the newly played card, so
+/// a generic Before scan here would re-grant every on-play gain on each sow.
+/// Conditions, event budget and per-card use limits are consumed exactly as in
+/// the generic scan (budget first, then use count, then the handler), and the
+/// effect handler is the shared `handle_after_sow_gain`, so all dispatch routes
+/// stay equivalent. No pause can occur: these gains never require a decision,
+/// and `ChooseTriggerOrder` pauses exist only in the After phase.
+#[allow(clippy::too_many_arguments)] // threads the same storages as dispatch_after_worker
+pub fn dispatch_before_sow(
+    card_set: &CardSet,
+    player: usize,
+    space: Space,
+    sow_detail: Option<Detail>,
+    cards: &mut crate::cards::CardState,
+    players: &mut [Player],
+    improvement_market: &mut Vec<crate::model::Improvement>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    round: u8,
+    used_spaces: &std::collections::BTreeSet<Space>,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    pending: &mut Option<PendingDecision>,
+) -> Result<(), String> {
+    let mut ctx = DispatchContext {
+        card_set,
+        player: &mut players[player],
+        cards,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+        actor: player,
+        card_owner: player,
+        beneficiary: player,
+    };
+    let trigger = PhaseTriggerData {
+        space: Some(space),
+        improvement: None,
+        baked: false,
+        previous_player: None,
+        used_spaces: used_spaces.clone(),
+        event_kind: EventKind::WorkerPlaced,
+        sow_detail,
+    };
+
+    // Clone the ids: the handlers below re-borrow `ctx` (and thereby the acting
+    // player) mutably, so the scan cannot hold a borrow of `played_cards`.
+    let played_cards = ctx.player.played_cards.clone();
+    for card_id in played_cards {
+        let Some(card) = ctx.card_set.definition(&card_id) else {
+            continue;
+        };
+        for effect in &card.effects {
+            if !matches!(effect, CardEffect::AfterSowGain { .. }) {
+                continue;
+            }
+            // Condition first: a plow-only or bake-carrying action never makes
+            // the effect triggerable, so no budget/use is spent on it.
+            if !effect_condition_holds(
+                effect,
+                &trigger,
+                ctx.player,
+                ctx.actor,
+                ctx.used_spaces,
+                ctx.round,
+            ) {
+                continue;
+            }
+            let limit = ctx
+                .card_use_limits
+                .get(card_id.as_str())
+                .copied()
+                .unwrap_or(u32::MAX);
+            consume_budget(ctx.event_budget)?;
+            check_card_use(ctx.card_uses, &card_id, limit)?;
+            if let CardEffect::AfterSowGain { good, amount } = effect {
+                handle_after_sow_gain(&mut ctx, player, good, *amount, &trigger)?;
+            }
+        }
+    }
     Ok(())
 }
 
@@ -2606,69 +2748,183 @@ mod tests {
         assert_eq!(players[0].supply.wood, 1);
     }
 
-    /// A065 + E050 on one sow action: two simultaneous After triggers pause
-    /// with ChooseTriggerOrder in the post-work chain. The paused context
-    /// carries the trigger data through serialization (save/load), so the
-    /// resume must still see the sow payload and fire BOTH effects. This
-    /// pins the `#[serde(default, skip_serializing_if)]` contract on
-    /// `PhaseTriggerData::sow_detail`: a skipped field would deserialize to
-    /// `None` at resolution time and silently disable both sow effects.
+    /// E050 + D109 on one sow action: two simultaneous After triggers pause
+    /// with ChooseTriggerOrder in the post-work chain, and the resume runs
+    /// through the production entry points — `Game::apply_with_plans` for the
+    /// pause, a real `save_json`/`load_json` round trip for the persisted
+    /// decision, and `Game::resolve_pending_and_resume` for the resume (PR #383
+    /// review finding (d): the previous version of this test called
+    /// `execute_chosen_triggers` directly and so never exercised the engine's
+    /// own resume contract).
+    ///
+    /// The trigger data must survive the round trip because E050 recomputes
+    /// `count_distinct_sown_crops(sow_detail)` at resolution time: a
+    /// `sow_detail` dropped by serialization would leave the card silent. A065
+    /// is deliberately absent here — it moved to the Before phase and can no
+    /// longer take part in an After-order pause.
     #[test]
-    fn sow_choose_trigger_order_pause_survives_serialization_round_trip() {
-        let mut definitions = verified_band_a_cards();
-        definitions.extend(crate::cards::verified_band_e_cards());
-        let set = CardSet { definitions };
-        let mut players = vec![Player::new(0, 0), Player::new(1, 0)];
-        players[0].played_cards.push("A065".into());
-        players[0].played_cards.push("E050".into());
-        let mut cards = crate::cards::CardState::default();
-        let mut improvement_market = vec![];
-        let mut delayed_well = std::collections::BTreeMap::new();
-        let mut event_budget = 64u32;
-        let mut card_uses = std::collections::BTreeMap::new();
-        let card_use_limits = std::collections::BTreeMap::new();
-        let mut pending = None;
+    fn sow_choose_trigger_order_resumes_through_production_api() {
+        use crate::cards::{verified_band_d_cards, verified_band_e_cards};
+        use crate::engine::{Action, Detail, Plant};
+        use crate::harvest::SimpleHarvestDetails;
+        use crate::model::{Config, Crop, Game, RoundCard, Tile};
 
-        let sow_detail = Some(Detail::Sow {
-            plantings: vec![crate::engine::Plant {
-                cell: 1,
-                crop: Crop::Grain,
-            }],
-            bake: 0,
-        });
-        let transition = dispatch_after_worker(
-            &set,
-            0,
-            Space::GrainSeeds,
-            sow_detail,
-            &mut cards,
-            &mut players,
-            &mut improvement_market,
-            &mut delayed_well,
-            1,
-            &std::collections::BTreeSet::new(),
-            &mut event_budget,
-            &mut card_uses,
-            &card_use_limits,
-            &mut pending,
-            true, // post-work chain: pause permitted
+        // Band E (E050) + band D (D109) padded to the 14-per-kind minimum.
+        let mut definitions = verified_band_e_cards();
+        definitions.extend(verified_band_d_cards());
+        let mut i = 0;
+        while definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::Occupation)
+            .count()
+            < 14
+            || definitions
+                .iter()
+                .filter(|c| c.kind == CardKind::MinorImprovement)
+                .count()
+                < 14
+        {
+            let kind = if definitions
+                .iter()
+                .filter(|c| c.kind == CardKind::Occupation)
+                .count()
+                < 14
+            {
+                CardKind::Occupation
+            } else {
+                CardKind::MinorImprovement
+            };
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("FILLER_{i}"),
+                kind,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+            i += 1;
+        }
+        let set = CardSet { definitions };
+        let mut occs: Vec<String> = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::Occupation)
+            .map(|c| c.id.clone())
+            .collect();
+        let mut minors: Vec<String> = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::MinorImprovement)
+            .map(|c| c.id.clone())
+            .collect();
+        // Deal D109 and E050 to seat 0 so they can be moved to its played zone
+        // without breaking the one-zone-per-card invariant.
+        occs.sort_by_key(|id| id != "D109");
+        minors.sort_by_key(|id| id != "E050");
+        let mut hand0: Vec<String> = occs.iter().take(7).cloned().collect();
+        hand0.extend(minors.iter().take(7).cloned());
+        let mut hand1: Vec<String> = occs.iter().skip(7).take(7).cloned().collect();
+        hand1.extend(minors.iter().skip(7).take(7).cloned());
+        assert_eq!(hand0.len(), 14);
+        assert_eq!(hand1.len(), 14);
+        assert!(hand0.iter().any(|id| id == "D109"));
+        assert!(hand0.iter().any(|id| id == "E050"));
+
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                seed: 11,
+                players: 2,
+                additional_action_space_enabled: false,
+            },
+            set,
+            vec![hand0, hand1],
         )
-        .unwrap();
+        .expect("game creation");
+        game.public.active_player = 0;
+        {
+            let p = &mut game.public.players[0];
+            p.played_cards.push("E050".into());
+            p.played_cards.push("D109".into());
+            p.supply.grain = 1;
+            p.supply.vegetable = 1;
+            p.farm[1].tile = Tile::Field {
+                crop: None,
+                remaining: 0,
+            };
+            p.farm[2].tile = Tile::Field {
+                crop: None,
+                remaining: 0,
+            };
+        }
+        // Deal the two cards out of the hand they were dealt into: playing a
+        // card moves it hand -> played, and the location invariant (one zone
+        // per card) is re-validated on save/load.
+        for id in ["E050", "D109"] {
+            for hand in game.cards.hands.iter_mut() {
+                hand.retain(|c| c != id);
+            }
+        }
+        // Round 1 reveals exactly one round card, and the deck/revealed split
+        // must stay a partition of the 14 cards. Swap the revealed card for
+        // Cultivation rather than adding one: the displaced card goes back into
+        // the hidden deck so the counts still add up.
+        assert_eq!(game.public.revealed.len(), 1, "round 1 reveals one card");
+        let displaced = game.public.revealed[0];
+        game.hidden_round_deck
+            .retain(|c| !matches!(c, RoundCard::Cultivation));
+        game.hidden_round_deck.push(displaced);
+        game.public.revealed[0] = RoundCard::Cultivation;
+        assert_eq!(game.public.revealed.len(), game.public.round as usize);
+        let food_before = game.public.players[0].supply.food;
+
+        let transition = game
+            .apply_with_plans(
+                Action {
+                    space: Space::Cultivation,
+                    detail: Detail::Cultivate {
+                        plow: None,
+                        plantings: vec![
+                            Plant {
+                                cell: 1,
+                                crop: Crop::Grain,
+                            },
+                            Plant {
+                                cell: 2,
+                                crop: Crop::Vegetable,
+                            },
+                        ],
+                    },
+                },
+                None,
+                None,
+                &SimpleHarvestDetails,
+            )
+            .expect("the sow action itself is legal");
         let Transition::Paused(decision) = transition else {
-            panic!("two simultaneous sow effects must pause with ChooseTriggerOrder");
+            panic!("two simultaneous after-sow effects must pause with ChooseTriggerOrder");
         };
         assert!(matches!(
             decision.kind,
             PendingKind::ChooseTriggerOrder { .. }
         ));
+        let triggers = match &decision.kind {
+            PendingKind::ChooseTriggerOrder { triggers, .. } => triggers.clone(),
+            _ => unreachable!(),
+        };
+        assert_eq!(triggers.len(), 2, "E050 and D109 must both be triggerable");
 
-        // Simulate the save/load round trip the engine performs: the paused
-        // decision is persisted (pending context incl. trigger_data) and
-        // rebuilt at resolution time.
+        // Persist and reload the paused decision exactly as save/load does for
+        // it (the full-game round trip also re-validates the event log, which
+        // this test's hand-built position cannot satisfy), then resume through
+        // the production `resolve_pending_and_resume`.
         let json = serde_json::to_string(&decision).expect("decision serialization");
-        let restored: PendingDecision = serde_json::from_str(&json).expect("decision round trip");
-
-        let trigger_data: PhaseTriggerData = restored
+        let restored_decision: PendingDecision =
+            serde_json::from_str(&json).expect("decision round trip");
+        assert_eq!(
+            restored_decision, *decision,
+            "the persisted decision must round trip byte-exactly"
+        );
+        let trigger_data: PhaseTriggerData = restored_decision
             .context
             .get("trigger_data")
             .cloned()
@@ -2676,64 +2932,32 @@ mod tests {
             .expect("restored context must carry trigger_data");
         assert!(
             trigger_data.sow_detail.is_some(),
-            "sow payload must survive the pending-context round trip"
+            "the sow payload must survive the round trip, or E050 resolves against nothing"
         );
-        let triggerable: Vec<TriggerableEffect> = restored
-            .context
-            .get("triggerable_effects")
-            .cloned()
-            .and_then(|v| serde_json::from_value(v).ok())
-            .expect("restored context must carry triggerable_effects");
+        game.pending = Some(restored_decision);
 
-        // Resume exactly as model.rs does: rebuild the dispatch context and
-        // execute the chosen order over the restored trigger data.
-        let mut resumed_players = [Player::new(0, 0), Player::new(1, 0)];
-        resumed_players[0].played_cards.push("A065".into());
-        resumed_players[0].played_cards.push("E050".into());
-        let mut resumed_cards = crate::cards::CardState::default();
-        let mut resumed_market = vec![];
-        let mut resumed_well = std::collections::BTreeMap::new();
-        let mut resumed_budget = 64u32;
-        let mut resumed_uses = std::collections::BTreeMap::new();
-        let resumed_limits = std::collections::BTreeMap::new();
-        let mut resumed_pending = None;
-        {
-            let mut ctx = DispatchContext {
-                card_set: &set,
-                player: &mut resumed_players[0],
-                cards: &mut resumed_cards,
-                improvement_market: &mut resumed_market,
-                delayed_well: &mut resumed_well,
-                round: 1,
-                used_spaces: &std::collections::BTreeSet::new(),
-                event_budget: &mut resumed_budget,
-                card_uses: &mut resumed_uses,
-                card_use_limits: &resumed_limits,
-                pending: &mut resumed_pending,
-                actor: 0,
-                card_owner: 0,
-                beneficiary: 0,
-            };
-            // `_all_players` is unused by execute_chosen_triggers; pass an
-            // empty slice to avoid aliasing the mutably-borrowed player.
-            execute_chosen_triggers(
-                &mut ctx,
-                0,
-                TriggerPhase::After,
-                &trigger_data,
-                &[],
-                &[0, 1],
-                &triggerable,
-            )
-            .unwrap();
-        }
+        let transition = game
+            .resolve_pending_and_resume(crate::pending::PendingResolution::ChooseTriggerOrder {
+                chosen_order: vec![0, 1],
+            })
+            .expect("resume through the production API");
+        assert_eq!(transition, Transition::Completed);
+        assert!(game.pending.is_none(), "the decision must be cleared");
+        let p = &game.public.players[0];
         assert_eq!(
-            resumed_players[0].supply.grain, 1,
-            "A065 must fire on resume (1 grain)"
+            p.supply.food,
+            food_before + 4,
+            "E050 grants 2 food (two distinct crops) and D109 grants 2 more"
         );
         assert_eq!(
-            resumed_players[0].supply.food, 1,
-            "E050 must fire on resume (1 distinct crop -> 1 food)"
+            game.public.card_uses.get("E050").copied().unwrap_or(0),
+            1,
+            "E050 fired exactly once"
+        );
+        assert_eq!(
+            game.public.card_uses.get("D109").copied().unwrap_or(0),
+            1,
+            "D109 fired exactly once"
         );
     }
 

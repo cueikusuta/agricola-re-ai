@@ -135,16 +135,24 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
-    /// A065 ペレット種子: after an unconditional sow action, gain `amount` of `good`.
-    /// Fired from the after-worker scan when the action space is a sow space and
-    /// the action detail confirms a sow occurred (not bake-only).
+    /// A065 ペレット種子: BEFORE each unconditional sow action, gain `amount` of
+    /// `good` (spec trigger `before_sow`, printed 効果 says その前に). Fired by
+    /// the dedicated pre-sow dispatcher (`card_events::dispatch_before_sow`,
+    /// called from `execute_work` immediately before the core `sow()`) when the
+    /// action space is a sow space and the action detail confirms an
+    /// unconditional sow occurred (plantings non-empty, no baking), so the
+    /// gained good can be spent by that same sow. Maps to
+    /// `TriggerPhase::Before`; the variant name is historical.
     AfterSowGain {
         good: Good,
         amount: u32,
     },
     /// E050 野草: after a sow action, gain `amount` food per distinct crop type sown
-    /// in that action. Fired from the after-worker scan when the action space is
-    /// a sow space.
+    /// in that action (spec trigger `after_sow`, no condition). Fired from the
+    /// after-worker scan when the action space is a sow space AND at least one
+    /// crop was actually sown, so a plow-only Farmland action no longer makes
+    /// the card triggerable and spends no event budget or use count (PR #383
+    /// review finding (e)).
     AfterSowGainPerDistinctCrop {
         amount: u32,
     },
@@ -264,10 +272,22 @@ pub enum HarvestFieldRule {
 pub enum CardRequirement {
     MinimumOccupations(u8),
     MaximumOccupations(u8),
-    MinimumAnimals { animal: Animal, number: u32 },
-    MinimumCropFields { crop: Crop, number: u8 },
+    MinimumAnimals {
+        animal: Animal,
+        number: u32,
+    },
+    MinimumCropFields {
+        crop: Crop,
+        number: u8,
+    },
     MinimumPlayers(u8),
     MinimumImprovements(u8),
+    /// Printed 条件「畑N」 (A065 ペレット種子, A070 掘り取り機): the player must
+    /// own at least N field tiles. Unlike [`CardRequirement::MinimumCropFields`],
+    /// which counts fields planted with one specific crop (小麦畑N), this counts
+    /// every `Tile::Field` regardless of crop, matching how the card wiki's 条件
+    /// row distinguishes bare 畑N from 小麦畑N.
+    MinimumFields(u8),
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -721,6 +741,9 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
                 crate::cards::CardRequirement::MinimumImprovements(min) => {
                                 improvement_count_in_front(set, player) >= u32::from(*min)
                             }
+                CardRequirement::MinimumFields(number) => {
+                    player.fields() >= usize::from(*number)
+                }
                 CardRequirement::MinimumPlayers(_) => true,
             }
         })
@@ -3232,17 +3255,26 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
             ],
         },
         // A065 ペレット種子 (Seed Pellets): before each unconditional sow action,
-        // gain 1 grain. Minor improvement, 0 points.
+        // gain 1 grain. Minor improvement, 0 points. The printed 条件 row is
+        // 「畑3」 (card wiki https://agricola.cloudfree.jp/?p=3360 — the same
+        // prerequisite the ledger records), so playing it requires three field
+        // tiles; `data/bga-card-specs/A065.json` still lists
+        // `play.prerequisites = []`, a known spec-side gap recorded in the PR.
         CardDefinition {
             use_limit: None,
             id: "A065".to_owned(),
             kind: CardKind::MinorImprovement,
             cost: vec![],
             points: 0,
-            effects: vec![CardEffect::AfterSowGain {
-                good: Good::Grain,
-                amount: 1,
-            }],
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumFields(3),
+                },
+                CardEffect::AfterSowGain {
+                    good: Good::Grain,
+                    amount: 1,
+                },
+            ],
         },
     ]
 }
@@ -3999,149 +4031,6 @@ mod verified_band_e_tests {
         after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
         assert_eq!(p.supply.wood, 4);
     }
-
-    /// Run one completed worker action through the engine's after-worker scan
-    /// (the firing point the sow effects are wired to), with the sow payload
-    /// the engine would extract for sow spaces.
-    fn dispatch_sow_action(
-        set: &CardSet,
-        p: &mut Player,
-        space: Space,
-        sow_detail: Option<crate::engine::Detail>,
-    ) {
-        use crate::pending::PendingDecision;
-        let mut cards = crate::cards::CardState::default();
-        let mut players = vec![Player::new(0, 0), Player::new(1, 0)];
-        players[0] = std::mem::replace(p, Player::new(0, 0));
-        let mut improvement_market = vec![];
-        let mut delayed_well = std::collections::BTreeMap::new();
-        let mut event_budget = 64u32;
-        let mut card_uses = std::collections::BTreeMap::new();
-        let card_use_limits = std::collections::BTreeMap::new();
-        let mut pending: Option<PendingDecision> = None;
-        crate::card_events::dispatch_after_worker(
-            set,
-            0,
-            space,
-            sow_detail,
-            &mut cards,
-            &mut players,
-            &mut improvement_market,
-            &mut delayed_well,
-            1,
-            &std::collections::BTreeSet::new(),
-            &mut event_budget,
-            &mut card_uses,
-            &card_use_limits,
-            &mut pending,
-            false,
-        )
-        .unwrap();
-        *p = std::mem::replace(&mut players[0], Player::new(0, 0));
-    }
-
-    fn sow(plantings: Vec<(usize, Crop)>) -> Option<crate::engine::Detail> {
-        Some(crate::engine::Detail::Sow {
-            plantings: plantings
-                .into_iter()
-                .map(|(cell, crop)| crate::engine::Plant { cell, crop })
-                .collect(),
-            bake: 0,
-        })
-    }
-
-    #[test]
-    fn e050_food_per_distinct_crop_sown() {
-        let set = CardSet {
-            definitions: verified_band_e_cards(),
-        };
-        let mut p = Player::new(0, 0);
-        p.played_cards.push("E050".into());
-        p.supply.grain = 2;
-        p.supply.vegetable = 2;
-        // Sow 1 grain: 1 distinct crop -> 1 food
-        dispatch_sow_action(&set, &mut p, Space::GrainSeeds, sow(vec![(1, Crop::Grain)]));
-        assert_eq!(p.supply.food, 1);
-        // Sow 1 vegetable: 1 distinct crop -> 1 food (total 2)
-        dispatch_sow_action(
-            &set,
-            &mut p,
-            Space::VegetableSeeds,
-            sow(vec![(2, Crop::Vegetable)]),
-        );
-        assert_eq!(p.supply.food, 2);
-        // Verify card definition
-        let card = set.definition("E050").unwrap();
-        assert_eq!(card.kind, CardKind::MinorImprovement);
-        assert!(card.cost.is_empty());
-        assert_eq!(card.points, 0);
-        assert_eq!(card.effects.len(), 1);
-        matches!(
-            card.effects[0],
-            CardEffect::AfterSowGainPerDistinctCrop { amount: 1 }
-        );
-    }
-
-    /// 境界（単一種）: two plantings of the SAME crop still count one distinct
-    /// type -> exactly 1 food per action.
-    #[test]
-    fn e050_two_plantings_of_same_crop_give_one_food() {
-        let set = CardSet {
-            definitions: verified_band_e_cards(),
-        };
-        let mut p = Player::new(0, 0);
-        p.played_cards.push("E050".into());
-        dispatch_sow_action(
-            &set,
-            &mut p,
-            Space::GrainSeeds,
-            sow(vec![(1, Crop::Grain), (2, Crop::Grain)]),
-        );
-        assert_eq!(p.supply.food, 1);
-    }
-
-    /// 境界（複数種）: one cultivation sowing both grain and vegetable yields
-    /// 2 food in a single action.
-    #[test]
-    fn e050_two_distinct_crops_in_one_action_give_two_food() {
-        let set = CardSet {
-            definitions: verified_band_e_cards(),
-        };
-        let mut p = Player::new(0, 0);
-        p.played_cards.push("E050".into());
-        dispatch_sow_action(
-            &set,
-            &mut p,
-            Space::Cultivation,
-            Some(crate::engine::Detail::Cultivate {
-                plow: Some(5),
-                plantings: vec![
-                    crate::engine::Plant {
-                        cell: 1,
-                        crop: Crop::Grain,
-                    },
-                    crate::engine::Plant {
-                        cell: 2,
-                        crop: Crop::Vegetable,
-                    },
-                ],
-            }),
-        );
-        assert_eq!(p.supply.food, 2);
-    }
-
-    /// 不発: non-sow actions never carry a sow payload and never fire E050.
-    #[test]
-    fn e050_not_triggered_by_non_sow_action() {
-        let set = CardSet {
-            definitions: verified_band_e_cards(),
-        };
-        let mut p = Player::new(0, 0);
-        p.played_cards.push("E050".into());
-        dispatch_sow_action(&set, &mut p, Space::Forest, None);
-        after_worker(&set, &mut p, Space::DayLaborer).unwrap();
-        assert_eq!(p.supply.food, 0);
-    }
 }
 
 #[cfg(test)]
@@ -4338,6 +4227,44 @@ mod verified_band_a_tests {
         );
     }
 
+    /// Run the pre-sow dispatch (the firing point of the `before_sow` gains,
+    /// e.g. A065) for a sow action that is about to be executed.
+    fn dispatch_before_sow_action(
+        set: &CardSet,
+        p: &mut Player,
+        space: Space,
+        sow_detail: Option<crate::engine::Detail>,
+    ) {
+        use crate::pending::PendingDecision;
+        let mut cards = crate::cards::CardState::default();
+        let mut players = vec![Player::new(0, 0), Player::new(1, 0)];
+        players[0] = std::mem::replace(p, Player::new(0, 0));
+        let mut improvement_market = vec![];
+        let mut delayed_well = std::collections::BTreeMap::new();
+        let mut event_budget = 64u32;
+        let mut card_uses = std::collections::BTreeMap::new();
+        let card_use_limits = std::collections::BTreeMap::new();
+        let mut pending: Option<PendingDecision> = None;
+        crate::card_events::dispatch_before_sow(
+            set,
+            0,
+            space,
+            sow_detail,
+            &mut cards,
+            &mut players,
+            &mut improvement_market,
+            &mut delayed_well,
+            1,
+            &std::collections::BTreeSet::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+        )
+        .unwrap();
+        *p = std::mem::replace(&mut players[0], Player::new(0, 0));
+    }
+
     /// Run one completed worker action through the engine's after-worker scan
     /// (the firing point the sow effects are wired to), with the sow payload
     /// the engine would extract for sow spaces.
@@ -4388,47 +4315,71 @@ mod verified_band_a_tests {
         })
     }
 
-    /// A065 ペレット種子 (Seed Pellets): before each unconditional sow action,
-    /// gain 1 grain. The engine fires it from the after-worker scan of sow
-    /// spaces when the sow detail confirms an unconditional sow (no bake),
-    /// which is the spec-equivalent realization documented in the PR body.
+    /// A065 ペレット種子 (Seed Pellets): its printed 効果 is
+    /// 「制約のなし「種をまく」アクションをするたびに、その前に小麦1を得る。」
+    /// (card wiki https://agricola.cloudfree.jp/?p=3360, spec trigger
+    /// `before_sow`), so the definition is the printed 条件「畑3」 plus a
+    /// `before_sow` grain gain.
+    ///
+    /// The firing itself is covered through production (`Game::apply`) in
+    /// `tests/pr383_sow_e2e.rs`. The unit tests that used to live here drove
+    /// `dispatch_after_worker` directly with `Detail::Sow` on `GrainSeeds` /
+    /// `VegetableSeeds`, which `execute_work` rejects via `require_none`, so
+    /// they exercised an input production can never produce (PR #383 review
+    /// finding (d)). Only the static shape of the definition stays here.
     #[test]
-    fn a065_grain_per_unconditional_sow() {
+    fn a065_definition_is_prerequisite_plus_before_sow_gain() {
         let set = CardSet {
             definitions: verified_band_a_cards(),
         };
-        let mut p = Player::new(0, 0);
-        p.played_cards.push("A065".into());
-        p.supply.grain = 2;
-        p.supply.vegetable = 2;
-        // Sow 1 grain on GrainSeeds: unconditional sow -> 1 grain
-        dispatch_sow_action(&set, &mut p, Space::GrainSeeds, sow(vec![(1, Crop::Grain)]));
-        assert_eq!(p.supply.grain, 3); // 2 + 1
-                                       // Sow 1 vegetable on VegetableSeeds: unconditional sow -> 1 grain
-        dispatch_sow_action(
-            &set,
-            &mut p,
-            Space::VegetableSeeds,
-            sow(vec![(2, Crop::Vegetable)]),
-        );
-        assert_eq!(p.supply.grain, 4); // 3 + 1
-                                       // Verify card definition
         let card = set.definition("A065").unwrap();
         assert_eq!(card.kind, CardKind::MinorImprovement);
         assert!(card.cost.is_empty());
         assert_eq!(card.points, 0);
-        assert_eq!(card.effects.len(), 1);
-        matches!(
-            card.effects[0],
-            CardEffect::AfterSowGain {
-                good: Good::Grain,
-                amount: 1
-            }
+        assert_eq!(
+            card.effects.len(),
+            2,
+            "A065 is one prerequisite plus one effect"
+        );
+        assert!(
+            matches!(
+                card.effects[0],
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumFields(3)
+                }
+            ),
+            "printed 条件 畑3 must gate the play, got {:?}",
+            card.effects[0]
+        );
+        assert!(
+            matches!(
+                card.effects[1],
+                CardEffect::AfterSowGain {
+                    good: Good::Grain,
+                    amount: 1
+                }
+            ),
+            "the gain itself is 1 grain, got {:?}",
+            card.effects[1]
+        );
+        assert_eq!(
+            crate::card_events::effect_phase_for_tests(&card.effects[1]),
+            crate::card_events::TriggerPhase::Before,
+            "A065 is a before_sow effect, so it must not resolve in the After phase"
         );
     }
 
-    /// 境界: each unconditional sow action grants the grain again (every_use),
-    /// regardless of the crop type sown.
+    /// 発火: every unconditional sow grants the grain again (every_use),
+    /// regardless of space or crop type. Runs through the pre-sow dispatch that
+    /// `execute_work` calls immediately before the core sow, with only
+    /// production-reachable space/detail payloads (PR #383 review finding (d)):
+    /// `Detail::Sow`/`Detail::SowDetailed` at `Space::GrainUtilization` and
+    /// `Detail::Cultivate` at `Space::Cultivation` are exactly what
+    /// `execute_work` accepts; the seed spaces take `require_none(detail)`, so
+    /// pairing them with a sow payload would prove behaviour on an input the
+    /// engine refuses. The before/after timeline evidence (the grain arriving
+    /// in time to be planted by the same action) lives in
+    /// `tests/pr383_sow_e2e.rs`, which drives `Game::apply`.
     #[test]
     fn a065_fires_on_each_unconditional_sow_action() {
         let set = CardSet {
@@ -4436,14 +4387,27 @@ mod verified_band_a_tests {
         };
         let mut p = Player::new(0, 0);
         p.played_cards.push("A065".into());
-        dispatch_sow_action(&set, &mut p, Space::GrainSeeds, sow(vec![(1, Crop::Grain)]));
-        dispatch_sow_action(
+        dispatch_before_sow_action(
             &set,
             &mut p,
-            Space::VegetableSeeds,
-            sow(vec![(2, Crop::Vegetable)]),
+            Space::GrainUtilization,
+            sow(vec![(1, Crop::Grain)]),
         );
-        dispatch_sow_action(
+        assert_eq!(p.supply.grain, 1);
+        dispatch_before_sow_action(
+            &set,
+            &mut p,
+            Space::GrainUtilization,
+            Some(crate::engine::Detail::SowDetailed {
+                plantings: vec![crate::engine::Plant {
+                    cell: 2,
+                    crop: Crop::Vegetable,
+                }],
+                baking: vec![],
+            }),
+        );
+        assert_eq!(p.supply.grain, 2);
+        dispatch_before_sow_action(
             &set,
             &mut p,
             Space::Cultivation,
@@ -4459,7 +4423,11 @@ mod verified_band_a_tests {
     }
 
     /// 不発: a GrainUtilization action that bakes (sow + bake, or bake-only)
-    /// is NOT an unconditional sow, so A065 must not fire.
+    /// is NOT an unconditional sow, so A065 must not fire. Kept on the
+    /// dispatch helpers deliberately: it asserts a NEGATIVE (the effect must
+    /// stay silent on both dispatch sites), which no production-reachable
+    /// payload can contradict, so the synthetic `Detail::Sow` payload is a
+    /// stronger test here than a real action would be.
     #[test]
     fn a065_not_triggered_by_sow_with_bake() {
         let set = CardSet {
@@ -4468,29 +4436,24 @@ mod verified_band_a_tests {
         let mut p = Player::new(0, 0);
         p.played_cards.push("A065".into());
         // Sow with a bake component on GrainUtilization -> conditional, no fire
-        dispatch_sow_action(
-            &set,
-            &mut p,
-            Space::GrainUtilization,
-            Some(crate::engine::Detail::Sow {
-                plantings: vec![crate::engine::Plant {
-                    cell: 1,
-                    crop: Crop::Grain,
-                }],
-                bake: 1,
-            }),
-        );
+        let sow_with_bake = Some(crate::engine::Detail::Sow {
+            plantings: vec![crate::engine::Plant {
+                cell: 1,
+                crop: Crop::Grain,
+            }],
+            bake: 1,
+        });
+        dispatch_before_sow_action(&set, &mut p, Space::GrainUtilization, sow_with_bake.clone());
+        dispatch_sow_action(&set, &mut p, Space::GrainUtilization, sow_with_bake);
         // Bake-only GrainUtilization action -> no sow at all, no fire
-        dispatch_sow_action(
-            &set,
-            &mut p,
-            Space::GrainUtilization,
-            Some(crate::engine::Detail::Sow {
-                plantings: vec![],
-                bake: 2,
-            }),
-        );
+        let bake_only = Some(crate::engine::Detail::Sow {
+            plantings: vec![],
+            bake: 2,
+        });
+        dispatch_before_sow_action(&set, &mut p, Space::GrainUtilization, bake_only.clone());
+        dispatch_sow_action(&set, &mut p, Space::GrainUtilization, bake_only);
         // Non-sow actions never fire either
+        dispatch_before_sow_action(&set, &mut p, Space::Forest, None);
         dispatch_sow_action(&set, &mut p, Space::Forest, None);
         after_worker(&set, &mut p, Space::DayLaborer).unwrap();
         assert_eq!(p.supply.grain, 0);

@@ -1510,6 +1510,35 @@ impl Game {
         }
         Ok(())
     }
+    /// Run the pre-sow (`before_sow`) card gains for a sow that `execute_work`
+    /// is about to perform. Called immediately before the core `sow()` in the
+    /// GrainUtilization and Cultivation arms so the gained goods can be planted
+    /// by that same action (A065 ペレット種子). Farmland only plows and the
+    /// seed spaces only grant goods, so neither is a sow site.
+    fn dispatch_before_sow_for(&mut self, id: usize, space: Space, detail: &Detail) -> Result<()> {
+        // Cardless games skip the dispatch entirely (same short-circuit as the
+        // post-work chain) so the hot path keeps its cost.
+        if !self.card_set.enabled() {
+            return Ok(());
+        }
+        crate::card_events::dispatch_before_sow(
+            &self.card_set,
+            id,
+            space,
+            Some(detail.clone()),
+            &mut self.cards,
+            &mut self.public.players,
+            &mut self.public.improvement_market,
+            &mut self.delayed_well,
+            self.public.round,
+            &self.public.used,
+            &mut self.event_budget,
+            &mut self.public.card_uses,
+            &self.card_use_limits,
+            &mut self.pending,
+        )
+    }
+
     fn execute_work(&mut self, id: usize, act: &Action) -> Result<()> {
         let space = act.space;
         let detail = &act.detail;
@@ -1774,6 +1803,8 @@ impl Game {
                     if plantings.is_empty() && *bake == 0 {
                         return Err("must sow or bake".into());
                     }
+                    self.dispatch_before_sow_for(id, space, detail)?;
+                    let p = &mut self.public.players[id];
                     sow(p, plantings)?;
                     bake_bread(p, *bake)?;
                 }
@@ -1781,6 +1812,8 @@ impl Game {
                     if plantings.is_empty() && baking.is_empty() {
                         return Err("must sow or bake".into());
                     }
+                    self.dispatch_before_sow_for(id, space, detail)?;
+                    let p = &mut self.public.players[id];
                     sow(p, plantings)?;
                     bake_allocated(p, baking)?;
                 }
@@ -1798,6 +1831,8 @@ impl Game {
                     if let Some(i) = cell {
                         plow(p, *i)?
                     };
+                    self.dispatch_before_sow_for(id, space, detail)?;
+                    let p = &mut self.public.players[id];
                     sow(p, plantings)?;
                 } else {
                     return Err("cultivation details required".into());
