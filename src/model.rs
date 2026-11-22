@@ -654,7 +654,7 @@ impl PublicState {
 impl PublicState {
     /// Compute the set of available action spaces for this public state.
     /// Used by both `Game::validate` (full validation) and
-    /// `crate::validation::validate_incremental` (incremental validation)
+    /// `crate::validation::check_incremental` (incremental validation)
     /// to ensure the same availability logic is applied consistently.
     pub(crate) fn available_spaces(
         &self,
@@ -1317,10 +1317,12 @@ impl Game {
                 &mut self.delayed_well,
                 self.public.round,
                 &self.public.used,
+                &self.public.accumulations,
                 &mut self.event_budget,
                 &mut self.public.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
+                &self.public.revealed,
             )
             // Before this change the same failure was a panic here; keeping the
             // expect would turn a rules error into a crash, so record it as a
@@ -1759,6 +1761,7 @@ impl Game {
                             delayed_well: &mut delayed_well,
                             round,
                             used_spaces: &used_spaces,
+                            accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
                             card_use_limits: &card_use_limits,
@@ -1775,6 +1778,7 @@ impl Game {
                             used_spaces: used_spaces.clone(),
                             site: crate::registry::EventKind::Bake,
                             event_kind: crate::registry::EventKind::Bake,
+                            revealed_round_cards: Vec::new(),
                             c066_take_food_instead: false,
                         };
                         // After phase. If THIS is the paused step and the pause
@@ -1893,6 +1897,7 @@ impl Game {
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
                         round,
+                        accumulations: None,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
@@ -1910,6 +1915,7 @@ impl Game {
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::ClayConstruction,
                         event_kind: crate::registry::EventKind::ClayConstruction,
+                        revealed_round_cards: Vec::new(),
                         c066_take_food_instead: false,
                     };
                     // After phase. If THIS is the paused step and the pause was
@@ -2002,6 +2008,7 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
+                        accumulations: None,
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -2020,6 +2027,7 @@ impl Game {
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
+                        revealed_round_cards: Vec::new(),
                         c066_take_food_instead: false,
                     };
                     // After phase. If THIS is the paused step and the pause was
@@ -2168,9 +2176,9 @@ impl Game {
         // worker/space delta). Every other mid-round law is unchanged for both
         // segments (validation.rs).
         if resume.space_applied {
-            crate::validation::validate_incremental_resume_completion_or_full(&next, self)?;
+            crate::validation::check_incremental_resume_completion_or_full(&next, self)?;
         } else {
-            crate::validation::validate_incremental_or_full(&next, self)?;
+            crate::validation::check_incremental_or_full(&next, self)?;
         }
         // The `work` event for this paused action is recorded by
         // `resolve_pending_and_resume` (with the paused hash as `after`), not
@@ -2353,6 +2361,7 @@ impl Game {
                     delayed_well: &mut self.delayed_well,
                     round: self.public.round,
                     used_spaces: &self.public.used,
+                    accumulations: None,
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,

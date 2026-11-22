@@ -642,6 +642,27 @@ fn card_priority(
                                 CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
+                                // Chapter 1 round-start cards: complex conditional effects not evaluated by heuristic
+                                CardEffect::StartRoundPlowFieldIfHouse { .. }
+                                | CardEffect::StartRoundCopyUnusedRoundSpace { .. }
+                                | CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. }
+                                | CardEffect::StartRoundPlayCardIfStoneHouse { .. }
+                                | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
+                                | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
+                                | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 0,
+                                // B114/A157/A049/C067: conditional round-start gains
+                                // (B114 family+rooms, A157 Lessons occupants, A049
+                                // accumulation grew, C067 non-harvest + pasture
+                                // animals). Same optimistic per-remaining-round
+                                // discount as the E111 conditional arm.
+                                CardEffect::StartRoundGainIfFamilyAndRooms { good, amount, .. }
+                                | CardEffect::StartRoundGainIfLessonsOccupants { good, amount, .. }
+                                | CardEffect::StartRoundGainIfAccumulationGrew { good, amount, .. }
+                                | CardEffect::StartRoundGainIfNoHarvestAndAnimals {
+                                    good,
+                                    amount,
+                                    ..
+                                } => card_good_value(*good) * i64::from(*amount) * horizon,
                             };
     }
     Some(value)
