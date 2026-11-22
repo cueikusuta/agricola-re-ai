@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "card_id": "D091",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "鋤手",
+    "name_en": "Plowman"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2830",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "board",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "field_tile",
+            "amounts": {
+              "round_plus_4": 1,
+              "round_plus_7": 1,
+              "round_plus_10": 1
+            },
+            "marker_kind": "plow_reservation"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "round_space_has_marker",
+          "params": {
+            "kind": "plow_reservation"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "action": "plow_reserved_field",
+                "effect": {
+                  "operation": "exchange",
+                  "params": {
+                    "give": { "good": "food", "amount": 1 },
+                    "receive": { "operation": "plow_field", "params": { "amount": 1 } }
+                  }
+                }
+              },
+              {
+                "action": "decline",
+                "effect": null
+              }
+            ]
+          }
+        },
+        {
+          "operation": "other",
+          "target": "board",
+          "params": {
+            "kind": "move_all_goods_on_card_to_supply",
+            "source_marker": "plow_reservation"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_round",
+      "duration": "instant",
+      "snapshot": "before_event",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "職業: stays in play area with round reservations"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params.amounts: round_plus_4/7/10 for '現在ラウンドに4・7・10を足したスペース' needs dynamic round calculation formula",
+      "effects[0].steps[0].params.good: 'field_tile' as marker type for round spaces needs vocabulary",
+      "effects[1].conditions: round_space_has_marker with custom 'plow_reservation' kind needs vocabulary",
+      "effects[1].steps[1].params: move_all_goods_on_card_to_supply for consuming the reservation marker needs vocabulary",
+      "effects: two effects (on_play place markers + round_start plow) - Stage 4 P7 round reservation + start"
+    ],
+    "test_case_ids": [
+      "D091-on-play-place-markers",
+      "D091-round-start-plow-pay-food",
+      "D091-round-start-decline",
+      "D091-round-14-overflow"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Effect: On play, place field tiles on round spaces (current round +4, +7, +10). At each such round start, may pay 1 food to plow 1 field using that tile. Stage 4: P7 round reservation + start plowing. Stays in play area. MQ-08: round 14 overflow handling."
+  }
+}

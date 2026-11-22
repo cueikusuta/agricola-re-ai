@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "card_id": "D071",
+  "cases": [
+    {
+      "id": "D071-field-with-one-good-replant",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          { "crop": "grain", "count": 1 },
+          { "crop": "vegetable", "count": 2 }
+        ]
+      },
+      "action": {
+        "trigger": "after_harvest",
+        "choose_option": "replant_field",
+        "target_field": 0,
+        "sow_crop": "vegetable"
+      },
+      "expected": {
+        "field_0_cleared": true,
+        "field_0_sown": "vegetable",
+        "field_1_unchanged": true,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "Field with exactly 1 good after harvest: discard it and sow 1 crop there"
+    },
+    {
+      "id": "D071-field-with-multiple-goods-no-effect",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          { "crop": "grain", "count": 2 }
+        ]
+      },
+      "action": {
+        "trigger": "after_harvest",
+        "choose_option": "replant_field"
+      },
+      "expected": {
+        "effect_not_applicable": true,
+        "reason": "no field has exactly 1 good"
+      },
+      "notes": "Field with 2+ goods does not trigger the effect"
+    },
+    {
+      "id": "D071-no-fields-with-one-good",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          { "crop": "grain", "count": 3 }
+        ]
+      },
+      "action": {
+        "trigger": "after_harvest"
+      },
+      "expected": {
+        "no_effect": true,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "No eligible fields means no option to replant"
+    }
+  ]
+}

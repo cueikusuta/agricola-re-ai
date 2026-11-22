@@ -159,6 +159,11 @@
 | `pasture_size` | `n` | 指定サイズの牧場がある（`A001` はちょうど1） |
 | `fenced_stable_count` | `n` | 柵内の厩が `n` 以上 |
 | `animal_count_at_most` | `animal`, `n` | 家畜数が `n` 以下 |
+| `round_space_in` | `rounds` | 対象ラウンド番号の範囲内（例 A151 の 1-4 ラウンド） |
+| `round_space_unused` | — | そのラウンドのラウンドスペースが未使用 |
+| `lessons_used_by_fewer_players` | — | 「授業」スペースを使ったプレイヤー数が他のスペースより少ない |
+| `has_stone_house` | — | 所有者が石の家に住んでいる |
+| `goods_on_upcoming_round_spaces` | — | 開始前のラウンドスペースのいずれかに所有者が受け取る品物がある |
 
 ## 発動頻度・持続・状態参照
 
@@ -279,3 +284,21 @@
 ### 未解決・保留
 - `A071` と `C018` と `C057` の「いつでも（anytime）」トリガーは語彙未定義のため `needs_resolution` のまま。フリーアクションAPI（手番境界・連続実行・取消・再演ハッシュ）が定義されるまで実装禁止。
 - `C020` のラウンド依存プレイ制限（ラウンド9以降）、`C054` の厩返却コスト、柵支払い、after_field_phase トリガー、`C056` の last-stable 判定と per-build 代替支払い、`C003` の未配置人物前提、`C009` の購入時間窓は語彙外のため `needs_resolution` 保持。推測で確定しない。
+
+## 2026-11-22追補：ラウンド開始時獲得カード7枚（A090/A151/A152/B097/B106/B135/C064）
+
+本節はカード仕様JSONの新規語彙を定義する。**本節の存在はRustエンジンでの効果適用完了を意味しない**。エンジン側の状態は各カードの spec JSON `review.notes` と実装PRの記述を正本とし、以下は要約である。
+
+### 新しいpredicate
+| predicate | パラメータ・評価 |
+|---|---|
+| `round_space_in` | `rounds`：対象がそのラウンド番号の範囲内。A151 で使用。 |
+| `round_space_unused` | —：そのラウンドのラウンドスペースが未使用。A151 で使用。 |
+| `lessons_used_by_fewer_players` | —：「授業」スペースを使ったプレイヤー数が他のいずれのスペースより少ない。A152 で使用。 |
+| `has_stone_house` | —：所有者が石の家に住んでいる。B097 で使用（A090 は既存の `house_is` を使用）。 |
+| `goods_on_upcoming_round_spaces` | —：開始前のラウンドスペースのいずれかに所有者が受け取る品物がある。B106 で使用。 |
+
+### エンジン実装状態（Rust）
+- 語彙マッピング（`CardEffect::StartRound*`）と `round_start` トリガーの dispatch 配線は7枚分完了。`verified_round_start_cards()` から既定レジストリへ登録済み。
+- **B106** は条件充足時に無条件で獲得できる唯一のカードとして実適用。エンジンの `accumulations` はベースアクションスペースも含むため、revealed ラウンドカードのスペースのみを検査する。解釈注記（第三者のWiki記載を基にするが「開始前」の読みに替代案あり）は実装PRに記録し、人間確認を待つ。
+- **A090 / A151 / A152 / B097 / B135 / C064** は dormant（発火しない）。round start で生成する PendingDecision には解決窓がなく（`GameState::start_round` は dispatch の Transition を破棄し、次ラウンド境界で pending をエラーにする）、複数所有者が共有 pending を上書きし合う。プレイヤー決定チャネル（耕す畑の位置・手札カードの選択・与える家畜・grain 消費の可否）を導入するまで適用しない。

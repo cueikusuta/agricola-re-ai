@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "E083",
+  "cases": [
+    {
+      "id": "E083-unfenced-empty",
+      "scope": "effect_only",
+      "setup": {
+        "unfenced_stables": 1,
+        "animals_in_stables": 0
+      },
+      "action": {
+        "play": "E083",
+        "harvest": "breeding_phase_start"
+      },
+      "expected": {
+        "sheep_delta": 1
+      },
+      "notes": "An unfenced stable without an animal qualifies."
+    },
+    {
+      "id": "E083-fenced-stable",
+      "scope": "effect_only",
+      "setup": {
+        "fenced_stables": 1,
+        "animals_in_stables": 0
+      },
+      "action": {
+        "play": "E083",
+        "harvest": "breeding_phase_start"
+      },
+      "expected": {
+        "sheep_delta": 0
+      },
+      "notes": "A fenced stable does not qualify."
+    },
+    {
+      "id": "E083-occupied-stable",
+      "scope": "effect_only",
+      "setup": {
+        "unfenced_stables": 1,
+        "animals_in_stables": 1
+      },
+      "action": {
+        "play": "E083",
+        "harvest": "breeding_phase_start"
+      },
+      "expected": {
+        "sheep_delta": 0
+      },
+      "notes": "An unfenced stable that already holds an animal does not qualify."
+    }
+  ]
+}

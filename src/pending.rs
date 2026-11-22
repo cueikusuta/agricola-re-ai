@@ -10,6 +10,7 @@ use crate::card_events::TriggerPhase;
 use crate::engine::Action;
 use crate::harvest::FeedingPlan;
 use crate::model::{Good, Player};
+use crate::registry::EventKind;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -150,6 +151,12 @@ pub enum PendingKind {
     ChooseTriggerOrder {
         /// The phase in which triggers fire.
         phase: TriggerPhase,
+        /// The trigger site (event kind) where the triggers originated.
+        /// Defaults to WorkerPlaced for backward compatibility with saves
+        /// that lack this field; resume-time validation ensures the site
+        /// matches the actual execution context.
+        #[serde(default = "EventKind::default")]
+        site: EventKind,
         /// The triggerable effects: (card_id, effect_index, effect_description).
         triggers: Vec<(String, usize, String)>,
     },
@@ -926,11 +933,13 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &mut uses_game,
             &card_use_limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         assert_eq!(players[0].supply.food, 5);
@@ -958,11 +967,13 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut budget2,
             &mut uses2,
             &mut uses_game2,
             &card_use_limits,
             &mut pending2,
+            &[],
         )
         .unwrap_err();
         assert!(err.contains("budget exhausted"), "got: {err}");
@@ -1690,5 +1701,123 @@ mod tests {
             "the choice must not be applied"
         );
         assert!(game.has_pending(), "the decision must stay resolvable");
+    }
+
+    /// ChooseTriggerOrder deserializes without `site` field (legacy save compat).
+    /// Missing `site` defaults to WorkerPlaced via serde(default).
+    #[test]
+    fn choose_trigger_order_legacy_without_site_deserializes() {
+        use crate::card_events::TriggerPhase;
+        use crate::registry::EventKind;
+
+        // JSON without `site` field (legacy format)
+        let json = r#"{
+                    "kind": "choose_trigger_order",
+                    "phase": "after",
+                    "triggers": [["CARD1", 0, "Effect 1"], ["CARD2", 1, "Effect 2"]]
+                }"#;
+
+        let kind: PendingKind = serde_json::from_str(json).unwrap();
+        match kind {
+            PendingKind::ChooseTriggerOrder {
+                phase,
+                site,
+                triggers,
+            } => {
+                assert_eq!(phase, TriggerPhase::After);
+                assert_eq!(
+                    site,
+                    EventKind::WorkerPlaced,
+                    "missing site defaults to WorkerPlaced"
+                );
+                assert_eq!(triggers.len(), 2);
+            }
+            other => panic!("expected ChooseTriggerOrder, got: {other:?}"),
+        }
+    }
+
+    /// PhaseTriggerData deserializes with legacy `event_kind` field only.
+    /// The custom Deserialize implementation converts `event_kind` to `site`.
+    #[test]
+    fn phase_trigger_data_legacy_event_kind_deserializes() {
+        use crate::model::Space;
+        use crate::registry::EventKind;
+
+        // JSON with legacy `event_kind` but no `site` field
+        let json = r#"{
+                    "space": "forest",
+                    "improvement": null,
+                    "baked": false,
+                    "previous_player": null,
+                    "used_spaces": [],
+                    "event_kind": "clay_construction"
+                }"#;
+
+        let trigger: crate::card_events::PhaseTriggerData = serde_json::from_str(json).unwrap();
+        assert_eq!(trigger.site, EventKind::ClayConstruction);
+        assert_eq!(trigger.event_kind, EventKind::ClayConstruction);
+        assert_eq!(trigger.space, Some(Space::Forest));
+    }
+
+    /// PhaseTriggerData deserializes with new `site` field (takes precedence over event_kind).
+    #[test]
+    fn phase_trigger_data_new_site_field_takes_precedence() {
+        use crate::registry::EventKind;
+
+        // JSON with both `site` and `event_kind` - site should win
+        let json = r#"{
+                    "space": null,
+                    "improvement": null,
+                    "baked": false,
+                    "previous_player": null,
+                    "used_spaces": [],
+                    "site": "bake",
+                    "event_kind": "worker_placed"
+                }"#;
+
+        let trigger: crate::card_events::PhaseTriggerData = serde_json::from_str(json).unwrap();
+        assert_eq!(trigger.site, EventKind::Bake);
+        assert_eq!(trigger.event_kind, EventKind::Bake); // synced to site
+    }
+
+    /// PhaseTriggerData: the `site` field wins by presence even when its value
+    /// is the WorkerPlaced default, matching the documented "site takes
+    /// precedence when present" behavior (review P3-2).
+    #[test]
+    fn phase_trigger_data_site_present_wins_over_event_kind() {
+        use crate::registry::EventKind;
+
+        let json = r#"{
+                    "space": null,
+                    "improvement": null,
+                    "baked": false,
+                    "previous_player": null,
+                    "used_spaces": [],
+                    "site": "worker_placed",
+                    "event_kind": "bake"
+                }"#;
+
+        let trigger: crate::card_events::PhaseTriggerData = serde_json::from_str(json).unwrap();
+        assert_eq!(trigger.site, EventKind::WorkerPlaced);
+        assert_eq!(trigger.event_kind, EventKind::WorkerPlaced); // synced to site
+    }
+
+    /// PhaseTriggerData: when both `site` and legacy `event_kind` are absent,
+    /// the site defaults to WorkerPlaced.
+    #[test]
+    fn phase_trigger_data_missing_site_fields_default_to_worker_placed() {
+        use crate::registry::EventKind;
+
+        let json = r#"{
+                    "space": null,
+                    "improvement": null,
+                    "baked": false,
+                    "previous_player": null,
+                    "used_spaces": []
+                }"#;
+
+        let trigger: crate::card_events::PhaseTriggerData = serde_json::from_str(json).unwrap();
+        assert_eq!(trigger.site, EventKind::WorkerPlaced);
+        assert_eq!(trigger.event_kind, EventKind::WorkerPlaced);
     }
 }

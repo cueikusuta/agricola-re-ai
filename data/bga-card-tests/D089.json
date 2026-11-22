@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "card_id": "D089",
+  "cases": [
+    {
+      "id": "D089-build-1-fence-get-stable",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0
+      },
+      "action": {
+        "trigger": "after_fence_build",
+        "fences_built": 1,
+        "choose_option": "build_free_stable"
+      },
+      "expected": {
+        "stables_built": 1,
+        "wood_paid": 0
+      },
+      "notes": "Build 1 fence -> may build 1 stable for free (no wood cost)"
+    },
+    {
+      "id": "D089-build-3-fences-get-3-stables",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0
+      },
+      "action": {
+        "trigger": "after_fence_build",
+        "fences_built": 3,
+        "choose_option": "build_free_stable"
+      },
+      "expected": {
+        "stables_built": 3,
+        "wood_paid": 0
+      },
+      "notes": "Build 3 fences -> may build 3 stables for free (per fence)"
+    },
+    {
+      "id": "D089-decline-stable",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 5
+      },
+      "action": {
+        "trigger": "after_fence_build",
+        "fences_built": 1,
+        "choose_option": "decline"
+      },
+      "expected": {
+        "stables_built": 0,
+        "wood_unchanged": true
+      },
+      "notes": "Player may decline the free stable (optional)"
+    }
+  ]
+}

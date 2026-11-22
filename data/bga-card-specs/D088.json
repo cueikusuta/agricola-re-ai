@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "card_id": "D088",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "石臼職人",
+    "name_en": "Millwright"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2833",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "substitute_cost",
+            "scope": "fence_stable_room_renovation",
+            "material_from": "any_building_resource",
+            "material_to": "grain",
+            "amount": 1,
+            "max_substitutions": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_build",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "職業: stays in play area with ongoing substitution effect"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[1].steps[0].params.scope: 'fence_stable_room_renovation' not in vocabulary - needs formal definition",
+      "effects[1].steps[0].params.max_substitutions: '2つまで' (up to 2 materials) per build action needs vocabulary",
+      "effects[1].steps[0].params.material_to: 'grain' as substitute for building resources needs confirmation",
+      "effects: two separate effects (on_play gain grain + passive substitute) - order field used"
+    ],
+    "test_case_ids": [
+      "D088-on-play-gain-grain",
+      "D088-substitute-fence-1-grain",
+      "D088-substitute-stable-2-grain",
+      "D088-substitute-room-2-grain-max",
+      "D088-substitute-renovation-2-grain-max"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Effect: (1) On play, gain 1 grain. (2) Ongoing: when building fences, stables, rooms, or renovating, may substitute up to 2 building resources with 1 grain each. Stage 4: P3 on_play + constant (construction cost substitute). Stays in play area."
+  }
+}

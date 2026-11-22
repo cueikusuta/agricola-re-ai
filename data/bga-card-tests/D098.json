@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "card_id": "D098",
+  "cases": [
+    {
+      "id": "D098-final-harvest-take-board-resources",
+      "scope": "effect_only",
+      "setup": {
+        "round": 14,
+        "board_wood": 3,
+        "board_clay": 2,
+        "board_reed": 1,
+        "board_stone": 2
+      },
+      "action": {
+        "trigger": "before_final_harvest"
+      },
+      "expected": {
+        "wood_gained": 3,
+        "clay_gained": 2,
+        "reed_gained": 1,
+        "stone_gained": 2,
+        "board_wood_remaining": 0,
+        "board_clay_remaining": 0,
+        "board_reed_remaining": 0,
+        "board_stone_remaining": 0
+      },
+      "notes": "Before final harvest (round 14), take all building resources from board accumulation spaces."
+    },
+    {
+      "id": "D098-round-13-no-effect",
+      "scope": "effect_only",
+      "setup": {
+        "round": 13,
+        "board_wood": 3,
+        "board_clay": 2
+      },
+      "action": {
+        "trigger": "before_final_harvest"
+      },
+      "expected": {
+        "resources_gained": 0,
+        "reason": "not final harvest (round 13)"
+      },
+      "notes": "Round 13 is not the final harvest. Effect should not trigger."
+    },
+    {
+      "id": "D098-empty-accumulations",
+      "scope": "effect_only",
+      "setup": {
+        "round": 14,
+        "board_wood": 0,
+        "board_clay": 0,
+        "board_reed": 0,
+        "board_stone": 0
+      },
+      "action": {
+        "trigger": "before_final_harvest"
+      },
+      "expected": {
+        "resources_gained": 0,
+        "reason": "no resources on board"
+      },
+      "notes": "Board has no building resources. Gain nothing."
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "card_id": "D092",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "児童相談員",
+    "name_en": "Child Ombudsman"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2829",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "round_number",
+          "params": {
+            "min": 5
+          }
+        },
+        {
+          "predicate": "has_empty_room",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "allow_family_member_to_act",
+            "action": "family_growth_without_room_cost",
+            "cost_food": 2,
+            "notes": "After a person's action ends, if there is an empty room, that person may perform family growth. If so, -2 points."
+          }
+        },
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": -2
+          },
+          "notes": "累積マイナス2点"
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: ラウンド5以降の各アクション後に空き部屋があれば家族増加可能（-2点）"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0]: allow_family_member_to_act の詳細仕様（食料支払い窓・新生児状態・同ラウンド内の他人物行動との整合）が未確定",
+      "effects[0].trigger: after_worker_space で「人物のアクション終了時」をどう表現するか（人物単位のトリガーか全体のトリガーか）",
+      "classification: 段階3（部屋・空き部屋）だが、家族増加アクションの実行窓・コスト支払いタイミングが文献で確定できない"
+    ],
+    "test_case_ids": [
+      "D092-family-growth-with-empty-room",
+      "D092-no-empty-room",
+      "D092-before-round-5"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Ban: strong. Effect: From round 5 onward, if there is an empty room after a person's action, that person may do family growth (costs 2 food, -2 points). Triggers on after_worker_space with has_empty_room and round_number>=5. Unresolved: family growth window, food payment timing, newborn state recording."
+  }
+}

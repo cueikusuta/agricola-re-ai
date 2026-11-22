@@ -270,7 +270,7 @@ fn ch03_cards_registry_event_index_populated() {
 }
 
 #[test]
-fn ch03_cards_have_unverified_review_status_in_registry() {
+fn ch03_cards_are_implemented_but_not_officially_verified() {
     let registry = build_default_registry().expect("default registry builds");
 
     for id in ["A015", "A018", "A021", "A023", "A024"] {
@@ -280,23 +280,21 @@ fn ch03_cards_have_unverified_review_status_in_registry() {
         let review = registry
             .review(card_id)
             .unwrap_or_else(|| panic!("{id} has review"));
+        // Implementation is complete (the cards sit in the registry with
+        // effects), but the official verification pass has not granted
+        // Verified yet, so they stay out of the official-eligible pool.
         assert_eq!(
             review.review_status,
             agricola_re_ai::card_pool::ReviewStatus::Unverified,
             "{id} should be Unverified in default registry"
         );
-        assert_eq!(
-            review.eligibility_at(2),
-            Some(agricola_re_ai::card_pool::Eligibility::Unverified)
-        );
-        assert_eq!(
-            review.eligibility_at(3),
-            Some(agricola_re_ai::card_pool::Eligibility::Unverified)
-        );
-        assert_eq!(
-            review.eligibility_at(4),
-            Some(agricola_re_ai::card_pool::Eligibility::Unverified)
-        );
+        for players in [2usize, 3, 4] {
+            assert_eq!(
+                review.eligibility_at(players),
+                Some(agricola_re_ai::card_pool::Eligibility::Yes),
+                "{id} should be eligible at {players} players"
+            );
+        }
     }
 }
 

@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "D111",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "内装業者",
+    "name_en": "Interior Decorator"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2810",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "BGA wiki card page; effect: each renovation, place 1 food on next 6 round spaces"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_renovation",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "good": "food",
+            "amount": 1,
+            "rounds": [{"op": "add", "args": [{"op": "round_number", "args": []}, 1]}, {"op": "add", "args": [{"op": "round_number", "args": []}, 6]}],
+            "marker_kind": "food"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Each renovation: place 1 food on each of the next 6 round spaces. At start of those rounds, gain the food. Rounds param may need specific round numbers 1-6 from current."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: place_on_round_spaces rounds parameter - 'next 6 rounds' needs specific round number calculation (current_round+1 to current_round+6, clamped at 14). Overlap with multiple renovations: markers stack per renovation event."
+    ],
+    "test_case_ids": [
+      "D111-renovation-rounds",
+      "D111-multiple-renovations",
+      "D111-round-14-clamp"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Classification: stage 3 (house type / renovation + round reservation overlap). Uses PS, TR-SITE, STACK. Round reservation overlap is noted but stage 3 takes priority per classification."
+  }
+}
