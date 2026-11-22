@@ -4,12 +4,16 @@
 //! - Registry/construction path reachability (Step 1)
 //! - Handler integration path for all 7 cards (Step 2)
 //! - Full game integration with round-start triggers (Step 3)
+//! - Effect application behaviour (Step 4): B106 applies for real; the
+//!   optional round-start effects stay dormant (no pending decision, no
+//!   state change, no bricked round boundary)
 
 use agricola_re_ai::card_events::PhaseTriggerData;
+use agricola_re_ai::cards::card_set_for_game;
 use agricola_re_ai::cards::{
     verified_round_start_cards, CardDefinition, CardEffect, CardKind, CardRequirement,
 };
-use agricola_re_ai::model::{Config, Game, Good, House};
+use agricola_re_ai::model::{Config, Game, Good, House, Space};
 use agricola_re_ai::registry::{build_default_registry, card_set_from_pool, CardPool};
 
 /// Build a CardSet containing exactly the 7 ch06 round-start cards for targeted testing.
@@ -298,4 +302,96 @@ fn round_start_trigger_data_structure() {
         trigger_data.site,
         agricola_re_ai::registry::EventKind::RoundStart
     );
+}
+
+/// Build a 2-player game with the registry card set (round 1 is opened during
+/// construction, so the first `start_round` below advances to round 2).
+fn ch06_game_2p(seed: u64) -> Game {
+    let config = Config {
+        players: 2,
+        seed,
+        additional_action_space_enabled: false,
+    };
+    Game::with_cards(config, card_set_for_game(2, true)).expect("ch06 game setup")
+}
+
+/// B106 清廉潔白な人: gains 1 food when goods sit on a round action space.
+/// The engine's `accumulations` map also covers the base action spaces
+/// (Forest, ClayPit, ...); those are NOT round spaces, so base-space goods
+/// must not satisfy the condition. Goods on a revealed round card's space
+/// must trigger the gain, for the owner only, at every round start.
+#[test]
+fn b106_applies_food_gain_from_round_space_goods_only() {
+    let mut game = ch06_game_2p(42);
+    game.public.players[0].played_cards.push("B106".to_string());
+
+    // Round 2: revealed round spaces (SheepMarket with seed 42) carry no
+    // goods even though the base spaces do — B106 must not fire.
+    let food_before = game.public.players[0].supply.food;
+    let other_food_before = game.public.players[1].supply.food;
+    game.start_round().expect("advance to round 2");
+    assert_eq!(
+        game.public.players[0].supply.food, food_before,
+        "base action space goods must not trigger B106"
+    );
+
+    // Round 3: goods placed on a revealed round space trigger the gain.
+    let round_space = Space::from(game.public.revealed[0]);
+    game.public.accumulations.insert(round_space, 1);
+    game.start_round().expect("advance to round 3");
+    assert_eq!(
+        game.public.players[0].supply.food,
+        food_before + 1,
+        "goods on a round action space must grant B106's 1 food"
+    );
+    assert_eq!(
+        game.public.players[1].supply.food, other_food_before,
+        "players without B106 must not gain food"
+    );
+
+    // The goods persist, so the gain repeats at the next round start.
+    game.start_round().expect("advance to round 4");
+    assert_eq!(game.public.players[0].supply.food, food_before + 2);
+    assert!(game.pending.is_none(), "B106 applies inline, no pause");
+}
+
+/// The optional round-start cards (A090/A152/B097/B135/C064) each need a
+/// player-decision channel (which field to plow, which hand card to play,
+/// which animal to give, whether to spend grain) that the round-start
+/// dispatcher cannot represent: `GameState::start_round` discards the
+/// dispatch Transition, so a pause created there has no resolution window
+/// and the next round boundary would hard-error on a carried pending (the
+/// PR #385 finding (c) brick pattern). They must stay dormant: no pending,
+/// no resource change, and the next round opens fine.
+#[test]
+fn optional_round_start_effects_stay_dormant_no_pending_brick() {
+    let mut game = ch06_game_2p(42);
+    for id in ["A090", "B097", "C064"] {
+        game.public.players[0].played_cards.push(id.to_string());
+    }
+    // Afford every condition so only the (missing) decision channel stands
+    // between the effect and its application.
+    game.public.players[0].house = House::Stone;
+    game.public.players[0].supply.food = 10;
+    game.public.players[0].supply.grain = 5;
+
+    for round in 2..=4 {
+        let supply_before = game.public.players[0].supply.clone();
+        game.start_round()
+            .unwrap_or_else(|e| panic!("advance to round {round} must succeed: {e}"));
+        assert!(
+            game.pending.is_none(),
+            "round {round}: optional round-start effects must not create a pending decision"
+        );
+        assert_eq!(
+            game.public.players[0].supply.get(Good::Food),
+            supply_before.get(Good::Food),
+            "round {round}: dormant effects must not spend or grant food"
+        );
+        assert_eq!(
+            game.public.players[0].supply.get(Good::Grain),
+            supply_before.get(Good::Grain),
+            "round {round}: dormant effects must not spend grain"
+        );
+    }
 }

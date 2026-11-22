@@ -693,7 +693,13 @@ fn resolve_phase_scan(
                     trigger_data,
                 )?,
                 CardEffect::StartRoundGainIfGoodsOnRoundSpaces { good, amount } => {
-                    handle_start_round_gain_if_goods_on_round_spaces(ctx, player, good, *amount)?
+                    handle_start_round_gain_if_goods_on_round_spaces(
+                        ctx,
+                        player,
+                        good,
+                        *amount,
+                        trigger_data,
+                    )?
                 }
                 CardEffect::StartRoundExchangeForFoodAndPoints {
                     give_animal,
@@ -991,26 +997,30 @@ fn effect_condition_holds(
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
-        // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064)
-        CardEffect::StartRoundPlowFieldIfHouse { .. } => trigger.site == EventKind::RoundStart,
-        CardEffect::StartRoundCopyUnusedRoundSpace { max_round } => {
-            trigger.site == EventKind::RoundStart && round <= *max_round
-        }
-        CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. } => {
-            trigger.site == EventKind::RoundStart
-        }
-        CardEffect::StartRoundPlayCardIfStoneHouse { .. } => {
-            trigger.site == EventKind::RoundStart && player.house == House::Stone
-        }
+        // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064).
+        //
+        // Optional round-start actions stay dormant in the generic scan for
+        // the same reason as the A118 exchange (PR #385 review finding (c)):
+        // `GameState::start_round` discards the dispatch Transition and only
+        // re-checks `pending.is_some()` at the NEXT round boundary, so a
+        // pause created here has no resolution window. Multiple owners would
+        // also overwrite one shared `pending` slot mid-loop. The trigger
+        // vocabulary, the dispatch wiring and the condition predicates are
+        // all in place; only the player-decision channel (which field to
+        // plow, which hand card to play, which animal to give) is missing,
+        // and it needs a round-start plan channel before these can apply.
+        CardEffect::StartRoundPlowFieldIfHouse { .. } => false,
+        CardEffect::StartRoundCopyUnusedRoundSpace { .. } => false,
+        CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. } => false,
+        CardEffect::StartRoundPlayCardIfStoneHouse { .. } => false,
+        // B106 is the exception that stays live: its gain is unconditional
+        // once the round spaces hold goods (the handler does the goods
+        // check), so it needs no player decision and can apply directly.
         CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. } => {
             trigger.site == EventKind::RoundStart
         }
-        CardEffect::StartRoundExchangeForFoodAndPoints { .. } => {
-            trigger.site == EventKind::RoundStart
-        }
-        CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => {
-            trigger.site == EventKind::RoundStart
-        }
+        CardEffect::StartRoundExchangeForFoodAndPoints { .. } => false,
+        CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => false,
         #[cfg(test)]
         CardEffect::PendingProbe { .. } => true,
     }
@@ -1288,7 +1298,13 @@ pub fn execute_chosen_triggers(
                 trigger_data,
             )?,
             CardEffect::StartRoundGainIfGoodsOnRoundSpaces { good, amount } => {
-                handle_start_round_gain_if_goods_on_round_spaces(ctx, player, good, *amount)?
+                handle_start_round_gain_if_goods_on_round_spaces(
+                    ctx,
+                    player,
+                    good,
+                    *amount,
+                    trigger_data,
+                )?
             }
             CardEffect::StartRoundExchangeForFoodAndPoints {
                 give_animal,
@@ -2136,164 +2152,120 @@ fn handle_gain_if_no_minor_played(
 
 // ============================================================================
 // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064)
+//
+// B106 applies for real (unconditional when goods sit on the revealed round
+// spaces). The optional cards stay dormant: a round-start PendingDecision has
+// no resolution window (`GameState::start_round` discards the dispatch
+// Transition and several owners would overwrite one shared `pending` slot),
+// which is the PR #385 finding (c) brick pattern. Applying them needs a
+// round-start plan channel carrying the player's choice; the trigger
+// vocabulary, dispatch wiring and condition predicates are already in place.
 // ============================================================================
 
 /// A090 鋤職人 (Plow Driver): at each round start, if the owner lives in a
-/// stone house, may pay 1 food to plow exactly 1 field. Optional; the handler
-/// checks the house condition and resource availability.
+/// stone house, may pay 1 food to plow exactly 1 field. Optional.
+/// ENGINE LIMITATION: dormant — needs a field-location decision channel.
 fn handle_start_round_plow_field_if_house(
-    ctx: &mut DispatchContext<'_>,
+    _ctx: &mut DispatchContext<'_>,
     _player: usize,
-    house: &House,
-    food_cost: u32,
-    fields: u32,
+    _house: &House,
+    _food_cost: u32,
+    _fields: u32,
     _trigger_data: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
-    // Verify the condition: must be in the required house type
-    if ctx.player.house != *house {
-        return Ok(EffectResult::Resolved);
-    }
-    // Check if player has enough food to pay
-    if ctx.player.supply.get(Good::Food) < food_cost {
-        return Ok(EffectResult::Resolved);
-    }
-    // Create a pending decision for the optional action
-    let kind = crate::pending::PendingKind::Custom {
-        source_card: "A090".to_string(),
-        payload: serde_json::json!({
-            "action": "plow_field",
-            "food_cost": food_cost,
-            "fields": fields,
-        }),
-    };
-    let decision = PendingDecision::new(
-        0, // Engine will stamp the actual decision ID
-        ctx.actor,
-        kind,
-        String::new(),
-        serde_json::json!({ "card": "A090" }),
-    );
-    Ok(EffectResult::Pending(decision))
+    // Dormant by design: the effect is optional and needs a field-location
+    // decision the round-start dispatcher cannot represent (see the
+    // `effect_condition_holds` note). The scan never reaches this handler
+    // today; reaching it is a bug, so stay a resolved no-op rather than
+    // creating an unresolvable pending decision (PR #385 finding (c)).
+    Ok(EffectResult::Resolved)
 }
 
 /// A151 吟遊楽人 (Minstrel): at each round start in rounds 1-4, if the round
 /// action space for that round is unused (no worker placed), copy its effect.
-/// The copied effect is resolved deterministically without placing a worker.
+/// ENGINE LIMITATION: dormant — copying a space action has no engine
+/// vocabulary (executing a space action without placing a worker).
 fn handle_start_round_copy_unused_round_space(
-    ctx: &mut DispatchContext<'_>,
+    _ctx: &mut DispatchContext<'_>,
     _player: usize,
-    max_round: u8,
-    round_now: u8,
-    trigger_data: &PhaseTriggerData,
+    _max_round: u8,
+    _round_now: u8,
+    _trigger_data: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
-    // Only applies in rounds 1-max_round
-    if round_now > max_round {
-        return Ok(EffectResult::Resolved);
-    }
-    // Check if the round space for this round is unused
-    // The round space is determined by the revealed round cards
-    if let Some(card) = trigger_data
-        .revealed_round_cards
-        .get(round_now as usize - 1)
-    {
-        let space = Space::from(*card);
-        if !ctx.used_spaces.contains(&space) {
-            // Space is unused - copy its effect
-            // This is a simplified implementation; the full effect copying
-            // would require executing the space's action without a worker
-            // For now, we just acknowledge the trigger
-        }
-    }
+    // Dormant by design: copying an arbitrary round space's effect means
+    // executing that space's action without a worker, which the engine has no
+    // vocabulary for. Documented limitation; the scan never reaches this
+    // handler (see the `effect_condition_holds` note), and reaching it stays
+    // a resolved no-op rather than an unresolvable pending decision.
     Ok(EffectResult::Resolved)
 }
 
 /// A152 夜学生 (Night-School Student): at each round start, if the Lessons
 /// space was used by fewer players than any other action space this round,
-/// may pay 1 food to play an occupation from hand. The condition requires
-/// checking all players' used spaces; handled in the handler.
+/// may pay 1 food to play an occupation from hand.
+/// ENGINE LIMITATION: dormant — needs all players' used-space analysis plus
+/// a hand-card choice channel.
 fn handle_start_round_play_occupation_if_lessons_underused(
-    ctx: &mut DispatchContext<'_>,
+    _ctx: &mut DispatchContext<'_>,
     _player: usize,
-    food_cost: u32,
+    _food_cost: u32,
     _trigger_data: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
-    // Check if player has enough food
-    if ctx.player.supply.get(Good::Food) < food_cost {
-        return Ok(EffectResult::Resolved);
-    }
-    // Check if Lessons space is underused compared to other spaces
-    // This requires analyzing all players' used spaces
-    // For now, we create a pending decision for the optional action
-    let kind = crate::pending::PendingKind::Custom {
-        source_card: "A152".to_string(),
-        payload: serde_json::json!({
-            "action": "play_occupation",
-            "food_cost": food_cost,
-        }),
-    };
-    let decision = PendingDecision::new(
-        0, // Engine will stamp the actual decision ID
-        ctx.actor,
-        kind,
-        String::new(),
-        serde_json::json!({ "card": "A152" }),
-    );
-    Ok(EffectResult::Pending(decision))
+    // Dormant by design: the condition ("Lessons used by fewer players than
+    // any other space") needs every player's used-space set, and the effect
+    // needs a hand-card choice the round-start dispatcher cannot represent
+    // (see the `effect_condition_holds` note). Resolved no-op, never an
+    // unresolvable pending decision (PR #385 finding (c)).
+    Ok(EffectResult::Resolved)
 }
 
 /// B097 学者 (Scholar): at each round start, if the owner has a stone house,
 /// may either pay 1 food to play an occupation from hand, or pay the normal
 /// cost to play a minor improvement from hand. Optional; two distinct choices.
+/// ENGINE LIMITATION: dormant — needs a hand-card choice channel.
 fn handle_start_round_play_card_if_stone_house(
-    ctx: &mut DispatchContext<'_>,
+    _ctx: &mut DispatchContext<'_>,
     _player: usize,
-    occupation_food_cost: u32,
+    _occupation_food_cost: u32,
     _trigger_data: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
-    // Verify the condition: must be in stone house
-    if ctx.player.house != House::Stone {
-        return Ok(EffectResult::Resolved);
-    }
-    // Check if player can afford either option
-    let can_afford_occupation = ctx.player.supply.get(Good::Food) >= occupation_food_cost;
-    let has_minor_in_hand = ctx.cards.hands[ctx.actor].iter().any(|id| {
-        ctx.card_set
-            .definition(id)
-            .is_some_and(|c| c.kind == crate::cards::CardKind::MinorImprovement)
-    });
-    if !can_afford_occupation && !has_minor_in_hand {
-        return Ok(EffectResult::Resolved);
-    }
-    // Create a pending decision for the choice
-    let kind = crate::pending::PendingKind::Custom {
-        source_card: "B097".to_string(),
-        payload: serde_json::json!({
-            "action": "play_occupation_or_minor",
-            "occupation_food_cost": occupation_food_cost,
-        }),
-    };
-    let decision = PendingDecision::new(
-        0, // Engine will stamp the actual decision ID
-        ctx.actor,
-        kind,
-        String::new(),
-        serde_json::json!({ "card": "B097" }),
-    );
-    Ok(EffectResult::Pending(decision))
+    // Dormant by design: either choice plays a hand card (occupation for 1
+    // food, or a minor for its normal cost), a card-selection decision the
+    // round-start dispatcher cannot represent (see the
+    // `effect_condition_holds` note). Resolved no-op, never an unresolvable
+    // pending decision (PR #385 finding (c)).
+    Ok(EffectResult::Resolved)
 }
 
-/// B106 清廉潔白な人 (Moral Crusader): at each round start, if there are any
-/// goods on revealed round action spaces (accumulations), gain 1 food.
-/// Unconditional gain when condition met; checked in effect_condition_holds.
+/// B106 清廉潔白な人 (Moral Crusader): immediately before each round begins,
+/// if any round action space holds goods the owner would receive, gain 1
+/// food. Unconditional gain when the condition met; the condition site is
+/// checked by effect_condition_holds, the goods check happens here.
+///
+/// Interpretation note (recorded for human confirmation, AGENTS.md rule 3):
+/// the BGA wiki text (checked 2026-11-14, spec `data/bga-card-specs/B106.json`)
+/// reads, in this engine's terms, "goods on round action spaces". The engine's
+/// single `accumulations` map also covers the base action spaces (Forest,
+/// ClayPit, ...), which are NOT round spaces, so this handler restricts the
+/// check to the revealed round cards' spaces. A stricter reading ("upcoming"
+/// = not-yet-started round spaces) is currently unsatisfiable in the engine
+/// because no effect can place goods on future round spaces yet.
 fn handle_start_round_gain_if_goods_on_round_spaces(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
     good: &Good,
     amount: u32,
+    trigger_data: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
-    // Check if there are any goods on upcoming round spaces (accumulations)
-    let has_accumulations = ctx.accumulations.values().any(|&v| v > 0);
-    if has_accumulations {
+    // Round-card spaces only: the base action spaces share the
+    // `accumulations` map but are not round spaces, so they must not satisfy
+    // the condition.
+    let has_round_space_goods = trigger_data.revealed_round_cards.iter().any(|card| {
+        ctx.accumulations
+            .get(&Space::from(*card))
+            .is_some_and(|&n| n > 0)
+    });
+    if has_round_space_goods {
         let p = &mut ctx.player;
         let next = p
             .supply
@@ -2307,91 +2279,44 @@ fn handle_start_round_gain_if_goods_on_round_spaces(
 
 /// B135 栄養士 (Nutrition Expert): at each round start, may exchange 1 animal
 /// of any owned type, 1 grain, and 1 vegetable for 5 food and 2 points.
-/// Optional; the handler verifies all give resources are available before
-/// exchanging. Points are added immediately to card_points.
+/// Optional.
+/// ENGINE LIMITATION: dormant — needs a given-animal choice channel.
 #[allow(clippy::too_many_arguments)] // the exchange vocabulary is fixed: 3 give slots + 2 receive slots
 fn handle_start_round_exchange_for_food_and_points(
-    ctx: &mut DispatchContext<'_>,
+    _ctx: &mut DispatchContext<'_>,
     _player: usize,
-    give_animal: bool,
-    give_grain: u32,
-    give_vegetable: u32,
-    receive_food: u32,
-    receive_points: i32,
+    _give_animal: bool,
+    _give_grain: u32,
+    _give_vegetable: u32,
+    _receive_food: u32,
+    _receive_points: i32,
     _trigger_data: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
-    // Check if player has the required resources
-    let has_animal = if give_animal {
-        ctx.player.animal_count(Animal::Sheep) > 0
-            || ctx.player.animal_count(Animal::Boar) > 0
-            || ctx.player.animal_count(Animal::Cattle) > 0
-    } else {
-        true
-    };
-    let has_grain = ctx.player.supply.get(Good::Grain) >= give_grain;
-    let has_vegetable = ctx.player.supply.get(Good::Vegetable) >= give_vegetable;
-
-    if has_animal && has_grain && has_vegetable {
-        // Create a pending decision for the optional exchange
-        let kind = crate::pending::PendingKind::Custom {
-            source_card: "B135".to_string(),
-            payload: serde_json::json!({
-                "action": "exchange",
-                "give_animal": give_animal,
-                "give_grain": give_grain,
-                "give_vegetable": give_vegetable,
-                "receive_food": receive_food,
-                "receive_points": receive_points,
-            }),
-        };
-        let decision = PendingDecision::new(
-            0, // Engine will stamp the actual decision ID
-            ctx.actor,
-            kind,
-            String::new(),
-            serde_json::json!({ "card": "B135" }),
-        );
-        Ok(EffectResult::Pending(decision))
-    } else {
-        Ok(EffectResult::Resolved)
-    }
+    // Dormant by design: the exchange is optional and the given-animal choice
+    // is a player decision the round-start dispatcher cannot represent (see
+    // the `effect_condition_holds` note). Resolved no-op, never an
+    // unresolvable pending decision (PR #385 finding (c)).
+    Ok(EffectResult::Resolved)
 }
 
 /// C064 穀物蒸留酒製造所 (Corn Schnapps Distillery): at each round start,
 /// may pay 1 grain to place 1 food on each of the next 4 round action
-/// spaces. The food is added to those spaces' accumulations and will be
-/// available when those rounds are reached. Optional; handler checks grain
-/// availability and updates future round accumulations.
+/// spaces. The food would be added to those spaces' accumulations and be
+/// available when those rounds are reached. Optional.
+/// ENGINE LIMITATION: dormant — needs a spend-vs-keep decision channel.
 fn handle_start_round_place_food_on_next_round_spaces(
-    ctx: &mut DispatchContext<'_>,
+    _ctx: &mut DispatchContext<'_>,
     _player: usize,
-    grain_cost: u32,
-    food_per_space: u32,
-    num_spaces: u8,
+    _grain_cost: u32,
+    _food_per_space: u32,
+    _num_spaces: u8,
     _trigger_data: &PhaseTriggerData,
 ) -> Result<EffectResult, String> {
-    // Check if player has enough grain
-    if ctx.player.supply.get(Good::Grain) < grain_cost {
-        return Ok(EffectResult::Resolved);
-    }
-    // Create a pending decision for the optional action
-    let kind = crate::pending::PendingKind::Custom {
-        source_card: "C064".to_string(),
-        payload: serde_json::json!({
-            "action": "place_food_on_round_spaces",
-            "grain_cost": grain_cost,
-            "food_per_space": food_per_space,
-            "num_spaces": num_spaces,
-        }),
-    };
-    let decision = PendingDecision::new(
-        0, // Engine will stamp the actual decision ID
-        ctx.actor,
-        kind,
-        String::new(),
-        serde_json::json!({ "card": "C064" }),
-    );
-    Ok(EffectResult::Pending(decision))
+    // Dormant by design: the effect is optional and needs the spend-vs-keep
+    // grain decision the round-start dispatcher cannot represent (see the
+    // `effect_condition_holds` note). Resolved no-op, never an unresolvable
+    // pending decision (PR #385 finding (c)).
+    Ok(EffectResult::Resolved)
 }
 
 // --- Public Dispatcher Entry Points ---
