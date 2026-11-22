@@ -26,13 +26,13 @@
   },
   "effects": [
     {
-      "trigger": "each_field_phase",
+      "trigger": "harvest_field_phase",
       "conditions": [],
       "steps": [
         { "operation": "gain_resource", "target": "owner", "params": { "good": "food", "amount": 1 } }
       ],
       "optional": false,
-      "frequency": "each_time",
+      "frequency": "every_use",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
@@ -40,13 +40,13 @@
       "notes": "Each field phase: if 1/4/7 sheep -> gain 1/2/3 food"
     },
     {
-      "trigger": "scoring",
+      "trigger": "end_scoring",
       "conditions": [],
       "steps": [
         { "operation": "gain_resource", "target": "owner", "params": { "good": "bonus_points", "amount": 1 } }
       ],
       "optional": false,
-      "frequency": "once",
+      "frequency": "end_of_game",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 1,

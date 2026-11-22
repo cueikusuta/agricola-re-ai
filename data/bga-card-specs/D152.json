@@ -40,7 +40,7 @@
   },
   "effects": [
     {
-      "trigger": "on_play_occupation",
+      "trigger": "after_occupation",
       "conditions": [
         {
           "predicate": "occupation_played_after_this",

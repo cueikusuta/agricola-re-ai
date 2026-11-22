@@ -52,7 +52,7 @@
         }
       ],
       "optional": false,
-      "frequency": "once",
+      "frequency": "once_per_play",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
@@ -75,8 +75,8 @@
         }
       ],
       "optional": false,
-      "frequency": "once",
-      "duration": "persistent",
+      "frequency": "once_per_play",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 1,
       "decision_owner": "none",

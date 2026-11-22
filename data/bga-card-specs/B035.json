@@ -26,7 +26,7 @@
   },
   "effects": [
     {
-      "trigger": "scoring",
+      "trigger": "end_scoring",
       "conditions": [],
       "steps": [
         {
@@ -36,7 +36,7 @@
         }
       ],
       "optional": false,
-      "frequency": "once",
+      "frequency": "end_of_game",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,

@@ -63,7 +63,7 @@
       "decision_owner": "owner"
     },
     {
-      "trigger": "end_game_scoring",
+      "trigger": "end_scoring",
       "conditions": [],
       "steps": [
         {

@@ -52,13 +52,13 @@
           "operation": "discount_cost",
           "target": "owner",
           "params": {
-            "good": "brick",
+            "good": "clay",
             "amount": {
               "op": "table",
               "args": [
                 "house",
                 {
-                  "wood": "brick",
+                  "wood": "clay",
                   "clay": "clay",
                   "stone": "stone"
                 }

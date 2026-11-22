@@ -71,7 +71,7 @@
         }
       ],
       "optional": true,
-      "frequency": "every_occurrence",
+      "frequency": "every_use",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,

@@ -39,7 +39,7 @@
   },
   "effects": [
     {
-      "trigger": "final_scoring",
+      "trigger": "end_scoring",
       "conditions": [],
       "steps": [
         {

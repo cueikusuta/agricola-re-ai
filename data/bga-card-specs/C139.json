@@ -91,7 +91,7 @@
       ],
       "optional": true,
       "frequency": "unlimited",
-      "duration": "persistent",
+      "duration": "permanent",
       "snapshot": "live_state",
       "order": 1,
       "decision_owner": "owner",

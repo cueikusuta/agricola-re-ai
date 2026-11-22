@@ -39,7 +39,7 @@
   },
   "effects": [
     {
-      "trigger": "continuous",
+      "trigger": "passive",
       "conditions": [],
       "steps": [
         {
@@ -53,8 +53,8 @@
         }
       ],
       "optional": false,
-      "frequency": "continuous",
-      "duration": "persistent",
+      "frequency": "always",
+      "duration": "permanent",
       "snapshot": "live_state",
       "order": 0,
       "decision_owner": "none",
@@ -76,7 +76,7 @@
       ],
       "optional": false,
       "frequency": "per_sow_action",
-      "duration": "persistent",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 1,
       "decision_owner": "none",

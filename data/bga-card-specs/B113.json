@@ -64,8 +64,8 @@
         }
       ],
       "optional": true,
-      "frequency": "once",
-      "duration": "persistent",
+      "frequency": "once_per_play",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "owner",

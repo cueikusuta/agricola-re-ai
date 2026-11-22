@@ -63,7 +63,7 @@
         }
       ],
       "optional": false,
-      "frequency": "every_occurrence",
+      "frequency": "every_use",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
@@ -78,7 +78,7 @@
           "operation": "gain_points",
           "target": "owner",
           "params": {
-            "amount": {
+            "points": {
               "op": "custom",
               "args": [
                 "count",

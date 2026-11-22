@@ -37,7 +37,7 @@
       ],
       "optional": false,
       "frequency": "once_per_play",
-      "duration": "persistent",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",

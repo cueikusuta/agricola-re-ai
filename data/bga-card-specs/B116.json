@@ -52,7 +52,7 @@
         }
       ],
       "optional": false,
-      "frequency": "once",
+      "frequency": "once_per_play",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
@@ -74,7 +74,7 @@
       ],
       "optional": false,
       "frequency": "per_reed_placed",
-      "duration": "persistent",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 1,
       "decision_owner": "none",

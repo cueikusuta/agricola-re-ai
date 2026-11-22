@@ -64,7 +64,7 @@
         }
       ],
       "optional": false,
-      "frequency": "per_use",
+      "frequency": "every_use",
       "duration": "delayed_3_rounds",
       "snapshot": "after_event",
       "order": 0,

@@ -58,7 +58,7 @@
               {
                 "kind": "gain_resource",
                 "params": {
-                  "good": "brick",
+                  "good": "clay",
                   "amount": 1
                 }
               },

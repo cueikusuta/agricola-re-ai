@@ -147,7 +147,7 @@
       "decision_owner": "none"
     },
     {
-      "trigger": "end_game_scoring",
+      "trigger": "end_scoring",
       "conditions": [
         {
           "predicate": "most_vegetables",
@@ -159,7 +159,7 @@
           "operation": "gain_points",
           "target": "owner",
           "params": {
-            "amount": 3
+            "points": 3
           }
         }
       ],

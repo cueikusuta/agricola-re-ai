@@ -91,7 +91,7 @@
         }
       ],
       "optional": false,
-      "frequency": "every_occurrence",
+      "frequency": "every_use",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 1,

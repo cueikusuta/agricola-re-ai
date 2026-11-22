@@ -50,8 +50,8 @@
         }
       ],
       "optional": false,
-      "frequency": "once",
-      "duration": "persistent",
+      "frequency": "once_per_play",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",
@@ -70,7 +70,7 @@
         }
       ],
       "optional": true,
-      "frequency": "each_time",
+      "frequency": "every_use",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 1,
