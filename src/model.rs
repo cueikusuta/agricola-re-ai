@@ -66,6 +66,23 @@ pub enum Good {
     Grain,
     Vegetable,
 }
+
+/// Decode a `Good` from the `{:?}` (Debug) name card payloads carry, such
+/// as the A118 exchange context written by the dispatcher. Unknown names
+/// are a hard error so a mismatch can never silently drop a payment
+/// (PR #385 review P3).
+fn good_from_debug_name(name: &str) -> Result<Good, String> {
+    match name {
+        "Wood" => Ok(Good::Wood),
+        "Clay" => Ok(Good::Clay),
+        "Reed" => Ok(Good::Reed),
+        "Stone" => Ok(Good::Stone),
+        "Food" => Ok(Good::Food),
+        "Grain" => Ok(Good::Grain),
+        "Vegetable" => Ok(Good::Vegetable),
+        other => Err(format!("unknown good '{other}' in card payload")),
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Animal {
@@ -1758,6 +1775,7 @@ impl Game {
                             used_spaces: used_spaces.clone(),
                             site: crate::registry::EventKind::Bake,
                             event_kind: crate::registry::EventKind::Bake,
+                            c066_take_food_instead: false,
                         };
                         // After phase. If THIS is the paused step and the pause
                         // was in the After phase (a resolved ChooseTriggerOrder,
@@ -1892,6 +1910,7 @@ impl Game {
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::ClayConstruction,
                         event_kind: crate::registry::EventKind::ClayConstruction,
+                        c066_take_food_instead: false,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -2001,6 +2020,7 @@ impl Game {
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
+                        c066_take_food_instead: false,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -2354,9 +2374,55 @@ impl Game {
                 )?;
                 Ok(())
             }
-            (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => {
-                // Extensible: custom effects handle their own payload.
-                Ok(())
+            (PendingKind::Custom { .. }, PendingResolution::Custom { payload }) => {
+                // Check if this is an A118 harvest field optional exchange
+                if pending.context.get("type").and_then(|v| v.as_str())
+                    == Some("harvest_field_optional_exchange")
+                {
+                    let confirmed = payload
+                        .get("confirmed")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    if confirmed {
+                        let cost_str = pending.context.get("cost").and_then(|v| v.as_str());
+                        let cost_amount = pending
+                            .context
+                            .get("cost_amount")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32;
+                        let gain_str = pending.context.get("gain").and_then(|v| v.as_str());
+                        let gain_amount = pending
+                            .context
+                            .get("gain_amount")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32;
+
+                        // Parse Good from the Debug name the payload
+                        // carries. An unknown name is a hard error, not a
+                        // silent drop (PR #385 review P3): the payload is
+                        // engine-written, so failure means tampering or an
+                        // untaught variant.
+                        let cost_good = cost_str.map(good_from_debug_name).transpose()?;
+                        let gain_good = gain_str.map(good_from_debug_name).transpose()?;
+
+                        if let (Some(cost_good), Some(gain_good)) = (cost_good, gain_good) {
+                            let player = &mut self.public.players[pending.player];
+                            // Pay cost
+                            player.supply.pay(cost_good, cost_amount)?;
+                            // Gain resource
+                            let next = player
+                                .supply
+                                .get(gain_good)
+                                .checked_add(gain_amount)
+                                .ok_or("resource overflow")?;
+                            player.supply.set(gain_good, next);
+                        }
+                    }
+                    Ok(())
+                } else {
+                    // Extensible: other custom effects handle their own payload
+                    Ok(())
+                }
             }
             (
                 PendingKind::ChooseAnimalPlacement { .. },

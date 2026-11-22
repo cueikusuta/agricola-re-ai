@@ -167,12 +167,17 @@ pub enum EventKind {
     CardPlayed,
     /// Round start
     RoundStart,
-    /// Harvest phase
+    /// Harvest phase (the field-phase trigger: fires BEFORE the fields yield
+    /// their crops; cards that watch the field state belong here)
     Harvest,
     /// Clay construction (room/stone upgrade)
     ClayConstruction,
     /// Baking
     Bake,
+    /// End of a whole harvest: fields + feeding + breeding all resolved.
+    /// Fires once per player at the harvest tail (A145 「各収穫の終わりに」,
+    /// C066 「各収穫の後に」). Added in the PR #385 review-fix round.
+    AfterHarvestComplete,
     /// Improvement played from hand (Major/Minor Improvement action, including renovation-combined)
     ImprovementPlayed,
 }
@@ -186,6 +191,7 @@ impl EventKind {
             EventKind::Harvest,
             EventKind::ClayConstruction,
             EventKind::Bake,
+            EventKind::AfterHarvestComplete,
             EventKind::ImprovementPlayed,
         ]
     }
@@ -333,6 +339,16 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::AfterOccupationGain { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::HarvestFieldGain { .. } => EventKind::Harvest,
+                crate::cards::CardEffect::AfterHarvestGain { .. } => {
+                    EventKind::AfterHarvestComplete
+                }
+                crate::cards::CardEffect::AfterHarvestGainIfAtLeast { .. } => {
+                    EventKind::AfterHarvestComplete
+                }
+                crate::cards::CardEffect::AfterHarvestChooseGainIfAtLeast { .. } => {
+                    EventKind::AfterHarvestComplete
+                }
+                crate::cards::CardEffect::HarvestFieldOptionalExchange { .. } => EventKind::Harvest,
                 crate::cards::CardEffect::AfterClayConstructionGain { .. } => {
                     EventKind::ClayConstruction
                 }
@@ -449,7 +465,20 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
-                        | crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterHarvestGain { amount, .. }
+                        | crate::cards::CardEffect::AfterHarvestGainIfAtLeast { amount, .. } => {
+                            *amount
+                        }
+                        crate::cards::CardEffect::AfterHarvestChooseGainIfAtLeast {
+                            amount,
+                            upgrade_amount,
+                            ..
+                        } => (*amount).max(*upgrade_amount),
+                        crate::cards::CardEffect::HarvestFieldOptionalExchange {
+                            gain_amount,
+                            ..
+                        } => *gain_amount,
+                        crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }

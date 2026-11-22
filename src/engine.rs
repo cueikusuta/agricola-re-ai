@@ -3606,23 +3606,72 @@ mod grow_with_minor_regression_tests {
     fn grow_with_minor_b010_order_preplayed_allows_growth() {
         // (c) PREVIOUSLY played B010 DOES provide room (existing behavior preserved)
         // Use verified_basic_card_set which has the full 14 cards per player (7 occupations + 7 minors)
-        // Find a seed where B010 is in player 0's hand
+        // Seed-independent setup (PR #385 review R-P1-2): the seed search
+        // adopted whichever seed first seats B010 in player 0's hand, and
+        // that seed's start player shifted with this batch's card-set
+        // composition (the apply then landed on the B010-less opponent).
+        // Hands are forced and seat 0 is the explicit start player instead.
         let set = verified_basic_card_set(2).unwrap();
-        let mut game = None;
-        for seed in 1..1000 {
-            let config = Config {
-                players: 2,
-                seed,
-                additional_action_space_enabled: false,
-            };
-            let g = Game::with_cards(config, set.clone()).unwrap();
-            if g.cards.hands[0].contains(&"B010".to_string()) {
-                game = Some(g);
-                break;
-            }
-        }
-        let mut game = game.expect("failed to find seed with B010 in player 0 hand");
-        game.public.active_player = 0;
+        let mut occs: Vec<String> = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::Occupation)
+            .map(|c| c.id.clone())
+            .collect();
+        occs.sort();
+        let mut minors: Vec<String> = set
+            .definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::MinorImprovement)
+            .map(|c| c.id.clone())
+            .collect();
+        minors.sort();
+        let seat0_occ: Vec<String> = occs.iter().take(7).cloned().collect();
+        let mut seat0_minor = vec!["B010".to_string(), "A063".to_string()];
+        seat0_minor.extend(
+            minors
+                .iter()
+                .filter(|id| *id != "B010" && *id != "A063")
+                .take(5)
+                .cloned(),
+        );
+        let seat1_occ: Vec<String> = occs
+            .iter()
+            .filter(|id| !seat0_occ.contains(id))
+            .take(7)
+            .cloned()
+            .collect();
+        let seat1_minor: Vec<String> = minors
+            .iter()
+            .filter(|id| !seat0_minor.contains(id))
+            .take(7)
+            .cloned()
+            .collect();
+        assert_eq!(
+            (seat0_occ.len(), seat0_minor.len()),
+            (7, 7),
+            "seat 0 must hold seven occupations and seven minors"
+        );
+        assert_eq!(
+            (seat1_occ.len(), seat1_minor.len()),
+            (7, 7),
+            "seat 1 must hold seven occupations and seven minors"
+        );
+        let config = Config {
+            players: 2,
+            seed: 1,
+            additional_action_space_enabled: false,
+        };
+        let mut game = Game::with_cards_and_hands_with_start_player(
+            config,
+            set.clone(),
+            vec![
+                [seat0_occ, seat0_minor].concat(),
+                [seat1_occ, seat1_minor].concat(),
+            ],
+            0,
+        )
+        .expect("forced hands must build a valid game");
         game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
         game.public.round = 1;
         // Give player 0 resources to play B010 (wood3, food3)

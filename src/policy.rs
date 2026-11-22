@@ -591,22 +591,46 @@ fn card_priority(
                     card_good_value(*good) * i64::from(*amount) * avg_count
                 }
                 CardEffect::Passive { .. } => horizon * 5,
-                CardEffect::EndGameBonus { .. } => 12,
-                CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
-                                // New variants for market followup cards
+                                CardEffect::EndGameBonus { .. } => 12,
+                                CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
+                                CardEffect::AfterHarvestGain { good, amount, .. }
+                                | CardEffect::AfterHarvestGainIfAtLeast { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                }
+                                // C066: the conditional choice grants the primary or the
+                                // upgrade gain; value the better of the two at the same
+                                // optimistic discount as the sibling after-harvest arms.
+                                CardEffect::AfterHarvestChooseGainIfAtLeast {
+                                    good,
+                                    amount,
+                                    upgrade_gain,
+                                    upgrade_amount,
+                                    ..
+                                } => {
+                                    let primary = card_good_value(*good) * i64::from(*amount);
+                                    let upgrade = card_good_value(*upgrade_gain) * i64::from(*upgrade_amount);
+                                    primary.max(upgrade) * horizon
+                                }
+                                // A118: the exchange is plan-driven and capped at 2 buys per
+                                // harvest, so value one purchase per remaining harvest at a
+                                // 50% discount (mirrors the sibling conditional arms).
+                                CardEffect::HarvestFieldOptionalExchange { gain, gain_amount, .. } => {
+                                    card_good_value(*gain) * i64::from(*gain_amount) * horizon / 2
+                                }
+                                // New variants for market followup cards (PR #393)
                                 CardEffect::AfterAnyWorkerGain { good, amount, .. }
                                 | CardEffect::AfterAnyWorkerOthersGain { good, amount, .. } => {
                                     // Fires on any player's use of the space; approximate with per-round expectation
                                     card_good_value(*good) * i64::from(*amount) * horizon / 4
                                 }
                                 CardEffect::HarvestStartGainIfFields { good, amount, .. } => {
-                                                                    // Conditional on field count; optimistic half-weight
-                                                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
-                                                                }
-                                                                CardEffect::OnPlayGainAnimal { animal, amount, .. }
-                                                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
-                                                                    card_animal_value(*animal) * i64::from(*amount) * horizon
-                                                                }
+                                    // Conditional on field count; optimistic half-weight
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                }
+                                CardEffect::OnPlayGainAnimal { animal, amount, .. }
+                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
+                                    card_animal_value(*animal) * i64::from(*amount) * horizon
+                                }
                                 CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
