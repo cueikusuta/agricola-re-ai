@@ -337,7 +337,7 @@ fn action_log_metadata_and_replay_information() {
 fn incremental_vs_full_validation_agree_on_legal_actions() {
     use agricola_re_ai::model::{Config, Game};
     use agricola_re_ai::policy::{CardChoiceDetails, DetailPolicy, RandomPolicy, SpacePolicy};
-    use agricola_re_ai::validation::{validate_full, validate_incremental, Verdict};
+    use agricola_re_ai::validation::{check_full, check_incremental, Verdict};
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
@@ -365,8 +365,8 @@ fn incremental_vs_full_validation_agree_on_legal_actions() {
                 game.apply(action).unwrap();
                 let post = game.clone();
 
-                let full = validate_full(&post);
-                let inc = validate_incremental(&post, &pre);
+                let full = check_full(&post);
+                let inc = check_incremental(&post, &pre);
                 assert!(
                     full.is_ok(),
                     "full validation failed after legal action: seed={seed} players={players} action={space:?}"
@@ -374,7 +374,7 @@ fn incremental_vs_full_validation_agree_on_legal_actions() {
                 match inc {
                     Verdict::Pass => {}
                     Verdict::Unsure => {
-                        assert!(validate_full(&post).is_ok());
+                        assert!(check_full(&post).is_ok());
                     }
                     Verdict::Fail(msg) => {
                         panic!("incremental rejected legal action: {msg} (seed={seed} players={players} action={space:?})");
@@ -388,7 +388,7 @@ fn incremental_vs_full_validation_agree_on_legal_actions() {
 #[test]
 fn incremental_validation_rejects_illegal_actions() {
     use agricola_re_ai::model::{Config, Game};
-    use agricola_re_ai::validation::{validate_incremental, Verdict};
+    use agricola_re_ai::validation::{check_incremental, Verdict};
 
     for players in [2, 3, 4] {
         let game = Game::new(Config {
@@ -402,17 +402,17 @@ fn incremental_validation_rejects_illegal_actions() {
         let space = post.legal_spaces()[0];
         post.public.used.insert(space);
         post.public.used.insert(space);
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert!(matches!(verdict, Verdict::Fail(_) | Verdict::Unsure));
 
         let mut post2 = pre.clone();
         post2.public.round = 99;
-        let verdict2 = validate_incremental(&post2, &pre);
+        let verdict2 = check_incremental(&post2, &pre);
         assert!(matches!(verdict2, Verdict::Fail(_) | Verdict::Unsure));
 
         let mut post3 = pre.clone();
         post3.public.work_quota[0] = 99;
-        let verdict3 = validate_incremental(&post3, &pre);
+        let verdict3 = check_incremental(&post3, &pre);
         assert!(matches!(verdict3, Verdict::Fail(_) | Verdict::Unsure));
     }
 }
