@@ -55,6 +55,13 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // phase. Its placement plan is derived and applied via place_animals
         // (the play executor cannot represent a play-time pause).
         CardEffect::OnPlayGainAnimal { .. } => TriggerPhase::Before,
+        // D007 三つ又の矛: the round-table gain is an instantaneous play-time
+        // effect — Before phase. The exact-round match is judged in
+        // effect_condition_holds so only one table entry is ever triggerable.
+        CardEffect::OnPlayGainIfRound { .. } => TriggerPhase::Before,
+        // Zone-move metadata, never resolved by the phase scan: modeled as
+        // Before (the move itself runs after the play chain in dispatch_play).
+        CardEffect::PostPlayPassLeft => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -523,6 +530,14 @@ fn resolve_phase_scan(
                 CardEffect::OnPlayGainAnimal { animal, amount } => {
                     handle_on_play_gain_animal(ctx, animal, *amount)?
                 }
+                // D007 三つ又の矛: the exact-round match is already resolved by
+                // effect_condition_holds, so a triggerable entry is the current
+                // round's row of the printed table and grants unconditionally.
+                CardEffect::OnPlayGainIfRound { good, amount, .. } => {
+                    handle_on_play_gain(ctx, player, good, *amount)?
+                }
+                // Zone-move metadata: never resolved by the scan.
+                CardEffect::PostPlayPassLeft => EffectResult::Resolved,
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -894,6 +909,17 @@ fn effect_condition_holds(
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
         CardEffect::OnPlayGainPerCount { .. } => true,
+        // D007 三つ又の矛: the round table is resolved here, not in the handler,
+        // so exactly one table entry (the current round's) is ever triggerable
+        // and the other three rounds grant nothing. The round is public engine
+        // state; no hidden information is consulted.
+        CardEffect::OnPlayGainIfRound {
+            round: effect_round,
+            ..
+        } => trigger.site == EventKind::CardPlayed && *effect_round == round,
+        // Zone-move metadata: never a resolvable trigger; the pass-left move
+        // runs after the play chain in dispatch_play.
+        CardEffect::PostPlayPassLeft => false,
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
@@ -1024,6 +1050,14 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainAnimal { animal, amount } => {
                 handle_on_play_gain_animal(ctx, animal, *amount)?
             }
+            // D007 三つ又の矛: the exact-round match is already resolved by
+            // effect_condition_holds, so a triggerable entry is the current
+            // round's row of the printed table and grants unconditionally.
+            CardEffect::OnPlayGainIfRound { good, amount, .. } => {
+                handle_on_play_gain(ctx, player, good, *amount)?
+            }
+            // Zone-move metadata: never resolved by the scan.
+            CardEffect::PostPlayPassLeft => EffectResult::Resolved,
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -2173,6 +2207,48 @@ pub fn dispatch_play(
                     }
                 }
             }
+        }
+    }
+    // Card points for the newly played card are applied here — before the
+    // post-play destination — so a printed "pass left" card can have them
+    // subtracted again as it leaves (the validate_card_points invariant must
+    // hold after every action). This replaces the per-call-site update the
+    // engine play paths ran after dispatch_play returned; the committed state
+    // is identical for cards that stay in the played area.
+    if let Some(card) = card_set.definition(new_card_id) {
+        crate::cards::update_card_points_on_play(&mut players[player], card.points)?;
+    }
+
+    // Post-play destination (2016 Lookout: printed "pass left" cards move to
+    // the left neighbour's hand instead of staying in the played area). The
+    // move runs exactly once, after every play phase resolved, through the
+    // canonical card_zones::move_card API so the location partition and the
+    // card-points invariant are preserved by construction. A one-player game
+    // has no left neighbour, so the card stays in front of its owner.
+    if let Some(card) = card_set.definition(new_card_id) {
+        if card
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, CardEffect::PostPlayPassLeft))
+            && players.len() >= 2
+        {
+            let left = (player + 1) % players.len();
+            let mut move_ctx = crate::card_zones::CardMoveCtx {
+                cards,
+                players,
+                improvement_market,
+            };
+            crate::card_zones::move_card(
+                &mut move_ctx,
+                new_card_id,
+                crate::card_zones::CardZone::Played { player },
+                crate::card_zones::CardZone::Hand { player: left },
+            )
+            .map_err(|e| e.to_string())?;
+            players[player].card_points = players[player]
+                .card_points
+                .checked_sub(card.points)
+                .ok_or("card points underflow on pass-left")?;
         }
     }
     Ok(())
@@ -3901,8 +3977,8 @@ mod tests {
                 true,
             )
             .unwrap();
-            let card = set.definition("M1").unwrap();
-            crate::cards::update_card_points_on_play(&mut ctx.players[0], card.points).unwrap();
+            // dispatch_play applies the newly played card's points itself
+            // (before the post-play destination), so no manual update here.
         }
 
         assert_eq!(
@@ -5834,8 +5910,8 @@ mod tests {
                 false,
             )
             .unwrap();
-            let card = set.definition("A117").unwrap();
-            crate::cards::update_card_points_on_play(&mut ctx.players[0], card.points).unwrap();
+            // dispatch_play applies the newly played card's points itself
+            // (before the post-play destination), so no manual update here.
         }
         let dispatcher_wood = players[0].supply.wood;
 

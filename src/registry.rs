@@ -323,7 +323,8 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainPerStored { .. }
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayGainIfRound { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -366,7 +367,9 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
-                | crate::cards::CardEffect::EndGameBonus { .. } => continue,
+                | crate::cards::CardEffect::EndGameBonus { .. }
+                // Zone-move metadata: no event subscription of its own.
+                | crate::cards::CardEffect::PostPlayPassLeft => continue,
                 #[cfg(test)]
                 crate::cards::CardEffect::PendingProbe { .. } => continue,
             };
@@ -436,7 +439,8 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         crate::cards::CardEffect::EndGameBonus { .. }
                         | crate::cards::CardEffect::Prerequisite { .. }
-                        | crate::cards::CardEffect::Passive { .. } => 1,
+                        | crate::cards::CardEffect::Passive { .. }
+                        | crate::cards::CardEffect::PostPlayPassLeft => 1,
                         #[cfg(test)]
                         crate::cards::CardEffect::PendingProbe { .. } => 1,
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
@@ -483,9 +487,8 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
                         | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. }
-                        | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
-                            *amount
-                        }
+                        | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainIfRound { amount, .. } => *amount,
                     };
                     amount == 0 || amount > 30
                 })

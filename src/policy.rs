@@ -545,7 +545,15 @@ fn card_priority(
                                 | CardEffect::OnPlayGainPerStored { .. }
                                 | CardEffect::OnPlayGainIfHouse { .. }
                                 | CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                                | CardEffect::Prerequisite { .. } => 0,
+                                | CardEffect::Prerequisite { .. }
+                                // D007 三つ又の矛: the round-table gain cannot be valued by
+                                // this heuristic — the play projection (`cards::play`) has no
+                                // round context, so the simulated play never applies it (same
+                                // contract as the hand-dependent B-deck on-play effects).
+                                // PostPlayPassLeft is zone metadata: the projection keeps the
+                                // card, so neither side of the pass-left move is modelled here.
+                                | CardEffect::OnPlayGainIfRound { .. }
+                                | CardEffect::PostPlayPassLeft => 0,
                 #[cfg(test)]
                 // Test-only probe; never part of a real evaluated pool.
                 CardEffect::PendingProbe { .. } => 0,

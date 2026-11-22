@@ -1571,12 +1571,6 @@ impl Game {
                             &mut self.pending,
                             true, // is_improvement_action
                         )?;
-                        // Update card points
-                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                        crate::cards::update_card_points_on_play(
-                            &mut self.public.players[id],
-                            card.points,
-                        )?;
                     }
                     _ => return Err("invalid starting-player details".into()),
                 }
@@ -1641,12 +1635,6 @@ impl Game {
                     &self.card_use_limits,
                     &mut self.pending,
                     false, // is_improvement_action
-                )?;
-                // Update card points
-                let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                crate::cards::update_card_points_on_play(
-                    &mut self.public.players[id],
-                    card.points,
                 )?;
             }
             Space::DayLaborer => {
@@ -1756,12 +1744,6 @@ impl Game {
                         &mut self.pending,
                         false, // is_improvement_action
                     )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
-                    )?;
                 } else if !matches!(detail, Detail::None) {
                     return Err("invalid growth details".into());
                 }
@@ -1842,12 +1824,6 @@ impl Game {
                         &self.card_use_limits,
                         &mut self.pending,
                         true, // is_improvement_action
-                    )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
                     )?;
                 }
                 Detail::Buy {
