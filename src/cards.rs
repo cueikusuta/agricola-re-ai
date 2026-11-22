@@ -246,129 +246,129 @@ pub enum CardEffect {
     /// the legacy `cards::play` helper does not re-scan earlier cards
     /// and therefore never fires it.
     AfterImprovementPlayedGain {
-            good: Good,
-            amount: u32,
-        },
-        /// D065 麦ふるい (Grain Sieve): during each harvest's field phase, if the
-        /// grain gained THIS field phase (pre-harvest equal to the number of
-        /// grain fields with a growing crop) is at least `threshold`, gain
-        /// `amount` of `good`. The engine's field phase harvests exactly one
-        /// grain per growing grain field AFTER this dispatch fires, so counting
-        /// grain fields with `remaining > 0` here equals the grain this phase
-        /// yields (pinned by comment and tests: the count is per FIELD, not per
-        /// remaining unit). The condition needs farm state, so the generic
-        /// condition scan reports it as triggerable and the handler performs
-        /// the threshold check (same pattern as E111 世捨て人).
-        HarvestFieldGainIfGrainHarvestedAtLeast {
-            threshold: u32,
-            good: Good,
-            amount: u32,
-        },
-        /// A090 鋤職人 (Plow Driver): at each round start, if the owner lives in a
-        /// stone house, may pay 1 food to plow exactly 1 field. Optional; the
-        /// handler checks the house condition and resource availability.
-        StartRoundPlowFieldIfHouse {
-            house: House,
-            food_cost: u32,
-            fields: u32,
-        },
-        /// A151 吟遊楽人 (Minstrel): at each round start in rounds 1-4, if the round
-        /// action space for that round is unused (no worker placed), copy its
-        /// effect. The copied effect is resolved deterministically without placing
-        /// a worker. Handled in the round-start dispatcher.
-        StartRoundCopyUnusedRoundSpace {
-            max_round: u8,
-        },
-        /// A152 夜学生 (Night-School Student): at each round start, if the Lessons
-        /// space was used by fewer players than any other action space this round,
-        /// may pay 1 food to play an occupation from hand. The condition requires
-        /// checking all players' used spaces; handled in the handler.
-        StartRoundPlayOccupationIfLessonsUnderused {
-            food_cost: u32,
-        },
-        /// B097 学者 (Scholar): at each round start, if the owner has a stone house,
-        /// may either pay 1 food to play an occupation from hand, or pay the
-        /// normal cost to play a minor improvement from hand. Optional; two
-        /// distinct choices handled in the handler.
-        StartRoundPlayCardIfStoneHouse {
-            occupation_food_cost: u32,
-        },
-        /// B106 清廉潔白な人 (Moral Crusader): at each round start, if there are
-        /// any goods on revealed round action spaces (accumulations), gain 1 food.
-        /// Unconditional gain when condition met; checked in effect_condition_holds.
-        StartRoundGainIfGoodsOnRoundSpaces {
-            good: Good,
-            amount: u32,
-        },
-        /// B135 栄養士 (Nutrition Expert): at each round start, may exchange 1
-        /// animal of any owned type, 1 grain, and 1 vegetable for 5 food and 2
-        /// points. Optional; the handler verifies all give resources are available
-        /// before exchanging. Points are added immediately to card_points.
-        StartRoundExchangeForFoodAndPoints {
-            give_animal: bool,
-            give_grain: u32,
-            give_vegetable: u32,
-            receive_food: u32,
-            receive_points: i32,
-        },
-        /// C064 穀物蒸留酒製造所 (Corn Schnapps Distillery): at each round start,
-        /// may pay 1 grain to place 1 food on each of the next 4 round action
-        /// spaces. The food is added to those spaces' accumulations and will be
-        /// available when those rounds are reached. Optional; handler checks grain
-        /// availability and updates future round accumulations.
-        StartRoundPlaceFoodOnNextRoundSpaces {
-            grain_cost: u32,
-            food_per_space: u32,
-            num_spaces: u8,
-        },
-        /// B114 子なし (Childless): at each round start, if the owner has exactly
-        /// `family` family members and at least `rooms_at_least` rooms, gain
-        /// `amount` of `good`. Fired from the round-start After scan; the condition
-        /// is judged inside the handler (E111/C111 pattern). The spec JSON's second
-        /// step (choose 1 grain or 1 vegetable) has no choice-effect slot at this
-        /// trigger and is recorded as needs_resolution in the PR — only the fixed
-        /// food gain is implemented here.
-        StartRoundGainIfFamilyAndRooms {
-            family: u32,
-            rooms_at_least: u8,
-            good: Good,
-            amount: u32,
-        },
-        /// A157 ボヘミアン (Bohemian): at each round start, if the Lessons space
-        /// has at least `min` occupants (i.e. `public.used` contains Lessons),
-        /// gain `amount` of `good`. The condition is judged inside the handler
-        /// (E111/C111 pattern). NOTE: the engine clears `public.used` at the top
-        /// of `start_round` before the round-start dispatch, so the handler only
-        /// fires when a dispatch carries a non-empty used-space set — see the PR
-        /// body for the recorded engine-timing needs_resolution.
-        StartRoundGainIfLessonsOccupants {
-            min: u32,
-            good: Good,
-            amount: u32,
-        },
-        /// A049 営巣地 (Nest Site): at each round start, if the `space`
-        /// accumulation holds at least `min` AND grew this round (the per-round
-        /// refill landed on a non-empty accumulation), gain `amount` of `good`.
-        /// The condition is judged inside the handler from the public
-        /// accumulations map threaded through `DispatchContext`.
-        StartRoundGainIfAccumulationGrew {
-            space: Space,
-            min: u32,
-            good: Good,
-            amount: u32,
-        },
-        /// C067 ミネラルフィーダー (Mineral Feeder): at each round start, if the
-        /// round does not end with a harvest (`!HARVEST_ROUNDS.contains(round)`)
-        /// and the owner has at least `min` `animal` in pastures, gain `amount`
-        /// of `good`. The condition is judged inside the handler (E111/C111
-        /// pattern).
-        StartRoundGainIfNoHarvestAndAnimals {
-            animal: Animal,
-            min: u32,
-            good: Good,
-            amount: u32,
-        },
-    }
+        good: Good,
+        amount: u32,
+    },
+    /// D065 麦ふるい (Grain Sieve): during each harvest's field phase, if the
+    /// grain gained THIS field phase (pre-harvest equal to the number of
+    /// grain fields with a growing crop) is at least `threshold`, gain
+    /// `amount` of `good`. The engine's field phase harvests exactly one
+    /// grain per growing grain field AFTER this dispatch fires, so counting
+    /// grain fields with `remaining > 0` here equals the grain this phase
+    /// yields (pinned by comment and tests: the count is per FIELD, not per
+    /// remaining unit). The condition needs farm state, so the generic
+    /// condition scan reports it as triggerable and the handler performs
+    /// the threshold check (same pattern as E111 世捨て人).
+    HarvestFieldGainIfGrainHarvestedAtLeast {
+        threshold: u32,
+        good: Good,
+        amount: u32,
+    },
+    /// A090 鋤職人 (Plow Driver): at each round start, if the owner lives in a
+    /// stone house, may pay 1 food to plow exactly 1 field. Optional; the
+    /// handler checks the house condition and resource availability.
+    StartRoundPlowFieldIfHouse {
+        house: House,
+        food_cost: u32,
+        fields: u32,
+    },
+    /// A151 吟遊楽人 (Minstrel): at each round start in rounds 1-4, if the round
+    /// action space for that round is unused (no worker placed), copy its
+    /// effect. The copied effect is resolved deterministically without placing
+    /// a worker. Handled in the round-start dispatcher.
+    StartRoundCopyUnusedRoundSpace {
+        max_round: u8,
+    },
+    /// A152 夜学生 (Night-School Student): at each round start, if the Lessons
+    /// space was used by fewer players than any other action space this round,
+    /// may pay 1 food to play an occupation from hand. The condition requires
+    /// checking all players' used spaces; handled in the handler.
+    StartRoundPlayOccupationIfLessonsUnderused {
+        food_cost: u32,
+    },
+    /// B097 学者 (Scholar): at each round start, if the owner has a stone house,
+    /// may either pay 1 food to play an occupation from hand, or pay the
+    /// normal cost to play a minor improvement from hand. Optional; two
+    /// distinct choices handled in the handler.
+    StartRoundPlayCardIfStoneHouse {
+        occupation_food_cost: u32,
+    },
+    /// B106 清廉潔白な人 (Moral Crusader): at each round start, if there are
+    /// any goods on revealed round action spaces (accumulations), gain 1 food.
+    /// Unconditional gain when condition met; checked in effect_condition_holds.
+    StartRoundGainIfGoodsOnRoundSpaces {
+        good: Good,
+        amount: u32,
+    },
+    /// B135 栄養士 (Nutrition Expert): at each round start, may exchange 1
+    /// animal of any owned type, 1 grain, and 1 vegetable for 5 food and 2
+    /// points. Optional; the handler verifies all give resources are available
+    /// before exchanging. Points are added immediately to card_points.
+    StartRoundExchangeForFoodAndPoints {
+        give_animal: bool,
+        give_grain: u32,
+        give_vegetable: u32,
+        receive_food: u32,
+        receive_points: i32,
+    },
+    /// C064 穀物蒸留酒製造所 (Corn Schnapps Distillery): at each round start,
+    /// may pay 1 grain to place 1 food on each of the next 4 round action
+    /// spaces. The food is added to those spaces' accumulations and will be
+    /// available when those rounds are reached. Optional; handler checks grain
+    /// availability and updates future round accumulations.
+    StartRoundPlaceFoodOnNextRoundSpaces {
+        grain_cost: u32,
+        food_per_space: u32,
+        num_spaces: u8,
+    },
+    /// B114 子なし (Childless): at each round start, if the owner has exactly
+    /// `family` family members and at least `rooms_at_least` rooms, gain
+    /// `amount` of `good`. Fired from the round-start After scan; the condition
+    /// is judged inside the handler (E111/C111 pattern). The spec JSON's second
+    /// step (choose 1 grain or 1 vegetable) has no choice-effect slot at this
+    /// trigger and is recorded as needs_resolution in the PR — only the fixed
+    /// food gain is implemented here.
+    StartRoundGainIfFamilyAndRooms {
+        family: u32,
+        rooms_at_least: u8,
+        good: Good,
+        amount: u32,
+    },
+    /// A157 ボヘミアン (Bohemian): at each round start, if the Lessons space
+    /// has at least `min` occupants (i.e. `public.used` contains Lessons),
+    /// gain `amount` of `good`. The condition is judged inside the handler
+    /// (E111/C111 pattern). NOTE: the engine clears `public.used` at the top
+    /// of `start_round` before the round-start dispatch, so the handler only
+    /// fires when a dispatch carries a non-empty used-space set — see the PR
+    /// body for the recorded engine-timing needs_resolution.
+    StartRoundGainIfLessonsOccupants {
+        min: u32,
+        good: Good,
+        amount: u32,
+    },
+    /// A049 営巣地 (Nest Site): at each round start, if the `space`
+    /// accumulation holds at least `min` AND grew this round (the per-round
+    /// refill landed on a non-empty accumulation), gain `amount` of `good`.
+    /// The condition is judged inside the handler from the public
+    /// accumulations map threaded through `DispatchContext`.
+    StartRoundGainIfAccumulationGrew {
+        space: Space,
+        min: u32,
+        good: Good,
+        amount: u32,
+    },
+    /// C067 ミネラルフィーダー (Mineral Feeder): at each round start, if the
+    /// round does not end with a harvest (`!HARVEST_ROUNDS.contains(round)`)
+    /// and the owner has at least `min` `animal` in pastures, gain `amount`
+    /// of `good`. The condition is judged inside the handler (E111/C111
+    /// pattern).
+    StartRoundGainIfNoHarvestAndAnimals {
+        animal: Animal,
+        min: u32,
+        good: Good,
+        amount: u32,
+    },
+}
 
 impl CardEffect {
     /// Stable public name for this implemented effect category. Used to build
@@ -459,6 +459,7 @@ impl CardEffect {
 }
 
 /// What to count for OnPlayGainPerCount effects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CountKind {
     /// Number of occupations the player has played.
@@ -707,19 +708,18 @@ impl CardSet {
                         CardEffect::AfterAnyWorkerGain { amount, .. }
                         | CardEffect::AfterAnyWorkerOthersGain { amount, .. }
                         | CardEffect::HarvestStartGainIfFields { amount, .. }
-                        | CardEffect::AfterImprovementPlayedGain { amount, .. }
                         | CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { amount, .. } => {
                             *amount
                         }
                         // Chapter 1 round-start cards: no direct resource amount to validate
-                        | CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        CardEffect::StartRoundPlowFieldIfHouse { .. }
                         | CardEffect::StartRoundCopyUnusedRoundSpace { .. }
                         | CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. }
                         | CardEffect::StartRoundPlayCardIfStoneHouse { .. }
                         | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
                         | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
                         | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 1,
-                        };
+                    };
                     amount == 0 || amount > 30
                 })
                 || card.effects.iter().any(|effect| {
