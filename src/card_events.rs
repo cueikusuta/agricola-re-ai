@@ -83,6 +83,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterHarvestBakeGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGain { .. } => TriggerPhase::After,
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => TriggerPhase::After,
+        CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { .. } => TriggerPhase::After,
         CardEffect::AfterHarvestGain { .. } => TriggerPhase::After,
         CardEffect::AfterHarvestGainIfAtLeast { .. } => TriggerPhase::After,
         // C066: conditional choice at the harvest tail — After phase
@@ -629,6 +630,13 @@ fn resolve_phase_scan(
                 CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount } => {
                     handle_gain_if_no_minor_played(ctx, player, good, *amount)?
                 }
+                CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
+                    threshold,
+                    good,
+                    amount,
+                } => handle_harvest_field_gain_if_grain_harvested_at_least(
+                    ctx, player, *threshold, good, *amount,
+                )?,
                 CardEffect::AfterClayConstructionGain { good, amount } => {
                     handle_after_clay_construction_gain(ctx, player, good, *amount, trigger_data)?
                 }
@@ -1008,6 +1016,12 @@ fn effect_condition_holds(
             trigger.site == EventKind::RoundStart
         }
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => trigger.site == EventKind::Harvest,
+        // D065 麦ふるい: the grain-harvested threshold needs farm state, so the
+        // scan reports the effect as triggerable and the handler counts the
+        // growing grain fields (the pre-harvest equal of this phase's grain).
+        CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { .. } => {
+            trigger.site == EventKind::Harvest
+        }
         // C116 調度品職員 fires only from dispatch_play's dedicated after-play
         // scan, never from the generic phase scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => false,
@@ -1297,6 +1311,13 @@ pub fn execute_chosen_triggers(
             CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount } => {
                 handle_gain_if_no_minor_played(ctx, player, good, *amount)?
             }
+            CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
+                threshold,
+                good,
+                amount,
+            } => handle_harvest_field_gain_if_grain_harvested_at_least(
+                ctx, player, *threshold, good, *amount,
+            )?,
             CardEffect::AfterClayConstructionGain { good, amount } => {
                 handle_after_clay_construction_gain(ctx, player, good, *amount, trigger_data)?
             }
@@ -1926,6 +1947,48 @@ fn handle_harvest_start_gain_if_fields(
         })
         .count() as u8;
     if field_count >= threshold {
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// D065 麦ふるい (Grain Sieve): during the harvest field phase, if the grain
+/// gained THIS field phase (pre-harvest equal to the number of grain fields
+/// with a growing crop) is at least `threshold`, gain `amount` of `good`.
+/// The engine's field phase (`harvest.rs::harvest_fields`) harvests exactly
+/// one grain per growing grain field AFTER this dispatch fires, so counting
+/// grain fields with `remaining >= 1` here equals the grain this phase yields.
+/// The count is per FIELD, not per remaining unit: a field with
+/// `remaining: 2` still yields exactly one grain this harvest. The generic
+/// condition scan reports the effect as triggerable on `EventKind::Harvest`;
+/// the threshold check needs farm state, so it happens here.
+fn handle_harvest_field_gain_if_grain_harvested_at_least(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    threshold: u32,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    let grain_fields = p
+        .farm
+        .iter()
+        .filter(|cell| {
+            matches!(
+                cell.tile,
+                Tile::Field {
+                    crop: Some(Crop::Grain),
+                    remaining: 1..,
+                }
+            )
+        })
+        .count() as u32;
+    if grain_fields >= threshold {
         let next = p
             .supply
             .get(*good)

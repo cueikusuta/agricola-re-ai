@@ -344,6 +344,9 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
                     EventKind::Harvest
                 }
+                crate::cards::CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { .. } => {
+                    EventKind::Harvest
+                }
                 crate::cards::CardEffect::AfterOccupationGainPerFoodCost { .. } => {
                     EventKind::CardPlayed
                 }
@@ -480,6 +483,10 @@ impl CardRegistryBuilder {
                             amount, ..
                         }
                         | crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed {
+                            amount,
+                            ..
+                        }
+                        | crate::cards::CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
                             amount,
                             ..
                         }
