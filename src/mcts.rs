@@ -1190,8 +1190,10 @@ mod tests {
         // Updated: added A118/A145/C066 to verified_round_and_harvest_cards (pool size 35->38)
         // Updated: PR #385 review fix (e) — A145 removed from the two-player
         // preset (spec eligibility "2": "no"), pool size 38->37.
+        // Updated: StartRoundGainIf* wave — B114/A049/C067 joined the
+        // two-player preset (A157 stays out, 4 players only), pool size 37->41.
         assert_eq!(
-            digest, "e56fd942d6faa56e269926ec1fa9f16bf2eb3b0ac0b7cc98b5664f108ba6aaa8",
+            digest, "310a31bdb04fa7fa2abec2a215396065daf5874819f413c6f669247f5f55deff",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
