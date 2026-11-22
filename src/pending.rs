@@ -169,6 +169,48 @@ pub enum PendingKind {
         /// Total amount of animals to place.
         amount: u32,
     },
+    /// A015 Carpenter's Axe: choose where to build a stable (costs 1 wood).
+    BuildStable {
+        /// Source card ID (always "A015").
+        source_card: String,
+        /// Valid farm indices where a stable can be built.
+        valid_sites: Vec<usize>,
+        /// Wood cost to build the stable.
+        wood_cost: u32,
+        /// The space that triggered this effect.
+        trigger_space: crate::model::Space,
+    },
+    /// A018 Wheel Plow: choose which fields to plow.
+    PlowFields {
+        /// Source card ID (always "A018").
+        source_card: String,
+        /// Valid farm indices where fields can be plowed.
+        valid_sites: Vec<usize>,
+        /// Number of fields to plow.
+        amount: u32,
+        /// The space that triggered this effect.
+        trigger_space: crate::model::Space,
+        /// Whether this is the first (and only) use this game.
+        once_per_game: bool,
+    },
+    /// A023 Stone Company: choose an improvement to play (must spend 1+ stone).
+    ImprovementAction {
+        /// Source card ID (always "A023").
+        source_card: String,
+        /// Available improvements with their indices and costs.
+        available_improvements: Vec<ImprovementOption>,
+        /// The space that triggered this effect.
+        trigger_space: crate::model::Space,
+        /// Whether the improvement must cost at least 1 stone.
+        must_spend_stone: bool,
+    },
+    /// A024 Threshing Board: additional Bake Bread action.
+    BakeBread {
+        /// Source card ID (always "A024").
+        source_card: String,
+        /// The space that triggered this effect.
+        trigger_space: crate::model::Space,
+    },
 }
 
 /// A single gain option.
@@ -182,6 +224,19 @@ pub struct GainOption {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PaymentOption {
     pub cost: BTreeMap<Good, u32>,
+}
+
+/// An available improvement option for A023.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImprovementOption {
+    /// Index in the improvement market.
+    pub index: usize,
+    /// Name/ID of the improvement.
+    pub improvement_id: String,
+    /// Cost of the improvement.
+    pub cost: BTreeMap<Good, u32>,
+    /// Whether this improvement costs at least 1 stone.
+    pub costs_stone: bool,
 }
 
 /// A pending decision awaiting resolution.
@@ -204,12 +259,83 @@ pub struct PendingDecision {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PendingResolution {
-    ChooseGain { chosen: GainOption },
-    ChoosePayment { chosen: PaymentOption },
-    DelayedWellRelief { confirmed: bool },
-    ChooseTriggerOrder { chosen_order: Vec<usize> },
-    Custom { payload: serde_json::Value },
-    ChooseAnimalPlacement { plan: crate::engine::AnimalPlan },
+    ChooseGain {
+        chosen: GainOption,
+    },
+    ChoosePayment {
+        chosen: PaymentOption,
+    },
+    DelayedWellRelief {
+        confirmed: bool,
+    },
+    ChooseTriggerOrder {
+        chosen_order: Vec<usize>,
+    },
+    Custom {
+        payload: serde_json::Value,
+    },
+    ChooseAnimalPlacement {
+        plan: crate::engine::AnimalPlan,
+    },
+    /// A015: chosen site index to build a stable, or `None` to decline the
+    /// optional effect (spec A015 is `optional: true`).
+    BuildStable {
+        site_index: Option<usize>,
+    },
+    /// A018: chosen site indices to plow. Empty = decline the optional effect
+    /// (spec A018 is `optional: true`); otherwise exactly `amount` sites.
+    PlowFields {
+        site_indices: Vec<usize>,
+    },
+    /// A023: chosen improvement index.
+    ImprovementAction {
+        improvement_index: usize,
+    },
+    /// A024: confirmed to take the bake bread action.
+    BakeBread {
+        confirmed: bool,
+    },
+}
+
+impl PendingKind {
+    /// Deterministic headless default for a decision (PR #392).
+    ///
+    /// The one-shot `apply` API (`apply` / `apply_with_harvest_policy`,
+    /// which the AI, headless runners and batch simulations use) cannot
+    /// represent a paused state. Decisions that have an obvious *legal*
+    /// default — the A-deck `after_worker_space` cards, whose handlers only
+    /// ever offer legal options — are resolved with that default inside the
+    /// same transaction, so a headless game never stalls on them. The
+    /// default is recorded as a real `pending_resolution` event, so replay
+    /// and the re-run hash stay exact.
+    ///
+    /// Returns `None` for decisions that genuinely need a player choice
+    /// (gain selection, payment selection, trigger order, animal
+    /// placement): those keep the precise "cannot represent an interrupt"
+    /// error on the one-shot path.
+    pub fn default_resolution(&self) -> Option<PendingResolution> {
+        match self {
+            // A015: the handler only lists legal stable sites; take the first.
+            Self::BuildStable { .. } => Some(PendingResolution::BuildStable {
+                site_index: Some(0),
+            }),
+            // A018: take the first `amount` offered candidate POSITIONS, in offer
+            // order. The resolution addresses the offered list by position
+            // (the engine maps positions back to farm sites), so the default
+            // must be positions, not the farm indices themselves.
+            Self::PlowFields { amount, .. } => Some(PendingResolution::PlowFields {
+                site_indices: (0..*amount as usize).collect(),
+            }),
+            // A023: the handler only lists stone-affordable improvements; take
+            // the first candidate.
+            Self::ImprovementAction { .. } => Some(PendingResolution::ImprovementAction {
+                improvement_index: 0,
+            }),
+            // A024: the granted action is baking; take it.
+            Self::BakeBread { .. } => Some(PendingResolution::BakeBread { confirmed: true }),
+            _ => None,
+        }
+    }
 }
 
 impl PendingDecision {
@@ -278,6 +404,65 @@ impl PendingDecision {
                 PendingKind::ChooseAnimalPlacement { .. },
                 PendingResolution::ChooseAnimalPlacement { .. },
             ) => Ok(()),
+            (
+                PendingKind::BuildStable { valid_sites, .. },
+                PendingResolution::BuildStable { site_index },
+            ) => {
+                // `None` declines the optional effect (spec A015 is
+                // `optional: true`); a chosen site must be an offered one.
+                match site_index {
+                    None => Ok(()),
+                    Some(i) if *i < valid_sites.len() => Ok(()),
+                    Some(_) => Err("invalid site index for stable".into()),
+                }
+            }
+            (
+                PendingKind::PlowFields {
+                    valid_sites,
+                    amount,
+                    ..
+                },
+                PendingResolution::PlowFields { site_indices },
+            ) => {
+                // An empty choice declines the optional effect (spec A018 is
+                // `optional: true`). Otherwise exactly `amount` sites must be
+                // chosen, all offered and without duplicates.
+                if site_indices.is_empty() {
+                    return Ok(());
+                }
+                if site_indices.len() != *amount as usize {
+                    return Err("must choose exactly the required number of fields to plow".into());
+                }
+                // Check all chosen sites are in valid_sites
+                for &idx in site_indices {
+                    if idx >= valid_sites.len() {
+                        return Err("invalid site index for plow".into());
+                    }
+                }
+                // Check no duplicates
+                let mut seen = vec![false; valid_sites.len()];
+                for &idx in site_indices {
+                    if seen[idx] {
+                        return Err("duplicate site index for plow".into());
+                    }
+                    seen[idx] = true;
+                }
+                Ok(())
+            }
+            (
+                PendingKind::ImprovementAction {
+                    available_improvements,
+                    ..
+                },
+                PendingResolution::ImprovementAction { improvement_index },
+            ) => {
+                if *improvement_index < available_improvements.len() {
+                    Ok(())
+                } else {
+                    Err("invalid improvement index".into())
+                }
+            }
+            (PendingKind::BakeBread { .. }, PendingResolution::BakeBread { .. }) => Ok(()),
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
     }
@@ -727,6 +912,7 @@ mod tests {
         let mut market = vec![];
         let mut well = std::collections::BTreeMap::new();
         let mut uses = std::collections::BTreeMap::new();
+        let mut uses_game = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
         let mut budget = 64u32;
@@ -742,6 +928,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &card_use_limits,
             &mut pending,
         )
@@ -760,6 +947,7 @@ mod tests {
             players2[0].played_cards.push("LOOP".into());
         }
         let mut uses2 = std::collections::BTreeMap::new();
+        let mut uses_game2 = std::collections::BTreeMap::new();
         let mut budget2 = 2u32;
         let mut pending2 = None;
         let err = dispatch_start_round(
@@ -772,6 +960,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut budget2,
             &mut uses2,
+            &mut uses_game2,
             &card_use_limits,
             &mut pending2,
         )

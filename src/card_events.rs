@@ -98,9 +98,12 @@ pub struct DispatchContext<'a> {
     pub improvement_market: &'a mut Vec<crate::model::Improvement>,
     pub delayed_well: &'a mut BTreeMap<u8, Vec<usize>>,
     pub round: u8,
+    pub start_player: usize,
     pub used_spaces: &'a std::collections::BTreeSet<Space>,
     pub event_budget: &'a mut u32,
     pub card_uses: &'a mut BTreeMap<String, u32>,
+    /// Per-game card use counts for "once_per_game" effects.
+    pub card_uses_game: &'a mut BTreeMap<String, u32>,
     /// Declared per-card limits. Absent card = no per-period limit.
     pub card_use_limits: &'a BTreeMap<String, u32>,
     pub pending: &'a mut Option<PendingDecision>,
@@ -381,34 +384,69 @@ fn resolve_phase_scan(
         // Collect all players for snapshot
         let all_players = all_players.to_vec();
 
-        // Build dispatch context for the card owner
-        let mut exec_ctx = DispatchContext {
-            card_set: ctx.card_set,
-            player: ctx.player,
-            cards: ctx.cards,
-            improvement_market: ctx.improvement_market,
-            delayed_well: ctx.delayed_well,
-            round: ctx.round,
-            used_spaces: ctx.used_spaces,
-            event_budget: ctx.event_budget,
-            card_uses: ctx.card_uses,
-            card_use_limits: ctx.card_use_limits,
-            pending: ctx.pending,
-            actor: ctx.actor,
-            card_owner: player,
-            beneficiary: player,
-        };
-
-        // Execute in chosen order (play order)
-        execute_chosen_triggers(
-            &mut exec_ctx,
-            player,
-            phase,
-            &trigger_data_for_execute,
-            &all_players,
-            &chosen_order,
-            &triggerable_public,
-        )?;
+        // Execute in chosen order (play order), ONE effect at a time: an
+        // effect that raises a decision (e.g. an A-deck after_worker_space
+        // card) must be able to pause the chain instead of escaping as the
+        // legacy `Err("pending decision")` sentinel, which no caller can
+        // represent. The pause carries the real chain position, so the resume
+        // scan continues strictly after it and the remaining effects still
+        // execute in the same order.
+        let mut paused_at: Option<usize> = None;
+        {
+            let mut exec_ctx = DispatchContext {
+                card_set: ctx.card_set,
+                player: ctx.player,
+                cards: ctx.cards,
+                improvement_market: ctx.improvement_market,
+                delayed_well: ctx.delayed_well,
+                round: ctx.round,
+                start_player: ctx.start_player,
+                used_spaces: ctx.used_spaces,
+                event_budget: ctx.event_budget,
+                card_uses: ctx.card_uses,
+                card_uses_game: ctx.card_uses_game,
+                card_use_limits: ctx.card_use_limits,
+                pending: ctx.pending,
+                actor: ctx.actor,
+                card_owner: player,
+                beneficiary: player,
+            };
+            for &idx in &chosen_order {
+                let one = [idx];
+                match execute_chosen_triggers(
+                    &mut exec_ctx,
+                    player,
+                    phase,
+                    &trigger_data_for_execute,
+                    &all_players,
+                    &one,
+                    &triggerable_public,
+                ) {
+                    Ok(()) => {}
+                    Err(e) if e == "pending decision" => {
+                        paused_at = Some(idx);
+                        break;
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+        if let Some(idx) = paused_at {
+            let trigger = &triggerable[idx];
+            let Some(mut pending) = ctx.pending.take() else {
+                return Err("pending decision".into());
+            };
+            // Stamp the real chain position (the sentinel path only records a
+            // single-card context with card_index 0) and the phase, so the
+            // resume continues this same phase strictly after this effect.
+            pending.context = serde_json::json!({
+                "card": trigger.card_id,
+                "card_index": trigger.card_index,
+                "effect_index": trigger.effect_index,
+                "phase": format!("{:?}", phase),
+            });
+            return Ok(Transition::Paused(Box::new(pending)));
+        }
 
         // Continue to second pass for any remaining effects (should be none since we executed all)
         // But we need to skip the second pass for the effects we already executed.
@@ -633,6 +671,11 @@ fn resolve_phase_scan(
                     "card": card_id,
                     "card_index": card_index,
                     "effect_index": effect_index,
+                    // The phase the pause happened in: the resume must re-run THIS
+                    // phase strictly after this position (the remaining effects of
+                    // the same phase), not skip it as if an Interrupt pause had
+                    // already run the phase to completion.
+                    "phase": format!("{:?}", phase),
                 });
                 *ctx.pending = Some(pending.clone());
                 return Ok(Transition::Paused(Box::new(pending)));
@@ -1503,15 +1546,13 @@ fn handle_after_worker_space_build_stable(
         return Ok(EffectResult::Resolved);
     }
 
-    // Create a custom pending decision for choosing whether/where to build
-    let kind = crate::pending::PendingKind::Custom {
+    // Create a typed pending decision for choosing where to build the stable
+    // Engine will stamp decision_id and state_hash_before when pausing.
+    let kind = crate::pending::PendingKind::BuildStable {
         source_card: "A015".to_string(),
-        payload: serde_json::json!({
-            "effect": "build_stable",
-            "valid_sites": valid_sites,
-            "wood_cost": wood_cost,
-            "space": space,
-        }),
+        valid_sites: valid_sites.clone(),
+        wood_cost,
+        trigger_space: space,
     };
     let decision = PendingDecision::new(
         0,
@@ -1524,8 +1565,9 @@ fn handle_after_worker_space_build_stable(
 }
 
 /// A018 車輪鋤 (Wheel Plow): once per game, when first person of round uses
-/// Farmland or Cultivation, plow 2 fields. Creates a pending decision for
-/// choosing which fields to plow.
+/// Farmland or Cultivation, plow 2 fields. Creates a typed pending decision for
+/// choosing which fields to plow. Enforces `first_person_of_round` (actor is the
+/// start player) and `once_per_game` (game-wide use counter) in real state.
 fn handle_after_worker_space_plow_fields(
     ctx: &mut DispatchContext<'_>,
     spaces: &[Space],
@@ -1539,6 +1581,15 @@ fn handle_after_worker_space_plow_fields(
         return Ok(EffectResult::Resolved);
     };
     if !spaces.contains(&space) {
+        return Ok(EffectResult::Resolved);
+    }
+    // Condition: the actor must be the first person of the round (start player).
+    if ctx.actor != ctx.start_player {
+        return Ok(EffectResult::Resolved);
+    }
+    // Frequency: once per game (game-wide counter, never cleared per round).
+    let game_uses = ctx.card_uses_game.get("A018").copied().unwrap_or(0);
+    if game_uses >= 1 {
         return Ok(EffectResult::Resolved);
     }
 
@@ -1560,26 +1611,31 @@ fn handle_after_worker_space_plow_fields(
             valid_sites.push(i);
         }
     }
-    if valid_sites.is_empty() {
+    // The spec plows exactly `amount` fields, so a farm without that many
+    // legal sites leaves nothing to decide: no pending is created (and the
+    // headless default can never be asked for an impossible choice).
+    if valid_sites.len() < amount as usize {
         return Ok(EffectResult::Resolved);
     }
 
-    let kind = crate::pending::PendingKind::Custom {
+    // Mark the once-per-game use now so the card cannot refire, even across a
+    // pause/resume. The engine stamps `state_hash_before` at pause time, so the
+    // increment is part of the committed pause hash and survives save/replay.
+    *ctx.card_uses_game.entry("A018".to_string()).or_insert(0) += 1;
+
+    let kind = crate::pending::PendingKind::PlowFields {
         source_card: "A018".to_string(),
-        payload: serde_json::json!({
-            "effect": "plow_fields",
-            "valid_sites": valid_sites,
-            "amount": amount,
-            "space": space,
-            "once_per_game": true,
-        }),
+        valid_sites,
+        amount,
+        trigger_space: space,
+        once_per_game: true,
     };
     let decision = PendingDecision::new(
         0,
         ctx.card_owner,
         kind,
         String::new(),
-        serde_json::json!({ "card": "A018", "space": space, "valid_sites": valid_sites, "amount": amount }),
+        serde_json::json!({ "card": "A018", "space": space, "amount": amount }),
     );
     Ok(EffectResult::Pending(decision))
 }
@@ -1634,22 +1690,43 @@ fn handle_after_worker_space_improvement_action(
         return Ok(EffectResult::Resolved);
     }
 
-    // Get available improvements from the market
-    let available: Vec<_> = ctx.improvement_market.iter().enumerate().collect();
+    // Available improvements as typed options (stable ID + legal cost), not a
+    // `Debug` string. Candidates are narrowed to improvements the player can
+    // actually pay for right now (engine affordability, discounts included)
+    // and — when the spec requires spending stone — to those whose real cost
+    // contains at least 1 stone. The stone requirement is re-checked at
+    // resolution time against the chosen option's actual cost. With no legal
+    // candidate there is no meaningful decision, so the effect simply
+    // resolves (this also keeps the headless default well-defined: every
+    // offered candidate is payable).
+    let player = &*ctx.player;
+    let must = must_spend_stone;
+    let available: Vec<crate::pending::ImprovementOption> = ctx
+        .improvement_market
+        .iter()
+        .enumerate()
+        .filter(|(_, imp)| crate::engine::affordable(player, **imp))
+        .filter(|(_, imp)| !must || imp.cost().iter().any(|(g, _)| *g == Good::Stone))
+        .map(|(i, imp)| {
+            let cost: BTreeMap<Good, u32> = imp.cost().iter().cloned().collect();
+            let costs_stone = cost.contains_key(&Good::Stone);
+            crate::pending::ImprovementOption {
+                index: i,
+                improvement_id: imp.id().to_string(),
+                cost,
+                costs_stone,
+            }
+        })
+        .collect();
     if available.is_empty() {
         return Ok(EffectResult::Resolved);
     }
 
-    let kind = crate::pending::PendingKind::Custom {
+    let kind = crate::pending::PendingKind::ImprovementAction {
         source_card: "A023".to_string(),
-        payload: serde_json::json!({
-            "effect": "improvement_action",
-            "must_spend_stone": must_spend_stone,
-            "available_improvements": available.iter().map(|(i, imp)| {
-                serde_json::json!({ "index": i, "improvement": format!("{:?}", imp) })
-            }).collect::<Vec<_>>(),
-            "space": space,
-        }),
+        available_improvements: available,
+        trigger_space: space,
+        must_spend_stone,
     };
     let decision = PendingDecision::new(
         0,
@@ -1699,12 +1776,16 @@ fn handle_after_worker_space_bake_bread(
         return Ok(EffectResult::Resolved);
     }
 
-    let kind = crate::pending::PendingKind::Custom {
+    // NOTE (design): the `has_baking` / `grain > 0` gates are not spec
+    // conditions. They are kept as guards on pending creation: a Bake Bread
+    // decision is only meaningful when the player can actually bake (has grain
+    // and a baking improvement). Creating a pending when nothing can be baked
+    // would force a meaningless decision, and the resolution would have nothing
+    // to apply. The actual bake (grain -> food) is performed by the typed
+    // `BakeBread` resolution in `Game::apply_pending_resolution`.
+    let kind = crate::pending::PendingKind::BakeBread {
         source_card: "A024".to_string(),
-        payload: serde_json::json!({
-            "effect": "bake_bread",
-            "space": space,
-        }),
+        trigger_space: space,
     };
     let decision = PendingDecision::new(
         0,
@@ -2036,6 +2117,10 @@ pub fn dispatch_play(
 ) -> Result<(), String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
+    // start_player and card_uses_game are only needed for AfterWorkerSpace
+    // effects (first_person_of_round / once_per_game), which are dispatched
+    // via dispatch_after_worker, not dispatch_play. Provide neutral values.
+    let mut _card_uses_game = BTreeMap::new();
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -2043,9 +2128,11 @@ pub fn dispatch_play(
         improvement_market,
         delayed_well,
         round,
+        start_player: player,
         used_spaces,
         event_budget,
         card_uses,
+        card_uses_game: &mut _card_uses_game,
         card_use_limits,
         pending,
         actor: player,
@@ -2275,9 +2362,11 @@ pub fn dispatch_after_worker(
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
+    start_player: usize,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
+    card_uses_game: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
     allow_choose_trigger_order_pause: bool,
@@ -2304,9 +2393,11 @@ pub fn dispatch_after_worker(
         improvement_market,
         delayed_well,
         round,
+        start_player,
         used_spaces,
         event_budget,
         card_uses,
+        card_uses_game,
         card_use_limits,
         pending,
         actor: player,
@@ -2354,9 +2445,11 @@ pub fn dispatch_after_worker(
         improvement_market,
         delayed_well,
         round,
+        start_player,
         used_spaces,
         event_budget,
         card_uses,
+        card_uses_game,
         card_use_limits,
         pending,
         actor: player,
@@ -2389,6 +2482,7 @@ pub fn dispatch_start_round(
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
+    card_uses_game: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
 ) -> Result<Transition, String> {
@@ -2404,9 +2498,11 @@ pub fn dispatch_start_round(
             improvement_market,
             delayed_well,
             round,
+            start_player: actor,
             used_spaces,
             event_budget,
             card_uses,
+            card_uses_game,
             card_use_limits,
             pending,
             actor,
@@ -2469,6 +2565,7 @@ pub fn dispatch_after_clay_construction(
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
+    card_uses_game: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
     allow_choose_trigger_order_pause: bool,
@@ -2482,9 +2579,11 @@ pub fn dispatch_after_clay_construction(
         improvement_market,
         delayed_well,
         round,
+        start_player: player,
         used_spaces,
         event_budget,
         card_uses,
+        card_uses_game,
         card_use_limits,
         pending,
         actor: player,
@@ -2547,6 +2646,10 @@ pub fn dispatch_harvest_field(
 ) -> Result<Transition, String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
+    // start_player and card_uses_game are only needed for AfterWorkerSpace
+    // effects (first_person_of_round / once_per_game), which are dispatched
+    // via dispatch_after_worker, not dispatch_harvest_field.
+    let mut _card_uses_game = BTreeMap::new();
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -2554,9 +2657,11 @@ pub fn dispatch_harvest_field(
         improvement_market,
         delayed_well,
         round,
+        start_player: player,
         used_spaces,
         event_budget,
         card_uses,
+        card_uses_game: &mut _card_uses_game,
         card_use_limits,
         pending,
         actor: player,
@@ -2625,6 +2730,10 @@ pub fn dispatch_after_harvest_bake(
     }
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
+    // start_player and card_uses_game are only needed for AfterWorkerSpace
+    // effects (first_person_of_round / once_per_game), which are dispatched
+    // via dispatch_after_worker, not dispatch_after_harvest_bake.
+    let mut _card_uses_game = BTreeMap::new();
     let mut ctx = DispatchContext {
         card_set,
         player: &mut players[player],
@@ -2632,9 +2741,11 @@ pub fn dispatch_after_harvest_bake(
         improvement_market,
         delayed_well,
         round,
+        start_player: player,
         used_spaces,
         event_budget,
         card_uses,
+        card_uses_game: &mut _card_uses_game,
         card_use_limits,
         pending,
         actor: player,
@@ -3068,6 +3179,7 @@ mod tests {
         let mut delayed_well = std::collections::BTreeMap::new();
         let mut event_budget = 64;
         let mut card_uses = std::collections::BTreeMap::new();
+        let mut card_uses_game = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
 
@@ -3080,9 +3192,11 @@ mod tests {
             &mut improvement_market,
             &mut delayed_well,
             1,
+            0,
             &std::collections::BTreeSet::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             false, // test: not post-work chain
@@ -3116,6 +3230,7 @@ mod tests {
         let mut delayed_well = std::collections::BTreeMap::new();
         let mut event_budget = 64;
         let mut card_uses = std::collections::BTreeMap::new();
+        let mut card_uses_game = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
 
@@ -3129,6 +3244,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
         )
@@ -3167,6 +3283,7 @@ mod tests {
         let mut delayed_well = std::collections::BTreeMap::new();
         let mut event_budget = 64;
         let mut card_uses = std::collections::BTreeMap::new();
+        let mut card_uses_game = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
 
@@ -3180,6 +3297,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
         );
@@ -3279,6 +3397,7 @@ mod tests {
         cards: crate::cards::CardState,
         budget: u32,
         uses: BTreeMap<String, u32>,
+        uses_game: BTreeMap<String, u32>,
         limits: BTreeMap<String, u32>,
     }
 
@@ -3289,6 +3408,7 @@ mod tests {
                 cards: crate::cards::CardState::default(),
                 budget: 64,
                 uses: BTreeMap::new(),
+                uses_game: BTreeMap::new(),
                 limits: BTreeMap::new(),
             }
         }
@@ -3323,9 +3443,11 @@ mod tests {
                 &mut market,
                 &mut well,
                 1,
+                0,
                 &used,
                 &mut c.budget,
                 &mut c.uses,
+                &mut c.uses_game,
                 &c.limits,
                 &mut pending,
                 false, // test: not post-work chain
@@ -3367,6 +3489,7 @@ mod tests {
             2,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -3470,6 +3593,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -3573,9 +3697,11 @@ mod tests {
                     &mut market,
                     &mut well,
                     1,
+                    0,
                     &used,
                     &mut c.budget,
                     &mut c.uses,
+                    &mut c.uses_game,
                     &c.limits,
                     &mut pending,
                     false, // test: not post-work chain
@@ -3619,6 +3745,7 @@ mod tests {
                 &std::collections::BTreeSet::new(),
                 &mut c.budget,
                 &mut c.uses,
+                &mut c.uses_game,
                 &c.limits,
                 &mut pending,
             )
@@ -3744,6 +3871,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -3870,6 +3998,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut c.budget,
             &mut c.uses,
+            &mut c.uses_game,
             &c.limits,
             &mut pending,
         );
@@ -3932,6 +4061,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut c.budget,
             &mut c.uses,
+            &mut c.uses_game,
             &c.limits,
             &mut pending_none(),
         )
@@ -3988,9 +4118,11 @@ mod tests {
             &mut market,
             &mut well,
             1,
+            0,
             &used,
             &mut c.budget,
             &mut c.uses,
+            &mut c.uses_game,
             &c.limits,
             &mut pending,
             false, // test: not post-work chain
@@ -4062,12 +4194,14 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut uses = BTreeMap::new();
+        let mut uses_game = BTreeMap::<String, u32>::new();
         let limits = BTreeMap::new();
         let mut budget = 64u32;
         let mut pending = None;
 
-        // Activate Forest (NOT Fishing) - the Fishing-only effect should NOT fire
-        // and should NOT consume budget or card use
+        // Activate Forest but Lessons NOT used - effect should NOT fire
+        let mut used_spaces = std::collections::BTreeSet::new();
+        used_spaces.insert(Space::Forest);
         dispatch_after_worker(
             &set,
             0,
@@ -4077,9 +4211,11 @@ mod tests {
             &mut market,
             &mut well,
             1,
-            &std::collections::BTreeSet::new(),
+            0,
+            &used_spaces,
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &limits,
             &mut pending,
             false, // test: not post-work chain
@@ -4113,9 +4249,11 @@ mod tests {
             &mut market,
             &mut well,
             1,
+            0,
             &std::collections::BTreeSet::new(),
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &limits,
             &mut pending,
             false, // test: not post-work chain
@@ -4162,6 +4300,7 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut uses = BTreeMap::new();
+        let mut uses_game = BTreeMap::<String, u32>::new();
         let limits = BTreeMap::new();
         let mut budget = 64u32;
         let mut pending = None;
@@ -4178,9 +4317,11 @@ mod tests {
             &mut market,
             &mut well,
             1,
+            0,
             &used_spaces,
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &limits,
             &mut pending,
             false, // test: not post-work chain
@@ -4212,9 +4353,11 @@ mod tests {
             &mut market,
             &mut well,
             1,
+            0,
             &used_spaces,
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &limits,
             &mut pending,
             false, // test: not post-work chain
@@ -4259,6 +4402,7 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut uses = BTreeMap::new();
+        let mut uses_game = BTreeMap::<String, u32>::new();
         let limits = BTreeMap::new();
         let mut budget = 64u32;
         let mut pending = None;
@@ -4273,6 +4417,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &limits,
             &mut pending,
         )
@@ -4301,6 +4446,7 @@ mod tests {
             &std::collections::BTreeSet::new(),
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &limits,
             &mut pending,
         )
@@ -4357,6 +4503,7 @@ mod tests {
         let mut delayed_well = std::collections::BTreeMap::new();
         let mut event_budget = 64u32;
         let mut card_uses = std::collections::BTreeMap::new();
+        let mut card_uses_game = std::collections::BTreeMap::new();
         let card_use_limits = std::collections::BTreeMap::new();
         let mut pending = None;
 
@@ -4371,9 +4518,11 @@ mod tests {
             &mut improvement_market,
             &mut delayed_well,
             1,
+            0,
             &std::collections::BTreeSet::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             false, // test: not post-work chain
@@ -4412,9 +4561,11 @@ mod tests {
             &mut improvement_market,
             &mut delayed_well,
             1,
+            0,
             &std::collections::BTreeSet::new(),
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             false, // test: not post-work chain
@@ -5231,6 +5382,7 @@ mod tests {
                 &BTreeSet::new(),
                 &mut c.budget,
                 &mut c.uses,
+                &mut c.uses_game,
                 &c.limits,
                 &mut pending,
             )
@@ -5972,8 +6124,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6013,8 +6167,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6053,8 +6209,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6095,8 +6253,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6134,8 +6294,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6183,8 +6345,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6235,8 +6399,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6281,8 +6447,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6327,8 +6495,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6367,8 +6537,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6413,8 +6585,10 @@ mod tests {
             &mut market,
             &mut well,
             4,
+            0,
             &used,
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6490,6 +6664,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6613,6 +6788,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6645,6 +6821,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6726,6 +6903,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6842,6 +7020,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6917,6 +7096,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -6998,6 +7178,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -7079,6 +7260,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -7156,6 +7338,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -7233,6 +7416,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -7318,6 +7502,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -7402,6 +7587,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -7471,6 +7657,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -7544,6 +7731,7 @@ mod tests {
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
+            &mut c.uses_game,
             &mut c.uses,
             &c.limits,
             &mut pending,
@@ -7665,6 +7853,7 @@ mod tests {
         let mut pending = None;
         let mut budget = 64u32;
         let mut uses = BTreeMap::new();
+        let mut uses_game = BTreeMap::<String, u32>::new();
         let limits = BTreeMap::new();
 
         let result = dispatch_after_worker(
@@ -7676,9 +7865,11 @@ mod tests {
             &mut market,
             &mut well,
             1,
+            0,
             &BTreeSet::new(),
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &limits,
             &mut pending,
             false,
@@ -7707,6 +7898,7 @@ mod tests {
         let mut pending = None;
         let mut budget = 64u32;
         let mut uses = BTreeMap::new();
+        let mut uses_game = BTreeMap::<String, u32>::new();
         let limits = BTreeMap::new();
 
         // Use Forest instead of CattleMarket
@@ -7719,9 +7911,11 @@ mod tests {
             &mut market,
             &mut well,
             1,
+            0,
             &BTreeSet::new(),
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &limits,
             &mut pending,
             false,
@@ -7744,6 +7938,7 @@ mod tests {
         let mut well = BTreeMap::new();
         let mut budget = 64u32;
         let mut uses = BTreeMap::new();
+        let mut uses_game = BTreeMap::<String, u32>::new();
         let limits = BTreeMap::new();
 
         // First use
@@ -7757,9 +7952,11 @@ mod tests {
             &mut market,
             &mut well,
             1,
+            0,
             &BTreeSet::new(),
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &limits,
             &mut pending,
             false,
@@ -7778,9 +7975,11 @@ mod tests {
             &mut market,
             &mut well,
             1,
+            0,
             &BTreeSet::new(),
             &mut budget,
             &mut uses,
+            &mut uses_game,
             &limits,
             &mut pending,
             false,

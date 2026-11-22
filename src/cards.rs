@@ -2642,6 +2642,7 @@ mod round_and_harvest_card_tests {
         let mut used_spaces = std::collections::BTreeSet::new();
         let mut event_budget = 100;
         let mut card_uses = BTreeMap::new();
+        let mut card_uses_game = BTreeMap::new();
         let card_use_limits = BTreeMap::new();
         let mut pending = None;
 
@@ -2655,9 +2656,11 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -2676,9 +2679,11 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -2697,9 +2702,11 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -2723,6 +2730,7 @@ mod round_and_harvest_card_tests {
         let mut used_spaces = std::collections::BTreeSet::new();
         let mut event_budget = 100;
         let mut card_uses = BTreeMap::new();
+        let mut card_uses_game = BTreeMap::new();
         let card_use_limits = BTreeMap::new();
         let mut pending = None;
 
@@ -2736,9 +2744,11 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -2759,9 +2769,11 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -2782,9 +2794,11 @@ mod round_and_harvest_card_tests {
             &mut vec![],
             &mut BTreeMap::new(),
             1,
+            0,
             &used_spaces,
             &mut event_budget,
             &mut card_uses,
+            &mut card_uses_game,
             &card_use_limits,
             &mut pending,
             true,
@@ -5451,6 +5465,7 @@ pub fn verified_after_worker_space_cards() -> Vec<CardDefinition> {
         ),
         // A021 家族向け住宅 (Family Friendly Home)
         // Cost: 0. Prerequisite: 1+ occupation. After using Build Rooms while rooms > people: Family Growth + 1 food.
+        // Note: Build Rooms is Space::FarmExpansion (not FamilyGrowthWithRoom).
         minor(
             "A021",
             vec![],
@@ -5460,7 +5475,7 @@ pub fn verified_after_worker_space_cards() -> Vec<CardDefinition> {
                     rule: CardRequirement::MinimumOccupations(1),
                 },
                 CardEffect::AfterWorkerSpaceFamilyGrowth {
-                    space: Space::FamilyGrowthWithRoom,
+                    space: Space::FarmExpansion,
                     food_amount: 1,
                 },
             ],
