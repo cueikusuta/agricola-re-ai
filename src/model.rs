@@ -1293,6 +1293,8 @@ impl Game {
                 &mut self.public.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
+                &self.public.revealed,
+                &mut self.public.accumulations,
             )
             // Before this change the same failure was a panic here; keeping the
             // expect would turn a rules error into a crash, so record it as a
@@ -1697,6 +1699,7 @@ impl Game {
         let mut card_uses = next.public.card_uses.clone();
         let card_use_limits = next.card_use_limits.clone();
         let mut pending = next.pending.clone(); // Should be None after resolution
+        let mut accumulations = next.public.accumulations.clone();
 
         // Determine which steps remain to run based on where we paused.
         let steps = [
@@ -1738,6 +1741,7 @@ impl Game {
                             actor: player,
                             card_owner: player,
                             beneficiary: player,
+                            accumulations: &mut accumulations,
                         };
                         let trigger = crate::card_events::PhaseTriggerData {
                             space: None,
@@ -1747,6 +1751,7 @@ impl Game {
                             used_spaces: used_spaces.clone(),
                             site: crate::registry::EventKind::Bake,
                             event_kind: crate::registry::EventKind::Bake,
+                            revealed_round_cards: Vec::new(),
                         };
                         // After phase. If THIS is the paused step and the pause
                         // was in the After phase (a resolved ChooseTriggerOrder,
@@ -1872,6 +1877,7 @@ impl Game {
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
+                        accumulations: &mut accumulations,
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: None,
@@ -1881,6 +1887,7 @@ impl Game {
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::ClayConstruction,
                         event_kind: crate::registry::EventKind::ClayConstruction,
+                        revealed_round_cards: Vec::new(),
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -1981,6 +1988,7 @@ impl Game {
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
+                        accumulations: &mut accumulations,
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: Some(completion.action.space),
@@ -1990,6 +1998,7 @@ impl Game {
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
+                        revealed_round_cards: Vec::new(),
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -2329,6 +2338,7 @@ impl Game {
                     actor: pending.player,
                     card_owner,
                     beneficiary: card_owner,
+                    accumulations: &mut self.public.accumulations,
                 };
 
                 // Execute in chosen order

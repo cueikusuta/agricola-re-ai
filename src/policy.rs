@@ -600,17 +600,25 @@ fn card_priority(
                                     card_good_value(*good) * i64::from(*amount) * horizon / 4
                                 }
                                 CardEffect::HarvestStartGainIfFields { good, amount, .. } => {
-                                                                    // Conditional on field count; optimistic half-weight
-                                                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
-                                                                }
-                                                                CardEffect::OnPlayGainAnimal { animal, amount, .. }
-                                                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
-                                                                    card_animal_value(*animal) * i64::from(*amount) * horizon
-                                                                }
-                                CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
-                                    card_good_value(*good) * i64::from(*amount) * horizon
-                                }
-                            };
+                                                                                                    // Conditional on field count; optimistic half-weight
+                                                                                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                                                                                }
+                                                                                                CardEffect::OnPlayGainAnimal { animal, amount, .. }
+                                                                                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
+                                                                                                    card_animal_value(*animal) * i64::from(*amount) * horizon
+                                                                                                }
+                                                                                                CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
+                                                                                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                                                                                }
+                                                                                                // Chapter 1 round-start cards: complex conditional effects not evaluated by heuristic
+                                                                                                CardEffect::StartRoundPlowFieldIfHouse { .. }
+                                                                                                | CardEffect::StartRoundCopyUnusedRoundSpace { .. }
+                                                                                                | CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. }
+                                                                                                | CardEffect::StartRoundPlayCardIfStoneHouse { .. }
+                                                                                                | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
+                                                                                                | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
+                                                                                                | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 0,
+                                                                                            };
     }
     Some(value)
 }

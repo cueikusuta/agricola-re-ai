@@ -751,6 +751,8 @@ mod tests {
             &mut uses,
             &card_use_limits,
             &mut pending,
+            &[],
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.food, 5);
@@ -781,6 +783,8 @@ mod tests {
             &mut uses2,
             &card_use_limits,
             &mut pending2,
+            &[],
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap_err();
         assert!(err.contains("budget exhausted"), "got: {err}");

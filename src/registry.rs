@@ -285,6 +285,9 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
+                    EventKind::ImprovementPlayed
+                }
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -312,8 +315,27 @@ impl CardRegistryBuilder {
                     EventKind::WorkerPlaced
                 }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
-                crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
-                    EventKind::ImprovementPlayed
+                // Chapter 1 round-start cards
+                crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundCopyUnusedRoundSpace { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundPlayCardIfStoneHouse { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundExchangeForFoodAndPoints { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => {
+                    EventKind::RoundStart
                 }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
@@ -424,6 +446,18 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
                         }
+                        // Chapter 1 round-start cards: no direct resource amount to validate
+                        crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        | crate::cards::CardEffect::StartRoundCopyUnusedRoundSpace { .. }
+                        | crate::cards::CardEffect::StartRoundPlayOccupationIfLessonsUnderused {
+                            ..
+                        }
+                        | crate::cards::CardEffect::StartRoundPlayCardIfStoneHouse { .. }
+                        | crate::cards::CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
+                        | crate::cards::CardEffect::StartRoundExchangeForFoodAndPoints { .. }
+                        | crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
+                            ..
+                        } => 1,
                     };
                     amount == 0 || amount > 30
                 })
@@ -794,6 +828,12 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
     builder = add_cards_inner(
         builder,
         crate::cards::verified_extra_simple_cards(),
+        &mut seen,
+    )?;
+    // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064)
+    builder = add_cards_inner(
+        builder,
+        crate::cards::verified_round_start_cards(),
         &mut seen,
     )?;
     // C-deck band 070-120 typed effects (kept out of the A/B two-player
