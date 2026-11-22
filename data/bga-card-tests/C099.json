@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "card_id": "C099",
+  "cases": [
+    {
+      "id": "C099-place-one-food",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C099"
+        ],
+        "food": 4,
+        "empty_fields": 2,
+        "bonus_points": 0
+      },
+      "action": {
+        "score": true,
+        "place_food": {
+          "field_1": 1,
+          "field_2": 1
+        }
+      },
+      "expected": {
+        "food_delta": -2,
+        "points_delta": 2
+      },
+      "notes": "Placing 1 food on each of two empty fields scores 1 bonus point per field (2 total)."
+    },
+    {
+      "id": "C099-place-four-food",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C099"
+        ],
+        "food": 6,
+        "empty_fields": 1,
+        "bonus_points": 0
+      },
+      "action": {
+        "score": true,
+        "place_food": {
+          "field_1": 4
+        }
+      },
+      "expected": {
+        "food_delta": -4,
+        "points_delta": 2
+      },
+      "notes": "A single field loaded with exactly 4 food scores 2 bonus points."
+    },
+    {
+      "id": "C099-place-seven-food",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C099"
+        ],
+        "food": 8,
+        "empty_fields": 1,
+        "bonus_points": 0
+      },
+      "action": {
+        "score": true,
+        "place_food": {
+          "field_1": 7
+        }
+      },
+      "expected": {
+        "food_delta": -7,
+        "points_delta": 3
+      },
+      "notes": "A single field loaded with exactly 7 food scores the maximum 3 bonus points."
+    },
+    {
+      "id": "C099-decline-placement",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C099"
+        ],
+        "food": 3,
+        "empty_fields": 1,
+        "bonus_points": 0
+      },
+      "action": {
+        "score": true,
+        "place_food": null
+      },
+      "expected": {
+        "food_delta": 0,
+        "points_delta": 0
+      },
+      "notes": "The placement is optional; declining keeps food and points unchanged."
+    },
+    {
+      "id": "C099-non-threshold-amount",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C099"
+        ],
+        "food": 3,
+        "empty_fields": 1,
+        "bonus_points": 0
+      },
+      "action": {
+        "score": true,
+        "place_food": {
+          "field_1": 2
+        }
+      },
+      "expected": {
+        "food_delta": -2,
+        "points_delta": 0
+      },
+      "notes": "Only 1/4/7 food per field score; a field with 2 food spends the food and yields nothing."
+    }
+  ]
+}

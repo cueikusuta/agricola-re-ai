@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "card_id": "C101",
+  "cases": [
+    {
+      "id": "C101-zero-unfenced",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C101"
+        ],
+        "unfenced_stables": 0,
+        "grain": 2,
+        "food": 0,
+        "bonus_points": 0,
+        "card_uses_this_round": 0
+      },
+      "action": {
+        "use_card": "C101",
+        "exchange": true
+      },
+      "expected": {
+        "grain_delta": -2,
+        "food_delta": 1,
+        "points_delta": 1
+      },
+      "notes": "With no unfenced stables the trade still works at the lowest rate: 2 grain buys 1 point and 1 food."
+    },
+    {
+      "id": "C101-two-unfenced",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C101"
+        ],
+        "unfenced_stables": 2,
+        "grain": 3,
+        "food": 0,
+        "bonus_points": 0,
+        "card_uses_this_round": 0
+      },
+      "action": {
+        "use_card": "C101",
+        "exchange": true
+      },
+      "expected": {
+        "grain_delta": -2,
+        "food_delta": 3,
+        "points_delta": 1
+      },
+      "notes": "Two unfenced stables set the food rate at 3."
+    },
+    {
+      "id": "C101-four-unfenced",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C101"
+        ],
+        "unfenced_stables": 4,
+        "grain": 2,
+        "food": 0,
+        "bonus_points": 0,
+        "card_uses_this_round": 0
+      },
+      "action": {
+        "use_card": "C101",
+        "exchange": true
+      },
+      "expected": {
+        "grain_delta": -2,
+        "food_delta": 5,
+        "points_delta": 1
+      },
+      "notes": "Four unfenced stables reach the top of the source's table: 5 food plus 1 point."
+    },
+    {
+      "id": "C101-insufficient-grain",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C101"
+        ],
+        "unfenced_stables": 2,
+        "grain": 1,
+        "food": 0,
+        "bonus_points": 0,
+        "card_uses_this_round": 0
+      },
+      "action": {
+        "use_card": "C101",
+        "exchange": true
+      },
+      "expected": {
+        "grain_delta": 0,
+        "food_delta": 0,
+        "points_delta": 0
+      },
+      "notes": "Both grain are required; a short supply blocks the trade entirely (no partial payment)."
+    },
+    {
+      "id": "C101-once-per-round",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C101"
+        ],
+        "unfenced_stables": 2,
+        "grain": 4,
+        "food": 0,
+        "bonus_points": 0,
+        "card_uses_this_round": 1
+      },
+      "action": {
+        "use_card": "C101",
+        "exchange": true
+      },
+      "expected": {
+        "grain_delta": 0,
+        "food_delta": 0,
+        "points_delta": 0
+      },
+      "notes": "The source allows the trade once per round; a second attempt in the same round is blocked."
+    }
+  ]
+}
