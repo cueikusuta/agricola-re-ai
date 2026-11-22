@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "C089",
+  "cases": [
+    {
+      "id": "C089-on-play-stable",
+      "scope": "effect_only",
+      "setup": {
+        "card_in_play": "C089",
+        "wood": 1,
+        "stables": 0
+      },
+      "action": {
+        "play": "C089"
+      },
+      "expected": {
+        "wood_delta": -1,
+        "stables_delta": 1
+      },
+      "notes": "On play, must pay 1 wood to build exactly 1 stable"
+    },
+    {
+      "id": "C089-capacity-bonus",
+      "scope": "effect_only",
+      "setup": {
+        "card_in_play": "C089",
+        "stables": 1,
+        "animals": { "sheep": 2 },
+        "fenced_stables": 0
+      },
+      "action": {
+        "gain_sheep": 3
+      },
+      "expected": {
+        "animals": { "sheep": 3 }
+      },
+      "notes": "The single unfenced stable can hold up to 3 animals of one type"
+    },
+    {
+      "id": "C089-single-type-limit",
+      "scope": "effect_only",
+      "setup": {
+        "card_in_play": "C089",
+        "stables": 1,
+        "animals": { "sheep": 2 },
+        "fenced_stables": 0
+      },
+      "action": {
+        "gain_sheep": 1,
+        "gain_cattle": 1
+      },
+      "expected": {
+        "review_status": "needs_resolution"
+      },
+      "notes": "Cannot hold 2 different animal types in the same unfenced stable - capacity is for 1 type only"
+    }
+  ]
+}

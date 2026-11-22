@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "card_id": "C092",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "秋の母",
+    "name_en": "Autumn Mother"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2997",
+        "language": "ja",
+        "checked_on": "2026-11-22",
+        "page_version": null,
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-22",
+        "page_version": null,
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "empty_field_count",
+          "params": { "n": 0 },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": 3
+          },
+          "notes": "If no empty fields, gain 3 points immediately"
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At game end (before final harvest), if there are no empty fields, gain 3 points."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area for the game"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C092-empty-fields-points",
+      "C092-empty-fields-present"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-22",
+    "implementation_status": "not_started",
+    "notes": "Passive effect: at game end before final harvest, if no empty fields, gain 3 points. Stage 3 per classification (room: empty room)."
+  }
+}

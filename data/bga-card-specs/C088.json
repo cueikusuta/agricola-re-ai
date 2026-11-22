@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "card_id": "C088",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "見習い大工",
+    "name_en": "Carpenter's Apprentice"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3001",
+        "language": "ja",
+        "checked_on": "2026-11-22",
+        "page_version": null,
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-22",
+        "page_version": null,
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 2,
+            "scope": "wood_room_construction",
+            "segment_cap": null
+          },
+          "notes": "Wood rooms cost 2 less wood"
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Permanent discount: each wood room costs 2 less wood"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "stable_count",
+          "params": { "min": 3 },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1,
+            "scope": "stable_construction_3rd_or_4th",
+            "segment_cap": 2
+          },
+          "notes": "3rd and 4th stables cost 1 less wood each"
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "When you have 2+ stables, the 3rd and 4th stables each cost 1 less wood"
+    },
+    {
+      "trigger": "passive",
+      "conditions": [
+        {
+          "predicate": "fences_built_at_least",
+          "params": { "n": 12 },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "discount_cost",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1,
+            "scope": "fence_construction_13th_to_15th",
+            "segment_cap": 3
+          },
+          "notes": "13th to 15th fences are free (wood cost reduced by 1 each)"
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 2,
+      "decision_owner": "none",
+      "notes": "When you have 12+ fences, the 13th, 14th, and 15th fences cost no wood"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "Occupation stays in play area for the game"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C088-wood-room-discount",
+      "C088-stable-discount",
+      "C088-fence-discount",
+      "C088-combined-discounts"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-22",
+    "implementation_status": "not_started",
+    "notes": "Three independent permanent cost reductions: wood rooms -2 wood, 3rd/4th stables -1 wood each, 13th-15th fences free. All confirmed from BGA wiki Japanese and English pages. Stage 3 per classification (ROOM payload - room cost reduction)."
+  }
+}
