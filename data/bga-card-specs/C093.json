@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "card_id": "C093",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "内地管理者",
+    "name_en": "Inner Districts Director"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2996",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; effect rephrased in own words, no verbatim text kept"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list row used to cross-check the card id, name and effect summary"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "forest",
+              "clay_pit"
+            ]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "board",
+          "params": {
+            "kind": "place_good_from_supply_on_accumulation_space",
+            "good": "stone",
+            "amount": 1,
+            "space": "other_of_used_space_pair",
+            "notes": "1 stone is taken from the general supply and set on whichever of the Forest / Clay Pit pair was not used"
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "place_unplaced_person",
+            "amount": 1,
+            "destination": "work_phase",
+            "immediately": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each time the owner uses the Forest or Clay Pit accumulation space, they may move 1 stone from the general supply onto the other of the two spaces; only when they do so may they immediately place one more of their unplaced people. The two steps are chained: skipping the stone also skips the extra placement."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params: setting a stone from the general supply onto the other accumulation space has no established encoding (E166 provisional sibling models an inter-space good move with exchange source/move params); 'other_of_used_space_pair' targeting needs a definition",
+      "effects[0].steps[1].params: placing 'another person' immediately depends on the unplaced-person availability and placement-window contract (same gap flagged for C003)"
+    ],
+    "test_case_ids": [
+      "C093-forest-stone-then-person",
+      "C093-clay-pit-stone-then-person",
+      "C093-decline-stone-no-person"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Printed points: 0. Ban: none. Own-word summary of the third-party wiki effect: after each use of the Forest or Clay Pit accumulation space, the owner may place 1 stone from the general supply onto the other space of that pair; if they do, they may immediately place another person. Classification (docs/all-cards-classification-final.md, PR #377 source): stage 4, P9 two-space linkage plus extra placement (TR-SITE, STACK, DEC). Sources: BGA wiki JA page and English list row, cross-checked; not official Lookout verification."
+  }
+}

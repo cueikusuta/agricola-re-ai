@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "card_id": "C096",
+  "cases": [
+    {
+      "id": "C096-major-or-minor-repeat",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C096"
+        ],
+        "food": 1,
+        "improvements_in_hand": 2,
+        "improvement_action_cost": "none"
+      },
+      "action": {
+        "use_space": "major_or_minor_improvement",
+        "pay_food_for_repeat": true
+      },
+      "expected": {
+        "improvement_actions_taken": 2,
+        "improvements_built": 2,
+        "food_delta": -1
+      },
+      "notes": "After the Major or Minor Improvement action, 1 food buys the same action a second time; the repeated action still pays its own normal improvement cost."
+    },
+    {
+      "id": "C096-minor-repeat",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C096"
+        ],
+        "food": 1,
+        "minor_improvements_in_hand": 2,
+        "minor_improvement_action_cost": "none"
+      },
+      "action": {
+        "use_space": "minor_improvement",
+        "pay_food_for_repeat": true
+      },
+      "expected": {
+        "improvement_actions_taken": 2,
+        "minor_improvements_built": 2,
+        "food_delta": -1
+      },
+      "notes": "The Minor Improvement space offers the same repeat for 1 food."
+    },
+    {
+      "id": "C096-not-triggered",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C096"
+        ],
+        "food": 1,
+        "improvements_in_hand": 1
+      },
+      "action": {
+        "use_space": "forest"
+      },
+      "expected": {
+        "improvement_actions_taken": 1,
+        "food_delta": 0
+      },
+      "notes": "Using an unrelated space (Forest here) does not offer the paid repeat."
+    },
+    {
+      "id": "C096-decline-repeat",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C096"
+        ],
+        "food": 0,
+        "improvements_in_hand": 1
+      },
+      "action": {
+        "use_space": "major_or_minor_improvement",
+        "pay_food_for_repeat": true
+      },
+      "expected": {
+        "improvement_actions_taken": 1,
+        "food_delta": 0
+      },
+      "notes": "Without the 1 food the repeat cannot be taken and the first action is unaffected."
+    }
+  ]
+}

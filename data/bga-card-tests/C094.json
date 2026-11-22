@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "card_id": "C094",
+  "cases": [
+    {
+      "id": "C094-anytime-build-one-stable",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C094"
+        ],
+        "wood": 1,
+        "food": 1,
+        "empty_farmyard_spaces": 2
+      },
+      "action": {
+        "use_card_ability": "C094",
+        "build_stables": 1
+      },
+      "expected": {
+        "stables_built": 1,
+        "wood_delta": -1,
+        "food_delta": -1,
+        "persons_placed": 0
+      },
+      "notes": "One stable through the card: 1 wood plus 1 food, and no person is consumed by the action."
+    },
+    {
+      "id": "C094-two-stables-cost",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C094"
+        ],
+        "wood": 2,
+        "food": 2,
+        "empty_farmyard_spaces": 2
+      },
+      "action": {
+        "use_card_ability": "C094",
+        "build_stables": 2
+      },
+      "expected": {
+        "stables_built": 2,
+        "wood_delta": -2,
+        "food_delta": -2,
+        "persons_placed": 0
+      },
+      "notes": "The wood 1 plus food 1 price applies per stable, so two stables cost 2 wood and 2 food in total."
+    },
+    {
+      "id": "C094-no-person-placed",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C094"
+        ],
+        "wood": 1,
+        "food": 1,
+        "all_persons_placed": true,
+        "empty_farmyard_spaces": 1
+      },
+      "action": {
+        "use_card_ability": "C094",
+        "build_stables": 1
+      },
+      "expected": {
+        "stables_built": 1,
+        "persons_placed": 0,
+        "workers_on_board_delta": 0
+      },
+      "notes": "The action is taken without placing a person, so it stays available even with every person already placed."
+    },
+    {
+      "id": "C094-insufficient-resources",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C094"
+        ],
+        "wood": 1,
+        "food": 0,
+        "empty_farmyard_spaces": 2
+      },
+      "action": {
+        "use_card_ability": "C094",
+        "build_stables": 1
+      },
+      "expected": {
+        "stables_built": 0,
+        "wood_delta": 0,
+        "food_delta": 0
+      },
+      "notes": "Both goods are required for each stable; missing one good blocks the build (begging cards are out of scope for this contract)."
+    },
+    {
+      "id": "C094-timing-pending",
+      "scope": "legal_play",
+      "setup": {
+        "occupation_in_play": [
+          "C094"
+        ],
+        "wood": 1,
+        "food": 1,
+        "phase": "work_phase_mid_turn"
+      },
+      "action": {
+        "use_card_ability": "C094",
+        "build_stables": 1
+      },
+      "expected": {
+        "outcome": "pending_free_action_api",
+        "stables_built": null
+      },
+      "notes": "The 'at any time' window (turn boundaries, chaining, cancellation, replay hashing) is not defined by the free-action API yet; expected outcome stays null until review.unresolved_fields is resolved."
+    }
+  ]
+}
