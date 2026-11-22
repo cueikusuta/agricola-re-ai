@@ -592,7 +592,8 @@ fn card_priority(
                                                 | CardEffect::OnPlayGainIfHouse { .. }
                                                 | CardEffect::OnPlayGainIfRoomCount { .. }
                                                 | CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                                                | CardEffect::Prerequisite { .. } => 0,
+                                                | CardEffect::Prerequisite { .. }
+                                                | CardEffect::AfterAnimalAcquisitionBonusPoints { .. } => 0,
                 #[cfg(test)]
                 // Test-only probe; never part of a real evaluated pool.
                 CardEffect::PendingProbe { .. } => 0,

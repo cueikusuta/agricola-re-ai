@@ -387,6 +387,9 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => {
                     EventKind::WorkerPlaced
                 }
+                crate::cards::CardEffect::AfterAnimalAcquisitionBonusPoints { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
                 // Chapter 1 round-start cards
                 crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. } => {
@@ -482,7 +485,8 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         crate::cards::CardEffect::EndGameBonus { .. }
                         | crate::cards::CardEffect::Prerequisite { .. }
-                        | crate::cards::CardEffect::Passive { .. } => 1,
+                        | crate::cards::CardEffect::Passive { .. }
+                        | crate::cards::CardEffect::AfterAnimalAcquisitionBonusPoints { .. } => 1,
                         #[cfg(test)]
                         crate::cards::CardEffect::PendingProbe { .. } => 1,
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }

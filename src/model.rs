@@ -207,6 +207,18 @@ pub struct Player {
     pub played_cards: Vec<String>,
     #[serde(default)]
     pub card_points: i32,
+    /// Bonus points from `AfterAnimalAcquisitionBonusPoints` cards (A153 /
+    /// B154), awarded immediately on the after-animal-acquisition trigger and
+    /// summed into the `cards` scoring category at game end. Kept separate
+    /// from `card_points` because `card_points` must equal the printed-points
+    /// sum of played cards at all times (`validate_card_points`).
+    #[serde(default)]
+    pub animal_acquisition_bonus_points: i32,
+    /// Card ids for which an `AfterAnimalAcquisitionBonusPoints` bonus
+    /// (A153 豚持ち / B154 羊持ち) has already been awarded this game
+    /// (once_per_game frequency in the spec).
+    #[serde(default)]
+    pub animal_acquisition_bonus_fired: BTreeSet<String>,
     #[serde(default)]
     pub pasture_capacity_bonus: u32,
     #[serde(default)]
@@ -252,6 +264,8 @@ impl Player {
             improvements: vec![],
             played_cards: vec![],
             card_points: 0,
+            animal_acquisition_bonus_points: 0,
+            animal_acquisition_bonus_fired: BTreeSet::new(),
             pasture_capacity_bonus: 0,
             free_fence_wood: 0,
             improvement_wood_discount: 0,

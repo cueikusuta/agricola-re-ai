@@ -52,4 +52,16 @@ assert.equal(
   label({ OnPlayGain: { good: "wood", amount: 2 } }),
   "使用時：木2個"
 );
-console.log("Japanese card effect labels: all 8 serialization cases passed");
+assert.equal(
+  label({ Prerequisite: { rule: { animal_count_less: { animal: "sheep", number: 7 } } } }),
+  "使用条件：7頭未満の羊"
+);
+assert.equal(
+  label({ AfterAnimalAcquisitionBonusPoints: { animal: "boar", threshold: 5, points: 3, food: 0 } }),
+  "家畜取得後：猪5頭以上で3点"
+);
+assert.equal(
+  label({ AfterAnimalAcquisitionBonusPoints: { animal: "sheep", threshold: 7, points: 3, food: 2 } }),
+  "家畜取得後：羊7頭以上で3点・食料2個"
+);
+console.log("Japanese card effect labels: all 11 serialization cases passed");

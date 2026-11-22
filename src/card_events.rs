@@ -66,6 +66,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterWorkerGainAnimal { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => TriggerPhase::After,
+        CardEffect::AfterAnimalAcquisitionBonusPoints { .. } => TriggerPhase::After,
         // Round start — After phase (happens after round begins)
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
@@ -289,6 +290,7 @@ fn resolve_phase_scan(
                 ctx.actor,
                 ctx.used_spaces,
                 ctx.round,
+                card_id,
             ) {
                 effect_index += 1;
                 continue; // Condition not met: skip this effect entirely, no budget/use consumed
@@ -494,6 +496,7 @@ fn resolve_phase_scan(
                 ctx.actor,
                 ctx.used_spaces,
                 ctx.round,
+                card_id,
             ) {
                 effect_index += 1;
                 continue;
@@ -611,6 +614,19 @@ fn resolve_phase_scan(
                     good,
                     *amount,
                     trigger_data,
+                )?,
+                CardEffect::AfterAnimalAcquisitionBonusPoints {
+                    animal,
+                    threshold,
+                    points,
+                    food,
+                } => handle_after_animal_acquisition_bonus_points(
+                    ctx,
+                    card_id,
+                    *animal,
+                    *threshold,
+                    *points,
+                    *food,
                 )?,
                 CardEffect::StartRoundGain {
                     good,
@@ -1027,6 +1043,7 @@ fn effect_condition_holds(
     _actor: usize,
     used_spaces: &std::collections::BTreeSet<Space>,
     round: u8,
+    card_id: &str,
 ) -> bool {
     match effect {
         CardEffect::AfterWorkerGain { space, .. } => {
@@ -1154,6 +1171,20 @@ fn effect_condition_holds(
         CardEffect::AfterWorkerGainIfOwnsAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
+        CardEffect::AfterAnimalAcquisitionBonusPoints { animal, threshold, .. } => {
+            // A153/B154: re-evaluated on every WorkerPlaced After scan (the
+            // scan runs after the core action has placed any acquired
+            // animals). The head-count threshold is part of the condition so
+            // the effect only joins a simultaneous-trigger order choice when
+            // its bonus is actually due — the spec's own boundary contract
+            // (5 boars, no acquisition in this action) still fires here. The
+            // once-per-game guard keeps an already-awarded card out of every
+            // later scan (no re-trigger, no spurious order pause); the
+            // handler re-checks both guards as defense in depth.
+            trigger.site == EventKind::WorkerPlaced
+                && player.animal_count(*animal) >= *threshold
+                && !player.animal_acquisition_bonus_fired.contains(card_id)
+        }
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
@@ -1243,6 +1274,7 @@ pub fn execute_chosen_triggers(
             ctx.actor,
             ctx.used_spaces,
             ctx.round,
+            &trigger.card_id,
         ) {
             continue;
         }
@@ -1360,6 +1392,19 @@ pub fn execute_chosen_triggers(
                 good,
                 *amount,
                 trigger_data,
+                )?,
+            CardEffect::AfterAnimalAcquisitionBonusPoints {
+                animal,
+                threshold,
+                points,
+                food,
+            } => handle_after_animal_acquisition_bonus_points(
+                ctx,
+                &trigger.card_id,
+                *animal,
+                *threshold,
+                *points,
+                *food,
             )?,
             CardEffect::StartRoundGain {
                 good,
@@ -1698,6 +1743,9 @@ fn handle_prerequisite(
         }
         crate::cards::CardRequirement::MinimumAnimals { animal, number } => {
             p.animal_count(*animal) >= *number
+        }
+        crate::cards::CardRequirement::AnimalCountLess { animal, number } => {
+            p.animal_count(*animal) < *number
         }
         crate::cards::CardRequirement::MinimumCropFields { crop, number } => {
             p.farm
@@ -2112,6 +2160,40 @@ fn handle_after_worker_gain_animal(
         );
         return Ok(EffectResult::Pending(decision));
     }
+    Ok(EffectResult::Resolved)
+}
+
+/// A153 豚持ち / B154 羊持ち: after any animal acquisition applied through
+/// `place_animals`, if the card owner has at least `threshold` of `animal`,
+/// award `points` bonus points (and `food` food when non-zero) to the owner.
+/// Re-evaluated on every WorkerPlaced After scan; the threshold check is
+/// dynamic, and the once-per-game guard (`animal_acquisition_bonus_fired`)
+/// ensures the bonus is awarded at most once per card even if the head count
+/// later drops below and recovers above the threshold.
+fn handle_after_animal_acquisition_bonus_points(
+    ctx: &mut DispatchContext<'_>,
+    card_id: &str,
+    animal: Animal,
+    threshold: u32,
+    points: i32,
+    food: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut *ctx.player;
+    if p.animal_acquisition_bonus_fired.contains(card_id) {
+        return Ok(EffectResult::Resolved);
+    }
+    let count = p.animal_count(animal);
+    if count < threshold {
+        return Ok(EffectResult::Resolved);
+    }
+    p.animal_acquisition_bonus_points = p
+        .animal_acquisition_bonus_points
+        .checked_add(points)
+        .ok_or("animal acquisition bonus points overflow")?;
+    if food > 0 {
+        p.supply.food = p.supply.food.checked_add(food).ok_or("animal acquisition bonus food overflow")?;
+    }
+    p.animal_acquisition_bonus_fired.insert(card_id.to_owned());
     Ok(EffectResult::Resolved)
 }
 
