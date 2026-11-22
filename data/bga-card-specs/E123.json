@@ -49,11 +49,11 @@
             "kind": "use_resource_from_card",
             "resources": [
               "stone",
-              "brick",
+              "clay",
               "stone",
               "reed",
               "wood",
-              "brick"
+              "clay"
             ],
             "order": "top_down",
             "multiple_allowed": true

@@ -44,7 +44,7 @@
         {
           "predicate": "action_space_name",
           "params": {
-            "name": "小麦の種"
+            "name": "grain_seeds"
           }
         }
       ],
@@ -53,13 +53,13 @@
           "operation": "gain_resource",
           "target": "owner",
           "params": {
-            "good": "brick",
+            "good": "clay",
             "amount": 2
           }
         }
       ],
       "optional": false,
-      "frequency": "once_per_use",
+      "frequency": "every_use",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
@@ -71,7 +71,7 @@
         {
           "predicate": "action_space_name",
           "params": {
-            "name": "野菜の種"
+            "name": "vegetable_seeds"
           }
         }
       ],
@@ -80,13 +80,13 @@
           "operation": "gain_resource",
           "target": "owner",
           "params": {
-            "good": "brick",
+            "good": "clay",
             "amount": 3
           }
         }
       ],
       "optional": false,
-      "frequency": "once_per_use",
+      "frequency": "every_use",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,

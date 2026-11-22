@@ -44,7 +44,7 @@
   },
   "effects": [
     {
-      "trigger": "after_stables_built",
+      "trigger": "after_stable_built",
       "conditions": [
         {
           "predicate": "stables_built_on_own_turn",

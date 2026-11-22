@@ -43,7 +43,7 @@
       "conditions": [
         {
           "predicate": "is_action_space",
-          "params": { "space_name": "柵の建設" }
+          "params": { "space_name": "fencing" }
         }
       ],
       "steps": [
@@ -65,8 +65,8 @@
         }
       ],
       "optional": false,
-      "frequency": "per_use",
-      "duration": "persistent",
+      "frequency": "every_use",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "owner",

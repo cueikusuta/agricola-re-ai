@@ -83,7 +83,7 @@
         }
       ],
       "optional": false,
-      "frequency": "per_use",
+      "frequency": "every_use",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,

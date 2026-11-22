@@ -43,7 +43,7 @@
       "conditions": [
         {
           "predicate": "is_cumulative_space",
-          "params": { "space_name": "羊市場" }
+          "params": { "space_name": "sheep_market" }
         },
         {
           "predicate": "round_at_least",
@@ -60,8 +60,8 @@
         }
       ],
       "optional": false,
-      "frequency": "per_use",
-      "duration": "persistent",
+      "frequency": "every_use",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",

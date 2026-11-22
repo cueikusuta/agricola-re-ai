@@ -67,14 +67,14 @@
       "decision_owner": "none"
     },
     {
-      "trigger": "end_game_scoring",
+      "trigger": "end_scoring",
       "conditions": [],
       "steps": [
         {
           "operation": "gain_points",
           "target": "owner",
           "params": {
-            "amount": -1,
+            "points": -1,
             "per_resource": "wood"
           }
         },
@@ -82,7 +82,7 @@
           "operation": "gain_points",
           "target": "owner",
           "params": {
-            "amount": -1,
+            "points": -1,
             "per_resource": "stone"
           }
         }

@@ -60,7 +60,7 @@
           "operation": "gain_resource",
           "target": "owner",
           "params": {
-            "good": "wild_boar",
+            "good": "boar",
             "amount": {
               "op": "custom",
               "args": [

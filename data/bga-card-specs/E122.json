@@ -66,7 +66,7 @@
           "operation": "gain_resource",
           "target": "owner",
           "params": {
-            "good": "brick",
+            "good": "clay",
             "amount": 1
           }
         }

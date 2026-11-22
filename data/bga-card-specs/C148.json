@@ -92,7 +92,7 @@
             ],
             "receive": [
               {
-                "good": "wild_boar",
+                "good": "boar",
                 "amount": 1,
                 "destination": "card"
               }
@@ -101,7 +101,7 @@
         }
       ],
       "optional": false,
-      "frequency": "every_occurrence",
+      "frequency": "every_use",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 1,

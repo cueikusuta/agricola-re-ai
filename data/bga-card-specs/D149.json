@@ -60,7 +60,7 @@
         }
       ],
       "optional": true,
-      "frequency": "per_use",
+      "frequency": "every_use",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
@@ -88,7 +88,7 @@
         }
       ],
       "optional": true,
-      "frequency": "per_use",
+      "frequency": "every_use",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 1,

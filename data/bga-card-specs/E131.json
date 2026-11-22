@@ -44,7 +44,7 @@
         {
           "predicate": "action_space_name",
           "params": {
-            "name": "小劇場"
+            "name": "small_theater"
           }
         },
         {
@@ -65,7 +65,7 @@
         }
       ],
       "optional": true,
-      "frequency": "once_per_use",
+      "frequency": "every_use",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,

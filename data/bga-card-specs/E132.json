@@ -47,7 +47,7 @@
           "target": "owner",
           "params": {
             "input": {
-              "wheat": 1,
+              "grain": 1,
               "vegetable": 1
             },
             "output": {
@@ -65,7 +65,7 @@
       "decision_owner": "owner"
     },
     {
-      "trigger": "end_game_scoring",
+      "trigger": "end_scoring",
       "conditions": [],
       "steps": [
         {
@@ -74,7 +74,7 @@
           "params": {
             "conversion": {
               "input": {
-                "wheat": 1,
+                "grain": 1,
                 "vegetable": 1
               },
               "output_points": 2,

@@ -40,7 +40,7 @@
   },
   "effects": [
     {
-      "trigger": "ongoing",
+      "trigger": "passive",
       "conditions": [],
       "steps": [
         {
@@ -53,7 +53,7 @@
         }
       ],
       "optional": false,
-      "frequency": "continuous",
+      "frequency": "always",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,

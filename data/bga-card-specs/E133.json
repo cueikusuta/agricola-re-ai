@@ -51,7 +51,7 @@
           "operation": "gain_points",
           "target": "owner",
           "params": {
-            "amount": 0.5,
+            "points": 0.5,
             "per_animal_bred": true
           }
         }

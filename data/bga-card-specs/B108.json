@@ -56,8 +56,8 @@
         }
       ],
       "optional": false,
-      "frequency": "per_use",
-      "duration": "persistent",
+      "frequency": "every_use",
+      "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",

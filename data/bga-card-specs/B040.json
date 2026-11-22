@@ -33,7 +33,7 @@
         { "operation": "gain_resource", "target": "owner", "params": { "good": "wood", "amount": 1 } }
       ],
       "optional": false,
-      "frequency": "each_time",
+      "frequency": "every_use",
       "duration": "instant",
       "snapshot": "after_event",
       "order": 0,
