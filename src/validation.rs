@@ -2144,8 +2144,9 @@ mod tests {
 
     /// Layer-3 contract: a committed game with a complete logged history
     /// passes all three gates at every checkpoint; a log with a dropped
-    /// event fails at the replay gate; a tampered save fails to load (the
-    /// mechanism gate 3 relies on).
+    /// event fails at the replay gate by gate 2's exact message (which a
+    /// gate-3 `load_json` failure cannot impersonate); a tampered save
+    /// fails to load (the mechanism gate 3 relies on).
     #[test]
     fn replay_layer_contract_round_trip_consistency() {
         let mut game = cardless(2, 83);
@@ -2168,14 +2169,50 @@ mod tests {
         assert!(game.log.events.len() >= 6, "setup: logged actions");
 
         // Dropping the last event desynchronizes the log from the state:
-        // the replay gate must reject it.
+        // the replay gate must reject it — and that gate specifically.
+        //
+        // Gate 2's hash-mismatch message names the replayed log
+        // ("replayed state hash differs from the recorded state"), while
+        // gate 3's load-side replay failure says "saved game differs from
+        // logged action replay" and gate 3's own mismatch says "restored
+        // state hash differs from the saved state". A `contains("replay")`
+        // style assertion cannot tell gate 2 from gate 3's load-side
+        // replay failure, so this negative control pins the exact gate-2
+        // message instead: the two gates stay mutually non-substitutable.
         let mut truncated = game.clone();
         truncated.log.events.pop();
+        // Gate 1 still accepts the mutated state, so the mutation cannot
+        // short-circuit into a layer-2 rejection before gate 2 runs.
+        assert_eq!(
+            check_full(&truncated),
+            Ok(()),
+            "the truncated log must leave the state itself acceptable, so only gate 2 can fire"
+        );
         let error =
             check_replay(&truncated).expect_err("a truncated log must fail replay validation");
+        assert_eq!(
+            error, "replayed state hash differs from the recorded state",
+            "a truncated log must fail at the replay gate (gate 2), not gate 1 or gate 3"
+        );
+
+        // Negative-control specificity probe (the PR #430 P2 fix): the
+        // SAME mutant, evaluated one gate later, fails inside
+        // `load_json`'s own event-chain replay — an error that also
+        // contains the word "replay". The old `contains("replay")`
+        // assertion therefore accepted a gate-3 failure as if it were
+        // gate 2, so it could not pin the gate. The gate-2 assertion
+        // above must reject it, so the two gates remain discriminated by
+        // exact message, never by a shared substring.
+        let gate3_replay_failure =
+            Game::load_json(&truncated.save_json().expect("save must succeed"))
+                .expect_err("a truncated log must also fail the save/load round-trip");
+        assert_ne!(
+            gate3_replay_failure, "replayed state hash differs from the recorded state",
+            "a gate-3 load-side replay failure must not satisfy the gate-2 assertion; got: {gate3_replay_failure}"
+        );
         assert!(
-            error.contains("replay"),
-            "truncated log must fail at the replay gate, got: {error}"
+            gate3_replay_failure.contains("replay"),
+            "this gate-3 failure is exactly the kind the pre-fix `contains(\"replay\")` assertion wrongly accepted as gate 2; got: {gate3_replay_failure}"
         );
 
         // Tampering with the serialized save: `load_json` (the gate-3
