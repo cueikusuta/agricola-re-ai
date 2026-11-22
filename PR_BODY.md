@@ -105,6 +105,19 @@ A015×6、A018×7、A021×4、A023×5、A024×5、pending/hash×2、headless×4�
 
 **全必須ゲート緑**（aggregate / shard は skipped: 通常 PR では大量検証ジョブは実行対象外）。ローカル測定値ではなく Actions の実測値・URL を記録。
 
+### 追記: docs コミット HEAD の再実行確認
+
+CI 証跡行の追加のみを行った HEAD `a3d0175`（fbe821f + PR_BODY.md のみ）でも同一ゲートを再実行し全必須チェック緑:
+
+- CI required: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45056633105/job/137313971791
+- cargo test: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45056633105/job/137313404133
+- rustfmt: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45056633105/job/137313404079
+- clippy: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45056633105/job/137313404073
+- M1/M2/M7 seeded performance: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45056633105/job/137313404166
+- Pipeline gates (spec/catalog/blockers): https://github.com/cueikusuta/agricola-re-ai/actions/runs/45056633071/job/137313203467
+- Python unittest discovery: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45056633058/job/137313210886
+- test (aggregate): https://github.com/cueikusuta/agricola-re-ai/actions/runs/45056633037/job/137313203103
+
 ## 宣言
 
 - 1 Issue = 1 目的 = 1 ブランチ = 1 PR。変更は A015/A018/A021/A023/A024 の実装とレビュー対応に限定。
