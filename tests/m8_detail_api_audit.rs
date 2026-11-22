@@ -144,8 +144,8 @@ fn sow_accepts_partial_and_crop_mixed_allocations_the_default_policy_skips() {
     let mut game = new_game(2, 11, false);
     let owner = actor(&game);
     reveal(&mut game, RoundCard::GrainUtilization);
-    for cell in 1..=3 {
-        game.public.players[owner].farm[cell].tile = empty_field();
+    for cell in game.public.players[owner].farm.iter_mut().skip(1).take(3) {
+        cell.tile = empty_field();
     }
     game.public.players[owner].supply.grain = 1;
     game.public.players[owner].supply.vegetable = 1;
@@ -204,8 +204,8 @@ fn sow_rejects_missing_seed_and_duplicate_targets_atomically() {
     let mut game = new_game(2, 12, false);
     let owner = actor(&game);
     reveal(&mut game, RoundCard::GrainUtilization);
-    for cell in 1..=2 {
-        game.public.players[owner].farm[cell].tile = empty_field();
+    for cell in game.public.players[owner].farm.iter_mut().skip(1).take(2) {
+        cell.tile = empty_field();
     }
     game.public.players[owner].supply.grain = 1;
     let before = game.state_hash();
