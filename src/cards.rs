@@ -97,9 +97,12 @@ pub enum CardEffect {
     },
     /// C116 調度品職人 (Furniture Maker): each time the owner plays an
     /// occupation AFTER this card, gain `amount` of `good` per food paid as
-    /// that occupation's cost (printed cost + optional fee). Fired from the
-    /// play dispatcher's after-play scan; the legacy `cards::play` helper does
-    /// not re-scan earlier cards and therefore never fires it.
+    /// that occupation's occupation cost (the food paid on the Lessons /
+    /// ExtraLessons action space). The occupation's own printed cost is the
+    /// separate "individual cost" of the 2016 Lookout appendix and never
+    /// feeds this multiplier. Fired from the play dispatcher's after-play
+    /// scan; the legacy `cards::play` helper does not re-scan earlier cards
+    /// and therefore never fires it.
     AfterOccupationGainPerFoodCost {
         good: Good,
         amount: u32,
@@ -4312,7 +4315,9 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
             }],
         ),
         // C116 調度品職人 (Furniture Maker): no cost; on play gain 1 wood, and
-        // each later occupation play grants 1 wood per food paid as its cost.
+        // each later occupation play grants 1 wood per food paid as that
+        // occupation's occupation cost (the Lessons/ExtraLessons fee; the
+        // occupation's printed individual cost never counts).
         card(
             "C116",
             occupation,

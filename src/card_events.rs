@@ -2650,22 +2650,26 @@ pub fn dispatch_play(
 
     // Phase 4: After — card-play dependent triggers owned by EARLIER played
     // cards. C116 調度品職人 (`AfterOccupationGainPerFoodCost`): each time the owner
-    // plays an occupation after it, it grants wood per food paid as that occupation's
-    // cost (printed cost + the optional occupation fee). C068 書棚
+    // plays an occupation after it, it grants wood per food paid as that
+    // occupation's occupation cost (the Lessons/ExtraLessons fee). The 2016
+    // Lookout appendix defines the occupation cost as the food paid on the
+    // "Lessons" action space and the card's own printed cost as the separate
+    // "individual cost", so only the fee feeds the multiplier. C068 書棚
     // (`AfterOccupationGain`): each time the owner plays an occupation after it,
     // grants a fixed amount of the specified good, independent of the occupation's
     // cost. The new card is already last in `played_cards` (the caller ran the zone
     // move), so the scan covers exactly the cards played "before this one".
     if let Some(new_card) = card_set.definition(new_card_id) {
         if new_card.kind == crate::cards::CardKind::Occupation {
-            // Calculate food paid for PerFoodCost effects
-            let printed_food: u32 = new_card
-                .cost
-                .iter()
-                .filter(|(good, _)| *good == Good::Food)
-                .map(|(_, n)| *n)
-                .sum();
-            let food_paid = printed_food.saturating_add(extra_food_paid);
+            // Food paid as the occupation cost (2016 Lookout appendix: "The
+            // occupation cost is what you must pay when playing the occupation
+            // card from your hand. It is stated on the 'Lessons' action space.
+            // The (rather rare) individual cost is printed on the occupation
+            // card itself."). C116 counts the occupation cost only, so the
+            // Lessons/ExtraLessons fee is the whole multiplier; the played
+            // occupation's own printed food cost is the individual cost and
+            // never feeds it.
+            let food_paid = extra_food_paid;
             let played = ctx.player.played_cards.clone();
             let owned = played.len().saturating_sub(1); // exclude the new card
             for id in &played[..owned] {
@@ -6088,10 +6092,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            c.players[0].supply.wood, 2,
-            "occupation food cost 2 must grant 2 wood via C116"
+            c.players[0].supply.wood, 0,
+            "the printed individual cost of 2 food must not grant wood via C116"
         );
-        // Fee also counts as occupation cost.
+        // The Lessons fee IS the occupation cost, so it counts alone.
         c.players[0].played_cards = vec!["C116".into(), "C111".into()];
         dispatch_play(
             &set,
@@ -6111,7 +6115,7 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(c.players[0].supply.wood, 5, "fee 3 + cost 0 -> 3 wood");
+        assert_eq!(c.players[0].supply.wood, 3, "occupation cost 3 -> 3 wood");
         // Minor improvements and zero-cost occupations do not trigger it.
         c.players[0].played_cards = vec!["C116".into(), "C106".into()];
         dispatch_play(
@@ -6132,7 +6136,166 @@ mod tests {
             false,
         )
         .unwrap();
-        assert_eq!(c.players[0].supply.wood, 5, "no food paid -> no gain");
+        assert_eq!(
+            c.players[0].supply.wood, 3,
+            "no occupation cost paid -> no gain"
+        );
+    }
+
+    /// C116 boundary reproduction (static-review 2026-11-20 triage card 3/4),
+    /// axis 1 — the LESSON FEE ALONE. The 2016 Lookout appendix calls the
+    /// Lessons-space food payment the "occupation cost" ("On the 'Lessons'
+    /// action space above 'Day Laborer', the first occupation you play in the
+    /// game is free. Each additional occupation you play after that costs you
+    /// 1 food ... These costs are called 'occupation costs'."), and the printed
+    /// card grants "1 wood for each food paid as occupation cost", so the fee
+    /// must feed the multiplier with no printed cost involved.
+    #[test]
+    fn c116_lesson_fee_alone_grants_wood_per_fee_food() {
+        let mut set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "occ_free".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        });
+        let mut c = Ctx::new();
+        // Zone move already applied by the caller: C116 first, new card last.
+        c.players[0].played_cards = vec!["C116".into(), "occ_free".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        dispatch_play(
+            &set,
+            0,
+            "occ_free",
+            1,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 1,
+            "occupation cost (Lessons fee) of 1 food must grant 1 wood via C116"
+        );
+    }
+
+    /// C116 boundary reproduction, axis 2 — the PRINTED INDIVIDUAL COST ALONE.
+    /// The 2016 Lookout appendix separates the two payments: "The occupation
+    /// cost is what you must pay when playing the occupation card from your
+    /// hand. It is stated on the 'Lessons' action space. The (rather rare)
+    /// individual cost is printed on the occupation card itself." C116's effect
+    /// counts "food paid as occupation cost", so an occupation's own printed
+    /// food cost (its individual cost) must NOT feed the multiplier.
+    #[test]
+    fn c116_printed_individual_cost_alone_grants_no_wood() {
+        let mut set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "occ_food2".into(),
+            kind: CardKind::Occupation,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![],
+        });
+        let mut c = Ctx::new();
+        // Zone move already applied by the caller: C116 first, new card last.
+        c.players[0].played_cards = vec!["C116".into(), "occ_food2".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        dispatch_play(
+            &set,
+            0,
+            "occ_food2",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 0,
+            "the printed individual cost is not the occupation cost and must not grant wood"
+        );
+    }
+
+    /// C116 boundary reproduction, both axes at once: the multiplier follows the
+    /// occupation cost (the fee) only, even when the played occupation also
+    /// charges a printed individual cost.
+    #[test]
+    fn c116_counts_only_the_occupation_cost_when_both_payments_are_made() {
+        let mut set = CardSet {
+            definitions: crate::cards::verified_band_c_cards(),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "occ_food1".into(),
+            kind: CardKind::Occupation,
+            cost: vec![(Good::Food, 1)],
+            points: 0,
+            effects: vec![],
+        });
+        let mut c = Ctx::new();
+        // Zone move already applied by the caller: C116 first, new card last.
+        c.players[0].played_cards = vec!["C116".into(), "occ_food1".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        let mut budget = 64u32;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        dispatch_play(
+            &set,
+            0,
+            "occ_food1",
+            1,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            1,
+            &BTreeSet::new(),
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.wood, 1,
+            "fee 1 + individual cost 1 must grant only 1 wood (occupation cost only)"
+        );
     }
 
     /// Dispatcher play path for A117 木材調達人: verifies that the dispatcher
