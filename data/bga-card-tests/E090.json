@@ -27,6 +27,7 @@
         "fields": 1
       },
       "action": {
+        "play": "E090",
         "breed_1_offspring": true
       },
       "expected": {

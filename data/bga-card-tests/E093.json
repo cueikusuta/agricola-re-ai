@@ -27,6 +27,7 @@
         "people_in_supply": 2
       },
       "action": {
+        "play": "E093",
         "first_turn_of_round": true
       },
       "expected": {

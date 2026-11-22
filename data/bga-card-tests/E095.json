@@ -36,7 +36,7 @@
       "scope": "effect_only",
       "setup": {
         "stone_oven_available": true,
-        "resources": { "stone": 1 }
+        "resources": { "clay": 1, "stone": 3 }
       },
       "action": {
         "play": "E095",
@@ -45,6 +45,7 @@
       },
       "expected": {
         "stone_oven_built": true,
+        "resources_spent": { "clay": 1, "stone": 3 },
         "baking_actions_gained": 2
       }
     }

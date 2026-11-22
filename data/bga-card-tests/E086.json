@@ -16,7 +16,8 @@
       "expected": {
         "wood": 1,
         "animals_on_card_capacity": 4
-      }
+      },
+      "notes": "Expected values follow the Japanese wiki reading (wood is discarded; capacity is 2x the discarded wood). Destination of the wood and the capacity rule remain open as MQ-06; re-check this case after resolution."
     },
     {
       "id": "E086-capacity",
@@ -31,7 +32,8 @@
       "expected": {
         "wood": 4,
         "animals_on_card_capacity": 2
-      }
+      },
+      "notes": "Expected values follow the Japanese wiki reading (wood is discarded; capacity is 2x the discarded wood). Destination of the wood and the capacity rule remain open as MQ-06; re-check this case after resolution."
     }
   ]
 }

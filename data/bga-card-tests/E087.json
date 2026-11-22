@@ -28,6 +28,7 @@
         "house": "clay"
       },
       "action": {
+        "play": "E087",
         "end_work_phase": true,
         "renovate_to": "stone"
       },

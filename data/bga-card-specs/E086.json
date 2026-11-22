@@ -71,7 +71,7 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects[0].steps[0].params.action: Japanese says '木1を捨てる' (discard 1 wood), English says 'place on card irretrievably'. Classification MQ-06: unclear whether wood is discarded or placed on card, and whether animal capacity is 2x number of cards or 2x wood discarded."
+      "effects[0].steps[0].params.action: classification MQ-06 — JA wiki says the wood is discarded from supply, EN wiki says the wood is placed on the card irretrievably, JA does not mention card capacity. Open: discard vs place-on-card, and whether capacity is 2x the discarded wood or a fixed number."
     ],
     "test_case_ids": [
       "E086-normal",

@@ -16,10 +16,11 @@
         "play_minor_improvement": true
       },
       "expected": {
-        "occupations_played": 3,
+        "occupations_played": 4,
         "food": 1,
         "minor_improvements_played": 1
-      }
+      },
+      "notes": "E097 is the 3rd occupation; the extra occupation play brings the total to 4."
     },
     {
       "id": "E097-not-3rd",
@@ -51,10 +52,11 @@
         "play_minor_improvement": true
       },
       "expected": {
-        "occupations_played": 3,
+        "occupations_played": 4,
         "food": 2,
         "minor_improvements_played": 1
-      }
+      },
+      "notes": "E097 is the 3rd occupation; the extra occupation play brings the total to 4."
     }
   ]
 }

@@ -29,6 +29,7 @@
         "fences": 0
       },
       "action": {
+        "play": "E088",
         "round_start": true
       },
       "expected": {
@@ -45,6 +46,7 @@
         "fences": 0
       },
       "action": {
+        "play": "E088",
         "round_start": true,
         "pay_3_wood_for_4_fences": true
       },

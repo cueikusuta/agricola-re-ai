@@ -13,8 +13,9 @@
         "play": "E089"
       },
       "expected": {
-        "stables": 0
-      }
+        "stables": 1
+      },
+      "notes": "E089 is played as the 2nd occupation; a free stable is built."
     },
     {
       "id": "E089-3rd-occupation",
@@ -57,6 +58,21 @@
       "expected": {
         "stables": 3
       }
+    },
+    {
+      "id": "E089-4th-occupation",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 3,
+        "stables": 1
+      },
+      "action": {
+        "play_occupation": "other"
+      },
+      "expected": {
+        "stables": 1
+      },
+      "notes": "4th occupation is not a trigger count (2/3/5/7); no stable is built."
     }
   ]
 }

@@ -28,6 +28,7 @@
         "has_room_for_growth": false
       },
       "action": {
+        "play": "E092",
         "use_family_growth": true
       },
       "expected": {
@@ -44,6 +45,7 @@
         "already_used": true
       },
       "action": {
+        "play": "E092",
         "use_family_growth": true
       },
       "expected": {

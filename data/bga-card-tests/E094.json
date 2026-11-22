@@ -7,6 +7,7 @@
       "scope": "effect_only",
       "setup": {
         "house": "wood",
+        "rooms": 3,
         "resources": { "clay": 3, "reed": 1 }
       },
       "action": {
@@ -39,6 +40,7 @@
       "scope": "effect_only",
       "setup": {
         "house": "wood",
+        "rooms": 3,
         "wood": 5,
         "clay": 3,
         "reed": 1,

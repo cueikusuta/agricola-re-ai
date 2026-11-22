@@ -74,7 +74,8 @@
     }
   ],
   "post_play": {
-    "destination": "left_neighbor_hand"
+    "destination": "played_area",
+    "notes": "Permanent effect (1 sheep capacity on the card; breeding requirement) and 1 printed victory point; the card remains in the played area."
   },
   "review": {
     "status": "bga_checked",
@@ -86,6 +87,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-20",
     "implementation_status": "not_started",
-    "notes": "During harvest breeding, only 1 sheep needed for breeding; this card can hold 1 sheep; pass left."
+    "notes": "During harvest breeding, only 1 sheep needed for breeding; this card can hold 1 sheep. Stays in played area (permanent effect plus 1 printed point)."
   }
 }
