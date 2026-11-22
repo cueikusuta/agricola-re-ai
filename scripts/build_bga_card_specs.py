@@ -179,6 +179,7 @@ def case(cid, setup, act, expected, scope="effect_only", notes=None):
 
 # --- prerequisite structures --------------------------------------------
 PREREQ = {
+
     "A008": [cond("occupation_count", n=2), cond("improvement_count", n=2)],
     "A013": [cond("house_is", house="wood"), cond("room_count", n=2)],
     "A021": [cond("occupation_count", n=1)],
@@ -220,6 +221,19 @@ PREREQ = {
     "E036": [cond("pasture_count", n=1)],
     "E037": [cond("animal_count_at_least", animal="cattle", n=1)],
     "E039": [cond("animal_count_at_least", animal="wild_boar", n=1)],
+    "A010": [cond("house_is", house="wood")],
+    "A018": [cond("occupation_count", n=2)],
+    "A034": [cond("occupation_count", n=2)],
+    "A035": [cond("occupation_count", n=2)],
+    "A043": [cond("animal_count_at_least", n=1)],
+    "A044": [cond("occupation_count", n=2)],
+    "A045": [cond("house_is", house="wood")],
+    "A046": [cond("pasture_count", n=1)],
+    "A049": [cond("occupation_count", n=1)],
+    "A052": [cond("round_number", min=7)],
+    "A062": [cond("resource_at_least", good="grain", n=2)],
+    "A065": [cond("field_count", n=3)],
+    "A069": [cond("occupation_count", n=2)],
 }
 
 # --- curated card table --------------------------------------------------
@@ -2638,8 +2652,8 @@ CARDS = {
             "A004": {
         "post": "left_neighbor_hand",
         "effects": [
-            effect("on_play", [gain("wood", per(count("room"), 1)),
-                               gain("wood", 1)],
+            effect("on_play", [gain("wood", per(count("room"), 1))]),
+            effect("on_play", [gain("wood", 1)],
                    cond=[cond("rooms_exceed_people")], order=1),
         ],
         "notes": "Gain 1 wood per room; if rooms exceed people, gain 1 extra wood; pass left.",
@@ -2697,7 +2711,7 @@ CARDS = {
     "A014": {
         "post": "played_area",
         "effects": [
-            effect("after_room_construction",
+            effect("when_buying",
                    [discount_cost(good="reed", amount=2, scope="room_building"),
                     discount_cost(good=table("house", {"wood": "wood", "clay": "clay",
                                                        "stone": "stone"}),
@@ -3654,7 +3668,7 @@ CARDS = {
         "effects": [
             effect("after_worker_space",
                    [gain(table("food_taken", {"2": "stone", "3": "reed", "4": "clay", "5": "wood"}), 1)],
-                   cond=[cond("worker_space_used", space="fishing"),
+                   cond=[cond("worker_space_used", spaces=["fishing", "traveling_players"]),
                          cond("food_taken_in", values=[2, 3, 4, 5])],
                    freq="every_use", dur="permanent"),
         ],

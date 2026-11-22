@@ -36,7 +36,7 @@
     "cost": [],
     "prerequisites": [
       {
-        "predicate": "at_least_occupations",
+        "predicate": "occupation_count",
         "params": {
           "n": 3
         }

@@ -44,7 +44,7 @@
   },
   "effects": [
     {
-      "trigger": "after_room_construction",
+      "trigger": "when_buying",
       "conditions": [
         {
           "predicate": "rooms_built_at_once_at_least",

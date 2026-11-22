@@ -39,7 +39,14 @@
         "amount": 1
       }
     ],
-    "prerequisites": [],
+    "prerequisites": [
+      {
+        "predicate": "pasture_count",
+        "params": {
+          "n": 1
+        }
+      }
+    ],
     "printed_points": 0
   },
   "effects": [
