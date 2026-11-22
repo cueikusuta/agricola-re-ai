@@ -416,6 +416,14 @@ pub enum ScoreBonusRule {
     FarmyardAllUsed,
     /// E035 人間不信 (Misanthropy): 2/3/5 points for exactly 4/3/2 family members.
     ExactFamilyMembers,
+    /// D030 職人地区 (Artisan District): 2/5/8 bonus points when the bottom
+    /// row of the supply board holds 3/4/5 or more major improvements
+    /// (2 or fewer -> no bonus). The count reuses the canonical bottom-row
+    /// judgment shared with `CountKind::MajorImprovementsBottomRow`
+    /// (joinery/pottery/basketry); it never counts the total number of
+    /// major improvements. Appended at the enum tail so existing serde
+    /// variants and saved-game bytes are unchanged.
+    MajorImprovementsBottomRowThresholds,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1446,6 +1454,16 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                     2 => 5,
                     _ => 0,
                 },
+                ScoreBonusRule::MajorImprovementsBottomRowThresholds => {
+                    // Bottom row only (Joinery/Pottery/Basketry), never the
+                    // total major-improvement count.
+                    match major_improvements_bottom_row(player) {
+                        3 => 2,
+                        4 => 5,
+                        n if n >= 5 => 8,
+                        _ => 0,
+                    }
+                }
             },
             _ => 0,
         })
@@ -4043,6 +4061,25 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 rule: ScoreBonusRule::StoneRoomsExceedPeople,
             }],
         ),
+        // D030 職人地区 (Artisan District): cost 1 stone, prerequisites 3
+        // occupations, printed points 1; at scoring, 2/5/8 bonus points when
+        // the bottom row of the supply board holds 3/4/5+ major improvements
+        // (2 or fewer -> no bonus).
+        CardDefinition {
+            use_limit: None,
+            id: "D030".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Stone, 1)],
+            points: 1,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(3),
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::MajorImprovementsBottomRowThresholds,
+                },
+            ],
+        },
     ]
 }
 
@@ -4913,10 +4950,154 @@ mod verified_band_d_tests {
         assert_eq!(card.points, 0);
     }
 
+    /// Bottom row = Joinery / Pottery / Basketry (same canonical set as
+    /// `CountKind::MajorImprovementsBottomRow` / B007), each contributing one
+    /// to the count; 3/4/5+ -> 2/5/8, 0-2 -> 0.
+    #[test]
+    fn d030_thresholds_two_five_eight_for_three_four_five_bottom_row_majors() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D030".into());
+        // 0 and 2 bottom-row majors -> no bonus (2 is the exact boundary).
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        for imp in [Improvement::Joinery, Improvement::Pottery] {
+            p.improvements.push(imp);
+        }
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // 3 -> +2 (spec contract D030-three-majors).
+        p.improvements.push(Improvement::Basketry);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        // 4 -> +5.
+        p.improvements.push(Improvement::Joinery);
+        assert_eq!(end_game_bonus(&set, &p), 5);
+        // 5 -> +8.
+        p.improvements.push(Improvement::Pottery);
+        assert_eq!(end_game_bonus(&set, &p), 8);
+        // 6 (above the top threshold) still caps at +8.
+        p.improvements.push(Improvement::Basketry);
+        assert_eq!(end_game_bonus(&set, &p), 8);
+    }
+
+    #[test]
+    fn d030_less_than_three_bottom_row_majors_no_bonus() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D030".into());
+        // spec contract D030-less-than-three.
+        p.improvements
+            .extend([Improvement::Joinery, Improvement::Pottery]);
+        assert_eq!(end_game_bonus(&set, &p), 0);
+    }
+
+    #[test]
+    fn d030_bonus_counts_only_bottom_row_majors() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D030".into());
+        // 3 bottom-row majors -> +2; adding five non-bottom-row majors
+        // must not raise the count or the bonus.
+        p.improvements.extend([
+            Improvement::Joinery,
+            Improvement::Pottery,
+            Improvement::Basketry,
+            Improvement::Fireplace2,
+            Improvement::Fireplace3,
+            Improvement::Hearth4,
+            Improvement::ClayOven,
+            Improvement::StoneOven,
+        ]);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        // Two bottom-row majors mixed with others stays below the threshold.
+        let mut q = Player::new(0, 0);
+        q.played_cards.push("D030".into());
+        q.improvements.extend([
+            Improvement::Joinery,
+            Improvement::Basketry,
+            Improvement::Fireplace2,
+            Improvement::ClayOven,
+        ]);
+        assert_eq!(end_game_bonus(&set, &q), 0);
+    }
+
+    #[test]
+    fn d030_cost_stone_one_three_occupations_and_printed_points_one() {
+        let set = set();
+        let card = set.definition("D030").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Stone, 1)]);
+        // Printed points 1 live on the definition, separate from the
+        // end-game bonus effect.
+        assert_eq!(card.points, 1);
+        assert!(card.effects.iter().any(|effect| matches!(
+            effect,
+            CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumOccupations(3)
+            }
+        )));
+        let mut p = Player::new(0, 0);
+        p.supply.stone = 1;
+        // Two played occupations (D100/D105) cannot satisfy the 3-occupation
+        // prerequisite even though the stone cost is affordable.
+        p.played_cards.extend(["D100".into(), "D105".into()]);
+        assert!(!can_play(&set, card, &p, 0));
+        // A third occupation (D109) opens the play.
+        p.played_cards.push("D109".into());
+        assert!(can_play(&set, card, &p, 0));
+        // Without the stone the cost alone blocks the play.
+        p.supply.stone = 0;
+        assert!(!can_play(&set, card, &p, 0));
+    }
+
+    #[test]
+    fn d030_printed_points_and_end_game_bonus_are_separate() {
+        let set = set();
+        let mut hand = vec!["D030".to_string()];
+        let mut p = Player::new(0, 0);
+        p.supply.stone = 1;
+        // Prerequisite unmet (2 occupations) -> play refuses.
+        p.played_cards.extend(["D100".into(), "D105".into()]);
+        assert!(play(
+            &set,
+            &mut hand,
+            &mut p,
+            "D030",
+            CardKind::MinorImprovement,
+            0
+        )
+        .is_err());
+        // With the third occupation the play succeeds and adds the printed
+        // point immediately; the end-game bonus is still computed separately.
+        p.played_cards.push("D109".into());
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "D030",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.card_points, 1);
+        assert_eq!(p.supply.stone, 0, "cost stone 1 was paid");
+        // No bottom-row major -> no bonus on top of the printed point.
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // Three bottom-row majors -> +2 on top of the printed point.
+        p.improvements.extend([
+            Improvement::Joinery,
+            Improvement::Pottery,
+            Improvement::Basketry,
+        ]);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        assert_eq!(
+            p.card_points, 1,
+            "bonus never joins the card-points counter"
+        );
+    }
+
     #[test]
     fn band_d_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["D100", "D105", "D109", "D032", "D034"] {
+        for id in ["D100", "D105", "D109", "D032", "D034", "D030"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
