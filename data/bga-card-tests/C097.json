@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "C097",
+  "cases": [
+    {
+      "id": "C097-both-seeds-any-player",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C097"
+        ],
+        "grain_seeds_occupied_by": "other_player",
+        "vegetable_seeds_occupied_by": "other_player"
+      },
+      "action": {
+        "phase": "returning_home_phase"
+      },
+      "expected": {
+        "food_delta": 2,
+        "free_occupation_play_offered": true
+      },
+      "notes": "Both seed spaces filled by other players is enough: the owner still gains 2 food and may play one occupation for free."
+    },
+    {
+      "id": "C097-one-space-only",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C097"
+        ],
+        "grain_seeds_occupied_by": "owner",
+        "vegetable_seeds_occupied_by": null
+      },
+      "action": {
+        "phase": "returning_home_phase"
+      },
+      "expected": {
+        "food_delta": 0,
+        "free_occupation_play_offered": false
+      },
+      "notes": "Only one of the two spaces occupied: no food and no free occupation."
+    },
+    {
+      "id": "C097-own-both-spaces",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C097"
+        ],
+        "grain_seeds_occupied_by": "owner",
+        "vegetable_seeds_occupied_by": "owner"
+      },
+      "action": {
+        "phase": "returning_home_phase"
+      },
+      "expected": {
+        "food_delta": 2,
+        "free_occupation_play_offered": true
+      },
+      "notes": "Owner filling both spaces triggers the same reward."
+    },
+    {
+      "id": "C097-decline-free-occupation",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C097"
+        ],
+        "grain_seeds_occupied_by": "owner",
+        "vegetable_seeds_occupied_by": "owner",
+        "occupations_in_hand": 0
+      },
+      "action": {
+        "phase": "returning_home_phase",
+        "play_free_occupation": false
+      },
+      "expected": {
+        "food_delta": 2,
+        "free_occupations_played": 0
+      },
+      "notes": "The food gain is mandatory once both spaces were occupied; only the free occupation play is optional."
+    }
+  ]
+}

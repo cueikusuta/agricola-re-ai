@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "C093",
+  "cases": [
+    {
+      "id": "C093-forest-stone-then-person",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C093"
+        ],
+        "unplaced_persons": 1,
+        "used_space": "forest",
+        "general_supply_stone": 2
+      },
+      "action": {
+        "use_space": "forest",
+        "accept_effect": true
+      },
+      "expected": {
+        "stone_placed_on": "clay_pit",
+        "stone_removed_from": "general_supply",
+        "extra_persons_placed": 1
+      },
+      "notes": "Using the Forest accumulation space lets the owner move 1 stone from the general supply onto the Clay Pit and then place one more unplaced person."
+    },
+    {
+      "id": "C093-clay-pit-stone-then-person",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C093"
+        ],
+        "unplaced_persons": 1,
+        "used_space": "clay_pit",
+        "general_supply_stone": 2
+      },
+      "action": {
+        "use_space": "clay_pit",
+        "accept_effect": true
+      },
+      "expected": {
+        "stone_placed_on": "forest",
+        "stone_removed_from": "general_supply",
+        "extra_persons_placed": 1
+      },
+      "notes": "Mirror of the Forest case: the stone lands on the other space of the pair."
+    },
+    {
+      "id": "C093-decline-stone-no-person",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C093"
+        ],
+        "unplaced_persons": 1,
+        "used_space": "forest",
+        "general_supply_stone": 2
+      },
+      "action": {
+        "use_space": "forest",
+        "accept_effect": false
+      },
+      "expected": {
+        "stone_placed_on": null,
+        "extra_persons_placed": 0
+      },
+      "notes": "Both steps are chained and optional: skipping the stone placement also forfeits the extra person placement."
+    },
+    {
+      "id": "C093-no-unplaced-person",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C093"
+        ],
+        "unplaced_persons": 0,
+        "used_space": "forest",
+        "general_supply_stone": 2
+      },
+      "action": {
+        "use_space": "forest",
+        "accept_effect": true
+      },
+      "expected": {
+        "stone_placed_on": "clay_pit",
+        "extra_persons_placed": 0
+      },
+      "notes": "The stone placement is independent of person availability; with nobody unplaced the second step simply finds no legal placement (encoding flagged in review.unresolved_fields)."
+    }
+  ]
+}

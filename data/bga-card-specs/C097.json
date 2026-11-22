@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "card_id": "C097",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "種子研究者",
+    "name_en": "Seed Researcher"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2992",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; effect rephrased in own words, no verbatim text kept"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list row used to cross-check the card id, name and effect summary"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "returning_home_phase",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "grain_seeds"
+          }
+        },
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "vegetable_seeds"
+          }
+        },
+        {
+          "predicate": "any_player",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_round",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Once in the returning-home phase of a round in which both seed spaces had people on them (the owner's or any other player's)."
+    },
+    {
+      "trigger": "returning_home_phase",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "grain_seeds"
+          }
+        },
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "vegetable_seeds"
+          }
+        },
+        {
+          "predicate": "any_player",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "play_occupation_from_hand_free",
+            "count": 1,
+            "waived_cost": "occupation_cost"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_round",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "The owner may play 1 occupation card from hand without paying its occupation cost. The English source states the occupation cost is waived; other costs (for example food substitution on the played card) are not addressed by the sources."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C097-both-seeds-any-player",
+      "C097-one-space-only",
+      "C097-own-both-spaces"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Printed points: 0. Ban: none. Own-word summary of the third-party wiki effect: whenever people come back from both the Grain Seeds and the Vegetable Seeds action spaces (either space may have been filled by any player), the owner gains 2 food and may play 1 occupation card for free. The Japanese page commentary confirms the spaces need not have been filled by the owner. Encoded as one food gain plus one optional free occupation play in the same returning-home phase. Classification (docs/all-cards-classification-final.md, PR #377 source): stage 3, returning-home phase with any-player overlap (RH). Sources: BGA wiki JA page and English list row, cross-checked; not official Lookout verification."
+  }
+}

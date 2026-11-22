@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "card_id": "C098",
+  "cases": [
+    {
+      "id": "C098-on-play-wood",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0
+      },
+      "action": {
+        "play": "C098"
+      },
+      "expected": {
+        "wood_delta": 1
+      },
+      "notes": "Immediately on play, the owner gains 1 wood."
+    },
+    {
+      "id": "C098-field-phase-exchange",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C098"
+        ],
+        "wood": 1,
+        "food": 1,
+        "bonus_points": 0,
+        "phase": "harvest_field_phase"
+      },
+      "action": {
+        "use_card": "C098",
+        "exchange": true
+      },
+      "expected": {
+        "wood_delta": -1,
+        "food_delta": -1,
+        "points_delta": 1
+      },
+      "notes": "In the harvest field phase, exactly 1 wood plus 1 food buys 1 bonus point through this card."
+    },
+    {
+      "id": "C098-decline-exchange",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C098"
+        ],
+        "wood": 1,
+        "food": 1,
+        "bonus_points": 0,
+        "phase": "harvest_field_phase"
+      },
+      "action": {
+        "use_card": "C098",
+        "exchange": false
+      },
+      "expected": {
+        "wood_delta": 0,
+        "food_delta": 0,
+        "points_delta": 0
+      },
+      "notes": "The field-phase exchange is optional; declining keeps goods and points unchanged."
+    },
+    {
+      "id": "C098-insufficient-goods",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C098"
+        ],
+        "wood": 0,
+        "food": 1,
+        "bonus_points": 0,
+        "phase": "harvest_field_phase"
+      },
+      "action": {
+        "use_card": "C098",
+        "exchange": true
+      },
+      "expected": {
+        "wood_delta": 0,
+        "food_delta": 0,
+        "points_delta": 0
+      },
+      "notes": "Both goods are required for the exchange; a missing good blocks it entirely (no partial payment)."
+    }
+  ]
+}
