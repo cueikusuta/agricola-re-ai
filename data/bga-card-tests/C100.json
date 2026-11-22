@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "card_id": "C100",
+  "cases": [
+    {
+      "id": "C100-early-play-rooms-exceed",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C100"
+        ],
+        "played_round": 11,
+        "rooms": 3,
+        "people": 2,
+        "bonus_points": 0
+      },
+      "action": {
+        "score": true
+      },
+      "expected": {
+        "points_delta": 4
+      },
+      "notes": "Played by round 11 with 3 rooms against 2 family members: the 4-point bonus applies."
+    },
+    {
+      "id": "C100-late-play-no-bonus",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C100"
+        ],
+        "played_round": 12,
+        "rooms": 4,
+        "people": 2,
+        "bonus_points": 0
+      },
+      "action": {
+        "score": true
+      },
+      "expected": {
+        "points_delta": 0
+      },
+      "notes": "Both sources make the bonus conditional on playing the card in round 11 or before; a round-12 play does not score even with surplus rooms."
+    },
+    {
+      "id": "C100-rooms-not-exceed",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C100"
+        ],
+        "played_round": 5,
+        "rooms": 2,
+        "people": 3,
+        "bonus_points": 0
+      },
+      "action": {
+        "score": true
+      },
+      "expected": {
+        "points_delta": 0
+      },
+      "notes": "Fewer rooms than family members: no bonus."
+    },
+    {
+      "id": "C100-rooms-equal-people",
+      "scope": "effect_only",
+      "setup": {
+        "occupation_in_play": [
+          "C100"
+        ],
+        "played_round": 5,
+        "rooms": 2,
+        "people": 2,
+        "bonus_points": 0
+      },
+      "action": {
+        "score": true
+      },
+      "expected": {
+        "points_delta": 0
+      },
+      "notes": "Boundary case: rooms must strictly exceed the people count, so equality scores nothing."
+    }
+  ]
+}

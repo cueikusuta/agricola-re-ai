@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "card_id": "C101",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "屋台の所有者",
+    "name_en": "Stall Holder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2988",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; effect rephrased in own words, no verbatim text kept"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list row used to cross-check the card id, name and effect summary"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "grain",
+                "amount": 2
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": {
+                  "op": "custom",
+                  "args": [
+                    "table",
+                    "unfenced_stables",
+                    {
+                      "0": 1,
+                      "1": 2,
+                      "2": 3,
+                      "3": 4,
+                      "4": 5
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_round",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Once per round, at any time, when the farm has 0/1/2/3/4 stables that are not fenced in, the owner may hand over 2 grain to receive 1 bonus point plus 1/2/3/4/5 food according to that stable count."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: 'once per round at any time' is not in the trigger vocabulary; modeled as passive with frequency once_per_round (same gap as C009/C018)",
+      "effects[0].steps[0].params.receive: the food amount is a table keyed by the unfenced-stable count (count source 'unfenced_stables' per A098); the source enumerates 0-4 only and does not state the 5-or-more case"
+    ],
+    "test_case_ids": [
+      "C101-zero-unfenced",
+      "C101-two-unfenced",
+      "C101-four-unfenced",
+      "C101-insufficient-grain",
+      "C101-once-per-round"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Printed points: 0. Ban: none. Own-word summary of the third-party wiki effect: once per round the owner may trade 2 grain for 1 bonus point and 1/2/3/4/5 food, the food rate set by how many stables on the farm are not enclosed by fences (0/1/2/3/4). Classification (docs/all-cards-classification-final.md, PR #377 source): stage outside, single site: any time (once per round) / exchange plus points, PS. Sources: BGA wiki JA page and English list row, cross-checked; not official Lookout verification."
+  }
+}
