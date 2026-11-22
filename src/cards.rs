@@ -246,6 +246,63 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// A090 鋤職人 (Plow Driver): at each round start, if the owner lives in a
+    /// stone house, may pay 1 food to plow exactly 1 field. Optional; the
+    /// handler checks the house condition and resource availability.
+    StartRoundPlowFieldIfHouse {
+        house: House,
+        food_cost: u32,
+        fields: u32,
+    },
+    /// A151 吟遊楽人 (Minstrel): at each round start in rounds 1-4, if the round
+    /// action space for that round is unused (no worker placed), copy its
+    /// effect. The copied effect is resolved deterministically without placing
+    /// a worker. Handled in the round-start dispatcher.
+    StartRoundCopyUnusedRoundSpace {
+        max_round: u8,
+    },
+    /// A152 夜学生 (Night-School Student): at each round start, if the Lessons
+    /// space was used by fewer players than any other action space this round,
+    /// may pay 1 food to play an occupation from hand. The condition requires
+    /// checking all players' used spaces; handled in the handler.
+    StartRoundPlayOccupationIfLessonsUnderused {
+        food_cost: u32,
+    },
+    /// B097 学者 (Scholar): at each round start, if the owner has a stone house,
+    /// may either pay 1 food to play an occupation from hand, or pay the
+    /// normal cost to play a minor improvement from hand. Optional; two
+    /// distinct choices handled in the handler.
+    StartRoundPlayCardIfStoneHouse {
+        occupation_food_cost: u32,
+    },
+    /// B106 清廉潔白な人 (Moral Crusader): at each round start, if there are
+    /// any goods on revealed round action spaces (accumulations), gain 1 food.
+    /// Unconditional gain when condition met; checked in effect_condition_holds.
+    StartRoundGainIfGoodsOnRoundSpaces {
+        good: Good,
+        amount: u32,
+    },
+    /// B135 栄養士 (Nutrition Expert): at each round start, may exchange 1
+    /// animal of any owned type, 1 grain, and 1 vegetable for 5 food and 2
+    /// points. Optional; the handler verifies all give resources are available
+    /// before exchanging. Points are added immediately to card_points.
+    StartRoundExchangeForFoodAndPoints {
+        give_animal: bool,
+        give_grain: u32,
+        give_vegetable: u32,
+        receive_food: u32,
+        receive_points: i32,
+    },
+    /// C064 穀物蒸留酒製造所 (Corn Schnapps Distillery): at each round start,
+    /// may pay 1 grain to place 1 food on each of the next 4 round action
+    /// spaces. The food is added to those spaces' accumulations and will be
+    /// available when those rounds are reached. Optional; handler checks grain
+    /// availability and updates future round accumulations.
+    StartRoundPlaceFoodOnNextRoundSpaces {
+        grain_cost: u32,
+        food_per_space: u32,
+        num_spaces: u8,
+    },
     /// B114 子なし (Childless): at each round start, if the owner has exactly
     /// `family` family members and at least `rooms_at_least` rooms, gain
     /// `amount` of `good`. Fired from the round-start After scan; the condition
@@ -345,6 +402,25 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
             CardEffect::AfterImprovementPlayedGain { .. } => "after_improvement_played_gain",
+            CardEffect::StartRoundPlowFieldIfHouse { .. } => "start_round_plow_field_if_house",
+            CardEffect::StartRoundCopyUnusedRoundSpace { .. } => {
+                "start_round_copy_unused_round_space"
+            }
+            CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. } => {
+                "start_round_play_occupation_if_lessons_underused"
+            }
+            CardEffect::StartRoundPlayCardIfStoneHouse { .. } => {
+                "start_round_play_card_if_stone_house"
+            }
+            CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. } => {
+                "start_round_gain_if_goods_on_round_spaces"
+            }
+            CardEffect::StartRoundExchangeForFoodAndPoints { .. } => {
+                "start_round_exchange_for_food_and_points"
+            }
+            CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => {
+                "start_round_place_food_on_next_round_spaces"
+            }
             CardEffect::StartRoundGainIfFamilyAndRooms { .. } => {
                 "start_round_gain_if_family_and_rooms"
             }
@@ -584,6 +660,7 @@ impl CardSet {
                         | CardEffect::AfterClayConstructionGain { amount, .. }
                         | CardEffect::AfterHarvestBakeGain { amount }
                         | CardEffect::OnPlayGainPerCount { amount, .. }
+                        | CardEffect::AfterImprovementPlayedGain { amount, .. }
                         | CardEffect::AfterHarvestGain { amount, .. }
                         | CardEffect::AfterHarvestGainIfAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfFamilyAndRooms { amount, .. }
@@ -601,8 +678,15 @@ impl CardSet {
 
                         CardEffect::AfterAnyWorkerGain { amount, .. }
                         | CardEffect::AfterAnyWorkerOthersGain { amount, .. }
-                        | CardEffect::HarvestStartGainIfFields { amount, .. }
-                        | CardEffect::AfterImprovementPlayedGain { amount, .. } => *amount,
+                        | CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
+                        // Chapter 1 round-start cards: no direct resource amount to validate
+                        CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        | CardEffect::StartRoundCopyUnusedRoundSpace { .. }
+                        | CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. }
+                        | CardEffect::StartRoundPlayCardIfStoneHouse { .. }
+                        | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
+                        | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
+                        | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 1,
                     };
                     amount == 0 || amount > 30
                 })
@@ -3379,6 +3463,7 @@ mod round_and_harvest_card_tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         players[0].supply.food
@@ -3425,6 +3510,7 @@ mod round_and_harvest_card_tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         players[0].supply.food
@@ -3474,6 +3560,7 @@ mod round_and_harvest_card_tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         players[0].supply.food
@@ -3534,6 +3621,7 @@ mod round_and_harvest_card_tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         players[0].supply.grain
@@ -3994,6 +4082,127 @@ pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
             cost: vec![(Good::Wood, 2), (Good::Stone, 2)],
             points: 2,
             effects: vec![CardEffect::AfterHarvestBakeGain { amount: 3 }],
+        },
+    ]
+}
+
+/// Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064) mapped from
+/// bga_checked specifications. These use the new StartRoundGain vocabulary
+/// and custom StartRound* effect variants for complex triggers.
+pub fn verified_round_start_cards() -> Vec<CardDefinition> {
+    let minor = CardKind::MinorImprovement;
+    let occupation = CardKind::Occupation;
+    vec![
+        // A090 鋤職人 (Plow Driver): at each round start, if the owner lives in a
+        // stone house, may pay 1 food to plow exactly 1 field. Optional.
+        CardDefinition {
+            use_limit: None,
+            id: "A090".into(),
+            kind: occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::StartRoundPlowFieldIfHouse {
+                house: House::Stone,
+                food_cost: 1,
+                fields: 1,
+            }],
+        },
+        // A151 吟遊楽人 (Minstrel): at each round start in rounds 1-4, if the round
+        // action space for that round is unused (no worker placed), copy its
+        // effect. The copied effect is resolved deterministically without placing
+        // a worker. Not optional (automatic when condition met). 4 players only.
+        CardDefinition {
+            use_limit: None,
+            id: "A151".into(),
+            kind: occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::StartRoundCopyUnusedRoundSpace { max_round: 4 },
+            ],
+        },
+        // A152 夜学生 (Night-School Student): at each round start, if the Lessons
+        // space was used by fewer players than any other action space this round,
+        // may pay 1 food to play an occupation from hand. Optional. 4 players only.
+        CardDefinition {
+            use_limit: None,
+            id: "A152".into(),
+            kind: occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::StartRoundPlayOccupationIfLessonsUnderused { food_cost: 1 },
+            ],
+        },
+        // B097 学者 (Scholar): at each round start, if the owner has a stone house,
+        // may either pay 1 food to play an occupation from hand, or pay the normal
+        // cost to play a minor improvement from hand. Optional. All player counts.
+        CardDefinition {
+            use_limit: None,
+            id: "B097".into(),
+            kind: occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::StartRoundPlayCardIfStoneHouse {
+                occupation_food_cost: 1,
+            }],
+        },
+        // B106 清廉潔白な人 (Moral Crusader): at each round start, if there are any
+        // goods on revealed round action spaces (accumulations), gain 1 food.
+        // Unconditional gain when condition met. All player counts.
+        CardDefinition {
+            use_limit: None,
+            id: "B106".into(),
+            kind: occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::StartRoundGainIfGoodsOnRoundSpaces {
+                good: Good::Food,
+                amount: 1,
+            }],
+        },
+        // B135 栄養士 (Nutrition Expert): at each round start, may exchange 1 animal
+        // of any owned type, 1 grain, and 1 vegetable for 5 food and 2 points.
+        // Optional. 3+ players only.
+        CardDefinition {
+            use_limit: None,
+            id: "B135".into(),
+            kind: occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::StartRoundExchangeForFoodAndPoints {
+                    give_animal: true,
+                    give_grain: 1,
+                    give_vegetable: 1,
+                    receive_food: 5,
+                    receive_points: 2,
+                },
+            ],
+        },
+        // C064 穀物蒸留酒製造所 (Corn Schnapps Distillery): cost 1 wood + 2 clay,
+        // 1 printed point. At each round start, may pay 1 grain to place 1 food
+        // on each of the next 4 round action spaces. Optional. All player counts.
+        CardDefinition {
+            use_limit: None,
+            id: "C064".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1), (Good::Clay, 2)],
+            points: 1,
+            effects: vec![CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
+                grain_cost: 1,
+                food_per_space: 1,
+                num_spaces: 4,
+            }],
         },
     ]
 }
@@ -6474,11 +6683,13 @@ mod p1_2_repro_tests {
             insert_cards(players, &verified_simple_occupations(players));
             insert_cards(players, &verified_multiplayer_passive_cards(players));
         }
-        let count_independent: [Vec<CardDefinition>; 9] = [
+        let count_independent: [Vec<CardDefinition>; 10] = [
             verified_immediate_resource_cards(),
             verified_round_and_harvest_cards(),
             verified_passive_cards(),
             verified_extra_simple_cards(),
+            // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064)
+            verified_round_start_cards(),
             verified_band_a_cards(),
             verified_band_b_cards(),
             verified_band_c_cards(),

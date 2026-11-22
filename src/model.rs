@@ -1322,6 +1322,7 @@ impl Game {
                 &mut self.public.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
+                &self.public.revealed,
             )
             // Before this change the same failure was a panic here; keeping the
             // expect would turn a rules error into a crash, so record it as a
@@ -1777,6 +1778,7 @@ impl Game {
                             used_spaces: used_spaces.clone(),
                             site: crate::registry::EventKind::Bake,
                             event_kind: crate::registry::EventKind::Bake,
+                            revealed_round_cards: Vec::new(),
                             c066_take_food_instead: false,
                         };
                         // After phase. If THIS is the paused step and the pause
@@ -1913,6 +1915,7 @@ impl Game {
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::ClayConstruction,
                         event_kind: crate::registry::EventKind::ClayConstruction,
+                        revealed_round_cards: Vec::new(),
                         c066_take_food_instead: false,
                     };
                     // After phase. If THIS is the paused step and the pause was
@@ -2024,6 +2027,7 @@ impl Game {
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
+                        revealed_round_cards: Vec::new(),
                         c066_take_food_instead: false,
                     };
                     // After phase. If THIS is the paused step and the pause was

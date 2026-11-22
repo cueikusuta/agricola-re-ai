@@ -93,6 +93,14 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::HarvestStartGainIfFields { .. } => TriggerPhase::After,
         // End game scoring — After phase
         CardEffect::EndGameBonus { .. } => TriggerPhase::After,
+        // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064) — After phase
+        CardEffect::StartRoundPlowFieldIfHouse { .. } => TriggerPhase::After,
+        CardEffect::StartRoundCopyUnusedRoundSpace { .. } => TriggerPhase::After,
+        CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. } => TriggerPhase::After,
+        CardEffect::StartRoundPlayCardIfStoneHouse { .. } => TriggerPhase::After,
+        CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. } => TriggerPhase::After,
+        CardEffect::StartRoundExchangeForFoodAndPoints { .. } => TriggerPhase::After,
+        CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => TriggerPhase::After,
     }
 }
 
@@ -393,6 +401,7 @@ fn resolve_phase_scan(
             used_spaces: trigger_data.used_spaces.clone(),
             site: trigger_data.site,
             event_kind: trigger_data.site,
+            revealed_round_cards: trigger_data.revealed_round_cards.clone(),
             c066_take_food_instead: trigger_data.c066_take_food_instead,
         };
 
@@ -689,6 +698,81 @@ fn resolve_phase_scan(
                     *amount,
                     trigger_data,
                 )?,
+                // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064)
+                CardEffect::StartRoundPlowFieldIfHouse {
+                    house,
+                    food_cost,
+                    fields,
+                } => handle_start_round_plow_field_if_house(
+                    ctx,
+                    player,
+                    house,
+                    *food_cost,
+                    *fields,
+                    trigger_data,
+                )?,
+                CardEffect::StartRoundCopyUnusedRoundSpace { max_round } => {
+                    handle_start_round_copy_unused_round_space(
+                        ctx,
+                        player,
+                        *max_round,
+                        round_now,
+                        trigger_data,
+                    )?
+                }
+                CardEffect::StartRoundPlayOccupationIfLessonsUnderused { food_cost } => {
+                    handle_start_round_play_occupation_if_lessons_underused(
+                        ctx,
+                        player,
+                        *food_cost,
+                        trigger_data,
+                    )?
+                }
+                CardEffect::StartRoundPlayCardIfStoneHouse {
+                    occupation_food_cost,
+                } => handle_start_round_play_card_if_stone_house(
+                    ctx,
+                    player,
+                    *occupation_food_cost,
+                    trigger_data,
+                )?,
+                CardEffect::StartRoundGainIfGoodsOnRoundSpaces { good, amount } => {
+                    handle_start_round_gain_if_goods_on_round_spaces(
+                        ctx,
+                        player,
+                        good,
+                        *amount,
+                        trigger_data,
+                    )?
+                }
+                CardEffect::StartRoundExchangeForFoodAndPoints {
+                    give_animal,
+                    give_grain,
+                    give_vegetable,
+                    receive_food,
+                    receive_points,
+                } => handle_start_round_exchange_for_food_and_points(
+                    ctx,
+                    player,
+                    *give_animal,
+                    *give_grain,
+                    *give_vegetable,
+                    *receive_food,
+                    *receive_points,
+                    trigger_data,
+                )?,
+                CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
+                    grain_cost,
+                    food_per_space,
+                    num_spaces,
+                } => handle_start_round_place_food_on_next_round_spaces(
+                    ctx,
+                    player,
+                    *grain_cost,
+                    *food_per_space,
+                    *num_spaces,
+                    trigger_data,
+                )?,
                 CardEffect::EndGameBonus { .. } => {
                     // Scoring is handled separately in evaluation; no runtime effect.
                     EffectResult::Resolved
@@ -805,6 +889,10 @@ pub struct PhaseTriggerData {
     /// Not serialized; only used during deserialization to populate `site`.
     #[serde(skip_serializing, default = "EventKind::default")]
     pub event_kind: EventKind,
+    /// Revealed round cards (for round-start effects that need to know the round action spaces).
+    /// Only populated for RoundStart triggers.
+    #[serde(default)]
+    pub revealed_round_cards: Vec<crate::model::RoundCard>,
     /// C066 永遠のライ麦畑 owner's instead-choice for this harvest: `true`
     /// takes the 1 food at grain >= 3, `false` (default) takes the 1 grain.
     /// Only read by the `AfterHarvestComplete` dispatch; harmless elsewhere.
@@ -827,6 +915,7 @@ impl<'de> Deserialize<'de> for PhaseTriggerData {
             used_spaces: std::collections::BTreeSet<Space>,
             site: Option<EventKind>,
             event_kind: Option<EventKind>,
+            revealed_round_cards: Option<Vec<crate::model::RoundCard>>,
             c066_take_food_instead: Option<bool>,
         }
 
@@ -844,6 +933,7 @@ impl<'de> Deserialize<'de> for PhaseTriggerData {
             used_spaces: h.used_spaces,
             site,
             event_kind: site, // Keep in sync for any downstream code that reads event_kind
+            revealed_round_cards: h.revealed_round_cards.unwrap_or_default(),
             c066_take_food_instead: h.c066_take_food_instead.unwrap_or(false),
         })
     }
@@ -966,6 +1056,30 @@ fn effect_condition_holds(
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
+        // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064).
+        //
+        // Optional round-start actions stay dormant in the generic scan for
+        // the same reason as the A118 exchange (PR #385 review finding (c)):
+        // `GameState::start_round` discards the dispatch Transition and only
+        // re-checks `pending.is_some()` at the NEXT round boundary, so a
+        // pause created here has no resolution window. Multiple owners would
+        // also overwrite one shared `pending` slot mid-loop. The trigger
+        // vocabulary, the dispatch wiring and the condition predicates are
+        // all in place; only the player-decision channel (which field to
+        // plow, which hand card to play, which animal to give) is missing,
+        // and it needs a round-start plan channel before these can apply.
+        CardEffect::StartRoundPlowFieldIfHouse { .. } => false,
+        CardEffect::StartRoundCopyUnusedRoundSpace { .. } => false,
+        CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. } => false,
+        CardEffect::StartRoundPlayCardIfStoneHouse { .. } => false,
+        // B106 is the exception that stays live: its gain is unconditional
+        // once the round spaces hold goods (the handler does the goods
+        // check), so it needs no player decision and can apply directly.
+        CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. } => {
+            trigger.site == EventKind::RoundStart
+        }
+        CardEffect::StartRoundExchangeForFoodAndPoints { .. } => false,
+        CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => false,
         #[cfg(test)]
         CardEffect::PendingProbe { .. } => true,
     }
@@ -1238,6 +1352,81 @@ pub fn execute_chosen_triggers(
                 *threshold,
                 good,
                 *amount,
+                trigger_data,
+            )?,
+            // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064)
+            CardEffect::StartRoundPlowFieldIfHouse {
+                house,
+                food_cost,
+                fields,
+            } => handle_start_round_plow_field_if_house(
+                ctx,
+                player,
+                house,
+                *food_cost,
+                *fields,
+                trigger_data,
+            )?,
+            CardEffect::StartRoundCopyUnusedRoundSpace { max_round } => {
+                handle_start_round_copy_unused_round_space(
+                    ctx,
+                    player,
+                    *max_round,
+                    round_now,
+                    trigger_data,
+                )?
+            }
+            CardEffect::StartRoundPlayOccupationIfLessonsUnderused { food_cost } => {
+                handle_start_round_play_occupation_if_lessons_underused(
+                    ctx,
+                    player,
+                    *food_cost,
+                    trigger_data,
+                )?
+            }
+            CardEffect::StartRoundPlayCardIfStoneHouse {
+                occupation_food_cost,
+            } => handle_start_round_play_card_if_stone_house(
+                ctx,
+                player,
+                *occupation_food_cost,
+                trigger_data,
+            )?,
+            CardEffect::StartRoundGainIfGoodsOnRoundSpaces { good, amount } => {
+                handle_start_round_gain_if_goods_on_round_spaces(
+                    ctx,
+                    player,
+                    good,
+                    *amount,
+                    trigger_data,
+                )?
+            }
+            CardEffect::StartRoundExchangeForFoodAndPoints {
+                give_animal,
+                give_grain,
+                give_vegetable,
+                receive_food,
+                receive_points,
+            } => handle_start_round_exchange_for_food_and_points(
+                ctx,
+                player,
+                *give_animal,
+                *give_grain,
+                *give_vegetable,
+                *receive_food,
+                *receive_points,
+                trigger_data,
+            )?,
+            CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
+                grain_cost,
+                food_per_space,
+                num_spaces,
+            } => handle_start_round_place_food_on_next_round_spaces(
+                ctx,
+                player,
+                *grain_cost,
+                *food_per_space,
+                *num_spaces,
                 trigger_data,
             )?,
             CardEffect::EndGameBonus { .. } => {
@@ -2182,6 +2371,175 @@ fn handle_gain_if_no_minor_played(
     Ok(EffectResult::Resolved)
 }
 
+// ============================================================================
+// Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064)
+//
+// B106 applies for real (unconditional when goods sit on the revealed round
+// spaces). The optional cards stay dormant: a round-start PendingDecision has
+// no resolution window (`GameState::start_round` discards the dispatch
+// Transition and several owners would overwrite one shared `pending` slot),
+// which is the PR #385 finding (c) brick pattern. Applying them needs a
+// round-start plan channel carrying the player's choice; the trigger
+// vocabulary, dispatch wiring and condition predicates are already in place.
+// ============================================================================
+
+/// A090 鋤職人 (Plow Driver): at each round start, if the owner lives in a
+/// stone house, may pay 1 food to plow exactly 1 field. Optional.
+/// ENGINE LIMITATION: dormant — needs a field-location decision channel.
+fn handle_start_round_plow_field_if_house(
+    _ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    _house: &House,
+    _food_cost: u32,
+    _fields: u32,
+    _trigger_data: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    // Dormant by design: the effect is optional and needs a field-location
+    // decision the round-start dispatcher cannot represent (see the
+    // `effect_condition_holds` note). The scan never reaches this handler
+    // today; reaching it is a bug, so stay a resolved no-op rather than
+    // creating an unresolvable pending decision (PR #385 finding (c)).
+    Ok(EffectResult::Resolved)
+}
+
+/// A151 吟遊楽人 (Minstrel): at each round start in rounds 1-4, if the round
+/// action space for that round is unused (no worker placed), copy its effect.
+/// ENGINE LIMITATION: dormant — copying a space action has no engine
+/// vocabulary (executing a space action without placing a worker).
+fn handle_start_round_copy_unused_round_space(
+    _ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    _max_round: u8,
+    _round_now: u8,
+    _trigger_data: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    // Dormant by design: copying an arbitrary round space's effect means
+    // executing that space's action without a worker, which the engine has no
+    // vocabulary for. Documented limitation; the scan never reaches this
+    // handler (see the `effect_condition_holds` note), and reaching it stays
+    // a resolved no-op rather than an unresolvable pending decision.
+    Ok(EffectResult::Resolved)
+}
+
+/// A152 夜学生 (Night-School Student): at each round start, if the Lessons
+/// space was used by fewer players than any other action space this round,
+/// may pay 1 food to play an occupation from hand.
+/// ENGINE LIMITATION: dormant — needs all players' used-space analysis plus
+/// a hand-card choice channel.
+fn handle_start_round_play_occupation_if_lessons_underused(
+    _ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    _food_cost: u32,
+    _trigger_data: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    // Dormant by design: the condition ("Lessons used by fewer players than
+    // any other space") needs every player's used-space set, and the effect
+    // needs a hand-card choice the round-start dispatcher cannot represent
+    // (see the `effect_condition_holds` note). Resolved no-op, never an
+    // unresolvable pending decision (PR #385 finding (c)).
+    Ok(EffectResult::Resolved)
+}
+
+/// B097 学者 (Scholar): at each round start, if the owner has a stone house,
+/// may either pay 1 food to play an occupation from hand, or pay the normal
+/// cost to play a minor improvement from hand. Optional; two distinct choices.
+/// ENGINE LIMITATION: dormant — needs a hand-card choice channel.
+fn handle_start_round_play_card_if_stone_house(
+    _ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    _occupation_food_cost: u32,
+    _trigger_data: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    // Dormant by design: either choice plays a hand card (occupation for 1
+    // food, or a minor for its normal cost), a card-selection decision the
+    // round-start dispatcher cannot represent (see the
+    // `effect_condition_holds` note). Resolved no-op, never an unresolvable
+    // pending decision (PR #385 finding (c)).
+    Ok(EffectResult::Resolved)
+}
+
+/// B106 清廉潔白な人 (Moral Crusader): immediately before each round begins,
+/// if any round action space holds goods the owner would receive, gain 1
+/// food. Unconditional gain when the condition met; the condition site is
+/// checked by effect_condition_holds, the goods check happens here.
+///
+/// Interpretation note (recorded for human confirmation, AGENTS.md rule 3):
+/// the BGA wiki text (checked 2026-11-14, spec `data/bga-card-specs/B106.json`)
+/// reads, in this engine's terms, "goods on round action spaces". The engine's
+/// single `accumulations` map also covers the base action spaces (Forest,
+/// ClayPit, ...), which are NOT round spaces, so this handler restricts the
+/// check to the revealed round cards' spaces. A stricter reading ("upcoming"
+/// = not-yet-started round spaces) is currently unsatisfiable in the engine
+/// because no effect can place goods on future round spaces yet.
+fn handle_start_round_gain_if_goods_on_round_spaces(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    good: &Good,
+    amount: u32,
+    trigger_data: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    // Round-card spaces only: the base action spaces share the
+    // `accumulations` map but are not round spaces, so they must not satisfy
+    // the condition. Only the round-start dispatcher threads `accumulations`
+    // in (`None` elsewhere), so the Option gates the check naturally.
+    let has_round_space_goods = trigger_data.revealed_round_cards.iter().any(|card| {
+        ctx.accumulations
+            .is_some_and(|map| map.get(&Space::from(*card)).is_some_and(|&n| n > 0))
+    });
+    if has_round_space_goods {
+        let p = &mut ctx.player;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B135 栄養士 (Nutrition Expert): at each round start, may exchange 1 animal
+/// of any owned type, 1 grain, and 1 vegetable for 5 food and 2 points.
+/// Optional.
+/// ENGINE LIMITATION: dormant — needs a given-animal choice channel.
+#[allow(clippy::too_many_arguments)] // the exchange vocabulary is fixed: 3 give slots + 2 receive slots
+fn handle_start_round_exchange_for_food_and_points(
+    _ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    _give_animal: bool,
+    _give_grain: u32,
+    _give_vegetable: u32,
+    _receive_food: u32,
+    _receive_points: i32,
+    _trigger_data: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    // Dormant by design: the exchange is optional and the given-animal choice
+    // is a player decision the round-start dispatcher cannot represent (see
+    // the `effect_condition_holds` note). Resolved no-op, never an
+    // unresolvable pending decision (PR #385 finding (c)).
+    Ok(EffectResult::Resolved)
+}
+
+/// C064 穀物蒸留酒製造所 (Corn Schnapps Distillery): at each round start,
+/// may pay 1 grain to place 1 food on each of the next 4 round action
+/// spaces. The food would be added to those spaces' accumulations and be
+/// available when those rounds are reached. Optional.
+/// ENGINE LIMITATION: dormant — needs a spend-vs-keep decision channel.
+fn handle_start_round_place_food_on_next_round_spaces(
+    _ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    _grain_cost: u32,
+    _food_per_space: u32,
+    _num_spaces: u8,
+    _trigger_data: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    // Dormant by design: the effect is optional and needs the spend-vs-keep
+    // grain decision the round-start dispatcher cannot represent (see the
+    // `effect_condition_holds` note). Resolved no-op, never an unresolvable
+    // pending decision (PR #385 finding (c)).
+    Ok(EffectResult::Resolved)
+}
+
 // --- Public Dispatcher Entry Points ---
 /// Dispatch all phases for a card play action.
 ///
@@ -2247,6 +2605,7 @@ pub fn dispatch_play(
         used_spaces: std::collections::BTreeSet::new(),
         site: EventKind::CardPlayed,
         event_kind: EventKind::CardPlayed,
+        revealed_round_cards: Vec::new(),
         c066_take_food_instead: false,
     };
 
@@ -2523,6 +2882,7 @@ pub fn dispatch_after_worker(
         used_spaces: used_spaces.clone(),
         site: EventKind::WorkerPlaced,
         event_kind: EventKind::WorkerPlaced,
+        revealed_round_cards: Vec::new(),
         c066_take_food_instead: false,
     };
 
@@ -2626,6 +2986,7 @@ pub fn dispatch_start_round(
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
+    revealed_round_cards: &[crate::model::RoundCard],
 ) -> Result<Transition, String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
@@ -2658,6 +3019,7 @@ pub fn dispatch_start_round(
             used_spaces: used_spaces.clone(),
             site: EventKind::RoundStart,
             event_kind: EventKind::RoundStart,
+            revealed_round_cards: revealed_round_cards.to_vec(),
             c066_take_food_instead: false,
         };
 
@@ -2739,6 +3101,7 @@ pub fn dispatch_after_clay_construction(
         used_spaces: used_spaces.clone(),
         site: EventKind::ClayConstruction,
         event_kind: EventKind::ClayConstruction,
+        revealed_round_cards: Vec::new(),
         c066_take_food_instead: false,
     };
 
@@ -2814,6 +3177,7 @@ pub fn dispatch_harvest_field(
         used_spaces: used_spaces.clone(),
         site: EventKind::Harvest,
         event_kind: EventKind::Harvest,
+        revealed_round_cards: Vec::new(),
         c066_take_food_instead: false,
     };
 
@@ -2891,6 +3255,7 @@ pub fn dispatch_after_harvest_complete(
         used_spaces: used_spaces.clone(),
         site: EventKind::AfterHarvestComplete,
         event_kind: EventKind::AfterHarvestComplete,
+        revealed_round_cards: Vec::new(),
         c066_take_food_instead,
     };
 
@@ -2959,6 +3324,7 @@ pub fn dispatch_after_harvest_bake(
         used_spaces: used_spaces.clone(),
         site: EventKind::Bake,
         event_kind: EventKind::Bake,
+        revealed_round_cards: Vec::new(),
         c066_take_food_instead: false,
     };
 
@@ -3444,6 +3810,7 @@ mod tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &[],
         )
         .unwrap();
 
@@ -3496,6 +3863,7 @@ mod tests {
             &mut card_uses,
             &card_use_limits,
             &mut pending,
+            &[],
         );
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("budget exhausted"));
@@ -3685,6 +4053,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         assert_eq!(legacy[0].supply.food, c.players[0].supply.food);
@@ -3937,6 +4306,7 @@ mod tests {
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
+                &[],
             )
             .unwrap();
             assert_eq!(
@@ -4190,6 +4560,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &[],
         );
         // With a single PendingProbe effect, the chain pauses on that effect.
         assert!(
@@ -4253,6 +4624,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending_none(),
+            &[],
         )
         .unwrap_err();
         assert!(err.contains("use limit"), "got: {err}");
@@ -4595,6 +4967,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &[],
         )
         .unwrap();
 
@@ -4624,6 +4997,7 @@ mod tests {
             &mut uses,
             &limits,
             &mut pending,
+            &[],
         )
         .unwrap();
 
@@ -5609,6 +5983,7 @@ mod tests {
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
+                &[],
             )
             .unwrap();
             c.players[0].supply.food
@@ -6664,6 +7039,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         assert_eq!(
@@ -6672,7 +7048,7 @@ mod tests {
         );
     }
 
-    /// Test that B050 fires on harvest field phase.
+    /// Test that B118 fires on harvest field phase.
     #[test]
     fn b050_harvest_field_gain_fires_on_harvest_field() {
         let set = CardSet {
@@ -6788,6 +7164,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         assert_eq!(
@@ -6821,6 +7198,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         assert_eq!(
@@ -6903,6 +7281,7 @@ mod tests {
             &mut c.uses,
             &c.limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         assert_eq!(
