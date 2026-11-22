@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "card_id": "D075",
+  "cases": [
+    {
+      "id": "D075-sow-wood-harvest-wood",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0
+      },
+      "action": {
+        "trigger": "sow_action",
+        "target_field": "D075_card_field",
+        "crop": "wood",
+        "amount": 2
+      },
+      "expected": {
+        "wood_on_field": 2,
+        "field_counted_as": 2
+      },
+      "notes": "Sow wood on card field (counts as 2 fields)"
+    },
+    {
+      "id": "D075-counts-as-2-fields",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          { "crop": "grain", "count": 1 }
+        ],
+        "card_fields": [
+          { "id": "D075", "crop": "wood", "count": 2 }
+        ]
+      },
+      "action": {
+        "trigger": "harvest_field_phase"
+      },
+      "expected": {
+        "total_fields_for_wood": 2,
+        "wood_harvested": 2
+      },
+      "notes": "Card field counts as 2 fields for wood harvest"
+    },
+    {
+      "id": "D075-sow-like-grain",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 2
+      },
+      "action": {
+        "trigger": "sow_action",
+        "target_field": "D075_card_field",
+        "crop": "wood",
+        "amount": 2
+      },
+      "expected": {
+        "sow_allowed": true,
+        "wood_on_field": 2
+      },
+      "notes": "Wood is sown like grain (1 per field, so 2 total for this card field)"
+    }
+  ]
+}

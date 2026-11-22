@@ -1189,8 +1189,13 @@ mod tests {
         // excluded from the verified pool, so the sample_game distribution is unchanged.
         // Updated: added A042 Forest Lake Hut to verified_minor_worker_cards (pool size 33->34)
         // Updated: added A121 Brick Stamping to verified_minor_worker_cards (pool size 34->35)
+        // Updated: added A118/A145/C066 to verified_round_and_harvest_cards (pool size 35->38)
+        // Updated: PR #385 review fix (e) — A145 removed from the two-player
+        // preset (spec eligibility "2": "no"), pool size 38->37.
+        // Updated: StartRoundGainIf* wave — B114/A049/C067 joined the
+        // two-player preset (A157 stays out, 4 players only), pool size 37->41.
         assert_eq!(
-            digest, "a024ed2ee08bad2a70262613afa86f07d89686e4f28cb17c0a6415d700104e99",
+            digest, "310a31bdb04fa7fa2abec2a215396065daf5874819f413c6f669247f5f55deff",
             "sample_game distribution changed — update this test only if intentional"
         );
     }

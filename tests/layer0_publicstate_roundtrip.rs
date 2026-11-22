@@ -292,7 +292,10 @@ fn use_limit_ledger_survives_save_load_as_canonical_state() {
     })
     .unwrap_or_else(|e| panic!("day laborer must be playable at start: {e}"));
     assert_eq!(
-        game.public.card_uses.get("TEST_LIMITED"),
+        game.public.card_uses.get(&format!(
+            "TEST_LIMITED:{:?}",
+            agricola_re_ai::registry::EventKind::WorkerPlaced
+        )),
         Some(&1),
         "use_limit カードの使用が正本台帳に記録される"
     );
@@ -307,7 +310,13 @@ fn use_limit_ledger_survives_save_load_as_canonical_state() {
 
     // 観測射影にも台帳が乗り、再構築ゲームで一致する。
     let obs = game.observation(0).unwrap();
-    assert_eq!(obs.public.card_uses.get("TEST_LIMITED"), Some(&1));
+    assert_eq!(
+        obs.public.card_uses.get(&format!(
+            "TEST_LIMITED:{:?}",
+            agricola_re_ai::registry::EventKind::WorkerPlaced
+        )),
+        Some(&1)
+    );
     let mut rng = ChaCha8Rng::seed_from_u64(0xBEEF);
     let reconstructed = sample_game(&obs, &mut rng).expect("reconstruction must succeed");
     assert_eq!(reconstructed.public.card_uses, game.public.card_uses);
@@ -333,11 +342,13 @@ fn start_round_rejects_pending_and_preserves_state_hash() {
     // 手動で pending decision を注入 (ChooseTriggerOrder を模倣)
     use agricola_re_ai::card_events::TriggerPhase;
     use agricola_re_ai::pending::{PendingDecision, PendingKind};
+    use agricola_re_ai::registry::EventKind;
     let decision = PendingDecision::new(
         1, // id
         0, // player
         PendingKind::ChooseTriggerOrder {
             phase: TriggerPhase::After,
+            site: EventKind::WorkerPlaced,
             triggers: vec![("fake_card".into(), 0, "fake_trigger".into())],
         },
         hash_before.clone(), // state_hash_before は現在の hash と一致

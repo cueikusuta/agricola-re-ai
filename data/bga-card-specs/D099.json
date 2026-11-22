@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "card_id": "D099",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "土器作り",
+    "name_en": "Earthenware Potter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2822",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "round_number",
+          "params": {
+            "max": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "stack_goods_on_card",
+            "action": "mark_played_early",
+            "goods": ["clay"],
+            "notes": "ラウンド4以前に出していればマーカーを置く"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "after_final_harvest",
+      "conditions": [
+        {
+          "predicate": "accumulation_at_least",
+          "params": {
+            "space": "card",
+            "n": 1
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_points",
+          "target": "owner",
+          "params": {
+            "points": {
+              "custom": ["threshold_table", "people", { "1": 1, "2": 2, "3": 3, "4": 4, "5": 5 }]
+            }
+          },
+          "notes": "最後の収穫後に人物1人につきレンガ1で1点（人物数まで）"
+        },
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": {
+              "custom": ["count", "person"]
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "出した時（ラウンド4以前ならマーカー）。最終収穫後、人物数までレンガ1で1点購入可（PR #356 G0-G2ゲート対象）"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params.kind=other: stack_goods_on_card で『ラウンド4以前に出していれば』という条件を記録するマーカーの仕様",
+      "effects[1].steps[0].params.points: custom threshold_table で人物数を上限とする得点計算",
+      "effects[1].steps[1].params.amount: custom count person で人物数分のレンガを支払う",
+      "classification: 段階4（P9 出したとき＋最終収穫後）。PR #356 の G0〜G2 ゲート対象カードとして再調査せず #356 の扱いを参照とある"
+    ],
+    "test_case_ids": [
+      "D099-play-round-4-then-final-harvest-score",
+      "D099-play-round-5-no-score",
+      "D099-final-harvest-insufficient-clay"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: If played in round 4 or earlier, after final harvest, may pay 1 clay per person (up to person count) for 1 point each. PR #356 G0-G2 gate target. Triggers: on_play (with round<=4 marker) + after_final_harvest. Unresolved: marker specification, clay payment up to person count, points calculation."
+  }
+}

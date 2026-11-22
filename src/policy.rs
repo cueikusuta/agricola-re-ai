@@ -502,6 +502,14 @@ fn card_good_value(good: Good) -> i64 {
     }
 }
 
+fn card_animal_value(animal: Animal) -> i64 {
+    match animal {
+        Animal::Cattle => 5, // Cattle are most valuable (can breed, worth 1 VP each)
+        Animal::Sheep => 4,  // Sheep breed fast
+        Animal::Boar => 3,   // Boar don't breed but worth 1 VP
+    }
+}
+
 /// Score the card's actual immediate resource/point change after payments,
 /// then add a bounded forecast for explicitly recurring or passive effects.
 /// This avoids treating conditional on-play rewards as unconditional.
@@ -534,10 +542,10 @@ fn card_priority(
         value += match effect {
                 // Exact gains and discounted costs were simulated above.
                 CardEffect::OnPlayGain { .. }
-                | CardEffect::OnPlayGainPerStored { .. }
-                | CardEffect::OnPlayGainIfHouse { .. }
-                | CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | CardEffect::Prerequisite { .. } => 0,
+                                | CardEffect::OnPlayGainPerStored { .. }
+                                | CardEffect::OnPlayGainIfHouse { .. }
+                                | CardEffect::OnPlayGainPerImprovementPlayed { .. }
+                                | CardEffect::Prerequisite { .. } => 0,
                 #[cfg(test)]
                 // Test-only probe; never part of a real evaluated pool.
                 CardEffect::PendingProbe { .. } => 0,
@@ -583,9 +591,71 @@ fn card_priority(
                     card_good_value(*good) * i64::from(*amount) * avg_count
                 }
                 CardEffect::Passive { .. } => horizon * 5,
-                CardEffect::EndGameBonus { .. } => 12,
-                CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
-            };
+                                CardEffect::EndGameBonus { .. } => 12,
+                                CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
+                                CardEffect::AfterHarvestGain { good, amount, .. }
+                                | CardEffect::AfterHarvestGainIfAtLeast { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                }
+                                // C066: the conditional choice grants the primary or the
+                                // upgrade gain; value the better of the two at the same
+                                // optimistic discount as the sibling after-harvest arms.
+                                CardEffect::AfterHarvestChooseGainIfAtLeast {
+                                    good,
+                                    amount,
+                                    upgrade_gain,
+                                    upgrade_amount,
+                                    ..
+                                } => {
+                                    let primary = card_good_value(*good) * i64::from(*amount);
+                                    let upgrade = card_good_value(*upgrade_gain) * i64::from(*upgrade_amount);
+                                    primary.max(upgrade) * horizon
+                                }
+                                // A118: the exchange is plan-driven and capped at 2 buys per
+                                // harvest, so value one purchase per remaining harvest at a
+                                // 50% discount (mirrors the sibling conditional arms).
+                                CardEffect::HarvestFieldOptionalExchange { gain, gain_amount, .. } => {
+                                    card_good_value(*gain) * i64::from(*gain_amount) * horizon / 2
+                                }
+                                // New variants for market followup cards (PR #393)
+                                CardEffect::AfterAnyWorkerGain { good, amount, .. }
+                                | CardEffect::AfterAnyWorkerOthersGain { good, amount, .. } => {
+                                    // Fires on any player's use of the space; approximate with per-round expectation
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 4
+                                }
+                                CardEffect::HarvestStartGainIfFields { good, amount, .. } => {
+                                    // Conditional on field count; optimistic half-weight
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                }
+                                CardEffect::OnPlayGainAnimal { animal, amount, .. }
+                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
+                                    card_animal_value(*animal) * i64::from(*amount) * horizon
+                                }
+                                CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                }
+                                // Chapter 1 round-start cards: complex conditional effects not evaluated by heuristic
+                                CardEffect::StartRoundPlowFieldIfHouse { .. }
+                                | CardEffect::StartRoundCopyUnusedRoundSpace { .. }
+                                | CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. }
+                                | CardEffect::StartRoundPlayCardIfStoneHouse { .. }
+                                | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
+                                | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
+                                | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 0,
+                                // B114/A157/A049/C067: conditional round-start gains
+                                // (B114 family+rooms, A157 Lessons occupants, A049
+                                // accumulation grew, C067 non-harvest + pasture
+                                // animals). Same optimistic per-remaining-round
+                                // discount as the E111 conditional arm.
+                                CardEffect::StartRoundGainIfFamilyAndRooms { good, amount, .. }
+                                | CardEffect::StartRoundGainIfLessonsOccupants { good, amount, .. }
+                                | CardEffect::StartRoundGainIfAccumulationGrew { good, amount, .. }
+                                | CardEffect::StartRoundGainIfNoHarvestAndAnimals {
+                                    good,
+                                    amount,
+                                    ..
+                                } => card_good_value(*good) * i64::from(*amount) * horizon,
+                            };
     }
     Some(value)
 }

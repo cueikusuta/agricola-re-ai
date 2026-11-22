@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "card_id": "E072",
+  "cases": [
+    {
+      "id": "E072-harvest-food",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "grain_2"
+      },
+      "action": {
+        "play": "E072",
+        "harvest_phase": "harvest_1_from_this_card"
+      },
+      "expected": {
+        "food_delta": 1
+      },
+      "notes": "At least 1 good harvested from this card during a field phase -> gain 1 food."
+    },
+    {
+      "id": "E072-no-harvest-no-food",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "empty"
+      },
+      "action": {
+        "play": "E072",
+        "harvest_phase": true
+      },
+      "expected": {
+        "food_delta": 0
+      },
+      "notes": "Nothing harvested from this card -> no food."
+    }
+  ]
+}

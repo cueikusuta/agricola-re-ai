@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "E079",
+  "cases": [
+    {
+      "id": "E079-sow-at-least-one",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          "A"
+        ]
+      },
+      "action": {
+        "play": "E079",
+        "sow": {
+          "A": "grain"
+        }
+      },
+      "expected": {
+        "stone_delta": 1
+      },
+      "notes": "Sowing at least one field gains 1 stone."
+    },
+    {
+      "id": "E079-no-sow",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E079",
+        "round": "no_sow_action"
+      },
+      "expected": {
+        "stone_delta": 0
+      },
+      "notes": "No stones gained without a sow action."
+    }
+  ]
+}
