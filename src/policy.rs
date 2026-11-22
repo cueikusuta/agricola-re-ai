@@ -634,6 +634,19 @@ fn card_priority(
                                 CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
+                                // B114/A157/A049/C067: conditional round-start gains
+                                // (B114 family+rooms, A157 Lessons occupants, A049
+                                // accumulation grew, C067 non-harvest + pasture
+                                // animals). Same optimistic per-remaining-round
+                                // discount as the E111 conditional arm.
+                                CardEffect::StartRoundGainIfFamilyAndRooms { good, amount, .. }
+                                | CardEffect::StartRoundGainIfLessonsOccupants { good, amount, .. }
+                                | CardEffect::StartRoundGainIfAccumulationGrew { good, amount, .. }
+                                | CardEffect::StartRoundGainIfNoHarvestAndAnimals {
+                                    good,
+                                    amount,
+                                    ..
+                                } => card_good_value(*good) * i64::from(*amount) * horizon,
                             };
     }
     Some(value)

@@ -331,6 +331,12 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::StartRoundGainIfNoMinorPlayed { .. } => {
                     EventKind::RoundStart
                 }
+                crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms { .. }
+                | crate::cards::CardEffect::StartRoundGainIfLessonsOccupants { .. }
+                | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew { .. }
+                | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
+                    EventKind::RoundStart
+                }
                 crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
                     EventKind::Harvest
                 }
@@ -483,6 +489,21 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
                         | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. }
+                        | crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms {
+                            amount, ..
+                        }
+                        | crate::cards::CardEffect::StartRoundGainIfLessonsOccupants {
+                            amount,
+                            ..
+                        }
+                        | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew {
+                            amount,
+                            ..
+                        }
+                        | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals {
+                            amount,
+                            ..
+                        }
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
                         }

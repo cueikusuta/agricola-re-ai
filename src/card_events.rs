@@ -65,6 +65,10 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfNoMinorPlayed { .. } => TriggerPhase::After,
+        CardEffect::StartRoundGainIfFamilyAndRooms { .. } => TriggerPhase::After,
+        CardEffect::StartRoundGainIfLessonsOccupants { .. } => TriggerPhase::After,
+        CardEffect::StartRoundGainIfAccumulationGrew { .. } => TriggerPhase::After,
+        CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => TriggerPhase::After,
         // Fired only by the play dispatcher's dedicated after-play scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
         CardEffect::AfterOccupationGain { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
@@ -101,6 +105,12 @@ pub struct DispatchContext<'a> {
     pub delayed_well: &'a mut BTreeMap<u8, Vec<usize>>,
     pub round: u8,
     pub used_spaces: &'a std::collections::BTreeSet<Space>,
+    /// Public space accumulations (space -> amount), provided only by the
+    /// round-start dispatcher for accumulation-grew conditions (A049 営巣地).
+    /// `None` on every other dispatch path. This is a runtime-only borrow:
+    /// the struct is never serialized, so save/observation formats are
+    /// untouched.
+    pub accumulations: Option<&'a std::collections::BTreeMap<Space, u32>>,
     pub event_budget: &'a mut u32,
     pub card_uses: &'a mut BTreeMap<String, u32>,
     /// Declared per-card limits. Absent card = no per-period limit.
@@ -398,6 +408,7 @@ fn resolve_phase_scan(
             delayed_well: ctx.delayed_well,
             round: ctx.round,
             used_spaces: ctx.used_spaces,
+            accumulations: ctx.accumulations,
             event_budget: ctx.event_budget,
             card_uses: ctx.card_uses,
             card_use_limits: ctx.card_use_limits,
@@ -562,6 +573,42 @@ fn resolve_phase_scan(
                 CardEffect::StartRoundGainIfNoMinorPlayed { good, amount } => {
                     handle_gain_if_no_minor_played(ctx, player, good, *amount)?
                 }
+                // B114 子なし: family exactly N + rooms >= M (handler judges).
+                CardEffect::StartRoundGainIfFamilyAndRooms {
+                    family,
+                    rooms_at_least,
+                    good,
+                    amount,
+                } => handle_start_round_gain_if_family_and_rooms(
+                    ctx,
+                    player,
+                    *family,
+                    *rooms_at_least,
+                    good,
+                    *amount,
+                )?,
+                // A157 ボヘミアン: Lessons occupants >= min (handler judges).
+                CardEffect::StartRoundGainIfLessonsOccupants { min, good, amount } => {
+                    handle_start_round_gain_if_lessons_occupants(ctx, player, *min, good, *amount)?
+                }
+                // A049 営巣地: accumulation >= min and grew this round.
+                CardEffect::StartRoundGainIfAccumulationGrew {
+                    space,
+                    min,
+                    good,
+                    amount,
+                } => handle_start_round_gain_if_accumulation_grew(
+                    ctx, player, *space, *min, good, *amount,
+                )?,
+                // C067 ミネラルフィーダー: non-harvest round + pasture animals.
+                CardEffect::StartRoundGainIfNoHarvestAndAnimals {
+                    animal,
+                    min,
+                    good,
+                    amount,
+                } => handle_start_round_gain_if_no_harvest_and_animals(
+                    ctx, player, *animal, *min, good, *amount, round_now,
+                )?,
                 CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount } => {
                     handle_gain_if_no_minor_played(ctx, player, good, *amount)?
                 }
@@ -847,6 +894,21 @@ fn effect_condition_holds(
         // definitions, so the scan reports it as triggerable and the
         // handler performs the check.
         CardEffect::StartRoundGainIfNoMinorPlayed { .. } => trigger.site == EventKind::RoundStart,
+        // B114 子なし (family exactly N + rooms >= M), A157 ボヘミアン (Lessons
+        // occupants), A049 営巣地 (accumulation grew), C067 ミネラルフィーダー
+        // (non-harvest round + pasture animals): the conditions are judged
+        // inside the handlers (E111/C111 pattern), so the scan only gates the
+        // site.
+        CardEffect::StartRoundGainIfFamilyAndRooms { .. } => trigger.site == EventKind::RoundStart,
+        CardEffect::StartRoundGainIfLessonsOccupants { .. } => {
+            trigger.site == EventKind::RoundStart
+        }
+        CardEffect::StartRoundGainIfAccumulationGrew { .. } => {
+            trigger.site == EventKind::RoundStart
+        }
+        CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
+            trigger.site == EventKind::RoundStart
+        }
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => trigger.site == EventKind::Harvest,
         // C116 調度品職員 fires only from dispatch_play's dedicated after-play
         // scan, never from the generic phase scan.
@@ -1063,6 +1125,42 @@ pub fn execute_chosen_triggers(
             CardEffect::StartRoundGainIfNoMinorPlayed { good, amount } => {
                 handle_gain_if_no_minor_played(ctx, player, good, *amount)?
             }
+            // B114 子なし: family exactly N + rooms >= M (handler judges).
+            CardEffect::StartRoundGainIfFamilyAndRooms {
+                family,
+                rooms_at_least,
+                good,
+                amount,
+            } => handle_start_round_gain_if_family_and_rooms(
+                ctx,
+                player,
+                *family,
+                *rooms_at_least,
+                good,
+                *amount,
+            )?,
+            // A157 ボヘミアン: Lessons occupants >= min (handler judges).
+            CardEffect::StartRoundGainIfLessonsOccupants { min, good, amount } => {
+                handle_start_round_gain_if_lessons_occupants(ctx, player, *min, good, *amount)?
+            }
+            // A049 営巣地: accumulation >= min and grew this round.
+            CardEffect::StartRoundGainIfAccumulationGrew {
+                space,
+                min,
+                good,
+                amount,
+            } => handle_start_round_gain_if_accumulation_grew(
+                ctx, player, *space, *min, good, *amount,
+            )?,
+            // C067 ミネラルフィーダー: non-harvest round + pasture animals.
+            CardEffect::StartRoundGainIfNoHarvestAndAnimals {
+                animal,
+                min,
+                good,
+                amount,
+            } => handle_start_round_gain_if_no_harvest_and_animals(
+                ctx, player, *animal, *min, good, *amount, round_now,
+            )?,
             CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount } => {
                 handle_gain_if_no_minor_played(ctx, player, good, *amount)?
             }
@@ -1650,6 +1748,132 @@ fn handle_start_round_gain_if_food_at_least_round(
     Ok(EffectResult::Resolved)
 }
 
+/// B114 子なし (Childless): at round start, if the owner has exactly `family`
+/// family members and at least `rooms_at_least` rooms, gain `amount` of
+/// `good`. Spec conditions: `family_exactly` (2) + `rooms_at_least` (3).
+/// The spec's second step (choose 1 grain or 1 vegetable) is recorded as
+/// needs_resolution in the PR and is deliberately not implemented here.
+fn handle_start_round_gain_if_family_and_rooms(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    family: u32,
+    rooms_at_least: u8,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    if u32::from(p.family) == family && p.rooms() >= usize::from(rooms_at_least) {
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// A157 ボヘミアン (Bohemian): at round start, if the Lessons space has at
+/// least `min` occupants, gain `amount` of `good`. The occupants are read
+/// from the used-space set the dispatcher carries (`public.used`).
+///
+/// Engine-timing note (needs_resolution, see PR body): `Game::start_round`
+/// clears `public.used` before dispatching round-start triggers, so the
+/// production path always hands this handler an empty set and the card stays
+/// dormant there. The handler itself is correct whenever a dispatch carries
+/// the occupants (covered by the positive test).
+fn handle_start_round_gain_if_lessons_occupants(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    min: u32,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let occupants = u32::from(ctx.used_spaces.contains(&Space::Lessons));
+    if occupants >= min {
+        let p = &mut ctx.player;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// A049 営巣地 (Nest Site): at round start, if the `space` accumulation holds
+/// at least `min` AND grew this round, gain `amount` of `good`. "Grew this
+/// round" means the per-round refill landed on a non-empty accumulation: the
+/// dispatcher runs right after the refill, so `current > per_round_amount`
+/// identifies exactly that case (current = pre-refill + per-round amount).
+///
+/// The per-round amount comes from `Space::accumulation` (the base refill);
+/// `Space::accumulation_for` differs from it only for Hollow at 4 players,
+/// which no card configures for this effect, and the handler has no
+/// player-count context.
+fn handle_start_round_gain_if_accumulation_grew(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    space: Space,
+    min: u32,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let current = ctx
+        .accumulations
+        .and_then(|map| map.get(&space).copied())
+        .unwrap_or(0);
+    let per_round = space.accumulation().map(|(_, n)| n).unwrap_or(0);
+    if current >= min && current > per_round {
+        let p = &mut ctx.player;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// C067 ミネラルフィーダー (Mineral Feeder): at round start, if the round
+/// does not end with a harvest and the owner pastures at least `min` of
+/// `animal`, gain `amount` of `good`. Spec conditions:
+/// `round_has_no_harvest` and `animal_count_at_least` with location
+/// "pasture", so only pasture-held animals count (stable/pet animals are
+/// excluded on purpose).
+fn handle_start_round_gain_if_no_harvest_and_animals(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    animal: Animal,
+    min: u32,
+    good: &Good,
+    amount: u32,
+    round: u8,
+) -> Result<EffectResult, String> {
+    if crate::model::HARVEST_ROUNDS.contains(&round) {
+        return Ok(EffectResult::Resolved);
+    }
+    let in_pastures: u32 = ctx
+        .player
+        .pastures
+        .iter()
+        .filter(|pasture| pasture.animal == Some(animal))
+        .map(|pasture| pasture.quantity)
+        .sum();
+    if in_pastures >= min {
+        let p = &mut ctx.player;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
 fn handle_after_clay_construction_gain(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
@@ -2005,6 +2229,7 @@ pub fn dispatch_play(
         delayed_well,
         round,
         used_spaces,
+        accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -2312,6 +2537,7 @@ pub fn dispatch_after_worker(
         delayed_well,
         round,
         used_spaces,
+        accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -2362,6 +2588,7 @@ pub fn dispatch_after_worker(
         delayed_well,
         round,
         used_spaces,
+        accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -2394,6 +2621,7 @@ pub fn dispatch_start_round(
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
+    accumulations: &std::collections::BTreeMap<Space, u32>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
@@ -2412,6 +2640,7 @@ pub fn dispatch_start_round(
             delayed_well,
             round,
             used_spaces,
+            accumulations: Some(accumulations),
             event_budget,
             card_uses,
             card_use_limits,
@@ -2492,6 +2721,7 @@ pub fn dispatch_after_clay_construction(
         delayed_well,
         round,
         used_spaces,
+        accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -2566,6 +2796,7 @@ pub fn dispatch_harvest_field(
         delayed_well,
         round,
         used_spaces,
+        accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -2642,6 +2873,7 @@ pub fn dispatch_after_harvest_complete(
         delayed_well,
         round,
         used_spaces,
+        accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -2709,6 +2941,7 @@ pub fn dispatch_after_harvest_bake(
         delayed_well,
         round,
         used_spaces,
+        accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3206,6 +3439,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3257,6 +3491,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3445,6 +3680,7 @@ mod tests {
             &mut well,
             2,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -3696,6 +3932,7 @@ mod tests {
                 &mut well,
                 round,
                 &std::collections::BTreeSet::new(),
+                &std::collections::BTreeMap::new(),
                 &mut c.budget,
                 &mut c.uses,
                 &c.limits,
@@ -3948,6 +4185,7 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -4010,6 +4248,7 @@ mod tests {
             &mut BTreeMap::new(),
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -4351,6 +4590,7 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -4379,6 +4619,7 @@ mod tests {
             &mut well,
             2,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -5363,6 +5604,7 @@ mod tests {
                 &mut well,
                 round,
                 &BTreeSet::new(),
+                &std::collections::BTreeMap::new(),
                 &mut c.budget,
                 &mut c.uses,
                 &c.limits,
@@ -6417,6 +6659,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6540,6 +6783,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6572,6 +6816,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6653,6 +6898,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
