@@ -347,6 +347,12 @@ impl CardRegistryBuilder {
                     EventKind::CardPlayed
                 }
                 crate::cards::CardEffect::AfterOccupationGain { .. } => EventKind::CardPlayed,
+                // B049 fires from dispatch_play's two after-play scans when an
+                // occupation or an improvement is placed, so it is indexed under
+                // the card-play event.
+                crate::cards::CardEffect::AfterPlacementGainIfImprovementsEqualOccupations {
+                    ..
+                } => EventKind::CardPlayed,
                 crate::cards::CardEffect::HarvestFieldGain { .. } => EventKind::Harvest,
                 crate::cards::CardEffect::AfterHarvestGain { .. } => {
                     EventKind::AfterHarvestComplete
@@ -526,7 +532,10 @@ impl CardRegistryBuilder {
                             amount,
                             ..
                         }
-                        | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
+                        | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. }
+                        | crate::cards::CardEffect::AfterPlacementGainIfImprovementsEqualOccupations {
+                            amount, ..
+                        } => {
                             *amount
                         }
                         // Chapter 1 round-start cards: no direct resource amount to validate
