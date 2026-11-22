@@ -1317,12 +1317,12 @@ impl Game {
                 &mut self.delayed_well,
                 self.public.round,
                 &self.public.used,
+                &self.public.accumulations,
                 &mut self.event_budget,
                 &mut self.public.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
                 &self.public.revealed,
-                &mut self.public.accumulations,
             )
             // Before this change the same failure was a panic here; keeping the
             // expect would turn a rules error into a crash, so record it as a
@@ -1727,7 +1727,6 @@ impl Game {
         let mut card_uses = next.public.card_uses.clone();
         let card_use_limits = next.card_use_limits.clone();
         let mut pending = next.pending.clone(); // Should be None after resolution
-        let mut accumulations = next.public.accumulations.clone();
 
         // Determine which steps remain to run based on where we paused.
         let steps = [
@@ -1762,6 +1761,7 @@ impl Game {
                             delayed_well: &mut delayed_well,
                             round,
                             used_spaces: &used_spaces,
+                            accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
                             card_use_limits: &card_use_limits,
@@ -1769,7 +1769,6 @@ impl Game {
                             actor: player,
                             card_owner: player,
                             beneficiary: player,
-                            accumulations: &mut accumulations,
                         };
                         let trigger = crate::card_events::PhaseTriggerData {
                             space: None,
@@ -1898,6 +1897,7 @@ impl Game {
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
                         round,
+                        accumulations: None,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
@@ -1906,7 +1906,6 @@ impl Game {
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
-                        accumulations: &mut accumulations,
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: None,
@@ -2009,6 +2008,7 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
+                        accumulations: None,
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -2018,7 +2018,6 @@ impl Game {
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
-                        accumulations: &mut accumulations,
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: Some(completion.action.space),
@@ -2362,6 +2361,7 @@ impl Game {
                     delayed_well: &mut self.delayed_well,
                     round: self.public.round,
                     used_spaces: &self.public.used,
+                    accumulations: None,
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,
@@ -2369,7 +2369,6 @@ impl Game {
                     actor: pending.player,
                     card_owner,
                     beneficiary: card_owner,
-                    accumulations: &mut self.public.accumulations,
                 };
 
                 // Execute in chosen order

@@ -133,6 +133,18 @@ PendingDecision／イベントフックの拡張は別作業として切り出�
 - 次にやること: 第2章（C帯 難易度3: C071, C073, C075, C080, C081, C082, C085, C086,
   C090, C091, C092, C093 …）で C116（職業コスト連動）等の可否を含めて進める。
 
+### 第1章（B帯）: B001-069 難易度1〜2 — 0実装 / 4保留
+- 対象: B001 裕福な生活 / B002 小牧場 / B003 密造酒 / B008 露店（Issue #235 B帯001-069 第1章、base origin/main）。
+- 判定: 4枚とも現行の型付き効果語彙では実装不可。**0実装 / 4保留**。
+  - B001: `post_play.destination: left_neighbor_hand` + `grant_action(renovation, must_pay_cost=true)` — Renovation アクション付与と左隣手札受け渡しの語彙未実装。
+  - B002: `post_play.destination: left_neighbor_hand` + `operation: fence_pasture` — 柵牧場設置と左隣手札受け渡しの語彙未実装。
+  - B003: `post_play.destination: left_neighbor_hand` + `operation: pick_random_from_hand` + `then: play_for_2_food_or_pass_left` — 手札職業ランダム引き・条件付きプレイ・左隣手札受け渡しの語彙未実装。
+  - B008: `post_play.destination: left_neighbor_hand` + `operation: exchange` — 穀物↔野菜交換と左隣手札受け渡しの語彙未実装。
+- `src/` 変更なし: `verified_band_b_cards()` は main 側既定義（B122/B142/B144/B006/B007 の5枚＋テスト＋registry登録）を保持。branch 側の空プール定義・テスト・registry登録は重複のため削除。`git diff origin/main...HEAD` で `src/` は 0 ファイル。
+- 根拠: `data/bga-card-specs/B001.json`（p=3256, checked 2026-11-09）/`B002.json`（p=3255）/`B003.json`（p=3254）/`B008.json`（p=3249）の `play.effects.*.operation` と `post_play.destination`。BGA wiki: https://agricola.cloudfree.jp/?p=3256 / ?p=3255 / ?p=3254 / ?p=3249（英語一覧 /cardlist_en/ と相互照合）。
+- 解放条件: `post_play.destination: left_neighbor_hand` の実装と `CardEffect` への `grant_action(renovation)` / `fence_pasture` / `pick_random_from_hand` / `exchange` variant 追加（AGENTS.md §3 Issue 起票済み）。
+- テスト: コード変更なし。`cargo fmt --check` / `cargo clippy --all-targets --all-features --locked -- -D warnings` 合格、`cargo test --locked` 全群 green。低リスクの文書変更のため独立再レビューは不要と判断する。
+
 ### 第2章（C帯）: 難易度3（残り21枚）＋ C116
 - 処理対象: C071, C073, C075, C080, C081, C082, C085, C086, C090, C091, C092,
   C093, C097, C098, C100, C101, C102, C103, C112, C114, C116, C117, C120（難易度3）。
