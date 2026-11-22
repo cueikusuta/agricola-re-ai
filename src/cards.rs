@@ -249,6 +249,21 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// D065 麦ふるい (Grain Sieve): during each harvest's field phase, if the
+    /// grain gained THIS field phase (pre-harvest equal to the number of
+    /// grain fields with a growing crop) is at least `threshold`, gain
+    /// `amount` of `good`. The engine's field phase harvests exactly one
+    /// grain per growing grain field AFTER this dispatch fires, so counting
+    /// grain fields with `remaining > 0` here equals the grain this phase
+    /// yields (pinned by comment and tests: the count is per FIELD, not per
+    /// remaining unit). The condition needs farm state, so the generic
+    /// condition scan reports it as triggerable and the handler performs
+    /// the threshold check (same pattern as E111 世捨て人).
+    HarvestFieldGainIfGrainHarvestedAtLeast {
+        threshold: u32,
+        good: Good,
+        amount: u32,
+    },
     /// A090 鋤職人 (Plow Driver): at each round start, if the owner lives in a
     /// stone house, may pay 1 food to plow exactly 1 field. Optional; the
     /// handler checks the house condition and resource availability.
@@ -442,6 +457,9 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
             CardEffect::AfterImprovementPlayedGain { .. } => "after_improvement_played_gain",
+            CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { .. } => {
+                "harvest_field_gain_if_grain_harvested_at_least"
+            }
             CardEffect::StartRoundPlowFieldIfHouse { .. } => "start_round_plow_field_if_house",
             CardEffect::StartRoundCopyUnusedRoundSpace { .. } => {
                 "start_round_copy_unused_round_space"
@@ -733,7 +751,10 @@ impl CardSet {
 
                         CardEffect::AfterAnyWorkerGain { amount, .. }
                         | CardEffect::AfterAnyWorkerOthersGain { amount, .. }
-                        | CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
+                        | CardEffect::HarvestStartGainIfFields { amount, .. }
+                        | CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { amount, .. } => {
+                            *amount
+                        }
                         // Chapter 1 round-start cards: no direct resource amount to validate
                         CardEffect::StartRoundPlowFieldIfHouse { .. }
                         | CardEffect::StartRoundCopyUnusedRoundSpace { .. }
@@ -2818,6 +2839,32 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                 if no_minor_improvements_played(set, player) {
                     safe_gain(player, *good, *amount)?;
                 }
+            } else if let CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
+                threshold,
+                good,
+                amount,
+            } = effect
+            {
+                // D065 麦ふるい: same pre-harvest equivalence as the dispatcher
+                // handler (card_events.rs) — this legacy path also runs before
+                // crops are taken, so growing grain fields (remaining >= 1)
+                // equal the grain this field phase yields, one per field.
+                let grain_fields = player
+                    .farm
+                    .iter()
+                    .filter(|cell| {
+                        matches!(
+                            cell.tile,
+                            Tile::Field {
+                                crop: Some(Crop::Grain),
+                                remaining: 1..,
+                            }
+                        )
+                    })
+                    .count() as u32;
+                if grain_fields >= *threshold {
+                    safe_gain(player, *good, *amount)?;
+                }
             }
         }
     }
@@ -4793,6 +4840,20 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 rule: ScoreBonusRule::StoneRoomsExceedPeople,
             }],
         ),
+        // D065 麦ふるい (Grain Sieve): cost 1 wood; during each harvest's field
+        // phase, if the grain gained this field phase is at least 2, gain 1
+        // more grain from the general supply (BGA spec D065, harvest_field_phase
+        // with grain_harvested_at_least n=2 -> gain_resource grain 1).
+        card(
+            "D065",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1)],
+            vec![CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
+                threshold: 2,
+                good: Good::Grain,
+                amount: 1,
+            }],
+        ),
         // D030 職人地区 (Artisan District): cost 1 stone, prerequisites 3
         // occupations, printed points 1; at scoring, 2/5/8 bonus points when
         // the bottom row of the supply board holds 3/4/5+ major improvements
@@ -5903,7 +5964,7 @@ mod verified_band_d_tests {
     #[test]
     fn band_d_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["D100", "D105", "D109", "D032", "D034", "D030", "D007"] {
+        for id in ["D100", "D105", "D109", "D032", "D034", "D065", "D030", "D007"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -6149,6 +6210,127 @@ mod verified_band_d_tests {
             game.state_hash(),
             "the pass-left move and the round-table gain must replay identically"
         );
+    /// D065 spec parity (data/bga-card-specs/D065.json): cost wood 1, printed
+    /// points 0, no prerequisites; the single harvest effect carries the
+    /// printed threshold 2 and gain grain 1.
+    #[test]
+    fn d065_cost_and_effect_params_match_the_spec() {
+        let card = set()
+            .definition("D065")
+            .expect("D065 in the band D pool")
+            .clone();
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        assert!(
+            !card
+                .effects
+                .iter()
+                .any(|e| matches!(e, CardEffect::Prerequisite { .. })),
+            "D065 prints no prerequisites"
+        );
+        assert!(matches!(
+            card.effects.as_slice(),
+            [CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
+                threshold: 2,
+                good: Good::Grain,
+                amount: 1,
+            }]
+        ));
+        assert_eq!(
+            card.effects[0].public_tag(),
+            "harvest_field_gain_if_grain_harvested_at_least"
+        );
+    }
+
+    /// D065 麦ふるい dispatcher contract (D065-normal / D065-boundary): the
+    /// pre-harvest count is growing grain FIELDS (remaining >= 1), one grain
+    /// per field — a single field with two remaining crops is still one field
+    /// and yields one grain, so the printed "at least 2 grain" is NOT met.
+    #[test]
+    fn d065_grants_extra_grain_only_when_two_fields_are_sown_with_grain() {
+        use crate::card_events::dispatch_harvest_field;
+        use std::collections::BTreeMap;
+
+        let set = set();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("D065".into());
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+
+        // D065-boundary: one growing grain field with 2 remaining crops yields
+        // exactly one grain this phase, so the threshold of 2 is not met.
+        players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut BTreeMap::new(),
+            4,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            players[0].supply.grain, 0,
+            "one growing grain field must not reach the printed threshold of 2"
+        );
+
+        // D065-normal: the second field makes this phase yield 2 grain, so the
+        // card adds exactly 1 more (the dispatcher grants only the card bonus;
+        // the field yield itself happens in harvest_fields afterwards).
+        players[0].farm[3].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut BTreeMap::new(),
+            4,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(players[0].supply.grain, 1, "two fields -> exactly +1 grain");
+    }
+
+    /// The legacy `harvest_field_rewards` differential path keeps the same
+    /// pre-harvest equivalence: it also runs before crops are taken.
+    #[test]
+    fn d065_legacy_harvest_field_rewards_match_the_dispatcher() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D065".into());
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 3,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.grain, 0, "one field is below the threshold");
+        p.farm[4].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.grain, 1, "two fields -> exactly +1 grain");
     }
 }
 
