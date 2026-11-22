@@ -89,8 +89,21 @@ A015×6、A018×7、A021×4、A023×5、A024×5、pending/hash×2、headless×4�
 
 ## Actions CI（最新 HEAD）
 
-- HEAD SHA: （CI 完了後に記載）
-- 必須チェック（cargo test / clippy / rustfmt / pipeline gates）: （run URL・結論を追記）
+- HEAD SHA: `fbe821f` — 全必須チェック緑（下表、Actions 実測）
+| チェック名 | 結論 | Run URL |
+|---|---|---|
+| CI required (aggregate) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45055746662/job/137311177086 |
+| cargo test | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45055746662/job/137310505503 |
+| rustfmt | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45055746662/job/137310505506 |
+| clippy | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45055746662/job/137310505530 |
+| M1/M2/M7 seeded performance | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45055746662/job/137310505467 |
+| Detect changed files | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45055746662/job/137310457232 |
+| Pipeline gates (spec/catalog/blockers) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45055746776/job/137310457491 |
+| Python unittest discovery | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45055746761/job/137310457561 |
+| test (aggregate) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45055746652/job/137310456709 |
+
+
+**全必須ゲート緑**（aggregate / shard は skipped: 通常 PR では大量検証ジョブは実行対象外）。ローカル測定値ではなく Actions の実測値・URL を記録。
 
 ## 宣言
 
