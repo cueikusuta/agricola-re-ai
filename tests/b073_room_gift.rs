@@ -67,8 +67,8 @@ fn player_with_rooms(rooms: usize) -> Player {
     let mut player = Player::new(0, 0);
     // Player::new starts with two rooms at farm[0] and farm[5]. Fill cells
     // 1..=4 to reach the requested exact room count without touching farm[5].
-    for index in 1..=rooms.saturating_sub(2) {
-        player.farm[index].tile = Tile::Room;
+    for cell in player.farm.iter_mut().skip(1).take(rooms.saturating_sub(2)) {
+        cell.tile = Tile::Room;
     }
     assert_eq!(player.rooms(), rooms, "room setup must be exact");
     player
