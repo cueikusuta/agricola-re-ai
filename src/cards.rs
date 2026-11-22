@@ -3099,11 +3099,8 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
             ],
         ),
         // D109 種まきの達人 (Sow Master): no cost; on play gain 1 wood, and
-        // each use of an action space with the sow action (grain utilization,
-        // cultivation) grants 2 food. Grain Seeds and Vegetable Seeds are
-        // take-only spaces in this engine's action model (engine.rs applies
-        // them as Detail::None single-goods takes), so they do not carry the
-        // sow action and must not trigger the 2-food gain.
+        // each use of an action space with the sow action (grain seeds,
+        // vegetable seeds, cultivation) grants 2 food.
         card(
             "D109",
             CardKind::Occupation,
@@ -3113,7 +3110,8 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                     good: Good::Wood,
                     amount: 1,
                 },
-                gain(Space::GrainUtilization, Good::Food, 2),
+                gain(Space::GrainSeeds, Good::Food, 2),
+                gain(Space::VegetableSeeds, Good::Food, 2),
                 gain(Space::Cultivation, Good::Food, 2),
             ],
         ),
@@ -3720,16 +3718,12 @@ mod verified_band_d_tests {
         for space in [
             Space::GrainSeeds,
             Space::VegetableSeeds,
-            Space::Farmland,
-            Space::GrainUtilization,
             Space::Cultivation,
+            Space::Farmland,
         ] {
             after_worker(&set, &mut p, space).unwrap();
         }
-        assert_eq!(
-            p.supply.food, 4,
-            "two sow spaces (grain utilization, cultivation) -> 2 x 2 food"
-        );
+        assert_eq!(p.supply.food, 6, "three sow spaces -> 3 x 2 food");
     }
 
     #[test]
