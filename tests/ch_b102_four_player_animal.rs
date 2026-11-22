@@ -155,9 +155,9 @@ fn four_players_play_places_two_sheep_via_auto_placement() {
     // The 2/3-player series must not fire alongside the 4-player one.
     assert_eq!(owner.supply.clay, clay_before, "4 players: no clay series");
     assert_eq!(owner.supply.reed, reed_before, "4 players: no reed series");
-    for seat in 1..4 {
+    for (seat, player) in game.public.players.iter().enumerate().skip(1) {
         assert_eq!(
-            game.public.players[seat].animal_count(Animal::Sheep),
+            player.animal_count(Animal::Sheep),
             0,
             "sheep must not leak to seat {seat}"
         );
