@@ -7,7 +7,7 @@
       "scope": "effect_only",
       "setup": {
         "improvements": 1,
-        "occupations": 1
+        "occupations": 0
       },
       "action": {
         "play_occupation": true
@@ -21,7 +21,7 @@
       "scope": "effect_only",
       "setup": {
         "improvements": 1,
-        "occupations": 1
+        "occupations": 2
       },
       "action": {
         "play_minor_improvement": true
@@ -34,7 +34,7 @@
       "id": "B049-unbalanced",
       "scope": "effect_only",
       "setup": {
-        "improvements": 2,
+        "improvements": 1,
         "occupations": 1
       },
       "action": {

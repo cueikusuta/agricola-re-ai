@@ -118,7 +118,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-14",
-    "implementation_status": "not_started",
+    "implementation_status": "implemented",
     "notes": "Cost 1 wood; prerequisite no occupations in play (occupation_count n=0). Each time after you place an improvement or occupation, if the counts of improvements and occupations in play become equal, gain 2 food. bga_checked reflects the third-party BGA wiki comparison, not official Lookout verification."
   }
 }
