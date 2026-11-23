@@ -324,7 +324,8 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
                 | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayExchange { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
                     EventKind::ImprovementPlayed
                 }
@@ -515,6 +516,10 @@ impl CardRegistryBuilder {
                             gain_amount,
                             ..
                         } => *gain_amount,
+                        crate::cards::CardEffect::OnPlayExchange { receive, .. } => {
+                            // Each receive resource represents 1 unit; validate count
+                            receive.len().max(1) as u32
+                        }
                         crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }

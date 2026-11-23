@@ -613,12 +613,27 @@ fn card_priority(
                                     primary.max(upgrade) * horizon
                                 }
                                 // A118: the exchange is plan-driven and capped at 2 buys per
-                                // harvest, so value one purchase per remaining harvest at a
-                                // 50% discount (mirrors the sibling conditional arms).
-                                CardEffect::HarvestFieldOptionalExchange { gain, gain_amount, .. } => {
-                                    card_good_value(*gain) * i64::from(*gain_amount) * horizon / 2
-                                }
-                                // New variants for market followup cards (PR #393)
+                                                                // harvest, so value one purchase per remaining harvest at a
+                                                                // 50% discount (mirrors the sibling conditional arms).
+                                                                CardEffect::HarvestFieldOptionalExchange { gain, gain_amount, .. } => {
+                                                                    card_good_value(*gain) * i64::from(*gain_amount) * horizon / 2
+                                                                }
+                                                                // OnPlayExchange (A036/B008/D009): value the receive resources.
+                                                                                                                                // A036: food -> points (1 point ≈ 1 food value).
+                                                                                                                                // B008: grain -> vegetable (1 vegetable ≈ 1 grain value).
+                                                                                                                                // D009: sheep -> boar + cattle (1 boar + 1 cattle ≈ 2 sheep value).
+                                                                                                                                CardEffect::OnPlayExchange { receive, .. } => {
+                                                                                                                                    receive
+                                                                                                                                        .iter()
+                                                                                                                                        .map(|res| match res {
+                                                                                                                                            crate::cards::ExchangeResource::Good(g) => card_good_value(*g),
+                                                                                                                                            crate::cards::ExchangeResource::Animal(a) => card_animal_value(*a),
+                                                                                                                                            crate::cards::ExchangeResource::Points => 1, // 1 point ≈ 1 food value
+                                                                                                                                        })
+                                                                                                                                        .sum::<i64>()
+                                                                                                                                        * horizon
+                                                                                                                                }
+                                                                // New variants for market followup cards (PR #393)
                                 CardEffect::AfterAnyWorkerGain { good, amount, .. }
                                 | CardEffect::AfterAnyWorkerOthersGain { good, amount, .. } => {
                                     // Fires on any player's use of the space; approximate with per-round expectation
