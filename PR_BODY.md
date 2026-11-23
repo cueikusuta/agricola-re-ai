@@ -120,7 +120,7 @@ CI 証跡行の追加のみを行った HEAD `a3d0175`（fbe821f + PR_BODY.md �
 
 ### 追記2: origin/main 再統合 merge HEAD の再実行確認
 
-origin/main が前回 merge 以降に前進した（#434 D065 / #435 C116 / #436 B102 / #437 B073 / #440 replay gate-2 fix）ため、**merge（force push なし）**で再統合。衝突は `src/policy.rs` の 1 ファイルのみで、本 PR の `AfterWorkerSpace*` policy arm と main の D065 `HarvestFieldGainIfGrainHarvestedAtLeast` arm を union 解決した（上記「main 統合」節および fbe821f/a3d0175 の記録は歴代証跡として保持）。merge コミット HEAD `d6b63f87ddc8ec6006b7c528b08e606760ef4490` で全必須チェックを再実行し緑（**本節が最新 HEAD の証跡**）:
+origin/main が前回 merge 以降に前進した（#434 D065 / #435 C116 / #436 B102 / #437 B073 / #440 replay gate-2 fix）ため、**merge（force push なし）**で再統合。衝突は `src/policy.rs` の 1 ファイルのみで、本 PR の `AfterWorkerSpace*` policy arm と main の D065 `HarvestFieldGainIfGrainHarvestedAtLeast` arm を union 解決した（上記「main 統合」節および fbe821f/a3d0175 の記録は歴代証跡として保持）。merge コミット HEAD `d6b63f87ddc8ec6006b7c528b08e606760ef4490` で全必須チェックを再実行し緑:
 
 - CI required: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896796/job/137483514105
 - cargo test: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896796/job/137482847829
@@ -132,6 +132,19 @@ origin/main が前回 merge 以降に前進した（#434 D065 / #435 C116 / #436
 - test (aggregate): https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896971/job/137482764957
 
 merge 後も mergeable: MERGEABLE。ローカルでも `cargo test --lib` 480 passed・`cargo test --test ch03_afterworker_space_cards` 45 passed・main 側改修ファイルのテスト（b073 / ch_b102 / harvest_feeding / p1_2_player_projection）・Python gates 3 本を確認。A021 発火スペースの mutation probe（`Space::FarmExpansion` → `Space::FamilyGrowthWithRoom` に戻すと `a021_build_rooms_rooms_exceed_people_triggers_family_growth_and_food` と `mutation_verification::mutation_a021_space_binding_detected` が赤になること）もマージ後ツリーで再確認済み。
+
+### 追記3: 本文更新 docs HEAD の再実行確認
+
+上記追記2の追加のみを行った HEAD `9232886d0d52a400385b071eb1830417e8f67648`（branch tip）でも同一ゲートを再実行し全必須チェック緑（mergeable: MERGEABLE）:
+
+- CI required: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45111563991/job/137485521166
+- cargo test: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45111563991/job/137484930413
+- rustfmt: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45111563991/job/137484930363
+- clippy: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45111563991/job/137484930333
+- M1/M2/M7 seeded performance: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45111563991/job/137484930365
+- Pipeline gates (spec/catalog/blockers): https://github.com/cueikusuta/agricola-re-ai/actions/runs/45111564056/job/137484852532
+- Python unittest discovery: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45111564087/job/137484853104
+- test (aggregate): https://github.com/cueikusuta/agricola-re-ai/actions/runs/45111564021/job/137484852141
 
 ## 宣言
 
