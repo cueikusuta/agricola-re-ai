@@ -851,7 +851,6 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
                         | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
                         | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 1,
-                        CardEffect::AfterImprovementPlayedGain { amount, .. } => *amount,
                         CardEffect::AfterSowGain { amount, .. }
                         | CardEffect::AfterSowGainPerDistinctCrop { amount } => *amount,
                     };
@@ -3542,6 +3541,7 @@ mod round_and_harvest_card_tests {
             &set,
             0,
             Space::SheepMarket,
+            None,
             &mut cards,
             &mut players,
             &mut vec![],
@@ -3564,6 +3564,7 @@ mod round_and_harvest_card_tests {
             &set,
             1,
             Space::SheepMarket,
+            None,
             &mut cards,
             &mut players,
             &mut vec![],
@@ -3586,6 +3587,7 @@ mod round_and_harvest_card_tests {
             &set,
             0,
             Space::Forest,
+            None,
             &mut cards,
             &mut players,
             &mut vec![],
@@ -3626,6 +3628,7 @@ mod round_and_harvest_card_tests {
             &set,
             0,
             Space::CattleMarket,
+            None,
             &mut cards,
             &mut players,
             &mut vec![],
@@ -3650,6 +3653,7 @@ mod round_and_harvest_card_tests {
             &set,
             1,
             Space::CattleMarket,
+            None,
             &mut cards,
             &mut players,
             &mut vec![],
@@ -3674,6 +3678,7 @@ mod round_and_harvest_card_tests {
             &set,
             0,
             Space::Forest,
+            None,
             &mut cards,
             &mut players,
             &mut vec![],
@@ -7651,6 +7656,7 @@ mod verified_band_e_tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -7989,6 +7995,7 @@ mod verified_band_a_tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -8220,7 +8227,7 @@ mod verified_band_a_tests {
         )
         .unwrap();
         // Still fixed 1 grain + 1 vegetable
-+        assert_eq!(p.supply.grain, 1);
+        assert_eq!(p.supply.grain, 1);
         assert_eq!(p.supply.vegetable, 1);
     }
 }
