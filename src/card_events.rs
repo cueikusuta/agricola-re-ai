@@ -99,6 +99,13 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::HarvestStartGainIfFields { .. } => TriggerPhase::After,
         // End game scoring — After phase
         CardEffect::EndGameBonus { .. } => TriggerPhase::After,
+        // On-play choice gain / stone placement — instantaneous at play time — Before phase
+        CardEffect::OnPlayChoiceGain { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayAddStoneToEmptyFields { .. } => TriggerPhase::Before,
+        // PostPlayPassLeft is zone-move metadata; classify as Before so the
+        // play-time scan sees it, but the handler is a no-op (the engine arm
+        // performs the move).
+        CardEffect::PostPlayPassLeft => TriggerPhase::Before,
         // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064) — After phase
         CardEffect::StartRoundPlowFieldIfHouse { .. } => TriggerPhase::After,
         CardEffect::StartRoundCopyUnusedRoundSpace { .. } => TriggerPhase::After,
@@ -806,6 +813,22 @@ fn resolve_phase_scan(
                     // Scoring is handled separately in evaluation; no runtime effect.
                     EffectResult::Resolved
                 }
+                // On-play effects handled by apply_on_play_effects in the play path
+                // for the legacy API; here the Before-phase scan resolves them for
+                // the production path.
+                CardEffect::OnPlayAddStoneToEmptyFields { good: _, amount } => {
+                    handle_on_play_add_stone_to_empty_fields(ctx, player, *amount)?
+                }
+                CardEffect::OnPlayChoiceGain { .. } => {
+                    // Resolved by the engine's PlayMinorChoice arm (choice index
+                    // is action data): keep the scan a no-op so plain PlayMinor
+                    // cannot double-resolve it.
+                    EffectResult::Resolved
+                }
+                CardEffect::PostPlayPassLeft => {
+                    // Zone move executed by the engine play arm, not here.
+                    EffectResult::Resolved
+                }
             };
 
             // Handle pending interrupt: pause with the resume position.
@@ -1102,6 +1125,11 @@ fn effect_condition_holds(
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
+        // On-play effects always trigger when played — condition holds immediately.
+        CardEffect::OnPlayChoiceGain { .. } => true,
+        CardEffect::OnPlayAddStoneToEmptyFields { .. } => true,
+        // PostPlayPassLeft is pure zone-move metadata: hold trivially.
+        CardEffect::PostPlayPassLeft => true,
         // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064).
         //
         // Optional round-start actions stay dormant in the generic scan for
@@ -1504,6 +1532,19 @@ pub fn execute_chosen_triggers(
                 // Scoring is handled separately in evaluation; no runtime effect.
                 EffectResult::Resolved
             }
+            // On-play choice is action data resolved by the engine's
+            // PlayMinorChoice arm; the scan stays a no-op so plain PlayMinor
+            // cannot double-resolve it.
+            CardEffect::OnPlayChoiceGain { .. } => EffectResult::Resolved,
+            // C006 石取り作業 (same handler as the second pass arm above so
+            // the >=2-triggerable fallback path behaves identically).
+            CardEffect::OnPlayAddStoneToEmptyFields { amount, .. } => {
+                handle_on_play_add_stone_to_empty_fields(ctx, player, *amount)?
+            }
+            CardEffect::PostPlayPassLeft => {
+                // Zone move executed by the engine play arm, not here.
+                EffectResult::Resolved
+            }
         };
 
         // Handle pending interrupt: pause with the resume position.
@@ -1621,6 +1662,7 @@ fn handle_prerequisite(
             crate::cards::improvement_count_in_front(ctx.card_set, p) >= u32::from(*min)
         }
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
+        crate::cards::CardRequirement::PastureCount(n) => p.pastures.len() >= usize::from(*n),
         crate::cards::CardRequirement::MaximumPlayers(_) => true, // Validated at card set level
     };
 
@@ -1643,6 +1685,25 @@ fn handle_on_play_gain(
         .checked_add(amount)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// C006 石取り作業 (Stone Clearing): on play, place `amount` stones on each
+/// of the owner's EMPTY fields. The stones are collected at the next field
+/// phase (`cards::harvest_field_stones`); until then those fields count as
+/// cultivated. Mirrors the legacy `cards::apply_on_play_effects` arm so the
+/// production path and the legacy API agree.
+fn handle_on_play_add_stone_to_empty_fields(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    for cell in &mut p.farm {
+        if matches!(cell.tile, crate::model::Tile::Field { crop: None, .. }) {
+            cell.field_stones = cell.field_stones.saturating_add(amount);
+        }
+    }
     Ok(EffectResult::Resolved)
 }
 

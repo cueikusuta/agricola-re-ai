@@ -324,7 +324,10 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
                 | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayChoiceGain { .. }
+                | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. }
+                | crate::cards::CardEffect::PostPlayPassLeft => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
                     EventKind::ImprovementPlayed
                 }
@@ -548,11 +551,19 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
                         }
+                        crate::cards::CardEffect::OnPlayAddStoneToEmptyFields {
+                            amount, ..
+                        } => *amount,
+                        crate::cards::CardEffect::OnPlayChoiceGain { options } => {
+                            options.iter().map(|o| o.amount).max().unwrap_or(1)
+                        }
+                        // Zone-move metadata carries no gain amount.
+                        crate::cards::CardEffect::PostPlayPassLeft => 1,
                         // A140: the amount is read from the public
-                                                // accumulations at resolution time, not fixed here.
-                                                crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
-                                                // Chapter 1 round-start cards: no direct resource amount to validate
-                                                | crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        // accumulations at resolution time, not fixed here.
+                        crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
+                        // Chapter 1 round-start cards: no direct resource amount to validate
+                        | crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
                         | crate::cards::CardEffect::StartRoundCopyUnusedRoundSpace { .. }
                         | crate::cards::CardEffect::StartRoundPlayOccupationIfLessonsUnderused {
                             ..
