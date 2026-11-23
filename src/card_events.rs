@@ -2313,6 +2313,25 @@ fn handle_harvest_field_gain(
                 .count() as u32
         }
         crate::cards::HarvestFieldRule::Fixed => 1,
+        // A112 大鎌使い: one step per growing grain field, the same
+        // pre-harvest quantity as `cards::grain_fields_growing` (used by the
+        // non-dispatcher `cards::harvest_field_rewards`). The dispatcher runs
+        // before crops are removed, and each growing grain field yields
+        // exactly one grain this field phase, so grain in the supply and
+        // empty fields are not counted.
+        crate::cards::HarvestFieldRule::GrainFieldsGrowing => p
+            .farm
+            .iter()
+            .filter(|cell| {
+                matches!(
+                    cell.tile,
+                    crate::model::Tile::Field {
+                        crop: Some(Crop::Grain),
+                        remaining: 1..,
+                    }
+                )
+            })
+            .count() as u32,
     };
     let gain = multiplier
         .checked_mul(amount)
@@ -3804,6 +3823,22 @@ pub mod legacy {
                                 .count() as u32
                         }
                         crate::cards::HarvestFieldRule::Fixed => 1,
+                        // A112 大鎌使い: one step per growing grain field (mirrors the
+                        // dispatcher handler and cards::harvest_field_rewards).
+                        crate::cards::HarvestFieldRule::GrainFieldsGrowing => player
+                            .farm
+                            .iter()
+                            .filter(|cell| {
+                                matches!(
+                                    cell.tile,
+                                    crate::model::Tile::Field {
+                                        crop: Some(crate::model::Crop::Grain),
+                                        remaining: 1..,
+                                    }
+                                )
+                            })
+                            .count()
+                            as u32,
                     };
                     let gain = multiplier
                         .checked_mul(*amount)
