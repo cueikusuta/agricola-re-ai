@@ -10,7 +10,7 @@ use agricola_re_ai::card_events::dispatch_play;
 use agricola_re_ai::cards::{
     apply_on_play_effects, CardDefinition, CardEffect, CardKind, CardSet, PostPlayDestination,
 };
-use agricola_re_ai::model::{neighbors, Animal, Good, Pasture, Player, FARM_CELLS};
+use agricola_re_ai::model::{neighbors, Animal, Game, Good, Pasture, Player, FARM_CELLS};
 use agricola_re_ai::registry::build_default_registry;
 
 fn new_set(defs: Vec<CardDefinition>) -> CardSet {
@@ -44,14 +44,14 @@ fn minor_def(id: &str) -> CardDefinition {
 
 /// Dispatcher route: pay the printed cost manually (dispatch_play does not
 /// validate cost), then run `dispatch_play` for card `id`.
-/// Returns the modified hand so callers can inspect zone changes.
+/// Returns both hands so callers can assert left-neighbor reachability
+/// for pass-left cards (P2-3).
 fn dispatch_card(
     set: &CardSet,
     player: &mut Player,
     hand: &mut [String],
     id: &str,
-    _num_players: usize,
-) -> Vec<String> {
+) -> (Vec<String>, Vec<String>) {
     let card = set
         .definition(id)
         .unwrap_or_else(|| panic!("{id} missing from set"));
@@ -93,7 +93,7 @@ fn dispatch_card(
     )
     .unwrap_or_else(|e| panic!("dispatch_play {id}: {e}"));
     *player = players[0].clone();
-    cards.hands[0].clone()
+    (cards.hands[0].clone(), cards.hands[1].clone())
 }
 
 // ---------------- Registry reachability ----------------
@@ -217,7 +217,7 @@ fn b003_normal_pay_2_food_play_occupation() {
     let mut player = Player::new(0, 0);
     player.supply.food = 2;
     let mut hand = vec!["B003".to_owned(), "test_occ".to_owned()];
-    let _hand = dispatch_card(&set, &mut player, &mut hand, "B003", 2);
+    let _ = dispatch_card(&set, &mut player, &mut hand, "B003");
     // Occupation should be played (moved from hand to played_cards)
     assert!(player.played_cards.contains(&"test_occ".to_string()));
     assert_eq!(player.supply.food, 0, "2 food paid for occupation");
@@ -240,10 +240,16 @@ fn b003_pass_when_no_food() {
     let mut player = Player::new(0, 0);
     player.supply.food = 0;
     let mut hand = vec!["B003".to_owned(), "test_occ".to_owned()];
-    hand = dispatch_card(&set, &mut player, &mut hand, "B003", 2);
+    let (hand, left) = dispatch_card(&set, &mut player, &mut hand, "B003");
     // Occupation should be passed to left neighbour (not in player's hand or played)
     assert!(!hand.contains(&"test_occ".to_string()));
     assert!(!player.played_cards.contains(&"test_occ".to_string()));
+    // Reachability: the drawn occupation must actually reach the left
+    // neighbour's hand (P2-3), not merely vanish from this player.
+    assert!(
+        left.contains(&"test_occ".to_string()),
+        "drawn occupation must reach the left neighbour's hand"
+    );
 }
 
 #[test]
@@ -260,7 +266,7 @@ fn b003_no_occupation_in_hand_does_nothing() {
     let mut player = Player::new(0, 0);
     player.supply.food = 2;
     let mut hand = vec!["B003".to_owned()];
-    let _hand = dispatch_card(&set, &mut player, &mut hand, "B003", 2);
+    let _ = dispatch_card(&set, &mut player, &mut hand, "B003");
     // No occupation to draw, nothing happens
     assert_eq!(player.supply.food, 2);
 }
@@ -291,7 +297,7 @@ fn b005_normal_0_to_4_occupations_grants_stone() {
     let set = CardSet {
         definitions: vec![set.definitions[0].clone(), occ_def("occ1"), occ_def("occ2")],
     };
-    dispatch_card(&set, &mut player, &mut hand, "B005", 2);
+    let _ = dispatch_card(&set, &mut player, &mut hand, "B005");
     assert_eq!(player.supply.stone, 1, "2 occupations -> stone");
 }
 
@@ -327,7 +333,7 @@ fn b005_boundary_4_occupations_grants_stone() {
         "occ3".to_owned(),
         "occ4".to_owned(),
     ];
-    dispatch_card(&set, &mut player, &mut hand, "B005", 2);
+    let _ = dispatch_card(&set, &mut player, &mut hand, "B005");
     assert_eq!(player.supply.stone, 1, "4 occupations -> stone");
 }
 
@@ -365,7 +371,7 @@ fn b005_5_occupations_grants_reed() {
         "occ4".to_owned(),
         "occ5".to_owned(),
     ];
-    dispatch_card(&set, &mut player, &mut hand, "B005", 2);
+    let _ = dispatch_card(&set, &mut player, &mut hand, "B005");
     assert_eq!(player.supply.reed, 1, "5 occupations -> reed");
 }
 
@@ -405,7 +411,7 @@ fn b005_6_occupations_grants_clay() {
         "occ5".to_owned(),
         "occ6".to_owned(),
     ];
-    dispatch_card(&set, &mut player, &mut hand, "B005", 2);
+    let _ = dispatch_card(&set, &mut player, &mut hand, "B005");
     assert_eq!(player.supply.clay, 1, "6 occupations -> clay");
 }
 
@@ -447,7 +453,7 @@ fn b005_7_occupations_grants_wood() {
         "occ6".to_owned(),
         "occ7".to_owned(),
     ];
-    dispatch_card(&set, &mut player, &mut hand, "B005", 2);
+    let _ = dispatch_card(&set, &mut player, &mut hand, "B005");
     assert_eq!(player.supply.wood, 1, "7 occupations -> wood");
 }
 
@@ -491,7 +497,7 @@ fn b005_8_occupations_grants_nothing() {
         "occ7".to_owned(),
         "occ8".to_owned(),
     ];
-    dispatch_card(&set, &mut player, &mut hand, "B005", 2);
+    let _ = dispatch_card(&set, &mut player, &mut hand, "B005");
     assert_eq!(player.supply.stone, 0);
     assert_eq!(player.supply.reed, 0);
     assert_eq!(player.supply.clay, 0);
@@ -913,4 +919,163 @@ fn pass_left_requires_two_players() {
 
     agricola_re_ai::card_zones::validate_card_partition(&set, &cards, &players)
         .expect("card partition must remain valid");
+}
+
+// ---------------- P1-1: pass-left via the engine's production card-play path ----------------
+
+/// Build a valid 2-player game whose deck satisfies `CardSet::validate` (7 of
+/// each kind per player) and whose hands satisfy `from_hands` (7 occupations
+/// + 7 minor improvements per seat).
+///
+/// `pass_left_id` is a MinorImprovement with `post_play = LeftNeighborHand`
+/// placed in player 0's hand.
+fn build_pass_left_game(pass_left_id: &str, points: i32, effects: Vec<CardEffect>) -> Game {
+    use agricola_re_ai::model::{Config, Game};
+
+    let dummy_mi: Vec<String> = (0..13).map(|i| format!("dummy_mi_{i}")).collect();
+    let dummy_oc: Vec<String> = (0..14).map(|i| format!("dummy_oc_{i}")).collect();
+
+    let mut mi_defs: Vec<CardDefinition> = vec![CardDefinition {
+        use_limit: None,
+        id: pass_left_id.to_owned(),
+        kind: CardKind::MinorImprovement,
+        cost: vec![],
+        points,
+        effects,
+        post_play: PostPlayDestination::LeftNeighborHand,
+    }];
+    mi_defs.extend(dummy_mi.iter().map(|id| CardDefinition {
+        use_limit: None,
+        id: id.clone(),
+        kind: CardKind::MinorImprovement,
+        cost: vec![],
+        points: 0,
+        effects: vec![],
+        post_play: PostPlayDestination::PlayedArea,
+    }));
+
+    let oc_defs: Vec<CardDefinition> = dummy_oc
+        .iter()
+        .map(|id| CardDefinition {
+            use_limit: None,
+            id: id.clone(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
+        })
+        .collect();
+
+    let set = agricola_re_ai::cards::CardSet {
+        definitions: mi_defs.into_iter().chain(oc_defs).collect(),
+    };
+
+    let hand0: Vec<String> = std::iter::once(pass_left_id.to_owned())
+        .chain(dummy_mi[0..6].iter().cloned())
+        .chain(dummy_oc[0..7].iter().cloned())
+        .collect();
+    let hand1: Vec<String> = dummy_mi[6..13]
+        .iter()
+        .cloned()
+        .chain(dummy_oc[7..14].iter().cloned())
+        .collect();
+
+    Game::with_cards_and_hands(Config::default(), set, vec![hand0, hand1])
+        .expect("game with hands builds")
+}
+
+/// Exercises `dispatch_play`'s post-play block through the engine production
+/// path (`Space::MeetingPlace` → `Detail::PlayMinor` → `dispatch_play` — a
+/// regular space, so no round-card reveal is needed and every
+/// `Game::validate` invariant stays satisfiable). Verifies the pass-left card
+/// leaves the owner's played area, reaches the left neighbour's hand,
+/// card_points add/subtract is balanced, and the state-consistency invariant
+/// holds (§14).
+#[test]
+fn pass_left_via_engine_play_minor_path() {
+    use agricola_re_ai::engine::{Action, Detail};
+    use agricola_re_ai::model::Space;
+
+    let mut game = build_pass_left_game(
+        "B003",
+        0,
+        vec![CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost: 2 }],
+    );
+    // Open round 1 through the production path so `Game::validate`'s
+    // round/deck invariants hold.
+    game.start_round().expect("start round 1");
+    // Give player 0 enough food to pay so the drawn occupation is played
+    // (moved to played area) rather than passed to the left neighbour, keeping
+    // the pass-left assertion focused on B003 itself.
+    game.public.players[0].supply.food = 2;
+
+    game.apply(Action {
+        space: Space::MeetingPlace,
+        detail: Detail::PlayMinor {
+            card_id: "B003".to_owned(),
+        },
+    })
+    .expect("playing pass-left card via MeetingPlace succeeds");
+
+    // Card left owner's played area
+    assert!(
+        !game.public.players[0]
+            .played_cards
+            .contains(&"B003".to_string()),
+        "B003 should leave player 0's played area"
+    );
+    // Card reached left neighbour's hand
+    assert!(
+        game.cards.hands[1].contains(&"B003".to_string()),
+        "B003 should reach left neighbour's hand"
+    );
+    // card_points: 0 added, 0 subtracted → net 0
+    assert_eq!(
+        game.public.players[0].card_points, 0,
+        "card_points should be 0 for B003"
+    );
+    // Card partition invariant (state consistency, §14)
+    game.validate()
+        .expect("game state must remain valid after engine pass-left");
+}
+
+/// P2-1: a pass-left card with non-zero points must add points on play then
+/// subtract them on pass-left, never underflowing `card_points`.
+#[test]
+fn pass_left_via_engine_nonzero_points_balance() {
+    use agricola_re_ai::engine::{Action, Detail};
+    use agricola_re_ai::model::Space;
+
+    let mut game = build_pass_left_game("TEST_PASS_LEFT", 2, vec![]);
+    // Open round 1 through the production path (see the sibling test).
+    game.start_round().expect("start round 1");
+
+    game.apply(Action {
+        space: Space::MeetingPlace,
+        detail: Detail::PlayMinor {
+            card_id: "TEST_PASS_LEFT".to_owned(),
+        },
+    })
+    .expect("playing non-zero-point pass-left card via MeetingPlace succeeds");
+
+    // Card left owner's played area
+    assert!(
+        !game.public.players[0]
+            .played_cards
+            .contains(&"TEST_PASS_LEFT".to_string()),
+        "card should leave player 0's played area"
+    );
+    // Card reached left neighbour's hand
+    assert!(
+        game.cards.hands[1].contains(&"TEST_PASS_LEFT".to_string()),
+        "card should reach left neighbour's hand"
+    );
+    // card_points: +2 on play, −2 on pass-left → net 0 (no underflow)
+    assert_eq!(
+        game.public.players[0].card_points, 0,
+        "card_points should net to 0 after add+subtract"
+    );
+    // Card partition invariant (state consistency, §14)
+    game.validate().expect("game state must remain valid");
 }

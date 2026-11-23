@@ -19,17 +19,20 @@ Implements 5 B-deck on-play simple gain cards as typed effects, mapped from bga_
   - `OnPlayGainByHandOccupationCount { bands: [(4,Stone),(5,Reed),(6,Clay),(7,Wood)] }`
   - `OnPlayExchangeGain { give: Grain, give_amount: 1, receive: Vegetable, receive_amount: 1 }`
   - `OnPlayGainOrExchangeAnimal { gain_good: Reed, gain_amount: 1, pay_good: Reed, pay_amount: 1, animal: Cattle }`
+- Pass-left: `CardDefinition.post_play` / `RegisteredCard.post_play` (`PostPlayDestination::LeftNeighborHand`) with symmetric `#[serde(default, skip_serializing_if)]` attributes. `dispatch_play`'s post-play block (runs after every phase) adds the card's points, then moves the card through the canonical `card_zones::move_card` (Issue #266 single source of truth) and subtracts the points back — no underflow for non-zero-point pass-left cards. Pass-left is a no-op in 1-player games (`players.len() >= 2` guard), including B003's own pass branch, which now routes through the canonical `card_zones::hand_to_hand` transfer.
 
 ## Tests
 
-Added `tests/ch02_b_onplay_simple.rs` with 23 tests covering:
+Added `tests/ch02_b_onplay_simple.rs` (25 tests) covering:
 - Registry reachability and cost/prerequisite parity with BGA specs
 - Effect-only projection path (`apply_on_play_effects`)
 - Dispatcher route (`dispatch_play`) for hand-dependent effects
 - Edge cases: no empty cells, no occupations in hand, no grain for exchange, etc.
 - Cost/prerequisite pins and spec parity verification
+- Pass-left regression: zone transition via `move_card`, `card_points` add/subtract balance (0-point and non-zero-point cards), left-neighbour reachability of the drawn occupation, 1-player no-op
+- Pass-left through the engine production path (`Space::MeetingPlace` → `Detail::PlayMinor` → `dispatch_play`), asserting zone arrival, `card_points`, and `Game::validate` state-consistency invariants
 
-All tests pass. `cargo fmt` and `cargo clippy --all-targets --all-features --locked -- -D warnings` clean.
+All tests pass. `cargo fmt --check` and `cargo clippy --all-targets --all-features --locked -- -D warnings` clean.
 
 ## Rule References
 
@@ -40,3 +43,20 @@ All tests pass. `cargo fmt` and `cargo clippy --all-targets --all-features --loc
 - B009: agricola.cloudfree.jp/?p=3248
 
 All cross-checked against English list page. Cards are printed "pass left" (LeftNeighborHand).
+
+## Ambiguous rules and interpretation (AGENTS.md §3 record)
+
+The following official-wording ambiguities were resolved by interpretation; recorded here per §3 (no guessing beyond implementation):
+
+1. **B002 adjacency when no pasture exists (spec deviation).** The BGA spec JSON carries `must_be_adjacent: true` with notes "must touch an existing pasture". When the owner has no pasture yet there is nothing to touch, so the implementation falls back to the first empty, unstabled cell in farm order (`handle_on_play_build_pasture`; pinned by `b002_normal_grants_free_pasture`). With an existing pasture the new cell is adjacent (`b002_adjacent_to_existing_pasture`). No legal cell: the effect does nothing and the play still succeeds (`b002_no_pasture_when_no_empty_cells`).
+2. **B003 "2 food replaces the drawn occupation's own play cost".** The 2-food payment is charged instead of the drawn occupation's printed cost when it is played immediately (`handle_moonshine`, pay branch). The official wording leaves this ambiguous; recorded as our interpretation.
+3. **B003 deterministic draw policy.** The spec leaves the draw random (`decision_owner=random`); for deterministic replay the engine draws the ID-sorted-first occupation still in hand (same policy as the A-deck's A003).
+4. **B003/B009 deterministic choice policy.** B003 pays when food is affordable, otherwise passes (the play executor cannot represent a play-time pause, Issue #268 R2-P0-2). B009 exchanges whenever the payment resource is available (exchange yields the strictly larger reward) and gains otherwise.
+5. **Deterministic placement of on-play gains.** Animal gains (B009 cattle, C083 vocabulary) and B002's pasture cell are placed by a derived plan (free capacity first, overflow discarded) rather than a play-time pause.
+
+## Gates
+
+Verification is GitHub Actions-first per AGENTS.md §18 (this body records check names/conclusions/run URL after the run finishes, not local measurements):
+
+- `ci.yml` (fmt / clippy / test)
+- `pipeline-gates` (spec / ledger / blocker Python gates)

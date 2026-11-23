@@ -1543,11 +1543,12 @@ pub fn handle_moonshine(
         // Pass the drawn occupation to the left neighbour's hand.
         // In a 1-player game, there is no left neighbour; the card stays in hand.
         if num_players >= 2 {
-            if let Some(pos) = ctx.cards.hands[actor].iter().position(|x| x == &chosen) {
-                ctx.cards.hands[actor].remove(pos);
-            }
             let left = (actor + 1) % num_players;
-            ctx.cards.hands[left].push(chosen);
+            // Canonical zone move: hand -> left neighbour's hand (Issue #266).
+            // Fail-closed: a card that vanished from the hand errors instead of
+            // being silently dropped.
+            crate::card_zones::hand_to_hand(&mut ctx.cards.hands, actor, left, &chosen)
+                .map_err(|e| e.to_string())?;
         }
     }
     Ok(EffectResult::Resolved)

@@ -320,6 +320,42 @@ pub fn hand_to_played(
     Ok(())
 }
 
+/// Single canonical implementation of the hand -> hand transfer.
+///
+/// Used by pass-left effects whose card lands in a neighbour's hand rather
+/// than a played area (e.g. B003's pass branch). Mirrors `hand_to_played`
+/// for the two-hands case; both stay inside this module so ad-hoc Vec
+/// mutations do not reappear outside it (Issue #266: "card movement has a
+/// single source of truth, ad-hoc Vec mutations removed"). Fail-closed: a
+/// missing card is an error, never a silent drop.
+pub fn hand_to_hand(
+    hands: &mut [Vec<String>],
+    from: usize,
+    to: usize,
+    id: &str,
+) -> Result<(), CardZoneError> {
+    if from == to {
+        return Err(CardZoneError::InvalidMove(format!(
+            "source and destination hand are the same (player {from})"
+        )));
+    }
+    if to >= hands.len() || from >= hands.len() {
+        return Err(CardZoneError::InvalidMove(format!(
+            "hand index out of bounds (from {from}, to {to}, {} hands)",
+            hands.len()
+        )));
+    }
+    let Some(pos) = hands[from].iter().position(|x| x == id) else {
+        return Err(CardZoneError::CardNotInZone(
+            id.to_string(),
+            CardZone::Hand { player: from },
+        ));
+    };
+    let card = hands[from].remove(pos);
+    hands[to].push(card);
+    Ok(())
+}
+
 /// Convenience: move a card from a player's hand to their played area.
 /// This is the primary path for `cards::play`.
 pub fn play_from_hand(
