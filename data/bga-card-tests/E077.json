@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "E077",
+  "cases": [
+    {
+      "id": "E077-reed-space",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E077",
+        "take": "reed",
+        "from": "action_space"
+      },
+      "expected": {
+        "clay_delta": 1
+      },
+      "notes": "Taking reed from an action space gains 1 additional clay."
+    },
+    {
+      "id": "E077-stone-space",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E077",
+        "take": "stone",
+        "from": "action_space"
+      },
+      "expected": {
+        "clay_delta": 1
+      },
+      "notes": "Taking stone from an action space gains 1 additional clay."
+    },
+    {
+      "id": "E077-other-space",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E077",
+        "take": "wood",
+        "from": "action_space"
+      },
+      "expected": {
+        "clay_delta": 0
+      },
+      "notes": "Taking other goods does not trigger the clay gain."
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "card_id": "D072",
+  "cases": [
+    {
+      "id": "D072-no-stables-no-bonus",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          { "crop": "grain", "count": 2 },
+          { "crop": "vegetable", "count": 1 }
+        ],
+        "stables": 0
+      },
+      "action": {
+        "trigger": "harvest_field_phase"
+      },
+      "expected": {
+        "grain_harvested": 2,
+        "vegetable_harvested": 1,
+        "no_extra_gain": true
+      },
+      "notes": "No stables means no extra harvest"
+    },
+    {
+      "id": "D072-one-stable-one-extra",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          { "crop": "grain", "count": 2 },
+          { "crop": "vegetable", "count": 1 }
+        ],
+        "stables": 1
+      },
+      "action": {
+        "trigger": "harvest_field_phase"
+      },
+      "expected": {
+        "grain_harvested": 2,
+        "vegetable_harvested": 1,
+        "extra_gain": 1,
+        "extra_type": "grain_or_vegetable"
+      },
+      "notes": "1 stable gives 1 extra good matching one of the harvested fields"
+    },
+    {
+      "id": "D072-two-stables-two-extra",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          { "crop": "grain", "count": 2 }
+        ],
+        "stables": 2
+      },
+      "action": {
+        "trigger": "harvest_field_phase"
+      },
+      "expected": {
+        "grain_harvested": 2,
+        "extra_gain": 2,
+        "extra_type": "grain"
+      },
+      "notes": "2 stables give 2 extra grain (max 2 fields worth)"
+    }
+  ]
+}

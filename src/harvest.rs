@@ -44,6 +44,19 @@ pub struct FeedingPlan {
     /// Voluntary use of workshop processing, even if the family is already fed.
     #[serde(default)]
     pub extra_crafting: Vec<Improvement>,
+    /// C066 永遠のライ麦畑: at grain >= 3 the owner may take 1 grain INSTEAD
+    /// of the 1 food. `true` opts back into the food. Default `false`
+    /// (= take the grain), matching spec test C066-three and the card text
+    /// 「3以上ある場合は代わりに小麦1を得る」. PR #385 review finding (b).
+    #[serde(default)]
+    pub c066_take_food_instead: bool,
+    /// A118 樹木庭師: how many times to run the printed "pay 1 food, gain
+    /// 1 wood" exchange during the harvest field phase. Capped at 2 by
+    /// validation (「1つにつき食料1で購入…木材2まで」). Executed plan-driven by
+    /// `harvest_fields`; the dispatcher scan stays dormant. Default 0.
+    /// PR #385 review finding (c).
+    #[serde(default)]
+    pub a118_wood_buys: u32,
 }
 impl Default for FeedingPlan {
     fn default() -> Self {
@@ -51,6 +64,8 @@ impl Default for FeedingPlan {
             priorities: FeedSource::ALL.to_vec(),
             preserve_pairs_first: true,
             extra_crafting: vec![],
+            c066_take_food_instead: false,
+            a118_wood_buys: 0,
         }
     }
 }
@@ -73,9 +88,15 @@ impl FeedingPlan {
         {
             return Err("extra crafting must list each owned workshop at most once".into());
         }
+        if self.a118_wood_buys > A118_MAX_WOOD_BUYS {
+            return Err("a118 wood buys exceed the printed cap of 2".into());
+        }
         Ok(())
     }
 }
+
+/// A118 樹木庭師 printed exchange cap: 「追加で木材2まで」.
+pub const A118_MAX_WOOD_BUYS: u32 = 2;
 
 /// The policy sees only a public observation after field crops are harvested;
 /// the engine logs all resulting plans for deterministic action-only replay.
@@ -194,9 +215,53 @@ impl Game {
             return Err("breeding plan per player required".into());
         }
         self.harvest_fields()?;
+        // A118 樹木庭師: plan-driven optional exchanges, run after the field
+        // dispatcher granted the printed fixed wood. The plan count is
+        // validated (<= 2) and bounded by the food actually available.
+        for (id, plan) in feeding.iter().enumerate() {
+            for _ in 0..plan.a118_wood_buys {
+                let p = &mut self.public.players[id];
+                let owns_a118 = p.played_cards.iter().any(|c| c == "A118");
+                if !owns_a118 {
+                    return Err("a118 wood buys require the printed card".into());
+                }
+                if p.supply.food < 1 {
+                    return Err("a118 wood buys exceed the available food".into());
+                }
+                p.supply.food -= 1;
+                p.supply.gain(Good::Wood, 1);
+            }
+        }
         self.feed_after_fields(feeding)?;
         for (player, plan) in self.public.players.iter_mut().zip(breeding) {
             plan.apply(player)?;
+        }
+        // Field phase -> feeding -> breeding are done: fire the "end of each
+        // harvest" cards (A145 reed, C066 rye bonus). New tail dispatch added
+        // by the PR #385 review-fix round (review finding (a)).
+        if self.card_set.enabled() {
+            self.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
+            for p in 0..self.public.players.len() {
+                let take_food_instead = feeding
+                    .get(p)
+                    .map(|plan| plan.c066_take_food_instead)
+                    .unwrap_or(false);
+                crate::card_events::dispatch_after_harvest_complete(
+                    &self.card_set,
+                    p,
+                    &mut self.cards,
+                    &mut self.public.players,
+                    &mut self.public.improvement_market,
+                    &mut self.delayed_well,
+                    self.public.round,
+                    &self.public.used,
+                    &mut self.event_budget,
+                    &mut self.public.card_uses,
+                    &self.card_use_limits,
+                    &mut self.pending,
+                    take_food_instead,
+                )?;
+            }
         }
         Ok(())
     }

@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "card_id": "D074",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "王家の木材",
+    "name_en": "Royal Wood"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "strong",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2847",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "discount_cost",
+            "good": "wood",
+            "amount": 1,
+            "scope": "farm_expansion_and_improvements",
+            "per": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: stays in play area for ongoing wood refund"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params.scope: 'farm_expansion_and_improvements' not in vocabulary - needs formal definition",
+      "effects[0].steps[0].params.per: discount per 2 wood paid needs formula formalization",
+      "effects[0].trigger: passive with discount_cost at end of turn when farm expansion/improvement built needs precise timing"
+    ],
+    "test_case_ids": [
+      "D074-farm-expansion-refund",
+      "D074-improvement-build-refund",
+      "D074-odd-wood-no-refund"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 food. Prereq: none. Printed points: 0. Effect: At end of turn when using farm expansion or building an improvement, gain 1 wood per 2 wood paid (round down). Strong ban. Passive continuous effect stays in play area."
+  }
+}

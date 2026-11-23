@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "card_id": "D119",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "森の労役者",
+    "name_en": "Wood Barterer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2802",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "BGA wiki card page; effect: before using fence/room build action space, choose gain 2 wood or exchange up to 2 wood for 1 reed each"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "before_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": ["fence_build", "build_room"]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "steps": [
+                  {
+                    "operation": "gain_resource",
+                    "target": "owner",
+                    "params": {
+                      "good": "wood",
+                      "amount": 2
+                    }
+                  }
+                ]
+              },
+              {
+                "steps": [
+                  {
+                    "operation": "exchange",
+                    "target": "owner",
+                    "params": {
+                      "give": {"good": "wood", "amount": {"op": "min", "args": [{"op": "resource_count", "args": ["wood"]}, 2]}},
+                      "receive": {"good": "reed", "amount": {"op": "min", "args": [{"op": "resource_count", "args": ["wood"]}, 2]}}
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Before using action space with fence build or room build action, choose: gain 2 wood OR exchange up to 2 wood for 1 reed each (1:1)."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: exchange up to 2 wood for reed 1:1 with variable amount based on available wood not fully expressible; before_worker_space timing with choice"
+    ],
+    "test_case_ids": [
+      "D119-choose-wood",
+      "D119-choose-exchange-2-wood",
+      "D119-choose-exchange-1-wood",
+      "D119-no-wood-to-exchange"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Classification: stage外 (single site: before space use / gain or exchange). Uses TR-PHASE. Trigger: before_worker_space on fence_build or build_room action spaces. Choice between gain 2 wood or exchange up to 2 wood for reed 1:1."
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "card_id": "E074",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "トネリコの木",
+    "name_en": "Ash Trees"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2679",
+        "language": "ja",
+        "checked_on": "2026-11-19",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-19",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "cultivated_fields_at_least",
+        "params": {
+          "n": 2
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "place_fences_on_card",
+            "good": "fence",
+            "amount": 5,
+            "up_to": true,
+            "source": "supply"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "When you play this card, immediately place (up to) 5 fences from your supply on it."
+    },
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "free_fences_from_this_card",
+            "while": "fences_remain_on_card",
+            "scope": "fence_construction"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "When you build fences, the portion paid with fences taken from this card costs you nothing."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E074-place-5",
+      "E074-fence-from-card-free",
+      "E074-sixth-fence-normal"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-19",
+    "implementation_status": "not_started",
+    "notes": "On play, place (up to) 5 fences from your supply on this card. When building fences, fences taken from this card are free."
+  }
+}

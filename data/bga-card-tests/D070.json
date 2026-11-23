@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "card_id": "D070",
+  "cases": [
+    {
+      "id": "D070-pay-grain-gain-vegetable",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          { "crop": "vegetable", "count": 1 },
+          { "crop": "vegetable", "count": 1 },
+          { "crop": "grain", "count": 1 }
+        ],
+        "grain": 1
+      },
+      "action": {
+        "trigger": "harvest_field_phase",
+        "choose_option": "pay_and_gain_vegetable",
+        "target_fields": [0, 1]
+      },
+      "expected": {
+        "fields_delta": [
+          { "index": 0, "vegetable": 1 },
+          { "index": 1, "vegetable": 1 }
+        ],
+        "grain_delta": -1,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "Pay 1 grain before field phase, add 1 vegetable to up to 2 vegetable fields"
+    },
+    {
+      "id": "D070-decline",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          { "crop": "vegetable", "count": 1 }
+        ],
+        "grain": 1
+      },
+      "action": {
+        "trigger": "harvest_field_phase",
+        "choose_option": "decline"
+      },
+      "expected": {
+        "fields_unchanged": true,
+        "grain_unchanged": true,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "Player may decline the optional effect"
+    },
+    {
+      "id": "D070-insufficient-grain",
+      "scope": "effect_only",
+      "setup": {
+        "fields": [
+          { "crop": "vegetable", "count": 1 }
+        ],
+        "grain": 0
+      },
+      "action": {
+        "trigger": "harvest_field_phase",
+        "choose_option": "pay_and_gain_vegetable"
+      },
+      "expected": {
+        "effect_rejected": true,
+        "reason": "insufficient grain to pay cost"
+      },
+      "notes": "Cannot pay 1 grain if player has none"
+    }
+  ]
+}

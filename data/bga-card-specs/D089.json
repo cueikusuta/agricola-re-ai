@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "card_id": "D089",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "厩番",
+    "name_en": "Stablehand"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2832",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_fence_build",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "build_stable",
+          "target": "owner",
+          "params": {
+            "amount": 1,
+            "wood_cost": 0
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_fence_build",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "職業: stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: after_fence_build for '柵を1本以上建てるたび' - trigger on each fence built or per build action?",
+      "effects[0].steps[0].params: build_stable with wood_cost=0 for free stable needs vocabulary confirmation",
+      "effects[0].frequency: 'every_fence_build' vs 'every_build_action_with_fence' needs clarification"
+    ],
+    "test_case_ids": [
+      "D089-build-1-fence-get-stable",
+      "D089-build-3-fences-get-3-stables",
+      "D089-decline-stable"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Effect: Whenever you build 1+ fences, may build 1 stable for free (no wood cost). Stage外: single site fence building / stable building. Stays in play area."
+  }
+}

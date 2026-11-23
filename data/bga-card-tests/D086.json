@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "card_id": "D086",
+  "cases": [
+    {
+      "id": "D086-0-such-occupations",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_cannot_hold_animals": 0
+      },
+      "action": {
+        "trigger": "passive_check"
+      },
+      "expected": {
+        "sheep_capacity_on_card": 0
+      },
+      "notes": "No occupations that cannot hold animals -> 0 sheep capacity"
+    },
+    {
+      "id": "D086-1-such-occupation",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_cannot_hold_animals": 1
+      },
+      "action": {
+        "trigger": "passive_check"
+      },
+      "expected": {
+        "sheep_capacity_on_card": 1
+      },
+      "notes": "1 such occupation -> capacity for 1 sheep on this card"
+    },
+    {
+      "id": "D086-3-such-occupations",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_cannot_hold_animals": 3
+      },
+      "action": {
+        "trigger": "passive_check"
+      },
+      "expected": {
+        "sheep_capacity_on_card": 3
+      },
+      "notes": "3 such occupations -> capacity for 3 sheep on this card"
+    }
+  ]
+}

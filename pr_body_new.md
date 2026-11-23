@@ -60,3 +60,23 @@ Verification is GitHub Actions-first per AGENTS.md §18 (this body records check
 
 - `ci.yml` (fmt / clippy / test)
 - `pipeline-gates` (spec / ledger / blocker Python gates)
+
+## Merge with main
+
+The branch was rebased forward by merging `origin/main` (102 commits ahead of the
+merge base). Resolution highlights:
+
+- `CardEffect` / `public_tag` / policy / registry match unions: both sides'
+  variants kept (B-deck chapter 1 + main's A109/D065/A090/A151/A152/B097/B106/
+  B135/C064/B114/A157/A049/C067/B073 chapters).
+- `dispatch_play`: main's Phase 4b (`AfterImprovementPlayedGain`, A109) kept;
+  this PR's card-points update and pass-left post-play block run after it.
+- Main's `CardDefinition` literals received the mechanical `post_play` field.
+- Conversion paths preserve the field instead of hardcoding `PlayedArea`:
+  `CardSet::projected_for_players` (game entry projection) and
+  `RegisteredCard::to_card_definition_for_players` now carry the source card's
+  `post_play` — without this, every game-entry projection silently dropped the
+  printed pass-left behaviour (caught by the new engine-path regression tests).
+- Main's registry builder (`collect_cards` + `merge_card_variants`) is intact;
+  `verified_b_onplay_simple_cards()` was added to its independent-card list and
+  `merge_card_variants`/`add_card` carry `post_play` through.

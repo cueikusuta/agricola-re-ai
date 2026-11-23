@@ -6,6 +6,7 @@
 //! - dispatch_after_worker integration path for all 4 cards (Step 3)
 
 use agricola_re_ai::card_events::dispatch_after_worker;
+use agricola_re_ai::card_pool::Eligibility;
 use agricola_re_ai::cards::{
     after_worker, CardDefinition, CardEffect, CardKind, CardRequirement, CardSet,
     PostPlayDestination,
@@ -213,6 +214,47 @@ fn ch01_cards_reachable_via_default_registry() {
 }
 
 #[test]
+fn ch01_cards_have_unverified_review_status_in_registry() {
+    let registry = build_default_registry().expect("default registry builds");
+
+    // All 4 cards should have Unverified review status (default for built-in cards).
+    // Player-count eligibility is derived from the variants each card appears in
+    // (band card pools add cards at every supported player count), so all four
+    // are eligible at 2/3/4 at the registry level; per-effect prerequisites
+    // (e.g. A155's MinimumPlayers(4), B142/B144's MinimumPlayers(3)) filter
+    // them at pool/set build time.
+    for id in ["A155", "B122", "B142", "B144"] {
+        let card_id = registry
+            .card_id(id)
+            .unwrap_or_else(|| panic!("{id} must have CardId"));
+        let review = registry
+            .review(card_id)
+            .unwrap_or_else(|| panic!("{id} has review"));
+        assert_eq!(
+            review.review_status,
+            agricola_re_ai::card_pool::ReviewStatus::Unverified,
+            "{id} should be Unverified in default registry"
+        );
+        // Eligibility derives from per-effect player-count prerequisites in the
+        // merged definition (A155: 4+ only; B142/B144: 3+ only; B122: all counts).
+        let expected = match id {
+            "A155" => [Eligibility::No, Eligibility::No, Eligibility::Yes],
+            "B122" => [Eligibility::Yes, Eligibility::Yes, Eligibility::Yes],
+            "B142" | "B144" => [Eligibility::No, Eligibility::Yes, Eligibility::Yes],
+            _ => unreachable!(),
+        };
+        for (i, &players) in [2usize, 3, 4].iter().enumerate() {
+            assert_eq!(
+                review.eligibility_at(players),
+                Some(expected[i]),
+                "{id} should be {:?} at {players} players",
+                expected[i]
+            );
+        }
+    }
+}
+
+#[test]
 fn ch01_cards_registry_event_index_populated() {
     let registry = build_default_registry().expect("default registry builds");
 
@@ -227,39 +269,6 @@ fn ch01_cards_registry_event_index_populated() {
         assert!(
             candidate_ids.contains(&card_id),
             "{id} must be in WorkerPlaced event index"
-        );
-    }
-}
-
-#[test]
-fn ch01_cards_have_unverified_review_status_in_registry() {
-    let registry = build_default_registry().expect("default registry builds");
-
-    // All 4 cards should have Unverified review status (default for built-in cards)
-    for id in ["A155", "B122", "B142", "B144"] {
-        let card_id = registry
-            .card_id(id)
-            .unwrap_or_else(|| panic!("{id} in registry"));
-        let review = registry
-            .review(card_id)
-            .unwrap_or_else(|| panic!("{id} has review"));
-        assert_eq!(
-            review.review_status,
-            agricola_re_ai::card_pool::ReviewStatus::Unverified,
-            "{id} should be Unverified in default registry"
-        );
-        // Eligibility should be Unverified for all player counts
-        assert_eq!(
-            review.eligibility_at(2),
-            Some(agricola_re_ai::card_pool::Eligibility::Unverified)
-        );
-        assert_eq!(
-            review.eligibility_at(3),
-            Some(agricola_re_ai::card_pool::Eligibility::Unverified)
-        );
-        assert_eq!(
-            review.eligibility_at(4),
-            Some(agricola_re_ai::card_pool::Eligibility::Unverified)
         );
     }
 }

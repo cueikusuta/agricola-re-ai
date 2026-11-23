@@ -66,6 +66,23 @@ pub enum Good {
     Grain,
     Vegetable,
 }
+
+/// Decode a `Good` from the `{:?}` (Debug) name card payloads carry, such
+/// as the A118 exchange context written by the dispatcher. Unknown names
+/// are a hard error so a mismatch can never silently drop a payment
+/// (PR #385 review P3).
+fn good_from_debug_name(name: &str) -> Result<Good, String> {
+    match name {
+        "Wood" => Ok(Good::Wood),
+        "Clay" => Ok(Good::Clay),
+        "Reed" => Ok(Good::Reed),
+        "Stone" => Ok(Good::Stone),
+        "Food" => Ok(Good::Food),
+        "Grain" => Ok(Good::Grain),
+        "Vegetable" => Ok(Good::Vegetable),
+        other => Err(format!("unknown good '{other}' in card payload")),
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Animal {
@@ -637,7 +654,7 @@ impl PublicState {
 impl PublicState {
     /// Compute the set of available action spaces for this public state.
     /// Used by both `Game::validate` (full validation) and
-    /// `crate::validation::validate_incremental` (incremental validation)
+    /// `crate::validation::check_incremental` (incremental validation)
     /// to ensure the same availability logic is applied consistently.
     pub(crate) fn available_spaces(
         &self,
@@ -792,6 +809,11 @@ impl Game {
         if !(2..=4).contains(&config.players) {
             return Err("players must be 2..=4".into());
         }
+        // Player-count projection happens exactly once, here at the game
+        // entry point: every game owns a set already projected for its
+        // player count, and raw/unprojectable sets are rejected instead of
+        // being treated as validated (PR #368 close verdict).
+        let card_set = card_set.projected_for_players(config.players)?;
         card_set.validate(config.players)?;
         let cards = CardState::deal(&card_set, config.seed, config.players);
         Self::from_card_state(config, Arc::new(card_set), cards, None, None)
@@ -809,6 +831,9 @@ impl Game {
         if !(2..=4).contains(&config.players) {
             return Err("players must be 2..=4".into());
         }
+        // Projection happens exactly once at this game entry point, matching
+        // Game::with_cards (PR #368 close verdict).
+        let card_set = card_set.projected_for_players(config.players)?;
         card_set.validate(config.players)?;
         if hands.len() != config.players {
             return Err("explicit hands must match the player count".into());
@@ -827,6 +852,9 @@ impl Game {
         if !(2..=4).contains(&config.players) || start_player >= config.players {
             return Err("invalid drafted start player or player count".into());
         }
+        // Projection happens exactly once at this game entry point, matching
+        // Game::with_cards (PR #368 close verdict).
+        let card_set = card_set.projected_for_players(config.players)?;
         card_set.validate(config.players)?;
         if hands.len() != config.players {
             return Err("explicit hands must match the player count".into());
@@ -1289,10 +1317,12 @@ impl Game {
                 &mut self.delayed_well,
                 self.public.round,
                 &self.public.used,
+                &self.public.accumulations,
                 &mut self.event_budget,
                 &mut self.public.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
+                &self.public.revealed,
             )
             // Before this change the same failure was a panic here; keeping the
             // expect would turn a rules error into a crash, so record it as a
@@ -1456,12 +1486,25 @@ impl Game {
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&decision)?;
+        // P1-1 FIX: the standalone API must not accept a paused WORK action.
+        // Resolving a PostWork decision here would apply the choice but never
+        // run the continuation (the paused work chain), so the state would stay
+        // mid-action while the recorded `pending_resolution` event claims the
+        // decision is complete — a replay would then run the continuation and
+        // diverge (poststate hash mismatch). Only `resolve_pending_and_resume`
+        // can complete a PostWork decision, and it records `from_resume: true`.
+        if let crate::pending::Continuation::PostWork { .. } = pending.continuation {
+            return Err(
+                "paused work action requires resolve_pending_and_resume, not resolve_pending"
+                    .into(),
+            );
+        }
         // Only now remove the decision. The steps below are individually
         // atomic (see `apply_pending_resolution`); if one still fails the
         // decision is put back so it stays resolvable.
         let pending = self.pending.take().expect("checked above");
         match self.apply_pending_resolution(&pending, &decision) {
-            Ok(()) => self.record_pending_resolution(&pending, &decision),
+            Ok(()) => self.record_pending_resolution(&pending, &decision, false),
             Err(err) => {
                 self.pending = Some(pending);
                 Err(err)
@@ -1489,6 +1532,55 @@ impl Game {
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&resolution)?;
+        // Site validation for ChooseTriggerOrder (Dispatcher 2-axis rebuild):
+        // Ensure ChooseTriggerOrder.site, PhaseTriggerData.site, and execution
+        // context site all match. A mismatch indicates a corrupted/incompatible save.
+        if let crate::pending::PendingKind::ChooseTriggerOrder {
+            site: pending_site, ..
+        } = &pending.kind
+        {
+            // Get site from trigger_data in context
+            let trigger_data_site = pending
+                .context
+                .get("trigger_data")
+                .cloned()
+                .and_then(|v| {
+                    serde_json::from_value::<crate::card_events::PhaseTriggerData>(v).ok()
+                })
+                .map(|td| td.site)
+                .unwrap_or(crate::registry::EventKind::WorkerPlaced);
+            // Get execution context site from continuation (PostWork) or context
+            let execution_site = if let crate::pending::Continuation::PostWork { resume, .. } =
+                &pending.continuation
+            {
+                match resume.step {
+                    crate::pending::ChainStep::AfterHarvestBake => crate::registry::EventKind::Bake,
+                    crate::pending::ChainStep::AfterClayConstruction => {
+                        crate::registry::EventKind::ClayConstruction
+                    }
+                    crate::pending::ChainStep::AfterWorker => {
+                        crate::registry::EventKind::WorkerPlaced
+                    }
+                }
+            } else {
+                // Non-post-work continuations: try to get from context phase
+                pending
+                    .context
+                    .get("phase")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| match s {
+                        "After" => Some(crate::registry::EventKind::WorkerPlaced), // Default for non-post-work
+                        _ => None,
+                    })
+                    .unwrap_or(crate::registry::EventKind::WorkerPlaced)
+            };
+            if *pending_site != trigger_data_site || *pending_site != execution_site {
+                return Err(format!(
+                            "site mismatch on resume: ChooseTriggerOrder.site={:?}, trigger_data.site={:?}, execution_site={:?}",
+                            pending_site, trigger_data_site, execution_site
+                        ));
+            }
+        }
         // R2-P1-1 (+ Round 2 P1-1): a paused work action's space must still be
         // revealed/available at resume time. Check it BEFORE taking the
         // decision so a stale or tampered save is refused atomically — nothing
@@ -1518,13 +1610,22 @@ impl Game {
                 ));
             }
         }
-        // Take the decision and its continuation
+        // P1-2 FIX: Atomicity - snapshot the ENTIRE game (including the still-
+        // stored pending decision) before any fallible operation, so any Err
+        // in the resume chain restores pending, state, and log completely.
+        let state_snapshot = self.clone();
         let pending = self.pending.take().expect("checked above");
         let continuation = pending.continuation.clone();
+
         // Apply the resolution WITHOUT logging it: the pending_resolution event
         // must chain from the paused state to the FINAL state (after the
         // continuation), so it is appended at the end of this method.
-        self.apply_pending_resolution(&pending, &resolution)?;
+        let apply_result = self.apply_pending_resolution(&pending, &resolution);
+        if let Err(err) = apply_result {
+            // Restore all state on error (pending was already restored by *self)
+            *self = state_snapshot;
+            return Err(err);
+        }
         let transition = match continuation {
             crate::pending::Continuation::None => Transition::Completed,
             crate::pending::Continuation::PostWork {
@@ -1535,13 +1636,27 @@ impl Game {
                 // The `work` event for the paused action was already recorded at
                 // pause time (with `after` = the paused hash), so only the
                 // resolution event is appended here; it spans the whole resume.
-                self.resume_post_work(player, resume, *completion)?
+                // A second pause during the resume returns Ok(Transition::Paused)
+                // (commit_second_pause), which must propagate unchanged.
+                match self.resume_post_work(player, resume, *completion) {
+                    Err(err) => {
+                        // Restore all state on error
+                        *self = state_snapshot;
+                        return Err(err);
+                    }
+                    Ok(t) => t,
+                }
             }
         };
         // The resolution event spans the whole resume, so it is logged last:
         // before == the paused hash the event chain already reached, after ==
         // the final (resumed) state.
-        self.record_pending_resolution(&pending, &resolution)?;
+        let record_result = self.record_pending_resolution(&pending, &resolution, true);
+        if let Err(err) = record_result {
+            // Restore all state on error
+            *self = state_snapshot;
+            return Err(err);
+        }
         Ok(transition)
     }
 
@@ -1646,6 +1761,7 @@ impl Game {
                             delayed_well: &mut delayed_well,
                             round,
                             used_spaces: &used_spaces,
+                            accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
                             card_use_limits: &card_use_limits,
@@ -1660,7 +1776,10 @@ impl Game {
                             baked: true,
                             previous_player: None,
                             used_spaces: used_spaces.clone(),
+                            site: crate::registry::EventKind::Bake,
                             event_kind: crate::registry::EventKind::Bake,
+                            revealed_round_cards: Vec::new(),
+                            c066_take_food_instead: false,
                         };
                         // After phase. If THIS is the paused step and the pause
                         // was in the After phase (a resolved ChooseTriggerOrder,
@@ -1778,6 +1897,7 @@ impl Game {
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
                         round,
+                        accumulations: None,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
@@ -1793,7 +1913,10 @@ impl Game {
                         baked: false,
                         previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
+                        site: crate::registry::EventKind::ClayConstruction,
                         event_kind: crate::registry::EventKind::ClayConstruction,
+                        revealed_round_cards: Vec::new(),
+                        c066_take_food_instead: false,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -1885,6 +2008,7 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
+                        accumulations: None,
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -1901,7 +2025,10 @@ impl Game {
                         baked: false,
                         previous_player: None,
                         used_spaces: used_spaces.clone(),
+                        site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
+                        revealed_round_cards: Vec::new(),
+                        c066_take_food_instead: false,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -2049,9 +2176,9 @@ impl Game {
         // worker/space delta). Every other mid-round law is unchanged for both
         // segments (validation.rs).
         if resume.space_applied {
-            crate::validation::validate_incremental_resume_completion_or_full(&next, self)?;
+            crate::validation::check_incremental_resume_completion_or_full(&next, self)?;
         } else {
-            crate::validation::validate_incremental_or_full(&next, self)?;
+            crate::validation::check_incremental_or_full(&next, self)?;
         }
         // The `work` event for this paused action is recorded by
         // `resolve_pending_and_resume` (with the paused hash as `after`), not
@@ -2169,7 +2296,11 @@ impl Game {
                 Ok(())
             }
             (
-                PendingKind::ChooseTriggerOrder { phase, triggers },
+                PendingKind::ChooseTriggerOrder {
+                    phase,
+                    site: _site,
+                    triggers,
+                },
                 PendingResolution::ChooseTriggerOrder { chosen_order },
             ) => {
                 // Execute the triggers in the chosen order
@@ -2230,6 +2361,7 @@ impl Game {
                     delayed_well: &mut self.delayed_well,
                     round: self.public.round,
                     used_spaces: &self.public.used,
+                    accumulations: None,
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,
@@ -2251,9 +2383,55 @@ impl Game {
                 )?;
                 Ok(())
             }
-            (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => {
-                // Extensible: custom effects handle their own payload.
-                Ok(())
+            (PendingKind::Custom { .. }, PendingResolution::Custom { payload }) => {
+                // Check if this is an A118 harvest field optional exchange
+                if pending.context.get("type").and_then(|v| v.as_str())
+                    == Some("harvest_field_optional_exchange")
+                {
+                    let confirmed = payload
+                        .get("confirmed")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    if confirmed {
+                        let cost_str = pending.context.get("cost").and_then(|v| v.as_str());
+                        let cost_amount = pending
+                            .context
+                            .get("cost_amount")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32;
+                        let gain_str = pending.context.get("gain").and_then(|v| v.as_str());
+                        let gain_amount = pending
+                            .context
+                            .get("gain_amount")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32;
+
+                        // Parse Good from the Debug name the payload
+                        // carries. An unknown name is a hard error, not a
+                        // silent drop (PR #385 review P3): the payload is
+                        // engine-written, so failure means tampering or an
+                        // untaught variant.
+                        let cost_good = cost_str.map(good_from_debug_name).transpose()?;
+                        let gain_good = gain_str.map(good_from_debug_name).transpose()?;
+
+                        if let (Some(cost_good), Some(gain_good)) = (cost_good, gain_good) {
+                            let player = &mut self.public.players[pending.player];
+                            // Pay cost
+                            player.supply.pay(cost_good, cost_amount)?;
+                            // Gain resource
+                            let next = player
+                                .supply
+                                .get(gain_good)
+                                .checked_add(gain_amount)
+                                .ok_or("resource overflow")?;
+                            player.supply.set(gain_good, next);
+                        }
+                    }
+                    Ok(())
+                } else {
+                    // Extensible: other custom effects handle their own payload
+                    Ok(())
+                }
             }
             (
                 PendingKind::ChooseAnimalPlacement { .. },
@@ -2283,6 +2461,7 @@ impl Game {
         &mut self,
         pending: &PendingDecision,
         resolution: &PendingResolution,
+        from_resume: bool,
     ) -> Result<(), String> {
         if !self.record_events {
             return Ok(());
@@ -2291,6 +2470,7 @@ impl Game {
             player: pending.player,
             decision_id: pending.id,
             resolution: resolution.clone(),
+            from_resume,
         })
         .map_err(|e| e.to_string())?;
         self.log.events.push(Event {

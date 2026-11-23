@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "card_id": "D077",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "再生レンガ",
+    "name_en": "Recycled Brick"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2844",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "min": 3
+        }
+      }
+    ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "after_renovation",
+      "conditions": [
+        {
+          "predicate": "any_player",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": {
+              "op": "count",
+              "args": ["rooms_newly_renovated"]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_renovation",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "回る進歩: use once then pass to left neighbor"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: any_player for '誰か（自分を含む）' needs confirmation",
+      "effects[0].steps[0].params.amount: count of 'rooms newly renovated this event' not in vocabulary",
+      "effects[0].trigger: after_renovation timing for stone house renovation specifically needs clarification"
+    ],
+    "test_case_ids": [
+      "D077-self-renovate-1-room",
+      "D077-other-player-renovate",
+      "D077-renovate-2-rooms"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 food. Prereq: at least 3 occupations. Effect: Whenever any player (including self) renovates to stone house, gain 1 clay per newly renovated room. Stage 2: any player renovation (overlap: ROOM). Passes to left neighbor."
+  }
+}

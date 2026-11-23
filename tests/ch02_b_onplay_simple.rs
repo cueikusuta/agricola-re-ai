@@ -90,6 +90,7 @@ fn dispatch_card(
         &mut uses,
         &limits,
         &mut pending,
+        true, // is_improvement_action: all five ch02 cards are MinorImprovements
     )
     .unwrap_or_else(|e| panic!("dispatch_play {id}: {e}"));
     *player = players[0].clone();
@@ -768,6 +769,7 @@ fn pass_left_zone_transition_and_card_points() {
         &mut uses,
         &limits,
         &mut pending,
+        true, // is_improvement_action: the played cards are MinorImprovements
     )
     .expect("dispatch_play B003");
 
@@ -837,6 +839,7 @@ fn pass_left_with_nonzero_points_subtraction() {
         &mut uses,
         &limits,
         &mut pending,
+        true, // is_improvement_action: the played cards are MinorImprovements
     )
     .expect("dispatch_play TEST_PASS_LEFT");
 
@@ -906,6 +909,7 @@ fn pass_left_requires_two_players() {
         &mut uses,
         &limits,
         &mut pending,
+        true, // is_improvement_action: the played cards are MinorImprovements
     )
     .expect("dispatch_play B003 in 1-player game");
 

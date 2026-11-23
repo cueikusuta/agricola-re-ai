@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "card_id": "E070",
+  "cases": [
+    {
+      "id": "E070-resow-on-empty",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "grain_1"
+      },
+      "action": {
+        "play": "E070",
+        "use": "harvest_all_grain_from_card"
+      },
+      "expected": {
+        "may_sow_vegetable_on_card": true,
+        "sown_amount": 1
+      },
+      "notes": "Last grain removed -> may resow the opposite type (vegetable) on this card."
+    },
+    {
+      "id": "E070-no-resow-partial",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "grain_2"
+      },
+      "action": {
+        "play": "E070",
+        "use": "harvest_one_grain_from_card"
+      },
+      "expected": {
+        "may_sow_on_card": false
+      },
+      "notes": "Removing one of two grains is not the last grain; no resow triggers."
+    },
+    {
+      "id": "E070-resow-vegetable-side",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "vegetable_1"
+      },
+      "action": {
+        "play": "E070",
+        "use": "harvest_all_vegetables_from_card"
+      },
+      "expected": {
+        "may_sow_grain_on_card": true,
+        "sown_amount": 1
+      },
+      "notes": "Last vegetable removed -> may resow grain on this card."
+    }
+  ]
+}

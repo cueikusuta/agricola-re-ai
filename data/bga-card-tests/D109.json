@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "card_id": "D109",
+  "cases": [
+    {
+      "id": "D109-on-play-wood",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0
+      },
+      "action": {
+        "play": "D109"
+      },
+      "expected": {
+        "wood_delta": 1
+      },
+      "notes": "On play, immediately gain 1 wood"
+    },
+    {
+      "id": "D109-sow-action-food",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "sow",
+        "player": "owner"
+      },
+      "expected": {
+        "food_delta": 2
+      },
+      "notes": "Owner uses sow action space, gain 2 food"
+    },
+    {
+      "id": "D109-non-sow-space",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "day_laborer",
+        "player": "owner"
+      },
+      "expected": {
+        "food_delta": 0,
+        "effect_not_triggered": true
+      },
+      "notes": "Non-sow action space does not trigger effect"
+    }
+  ]
+}
