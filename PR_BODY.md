@@ -118,6 +118,21 @@ CI 証跡行の追加のみを行った HEAD `a3d0175`（fbe821f + PR_BODY.md �
 - Python unittest discovery: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45056633058/job/137313210886
 - test (aggregate): https://github.com/cueikusuta/agricola-re-ai/actions/runs/45056633037/job/137313203103
 
+### 追記2: origin/main 再統合 merge HEAD の再実行確認
+
+origin/main が前回 merge 以降に前進した（#434 D065 / #435 C116 / #436 B102 / #437 B073 / #440 replay gate-2 fix）ため、**merge（force push なし）**で再統合。衝突は `src/policy.rs` の 1 ファイルのみで、本 PR の `AfterWorkerSpace*` policy arm と main の D065 `HarvestFieldGainIfGrainHarvestedAtLeast` arm を union 解決した（上記「main 統合」節および fbe821f/a3d0175 の記録は歴代証跡として保持）。merge コミット HEAD `d6b63f87ddc8ec6006b7c528b08e606760ef4490` で全必須チェックを再実行し緑（**本節が最新 HEAD の証跡**）:
+
+- CI required: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896796/job/137483514105
+- cargo test: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896796/job/137482847829
+- rustfmt: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896796/job/137482847791
+- clippy: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896796/job/137482848024
+- M1/M2/M7 seeded performance: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896796/job/137482848069
+- Pipeline gates (spec/catalog/blockers): https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896887/job/137482765130
+- Python unittest discovery: https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896857/job/137482764806
+- test (aggregate): https://github.com/cueikusuta/agricola-re-ai/actions/runs/45110896971/job/137482764957
+
+merge 後も mergeable: MERGEABLE。ローカルでも `cargo test --lib` 480 passed・`cargo test --test ch03_afterworker_space_cards` 45 passed・main 側改修ファイルのテスト（b073 / ch_b102 / harvest_feeding / p1_2_player_projection）・Python gates 3 本を確認。A021 発火スペースの mutation probe（`Space::FarmExpansion` → `Space::FamilyGrowthWithRoom` に戻すと `a021_build_rooms_rooms_exceed_people_triggers_family_growth_and_food` と `mutation_verification::mutation_a021_space_binding_detected` が赤になること）もマージ後ツリーで再確認済み。
+
 ## 宣言
 
 - 1 Issue = 1 目的 = 1 ブランチ = 1 PR。変更は A015/A018/A021/A023/A024 の実装とレビュー対応に限定。
