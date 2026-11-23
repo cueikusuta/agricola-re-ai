@@ -566,12 +566,17 @@ fn card_priority(
                                 CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
                                                                 | CardEffect::HarvestFieldGain { good, amount, .. }
                 | CardEffect::AfterClayConstructionGain { good, amount }
+                | CardEffect::AfterSowGain { good, amount, .. }
                 // E111's halves fire only while the owner stays minor-free; the
                 // heuristic accepts the conditional gain optimistically.
                 | CardEffect::StartRoundGainIfNoMinorPlayed { good, amount, .. }
                                 | CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon / 2
                                 }
+                CardEffect::AfterSowGainPerDistinctCrop { amount } => {
+                    // Heuristic: ~1.5 distinct crops per sow action on average
+                    card_good_value(Good::Food) * i64::from(*amount) * 3 / 2 * horizon / 2
+                }
                                 // A140 ショベル運搬人: the food amount equals the OTHER
                                 // accumulation's current clay count, which this heuristic
                                 // cannot read; approximate with a typical mid-game
