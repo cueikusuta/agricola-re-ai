@@ -277,6 +277,36 @@ fn improvement_choice(obs: &Observation) -> Option<Improvement> {
             _ => 20,
         })
 }
+/// Value weight for one on-play choice option (C007 刈り鋏): resolve a
+/// per-animal option against the owner's current state and compare it with
+/// the plain amount. Deterministic: the lower index wins ties.
+fn choice_gain_value(
+    player: &crate::model::Player,
+    option: &crate::cards::ChoiceGainOption,
+) -> u32 {
+    match option.per_animal {
+        Some(animal) => option.amount.saturating_mul(player.animal_count(animal)),
+        None => option.amount,
+    }
+}
+
+/// Index of the best on-play choice option for the owner.
+fn choice_index(
+    player: &crate::model::Player,
+    options: &[crate::cards::ChoiceGainOption],
+) -> usize {
+    let mut best = 0usize;
+    let mut best_value = u32::MIN;
+    for (i, option) in options.iter().enumerate() {
+        let value = choice_gain_value(player, option);
+        if i == 0 || value > best_value {
+            best = i;
+            best_value = value;
+        }
+    }
+    best
+}
+
 impl DetailPolicy for SimpleDetails {
     fn produce(&self, obs: &Observation, space: Space) -> Option<Action> {
         let p = &obs.public.players[obs.player_id];
@@ -461,6 +491,22 @@ impl DetailPolicy for SimpleDetails {
                             })
                         })?
                         .clone();
+                    // C007-style choice cards: pick the better on-play gain
+                    // option (per-animal amounts resolve against the owner's
+                    // current state) and pass the choice as action data.
+                    if let Some(card) = card_set.definition(&card_id) {
+                        if let Some(crate::cards::CardEffect::OnPlayChoiceGain { options }) =
+                            card.effects.iter().find(|e| {
+                                matches!(e, crate::cards::CardEffect::OnPlayChoiceGain { .. })
+                            })
+                        {
+                            let option = choice_index(p, options);
+                            return Some(Action {
+                                space,
+                                detail: Detail::PlayMinorChoice { card_id, option },
+                            });
+                        }
+                    }
                     Detail::PlayMinor { card_id }
                 }
             }
@@ -504,9 +550,9 @@ fn card_good_value(good: Good) -> i64 {
 
 fn card_animal_value(animal: Animal) -> i64 {
     match animal {
-        Animal::Cattle => 5, // Cattle are most valuable (can breed, worth 1 VP each)
-        Animal::Sheep => 4,  // Sheep breed fast
-        Animal::Boar => 3,   // Boar don't breed but worth 1 VP
+        Animal::Sheep => 4,
+        Animal::Boar => 5,
+        Animal::Cattle => 6,
     }
 }
 
@@ -631,20 +677,36 @@ fn card_priority(
                                     // Fires on any player's use of the space; approximate with per-round expectation
                                     card_good_value(*good) * i64::from(*amount) * horizon / 4
                                 }
+                                CardEffect::AfterAnyWorkerGainByCountIfNotActor {
+                                    base_good,
+                                    base_amount,
+                                    ..
+                                } => {
+                                    // B143: fires on any player's use of Hollow;
+                                    // value the base clay gain at per-round expectation.
+                                    card_good_value(*base_good) * i64::from(*base_amount) * horizon / 4
+                                }
                                 CardEffect::HarvestStartGainIfFields { good, amount, .. } => {
-                                                                    // Conditional on field count; optimistic half-weight
-                                                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
-                                                                }
-                                                                CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { good, amount, .. } => {
-                                                                    // D065 麦ふるい: conditional on harvesting 2+ grain this
-                                                                    // field phase; optimistic half-weight like the sibling
-                                                                    // conditional arms.
-                                                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
-                                                                }
+                                    // Conditional on field count; optimistic half-weight
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                }
+                                // C083/C147 (main b876a46/f03d65b): animal gain variants from main.
+                                CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { good, amount, .. } => {
+                                    // D065 麦ふるい: conditional on harvesting 2+ grain this
+                                    // field phase; optimistic half-weight like the sibling
+                                    // conditional arms.
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                }
                                 CardEffect::OnPlayGainAnimal { animal, amount, .. }
                                 | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
                                     card_animal_value(*animal) * i64::from(*amount) * horizon
                                 }
+                                // C006/C007 on-play effects: stone placement and choice gain
+                                // are resolved at play time; heuristic assigns neutral value.
+                                CardEffect::OnPlayChoiceGain { .. } => 0,
+                                CardEffect::OnPlayAddStoneToEmptyFields { .. } => 0,
+                                // PostPlayPassLeft is a zone move with no valuation.
+                                CardEffect::PostPlayPassLeft => 0,
                                 CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
@@ -732,6 +794,20 @@ impl DetailPolicy for CardChoiceDetails {
                     preferred_card(obs, CardKind::MinorImprovement, 0)
                 {
                     if priority >= 12 {
+                        // Choice cards (C007) need the choice as action data.
+                        if let Some(card) = (crate::cards::CardSet {
+                            definitions: obs.card_definitions.clone(),
+                        })
+                        .definition(&card_id)
+                        {
+                            if let Some(crate::cards::CardEffect::OnPlayChoiceGain { .. }) =
+                                card.effects.iter().find(|e| {
+                                    matches!(e, crate::cards::CardEffect::OnPlayChoiceGain { .. })
+                                })
+                            {
+                                return None;
+                            }
+                        }
                         return Some(Action {
                             space,
                             detail: Detail::PlayMinor { card_id },
