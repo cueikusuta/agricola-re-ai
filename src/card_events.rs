@@ -2382,6 +2382,31 @@ fn handle_harvest_field_gain(
                 .count() as u32
         }
         crate::cards::HarvestFieldRule::Fixed => 1,
+        // D063 段地 (Lynchet): one step per harvested field tile orthogonally
+        // adjacent to the house (a room tile). Counted pre-harvest so exactly
+        // the fields that yield this phase count; empty/fallow fields never
+        // count even when they touch a room.
+        crate::cards::HarvestFieldRule::FieldsAdjacentToHouse => p
+            .farm
+            .iter()
+            .enumerate()
+            .filter(|&(cell, farm_cell)| {
+                let is_harvested_field = matches!(
+                    farm_cell.tile,
+                    crate::model::Tile::Field {
+                        crop: Some(_),
+                        remaining: 1..
+                    }
+                );
+                let adjacent_to_house = crate::model::neighbors(cell).iter().any(|&neighbor| {
+                    matches!(
+                        p.farm.get(neighbor).map(|c| &c.tile),
+                        Some(crate::model::Tile::Room)
+                    )
+                });
+                is_harvested_field && adjacent_to_house
+            })
+            .count() as u32,
         // A112 大鎌使い: one step per growing grain field, the same
         // pre-harvest quantity as `cards::grain_fields_growing` (used by the
         // non-dispatcher `cards::harvest_field_rewards`). The dispatcher runs
@@ -3897,6 +3922,34 @@ pub mod legacy {
                                 .count() as u32
                         }
                         crate::cards::HarvestFieldRule::Fixed => 1,
+                        // D063 段地 (Lynchet): one step per harvested field
+                        // tile orthogonally adjacent to the house (a room
+                        // tile). Counted pre-harvest so exactly the fields
+                        // that yield this phase count; empty/fallow fields
+                        // never count even when they touch a room.
+                        crate::cards::HarvestFieldRule::FieldsAdjacentToHouse => player
+                            .farm
+                            .iter()
+                            .enumerate()
+                            .filter(|&(cell, farm_cell)| {
+                                let is_harvested_field = matches!(
+                                    farm_cell.tile,
+                                    crate::model::Tile::Field {
+                                        crop: Some(_),
+                                        remaining: 1..
+                                    }
+                                );
+                                let adjacent_to_house =
+                                    crate::model::neighbors(cell).iter().any(|&neighbor| {
+                                        matches!(
+                                            player.farm.get(neighbor).map(|c| &c.tile),
+                                            Some(crate::model::Tile::Room)
+                                        )
+                                    });
+                                is_harvested_field && adjacent_to_house
+                            })
+                            .count()
+                            as u32,
                         // A112 大鎌使い: one step per growing grain field (mirrors the
                         // dispatcher handler and cards::harvest_field_rewards).
                         crate::cards::HarvestFieldRule::GrainFieldsGrowing => player

@@ -563,6 +563,12 @@ pub enum HarvestFieldRule {
     /// the grain the fields yield — the card pays 1 extra grain per such
     /// field. Grain in the supply and empty fields are not counted.
     GrainFieldsGrowing,
+    /// D063 段地 (Lynchet): one multiplier step per harvested field tile
+    /// orthogonally adjacent to the house (a room tile). Counted at the
+    /// field-phase dispatch, before crops are removed, so exactly the fields
+    /// that yield this phase count. A field with no crop (fallow/empty) is
+    /// not harvested and never counts, even when it touches a room.
+    FieldsAdjacentToHouse,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -2845,6 +2851,29 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                     // A112 大鎌使い: one step per growing grain field (the
                     // same pre-harvest count the dispatcher handler uses).
                     HarvestFieldRule::GrainFieldsGrowing => grain_fields_growing(player),
+                    HarvestFieldRule::FieldsAdjacentToHouse => player
+                        .farm
+                        .iter()
+                        .enumerate()
+                        .filter(|&(cell, farm_cell)| {
+                            let is_harvested_field = matches!(
+                                farm_cell.tile,
+                                Tile::Field {
+                                    crop: Some(_),
+                                    remaining: 1..
+                                }
+                            );
+                            let adjacent_to_house =
+                                crate::model::neighbors(cell).iter().any(|&neighbor| {
+                                    matches!(
+                                        player.farm.get(neighbor).map(|c| &c.tile),
+                                        Some(Tile::Room)
+                                    )
+                                });
+                            is_harvested_field && adjacent_to_house
+                        })
+                        .count()
+                        as u32,
                 };
                 safe_gain(
                     player,
@@ -4877,6 +4906,19 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
             vec![CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
                 threshold: 2,
                 good: Good::Grain,
+                amount: 1,
+            }],
+        ),
+        // D063 段地 (Lynchet): no cost, no points; during each harvest's field
+        // phase, gain 1 food per harvested field tile orthogonally adjacent to
+        // the house (BGA spec D063, per count("harvested_field_adjacent_house")).
+        card(
+            "D063",
+            CardKind::MinorImprovement,
+            vec![],
+            vec![CardEffect::HarvestFieldGain {
+                rule: HarvestFieldRule::FieldsAdjacentToHouse,
+                good: Good::Food,
                 amount: 1,
             }],
         ),
