@@ -380,6 +380,20 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// A140 ショベル運搬人 (Shovel Bearer): after the owner uses `space`
+    /// (ClayPit or Hollow), gain `good` (food) equal to the clay standing on
+    /// the OTHER clay accumulation space (ClayPit use reads Hollow, Hollow
+    /// use reads ClayPit). The printed card pays the opposite accumulation's
+    /// current clay count, so the amount is dynamic and deliberately not
+    /// folded into `AfterWorkerGain`'s fixed `amount`: the handler reads it
+    /// from the public accumulations map the after-worker dispatcher threads
+    /// read-only through `DispatchContext`. Only available at 3+ players.
+    AfterWorkerGainOtherAccumulationFood {
+        /// The accumulation space the owner used (clay_pit or hollow).
+        space: Space,
+        /// The good granted (food on the printed card).
+        good: Good,
+    },
 }
 
 impl CardEffect {
@@ -467,6 +481,9 @@ impl CardEffect {
                 "start_round_gain_if_no_harvest_and_animals"
             }
             CardEffect::OnPlayGainIfRoomCount { .. } => "on_play_gain_if_room_count",
+            CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
+                "after_worker_gain_other_accumulation_food"
+            }
         }
     }
 }
@@ -732,8 +749,11 @@ impl CardSet {
                         | CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { amount, .. } => {
                             *amount
                         }
+                        // A140: the amount is read from the public
+                        // accumulations at resolution time, not fixed here.
                         // Chapter 1 round-start cards: no direct resource amount to validate
-                        CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
+                        | CardEffect::StartRoundPlowFieldIfHouse { .. }
                         | CardEffect::StartRoundCopyUnusedRoundSpace { .. }
                         | CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. }
                         | CardEffect::StartRoundPlayCardIfStoneHouse { .. }
@@ -3278,6 +3298,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3299,6 +3320,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3320,6 +3342,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3359,6 +3382,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3382,6 +3406,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3405,6 +3430,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -5038,6 +5064,32 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // A140 ショベル運搬人 (Shovel Bearer): after using ClayPit, food equal
+        // to the clay left on Hollow; after using Hollow, food equal to the
+        // clay left on ClayPit (the printed card pays the OTHER accumulation's
+        // clay count; agricola.cloudfree.jp ?p=3285). The amount is dynamic,
+        // read from the public accumulations at resolution time. Only
+        // available at 3+ players.
+        CardDefinition {
+            use_limit: None,
+            id: "A140".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::AfterWorkerGainOtherAccumulationFood {
+                    space: Space::ClayPit,
+                    good: Good::Food,
+                },
+                CardEffect::AfterWorkerGainOtherAccumulationFood {
+                    space: Space::Hollow,
+                    good: Good::Food,
+                },
+            ],
+        },
     ]
 }
 
@@ -6498,7 +6550,7 @@ mod verified_band_a_tests {
     #[test]
     fn band_a_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["A099", "A101", "A106", "A117", "A155"] {
+        for id in ["A099", "A101", "A106", "A117", "A140", "A155"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"

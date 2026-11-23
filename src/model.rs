@@ -2008,7 +2008,11 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
-                        accumulations: None,
+                        // A140 ショベル運搬人 reads the OTHER clay accumulation
+                        // at resolution time; the paused state already reflects
+                        // the core action's take, so the current public map is
+                        // exactly what the original dispatch saw.
+                        accumulations: Some(&next.public.accumulations),
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -2361,7 +2365,11 @@ impl Game {
                     delayed_well: &mut self.delayed_well,
                     round: self.public.round,
                     used_spaces: &self.public.used,
-                    accumulations: None,
+                    // A140 ショベル運搬人 reads the OTHER clay accumulation
+                    // at resolution time; the paused state was committed after
+                    // the core action's take, so the current public map holds
+                    // exactly the amounts the original scan saw.
+                    accumulations: Some(&self.public.accumulations),
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,
