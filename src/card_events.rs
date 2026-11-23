@@ -7974,6 +7974,56 @@ mod tests {
             assert_eq!(c.players[0].supply.wood, 0, "no wood cost");
         }
 
+        /// A001: 適格な1セル牧草地が存在する場合、辞退不能（自動建設）を確認。
+        /// OnPlayBuildStableInPasture は Before フェーズで実行されるため、
+        /// Issue #268 R2-P0-2 に従い player pause / decision_owner は非対応。
+        /// したがって適格対象があれば必ず建設される（辞退オプションなし）。
+        #[test]
+        fn a001_eligible_pasture_no_decline_possible() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.cards.hands[0].push("A001".to_string());
+            // 適格な1セル牧草地を用意
+            c.players[0].pastures.push(crate::model::Pasture {
+                id: 0,
+                cells: vec![4],
+                animal: None,
+                quantity: 0,
+            });
+            c.players[0].farm[4].tile = Tile::Pasture { id: 0 };
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A001",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            // 適格対象がある場合、自動的に厩舎が建設される（辞退不能）
+            assert!(
+                c.players[0].farm[4].stable,
+                "stable automatically built; no decline possible in Before phase"
+            );
+            assert_eq!(c.players[0].supply.wood, 0, "free stable: no wood cost");
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A001"],
+                "card moves to left neighbor's hand"
+            );
+        }
+
         /// A002 移動耕作: 合法セル0 -> 何も耕さずコストのみ支払い。
         #[test]
         fn a002_zero_legal_cells_only_cost_paid() {
@@ -8571,6 +8621,11 @@ mod tests {
             assert_eq!(c.players[0].supply.food, 0, "unsown field: no food");
             assert_eq!(c.players[0].supply.grain, 0, "unsown field: no grain");
             assert_eq!(c.players[0].supply.wood, 0, "1 wood cost paid");
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A007"],
+                "card moves to left neighbor's hand"
+            );
         }
 
         /// A007: 穀物畑・野菜畑それぞれから複数獲得。
@@ -8618,6 +8673,11 @@ mod tests {
                 "1 grain per vegetable field x1"
             );
             assert_eq!(c.players[0].supply.wood, 0, "1 wood cost paid");
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A007"],
+                "card moves to left neighbor's hand"
+            );
         }
 
         // ---- Part-2 復元カード: 基本動作（本番ディスパッチ経路）----
@@ -8994,13 +9054,23 @@ mod tests {
             assert_eq!(c.players[0].card_points, -3, "C083: -3 points");
         }
 
-        /// C147 牛飼い: CattleMarket 使用後、配置決定の保留（ChooseAnimalPlacement）を返す。
+        /// C147 牛飼い: CattleMarket 使用後、配置決定の保留（ChooseAnimalPlacement）を返し、
+        /// 解決すると所有者が牛1頭を獲得、カードは場（played_area）に残る。
         #[test]
         fn c147_cowherd_pauses_for_placement_decision() {
             let set = CardSet {
                 definitions: crate::cards::verified_band_c_cards(),
             };
             let mut c = Ctx::new();
+            // 既存の牛牧場（2セル、空き容量あり）を用意: 配置先パスチャが存在しないと失敗する。
+            c.players[0].pastures.push(crate::model::Pasture {
+                id: 0,
+                cells: vec![1, 2],
+                animal: Some(Animal::Cattle),
+                quantity: 0,
+            });
+            c.players[0].farm[1].tile = Tile::Pasture { id: 0 };
+            c.players[0].farm[2].tile = Tile::Pasture { id: 0 };
             c.cards.hands[0].push("C147".to_string());
             let mut market = vec![];
             let mut well = BTreeMap::new();
@@ -9022,6 +9092,8 @@ mod tests {
                 &mut c.rng,
             )
             .unwrap();
+            // 職業カードは場に残る（post_play: PlayedArea）
+            assert!(c.players[0].played_cards.contains(&"C147".to_string()));
 
             let result = dispatch_after_worker(
                 &set,
@@ -9050,6 +9122,23 @@ mod tests {
                         crate::pending::PendingKind::ChooseAnimalPlacement { .. }
                     ),
                     "C147: pause kind is ChooseAnimalPlacement"
+                );
+                // 保留決定を解決: 既存の牛牧場(id=0)に牛1頭を配置するプランを手動作成
+                let plan = crate::engine::AnimalPlan {
+                    animal: Animal::Cattle,
+                    to_pastures: vec![(0, 1)],
+                    to_stables: Vec::new(),
+                    pet: false,
+                    cook: 0,
+                    discard: 0,
+                };
+                crate::engine::place_animals(&mut c.players[0], &plan, 1)
+                    .expect("animal placement should succeed");
+                // 所有者が牛1頭を獲得
+                assert_eq!(
+                    c.players[0].animal_count(Animal::Cattle),
+                    1,
+                    "C147: owner gains 1 cattle after resolving placement"
                 );
             }
         }
