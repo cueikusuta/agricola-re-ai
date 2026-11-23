@@ -111,12 +111,16 @@ fn b143_owner_own_hollow_use_grants_nothing() {
 
 #[test]
 fn b143_multiple_owners_all_non_actor_gain() {
-    // 3p: seats 0 and 2 own B143, actor seat 1 uses Hollow -> both gain clay 2.
+    // 3p: every seat owns B143; only the non-actor owners gain clay 2.
     let set = set_with_b143();
-    let players = dispatch(&set, &[0, 2], 1, Space::Hollow, 3);
+    let players = dispatch(&set, &[0, 1, 2], 1, Space::Hollow, 3);
     assert_eq!(players[0].supply.get(Good::Clay), 2, "owner 0 gains clay 2");
     assert_eq!(players[2].supply.get(Good::Clay), 2, "owner 2 gains clay 2");
-    assert_eq!(players[1].supply.get(Good::Clay), 0, "actor gains no bonus");
+    assert_eq!(
+        players[1].supply.get(Good::Clay),
+        0,
+        "actor is excluded even though they also own B143"
+    );
 }
 
 #[test]
