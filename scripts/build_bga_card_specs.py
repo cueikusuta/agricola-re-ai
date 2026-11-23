@@ -514,6 +514,7 @@ CARDS = {
                    freq="every_use", dur="permanent", order=1),
         ],
         "notes": "Gain 1 grain on play; in each field phase harvest 1 extra grain per grain field.",
+        "implementation_status": "tested",
         "tests": [
             case("A112-normal", {"grain": 0}, {"play": "A112"}, {"grain_delta": 1}),
             case("A112-harvest", {"grain_fields": 2}, {"harvest_field_phase": 1},

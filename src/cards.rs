@@ -97,9 +97,12 @@ pub enum CardEffect {
     },
     /// C116 調度品職人 (Furniture Maker): each time the owner plays an
     /// occupation AFTER this card, gain `amount` of `good` per food paid as
-    /// that occupation's cost (printed cost + optional fee). Fired from the
-    /// play dispatcher's after-play scan; the legacy `cards::play` helper does
-    /// not re-scan earlier cards and therefore never fires it.
+    /// that occupation's occupation cost (the food paid on the Lessons /
+    /// ExtraLessons action space). The occupation's own printed cost is the
+    /// separate "individual cost" of the 2016 Lookout appendix and never
+    /// feeds this multiplier. Fired from the play dispatcher's after-play
+    /// scan; the legacy `cards::play` helper does not re-scan earlier cards
+    /// and therefore never fires it.
     AfterOccupationGainPerFoodCost {
         good: Good,
         amount: u32,
@@ -246,6 +249,21 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// D065 麦ふるい (Grain Sieve): during each harvest's field phase, if the
+    /// grain gained THIS field phase (pre-harvest equal to the number of
+    /// grain fields with a growing crop) is at least `threshold`, gain
+    /// `amount` of `good`. The engine's field phase harvests exactly one
+    /// grain per growing grain field AFTER this dispatch fires, so counting
+    /// grain fields with `remaining > 0` here equals the grain this phase
+    /// yields (pinned by comment and tests: the count is per FIELD, not per
+    /// remaining unit). The condition needs farm state, so the generic
+    /// condition scan reports it as triggerable and the handler performs
+    /// the threshold check (same pattern as E111 世捨て人).
+    HarvestFieldGainIfGrainHarvestedAtLeast {
+        threshold: u32,
+        good: Good,
+        amount: u32,
+    },
     /// A090 鋤職人 (Plow Driver): at each round start, if the owner lives in a
     /// stone house, may pay 1 food to plow exactly 1 field. Optional; the
     /// handler checks the house condition and resource availability.
@@ -350,6 +368,32 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// B073 贈り物かご (Gift Basket): on play, if the owner has exactly
+    /// `rooms` rooms, gain `amount` of `good`. The printed table
+    /// (2 -> vegetable, 3 -> food, 4 -> grain, 5 -> vegetable; 1 each) is
+    /// expressed as four effects of this variant, and only the one row whose
+    /// room count matches the owner exactly resolves. A dedicated variant
+    /// (instead of widening `OnPlayGainIfHouse`) keeps the serialized shape
+    /// of existing variants byte-identical for saves and content hashes.
+    OnPlayGainIfRoomCount {
+        rooms: u8,
+        good: Good,
+        amount: u32,
+    },
+    /// A140 ショベル運搬人 (Shovel Bearer): after the owner uses `space`
+    /// (ClayPit or Hollow), gain `good` (food) equal to the clay standing on
+    /// the OTHER clay accumulation space (ClayPit use reads Hollow, Hollow
+    /// use reads ClayPit). The printed card pays the opposite accumulation's
+    /// current clay count, so the amount is dynamic and deliberately not
+    /// folded into `AfterWorkerGain`'s fixed `amount`: the handler reads it
+    /// from the public accumulations map the after-worker dispatcher threads
+    /// read-only through `DispatchContext`. Only available at 3+ players.
+    AfterWorkerGainOtherAccumulationFood {
+        /// The accumulation space the owner used (clay_pit or hollow).
+        space: Space,
+        /// The good granted (food on the printed card).
+        good: Good,
+    },
 }
 
 impl CardEffect {
@@ -402,6 +446,9 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
             CardEffect::AfterImprovementPlayedGain { .. } => "after_improvement_played_gain",
+            CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { .. } => {
+                "harvest_field_gain_if_grain_harvested_at_least"
+            }
             CardEffect::StartRoundPlowFieldIfHouse { .. } => "start_round_plow_field_if_house",
             CardEffect::StartRoundCopyUnusedRoundSpace { .. } => {
                 "start_round_copy_unused_round_space"
@@ -432,6 +479,10 @@ impl CardEffect {
             }
             CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
                 "start_round_gain_if_no_harvest_and_animals"
+            }
+            CardEffect::OnPlayGainIfRoomCount { .. } => "on_play_gain_if_room_count",
+            CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
+                "after_worker_gain_other_accumulation_food"
             }
         }
     }
@@ -505,6 +556,13 @@ pub enum HarvestFieldRule {
     /// A118 樹木庭師 (Treegardener): fixed amount per harvest field phase,
     /// independent of field count or crop state.
     Fixed,
+    /// A112 大鎌使い (Scythe Worker): one multiplier step per grain field
+    /// whose crop is still growing. The dispatcher runs before crops are
+    /// removed, and each growing grain field yields exactly one grain this
+    /// field phase, so counting `remaining >= 1` grain fields here equals
+    /// the grain the fields yield — the card pays 1 extra grain per such
+    /// field. Grain in the supply and empty fields are not counted.
+    GrainFieldsGrowing,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -551,6 +609,14 @@ pub enum ScoreBonusRule {
     FarmyardAllUsed,
     /// E035 人間不信 (Misanthropy): 2/3/5 points for exactly 4/3/2 family members.
     ExactFamilyMembers,
+    /// D030 職人地区 (Artisan District): 2/5/8 bonus points when the bottom
+    /// row of the supply board holds 3/4/5 or more major improvements
+    /// (2 or fewer -> no bonus). The count reuses the canonical bottom-row
+    /// judgment shared with `CountKind::MajorImprovementsBottomRow`
+    /// (joinery/pottery/basketry); it never counts the total number of
+    /// major improvements. Appended at the enum tail so existing serde
+    /// variants and saved-game bytes are unchanged.
+    MajorImprovementsBottomRowThresholds,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -666,7 +732,8 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfFamilyAndRooms { amount, .. }
                         | CardEffect::StartRoundGainIfLessonsOccupants { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
-                        | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. } => *amount,
+                        | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
+                        | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -678,9 +745,15 @@ impl CardSet {
 
                         CardEffect::AfterAnyWorkerGain { amount, .. }
                         | CardEffect::AfterAnyWorkerOthersGain { amount, .. }
-                        | CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
+                        | CardEffect::HarvestStartGainIfFields { amount, .. }
+                        | CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { amount, .. } => {
+                            *amount
+                        }
+                        // A140: the amount is read from the public
+                        // accumulations at resolution time, not fixed here.
                         // Chapter 1 round-start cards: no direct resource amount to validate
-                        CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
+                        | CardEffect::StartRoundPlowFieldIfHouse { .. }
                         | CardEffect::StartRoundCopyUnusedRoundSpace { .. }
                         | CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. }
                         | CardEffect::StartRoundPlayCardIfStoneHouse { .. }
@@ -1290,6 +1363,16 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
             } if player.house == *house && player.rooms() == usize::from(*rooms) => {
                 safe_gain(player, *good, *amount)?;
             }
+            // B073 贈り物かご: only the table row whose room count matches the
+            // owner exactly resolves; a non-matching row falls through to the
+            // catch-all below and grants nothing.
+            CardEffect::OnPlayGainIfRoomCount {
+                rooms,
+                good,
+                amount,
+            } if player.rooms() == usize::from(*rooms) => {
+                safe_gain(player, *good, *amount)?;
+            }
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 let bonus = improvement_count_in_front(set, player)
                     .checked_mul(*amount)
@@ -1593,6 +1676,16 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                     2 => 5,
                     _ => 0,
                 },
+                ScoreBonusRule::MajorImprovementsBottomRowThresholds => {
+                    // Bottom row only (Joinery/Pottery/Basketry), never the
+                    // total major-improvement count.
+                    match major_improvements_bottom_row(player) {
+                        3 => 2,
+                        4 => 5,
+                        n if n >= 5 => 8,
+                        _ => 0,
+                    }
+                }
             },
             _ => 0,
         })
@@ -2659,6 +2752,26 @@ fn vegetable_yield(player: &Player) -> u32 {
         .count() as u32
 }
 
+/// Grain fields the field phase is about to harvest: fields planted with
+/// grain whose crop is still growing (one grain per field). Read pre-harvest
+/// state, before any crops are removed. Supply grain and empty fields are
+/// not counted.
+fn grain_fields_growing(player: &Player) -> u32 {
+    player
+        .farm
+        .iter()
+        .filter(|cell| {
+            matches!(
+                cell.tile,
+                Tile::Field {
+                    crop: Some(Crop::Grain),
+                    remaining: 1..,
+                }
+            )
+        })
+        .count() as u32
+}
+
 /// Called before taking crops from fields; livestock and field layouts still
 /// represent the state at the start of the field phase.
 pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), String> {
@@ -2729,6 +2842,9 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                             .count() as u32
                     }
                     HarvestFieldRule::Fixed => 1,
+                    // A112 大鎌使い: one step per growing grain field (the
+                    // same pre-harvest count the dispatcher handler uses).
+                    HarvestFieldRule::GrainFieldsGrowing => grain_fields_growing(player),
                 };
                 safe_gain(
                     player,
@@ -2741,6 +2857,32 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                 // E111 世捨て人, harvest half: the condition is checked here
                 // because it needs card definitions.
                 if no_minor_improvements_played(set, player) {
+                    safe_gain(player, *good, *amount)?;
+                }
+            } else if let CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
+                threshold,
+                good,
+                amount,
+            } = effect
+            {
+                // D065 麦ふるい: same pre-harvest equivalence as the dispatcher
+                // handler (card_events.rs) — this legacy path also runs before
+                // crops are taken, so growing grain fields (remaining >= 1)
+                // equal the grain this field phase yields, one per field.
+                let grain_fields = player
+                    .farm
+                    .iter()
+                    .filter(|cell| {
+                        matches!(
+                            cell.tile,
+                            Tile::Field {
+                                crop: Some(Crop::Grain),
+                                remaining: 1..,
+                            }
+                        )
+                    })
+                    .count() as u32;
+                if grain_fields >= *threshold {
                     safe_gain(player, *good, *amount)?;
                 }
             }
@@ -3156,6 +3298,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3177,6 +3320,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3198,6 +3342,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3237,6 +3382,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3260,6 +3406,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3283,6 +3430,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3899,7 +4047,6 @@ pub fn after_clay_construction(
 }
 
 /// Additional A/B occupations with unambiguous fixed, public-state effects.
-/// Consultant's immediate option here applies to the two-player starter pool.
 pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
     let mut result = vec![
         CardDefinition {
@@ -3927,8 +4074,15 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
             }],
         },
     ];
-    if players == 2 {
-        result.push(CardDefinition {
+    // B102 女性顧問 (Consultant): on play, gain the printed per-player-count
+    // reward — 2 players 3 clay, 3 players 2 reed, 4 players 2 sheep. Each
+    // variant is a plain unguarded effect; the registry merge
+    // (`merge_card_variants` "B102") guards every variant behind paired
+    // Minimum/MaximumPlayers prerequisites so exactly one series projects at
+    // any given player count. Source: data/bga-card-specs/B102.json
+    // (player_count_table 2=clay/3, 3=reed/2, 4=sheep/2).
+    match players {
+        2 => result.push(CardDefinition {
             use_limit: None,
             id: "B102".into(),
             kind: CardKind::Occupation,
@@ -3938,7 +4092,30 @@ pub fn verified_simple_occupations(players: usize) -> Vec<CardDefinition> {
                 good: Good::Clay,
                 amount: 3,
             }],
-        });
+        }),
+        3 => result.push(CardDefinition {
+            use_limit: None,
+            id: "B102".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Reed,
+                amount: 2,
+            }],
+        }),
+        4 => result.push(CardDefinition {
+            use_limit: None,
+            id: "B102".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGainAnimal {
+                animal: Animal::Sheep,
+                amount: 2,
+            }],
+        }),
+        _ => {}
     }
     result
 }
@@ -4031,9 +4208,36 @@ mod simple_occupation_tests {
         )
         .unwrap();
         assert_eq!(p.supply.clay, 3);
-        assert!(!verified_simple_occupations(3)
+        // The 3-player subset carries its own Reed 2 variant and the
+        // 4-player subset the Sheep 2 OnPlayGainAnimal variant, so the
+        // two-player clay variant is the only one that can fire here.
+        let three = verified_simple_occupations(3);
+        let b102_3 = three
             .iter()
-            .any(|c| c.id == "B102"));
+            .find(|c| c.id == "B102")
+            .expect("B102 3-player variant must exist");
+        assert_eq!(
+            b102_3.effects,
+            vec![CardEffect::OnPlayGain {
+                good: Good::Reed,
+                amount: 2
+            }]
+        );
+        let four = verified_simple_occupations(4);
+        let b102_4 = four
+            .iter()
+            .find(|c| c.id == "B102")
+            .expect("B102 4-player variant must exist");
+        assert_eq!(
+            b102_4.effects,
+            vec![CardEffect::OnPlayGainAnimal {
+                animal: Animal::Sheep,
+                amount: 2
+            }]
+        );
+        assert!(verified_simple_occupations(5)
+            .iter()
+            .all(|c| c.id != "B102"));
     }
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
@@ -4294,7 +4498,9 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
             }],
         ),
         // C116 調度品職人 (Furniture Maker): no cost; on play gain 1 wood, and
-        // each later occupation play grants 1 wood per food paid as its cost.
+        // each later occupation play grants 1 wood per food paid as that
+        // occupation's occupation cost (the Lessons/ExtraLessons fee; the
+        // occupation's printed individual cost never counts).
         card(
             "C116",
             occupation,
@@ -4660,6 +4866,39 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 rule: ScoreBonusRule::StoneRoomsExceedPeople,
             }],
         ),
+        // D065 麦ふるい (Grain Sieve): cost 1 wood; during each harvest's field
+        // phase, if the grain gained this field phase is at least 2, gain 1
+        // more grain from the general supply (BGA spec D065, harvest_field_phase
+        // with grain_harvested_at_least n=2 -> gain_resource grain 1).
+        card(
+            "D065",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1)],
+            vec![CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
+                threshold: 2,
+                good: Good::Grain,
+                amount: 1,
+            }],
+        ),
+        // D030 職人地区 (Artisan District): cost 1 stone, prerequisites 3
+        // occupations, printed points 1; at scoring, 2/5/8 bonus points when
+        // the bottom row of the supply board holds 3/4/5+ major improvements
+        // (2 or fewer -> no bonus).
+        CardDefinition {
+            use_limit: None,
+            id: "D030".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Stone, 1)],
+            points: 1,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(3),
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::MajorImprovementsBottomRowThresholds,
+                },
+            ],
+        },
     ]
 }
 
@@ -4734,6 +4973,30 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // A112 大鎌使い (Scythe Worker): gain 1 grain when playing this card;
+        // in each field phase gain 1 extra grain per growing grain field (the
+        // dispatcher runs before crops are removed, so the count equals the
+        // grain the fields yield this phase). Spec: data/bga-card-specs/
+        // A112.json (on_play grain 1 + harvest_field_phase grain per grain
+        // field), cost/prereq none, 0 points.
+        CardDefinition {
+            use_limit: None,
+            id: "A112".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::GrainFieldsGrowing,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+            ],
+        },
         // A117 木材調達人 (Wood Carrier): 1 wood per improvement already in
         // front of the owner when playing this card.
         CardDefinition {
@@ -4798,6 +5061,32 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 CardEffect::OnPlayGain {
                     good: Good::Vegetable,
                     amount: 1,
+                },
+            ],
+        },
+        // A140 ショベル運搬人 (Shovel Bearer): after using ClayPit, food equal
+        // to the clay left on Hollow; after using Hollow, food equal to the
+        // clay left on ClayPit (the printed card pays the OTHER accumulation's
+        // clay count; agricola.cloudfree.jp ?p=3285). The amount is dynamic,
+        // read from the public accumulations at resolution time. Only
+        // available at 3+ players.
+        CardDefinition {
+            use_limit: None,
+            id: "A140".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::AfterWorkerGainOtherAccumulationFood {
+                    space: Space::ClayPit,
+                    good: Good::Food,
+                },
+                CardEffect::AfterWorkerGainOtherAccumulationFood {
+                    space: Space::Hollow,
+                    good: Good::Food,
                 },
             ],
         },
@@ -4924,6 +5213,44 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 CardEffect::HarvestFieldGain {
                     rule: HarvestFieldRule::VegetablesHarvested,
                     good: Good::Food,
+                    amount: 1,
+                },
+            ],
+        },
+        // B073 贈り物かご (Gift Basket): cost 1 reed, 1 VP; prerequisite: at
+        // least 3 occupations played. On play, if the owner has exactly
+        // 2/3/4/5 rooms, gain 1 vegetable/food/grain/vegetable. Each table
+        // row is one OnPlayGainIfRoomCount effect; only the row matching the
+        // current room count exactly resolves. Eligible at all player counts
+        // (spec eligibility 2/3/4 = yes).
+        CardDefinition {
+            use_limit: None,
+            id: "B073".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Reed, 1)],
+            points: 1,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(3),
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 2,
+                    good: Good::Vegetable,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 3,
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 4,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfRoomCount {
+                    rooms: 5,
+                    good: Good::Vegetable,
                     amount: 1,
                 },
             ],
@@ -5670,15 +5997,282 @@ mod verified_band_d_tests {
         assert_eq!(card.points, 0);
     }
 
+    /// Bottom row = Joinery / Pottery / Basketry (same canonical set as
+    /// `CountKind::MajorImprovementsBottomRow` / B007), each contributing one
+    /// to the count; 3/4/5+ -> 2/5/8, 0-2 -> 0.
+    #[test]
+    fn d030_thresholds_two_five_eight_for_three_four_five_bottom_row_majors() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D030".into());
+        // 0 and 2 bottom-row majors -> no bonus (2 is the exact boundary).
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        for imp in [Improvement::Joinery, Improvement::Pottery] {
+            p.improvements.push(imp);
+        }
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // 3 -> +2 (spec contract D030-three-majors).
+        p.improvements.push(Improvement::Basketry);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        // 4 -> +5.
+        p.improvements.push(Improvement::Joinery);
+        assert_eq!(end_game_bonus(&set, &p), 5);
+        // 5 -> +8.
+        p.improvements.push(Improvement::Pottery);
+        assert_eq!(end_game_bonus(&set, &p), 8);
+        // 6 (above the top threshold) still caps at +8.
+        p.improvements.push(Improvement::Basketry);
+        assert_eq!(end_game_bonus(&set, &p), 8);
+    }
+
+    #[test]
+    fn d030_less_than_three_bottom_row_majors_no_bonus() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D030".into());
+        // spec contract D030-less-than-three.
+        p.improvements
+            .extend([Improvement::Joinery, Improvement::Pottery]);
+        assert_eq!(end_game_bonus(&set, &p), 0);
+    }
+
+    #[test]
+    fn d030_bonus_counts_only_bottom_row_majors() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D030".into());
+        // 3 bottom-row majors -> +2; adding five non-bottom-row majors
+        // must not raise the count or the bonus.
+        p.improvements.extend([
+            Improvement::Joinery,
+            Improvement::Pottery,
+            Improvement::Basketry,
+            Improvement::Fireplace2,
+            Improvement::Fireplace3,
+            Improvement::Hearth4,
+            Improvement::ClayOven,
+            Improvement::StoneOven,
+        ]);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        // Two bottom-row majors mixed with others stays below the threshold.
+        let mut q = Player::new(0, 0);
+        q.played_cards.push("D030".into());
+        q.improvements.extend([
+            Improvement::Joinery,
+            Improvement::Basketry,
+            Improvement::Fireplace2,
+            Improvement::ClayOven,
+        ]);
+        assert_eq!(end_game_bonus(&set, &q), 0);
+    }
+
+    #[test]
+    fn d030_cost_stone_one_three_occupations_and_printed_points_one() {
+        let set = set();
+        let card = set.definition("D030").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Stone, 1)]);
+        // Printed points 1 live on the definition, separate from the
+        // end-game bonus effect.
+        assert_eq!(card.points, 1);
+        assert!(card.effects.iter().any(|effect| matches!(
+            effect,
+            CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumOccupations(3)
+            }
+        )));
+        let mut p = Player::new(0, 0);
+        p.supply.stone = 1;
+        // Two played occupations (D100/D105) cannot satisfy the 3-occupation
+        // prerequisite even though the stone cost is affordable.
+        p.played_cards.extend(["D100".into(), "D105".into()]);
+        assert!(!can_play(&set, card, &p, 0));
+        // A third occupation (D109) opens the play.
+        p.played_cards.push("D109".into());
+        assert!(can_play(&set, card, &p, 0));
+        // Without the stone the cost alone blocks the play.
+        p.supply.stone = 0;
+        assert!(!can_play(&set, card, &p, 0));
+    }
+
+    #[test]
+    fn d030_printed_points_and_end_game_bonus_are_separate() {
+        let set = set();
+        let mut hand = vec!["D030".to_string()];
+        let mut p = Player::new(0, 0);
+        p.supply.stone = 1;
+        // Prerequisite unmet (2 occupations) -> play refuses.
+        p.played_cards.extend(["D100".into(), "D105".into()]);
+        assert!(play(
+            &set,
+            &mut hand,
+            &mut p,
+            "D030",
+            CardKind::MinorImprovement,
+            0
+        )
+        .is_err());
+        // With the third occupation the play succeeds and adds the printed
+        // point immediately; the end-game bonus is still computed separately.
+        p.played_cards.push("D109".into());
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "D030",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.card_points, 1);
+        assert_eq!(p.supply.stone, 0, "cost stone 1 was paid");
+        // No bottom-row major -> no bonus on top of the printed point.
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // Three bottom-row majors -> +2 on top of the printed point.
+        p.improvements.extend([
+            Improvement::Joinery,
+            Improvement::Pottery,
+            Improvement::Basketry,
+        ]);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        assert_eq!(
+            p.card_points, 1,
+            "bonus never joins the card-points counter"
+        );
+    }
+
     #[test]
     fn band_d_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["D100", "D105", "D109", "D032", "D034"] {
+        for id in ["D100", "D105", "D109", "D032", "D034", "D065", "D030"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
             );
         }
+    }
+
+    /// D065 spec parity (data/bga-card-specs/D065.json): cost wood 1, printed
+    /// points 0, no prerequisites; the single harvest effect carries the
+    /// printed threshold 2 and gain grain 1.
+    #[test]
+    fn d065_cost_and_effect_params_match_the_spec() {
+        let card = set()
+            .definition("D065")
+            .expect("D065 in the band D pool")
+            .clone();
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        assert!(
+            !card
+                .effects
+                .iter()
+                .any(|e| matches!(e, CardEffect::Prerequisite { .. })),
+            "D065 prints no prerequisites"
+        );
+        assert!(matches!(
+            card.effects.as_slice(),
+            [CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
+                threshold: 2,
+                good: Good::Grain,
+                amount: 1,
+            }]
+        ));
+        assert_eq!(
+            card.effects[0].public_tag(),
+            "harvest_field_gain_if_grain_harvested_at_least"
+        );
+    }
+
+    /// D065 麦ふるい dispatcher contract (D065-normal / D065-boundary): the
+    /// pre-harvest count is growing grain FIELDS (remaining >= 1), one grain
+    /// per field — a single field with two remaining crops is still one field
+    /// and yields one grain, so the printed "at least 2 grain" is NOT met.
+    #[test]
+    fn d065_grants_extra_grain_only_when_two_fields_are_sown_with_grain() {
+        use crate::card_events::dispatch_harvest_field;
+        use std::collections::BTreeMap;
+
+        let set = set();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("D065".into());
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+
+        // D065-boundary: one growing grain field with 2 remaining crops yields
+        // exactly one grain this phase, so the threshold of 2 is not met.
+        players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut BTreeMap::new(),
+            4,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            players[0].supply.grain, 0,
+            "one growing grain field must not reach the printed threshold of 2"
+        );
+
+        // D065-normal: the second field makes this phase yield 2 grain, so the
+        // card adds exactly 1 more (the dispatcher grants only the card bonus;
+        // the field yield itself happens in harvest_fields afterwards).
+        players[0].farm[3].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut BTreeMap::new(),
+            4,
+            &used_spaces,
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(players[0].supply.grain, 1, "two fields -> exactly +1 grain");
+    }
+
+    /// The legacy `harvest_field_rewards` differential path keeps the same
+    /// pre-harvest equivalence: it also runs before crops are taken.
+    #[test]
+    fn d065_legacy_harvest_field_rewards_match_the_dispatcher() {
+        let set = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("D065".into());
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 3,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.grain, 0, "one field is below the threshold");
+        p.farm[4].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.grain, 1, "two fields -> exactly +1 grain");
     }
 }
 
@@ -6096,7 +6690,7 @@ mod verified_band_a_tests {
     #[test]
     fn band_a_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["A099", "A101", "A106", "A117", "A155"] {
+        for id in ["A099", "A101", "A106", "A117", "A140", "A155"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -6715,23 +7309,21 @@ mod p1_2_repro_tests {
                         ));
                     }
                     4 => {
-                        // B102 is not eligible for 4 players (OnPlayGainAnimal not implemented)
-                        panic!("B102 at 4 players should not be eligible");
+                        // 4 players: Sheep 2 through the existing OnPlayGainAnimal
+                        // on-play auto-placement path (C083's vocabulary).
+                        assert_eq!(active.len(), 1);
+                        assert!(matches!(
+                            &active[0],
+                            CardEffect::OnPlayGainAnimal {
+                                animal: Animal::Sheep,
+                                amount: 2
+                            }
+                        ));
                     }
                     _ => {}
                 }
             } else {
-                if players == 2 {
-                    panic!("B102 at 2 players: NOT FOUND (should exist)");
-                } else if players == 4 {
-                    // Expected: B102 not eligible for 4 players
-                } else {
-                    println!("B102 at {} players: NOT FOUND (unexpected)", players);
-                    panic!(
-                        "B102 at {} players should exist (eligible for all counts)",
-                        players
-                    );
-                }
+                panic!("B102 at {players} players: NOT FOUND (must exist at 2/3/4)");
             }
         }
     }
@@ -6769,6 +7361,18 @@ mod p1_2_repro_tests {
                     },
                     CardEffect::OnPlayGain {
                         good: Good::Reed,
+                        amount: 2,
+                    },
+                ]),
+                4 => Some(vec![
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MinimumPlayers(4),
+                    },
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MaximumPlayers(4),
+                    },
+                    CardEffect::OnPlayGainAnimal {
+                        animal: Animal::Sheep,
                         amount: 2,
                     },
                 ]),
@@ -6900,11 +7504,7 @@ mod p1_2_repro_tests {
                     .get(&reg.external_id)
                     .map(|raw_by_count| raw_by_count.contains_key(&players))
                     .unwrap_or(false);
-                if pool.contains(reg.id)
-                    && !in_catalog
-                    && !(reg.external_id == "B102" && players == 3)
-                {
-                    // B102 at 3 players is by design: registry-only, absent from cards.rs catalog
+                if pool.contains(reg.id) && !in_catalog {
                     unexpected_eligible.push(reg.external_id.clone());
                 }
             }
@@ -6946,7 +7546,8 @@ mod p1_2_repro_tests {
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
         // 2p: [A133, A143, A155, B142, B144]（A133/A143 は 3人+、A155 は 4人のみ、B142/B144 は 3人+ のみ；
-        // Round 2 指摘対象は A155/B142/B144）。3p: [A155] のみ。4p: [B102] のみ。
+        // Round 2 指摘対象は A155/B142/B144）。3p: [A155] のみ。4p: B102 は sheep2
+        // 実装により eligible になり不適格セットから外れた。
         // A109（main 2026-11-21 追加）は全人数 eligible なのでいずれの不適格セットにも入らない。
         // 主アサーションは「cards.rs カタログと registry の person-count 整合」の欠落/過剰ゼロ
         //（上のループの field-parity チェック）であり、総数・不適格セットの厳密な列挙は
@@ -6979,21 +7580,19 @@ mod p1_2_repro_tests {
             .filter(|c| !pool4.contains(c.id))
             .map(|c| c.external_id.clone())
             .collect();
+        // B102 女性顧問 is now eligible at 4 players too (4p = Sheep 2 via the
+        // existing OnPlayGainAnimal on-play auto-placement path), so it appears
+        // in every player-count pool instead of being the only 4p dropout.
+        let b102_id = registry
+            .card_id("B102")
+            .expect("B102 is in the default registry");
         assert!(
-            ineligible_4.contains(&"B102".to_string()),
-            "B102 must be pool-ineligible at 4 players"
+            !ineligible_4.contains(&"B102".to_string()),
+            "B102 must be pool-eligible at 4 players (4p = sheep 2)"
         );
         assert!(
-            pool2.contains(
-                registry
-                    .card_id("B102")
-                    .expect("B102 is in the default registry")
-            ) && pool3.contains(
-                registry
-                    .card_id("B102")
-                    .expect("B102 is in the default registry")
-            ),
-            "B102 must be pool-eligible at 2 and 3 players (registry-only at 3 players)"
+            pool2.contains(b102_id) && pool3.contains(b102_id) && pool4.contains(b102_id),
+            "B102 must be pool-eligible at 2, 3 and 4 players"
         );
     }
 }

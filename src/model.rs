@@ -654,7 +654,7 @@ impl PublicState {
 impl PublicState {
     /// Compute the set of available action spaces for this public state.
     /// Used by both `Game::validate` (full validation) and
-    /// `crate::validation::validate_incremental` (incremental validation)
+    /// `crate::validation::check_incremental` (incremental validation)
     /// to ensure the same availability logic is applied consistently.
     pub(crate) fn available_spaces(
         &self,
@@ -2008,7 +2008,11 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
-                        accumulations: None,
+                        // A140 ショベル運搬人 reads the OTHER clay accumulation
+                        // at resolution time; the paused state already reflects
+                        // the core action's take, so the current public map is
+                        // exactly what the original dispatch saw.
+                        accumulations: Some(&next.public.accumulations),
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -2176,9 +2180,9 @@ impl Game {
         // worker/space delta). Every other mid-round law is unchanged for both
         // segments (validation.rs).
         if resume.space_applied {
-            crate::validation::validate_incremental_resume_completion_or_full(&next, self)?;
+            crate::validation::check_incremental_resume_completion_or_full(&next, self)?;
         } else {
-            crate::validation::validate_incremental_or_full(&next, self)?;
+            crate::validation::check_incremental_or_full(&next, self)?;
         }
         // The `work` event for this paused action is recorded by
         // `resolve_pending_and_resume` (with the paused hash as `after`), not
@@ -2361,7 +2365,11 @@ impl Game {
                     delayed_well: &mut self.delayed_well,
                     round: self.public.round,
                     used_spaces: &self.public.used,
-                    accumulations: None,
+                    // A140 ショベル運搬人 reads the OTHER clay accumulation
+                    // at resolution time; the paused state was committed after
+                    // the core action's take, so the current public map holds
+                    // exactly the amounts the original scan saw.
+                    accumulations: Some(&self.public.accumulations),
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,
