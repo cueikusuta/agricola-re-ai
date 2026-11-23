@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "D077",
+  "cases": [
+    {
+      "id": "D077-self-renovate-1-room",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_renovation",
+        "player": "self",
+        "rooms_renovated": 1
+      },
+      "expected": {
+        "clay_delta": 1,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "Self renovates 1 room to stone -> gain 1 clay"
+    },
+    {
+      "id": "D077-other-player-renovate",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_renovation",
+        "player": "other",
+        "rooms_renovated": 2
+      },
+      "expected": {
+        "clay_delta": 2,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "Other player renovates 2 rooms -> gain 2 clay (any player triggers)"
+    },
+    {
+      "id": "D077-renovate-2-rooms",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "after_renovation",
+        "player": "self",
+        "rooms_renovated": 2
+      },
+      "expected": {
+        "clay_delta": 2,
+        "passes_to_left_neighbor": true
+      },
+      "notes": "Renovate 2 rooms at once -> gain 2 clay"
+    }
+  ]
+}

@@ -747,10 +747,12 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &card_use_limits,
             &mut pending,
+            &[],
         )
         .unwrap();
         assert_eq!(players[0].supply.food, 5);
@@ -777,10 +779,12 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut budget2,
             &mut uses2,
             &card_use_limits,
             &mut pending2,
+            &[],
         )
         .unwrap_err();
         assert!(err.contains("budget exhausted"), "got: {err}");

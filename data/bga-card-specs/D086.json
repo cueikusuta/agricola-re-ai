@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "D086",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "羊仲介者",
+    "name_en": "Sheep Agent"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2835",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "capacity",
+            "scope": "card",
+            "animal": "sheep",
+            "per_type": true,
+            "amount": {
+              "op": "count",
+              "args": ["occupations_cannot_hold_animals"]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "職業: stays in play area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params: capacity with scope='card' and per_type for sheep based on count of occupations that cannot hold animals - not in vocabulary",
+      "effects[0].steps[0].params.amount: dynamic count of 'occupations that cannot hold animals' needs formal definition",
+      "post_play.destination: 'played_area' for occupation with ongoing effect confirmed"
+    ],
+    "test_case_ids": [
+      "D086-0-such-occupations",
+      "D086-1-such-occupation",
+      "D086-3-such-occupations"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Effect: For each occupation card that cannot hold animals, you may place 1 sheep on this card (card holds animals). Stage外: single site constant/on-card holding. Residual issue #25: card上収容 scope 未定義."
+  }
+}

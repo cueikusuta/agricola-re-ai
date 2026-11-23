@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "D082",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "狩りの記念品",
+    "name_en": "Hunting Trophy"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2839",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": null,
+    "prerequisites": [],
+    "printed_points": 1,
+    "alternative_cost_notes": "OR cost: return 1 wild boar to supply OR cook 1 wild boar (meaning unresolved - MQ-12)"
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "substitute_cost",
+            "scope": "renovation_improvements",
+            "material_from": "any_building_resource",
+            "material_to": "clay",
+            "amount": 1
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "substitute_cost",
+            "scope": "farm_redevelopment_fences",
+            "material_from": "wood",
+            "material_to": "wood",
+            "amount": 3
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "継続効果: ongoing cost reduction for renovations and fences"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: OR cost (return 1 boar OR cook 1 boar) - 'cook' meaning unresolved (MQ-12), ledger has cost=unknown",
+      "play.cost: cost structure unknown, needs formal OR cost representation",
+      "effects[0].steps[0].params: substitute_cost for renovation improvements (material 1 per) needs vocabulary",
+      "effects[0].steps[1].params: substitute_cost for farm redevelopment fences (3 wood per fence) needs vocabulary",
+      "effects[0].trigger: passive with two substitute_cost effects needs confirmation"
+    ],
+    "test_case_ids": [
+      "D082-pay-return-boar",
+      "D082-pay-cook-boar",
+      "D082-renovation-discount",
+      "D082-fence-discount"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: return 1 wild boar OR cook 1 wild boar (OR cost, Stage 1, PROVISIONAL - 'cook' meaning unresolved per MQ-12). Printed points: 1. Effect: (1) When building improvements during renovation, each building resource costs 1 clay less (substitute). (2) When building fences via farm redevelopment, each fence costs 3 wood less. Ongoing passive effect stays in play area."
+  }
+}

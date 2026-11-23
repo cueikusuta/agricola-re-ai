@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "card_id": "D107",
+  "cases": [
+    {
+      "id": "D107-choose-food",
+      "scope": "effect_only",
+      "setup": {
+        "brick": 2,
+        "food": 0,
+        "vp": 0
+      },
+      "action": {
+        "trigger": "returning_home_phase",
+        "choose": "food"
+      },
+      "expected": {
+        "brick_delta": -2,
+        "food_delta": 3,
+        "vp_delta": 0
+      },
+      "notes": "Have 2 bricks, choose food option: discard all bricks, gain 3 food"
+    },
+    {
+      "id": "D107-choose-vp",
+      "scope": "effect_only",
+      "setup": {
+        "brick": 1,
+        "food": 0,
+        "vp": 10
+      },
+      "action": {
+        "trigger": "returning_home_phase",
+        "choose": "vp"
+      },
+      "expected": {
+        "brick_delta": -1,
+        "food_delta": 0,
+        "vp_delta": 1
+      },
+      "notes": "Have 1 brick, choose VP option: discard brick, gain 1 VP"
+    },
+    {
+      "id": "D107-no-brick",
+      "scope": "effect_only",
+      "setup": {
+        "brick": 0,
+        "food": 5,
+        "vp": 10
+      },
+      "action": {
+        "trigger": "returning_home_phase"
+      },
+      "expected": {
+        "brick_delta": 0,
+        "food_delta": 0,
+        "vp_delta": 0,
+        "effect_not_triggered": true
+      },
+      "notes": "No bricks, effect should not trigger"
+    }
+  ]
+}

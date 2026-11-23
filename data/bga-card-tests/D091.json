@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "card_id": "D091",
+  "cases": [
+    {
+      "id": "D091-on-play-place-markers",
+      "scope": "legal_play",
+      "setup": {
+        "current_round": 1
+      },
+      "action": {
+        "play": "D091"
+      },
+      "expected": {
+        "play_allowed": true,
+        "markers_placed": {
+          "round_5": 1,
+          "round_8": 1,
+          "round_11": 1
+        }
+      },
+      "notes": "Round 1: place field tiles on rounds 5, 8, 11 (current +4, +7, +10)"
+    },
+    {
+      "id": "D091-round-start-plow-pay-food",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 5,
+        "food": 1,
+        "reserved_field_tiles": 1
+      },
+      "action": {
+        "trigger": "round_start",
+        "round": 5,
+        "choose_option": "plow_reserved_field"
+      },
+      "expected": {
+        "food_delta": -1,
+        "fields_plowed": 1,
+        "marker_consumed": true
+      },
+      "notes": "At round 5 start: pay 1 food, plow 1 field using reserved tile"
+    },
+    {
+      "id": "D091-round-start-decline",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 8,
+        "food": 1,
+        "reserved_field_tiles": 1
+      },
+      "action": {
+        "trigger": "round_start",
+        "round": 8,
+        "choose_option": "decline"
+      },
+      "expected": {
+        "food_unchanged": true,
+        "no_plow": true,
+        "marker_consumed": true
+      },
+      "notes": "Player may decline; marker still consumed"
+    },
+    {
+      "id": "D091-round-14-overflow",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 11
+      },
+      "action": {
+        "play": "D091"
+      },
+      "expected": {
+        "play_allowed": true,
+        "markers_placed": {
+          "round_14": 1,
+          "note": "round_15 and round_18 would overflow - per MQ-08 capped at 14"
+        }
+      },
+      "notes": "Round 11: +4=15, +7=18, +10=21 -> capped at round 14 per MQ-08"
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "card_id": "E072",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "アーティチョーク畑",
+    "name_en": "Artichoke Field"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2681",
+        "language": "ja",
+        "checked_on": "2026-11-19",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-19",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 2
+        }
+      }
+    ],
+    "printed_points": 1
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "this_card_is_a_field",
+            "card_field": true,
+            "crops": [
+              "any"
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "This card is a field on your board (card-as-field modeling not in the vocabulary); the wiki does not restrict its crops."
+    },
+    {
+      "trigger": "harvest_field_phase",
+      "conditions": [
+        {
+          "predicate": "harvested_this_card_at_least",
+          "params": {
+            "n": 1
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "During each harvest's field phase, if at least 1 good was harvested from this card, gain 1 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: card-as-field modeling is not covered by the vocabulary; whether and how a minor improvement acts as a farmyard field is undecided (BQ-7 / R-C1)",
+      "effects.1.granularity: the per-harvest 'at least 1 good harvested from this card -> 1 food' hook depends on the card-field harvest granularity, which is undecided (BQ-7)"
+    ],
+    "test_case_ids": [
+      "E072-harvest-food",
+      "E072-no-harvest-no-food"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-19",
+    "implementation_status": "not_started",
+    "notes": "This card is a field. During each harvest's field phase, if at least 1 good is harvested from this card, gain 1 food."
+  }
+}

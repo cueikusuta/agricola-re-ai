@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "card_id": "D115",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "飼い葉の栽培人",
+    "name_en": "Fodder Planter"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2806",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "BGA wiki card page; effect: during breeding phase, per baby animal gained, may sow 1 crop on exactly 1 field"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_start",
+      "conditions": [
+        {
+          "predicate": "round_has_no_harvest",
+          "params": {},
+          "negate": true
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "repeat_per": "baby_animals_gained",
+                "steps": [
+                  {
+                    "operation": "grant_action",
+                    "target": "owner",
+                    "params": {
+                      "action": "sow",
+                      "must_pay_cost": false,
+                      "field_constraint": "exactly_one_empty_field"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_game",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "During harvest breeding phase, per baby animal gained, may sow 1 crop on exactly 1 empty field. Uses harvest_start trigger with breeding phase context. baby_animals_gained is not a standard count source - marked needs_resolution."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: baby_animals_gained count source not in vocabulary; breeding phase trigger timing (part of harvest_start); field_constraint 'exactly_one_empty_field' not standard"
+    ],
+    "test_case_ids": [
+      "D115-baby-animals-sow",
+      "D115-no-baby-animals",
+      "D115-no-empty-fields"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Classification: stage外 (single site: harvest/breeding / sow). Uses TR-SITE. During harvest breeding phase, per baby animal gained, may sow 1 crop on exactly 1 empty field."
+  }
+}

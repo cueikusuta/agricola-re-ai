@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "card_id": "D080",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "レンガハンマー",
+    "name_en": "Brick Hammer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2841",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      },
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": "OR cost: pay 1 wood OR 1 food (player chooses)"
+  },
+  "effects": [
+    {
+      "trigger": "after_improvement",
+      "conditions": [
+        {
+          "predicate": "raw_text",
+          "params": {
+            "text": "improvement costs 2 or more clay"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "stone",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_improvement",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "回る進歩: use once then pass to left neighbor"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: OR cost (wood 1 / food 1) needs formal representation in cost array",
+      "effects[0].conditions: predicate for 'improvement costs 2+ clay' not in vocabulary",
+      "effects[0].trigger: after_improvement includes this card itself? needs clarification"
+    ],
+    "test_case_ids": [
+      "D080-pay-wood-build-clay-improvement",
+      "D080-pay-food-build-clay-improvement",
+      "D080-build-non-clay-improvement-no-stone"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 wood OR 1 food (OR cost, Stage 1). Effect: When building an improvement costing 2+ clay, gain 1 stone. Passes to left neighbor. Ledger has cost=unknown and cost_alternative='1 木/1 飯'."
+  }
+}
