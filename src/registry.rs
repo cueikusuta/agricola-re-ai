@@ -379,6 +379,10 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
                     EventKind::WorkerPlaced
                 }
+                // A140 ショベル運搬人: after-worker dynamic-count effect.
+                crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
                 // Chapter 1 round-start cards
                 crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. } => {
@@ -548,8 +552,11 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
                         }
-                        // Chapter 1 round-start cards: no direct resource amount to validate
-                        crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        // A140: the amount is read from the public
+                                                // accumulations at resolution time, not fixed here.
+                                                crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
+                                                // Chapter 1 round-start cards: no direct resource amount to validate
+                                                | crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
                         | crate::cards::CardEffect::StartRoundCopyUnusedRoundSpace { .. }
                         | crate::cards::CardEffect::StartRoundPlayOccupationIfLessonsUnderused {
                             ..

@@ -2,8 +2,8 @@
 //
 // Included from `engine.rs` so the full-API pause/resume path
 // (`apply_with_plans` + `resolve_pending_and_resume`) and the private
-// renovation helpers are reachable. The pure dispatcher/definition surface is
-// covered by `tests/renovation_followup.rs`.
+// renovation helpers are reachable. These 11 lib tests cover the dispatcher
+// and definition surface end-to-end (there is no separate `tests/renovation_followup.rs`).
 
 use crate::cards::{verified_basic_card_set, CardKind};
 use crate::engine::{Action, Detail};
