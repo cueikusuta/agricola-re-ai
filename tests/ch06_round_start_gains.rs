@@ -290,6 +290,7 @@ fn round_start_trigger_data_structure() {
         event_kind: agricola_re_ai::registry::EventKind::RoundStart,
         revealed_round_cards: vec![],
         c066_take_food_instead: false,
+        sow_detail: None,
     };
 
     // These fields are used by the handlers:

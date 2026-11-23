@@ -3228,9 +3228,10 @@ pub fn dispatch_after_worker(
         event_kind: EventKind::WorkerPlaced,
         revealed_round_cards: Vec::new(),
         c066_take_food_instead: false,
+        sow_detail: sow_detail.clone(),
     };
 
-    // AfterWorkerGain and AfterWorkerGainIfUsed are After phase. A pause here
+    // AfterWorkerGain and AfterWorkerGainIfUsed are After phase.
     // (ChooseTriggerOrder, Issue #270) must reach the engine so it can build
     // the PostWork continuation — propagate instead of discarding.
     let mut ctx = DispatchContext {
@@ -3310,6 +3311,8 @@ pub fn dispatch_after_worker(
         used_spaces: used_spaces.clone(),
         site: EventKind::WorkerPlaced,
         event_kind: EventKind::WorkerPlaced,
+        revealed_round_cards: Vec::new(),
+        c066_take_food_instead: false,
         sow_detail,
     };
     // Interrupts pause the chain after the passive phase has resolved
@@ -3614,6 +3617,7 @@ pub fn dispatch_after_harvest_complete(
         event_kind: EventKind::AfterHarvestComplete,
         revealed_round_cards: Vec::new(),
         c066_take_food_instead,
+        sow_detail: None,
     };
 
     resolve_phase(
@@ -4202,6 +4206,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -4261,6 +4266,7 @@ mod tests {
                 delayed_well: &mut resumed_well,
                 round: 1,
                 used_spaces: &std::collections::BTreeSet::new(),
+                accumulations: None,
                 event_budget: &mut resumed_budget,
                 card_uses: &mut resumed_uses,
                 card_use_limits: &resumed_limits,
