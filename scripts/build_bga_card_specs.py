@@ -700,7 +700,8 @@ CARDS = {
                    optional=True, freq="every_use", dur="permanent", order=1,
                    decision="owner"),
         ],
-        "notes": "Gain 1 food on play; each renovation may add a stable without paying wood.",
+        "notes": "Gain 1 food on play; each renovation may add a stable without paying wood. Chapter 1 (restack 2026-11-23): the on-play 1-food gain is implemented with the existing OnPlayGain variant; the after_renovation free-stable half awaits its trigger chapter.",
+        "implementation_status": "in_progress",
         "tests": [
             case("B016-normal", {"food": 0}, {"play": "B016"}, {"food_delta": 1}),
             case("B016-renovate", {"stables": 0}, {"renovate": 1, "build_stable": True},
@@ -758,7 +759,8 @@ CARDS = {
                    cond=[cond("sow_unconditional")],
                    freq="every_use", dur="permanent", order=1),
         ],
-        "notes": "Gain 2 food on play; after each unconditional Sow get 1 food per stable.",
+        "notes": "Gain 2 food on play; after each unconditional Sow get 1 food per stable. Chapter 1 (restack 2026-11-23): the on-play 2-food gain is implemented with the existing OnPlayGain variant; the after_sow per-stable half awaits its trigger chapter.",
+        "implementation_status": "in_progress",
         "tests": [
             case("B054-normal", {"food": 0}, {"play": "B054"}, {"food_delta": 2}),
             case("B054-sow", {"stables": 3}, {"sow": 1}, {"food_delta": 3}),
@@ -1074,7 +1076,8 @@ CARDS = {
                    cond=[cond("resource_greater_than", good="stone", than="clay")],
                    freq="every_round", dur="permanent", order=1),
         ],
-        "notes": "Gain 1 wood; after each work phase with more stone than clay in supply, gain 1 wood.",
+        "notes": "Gain 1 wood; after each work phase with more stone than clay in supply, gain 1 wood. Chapter 1 (restack 2026-11-23): the on-play 1-wood gain is implemented with the existing OnPlayGain variant; the after_work_phase half awaits its trigger chapter.",
+        "implementation_status": "in_progress",
         "tests": [
             case("B117-normal", {"wood": 0}, {"play": "B117"}, {"wood_delta": 1}),
             case("B117-work-phase", {"stone": 3, "clay": 2}, {"end_work_phase": True},
@@ -1131,7 +1134,8 @@ CARDS = {
                    cond=[cond("house_is", house="wood"), cond("room_count", n=2)],
                    freq="always", dur="permanent", snap="live_state", order=1),
         ],
-        "notes": "Gain 1 stone; while living in a 2-room wooden house all action spaces except Meeting Place count as unoccupied.",
+        "notes": "Gain 1 stone; while living in a 2-room wooden house all action spaces except Meeting Place count as unoccupied. Chapter 1 (restack 2026-11-23): the on-play 1-stone gain is implemented with the existing OnPlayGain variant behind a MinimumPlayers(4) guard; the passive space-occupancy half awaits its trigger chapter.",
+        "implementation_status": "in_progress",
         "tests": [
             case("B151-normal", {"stone": 0}, {"play": "B151"}, {"stone_delta": 1}),
             case("B151-passive", {"house": "wood", "rooms": 2, "space_occupied": True},
