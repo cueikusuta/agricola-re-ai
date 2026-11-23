@@ -846,7 +846,7 @@ fn p1_1_replay_poststate_hash_matches_after_save_load() {
 /// 1. Preflight guard: space unavailable at resume time (pre-existing, atomic).
 /// 2. Post-take: `apply_pending_resolution` validation failure (insufficient
 ///    payment) — covered by `p1_2_resolve_pending_and_resume_atomicity_violation`.
-/// 3. Post-take: `resume_post_work` guard / `validate_incremental_*` gate /
+/// 3. Post-take: `resume_post_work` guard / `check_incremental_*` gate /
 ///    `record_pending_resolution` failure — reachable only via full game flow
 ///    at a harvest round; the snapshot mechanism uniformly covers them.
 /// 4. Harvest / breeding plan validation failure — requires a paused game at
@@ -934,13 +934,13 @@ fn p1_2_atomicity_extended_error_paths() {
     // model.rs:1485/1503/1516 -> that test turns RED, proving the snapshot
     // is necessary for post-take atomicity.
 
-    // ---- 3. Post-take resume_post_work guard / validate_incremental_* /
+    // ---- 3. Post-take resume_post_work guard / check_incremental_* /
     //     record_pending_resolution failure -----------------------------------
     // These run AFTER the decision is taken and `apply_pending_resolution`
     // has succeeded. The `resume_post_work` space guard is unreachable
     // post-take via the public API: it checks the same `available_spaces()`
     // as the preflight guard, and nothing changes space availability between
-    // the preflight check and the resume_post_work guard. `validate_incremental_*`
+    // the preflight check and the resume_post_work guard. `check_incremental_*`
     // and `record_pending_resolution` failures likewise require the resume
     // chain to proceed past apply_pending_resolution.
     //

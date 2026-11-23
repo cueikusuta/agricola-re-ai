@@ -1044,7 +1044,7 @@ impl Game {
             None
         };
         next.next_worker_or_round(harvest_plans.as_deref(), breeding_plans.as_deref())?;
-        crate::validation::validate_incremental_or_full(&next, self)?;
+        crate::validation::check_incremental_or_full(&next, self)?;
         if record {
             let after = next.state_hash();
             next.log.events.push(Event {
@@ -1129,7 +1129,7 @@ impl Game {
         // Same per-action budget reset as apply_with_plans.
         next.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         next.execute_free(player, &free)?;
-        crate::validation::validate_free_action_or_full(&next, self, player)?;
+        crate::validation::check_free_action_or_full(&next, self, player)?;
         if record {
             let after = next.state_hash();
             next.log.events.push(Event {
@@ -1459,7 +1459,7 @@ impl Game {
     }
 }
 /// This is the single implementation shared by `next_worker_or_round`
-/// and the validation layer (`validate_incremental`/`validate_free_action`).
+/// and the validation layer (`check_incremental`/`check_free_action`).
 /// Returns the index of the next player who has not placed all their workers,
 /// or `n` (player count) if all players have placed their quota (round should advance).
 pub fn expected_active_player(
