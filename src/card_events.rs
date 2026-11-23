@@ -58,6 +58,9 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // phase. Its placement plan is derived and applied via place_animals
         // (the play executor cannot represent a play-time pause).
         CardEffect::OnPlayGainAnimal { .. } => TriggerPhase::Before,
+        // A001/C002/E001: free (or card-priced) stable builds are
+        // instantaneous at play time — Before phase.
+        CardEffect::OnPlayBuildStable { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -554,6 +557,13 @@ fn resolve_phase_scan(
                 CardEffect::OnPlayGainAnimal { animal, amount } => {
                     handle_on_play_gain_animal(ctx, animal, *amount)?
                 }
+                // A001/C002/E001: free stable builds (A001: one-cell pasture
+                // only); sites picked deterministically inside the handler.
+                CardEffect::OnPlayBuildStable {
+                    amount,
+                    wood_cost,
+                    scope,
+                } => handle_on_play_build_stable(ctx, player, *amount, *wood_cost, *scope)?,
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -1092,6 +1102,11 @@ fn effect_condition_holds(
         // room count exactly resolves; rows for other room counts grant
         // nothing (no double grant, no rounding).
         CardEffect::OnPlayGainIfRoomCount { rooms, .. } => player.rooms() == usize::from(*rooms),
+        // A001/C002/E001: the fence/pasture-size restrictions live inside the
+        // scope (A001: one-cell pasture only) and the handler simply finds no
+        // legal site when the farm cannot take the stable, so the scan always
+        // reports the effect triggerable.
+        CardEffect::OnPlayBuildStable { .. } => true,
         CardEffect::OnPlayGainAnimal { .. } => true,
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
@@ -1250,6 +1265,13 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainAnimal { animal, amount } => {
                 handle_on_play_gain_animal(ctx, animal, *amount)?
             }
+            // A001/C002/E001: free stable builds (A001: one-cell pasture
+            // only); sites picked deterministically inside the handler.
+            CardEffect::OnPlayBuildStable {
+                amount,
+                wood_cost,
+                scope,
+            } => handle_on_play_build_stable(ctx, player, *amount, *wood_cost, *scope)?,
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1570,6 +1592,7 @@ fn handle_prerequisite(
 ) -> Result<EffectResult, String> {
     let p = &mut ctx.player;
     let ok = match rule {
+        crate::cards::CardRequirement::MinimumFences(min) => p.fences.len() >= usize::from(*min),
         crate::cards::CardRequirement::MinimumOccupations(min) => {
             let occ_count = p
                 .played_cards
@@ -1931,6 +1954,37 @@ fn handle_on_play_gain_animal(
     let plan = auto_animal_plan(ctx.player, *animal, amount);
     crate::engine::place_animals(ctx.player, &plan, amount)
         .map_err(|e| format!("on-play animal placement failed: {e}"))?;
+    Ok(EffectResult::Resolved)
+}
+
+/// A001 雨除け (Shelter) / C002 厩 (Stable) / E001 簡易納屋 (Pole Barns):
+/// on play, build up to `amount` stables, paying `wood_cost` wood per stable
+/// (0 for these cards: the stable itself is free while the card cost is
+/// still paid). Each stable must stand on a legal site within `scope` (A001:
+/// the cell of a fenced one-cell pasture only). The printed effect leaves
+/// placement to the player; the play executor cannot represent a play-time
+/// pause (Issue #268 R2-P0-2), so sites are picked deterministically: first
+/// legal cell in farm order, stopping when no legal site remains (E001's
+/// printed "up to 3" therefore degrades to the number of legal sites). No
+/// legal site: the effect does nothing (the play itself still succeeds).
+fn handle_on_play_build_stable(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    amount: u32,
+    wood_cost: u32,
+    scope: crate::cards::StablePlacementScope,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    for _ in 0..amount {
+        let Some(cell) = crate::engine::free_stable_site_candidates(p, scope)
+            .into_iter()
+            .next()
+        else {
+            break;
+        };
+        crate::engine::build_free_stable(p, cell, wood_cost)
+            .map_err(|e| format!("on-play stable build failed: {e}"))?;
+    }
     Ok(EffectResult::Resolved)
 }
 
