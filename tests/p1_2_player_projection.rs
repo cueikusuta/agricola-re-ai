@@ -7,11 +7,12 @@
 //! tree and GREEN after the fix):
 //!
 //! (a) A raw (unprojected) B102 definition — the registry merge form that
-//!     carries BOTH the 2-player Clay 3 series and the 3-player Reed 2
-//!     series behind paired MinimumPlayers/MaximumPlayers guards — fires
-//!     both OnPlayGain effects when the card is played in a 2-player game,
-//!     because neither `CardSet::validate` nor the effect dispatcher treats
-//!     a paired guard as blocking at execution time.
+//!     carries ALL player-count series (2-player Clay 3, 3-player Reed 2 and
+//!     4-player Sheep 2 via OnPlayGainAnimal) behind paired
+//!     MinimumPlayers/MaximumPlayers guards — fires every series when the card
+//!     is played in a 2-player game, because neither `CardSet::validate` nor
+//!     the effect dispatcher treats a paired guard as blocking at execution
+//!     time.
 //! (b) Handing a raw A155 (MinimumPlayers(4) whole-card prerequisite) to a
 //!     2-player game entry (`Game::with_cards*`) is accepted today: the
 //!     paired-guard parser in `CardSet::validate` silently skips the
@@ -33,7 +34,7 @@ use agricola_re_ai::model::{Config, Good, Space};
 use agricola_re_ai::registry::build_default_registry;
 use agricola_re_ai::Game;
 
-/// The registry merge form of B102: both player-count series in one card,
+/// The registry merge form of B102: every player-count series in one card,
 /// each behind paired guards. This is what `merge_card_variants("B102", ..)`
 /// produces and what any unprojected set built from the registry carries.
 fn raw_b102_registry_form() -> CardDefinition {
@@ -128,8 +129,8 @@ fn hands_with_b102_in_seat0(set: &CardSet) -> Vec<Vec<String>> {
 // =========================================================================
 
 #[test]
-fn raw_b102_def_carries_both_player_series() {
-    // Fixture premise: the registry B102 really is a dual-series card.
+fn raw_b102_def_carries_all_player_series() {
+    // Fixture premise: the registry B102 carries one series per player count.
     let b102 = raw_b102_registry_form();
     assert_eq!(
         b102.effects
@@ -137,7 +138,15 @@ fn raw_b102_def_carries_both_player_series() {
             .filter(|effect| matches!(effect, CardEffect::OnPlayGain { .. }))
             .count(),
         2,
-        "fixture premise: registry B102 carries two OnPlayGain series"
+        "fixture premise: registry B102 carries two OnPlayGain series (2p clay, 3p reed)"
+    );
+    assert_eq!(
+        b102.effects
+            .iter()
+            .filter(|effect| matches!(effect, CardEffect::OnPlayGainAnimal { .. }))
+            .count(),
+        1,
+        "fixture premise: registry B102 carries the 4p OnPlayGainAnimal sheep series"
     );
 }
 
@@ -227,6 +236,15 @@ fn raw_b102_both_series_fire_in_two_player_game() {
             .count(),
         1,
         "the 2-player game's B102 keeps exactly one 2p Clay series"
+    );
+    assert_eq!(
+        b102_in_game
+            .effects
+            .iter()
+            .filter(|effect| matches!(effect, CardEffect::OnPlayGainAnimal { .. }))
+            .count(),
+        0,
+        "the 2-player game's B102 must not carry the 4p Sheep series"
     );
 }
 
