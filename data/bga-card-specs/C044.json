@@ -20,69 +20,66 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3045",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
   },
   "play": {
     "action": "minor_improvement",
-    "cost": null,
-    "prerequisites": null,
+    "cost": [],
+    "prerequisites": [],
     "printed_points": 1,
-    "alternative_cost_notes": null
+    "alternative_cost_notes": "2 wood/2 clay OR 1 reed (choose one when playing)"
   },
   "effects": [
     {
-      "trigger": "end_scoring",
+      "trigger": "on_play",
       "conditions": [],
       "steps": [
         {
-          "operation": "gain_points",
-          "target": "owner",
+          "operation": "modify_capacity",
+          "target": "board",
           "params": {
-            "points": {
-              "op": "constant",
-              "args": [
-                1
-              ]
-            }
+            "rounds_ahead": 8,
+            "resource": "food",
+            "amount": 1
           }
         }
       ],
       "optional": false,
-      "frequency": "end_of_game",
+      "frequency": "once",
       "duration": "permanent",
-      "snapshot": "live_state",
+      "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "notes": "Place 1 food on each of the next 8 round spaces. Gain that food at the start of those rounds."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility",
-      "play.cost.exact",
-      "play.prerequisites.exact"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "C044-normal",
-      "C044-edge"
+      "C044-8-rounds-food",
+      "C044-cost-wood-clay",
+      "C044-cost-reed",
+      "C044-printed-points",
+      "C044-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3045. Alternative cost: 2 wood/2 clay OR 1 reed."
   }
 }

@@ -20,13 +20,15 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3053",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
@@ -41,10 +43,11 @@
     ],
     "prerequisites": [
       {
-        "predicate": "custom",
+        "predicate": "occupations_played_count",
         "params": {
-          "text": "職業1"
-        }
+          "count": 1
+        },
+        "negate": false
       }
     ],
     "printed_points": 0,
@@ -52,53 +55,46 @@
   },
   "effects": [
     {
-      "trigger": "end_scoring",
+      "trigger": "after_brick_accumulation_used",
       "conditions": [],
       "steps": [
         {
-          "operation": "gain_points",
+          "operation": "exchange",
           "target": "owner",
           "params": {
-            "points": {
-              "op": "per",
-              "args": [
-                {
-                  "op": "count",
-                  "args": [
-                    "unknown_metric"
-                  ]
-                },
-                1
-              ]
+            "give": {
+              "brick": 1
+            },
+            "receive": {
+              "points": 1,
+              "brick_accumulation": 1
             }
           }
         }
       ],
-      "optional": false,
-      "frequency": "end_of_game",
+      "optional": true,
+      "frequency": "per_use",
       "duration": "permanent",
-      "snapshot": "live_state",
+      "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "decision_owner": "owner",
+      "notes": "After using brick accumulation space, may exchange 1 brick for 1 bonus point. The brick is placed on the accumulation space."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "C036-normal",
-      "C036-edge"
+      "C036-brick-exchange",
+      "C036-prereq-occupation",
+      "C036-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3053"
   }
 }
