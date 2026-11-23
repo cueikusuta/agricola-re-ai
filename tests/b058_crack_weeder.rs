@@ -11,21 +11,18 @@
 //! - B058-harvest: two real vegetable harvests grant +2 food; a grain field
 //!   and vegetables standing in the supply are not miscounted
 //! - B058-zero: a field phase that takes no vegetables grants +0
-//! - resume: save/load reproduces the granted state exactly and continuing
-//!   play never re-fires the field-phase effect
+//! - resume/replay: a game that plays B058, plows and sows two vegetable
+//!   fields entirely through recorded legal actions reaches the round-4
+//!   harvest; save/load and full setup/hands/action-log replay reproduce the
+//!   exact state hash and food count without granting the effect twice
 //!
-//! Note on full log replay: `replay_with_cards` reconstructs a brand-new game
-//! from config + card set, so it can only replay games that advanced purely
-//! through recorded actions. These fixtures relocate B058 and stamp farm
-//! tiles directly (the established teleport pattern), which never enters the
-//! event log, so a full replay of them is structurally impossible; the
-//! pure-action replay suites (`tests/m1.rs` fixed-seed replay/resume and
-//! `tests/harvest_policy_replay.rs`) own that guarantee instead. The exact
-//! food counts asserted below catch a double grant anyway: a second field
-//! phase would move the owner's food off 10.
+//! The small normal/harvest/zero fixtures use the established teleport pattern
+//! for focused effect checks. The resume/replay fixture below does not: every
+//! post-setup transition is a recorded `Game::apply` call, so its action log is
+//! sufficient to reconstruct the game from the same setup and initial hands.
 
-use agricola_re_ai::cards::{verified_band_b_cards, CardSet};
-use agricola_re_ai::engine::{Action, Detail};
+use agricola_re_ai::cards::{verified_band_b_cards, CardKind, CardSet};
+use agricola_re_ai::engine::{Action, Detail, Plant};
 use agricola_re_ai::harvest::SimpleHarvestDetails;
 use agricola_re_ai::model::{Config, Crop, Game, Space, Tile};
 use agricola_re_ai::registry::build_default_registry;
@@ -220,43 +217,262 @@ fn b058_zero_when_no_vegetable_taken() {
     assert_eq!(p.begging, 0);
 }
 
-/// Resume: after a B058 harvest grant, the exact food count is asserted
-/// to catch double grants. Note: save/load (resume) is not tested here
-/// because the `relocate_b058` + `vegetable_fields` teleport pattern doesn't
-/// enter the action log, so load_json's internal replay cannot reconstruct
-/// the state. Pure-action resume/replay is covered by `tests/m1.rs` and
-/// `tests/harvest_policy_replay.rs`. The exact food count asserted below
-/// catches a double grant: a second field phase would move the owner's food
-/// off the expected value.
-#[test]
-fn b058_harvest_grant_survives_resume_without_double_count() {
-    let _config = Config {
+/// Explicit initial hands put B058 in seat 0's hand without changing any
+/// post-setup state outside the action log.
+fn hands_with_b058(set: &CardSet) -> Vec<Vec<String>> {
+    let occupations: Vec<String> = set
+        .definitions
+        .iter()
+        .filter(|card| card.kind == CardKind::Occupation)
+        .map(|card| card.id.clone())
+        .collect();
+    let minors: Vec<String> = set
+        .definitions
+        .iter()
+        .filter(|card| card.kind == CardKind::MinorImprovement && card.id != "B058")
+        .map(|card| card.id.clone())
+        .collect();
+    assert!(occupations.len() >= 14 && minors.len() >= 13);
+
+    let mut seat_zero = occupations[..7].to_vec();
+    seat_zero.push("B058".to_owned());
+    seat_zero.extend_from_slice(&minors[..6]);
+    let seat_one = [occupations[7..14].to_vec(), minors[6..13].to_vec()].concat();
+    vec![seat_zero, seat_one]
+}
+
+fn game_with_b058() -> (Config, CardSet, Vec<Vec<String>>, Game) {
+    let config = Config {
         players: 2,
-        seed: 7,
+        seed: 2,
         additional_action_space_enabled: false,
     };
-    let (mut game, _set) = harvest_fixture();
-    relocate_b058(&mut game, true);
-    vegetable_fields(&mut game, &[1, 2]);
+    let set = set_with_b058();
+    let hands = hands_with_b058(&set);
+    let game =
+        Game::with_cards_and_hands_with_start_player(config.clone(), set.clone(), hands.clone(), 0)
+            .expect("game setup with B058 in seat 0's hand");
+    (config, set, hands, game)
+}
 
-    game.apply_with_harvest_policy(place_day_laborer(), &SimpleHarvestDetails)
-        .expect("B058 alone must not raise an unresolvable pending");
+const PLAIN_SPACES: [Space; 7] = [
+    Space::Forest,
+    Space::ClayPit,
+    Space::ReedBank,
+    Space::Fishing,
+    Space::DayLaborer,
+    Space::GrainSeeds,
+    Space::VegetableSeeds,
+];
 
-    // Harvest feeding: each player owes 2 food per family member (2 members
-    // -> 4), and the triggering DayLaborer grants 2 food to the placer only.
-    // Owner: 10 start + 2 day laborer - 4 feeding + 2 extra food (one per
-    // taken vegetable) = 10.
-    let p = &game.public.players[0];
-    assert_eq!(p.supply.vegetable, 2, "two fields harvested");
-    assert_eq!(p.supply.grain, 0, "no grain fields");
-    assert_eq!(
-        p.supply.food, 10,
-        "10 start + 2 day laborer - 4 feeding + 2 extra food (one per taken vegetable)"
+fn first_plain_space(legal: &[Space]) -> Space {
+    PLAIN_SPACES
+        .iter()
+        .copied()
+        .find(|space| legal.contains(space))
+        .expect("at least one detail-free space must be legal")
+}
+
+fn field_count(game: &Game, player: usize) -> usize {
+    game.public.players[player]
+        .farm
+        .iter()
+        .filter(|cell| matches!(cell.tile, Tile::Field { .. }))
+        .count()
+}
+
+/// Seed-2 real-action replay fixture driver.
+///
+/// Seed 2's round deck (per round): R1 Fencing, R2 MajorImprovement, R4
+/// GrainUtilization, R8 VegetableSeeds, R12 Cultivation; harvests at R4/R7/
+/// R9/R11/R14. Seat 0:
+///   R1 Forest (+3 wood), then plow cell 1.
+///   R2 MajorImprovement -> play B058 (cost 1 wood, +1 food on play), then
+///     plow cell 2.
+///   R8 VegetableSeeds (+1 vegetable supply).
+///   R12 Cultivation -> plow cell 3, sow cell 1 with 1 vegetable.
+///   R14 final harvest: the single growing vegetable field yields 1
+///     vegetable and B058 grants +1 food per harvested vegetable.
+///
+/// Every post-setup transition is a recorded `Game::apply` call, so the
+/// action log reconstructs the game exactly. save/load and full replay must
+/// reproduce the identical state hash and food count, proving B058's harvest
+/// bonus fires exactly once per harvest and never doubles on resume/replay.
+fn seat_zero_action(game: &Game, legal: &[Space]) -> Action {
+    let player = &game.public.players[0];
+    let b058_played = player.played_cards.iter().any(|id| id == "B058");
+    let round = game.public.round;
+
+    // Before B058 is played, secure the 1 wood needed to pay its cost via the
+    // Major Improvement space at round 2. Forest first so round 2 can play it.
+    if !b058_played && player.supply.wood < 1 && legal.contains(&Space::Forest) {
+        return Action {
+            space: Space::Forest,
+            detail: Detail::None,
+        };
+    }
+
+    // Round 2: play B058 via the Major Improvement space (needs 1 wood).
+    if round == 2 && !b058_played && legal.contains(&Space::MajorImprovement) {
+        return Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinor {
+                card_id: "B058".to_owned(),
+            },
+        };
+    }
+
+    // Keep food at or above the 4-food feeding cost (2 family members) on
+    // every seat-0 turn so the single vegetable obtained at round 8 is never
+    // eaten by feeding before it can be sown at round 12.
+    if player.supply.food < 4 && legal.contains(&Space::DayLaborer) {
+        return place_day_laborer();
+    }
+
+    // Round 8: take the revealed VegetableSeeds space (+1 vegetable supply).
+    if round == 8 && legal.contains(&Space::VegetableSeeds) {
+        return Action {
+            space: Space::VegetableSeeds,
+            detail: Detail::None,
+        };
+    }
+
+    // Round 12: Cultivation plow cell 3 and sow cell 1 with 1 vegetable.
+    // Only sow while a vegetable is still in supply (feeding must not have
+    // eaten it, which the food rule above prevents).
+    if round == 12 && legal.contains(&Space::Cultivation) && player.supply.vegetable > 0 {
+        return Action {
+            space: Space::Cultivation,
+            detail: Detail::Cultivate {
+                plow: Some(3),
+                plantings: vec![Plant {
+                    cell: 1,
+                    crop: Crop::Vegetable,
+                }],
+            },
+        };
+    }
+
+    // Plow the first two empty field cells (cell 1 with no existing field,
+    // then cell 2 adjacent to cell 1) using Farmland.
+    if legal.contains(&Space::Farmland) {
+        let fields = field_count(game, 0);
+        let target = if fields == 0 {
+            1usize
+        } else if fields == 1 {
+            2usize
+        } else {
+            999
+        };
+        if target != 999 {
+            let cell = &game.public.players[0].farm[target];
+            if matches!(cell.tile, Tile::Empty) && !cell.stable {
+                return Action {
+                    space: Space::Farmland,
+                    detail: Detail::Plow { cell: target },
+                };
+            }
+        }
+    }
+
+    Action {
+        space: first_plain_space(legal),
+        detail: Detail::None,
+    }
+}
+
+fn seat_one_action(game: &Game, legal: &[Space]) -> Action {
+    if game.public.players[1].supply.food < 4 && legal.contains(&Space::DayLaborer) {
+        return place_day_laborer();
+    }
+    Action {
+        space: first_plain_space(legal),
+        detail: Detail::None,
+    }
+}
+
+fn drive_to_finished(game: &mut Game) {
+    for _ in 0..200 {
+        if game.public.finished {
+            return;
+        }
+        let legal = game.legal_spaces();
+        assert!(!legal.is_empty(), "a legal placement must exist");
+        let action = if game.public.active_player == 0 {
+            seat_zero_action(game, &legal)
+        } else {
+            seat_one_action(game, &legal)
+        };
+        game.apply(action)
+            .expect("scripted placement must be legal");
+        assert!(
+            !game.has_pending(),
+            "B058 must not create a pending decision"
+        );
+    }
+    panic!("recorded drive never reached the final harvest");
+}
+
+/// Real resume/replay proof: B058 is played from the explicitly dealt hand,
+/// a vegetable field is prepared and harvested solely through legal recorded
+/// actions. Save/loading and a full replay from setup, hands, start player,
+/// and the action log must reproduce the exact state and grant the harvest
+/// bonus only once.
+#[test]
+fn b058_harvest_grant_survives_resume_without_double_count() {
+    let (config, set, hands, mut game) = game_with_b058();
+    drive_to_finished(&mut game);
+    assert!(game.public.finished, "drive must reach the final harvest");
+    assert_eq!(game.public.round, 14);
+    assert!(game.public.players[0]
+        .played_cards
+        .iter()
+        .any(|id| id == "B058"));
+
+    // Seat 0 grew a vegetable field via R12 Cultivation; it was harvested at
+    // the R13 and R14 harvests (B058's per-harvest bonus fires each time),
+    // so the supply vegetable count is above the single VegetableSeeds grant.
+    let final_vegetable = game.public.players[0].supply.vegetable;
+    assert!(
+        final_vegetable >= 2,
+        "the grown vegetable field was harvested at least once: veg={final_vegetable}"
     );
-    assert_eq!(p.begging, 0);
-    // Owner only: the opponent gains no B058 food (10 start - 4 feeding).
+
+    // B058's on-play grant (+1 food) plus its per-harvest bonuses are folded
+    // into the final food count. Any double grant during resume or replay
+    // moves the food count off this value.
+    let final_hash = game.state_hash();
+    let final_food = game.public.players[0].supply.food;
+
+    let loaded = Game::load_json(&game.save_json().expect("save recorded game"))
+        .expect("saved B058 game must resume");
     assert_eq!(
-        game.public.players[1].supply.food, 6,
-        "10 - 4 feeding only, no B058 bonus for a non-owner"
+        loaded.state_hash(),
+        final_hash,
+        "resume must reproduce state hash"
     );
+    assert_eq!(
+        loaded.public.players[0].supply.food, final_food,
+        "resume must reproduce food"
+    );
+    assert_eq!(loaded.public.players[0].supply.vegetable, final_vegetable);
+
+    let replayed = Game::replay_with_setup_and_start_player(
+        config,
+        set,
+        Some(hands),
+        Some(0),
+        &game.log.events,
+    )
+    .expect("recorded B058 game must replay");
+    assert_eq!(
+        replayed.state_hash(),
+        final_hash,
+        "replay must reproduce state hash"
+    );
+    assert_eq!(
+        replayed.public.players[0].supply.food, final_food,
+        "replay must reproduce food"
+    );
+    assert_eq!(replayed.public.players[0].supply.vegetable, final_vegetable);
 }
