@@ -56,10 +56,23 @@ The following official-wording ambiguities were resolved by interpretation; reco
 
 ## Gates
 
-Verification is GitHub Actions-first per AGENTS.md §18 (this body records check names/conclusions/run URL after the run finishes, not local measurements):
+Verification is GitHub Actions-first per AGENTS.md §18: the gate evidence is
+the check-runs of the review HEAD (`0e75b83`), not local measurements. Run:
+<https://github.com/cueikusuta/agricola-re-ai/actions/runs/45135469985>
+(Rust CI: Detect changed files / rustfmt / clippy / cargo test / M1-M2-M7
+seeded performance) plus
+<https://github.com/cueikusuta/agricola-re-ai/actions/runs/45135469958>
+(Pipeline Gates), <https://github.com/cueikusuta/agricola-re-ai/actions/runs/45135469937>
+(Script test suites), <https://github.com/cueikusuta/agricola-re-ai/actions/runs/45135469926>
+(Browser UI E2E browser-smoke) and
+<https://github.com/cueikusuta/agricola-re-ai/actions/runs/45135469916>
+(Paired AI Evaluation) — all `pass` on `0e75b83`.
 
-- `ci.yml` (fmt / clippy / test)
-- `pipeline-gates` (spec / ledger / blocker Python gates)
+Local pre-push runs (developer machine, rustc 1.99 and the CI toolchain
+1.100.0): `cargo fmt --check` clean; `cargo clippy --all-targets
+--all-features --locked -- -D warnings` clean on both toolchains (the
+needless_range_loop finding in `b002_no_pasture_when_no_empty_cells` was fixed
+for clippy 1.100); `cargo test --locked` → 965 tests, 0 failures.
 
 ## Merge with main
 
