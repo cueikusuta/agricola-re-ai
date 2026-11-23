@@ -2296,6 +2296,10 @@ impl Game {
                         self.public.animal_accumulations.remove(&space).unwrap_or(0)
                     };
                     place_animals(p, plan, quantity)?;
+                    // A153/B154: market/accumulation acquisition completed —
+                    // the spec trigger `after_animal_acquisition` evaluates
+                    // after every acquisition route.
+                    crate::card_events::award_animal_acquisition_bonuses(&self.card_set, p)?;
                 } else {
                     return Err("animal placement required".into());
                 }

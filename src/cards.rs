@@ -445,36 +445,42 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
-        /// D054 マスの池 (Trout Pool): at each round start, if the `space`
-        /// accumulation holds at least `min`, gain `amount` of `good` from the
-        /// general supply. Unlike A049 営巣地 (`StartRoundGainIfAccumulationGrew`)
-        /// there is no "grew this round" requirement: the printed card pays on the
-        /// standing accumulation alone. The condition is judged inside the handler
-        /// from the public accumulations map the round-start dispatcher threads
-        /// read-only through `DispatchContext` (runtime-only, never serialized);
-        /// the map is never mutated, and any dispatch path without the map grants
-        /// nothing.
-        StartRoundGainIfAccumulationAtLeast {
-            space: Space,
-            min: u32,
-            good: Good,
-            amount: u32,
-        },
-        /// A153 豚持ち (Pig Owner) / B154 羊持ち (Sheep Keeper): after any animal
-        /// acquisition applied through `place_animals`, if the card owner has at
-        /// least `threshold` of `animal`, award `points` bonus points (and `food`
-        /// food when non-zero) to the owner. Re-evaluated on every acquisition
-        /// scan; awarded once per game per card (tracked on
-        /// `Player::animal_acquisition_bonus_fired`).
-        ///
-        /// Serialization compatibility: appended as the final variant so that
-        /// existing variants' serialized representation is unaffected.
-        AfterAnimalAcquisitionBonusPoints {
-            animal: Animal,
-            threshold: u32,
-            points: i32,
-            food: u32,
-        },
+            /// D054 マスの池 (Trout Pool): at each round start, if the `space`
+            /// accumulation holds at least `min`, gain `amount` of `good` from the
+            /// general supply. Unlike A049 営巣地 (`StartRoundGainIfAccumulationGrew`)
+            /// there is no "grew this round" requirement: the printed card pays on the
+            /// standing accumulation alone. The condition is judged inside the handler
+            /// from the public accumulations map the round-start dispatcher threads
+            /// read-only through `DispatchContext` (runtime-only, never serialized);
+            /// the map is never mutated, and any dispatch path without the map grants
+            /// nothing.
+            StartRoundGainIfAccumulationAtLeast {
+                space: Space,
+                min: u32,
+                good: Good,
+                amount: u32,
+            },
+            /// A153 豚持ち (Pig Owner) / B154 羊持ち (Sheep Keeper): after any animal
+            /// acquisition applied through `place_animals`, if the card owner has at
+            /// least `threshold` of `animal`, award `points` bonus points (and `food`
+            /// food when non-zero) to the owner. Re-evaluated on every acquisition
+            /// scan; awarded once per game per card (tracked on
+            /// `Player::animal_acquisition_bonus_fired`).
+            ///
+            /// Fire routes: market/accumulation spaces (`engine::execute_work`),
+            /// card-granted placement (`engine::place_animals` via on-play and the
+            /// pending-resolution path), and breeding births (`harvest::harvest`).
+            /// Each calls `card_events::award_animal_acquisition_bonuses` directly
+            /// after placement — no new event site, no serialization change.
+            ///
+            /// Serialization compatibility: appended as the final variant so that
+            /// existing variants' serialized representation is unaffected.
+            AfterAnimalAcquisitionBonusPoints {
+                animal: Animal,
+                threshold: u32,
+                points: i32,
+                food: u32,
+            },
     }
 
 impl CardEffect {
@@ -527,10 +533,10 @@ impl CardEffect {
 
             CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
             CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
-                        CardEffect::AfterAnimalAcquisitionBonusPoints { .. } => {
-                            "after_animal_acquisition_bonus_points"
-                        }
-                        CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
+            CardEffect::AfterAnimalAcquisitionBonusPoints { .. } => {
+                "after_animal_acquisition_bonus_points"
+            }
+            CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
             CardEffect::AfterImprovementPlayedGain { .. } => "after_improvement_played_gain",
             CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { .. } => {
@@ -694,7 +700,10 @@ pub enum CardRequirement {
     /// fewer than 7 sheep — the spec's `animal_count_less` predicate).
     /// Appended as the final variant so existing variants' serialized
     /// representation is unaffected.
-    AnimalCountLess { animal: Animal, number: u32 },
+    AnimalCountLess {
+        animal: Animal,
+        number: u32,
+    },
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -1417,7 +1426,9 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
                     .count()
                     >= usize::from(*number)
             }
-            CardRequirement::AnimalCountLess { animal, number } => player.animal_count(*animal) < *number,
+            CardRequirement::AnimalCountLess { animal, number } => {
+                player.animal_count(*animal) < *number
+            }
             CardRequirement::MinimumImprovements(min) => {
                 improvement_count_in_front(set, player) >= u32::from(*min)
             }

@@ -243,6 +243,17 @@ impl Game {
         for (player, plan) in self.public.players.iter_mut().zip(breeding) {
             plan.apply(player)?;
         }
+        // A153/B154: breeding births are animal acquisitions too — the spec
+        // trigger `after_animal_acquisition` evaluates after every birth
+        // route as well as on the market / card-granted routes.
+        if self.card_set.enabled() {
+            for p in 0..self.public.players.len() {
+                crate::card_events::award_animal_acquisition_bonuses(
+                    &self.card_set,
+                    &mut self.public.players[p],
+                )?;
+            }
+        }
         // Field phase -> feeding -> breeding are done: fire the "end of each
         // harvest" cards (A145 reed, C066 rye bonus). New tail dispatch added
         // by the PR #385 review-fix round (review finding (a)).

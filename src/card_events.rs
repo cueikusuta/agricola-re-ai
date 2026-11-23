@@ -621,12 +621,7 @@ fn resolve_phase_scan(
                     points,
                     food,
                 } => handle_after_animal_acquisition_bonus_points(
-                    ctx,
-                    card_id,
-                    *animal,
-                    *threshold,
-                    *points,
-                    *food,
+                    ctx, card_id, *animal, *threshold, *points, *food,
                 )?,
                 CardEffect::StartRoundGain {
                     good,
@@ -1043,7 +1038,7 @@ fn effect_condition_holds(
     _actor: usize,
     used_spaces: &std::collections::BTreeSet<Space>,
     round: u8,
-    card_id: &str,
+    _card_id: &str,
 ) -> bool {
     match effect {
         CardEffect::AfterWorkerGain { space, .. } => {
@@ -1171,20 +1166,12 @@ fn effect_condition_holds(
         CardEffect::AfterWorkerGainIfOwnsAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
-        CardEffect::AfterAnimalAcquisitionBonusPoints { animal, threshold, .. } => {
-            // A153/B154: re-evaluated on every WorkerPlaced After scan (the
-            // scan runs after the core action has placed any acquired
-            // animals). The head-count threshold is part of the condition so
-            // the effect only joins a simultaneous-trigger order choice when
-            // its bonus is actually due — the spec's own boundary contract
-            // (5 boars, no acquisition in this action) still fires here. The
-            // once-per-game guard keeps an already-awarded card out of every
-            // later scan (no re-trigger, no spurious order pause); the
-            // handler re-checks both guards as defense in depth.
-            trigger.site == EventKind::WorkerPlaced
-                && player.animal_count(*animal) >= *threshold
-                && !player.animal_acquisition_bonus_fired.contains(card_id)
-        }
+        CardEffect::AfterAnimalAcquisitionBonusPoints { .. } => false,
+        // Spec trigger `after_animal_acquisition` means acquisition
+        // completion, not an event site — A153/B154 never join the generic
+        // event scan (see `resolve_phase`'s scan; their fire routes call
+        // `award_animal_acquisition_bonuses` directly). `false` keeps the
+        // once-per-game guard from ever letting them wait for trigger order.
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
@@ -1392,7 +1379,7 @@ pub fn execute_chosen_triggers(
                 good,
                 *amount,
                 trigger_data,
-                )?,
+            )?,
             CardEffect::AfterAnimalAcquisitionBonusPoints {
                 animal,
                 threshold,
@@ -2130,6 +2117,9 @@ fn handle_on_play_gain_animal(
     let plan = auto_animal_plan(ctx.player, *animal, amount);
     crate::engine::place_animals(ctx.player, &plan, amount)
         .map_err(|e| format!("on-play animal placement failed: {e}"))?;
+    // A153/B154: an on-play animal acquisition is an acquisition too — the
+    // spec trigger evaluates after every `place_animals` completion.
+    crate::card_events::award_animal_acquisition_bonuses(ctx.card_set, ctx.player)?;
     Ok(EffectResult::Resolved)
 }
 
@@ -2163,13 +2153,84 @@ fn handle_after_worker_gain_animal(
     Ok(EffectResult::Resolved)
 }
 
-/// A153 豚持ち / B154 羊持ち: after any animal acquisition applied through
-/// `place_animals`, if the card owner has at least `threshold` of `animal`,
-/// award `points` bonus points (and `food` food when non-zero) to the owner.
-/// Re-evaluated on every WorkerPlaced After scan; the threshold check is
-/// dynamic, and the once-per-game guard (`animal_acquisition_bonus_fired`)
-/// ensures the bonus is awarded at most once per card even if the head count
-/// later drops below and recovers above the threshold.
+/// A153 豚持ち / B154 羊持ち: dedicated acquisition scan.
+///
+/// The spec trigger is `after_animal_acquisition` — the bonus evaluates when
+/// an animal acquisition *completes*: the animal markets / accumulation spaces
+/// (`engine::execute_work`), card-granted placement (`engine::place_animals`
+/// via the on-play and pending-resolution paths), and breeding births
+/// (`harvest::harvest`). Those routes share no single event site, so each calls
+/// this scan directly after the placement it owns, instead of routing through
+/// the generic event scan (which would also fire on non-acquisition actions and
+/// would miss births entirely).
+pub fn award_animal_acquisition_bonuses(
+    card_set: &CardSet,
+    player: &mut Player,
+) -> Result<(), String> {
+    let played = player.played_cards.clone();
+    for card_id in &played {
+        let Some(card) = card_set.definition(card_id) else {
+            continue;
+        };
+        for effect in &card.effects {
+            let CardEffect::AfterAnimalAcquisitionBonusPoints {
+                animal,
+                threshold,
+                points,
+                food,
+            } = effect
+            else {
+                continue;
+            };
+            award_animal_acquisition_bonus_point(
+                player, card_id, *animal, *threshold, *points, *food,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// Award `points` (plus `food` when non-zero) to the owner when the head count
+/// of `animal` is at least `threshold`. The threshold check is re-evaluated on
+/// every call, and the once-per-game guard (`frequency: once_per_game` in the
+/// spec, tracked on `Player::animal_acquisition_bonus_fired`) keeps an
+/// already-awarded card out of every later evaluation — the head count later
+/// dropping below and recovering above the threshold does not re-award.
+fn award_animal_acquisition_bonus_point(
+    player: &mut Player,
+    card_id: &str,
+    animal: Animal,
+    threshold: u32,
+    points: i32,
+    food: u32,
+) -> Result<(), String> {
+    if player.animal_acquisition_bonus_fired.contains(card_id) {
+        return Ok(());
+    }
+    if player.animal_count(animal) < threshold {
+        return Ok(());
+    }
+    player.animal_acquisition_bonus_points = player
+        .animal_acquisition_bonus_points
+        .checked_add(points)
+        .ok_or("animal acquisition bonus points overflow")?;
+    if food > 0 {
+        player.supply.food = player
+            .supply
+            .food
+            .checked_add(food)
+            .ok_or("animal acquisition bonus food overflow")?;
+    }
+    player
+        .animal_acquisition_bonus_fired
+        .insert(card_id.to_owned());
+    Ok(())
+}
+
+/// Scan-dispatch arm kept as defense in depth: the generic event scan never
+/// collects A153/B154 (see the `effect_condition_holds` arm — the spec trigger
+/// is acquisition completion, not an event site), but if a dispatch ever
+/// reaches this variant it applies the same once-per-game award.
 fn handle_after_animal_acquisition_bonus_points(
     ctx: &mut DispatchContext<'_>,
     card_id: &str,
@@ -2178,22 +2239,14 @@ fn handle_after_animal_acquisition_bonus_points(
     points: i32,
     food: u32,
 ) -> Result<EffectResult, String> {
-    let p = &mut *ctx.player;
-    if p.animal_acquisition_bonus_fired.contains(card_id) {
-        return Ok(EffectResult::Resolved);
-    }
-    let count = p.animal_count(animal);
-    if count < threshold {
-        return Ok(EffectResult::Resolved);
-    }
-    p.animal_acquisition_bonus_points = p
-        .animal_acquisition_bonus_points
-        .checked_add(points)
-        .ok_or("animal acquisition bonus points overflow")?;
-    if food > 0 {
-        p.supply.food = p.supply.food.checked_add(food).ok_or("animal acquisition bonus food overflow")?;
-    }
-    p.animal_acquisition_bonus_fired.insert(card_id.to_owned());
+    award_animal_acquisition_bonus_point(
+        &mut *ctx.player,
+        card_id,
+        animal,
+        threshold,
+        points,
+        food,
+    )?;
     Ok(EffectResult::Resolved)
 }
 

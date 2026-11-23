@@ -96,7 +96,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "Playable only with fewer than 7 sheep; once at 7 sheep gain 3 points and 2 food."
   }
 }
