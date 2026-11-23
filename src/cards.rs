@@ -785,12 +785,16 @@ pub(crate) fn major_improvements_bottom_row(player: &Player) -> usize {
         .count()
 }
 
-/// Count sown fields (fields with a crop planted).
+/// Count sown fields: fields with a crop planted, plus fields carrying C006
+/// stones (`field_stones > 0`) that count as cultivated until the field phase
+/// reset harvests the stones.
 pub(crate) fn sown_field_count(player: &Player) -> usize {
     player
         .farm
         .iter()
-        .filter(|cell| matches!(cell.tile, Tile::Field { crop: Some(_), .. }))
+        .filter(|cell| {
+            matches!(cell.tile, Tile::Field { crop: Some(_), .. }) || cell.field_stones > 0
+        })
         .count()
 }
 
@@ -800,23 +804,33 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
     }
     let occupations = occupation_count(set, player);
     card.effects.iter().all(|effect| {
-            let CardEffect::Prerequisite { rule } = effect else { return true; };
-            match rule {
-                CardRequirement::MinimumOccupations(min) => occupations >= usize::from(*min),
-                CardRequirement::MaximumOccupations(max) => occupations <= usize::from(*max),
-                CardRequirement::MinimumAnimals { animal, number } => player.animal_count(*animal) >= *number,
-                CardRequirement::MinimumCropFields { crop, number } => player.farm.iter().filter(|cell| {
-                    matches!(cell.tile, Tile::Field { crop: Some(found), .. } if found == *crop)
-                }).count() >= usize::from(*number),
-                crate::cards::CardRequirement::MinimumImprovements(min) => {
-                                improvement_count_in_front(set, player) >= u32::from(*min)
-                            }
-                CardRequirement::MinimumPlayers(_) => true,
-                CardRequirement::PastureCount(n) => {
-                    player.pastures.len() >= usize::from(*n)
-                }
+        let CardEffect::Prerequisite { rule } = effect else {
+            return true;
+        };
+        match rule {
+            CardRequirement::MinimumOccupations(min) => occupations >= usize::from(*min),
+            CardRequirement::MaximumOccupations(max) => occupations <= usize::from(*max),
+            CardRequirement::MinimumAnimals { animal, number } => {
+                player.animal_count(*animal) >= *number
             }
-        })
+            CardRequirement::MinimumCropFields { crop, number } => {
+                player
+                    .farm
+                    .iter()
+                    .filter(|cell| {
+                        matches!(cell.tile, Tile::Field { crop: Some(found), .. } if found == *crop)
+                            || cell.field_stones > 0
+                    })
+                    .count()
+                    >= usize::from(*number)
+            }
+            crate::cards::CardRequirement::MinimumImprovements(min) => {
+                improvement_count_in_front(set, player) >= u32::from(*min)
+            }
+            CardRequirement::MinimumPlayers(_) => true,
+            CardRequirement::PastureCount(n) => player.pastures.len() >= usize::from(*n),
+        }
+    })
 }
 
 fn safe_gain(player: &mut Player, good: Good, amount: u32) -> Result<(), String> {
@@ -1481,6 +1495,81 @@ mod card_prerequisite_tests {
             crop: Some(Crop::Grain),
             remaining: 1,
         };
+        assert!(can_play(&set, &card, &p, 0));
+    }
+
+    #[test]
+    fn c006_stone_fields_count_as_cultivated_until_harvest() {
+        // C006 石取り作業: 石を置かれた空き畑は、次フィールドフェイズで
+        // 石が収穫されるまで「栽培中」と数えられる。
+        let set = CardSet {
+            definitions: verified_band_c_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.supply.food = 1;
+        p.played_cards.push("occ1".to_string());
+        let mut set_with_occ = set.clone();
+        set_with_occ.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "occ1".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        });
+        p.farm[0].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[1].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        assert_eq!(sown_field_count(&p), 1);
+        play(
+            &set_with_occ,
+            &mut vec!["C006".to_string()],
+            &mut p,
+            "C006",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.farm[0].field_stones, 1);
+        assert_eq!(p.farm[1].field_stones, 1);
+        // 1 畑に作物 + 2 畑に石 = 3 畑が栽培中
+        assert_eq!(sown_field_count(&p), 3);
+        // 収穫で石は消費され、栽培中扱いも解除される
+        harvest_field_stones(&set_with_occ, &mut p).unwrap();
+        assert_eq!(p.farm[0].field_stones, 0);
+        assert_eq!(p.farm[1].field_stones, 0);
+        assert_eq!(sown_field_count(&p), 1);
+    }
+
+    #[test]
+    fn minimum_crop_fields_counts_stone_fields_as_cultivated() {
+        let (set, card) = prerequisite_card(CardRequirement::MinimumCropFields {
+            crop: Crop::Grain,
+            number: 2,
+        });
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        p.farm[0].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        // 1 枚だけでは足りない
+        assert!(!can_play(&set, &card, &p, 0));
+        // 石を置かれた空き畑も栽培中とみなされ、要件を満たす
+        p.farm[1].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        p.farm[1].field_stones = 1;
         assert!(can_play(&set, &card, &p, 0));
     }
 
@@ -3048,6 +3137,29 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
             vec![],
             PassiveRule::RoomCost(3),
         ),
+        // C083 若牛 (Early Cattle): minor improvement, -3 points, on play gain 2 cattle.
+        CardDefinition {
+            use_limit: None,
+            id: "C083".to_owned(),
+            kind: minor,
+            cost: vec![],
+            points: -3,
+            effects: vec![CardEffect::OnPlayGainAnimal {
+                animal: Animal::Cattle,
+                amount: 2,
+            }],
+        },
+        // C147 牛の飼育士 (Cowherd): occupation, 0 points, each time owner uses CattleMarket gain 1 cattle.
+        card(
+            "C147",
+            occupation,
+            vec![],
+            vec![CardEffect::AfterWorkerGainAnimal {
+                space: Space::CattleMarket,
+                animal: Animal::Cattle,
+                amount: 1,
+            }],
+        ),
     ]
 }
 #[cfg(test)]
@@ -4015,6 +4127,38 @@ mod verified_band_c_tests {
         assert_eq!(p.animal_count(Animal::Sheep), 0);
     }
 
+    #[test]
+    fn c083_has_negative_three_points_and_no_cost() {
+        let set = set();
+        let card = set.definition("C083").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, -3);
+        assert_eq!(
+            card.effects,
+            vec![CardEffect::OnPlayGainAnimal {
+                animal: Animal::Cattle,
+                amount: 2,
+            }]
+        );
+    }
+
+    #[test]
+    fn c147_has_zero_points_and_no_cost() {
+        let set = set();
+        let card = set.definition("C147").unwrap();
+        assert_eq!(card.kind, CardKind::Occupation);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+        assert_eq!(
+            card.effects,
+            vec![CardEffect::AfterWorkerGainAnimal {
+                space: Space::CattleMarket,
+                animal: Animal::Cattle,
+                amount: 1,
+            }]
+        );
+    }
     /// Pad the verified band-C pool up to the validated deck size (7 cards
     /// of each kind per player) with inert dummy definitions so the contract
     /// cases can drive the production `Game::apply` path.

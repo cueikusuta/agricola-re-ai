@@ -641,6 +641,11 @@ fn card_priority(
                                     // Conditional on field count; optimistic half-weight
                                     card_good_value(*good) * i64::from(*amount) * horizon / 2
                                 }
+                                // C083/C147 (main b876a46/f03d65b): animal gain variants from main.
+                                CardEffect::OnPlayGainAnimal { animal, amount, .. }
+                                | CardEffect::AfterWorkerGainAnimal { animal, amount, .. } => {
+                                    card_animal_value(*animal) * i64::from(*amount) * horizon
+                                }
                                 // C006/C007 on-play effects: stone placement and choice gain
                                 // are resolved at play time; heuristic assigns neutral value.
                                 CardEffect::OnPlayChoiceGain { .. } => 0,
