@@ -2312,6 +2312,32 @@ fn handle_harvest_field_gain(
                 })
                 .count() as u32
         }
+        crate::cards::HarvestFieldRule::FieldsAdjacentToHouse => {
+            // D063 段地 (Lynchet): 1 food per field tile orthogonally adjacent to
+            // any house cell (Tile::Room) whose last crop is taken this field phase.
+            // The dispatcher runs before crops are removed, so a field with
+            // remaining == 1 is exactly one whose last crop will be harvested now.
+            // Orthogonal adjacency uses the shared 5x3 model::neighbors helper.
+            use crate::model::neighbors;
+            let house_cells: Vec<usize> = p
+                .farm
+                .iter()
+                .enumerate()
+                .filter(|(_, cell)| matches!(cell.tile, crate::model::Tile::Room))
+                .map(|(i, _)| i)
+                .collect();
+            let mut count = 0u32;
+            for house in house_cells {
+                for adj in neighbors(house) {
+                    if let crate::model::Tile::Field { remaining, .. } = p.farm[adj].tile {
+                        if remaining == 1 {
+                            count += 1;
+                        }
+                    }
+                }
+            }
+            count
+        }
         crate::cards::HarvestFieldRule::Fixed => 1,
     };
     let gain = multiplier
@@ -3802,6 +3828,34 @@ pub mod legacy {
                                     )
                                 })
                                 .count() as u32
+                        }
+                        crate::cards::HarvestFieldRule::FieldsAdjacentToHouse => {
+                            // D063 段地 (Lynchet): 1 food per field tile orthogonally adjacent to
+                            // any house cell (Tile::Room) whose last crop is taken this field phase.
+                            // The dispatcher runs before crops are removed, so a field with
+                            // remaining == 1 is exactly one whose last crop will be harvested now.
+                            // Orthogonal adjacency uses the shared 5x3 model::neighbors helper.
+                            use crate::model::neighbors;
+                            let house_cells: Vec<usize> = player
+                                .farm
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, cell)| matches!(cell.tile, crate::model::Tile::Room))
+                                .map(|(i, _)| i)
+                                .collect();
+                            let mut count = 0u32;
+                            for house in house_cells {
+                                for adj in neighbors(house) {
+                                    if let crate::model::Tile::Field { remaining, .. } =
+                                        player.farm[adj].tile
+                                    {
+                                        if remaining == 1 {
+                                            count += 1;
+                                        }
+                                    }
+                                }
+                            }
+                            count
                         }
                         crate::cards::HarvestFieldRule::Fixed => 1,
                     };

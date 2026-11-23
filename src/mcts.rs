@@ -1192,8 +1192,9 @@ mod tests {
         // preset (spec eligibility "2": "no"), pool size 38->37.
         // Updated: StartRoundGainIf* wave — B114/A049/C067 joined the
         // two-player preset (A157 stays out, 4 players only), pool size 37->41.
+        // Updated: D063 段地 added to verified_round_and_harvest_cards, pool size 41->42.
         assert_eq!(
-            digest, "310a31bdb04fa7fa2abec2a215396065daf5874819f413c6f669247f5f55deff",
+            digest, "d510ef87cfb966fc9aad6e998c0462d0464705983f06e420ab5799e5dc72048b",
             "sample_game distribution changed — update this test only if intentional"
         );
     }

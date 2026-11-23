@@ -539,6 +539,16 @@ pub enum HarvestFieldRule {
     /// A118 樹木庭師 (Treegardener): fixed amount per harvest field phase,
     /// independent of field count or crop state.
     Fixed,
+    /// D063 段地 (Lynchet): at the field phase, one multiplier step per field
+    /// tile that is orthogonally adjacent to the house AND whose last crop is
+    /// taken this field phase. The dispatcher runs before crops are removed,
+    /// and each growing field yields exactly one good per harvest, so a field
+    /// with one remaining crop becomes empty afterwards. Orthogonal adjacency
+    /// uses the shared 5-column x 3-row `model::neighbors` helper (same-row
+    /// ±1 and vertical ±5 only — never a row wrap or a diagonal). The house is
+    /// any [`Tile::Room`] cell, so a two-room wooden house and a renovated
+    /// stone house are treated identically.
+    FieldsAdjacentToHouse,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -2794,6 +2804,32 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                             })
                             .count() as u32
                     }
+                    HarvestFieldRule::FieldsAdjacentToHouse => {
+                        // D063 段地 (Lynchet): 1 food per field tile orthogonally adjacent to
+                        // any house cell (Tile::Room) whose last crop is taken this field phase.
+                        // The dispatcher runs before crops are removed, so a field with
+                        // remaining == 1 is exactly one whose last crop will be harvested now.
+                        // Orthogonal adjacency uses the shared 5x3 model::neighbors helper.
+                        use crate::model::neighbors;
+                        let house_cells: Vec<usize> = player
+                            .farm
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, cell)| matches!(cell.tile, Tile::Room))
+                            .map(|(i, _)| i)
+                            .collect();
+                        let mut count = 0u32;
+                        for house in house_cells {
+                            for adj in neighbors(house) {
+                                if let Tile::Field { remaining, .. } = player.farm[adj].tile {
+                                    if remaining == 1 {
+                                        count += 1;
+                                    }
+                                }
+                            }
+                        }
+                        count
+                    }
                     HarvestFieldRule::Fixed => 1,
                 };
                 safe_gain(
@@ -3129,6 +3165,20 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 animal: Animal::Sheep,
                 min: 1,
                 good: Good::Grain,
+                amount: 1,
+            }],
+        },
+        // D063 段地 (Lynchet): at each harvest field phase, 1 food per field
+        // tile orthogonally adjacent to the house whose last crop is harvested.
+        CardDefinition {
+            use_limit: None,
+            id: "D063".into(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::HarvestFieldGain {
+                rule: HarvestFieldRule::FieldsAdjacentToHouse,
+                good: Good::Food,
                 amount: 1,
             }],
         },
@@ -4202,11 +4252,11 @@ mod simple_occupation_tests {
             .filter(|x| x.kind == CardKind::MinorImprovement)
             .count();
         // B114/A049/C067 (StartRoundGainIf* wave) join the two-player preset;
-        // A157 stays out (4 players only), so the count is 41 + 3 = 44
-        // (occupations 18 + 1, minors 23 + 2).
-        assert_eq!(total, 44);
+        // A157 stays out (4 players only), so the count is 41 + 3 + 1 = 45
+        // (occupations 18 + 1, minors 23 + 3). D063 added as minor.
+        assert_eq!(total, 45);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 25);
+        assert_eq!(minor, 26);
         assert!(verified_basic_card_set(3).is_err());
     }
 }
@@ -7293,10 +7343,10 @@ mod p1_2_repro_tests {
         // 2p プリセットのハッシュは変更不可（39 defs、content_hash 不変条件）
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
-            preset.content_hash(),
-            "d92847a8d127cc236d65b7df53d4af775d62a0015d8ab099b565e2465ad0d965",
-            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067 joined the preset and A157 was excluded as 4p-only; previous pin 323dbecb after PR #385 + d3c237c9 main merge)"
-        );
+                    preset.content_hash(),
+                    "f105d17e0c0912fdacb6f2814e1f97f52de59c813383be2db0c1ae3c7ae400e5",
+                    "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067 joined the preset and A157 was excluded as 4p-only; previous pin 323dbecb after PR #385 + d3c237c9 main merge; D063 added)"
+                );
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
         // 2p: [A133, A143, A155, B142, B144]（A133/A143 は 3人+、A155 は 4人のみ、B142/B144 は 3人+ のみ；
