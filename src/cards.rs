@@ -4644,11 +4644,11 @@ mod verified_band_e_tests {
         q.played_cards.push("E034".into());
         q.farm[0].tile = Tile::Room;
         q.farm[5].tile = Tile::Room;
-        for i in 1..5 {
-            q.farm[i].tile = Tile::Pasture { id: 0 };
+        for cell in q.farm.iter_mut().take(5).skip(1) {
+            cell.tile = Tile::Pasture { id: 0 };
         }
-        for i in 6..15 {
-            q.farm[i].tile = Tile::Pasture { id: 0 };
+        for cell in q.farm.iter_mut().take(15).skip(6) {
+            cell.tile = Tile::Pasture { id: 0 };
         }
         assert_eq!(end_game_bonus(&set, &q), 2);
     }
@@ -4664,14 +4664,14 @@ mod verified_band_e_tests {
         p.played_cards.push("E034".into());
         p.farm[0].tile = Tile::Room;
         p.farm[5].tile = Tile::Room;
-        for i in 1..=4 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(5).skip(1) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 1,
             };
         }
-        for i in 6..=13 {
-            p.farm[i].tile = Tile::Field {
+        for cell in p.farm.iter_mut().take(14).skip(6) {
+            cell.tile = Tile::Field {
                 crop: Some(Crop::Vegetable),
                 remaining: 1,
             };
