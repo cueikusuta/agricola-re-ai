@@ -406,6 +406,10 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => {
                     EventKind::RoundStart
                 }
+                crate::cards::CardEffect::AfterSowGain { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::AfterSowGainPerDistinctCrop { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
                 | crate::cards::CardEffect::EndGameBonus { .. } => continue,
@@ -574,6 +578,10 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
                             ..
                         } => 1,
+                        crate::cards::CardEffect::AfterSowGain { amount, .. }
+                        | crate::cards::CardEffect::AfterSowGainPerDistinctCrop { amount } => {
+                            *amount
+                        }
                     };
                     amount == 0 || amount > 30
                 })

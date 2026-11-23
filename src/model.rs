@@ -97,7 +97,7 @@ pub enum House {
     Clay,
     Stone,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Crop {
     Grain,
@@ -1863,6 +1863,7 @@ impl Game {
                             event_kind: crate::registry::EventKind::Bake,
                             revealed_round_cards: Vec::new(),
                             c066_take_food_instead: false,
+                            sow_detail: None,
                         };
                         // After phase. If THIS is the paused step and the pause
                         // was in the After phase (a resolved ChooseTriggerOrder,
@@ -2000,6 +2001,7 @@ impl Game {
                         event_kind: crate::registry::EventKind::ClayConstruction,
                         revealed_round_cards: Vec::new(),
                         c066_take_food_instead: false,
+                        sow_detail: None,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -2106,6 +2108,18 @@ impl Game {
                         card_owner: player,
                         beneficiary: player,
                     };
+                    let sow_detail = if matches!(
+                        completion.action.space,
+                        Space::GrainSeeds
+                            | Space::VegetableSeeds
+                            | Space::GrainUtilization
+                            | Space::Cultivation
+                            | Space::Farmland
+                    ) {
+                        Some(completion.action.detail.clone())
+                    } else {
+                        None
+                    };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: Some(completion.action.space),
                         improvement: None,
@@ -2116,6 +2130,7 @@ impl Game {
                         event_kind: crate::registry::EventKind::WorkerPlaced,
                         revealed_round_cards: Vec::new(),
                         c066_take_food_instead: false,
+                        sow_detail,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
