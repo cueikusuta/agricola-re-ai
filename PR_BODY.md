@@ -32,16 +32,21 @@ B049 天秤 (Minor Improvement, cost 1 wood, points 0) を実装。
 - cargo test --test m6_verified_pool (3/3 passed) ✅
 - cargo test --lib mcts::tests::sample_game_distribution_digest_is_stable ✅
 
-### Actions チェック結果（exact HEAD の実測値は push 後に記録）
+### Actions チェック結果（exact HEAD `e9a9a8c` の実測値、全必須チェック success）
 
 | チェック名 | 結論 | Run URL |
 |---|---|---|
-| CI required (aggregate) | この push で dispatch（後記） | — |
-| cargo test | — | — |
-| rustfmt | — | — |
-| clippy | — | — |
-| M1/M2/M7 seeded performance | — | — |
-| Pipeline gates (spec/catalog/blockers) | — | — |
+| CI required (aggregate) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137738550076 |
+| cargo test | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137737286487 |
+| rustfmt | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137737286361 |
+| clippy | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137737286418 |
+| M1/M2/M7 seeded performance | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137737286351 |
+| Pipeline gates (spec/catalog/blockers) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611540/job/137737206846 |
+| Detect changed files | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137737207123 |
+| bga-spec-contract | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611445/job/137737206759 |
+| test (Paired AI Evaluation aggregate) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611856/job/137737206331 |
+| Python unittest discovery | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611454/job/137737206317 |
+| shard / aggregate (Paired AI Evaluation) | skipped | — |
 
 ### 完了条件
 - P2/P3 指摘の全修正を本ブランチにコミット・push（force push なし、新規 PR なし、マージなし）
