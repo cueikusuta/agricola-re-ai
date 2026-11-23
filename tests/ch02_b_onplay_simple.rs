@@ -10,7 +10,7 @@ use agricola_re_ai::card_events::dispatch_play;
 use agricola_re_ai::cards::{
     apply_on_play_effects, CardDefinition, CardEffect, CardKind, CardSet, PostPlayDestination,
 };
-use agricola_re_ai::model::{neighbors, Animal, Game, Good, Pasture, Player, FARM_CELLS};
+use agricola_re_ai::model::{neighbors, Animal, Game, Good, Pasture, Player};
 use agricola_re_ai::registry::build_default_registry;
 
 fn new_set(defs: Vec<CardDefinition>) -> CardSet {
@@ -185,8 +185,8 @@ fn b002_no_pasture_when_no_empty_cells() {
     let mut player = Player::new(0, 0);
     player.supply.food = 2;
     // Fill all farm cells
-    for i in 0..FARM_CELLS {
-        player.farm[i].tile = agricola_re_ai::model::Tile::Field {
+    for cell in &mut player.farm {
+        cell.tile = agricola_re_ai::model::Tile::Field {
             crop: Some(agricola_re_ai::model::Crop::Grain),
             remaining: 1,
         };
