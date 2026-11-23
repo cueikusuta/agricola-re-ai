@@ -1572,6 +1572,55 @@ impl Game {
         }
         // Validate resolution matches pending kind
         pending.validate_resolution(&resolution)?;
+        // Site validation for ChooseTriggerOrder (Dispatcher 2-axis rebuild):
+        // Ensure ChooseTriggerOrder.site, PhaseTriggerData.site, and execution
+        // context site all match. A mismatch indicates a corrupted/incompatible save.
+        if let crate::pending::PendingKind::ChooseTriggerOrder {
+            site: pending_site, ..
+        } = &pending.kind
+        {
+            // Get site from trigger_data in context
+            let trigger_data_site = pending
+                .context
+                .get("trigger_data")
+                .cloned()
+                .and_then(|v| {
+                    serde_json::from_value::<crate::card_events::PhaseTriggerData>(v).ok()
+                })
+                .map(|td| td.site)
+                .unwrap_or(crate::registry::EventKind::WorkerPlaced);
+            // Get execution context site from continuation (PostWork) or context
+            let execution_site = if let crate::pending::Continuation::PostWork { resume, .. } =
+                &pending.continuation
+            {
+                match resume.step {
+                    crate::pending::ChainStep::AfterHarvestBake => crate::registry::EventKind::Bake,
+                    crate::pending::ChainStep::AfterClayConstruction => {
+                        crate::registry::EventKind::ClayConstruction
+                    }
+                    crate::pending::ChainStep::AfterWorker => {
+                        crate::registry::EventKind::WorkerPlaced
+                    }
+                }
+            } else {
+                // Non-post-work continuations: try to get from context phase
+                pending
+                    .context
+                    .get("phase")
+                    .and_then(|v| v.as_str())
+                    .and_then(|s| match s {
+                        "After" => Some(crate::registry::EventKind::WorkerPlaced), // Default for non-post-work
+                        _ => None,
+                    })
+                    .unwrap_or(crate::registry::EventKind::WorkerPlaced)
+            };
+            if *pending_site != trigger_data_site || *pending_site != execution_site {
+                return Err(format!(
+                            "site mismatch on resume: ChooseTriggerOrder.site={:?}, trigger_data.site={:?}, execution_site={:?}",
+                            pending_site, trigger_data_site, execution_site
+                        ));
+            }
+        }
         // R2-P1-1 (+ Round 2 P1-1): a paused work action's space must still be
         // revealed/available at resume time. Check it BEFORE taking the
         // decision so a stale or tampered save is refused atomically — nothing
@@ -1743,6 +1792,7 @@ impl Game {
                             baked: true,
                             previous_player: None,
                             used_spaces: used_spaces.clone(),
+                            site: crate::registry::EventKind::Bake,
                             event_kind: crate::registry::EventKind::Bake,
                         };
                         // After phase. If THIS is the paused step and the pause
@@ -1876,6 +1926,7 @@ impl Game {
                         baked: false,
                         previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
+                        site: crate::registry::EventKind::ClayConstruction,
                         event_kind: crate::registry::EventKind::ClayConstruction,
                     };
                     // After phase. If THIS is the paused step and the pause was
@@ -1984,6 +2035,7 @@ impl Game {
                         baked: false,
                         previous_player: None,
                         used_spaces: used_spaces.clone(),
+                        site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
                     };
                     // After phase. If THIS is the paused step and the pause was
@@ -2252,7 +2304,11 @@ impl Game {
                 Ok(())
             }
             (
-                PendingKind::ChooseTriggerOrder { phase, triggers },
+                PendingKind::ChooseTriggerOrder {
+                    phase,
+                    site: _site,
+                    triggers,
+                },
                 PendingResolution::ChooseTriggerOrder { chosen_order },
             ) => {
                 // Execute the triggers in the chosen order
@@ -2337,6 +2393,22 @@ impl Game {
             (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => {
                 // Extensible: custom effects handle their own payload.
                 Ok(())
+            }
+            (
+                PendingKind::ChooseAnimalPlacement { .. },
+                PendingResolution::ChooseAnimalPlacement { plan },
+            ) => {
+                let player = &mut self.public.players[pending.player];
+                crate::engine::place_animals(
+                    player,
+                    plan,
+                    plan.to_pastures.iter().map(|x| x.1).sum::<u32>()
+                        + plan.to_stables.len() as u32
+                        + u32::from(plan.pet)
+                        + plan.cook
+                        + plan.discard,
+                )
+                .map_err(|e| format!("animal placement failed: {e}"))
             }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }

@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "card_id": "D095",
+  "cases": [
+    {
+      "id": "D095-build-major-improvement-substitute-wood",
+      "scope": "effect_only",
+      "setup": {
+        "food": 3,
+        "wood": 0,
+        "clay": 2,
+        "reed": 1,
+        "stone": 1
+      },
+      "action": {
+        "trigger": "on_play",
+        "build_major_improvement": "fireplace",
+        "substitute_wood_with_food": 1
+      },
+      "expected": {
+        "improvement_built": true,
+        "food_delta": -1,
+        "wood_delta": 0,
+        "clay_delta": -2,
+        "reed_delta": -1,
+        "stone_delta": -1
+      },
+      "notes": "Fireplace costs 2 clay, 1 reed, 1 stone, 3 wood. Substitute 1 wood with 1 food (have 0 wood). Pay rest normally."
+    },
+    {
+      "id": "D095-substitute-all-four-materials",
+      "scope": "effect_only",
+      "setup": {
+        "food": 4,
+        "wood": 0,
+        "clay": 0,
+        "reed": 0,
+        "stone": 0
+      },
+      "action": {
+        "trigger": "on_play",
+        "build_major_improvement": "cooking_hearth",
+        "substitute_wood_with_food": 1,
+        "substitute_clay_with_food": 1,
+        "substitute_reed_with_food": 1,
+        "substitute_stone_with_food": 1
+      },
+      "expected": {
+        "improvement_built": true,
+        "food_delta": -4
+      },
+      "notes": "Cooking Hearth costs 1 wood, 3 clay, 1 reed. Substitute 1 of each building material type with food (max 1 each)."
+    },
+    {
+      "id": "D095-cannot-substitute-more-than-one-per-type",
+      "scope": "effect_only",
+      "setup": {
+        "food": 5,
+        "wood": 0,
+        "clay": 0,
+        "reed": 0,
+        "stone": 0
+      },
+      "action": {
+        "trigger": "on_play",
+        "build_major_improvement": "stone_oven",
+        "substitute_wood_with_food": 2,
+        "substitute_clay_with_food": 2
+      },
+      "expected": {
+        "improvement_built": false,
+        "reason": "cannot substitute more than 1 per material type"
+      },
+      "notes": "Stone Oven costs 1 wood, 3 clay. Can substitute at most 1 wood and 1 clay with food. Attempting 2 each should fail."
+    }
+  ]
+}
