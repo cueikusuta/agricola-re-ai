@@ -103,7 +103,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "tested",
     "notes": "Gain 1 grain on play; in each field phase harvest 1 extra grain per grain field."
   }
 }
