@@ -5934,8 +5934,8 @@ mod verified_band_e_tests {
         let mut p = Player::new(0, 0);
         p.played_cards.push("E032".into());
         // Place a room in each of the 5 columns (cells 0, 1, 2, 3, 4).
-        for col in 0..5 {
-            p.farm[col].tile = Tile::Room;
+        for cell in p.farm.iter_mut().take(5) {
+            cell.tile = Tile::Room;
         }
         assert_eq!(end_game_bonus(&set, &p), 5);
     }
