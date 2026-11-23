@@ -21,7 +21,7 @@
         "url": "https://agricola.cloudfree.jp/?p=2678",
         "language": "ja",
         "checked_on": "2026-11-24",
-        "note": "third-party BGA wiki card page; re-checked 2026-11-24 (page rev. 2024/10/10). Confirmed: prerequisite 2 occupations (条件: 職業2), points 1 (勝利点: 1). Cost row still shows only '1 木, 1_レンダ' — same mixed comma/underscore OR-alternative format, no base cost stated (R-3 unchanged). Effect = '木材の累積スペースを使用するたびに、石1を共通のストックに戻すことで木3を得ることができる。' (each time you use a wood accumulation space, you may return 1 stone to the general supply to get 3 wood)."
+        "note": "third-party BGA wiki card page; re-checked 2026-11-24 (page rev. 2024/10/10). Confirmed: prerequisite 2 occupations (条件: 職業2), points 1 (勝利点: 1). Cost row still shows only '1 木, 1_レンガ' — same mixed comma/underscore OR-alternative format, no base cost stated (R-3 unchanged). Effect = '木材の累積スペースを使用するたびに、石1を共通のストックに戻すことで木3を得ることができる。' (each time you use a wood accumulation space, you may return 1 stone to the general supply to get 3 wood)."
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
@@ -43,7 +43,7 @@
       }
     ],
     "printed_points": 1,
-    "alternative_cost_notes": "1 木 / 1 レンガ（OR費用。台帳 cost=unknown（R-2）、書式 \\\"1 木, 1_レンダ\\\" はカンマ＋アンダースコア混在（R-3）。候補: 木1 または レンガ1。通常費用は未確定）"
+    "alternative_cost_notes": "1 木 / 1 レンガ（OR費用。台帳 cost=unknown（R-2）、書式 \"1 木, 1_レンガ\" はカンマ＋アンダースコア混在（R-3）。候補: 木1 または レンガ1。通常費用は未確定）"
   },
   "effects": [
     {
@@ -86,7 +86,7 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "play.cost: ledger cost=unknown (R-2); re-checked 2026-11-24, JA page still shows only '1 木, 1_レンダ' and the EN list row carries no cost column, so no base-cost evidence was found. Unknown is preserved per the per-card decision rule — not inferred as AND/OR.",
+      "play.cost: ledger cost=unknown (R-2); re-checked 2026-11-24, JA page still shows only '1 木, 1_レンガ' and the EN list row carries no cost column, so no base-cost evidence was found. Unknown is preserved per the per-card decision rule — not inferred as AND/OR.",
       "bga.eligibility: E-deck cards keep eligible_2/3/4=unknown by rule (docs/bga-card-eligibility.md: E セットは番号規則を適用しない); JA/EN pages list no player-count eligibility. Preserved as unknown, not inferred."
     ],
     "test_case_ids": [
@@ -96,6 +96,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Cost: unknown — JA table shows '1 木, 1_レンダ' only (OR-alternative notation, base cost unstated); EN list row has no cost field; ledger cost=unknown (R-2). Prerequisite: 2 occupations (JA table: 職業2). Printed points: 1 (JA table: 勝利点 1). Effect: each time you use a wood accumulation space, you may return 1 stone to the general supply to get 3 additional wood. Sources: JA p=2678 (rev. 2024/10/10), EN cardlist_en/ (rev. 2026/06/12), both re-checked 2026-11-24. Third-party BGA wiki cross-check only; not official Lookout verification. status stays needs_resolution."
+    "notes": "Cost: unknown — JA table shows '1 木, 1_レンガ' only (OR-alternative notation, base cost unstated); EN list row has no cost field; ledger cost=unknown (R-2). Prerequisite: 2 occupations (JA table: 職業2). Printed points: 1 (JA table: 勝利点 1). Effect: each time you use a wood accumulation space, you may return 1 stone to the general supply to get 3 additional wood. Sources: JA p=2678 (rev. 2024/10/10), EN cardlist_en/ (rev. 2026/06/12), both re-checked 2026-11-24. Third-party BGA wiki cross-check only; not official Lookout verification. status stays needs_resolution."
   }
 }
