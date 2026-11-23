@@ -563,14 +563,21 @@ fn card_priority(
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
                                 CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
-                | CardEffect::HarvestFieldGain { good, amount, .. }
+                                                                | CardEffect::HarvestFieldGain { good, amount, .. }
                 | CardEffect::AfterClayConstructionGain { good, amount }
                 // E111's halves fire only while the owner stays minor-free; the
                 // heuristic accepts the conditional gain optimistically.
                 | CardEffect::StartRoundGainIfNoMinorPlayed { good, amount, .. }
-                | CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount, .. } => {
-                    card_good_value(*good) * i64::from(*amount) * horizon / 2
-                }
+                                | CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                }
+                                // A140 ショベル運搬人: the food amount equals the OTHER
+                                // accumulation's current clay count, which this heuristic
+                                // cannot read; approximate with a typical mid-game
+                                // accumulation (2 clay) at the same conditional discount.
+                                CardEffect::AfterWorkerGainOtherAccumulationFood { good, .. } => {
+                                    card_good_value(*good) * 2 * horizon / 2
+                                }
                 // OnPlayGainPerCount (ch3 OnPlayGainPerCount chapter): the exact
                 // per-count quantity needs board state this heuristic does not
                 // have, so use a per-kind typical count at play time.

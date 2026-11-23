@@ -463,6 +463,7 @@ impl Game {
             &mut self.delayed_well,
             self.public.round,
             &self.public.used,
+            &self.public.accumulations,
             &mut self.event_budget,
             &mut self.public.card_uses,
             &self.card_use_limits,

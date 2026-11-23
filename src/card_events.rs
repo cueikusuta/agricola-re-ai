@@ -61,6 +61,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterWorkerGain { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainIfUsed { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainAnimal { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => TriggerPhase::After,
         // Round start — After phase (happens after round begins)
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
@@ -113,11 +114,12 @@ pub struct DispatchContext<'a> {
     pub delayed_well: &'a mut BTreeMap<u8, Vec<usize>>,
     pub round: u8,
     pub used_spaces: &'a std::collections::BTreeSet<Space>,
-    /// Public space accumulations (space -> amount), provided only by the
-    /// round-start dispatcher for accumulation-grew conditions (A049 営巣地).
-    /// `None` on every other dispatch path. This is a runtime-only borrow:
-    /// the struct is never serialized, so save/observation formats are
-    /// untouched.
+    /// Public space accumulations (space -> amount). Provided by the
+    /// round-start dispatcher for accumulation-grew conditions (A049 営巣地)
+    /// and by the after-worker dispatcher for dynamic-count effects
+    /// (A140 ショベル運搬人 reads the OTHER clay accumulation). `None` on
+    /// every other dispatch path. This is a runtime-only borrow: the struct
+    /// is never serialized, so save/observation formats are untouched.
     pub accumulations: Option<&'a std::collections::BTreeMap<Space, u32>>,
     pub event_budget: &'a mut u32,
     pub card_uses: &'a mut BTreeMap<String, u32>,
@@ -563,6 +565,15 @@ fn resolve_phase_scan(
                     *amount,
                     trigger_data,
                 )?,
+                CardEffect::AfterWorkerGainOtherAccumulationFood { space, good } => {
+                    handle_after_worker_gain_other_accumulation_food(
+                        ctx,
+                        player,
+                        space,
+                        good,
+                        trigger_data,
+                    )?
+                }
                 CardEffect::AfterWorkerGainAnimal {
                     space,
                     animal,
@@ -963,6 +974,12 @@ fn effect_condition_holds(
                 && trigger.space == Some(*space)
                 && used_spaces.contains(required_space)
         }
+        // A140 ショベル運搬人: fires on the owner's own use of either clay
+        // accumulation space; the amount is read from accumulations in the
+        // handler, so the condition only gates the site and space.
+        CardEffect::AfterWorkerGainOtherAccumulationFood { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
         // AfterAnyWorkerGain and AfterAnyWorkerOthersGain are handled in
         // dispatch_after_worker_any_player, not the generic phase scan.
         // Return false here to prevent double-triggering.
@@ -1220,6 +1237,15 @@ pub fn execute_chosen_triggers(
                 *amount,
                 trigger_data,
             )?,
+            CardEffect::AfterWorkerGainOtherAccumulationFood { space, good } => {
+                handle_after_worker_gain_other_accumulation_food(
+                    ctx,
+                    player,
+                    space,
+                    good,
+                    trigger_data,
+                )?
+            }
             CardEffect::AfterWorkerGainAnimal {
                 space,
                 animal,
@@ -1729,6 +1755,49 @@ fn handle_after_worker_gain_if_used(
             .ok_or("resource overflow")?;
         p.supply.set(*good, next);
     }
+    Ok(EffectResult::Resolved)
+}
+
+/// A140 ショベル運搬人 (Shovel Bearer): after the owner uses ClayPit or
+/// Hollow, the OTHER clay accumulation's current count becomes food
+/// (ClayPit use reads Hollow, Hollow use reads ClayPit). The printed card
+/// pays what is standing on the opposite accumulation after the normal
+/// action resolved, so the count is read from the public accumulations the
+/// dispatcher threads read-only — the used side's own remainder (already
+/// taken by the core action) and pre-action values are never substituted.
+/// A missing accumulation entry (or a zero count) grants nothing, and the
+/// gain lands on the card owner only (this handler is reached solely for
+/// the owner's own played cards).
+fn handle_after_worker_gain_other_accumulation_food(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    space: &Space,
+    good: &Good,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space != Some(*space) {
+        return Ok(EffectResult::Resolved);
+    }
+    let other = match space {
+        Space::ClayPit => Space::Hollow,
+        Space::Hollow => Space::ClayPit,
+        // The vocabulary is only defined for the clay accumulation pair.
+        _ => return Ok(EffectResult::Resolved),
+    };
+    let amount = ctx
+        .accumulations
+        .and_then(|map| map.get(&other).copied())
+        .unwrap_or(0);
+    if amount == 0 {
+        return Ok(EffectResult::Resolved);
+    }
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(amount)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
 }
 
@@ -2865,6 +2934,11 @@ pub fn dispatch_after_worker(
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
+    // Public space accumulations (space -> amount) as they stand after the
+    // core action resolved, threaded read-only for dynamic-count effects
+    // (A140 ショベル運搬人 reads the OTHER clay accumulation). Runtime-only
+    // borrow: the dispatcher never mutates or serializes it.
+    accumulations: &std::collections::BTreeMap<Space, u32>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
@@ -2897,7 +2971,7 @@ pub fn dispatch_after_worker(
         delayed_well,
         round,
         used_spaces,
-        accumulations: None,
+        accumulations: Some(accumulations),
         event_budget,
         card_uses,
         card_use_limits,
@@ -2948,7 +3022,7 @@ pub fn dispatch_after_worker(
         delayed_well,
         round,
         used_spaces,
-        accumulations: None,
+        accumulations: Some(accumulations),
         event_budget,
         card_uses,
         card_use_limits,
@@ -3759,6 +3833,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -4006,6 +4081,7 @@ mod tests {
                 &mut well,
                 1,
                 &used,
+                &std::collections::BTreeMap::new(),
                 &mut c.budget,
                 &mut c.uses,
                 &c.limits,
@@ -4258,6 +4334,7 @@ mod tests {
                     &mut well,
                     1,
                     &used,
+                    &std::collections::BTreeMap::new(),
                     &mut c.budget,
                     &mut c.uses,
                     &c.limits,
@@ -4680,6 +4757,7 @@ mod tests {
             &mut well,
             1,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -4769,6 +4847,7 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -4805,6 +4884,7 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -4870,6 +4950,7 @@ mod tests {
             &mut well,
             1,
             &used_spaces,
+            &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -4904,6 +4985,7 @@ mod tests {
             &mut well,
             1,
             &used_spaces,
+            &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -5067,6 +5149,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -5108,6 +5191,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -6518,6 +6602,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6559,6 +6644,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6599,6 +6685,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6641,6 +6728,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6680,6 +6768,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6729,6 +6818,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6781,6 +6871,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6827,6 +6918,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6873,6 +6965,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6913,6 +7006,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -6959,6 +7053,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
