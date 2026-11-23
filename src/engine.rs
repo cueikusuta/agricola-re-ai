@@ -248,7 +248,7 @@ fn next_house(h: House) -> Option<(House, Good)> {
         House::Stone => None,
     }
 }
-fn can_renovate(p: &Player) -> bool {
+pub(crate) fn can_renovate(p: &Player) -> bool {
     next_house(p.house)
         .map(|(_, g)| {
             let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
@@ -256,9 +256,15 @@ fn can_renovate(p: &Player) -> bool {
             } else {
                 0
             });
-            p.supply.reed >= 1 && p.supply.get(g) >= cost
+            p.supply.reed >= renovation_reed_cost(p) && p.supply.get(g) >= cost
         })
         .unwrap_or(false)
+}
+/// Reed due on one house renovation. The base payment is exactly 1 reed;
+/// D081 屋根梯子 (Roof Ladder) makes each renovation cost 1 reed less, so the
+/// discount saturates at zero and never turns the payment negative.
+pub(crate) fn renovation_reed_cost(p: &Player) -> u32 {
+    1u32.saturating_sub(p.renovation_reed_discount)
 }
 fn available_room(p: &Player) -> bool {
     p.farm.iter().enumerate().any(|(i, c)| {
@@ -2150,10 +2156,16 @@ fn build_room(p: &mut Player, i: usize) -> Result<()> {
     Ok(())
 }
 fn build_stable(p: &mut Player, i: usize) -> Result<()> {
+    build_stable_with_wood(p, i, 2)
+}
+/// Build one stable at an explicit wood cost (site legality unchanged). The
+/// ordinary Farm Expansion stable keeps the printed 2 wood; B016 解体ハンマー
+/// pays 0 wood through its renovation follow-up decision.
+pub(crate) fn build_stable_with_wood(p: &mut Player, i: usize, wood: u32) -> Result<()> {
     if !stable_site_available(p, i) {
         return Err("stable location illegal".into());
     }
-    p.supply.pay(Good::Wood, 2)?;
+    p.supply.pay(Good::Wood, wood)?;
     p.farm[i].stable = true;
     Ok(())
 }
@@ -2173,7 +2185,9 @@ fn renovate(p: &mut Player) -> Result<()> {
         0
     });
     p.supply.pay(g, cost)?;
-    p.supply.pay(Good::Reed, 1)?;
+    // D081 屋根梯子's printed discount is consumed here, so the legality gate
+    // (`can_renovate`) and the payment can never disagree about the reed due.
+    p.supply.pay(Good::Reed, renovation_reed_cost(p))?;
     p.house = new;
     Ok(())
 }
@@ -4727,4 +4741,9 @@ mod audit_p2_1_exhaustive_tests {
 #[cfg(test)]
 mod p1_tests {
     include!("p1_tests.rs");
+}
+
+#[cfg(test)]
+mod renovation_followup_tests {
+    include!("renovation_followup_tests.rs");
 }

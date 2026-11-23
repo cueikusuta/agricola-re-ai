@@ -105,6 +105,10 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. } => TriggerPhase::After,
         CardEffect::StartRoundExchangeForFoodAndPoints { .. } => TriggerPhase::After,
         CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => TriggerPhase::After,
+        // D081 / B016 renovation follow-ups — After phase, same as the legacy
+        // AfterClayConstructionGain they share the ClayConstruction site with.
+        CardEffect::AfterRenovationGain { .. } => TriggerPhase::After,
+        CardEffect::AfterRenovationBuildStable { .. } => TriggerPhase::After,
     }
 }
 
@@ -138,6 +142,15 @@ pub struct DispatchContext<'a> {
     /// the card owner, but some effects target other players (e.g., "all opponents").
     /// Handlers should use this to determine the actual beneficiary.
     pub beneficiary: usize,
+    /// Whether this dispatch can still represent a player decision, i.e.
+    /// whether a handler may return `EffectResult::Pending` and have the
+    /// engine commit and later resume a `PendingDecision`. `false` marks
+    /// dispatchers whose caller discards (or rejects) a `Transition::Paused`
+    /// result: the one-shot `apply` chain, the >=2-trigger fallback inside the
+    /// scan itself, and the chosen-order executor inside a pending resolution.
+    /// Runtime-only: the struct is never serialized, so saves and observations
+    /// are untouched.
+    pub pause_permitted: bool,
 }
 
 /// Result of resolving a single effect.
@@ -429,6 +442,7 @@ fn resolve_phase_scan(
             actor: ctx.actor,
             card_owner: player,
             beneficiary: player,
+            pause_permitted: false,
         };
 
         // Execute in chosen order (play order)
@@ -639,6 +653,17 @@ fn resolve_phase_scan(
                 )?,
                 CardEffect::AfterClayConstructionGain { good, amount } => {
                     handle_after_clay_construction_gain(ctx, player, good, *amount, trigger_data)?
+                }
+                // D081 屋根梯子 (Roof Ladder): fixed 1-stone gain after each
+                // renovation; unconditional once the condition holds.
+                CardEffect::AfterRenovationGain { good, amount } => {
+                    handle_after_renovation_gain(ctx, good, *amount, trigger_data)?
+                }
+                // B016 解体ハンマー (Mining Hammer): optional wood-0 stable
+                // after each renovation, decided through a PendingDecision
+                // (or declined when this dispatch cannot carry a decision).
+                CardEffect::AfterRenovationBuildStable { free_stables } => {
+                    handle_after_renovation_build_stable(ctx, *free_stables, trigger_data, card_id)?
                 }
                 CardEffect::AfterHarvestBakeGain { amount } => {
                     handle_after_harvest_bake_gain(ctx, player, *amount, trigger_data)?
@@ -1038,6 +1063,17 @@ fn effect_condition_holds(
                         || (prev.house == House::Clay && player.house == House::Stone)
                 })
         }
+        // D081 屋根梯子 / B016 解体ハンマー: a renovation is the clay
+        // construction event that moved the house off its previous material
+        // (Wood -> Clay or Clay -> Stone; `engine::renovate` is the only
+        // writer of `Player::house`). The identification reuses the same
+        // existing inputs as the legacy family above (the trigger site plus
+        // the pre-action snapshot); no new event kind or event field is
+        // added. Adding rooms to a clay house and the first wooden house are
+        // NOT renovations, so neither fires these cards.
+        CardEffect::AfterRenovationGain { .. } | CardEffect::AfterRenovationBuildStable { .. } => {
+            renovation_qualifies(player, trigger)
+        }
         CardEffect::AfterHarvestBakeGain { .. } => trigger.site == EventKind::Bake && trigger.baked,
         CardEffect::HarvestFieldGain { .. } => trigger.site == EventKind::Harvest,
         // AfterHarvestGain/IfAtLeast are "at the end of each harvest" cards
@@ -1130,6 +1166,10 @@ pub fn execute_chosen_triggers(
     chosen_order: &[usize],
     triggerable: &[TriggerableEffect],
 ) -> Result<(), String> {
+    // This executor runs INSIDE a pending resolution, so a handler that wants
+    // a second decision cannot be represented: the optional B016 stable is
+    // declined here instead of pausing (documented needs_resolution).
+    ctx.pause_permitted = false;
     // Map card_id to its definition for quick lookup
     let mut card_defs: std::collections::BTreeMap<String, &crate::cards::CardDefinition> =
         std::collections::BTreeMap::new();
@@ -1320,6 +1360,17 @@ pub fn execute_chosen_triggers(
             )?,
             CardEffect::AfterClayConstructionGain { good, amount } => {
                 handle_after_clay_construction_gain(ctx, player, good, *amount, trigger_data)?
+            }
+            CardEffect::AfterRenovationGain { good, amount } => {
+                handle_after_renovation_gain(ctx, good, *amount, trigger_data)?
+            }
+            CardEffect::AfterRenovationBuildStable { free_stables } => {
+                handle_after_renovation_build_stable(
+                    ctx,
+                    *free_stables,
+                    trigger_data,
+                    &trigger.card_id,
+                )?
             }
             CardEffect::AfterHarvestBakeGain { amount } => {
                 handle_after_harvest_bake_gain(ctx, player, *amount, trigger_data)?
@@ -1753,6 +1804,9 @@ fn handle_passive(
         }
         crate::cards::PassiveRule::StoneDiscount(n) => p.stone_cost_discount += n,
         crate::cards::PassiveRule::HousingSpace(n) => p.extra_housing += n,
+        // D081 屋根梯子: each renovation pays `n` less reed. The engine's
+        // renovation gate and payment consult the accumulated field.
+        crate::cards::PassiveRule::RenovationReedDiscount(n) => p.renovation_reed_discount += n,
     }
     Ok(EffectResult::Resolved)
 }
@@ -2199,6 +2253,80 @@ fn handle_after_clay_construction_gain(
         p.supply.set(*good, next);
     }
     Ok(EffectResult::Resolved)
+}
+
+/// True when the clay-construction event was a RENOVATION: the house changed
+/// material during this action (`engine::renovate` is the only writer of
+/// `Player::house`, so Wood -> Clay and Clay -> Stone are exactly the two
+/// renovations the 2016 rules define). Shared by the trigger condition
+/// (`effect_condition_holds`) and the D081/B016 handlers so the gate can never
+/// disagree with the execution.
+fn renovation_qualifies(player: &crate::model::Player, trigger: &PhaseTriggerData) -> bool {
+    trigger.site == EventKind::ClayConstruction
+        && trigger
+            .previous_player
+            .as_ref()
+            .is_some_and(|prev| prev.house != player.house)
+}
+
+/// D081 屋根梯子 (Roof Ladder): gain `amount` of `good` (printed card: 1
+/// stone) at the end of each renovation. The printed gain is fixed and
+/// unconditional once the renovation condition holds, so it applies directly.
+fn handle_after_renovation_gain(
+    ctx: &mut DispatchContext<'_>,
+    good: &Good,
+    amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if !renovation_qualifies(ctx.player, trigger) {
+        return Ok(EffectResult::Resolved);
+    }
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(amount)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// B016 解体ハンマー (Mining Hammer): after each renovation the owner MAY build
+/// up to `free_stables` stables without paying wood. The construction is
+/// optional, so the handler asks the player through a
+/// `PendingKind::AfterRenovationBuildStable` decision whenever this dispatch
+/// can represent one (`ctx.pause_permitted`); with no decision channel the
+/// optional construction is declined.
+fn handle_after_renovation_build_stable(
+    ctx: &mut DispatchContext<'_>,
+    free_stables: u32,
+    trigger: &PhaseTriggerData,
+    source_card: &str,
+) -> Result<EffectResult, String> {
+    if !renovation_qualifies(ctx.player, trigger) {
+        return Ok(EffectResult::Resolved);
+    }
+    // Legal stable sites at decision time. The engine already caps a farm at
+    // 4 stables, so an empty list means there is nothing to build and the
+    // optional effect resolves without a decision.
+    let cells: Vec<usize> = (0..crate::model::FARM_CELLS)
+        .filter(|&i| crate::engine::stable_site_available(ctx.player, i))
+        .collect();
+    if free_stables == 0 || cells.is_empty() || !ctx.pause_permitted {
+        return Ok(EffectResult::Resolved);
+    }
+    let decision = PendingDecision::new(
+        0, // stamped by the engine when it actually pauses
+        ctx.card_owner,
+        crate::pending::PendingKind::AfterRenovationBuildStable {
+            source_card: source_card.to_owned(),
+            free_stables,
+            cells,
+        },
+        String::new(), // stamped by the engine
+        serde_json::json!({ "card": source_card }),
+    );
+    Ok(EffectResult::Pending(decision))
 }
 
 fn handle_after_harvest_bake_gain(
@@ -2703,6 +2831,7 @@ pub fn dispatch_play(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        pause_permitted: false,
     };
 
     let trigger = PhaseTriggerData {
@@ -3017,6 +3146,7 @@ pub fn dispatch_after_worker(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        pause_permitted: allow_choose_trigger_order_pause,
     };
     if let Transition::Paused(p) = resolve_phase(
         &mut ctx,
@@ -3068,6 +3198,7 @@ pub fn dispatch_after_worker(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        pause_permitted: allow_choose_trigger_order_pause,
     };
 
     // Interrupts pause the chain after the passive phase has resolved
@@ -3121,6 +3252,7 @@ pub fn dispatch_start_round(
             actor,
             card_owner: player,
             beneficiary: player,
+            pause_permitted: false,
         };
 
         let trigger = PhaseTriggerData {
@@ -3203,6 +3335,7 @@ pub fn dispatch_after_clay_construction(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        pause_permitted: allow_choose_trigger_order_pause,
     };
 
     let trigger = PhaseTriggerData {
@@ -3279,6 +3412,7 @@ pub fn dispatch_harvest_field(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        pause_permitted: false,
     };
 
     let trigger = PhaseTriggerData {
@@ -3357,6 +3491,7 @@ pub fn dispatch_after_harvest_complete(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        pause_permitted: false,
     };
 
     let trigger = PhaseTriggerData {
@@ -3426,6 +3561,7 @@ pub fn dispatch_after_harvest_bake(
         actor: player,
         card_owner: player,
         beneficiary: player,
+        pause_permitted: allow_choose_trigger_order_pause,
     };
 
     let trigger = PhaseTriggerData {
@@ -3573,6 +3709,9 @@ pub mod legacy {
                     }
                     crate::cards::PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                     crate::cards::PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                    crate::cards::PassiveRule::RenovationReedDiscount(n) => {
+                        player.renovation_reed_discount += n
+                    }
                 },
                 _ => {}
             }

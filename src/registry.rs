@@ -365,6 +365,12 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterClayConstructionGain { .. } => {
                     EventKind::ClayConstruction
                 }
+                // D081 / B016 renovation follow-ups fire from the same clay
+                // construction dispatch as the legacy family.
+                crate::cards::CardEffect::AfterRenovationGain { .. }
+                | crate::cards::CardEffect::AfterRenovationBuildStable { .. } => {
+                    EventKind::ClayConstruction
+                }
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
@@ -500,6 +506,7 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
+                        | crate::cards::CardEffect::AfterRenovationGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestGain { amount, .. }
@@ -515,6 +522,9 @@ impl CardRegistryBuilder {
                             gain_amount,
                             ..
                         } => *gain_amount,
+                        // B016 builds a stable instead of granting goods; the
+                        // resource-amount sanity check reports the neutral unit.
+                        crate::cards::CardEffect::AfterRenovationBuildStable { .. } => 1,
                         crate::cards::CardEffect::OnPlayGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }

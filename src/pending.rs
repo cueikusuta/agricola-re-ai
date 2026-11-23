@@ -176,6 +176,19 @@ pub enum PendingKind {
         /// Total amount of animals to place.
         amount: u32,
     },
+    /// B016 解体ハンマー (Mining Hammer): after a renovation the owner MAY build
+    /// `free_stables` stables without paying wood. The decision carries the farm
+    /// cells that were legal stable sites when the renovation resolved; the
+    /// player answers with one cell or declines. Appended at the enum tail so
+    /// pre-B016 saves keep loading.
+    AfterRenovationBuildStable {
+        /// Source card ID that triggered this decision.
+        source_card: String,
+        /// Stable constructions the printed effect still owes the owner.
+        free_stables: u32,
+        /// Legal stable sites computed when the decision was created.
+        cells: Vec<usize>,
+    },
 }
 
 /// A single gain option.
@@ -211,12 +224,29 @@ pub struct PendingDecision {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PendingResolution {
-    ChooseGain { chosen: GainOption },
-    ChoosePayment { chosen: PaymentOption },
-    DelayedWellRelief { confirmed: bool },
-    ChooseTriggerOrder { chosen_order: Vec<usize> },
-    Custom { payload: serde_json::Value },
-    ChooseAnimalPlacement { plan: crate::engine::AnimalPlan },
+    ChooseGain {
+        chosen: GainOption,
+    },
+    ChoosePayment {
+        chosen: PaymentOption,
+    },
+    DelayedWellRelief {
+        confirmed: bool,
+    },
+    ChooseTriggerOrder {
+        chosen_order: Vec<usize>,
+    },
+    Custom {
+        payload: serde_json::Value,
+    },
+    ChooseAnimalPlacement {
+        plan: crate::engine::AnimalPlan,
+    },
+    /// B016 解体ハンマー stable placement: one of the offered farm cells, or
+    /// `None` to decline the optional (printed "may") construction.
+    AfterRenovationBuildStable {
+        cell: Option<usize>,
+    },
 }
 
 impl PendingDecision {
@@ -285,6 +315,20 @@ impl PendingDecision {
                 PendingKind::ChooseAnimalPlacement { .. },
                 PendingResolution::ChooseAnimalPlacement { .. },
             ) => Ok(()),
+            (
+                PendingKind::AfterRenovationBuildStable { cells, .. },
+                PendingResolution::AfterRenovationBuildStable { cell },
+            ) => {
+                // Declining is always legal; a chosen cell must be one of the
+                // stable sites the decision offered when it was created.
+                match cell {
+                    None => Ok(()),
+                    Some(cell) if cells.contains(cell) => Ok(()),
+                    Some(_) => {
+                        Err("chosen stable site was not offered by the renovation decision".into())
+                    }
+                }
+            }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
     }

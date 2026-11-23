@@ -566,6 +566,9 @@ fn card_priority(
                                 CardEffect::AfterWorkerGainIfUsed { good, amount, .. }
                 | CardEffect::HarvestFieldGain { good, amount, .. }
                 | CardEffect::AfterClayConstructionGain { good, amount }
+                // D081 屋根梯子's printed stone follows the clay-bonus shape
+                // (halved: at most two renovations per game, one stone each).
+                | CardEffect::AfterRenovationGain { good, amount }
                 // E111's halves fire only while the owner stays minor-free; the
                 // heuristic accepts the conditional gain optimistically.
                 | CardEffect::StartRoundGainIfNoMinorPlayed { good, amount, .. }
@@ -592,6 +595,10 @@ fn card_priority(
                     card_good_value(*good) * i64::from(*amount) * avg_count
                 }
                 CardEffect::Passive { .. } => horizon * 5,
+                // B016 解体ハンマー's free stable saves the printed 2 wood and
+                // doubles one pasture's capacity; halved like the other
+                // optional triggers (at most two renovations per game).
+                CardEffect::AfterRenovationBuildStable { .. } => horizon * 6,
                                 CardEffect::EndGameBonus { .. } => 12,
                                 CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
                                 CardEffect::AfterHarvestGain { good, amount, .. }

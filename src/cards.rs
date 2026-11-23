@@ -380,6 +380,25 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// D081 屋根梯子 (Roof Ladder): at the end of each renovation (the clay
+    /// construction trigger whose pre-action house differs in material from
+    /// the house after it), gain `amount` of `good` (printed card: 1 stone).
+    /// Fires from the existing `EventKind::ClayConstruction` After scan; the
+    /// renovation identification reuses the same trigger data as the legacy
+    /// `AfterClayConstructionGain` arm (site plus the pre-action player
+    /// snapshot) without adding an event kind or an event field.
+    AfterRenovationGain {
+        good: Good,
+        amount: u32,
+    },
+    /// B016 解体ハンマー (Mining Hammer): after each renovation the owner MAY
+    /// build up to `free_stables` stables without paying wood (printed card:
+    /// 1 stable at wood cost 0). The construction is optional, so the handler
+    /// pauses on a `PendingKind::AfterRenovationBuildStable` decision when the
+    /// dispatch can represent a pause, and declines when it cannot.
+    AfterRenovationBuildStable {
+        free_stables: u32,
+    },
 }
 
 impl CardEffect {
@@ -467,6 +486,8 @@ impl CardEffect {
                 "start_round_gain_if_no_harvest_and_animals"
             }
             CardEffect::OnPlayGainIfRoomCount { .. } => "on_play_gain_if_room_count",
+            CardEffect::AfterRenovationGain { .. } => "after_renovation_gain",
+            CardEffect::AfterRenovationBuildStable { .. } => "after_renovation_build_stable",
         }
     }
 }
@@ -500,6 +521,11 @@ pub enum PassiveRule {
     MajorStoneDiscountByRooms,
     StoneDiscount(u32),
     HousingSpace(u8),
+    /// D081 屋根梯子 (Roof Ladder): each renovation pays `n` less reed.
+    /// Connected exactly like the other discount rules (the apply arms add it
+    /// to `Player::renovation_reed_discount`; the engine's renovation gate and
+    /// payment consult that field).
+    RenovationReedDiscount(u32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -709,7 +735,13 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfLessonsOccupants { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
-                        | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
+                        | CardEffect::OnPlayGainIfRoomCount { amount, .. }
+                        | CardEffect::AfterRenovationGain { amount, .. } => *amount,
+                        // B016 builds a stable instead of granting goods; the
+                        // resource-amount sanity check has nothing to measure,
+                        // so it reports the neutral unit like the other
+                        // non-resource effects.
+                        CardEffect::AfterRenovationBuildStable { .. } => 1,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -1383,6 +1415,8 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 }
                 PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                // D081 屋根梯子: each renovation pays `n` less reed.
+                PassiveRule::RenovationReedDiscount(n) => player.renovation_reed_discount += n,
             },
             _ => {}
         }
@@ -3132,6 +3166,60 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         },
+        // D081 屋根梯子 (Roof Ladder): each renovation costs 1 reed less and
+        // the renovating player gains 1 stone at the end of the action.
+        // Spec: data/bga-card-specs/D081.json (after_renovation: discount_cost
+        // reed 1 scope=renovation + gain_resource stone 1, every_use).
+        CardDefinition {
+            use_limit: None,
+            id: "D081".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::Passive {
+                    rule: PassiveRule::RenovationReedDiscount(1),
+                },
+                CardEffect::AfterRenovationGain {
+                    good: Good::Stone,
+                    amount: 1,
+                },
+            ],
+        },
+        // B016 解体ハンマー (Mining Hammer): gain 1 food on play; after each
+        // renovation the owner may build 1 stable without paying wood.
+        // Spec: data/bga-card-specs/B016.json (on_play gain food 1 +
+        // after_renovation build_stable amount 1 wood_cost 0, optional).
+        CardDefinition {
+            use_limit: None,
+            id: "B016".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::AfterRenovationBuildStable { free_stables: 1 },
+            ],
+        },
+        // A037 大枠のこぎり (Bucksaw): the printed effect is an OPTIONAL
+        // exchange after each renovation (pay 1 wood to gain 1 grain and 1
+        // point). That combination has no slot in the current effect
+        // vocabulary (no "pay X to gain Y + points" effect exists), so the
+        // effect part is recorded as needs_resolution in the PR body and the
+        // card is registered with its printed cost and no effects. Nothing is
+        // silently dropped from the spec: data/bga-card-specs/A037.json stays
+        // the source of record until the vocabulary gains the exchange.
+        CardDefinition {
+            use_limit: None,
+            id: "A037".into(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![],
+        },
     ]
 }
 
@@ -4202,11 +4290,12 @@ mod simple_occupation_tests {
             .filter(|x| x.kind == CardKind::MinorImprovement)
             .count();
         // B114/A049/C067 (StartRoundGainIf* wave) join the two-player preset;
-        // A157 stays out (4 players only), so the count is 41 + 3 = 44
-        // (occupations 18 + 1, minors 23 + 2).
-        assert_eq!(total, 44);
+        // A157 stays out (4 players only). D081/B016/A037 join via
+        // verified_round_and_harvest_cards, so the count is 44 + 3 = 47
+        // (occupations 19, minors 28).
+        assert_eq!(total, 47);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 25);
+        assert_eq!(minor, 28);
         assert!(verified_basic_card_set(3).is_err());
     }
 }
@@ -7290,12 +7379,12 @@ mod p1_2_repro_tests {
         );
         }
 
-        // 2p プリセットのハッシュは変更不可（39 defs、content_hash 不変条件）
+        // 2p プリセットのハッシュは変更不可（47 defs、content_hash 不変条件）
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
             preset.content_hash(),
-            "d92847a8d127cc236d65b7df53d4af775d62a0015d8ab099b565e2465ad0d965",
-            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067 joined the preset and A157 was excluded as 4p-only; previous pin 323dbecb after PR #385 + d3c237c9 main merge)"
+            "a792a32670a61c8c22409dbdf7dc45a0a7e4f3bcfc8bb97a0545bdec17808944",
+            "2-player preset content hash (renovation follow-up: D081/B016/A037 joined via verified_round_and_harvest_cards; previous pin d92847 after StartRoundGainIf* wave)"
         );
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
