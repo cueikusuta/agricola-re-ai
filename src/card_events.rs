@@ -65,6 +65,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterWorkerGainIfUsed { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainAnimal { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerOptionalBundleGain { .. } => TriggerPhase::After,
         // Round start — After phase (happens after round begins)
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
@@ -583,6 +584,21 @@ fn resolve_phase_scan(
                         trigger_data,
                     )?
                 }
+                CardEffect::AfterWorkerOptionalBundleGain {
+                    space,
+                    owner_goods,
+                    others_good,
+                    others_amount,
+                } => handle_after_worker_optional_bundle_gain(
+                    ctx,
+                    player,
+                    card_id,
+                    space,
+                    owner_goods,
+                    others_good,
+                    *others_amount,
+                    trigger_data,
+                )?,
                 CardEffect::AfterWorkerGainAnimal {
                     space,
                     animal,
@@ -807,12 +823,24 @@ fn resolve_phase_scan(
             };
 
             // Handle pending interrupt: pause with the resume position.
+            // The handler's context (e.g. C142's optional-bundle payload) is
+            // preserved; only the resume position is stamped on top.
             if let EffectResult::Pending(mut pending) = result {
-                pending.context = serde_json::json!({
+                let resume_pos = serde_json::json!({
                     "card": card_id,
                     "card_index": card_index,
                     "effect_index": effect_index,
                 });
+                if let Some(obj) = pending.context.as_object_mut() {
+                    for (key, value) in resume_pos
+                        .as_object()
+                        .expect("resume position is an object")
+                    {
+                        obj.insert(key.clone(), value.clone());
+                    }
+                } else {
+                    pending.context = resume_pos;
+                }
                 *ctx.pending = Some(pending.clone());
                 return Ok(Transition::Paused(Box::new(pending)));
             }
@@ -996,6 +1024,9 @@ fn effect_condition_holds(
         CardEffect::AfterWorkerGainOtherAccumulationFood { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
+        CardEffect::AfterWorkerOptionalBundleGain { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
         // AfterAnyWorkerGain and AfterAnyWorkerOthersGain are handled in
         // dispatch_after_worker_any_player, not the generic phase scan.
         // Return false here to prevent double-triggering.
@@ -1158,6 +1189,7 @@ pub fn execute_chosen_triggers(
 
     for &idx in chosen_order {
         let trigger = &triggerable[idx];
+        let card_id = &trigger.card_id;
         let Some(card) = card_defs.get(&trigger.card_id) else {
             continue; // Card not found, skip
         };
@@ -1279,6 +1311,21 @@ pub fn execute_chosen_triggers(
                     trigger_data,
                 )?
             }
+            CardEffect::AfterWorkerOptionalBundleGain {
+                space,
+                owner_goods,
+                others_good,
+                others_amount,
+            } => handle_after_worker_optional_bundle_gain(
+                ctx,
+                player,
+                card_id,
+                space,
+                owner_goods,
+                others_good,
+                *others_amount,
+                trigger_data,
+            )?,
             CardEffect::AfterWorkerGainAnimal {
                 space,
                 animal,
@@ -1502,12 +1549,24 @@ pub fn execute_chosen_triggers(
         };
 
         // Handle pending interrupt: pause with the resume position.
+        // The handler's context (e.g. C142's optional-bundle payload) is
+        // preserved; only the resume position is stamped on top.
         if let EffectResult::Pending(mut pending) = result {
-            pending.context = serde_json::json!({
+            let resume_pos = serde_json::json!({
                 "card": trigger.card_id,
                 "card_index": 0, // Single-card execution context
                 "effect_index": trigger.effect_index,
             });
+            if let Some(obj) = pending.context.as_object_mut() {
+                for (key, value) in resume_pos
+                    .as_object()
+                    .expect("resume position is an object")
+                {
+                    obj.insert(key.clone(), value.clone());
+                }
+            } else {
+                pending.context = resume_pos;
+            }
             *ctx.pending = Some(pending.clone());
             return Err("pending decision".into()); // Signal to caller to pause
         }
@@ -1865,6 +1924,44 @@ fn handle_after_worker_gain_other_accumulation_food(
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
     Ok(EffectResult::Resolved)
+}
+
+/// C142 てき屋 (Market Crier): after the owner uses `space`, pause for the
+/// owner's all-or-nothing bundle decision. Yes grants `owner_goods` to the
+/// owner and `others_amount` of `others_good` to every other player; no
+/// grants anything. The decision is one atomic `PendingKind::Custom`
+/// (context type `after_worker_optional_bundle_gain`): both halves grant
+/// together on resolution, and replay/resume cannot grant twice because the
+/// decision is cleared after a single successful resolution.
+#[allow(clippy::too_many_arguments)]
+fn handle_after_worker_optional_bundle_gain(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    card_id: &str,
+    space: &Space,
+    owner_goods: &[(Good, u32)],
+    others_good: &Good,
+    others_amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space != Some(*space) {
+        return Ok(EffectResult::Resolved);
+    }
+    let context = serde_json::json!({
+        "card": card_id,
+        "type": "after_worker_optional_bundle_gain",
+        "space": space,
+        "owner_goods": owner_goods,
+        "others_good": others_good,
+        "others_amount": others_amount,
+        "owner": ctx.card_owner,
+    });
+    let kind = crate::pending::PendingKind::Custom {
+        source_card: card_id.to_string(),
+        payload: serde_json::json!({ "confirmed": false }),
+    };
+    let decision = PendingDecision::new(0, ctx.card_owner, kind, String::new(), context);
+    Ok(EffectResult::Pending(decision))
 }
 
 /// Derive an explicit [`crate::engine::AnimalPlan`] that accounts for exactly

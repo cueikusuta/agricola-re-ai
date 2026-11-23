@@ -377,6 +377,9 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                     EventKind::WorkerPlaced
                 }
+                crate::cards::CardEffect::AfterWorkerOptionalBundleGain { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
                 // Chapter 1 round-start cards
                 crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. } => {
@@ -541,6 +544,9 @@ impl CardRegistryBuilder {
                         }
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
+                        }
+                        crate::cards::CardEffect::AfterWorkerOptionalBundleGain { owner_goods, .. } => {
+                            owner_goods.iter().map(|(_, amount)| *amount).sum::<u32>()
                         }
                         // A140: the amount is read from the public
                                                 // accumulations at resolution time, not fixed here.

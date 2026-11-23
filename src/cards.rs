@@ -394,6 +394,26 @@ pub enum CardEffect {
         /// The good granted (food on the printed card).
         good: Good,
     },
+    /// C142 てき屋 (Market Crier): each time the OWNER uses `space`
+    /// (GrainSeeds), the owner may take `owner_goods` as an all-or-nothing
+    /// bundle; if taken, every OTHER player gains `others_amount` of
+    /// `others_good`. Part of the bundle or other-players-only gain is
+    /// impossible by construction. Resolved as one atomic effect: the owner's
+    /// yes/no decision pauses the after-worker chain through
+    /// `PendingKind::Custom` (context type `after_worker_optional_bundle_gain`)
+    /// and both halves grant together on `apply_pending_resolution`, never
+    /// half and never twice across replay/resume.
+    AfterWorkerOptionalBundleGain {
+        /// The action space the owner must use for this to fire.
+        space: Space,
+        /// Goods the owner may take as one all-or-nothing bundle.
+        owner_goods: Vec<(Good, u32)>,
+        /// Good granted to every player except the owner, only when the
+        /// bundle is taken.
+        others_good: Good,
+        /// Amount of `others_good` granted to each other player.
+        others_amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -484,6 +504,7 @@ impl CardEffect {
             CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                 "after_worker_gain_other_accumulation_food"
             }
+            CardEffect::AfterWorkerOptionalBundleGain { .. } => "after_worker_optional_bundle_gain",
         }
     }
 }
@@ -748,6 +769,9 @@ impl CardSet {
                         | CardEffect::HarvestStartGainIfFields { amount, .. }
                         | CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { amount, .. } => {
                             *amount
+                        }
+                        CardEffect::AfterWorkerOptionalBundleGain { owner_goods, .. } => {
+                            owner_goods.iter().map(|(_, amount)| *amount).sum::<u32>()
                         }
                         // A140: the amount is read from the public
                         // accumulations at resolution time, not fixed here.
@@ -4583,6 +4607,27 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 animal: Animal::Cattle,
                 amount: 1,
             }],
+        ),
+        // C142 てき屋 (Market Crier): each time the owner uses GrainSeeds, the
+        // owner may take 1 grain + 1 vegetable as a bundle; if taken, every
+        // other player gains 1 grain. Opt-in as a whole, decided by the owner.
+        // Band C card: eligible at 3+ players only (MinimumPlayers(3)),
+        // deliberately NOT in verified_basic_card_set.
+        card(
+            "C142",
+            occupation,
+            vec![],
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::AfterWorkerOptionalBundleGain {
+                    space: Space::GrainSeeds,
+                    owner_goods: vec![(Good::Grain, 1), (Good::Vegetable, 1)],
+                    others_good: Good::Grain,
+                    others_amount: 1,
+                },
+            ],
         ),
     ]
 }
