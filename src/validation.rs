@@ -1,28 +1,34 @@
-//! Validation layering for game state transitions (Issue #255 Phase B).
+//! Validation layering for game state transitions (Issue #255 Phase B,
+//! 設計判断 3 段階C: 増分/全件/リプレイの3層分離・契約文書化).
 //!
-//! Two validation tiers share one implementation of the per-player invariants
-//! (`crate::model::validate_player_state`), so the layers cannot drift:
+//! Three layers with distinct contracts share one implementation of the
+//! per-player invariants (`crate::model::validate_player_state`), so the
+//! layers cannot drift:
 //!
-//! - [`validate_full`]: complete state validation, used at trust boundaries —
-//!   save/load, replay, external data ingestion, strict/debug tests. It is a
-//!   thin wrapper around `Game::validate`, which stays the single source of
-//!   truth for the complete invariant set.
-//! - [`validate_incremental`]: fast single-action validation for search
-//!   paths (MCTS/PUCT). `pre` is assumed valid (inductive base); the check
-//!   verifies only what a work move can change mid-round. Anything the cheap
-//!   checks cannot decide returns [`Verdict::Unsure`], and the caller must
-//!   fall back to [`validate_full`] — no invalid state is ever accepted.
+//! | # | Layer | Entry point | Guarantees | Tolerates | Fallback |
+//! |---|-------|-------------|------------|-----------|----------|
+//! | 1 | incremental | [`check_incremental`] (work moves), [`check_incremental_resume_completion`] (double-pause continuation), [`check_free_action`] (free actions) | `Pass` only when every `pre`→`post` difference is *proven legal* by the cheap checks — a `Pass` is never a state [`check_full`] rejects | says [`Verdict::Unsure`] instead of guessing for anything not explicitly verified (RNG stream, card ledgers, round transitions, start-player changes) | `Unsure` → the caller must run [`check_full`]; the `check_*_or_full` wrappers below do it automatically |
+//! | 2 | full | [`check_full`] | the complete invariant set (thin wrapper over `Game::validate`, the single source of truth); the trust-boundary arbiter | structural state only — it does not prove replay or serialization integrity (layer 3) | none: it *is* the fallback; an `Err` rejects the state |
+//! | 3 | replay | [`check_replay`] | layer 2 on the state, plus the recorded event log replays to the same state hash and `save_json`/`load_json` round-trips to the same state hash | self-consistency only — it cannot prove rules correctness or that the log was produced by this engine | none: any mismatch rejects the game at the boundary |
+//!
+//! Which layer a caller uses:
+//!
+//! - Search paths (MCTS/PUCT) call the layer-1 wrappers; the cost of a `Pass`
+//!   is O(one move), and `Unsure` degrades to layer 2 without accepting
+//!   anything invalid.
+//! - Commit points, save/load, replay, external data ingestion and
+//!   strict/debug tests call layer 2 or layer 3.
 //!
 //! Soundness contract (review P1-A): `Pass` is returned only when every
 //! difference between `pre` and `post` has been *proven legal* by the checks
 //! below. Any component the incremental layer does not explicitly verify is
 //! either shown unchanged, or downgrades the verdict to `Unsure` so the full
 //! validator arbitrates. A `Pass` is never reachable from a post state that
-//! `validate_full` rejects. This includes `post.cards`, `post.card_set`,
+//! `check_full` rejects. This includes `post.cards`, `post.card_set`,
 //! `post.delayed_well`, and `post.public.active_player` which are all fully
 //! verified or downgraded to `Unsure`. The internal RNG state (`post.rng`) is
 //! explicitly excluded from incremental checks and is only validated by
-//! `validate_full` (if at all) — documented here per review P1-A.
+//! `check_full` (if at all) — documented here per review P1-A.
 
 use crate::engine::expected_active_player;
 use crate::model::{Game, Tile};
@@ -38,10 +44,42 @@ pub enum Verdict {
     Unsure,
 }
 
+// =====================================================================
+// Layer 2 — full validation (the complete invariant set).
+//
+// Contract:
+//   * Guarantees: every invariant `Game::validate` enforces, and nothing
+//     less — it is the single source of truth the other layers arbitrate
+//     against.
+//   * Tolerates: structural state only. It does NOT prove replay
+//     consistency or serialization integrity (layer 3's job).
+//   * Fallback: none. It *is* the fallback target of layer 1; an `Err`
+//     rejects the state at the trust boundary.
+// =====================================================================
+
 /// Full validation — the complete invariant set, identical to `Game::validate`.
-pub fn validate_full(game: &Game) -> Result<(), String> {
+///
+/// Use at every trust boundary: save/load, replay, external data ingestion,
+/// strict/debug tests, and as the arbiter for layer-1 `Unsure` verdicts.
+pub fn check_full(game: &Game) -> Result<(), String> {
     game.validate()
 }
+
+// =====================================================================
+// Layer 1 — incremental validation (fast per-action checks).
+//
+// Contract:
+//   * Guarantees: `Pass` only when every pre→post difference is proven
+//     legal by the checks below; a `Pass` is never a state layer 2
+//     (`check_full`) rejects (soundness contract, review P1-A/2).
+//   * Tolerates: `Verdict::Unsure` instead of guessing. The layer never
+//     proves completeness — components it does not explicitly verify are
+//     downgraded (`rng`, `cards`, `card_set`, `delayed_well`,
+//     `public.active_player` rotation edges, round transitions, …).
+//   * Fallback: `Unsure` → the caller MUST run `check_full`; the
+//     `check_*_or_full` wrappers at the end of this section do it
+//     automatically so no invalid state is ever accepted.
+// =====================================================================
 
 /// Fast incremental validation for one mid-round work move.
 ///
@@ -56,9 +94,9 @@ pub fn validate_full(game: &Game) -> Result<(), String> {
 /// below. Any component the incremental layer does not explicitly verify is
 /// either shown unchanged, or downgrades the verdict to `Unsure` so the full
 /// validator arbitrates. A `Pass` is never reachable from a post state that
-/// `validate_full` rejects.
-pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
-    validate_incremental_impl(post, pre, PLAIN_MOVE)
+/// `check_full` rejects.
+pub fn check_incremental(post: &Game, pre: &Game) -> Verdict {
+    check_incremental_impl(post, pre, PLAIN_MOVE)
 }
 
 /// Incremental validation for the completion segment of a resumed work
@@ -66,8 +104,8 @@ pub fn validate_incremental(post: &Game, pre: &Game) -> Verdict {
 /// space/worker bookkeeping was applied by the first segment of the same
 /// logical move, so this segment adds no worker and no used space; every
 /// other mid-round law is enforced exactly as for a plain move.
-pub fn validate_incremental_resume_completion(post: &Game, pre: &Game) -> Verdict {
-    validate_incremental_impl(post, pre, RESUME_COMPLETION)
+pub fn check_incremental_resume_completion(post: &Game, pre: &Game) -> Verdict {
+    check_incremental_impl(post, pre, RESUME_COMPLETION)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -92,7 +130,7 @@ const RESUME_COMPLETION: DeltaExpectation = DeltaExpectation {
     used_added: 0,
 };
 
-fn validate_incremental_impl(post: &Game, pre: &Game, expect: DeltaExpectation) -> Verdict {
+fn check_incremental_impl(post: &Game, pre: &Game, expect: DeltaExpectation) -> Verdict {
     // 1. Identity of the game itself.
     if post.config != pre.config {
         return Verdict::Fail("config mutated".into());
@@ -204,7 +242,7 @@ fn validate_incremental_impl(post: &Game, pre: &Game, expect: DeltaExpectation) 
     }
     // 7. Major improvements: the union across market + player tables must keep
     //    every physical major improvement in exactly one location (the same
-    //    invariant `validate_full` enforces). A work move may move an item
+    //    invariant `check_full` enforces). A work move may move an item
     //    from market to the actor's table, or return an exchanged Fireplace
     //    to the market — but never duplicate or lose an item. Comparing the
     //    per-item multisets is O(market+tables), far cheaper than full
@@ -267,7 +305,7 @@ fn validate_incremental_impl(post: &Game, pre: &Game, expect: DeltaExpectation) 
             // Full structural equality for non-actors: any difference (including
             // id, pastures, pet, and all effect-counter fields) is Unsure.
             // The cheap bounds above remain as definite Fail guards matching
-            // validate_full's hard errors.
+            // check_full's hard errors.
             if player != &pre.public.players[i] {
                 return Verdict::Unsure;
             }
@@ -502,26 +540,23 @@ fn validate_incremental_impl(post: &Game, pre: &Game, expect: DeltaExpectation) 
 }
 
 /// Incremental validation with automatic fallback to full validation.
-pub fn validate_incremental_or_full(post: &Game, pre: &Game) -> Result<(), String> {
-    match validate_incremental(post, pre) {
+pub fn check_incremental_or_full(post: &Game, pre: &Game) -> Result<(), String> {
+    match check_incremental(post, pre) {
         Verdict::Pass => Ok(()),
         Verdict::Fail(e) => Err(e),
-        Verdict::Unsure => validate_full(post),
+        Verdict::Unsure => check_full(post),
     }
 }
 
 /// Incremental validation for the completion segment of a resumed work
 /// action (double-pause continuation) with automatic fallback to full
 /// validation. The segment adds no worker and no used space; every other
-/// mid-round law is enforced by [`validate_incremental_resume_completion`].
-pub fn validate_incremental_resume_completion_or_full(
-    post: &Game,
-    pre: &Game,
-) -> Result<(), String> {
-    match validate_incremental_resume_completion(post, pre) {
+/// mid-round law is enforced by [`check_incremental_resume_completion`].
+pub fn check_incremental_resume_completion_or_full(post: &Game, pre: &Game) -> Result<(), String> {
+    match check_incremental_resume_completion(post, pre) {
         Verdict::Pass => Ok(()),
         Verdict::Fail(e) => Err(e),
-        Verdict::Unsure => validate_full(post),
+        Verdict::Unsure => check_full(post),
     }
 }
 
@@ -547,7 +582,7 @@ pub fn validate_incremental_resume_completion_or_full(
 /// - Used spaces, workers_placed
 /// - Major improvement multiset
 /// - Accumulations can only decrease
-pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
+pub fn check_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
     // 1. Identity of the game itself.
     if post.config != pre.config {
         return Verdict::Fail("config mutated".into());
@@ -647,7 +682,7 @@ pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
             // Full structural equality for non-actors: any difference (including
             // id, pastures, pet, and all effect-counter fields) is Unsure.
             // The cheap bounds above remain as definite Fail guards matching
-            // validate_full's hard errors.
+            // check_full's hard errors.
             if player != &pre.public.players[i] {
                 return Verdict::Unsure;
             }
@@ -795,12 +830,82 @@ pub fn validate_free_action(post: &Game, pre: &Game, actor: usize) -> Verdict {
 }
 
 /// Incremental free-action validation with automatic fallback to full validation.
-pub fn validate_free_action_or_full(post: &Game, pre: &Game, actor: usize) -> Result<(), String> {
-    match validate_free_action(post, pre, actor) {
+pub fn check_free_action_or_full(post: &Game, pre: &Game, actor: usize) -> Result<(), String> {
+    match check_free_action(post, pre, actor) {
         Verdict::Pass => Ok(()),
         Verdict::Fail(e) => Err(e),
-        Verdict::Unsure => validate_full(post),
+        Verdict::Unsure => check_full(post),
     }
+}
+
+// =====================================================================
+// Layer 3 — replay validation (save/load/replay round-trip consistency).
+//
+// Contract:
+//   * Guarantees: (a) the state satisfies layer 2 (`check_full`);
+//     (b) the recorded event log, replayed from the same initial setup
+//     (config, card set, drafted hands, first start player), reproduces
+//     the exact `state_hash`; (c) `save_json` -> `load_json` round-trips
+//     to the same `state_hash` — and `load_json` itself re-verifies the
+//     complete event chain, the stamped integrity hash and the version
+//     metadata, so the serialized form cannot smuggle in a state the
+//     log does not support.
+//   * Tolerates: self-consistency only. It does NOT prove rules
+//     correctness, nor that the log was produced by this engine — a
+//     faithfully recorded illegal game would still fail layer 2's
+//     invariants or the engine's per-action validation during replay,
+//     but layer 3 adds no rule judgement of its own.
+//   * Applies only to committed games with a complete, hash-checked
+//     event log. Hypothetical search positions (`record_events=false`)
+//     log nothing, so their replay trivially mismatches — never call
+//     this layer on them.
+//   * Fallback: none. Any mismatch rejects the game at the boundary.
+// =====================================================================
+
+/// Replay validation — save/load/replay round-trip consistency.
+///
+/// The single entry point for trust boundaries where a game crosses a
+/// serialization boundary: restoring a save, replaying a recorded log,
+/// ingesting external game data. It runs all three gates in order and
+/// fails on the first mismatch with a message naming the gate:
+///
+/// 1. [`check_full`] — the complete invariant set on the state itself.
+/// 2. `Game::replay_with_setup_and_start_player_inner` on the recorded
+///    log, starting from the same initial setup the game recorded
+///    (`log.initial_hands` / `log.initial_start_player_override`), with
+///    pause-at-end handling exactly as `Game::load_json` uses it — so a
+///    game paused mid-action replays to the paused state, not past it.
+/// 3. `save_json` -> `load_json`, which additionally re-verifies the
+///    full event chain and the stamped integrity hash.
+///
+/// Gates 2 and 3 compare `state_hash` values: equality means the log
+/// and the serialized form describe exactly this state, including
+/// hidden state covered by the hash (`rng`, `delayed_well`, `pending`).
+pub fn check_replay(game: &Game) -> Result<(), String> {
+    // Gate 1: the state itself must satisfy the complete invariant set.
+    check_full(game)?;
+    // Gate 2: replaying the recorded event log must reproduce the state.
+    let replayed = Game::replay_with_setup_and_start_player_inner(
+        game.config.clone(),
+        (*game.card_set).clone(),
+        game.log.initial_hands.clone(),
+        game.log.initial_start_player_override,
+        &game.log.events,
+        game.pending.is_some(),
+    )
+    .map_err(|error| format!("replay failed: {error}"))?;
+    if replayed.state_hash() != game.state_hash() {
+        return Err("replayed state hash differs from the recorded state".into());
+    }
+    // Gate 3: the JSON save must restore to the same state hash.
+    let saved = game
+        .save_json()
+        .map_err(|error| format!("save_json failed: {error}"))?;
+    let restored = Game::load_json(&saved).map_err(|error| format!("load_json failed: {error}"))?;
+    if restored.state_hash() != game.state_hash() {
+        return Err("restored state hash differs from the saved state".into());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -860,12 +965,12 @@ mod tests {
             );
             for (pre, post) in mid_round {
                 assert_eq!(
-                    validate_incremental(post, pre),
+                    check_incremental(post, pre),
                     Verdict::Pass,
                     "mid-round move must pass incremental validation"
                 );
-                validate_incremental_or_full(post, pre).unwrap();
-                assert_eq!(validate_full(post), Ok(()));
+                check_incremental_or_full(post, pre).unwrap();
+                assert_eq!(check_full(post), Ok(()));
             }
             // MeetingPlace moves legitimately change the start player; they
             // must still be accepted, via the fallback path.
@@ -877,8 +982,8 @@ mod tests {
                 })
                 .collect();
             for (pre, post) in start_moves {
-                assert_eq!(validate_incremental(post, pre), Verdict::Unsure);
-                validate_incremental_or_full(post, pre).unwrap();
+                assert_eq!(check_incremental(post, pre), Verdict::Unsure);
+                check_incremental_or_full(post, pre).unwrap();
             }
         }
     }
@@ -901,9 +1006,9 @@ mod tests {
             game.apply(action).unwrap();
         }
         assert_eq!(game.public.round, 2);
-        assert_eq!(validate_incremental(&game, &before), Verdict::Unsure);
+        assert_eq!(check_incremental(&game, &before), Verdict::Unsure);
         // Fallback path accepts it via the full validator.
-        validate_incremental_or_full(&game, &before).unwrap();
+        check_incremental_or_full(&game, &before).unwrap();
     }
 
     #[test]
@@ -915,13 +1020,13 @@ mod tests {
         // Corrupt the actor's farm: a stable on a room tile.
         let actor = pre.public.active_player;
         post.public.players[actor].farm[0].stable = true;
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert!(
             matches!(verdict, Verdict::Fail(_) | Verdict::Unsure),
             "corrupted farm must not pass"
         );
         if let Verdict::Unsure = verdict {
-            assert!(validate_full(&post).is_err());
+            assert!(check_full(&post).is_err());
         }
     }
 
@@ -939,19 +1044,16 @@ mod tests {
             .next()
             .expect("one new space");
         post.public.used.remove(&space);
-        assert!(matches!(
-            validate_incremental(&post, &pre),
-            Verdict::Fail(_)
-        ));
+        assert!(matches!(check_incremental(&post, &pre), Verdict::Fail(_)));
     }
 
     #[test]
     fn full_validation_wraps_engine_validate() {
         let game = cardless(3, 37);
-        assert_eq!(validate_full(&game), Ok(()));
+        assert_eq!(check_full(&game), Ok(()));
         let mut broken = game.clone();
         broken.public.round = 99;
-        assert!(validate_full(&broken).is_err());
+        assert!(check_full(&broken).is_err());
     }
 
     #[test]
@@ -1014,20 +1116,20 @@ mod tests {
         post.public.players[0].improvements.push(id);
         // A purchase outside the engine's work-move shape: the incremental
         // layer must decline (Fail/Unsure), never guess.
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert!(matches!(verdict, Verdict::Fail(_) | Verdict::Unsure));
         // Restore the market and re-check: legal state again.
         let mut restored = post;
         let imp = restored.public.players[0].improvements.pop().unwrap();
         restored.public.improvement_market.push(imp);
         restored.public.improvement_market.sort();
-        assert_eq!(validate_full(&restored), Ok(()));
+        assert_eq!(check_full(&restored), Ok(()));
     }
 
     /// Review P1-2 regression: a major improvement outright REMOVED (the
     /// counter-example from the review: `improvement_market.pop()` without
     /// re-adding it anywhere) must never reach `Pass`, because
-    /// `validate_full` rejects it ("major improvement duplicated or missing").
+    /// `check_full` rejects it ("major improvement duplicated or missing").
     /// The per-item multiset check makes this a definite `Fail`.
     #[test]
     fn removed_major_improvement_is_never_pass() {
@@ -1040,14 +1142,14 @@ mod tests {
             "setup: market must be non-empty"
         );
         post.public.improvement_market.pop();
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert!(
             matches!(verdict, Verdict::Fail(_) | Verdict::Unsure),
             "vanished major improvement must not Pass (got {verdict:?})"
         );
-        assert!(validate_full(&post).is_err());
+        assert!(check_full(&post).is_err());
         // And the fallback wrapper must reject it too.
-        assert!(validate_incremental_or_full(&post, &pre).is_err());
+        assert!(check_incremental_or_full(&post, &pre).is_err());
     }
 
     /// Review P1-2 regression: removing an already-used space from `used`
@@ -1063,7 +1165,7 @@ mod tests {
             .expect("need at least 3 transitions");
         let any_pre_used = *pre.public.used.iter().next().expect("used spaces exist");
         assert!(post.public.used.remove(&any_pre_used));
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert!(
             matches!(verdict, Verdict::Fail(_)),
             "removing a used space must be a definite Fail (got {verdict:?})"
@@ -1080,16 +1182,16 @@ mod tests {
         let actor = pre.public.active_player;
         let other = (actor + 1) % pre.public.players.len();
         post.public.players[other].supply.food += 10;
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert!(
             matches!(verdict, Verdict::Unsure),
             "non-actor supply drift must be Unsure (got {verdict:?})"
         );
         // The full validator doesn't check supply reachability, only structural
         // invariants. This is correct — both validators accept, no disagreement.
-        assert_eq!(validate_full(&post), Ok(()));
+        assert_eq!(check_full(&post), Ok(()));
         // The fallback wrapper therefore accepts via the full path.
-        assert_eq!(validate_incremental_or_full(&post, &pre), Ok(()));
+        assert_eq!(check_incremental_or_full(&post, &pre), Ok(()));
     }
 
     #[cfg(feature = "perf-count-alloc")]
@@ -1233,20 +1335,17 @@ mod tests {
 
     /// Review re-review P1-A counterexample reproduction (issuecomment-6766412202):
     /// a valid mid-round transition whose non-actor `Player.id` is tampered must
-    /// never yield `Pass`, and `validate_incremental_or_full` must reject what
-    /// `validate_full` rejects.
+    /// never yield `Pass`, and `check_incremental_or_full` must reject what
+    /// `check_full` rejects.
     #[test]
     fn tampered_non_actor_id_declines_and_full_rejects() {
         let (pre, mut post) = mid_round_pair();
         let non_actor = 1 - pre.public.active_player;
         post.public.players[non_actor].id = 999;
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert_ne!(verdict, Verdict::Pass, "tampered id must not Pass");
-        assert!(validate_incremental_or_full(&post, &pre).is_err());
-        assert_eq!(
-            validate_full(&post).unwrap_err(),
-            "farm shape/player mismatch"
-        );
+        assert!(check_incremental_or_full(&post, &pre).is_err());
+        assert_eq!(check_full(&post).unwrap_err(), "farm shape/player mismatch");
     }
 
     /// P1-A: post.active_player tampered to an out-of-range value fails fast.
@@ -1254,11 +1353,8 @@ mod tests {
     fn tampered_active_player_out_of_range_fails() {
         let (pre, mut post) = mid_round_pair();
         post.public.active_player = 999;
-        assert!(matches!(
-            validate_incremental(&post, &pre),
-            Verdict::Fail(_)
-        ));
-        assert!(validate_incremental_or_full(&post, &pre).is_err());
+        assert!(matches!(check_incremental(&post, &pre), Verdict::Fail(_)));
+        assert!(check_incremental_or_full(&post, &pre).is_err());
     }
 
     /// P1-A: post.active_player set back to the player who just moved (rotation
@@ -1267,10 +1363,7 @@ mod tests {
     fn tampered_active_player_regression_fails() {
         let (pre, mut post) = mid_round_pair();
         post.public.active_player = pre.public.active_player;
-        assert!(matches!(
-            validate_incremental(&post, &pre),
-            Verdict::Fail(_)
-        ));
+        assert!(matches!(check_incremental(&post, &pre), Verdict::Fail(_)));
     }
 
     /// P1-A: non-actor `pet` (uncompared in the old field list) drifts -> Unsure,
@@ -1280,13 +1373,13 @@ mod tests {
         let (pre, mut post) = mid_round_pair();
         let non_actor = 1 - pre.public.active_player;
         post.public.players[non_actor].pet = Some(crate::model::Animal::Sheep);
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert_ne!(verdict, Verdict::Pass);
         if matches!(verdict, Verdict::Unsure) {
             // The full validator accepts this particular drift (pet is not
             // cross-checked there); the contract only requires incremental to
             // never Pass when it cannot prove the delta.
-            validate_incremental_or_full(&post, &pre).unwrap();
+            check_incremental_or_full(&post, &pre).unwrap();
         }
     }
 
@@ -1296,7 +1389,7 @@ mod tests {
     fn tampered_card_set_swap_declines() {
         let (pre, mut post) = mid_round_pair();
         post.card_set = std::sync::Arc::new(crate::cards::CardSet::default());
-        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        assert_eq!(check_incremental(&post, &pre), Verdict::Unsure);
     }
 
     /// P1-A: mutating `post.delayed_well` (hidden ledger) is not proved -> Unsure.
@@ -1304,7 +1397,7 @@ mod tests {
     fn tampered_delayed_well_declines() {
         let (pre, mut post) = mid_round_pair();
         post.delayed_well.insert(5, vec![pre.public.active_player]);
-        assert_eq!(validate_incremental(&post, &pre), Verdict::Unsure);
+        assert_eq!(check_incremental(&post, &pre), Verdict::Unsure);
     }
 
     /// P1-A: an untampered mid-round pair still passes — the soundness fixes
@@ -1312,7 +1405,7 @@ mod tests {
     #[test]
     fn untampered_mid_round_still_passes() {
         let (pre, post) = mid_round_pair();
-        assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+        assert_eq!(check_incremental(&post, &pre), Verdict::Pass);
     }
 
     /// Review P1-A/2 counterexample 1 (issuecomment-6769764161): actor card_points
@@ -1366,14 +1459,14 @@ mod tests {
         // Tamper: increment actor card_points by 1 on the real post state.
         let mut post = post;
         post.public.players[actor].card_points += 1;
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert_ne!(
             verdict,
             Verdict::Pass,
             "tampered card_points must not Pass (got {verdict:?})"
         );
-        assert!(validate_incremental_or_full(&post, &pre).is_err());
-        assert!(validate_full(&post).is_err());
+        assert!(check_incremental_or_full(&post, &pre).is_err());
+        assert!(check_full(&post).is_err());
     }
 
     /// Review P1-A/2 counterexample 1 variant: card_set disabled but actor card_points changed.
@@ -1382,14 +1475,14 @@ mod tests {
         let (pre, mut post) = mid_round_pair();
         let actor = pre.public.active_player;
         post.public.players[actor].card_points += 1;
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert_ne!(
             verdict,
             Verdict::Pass,
             "tampered card_points (cardless) must not Pass (got {verdict:?})"
         );
-        assert!(validate_incremental_or_full(&post, &pre).is_err());
-        assert!(validate_full(&post).is_err());
+        assert!(check_incremental_or_full(&post, &pre).is_err());
+        assert!(check_full(&post).is_err());
     }
 
     /// Review P1-A/2 counterexample 2 (issuecomment-6769764161): free action with
@@ -1442,14 +1535,14 @@ mod tests {
             "setup: actor must have cards"
         );
         post.cards.hands[actor].pop();
-        let verdict = validate_free_action(&post, &pre, actor);
+        let verdict = check_free_action(&post, &pre, actor);
         assert_ne!(
             verdict,
             Verdict::Pass,
             "tampered free action hand must not Pass (got {verdict:?})"
         );
-        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
-        assert!(validate_full(&post).is_err());
+        assert!(check_free_action_or_full(&post, &pre, actor).is_err());
+        assert!(check_full(&post).is_err());
     }
 
     /// Review P1-A/2 counterexample 2 variant: free action with actor card_points tampered.
@@ -1493,14 +1586,14 @@ mod tests {
         .expect("free action must apply");
         // Tamper: increment actor card_points.
         post.public.players[actor].card_points += 1;
-        let verdict = validate_free_action(&post, &pre, actor);
+        let verdict = check_free_action(&post, &pre, actor);
         assert_ne!(
             verdict,
             Verdict::Pass,
             "tampered free action card_points must not Pass (got {verdict:?})"
         );
-        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
-        assert!(validate_full(&post).is_err());
+        assert!(check_free_action_or_full(&post, &pre, actor).is_err());
+        assert!(check_full(&post).is_err());
     }
 
     /// Normal card play regression: a legal work move that plays a card (Occupation/Minor
@@ -1537,14 +1630,14 @@ mod tests {
             if post.public.players[id].played_cards.len()
                 > pre.public.players[id].played_cards.len()
             {
-                let verdict = validate_incremental(&post, &pre);
+                let verdict = check_incremental(&post, &pre);
                 assert_eq!(
                     verdict,
                     Verdict::Pass,
                     "legal card play must Pass incremental (got {verdict:?})"
                 );
-                validate_incremental_or_full(&post, &pre).unwrap();
-                assert_eq!(validate_full(&post), Ok(()));
+                check_incremental_or_full(&post, &pre).unwrap();
+                assert_eq!(check_full(&post), Ok(()));
                 return; // Found at least one card play, test passes.
             }
         }
@@ -1552,7 +1645,7 @@ mod tests {
     }
 
     /// 4th review P1 (issuecomment-6772921046): duplicate played-card ID in
-    /// validate_incremental (work-path, 0-point card) must not Pass.
+    /// check_incremental (work-path, 0-point card) must not Pass.
     /// Drive a real transition where actor has played cards, then tamper by
     /// pushing a duplicate of a 0-point played card. The explicit duplicate
     /// guard in section 12 must catch this with a definite Fail.
@@ -1590,7 +1683,7 @@ mod tests {
             let post_candidate = game.clone();
             let mover = pre_candidate.public.active_player;
             if !post_candidate.public.players[mover].played_cards.is_empty()
-                && validate_incremental(&post_candidate, &pre_candidate) == Verdict::Pass
+                && check_incremental(&post_candidate, &pre_candidate) == Verdict::Pass
             {
                 pre = pre_candidate;
                 post = post_candidate;
@@ -1617,18 +1710,18 @@ mod tests {
         // Tamper: push a duplicate of the 0-point played card.
         post.public.players[actor].played_cards.push(zero_point_id);
         // The duplicate guard must produce a definite Fail.
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert!(
             matches!(verdict, Verdict::Fail(_)),
             "duplicate 0-point card must be definite Fail (got {verdict:?})"
         );
         // Full validation must also reject.
-        assert!(validate_incremental_or_full(&post, &pre).is_err());
-        assert!(validate_full(&post).is_err());
+        assert!(check_incremental_or_full(&post, &pre).is_err());
+        assert!(check_full(&post).is_err());
     }
 
     /// 4th review P1 (issuecomment-6772921046): duplicate played-card ID in
-    /// validate_incremental (work-path, non-zero-point card) must not Pass.
+    /// check_incremental (work-path, non-zero-point card) must not Pass.
     /// Duplicate a non-zero-point card AND bump card_points by its points so
     /// the points check alone would pass — the duplicate guard must still catch it.
     #[test]
@@ -1665,7 +1758,7 @@ mod tests {
             let post_candidate = game.clone();
             let mover = pre_candidate.public.active_player;
             if !post_candidate.public.players[mover].played_cards.is_empty()
-                && validate_incremental(&post_candidate, &pre_candidate) == Verdict::Pass
+                && check_incremental(&post_candidate, &pre_candidate) == Verdict::Pass
             {
                 // Check if actor has a non-zero-point played card.
                 let has_nonzero = post_candidate.public.players[mover]
@@ -1712,18 +1805,18 @@ mod tests {
             .push(nonzero_id.clone());
         post.public.players[actor].card_points += card_points;
         // The duplicate guard must produce a definite Fail (points check would pass alone).
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert!(
             matches!(verdict, Verdict::Fail(_)),
             "duplicate non-zero-point card must be definite Fail (got {verdict:?})"
         );
         // Full validation must also reject.
-        assert!(validate_incremental_or_full(&post, &pre).is_err());
-        assert!(validate_full(&post).is_err());
+        assert!(check_incremental_or_full(&post, &pre).is_err());
+        assert!(check_full(&post).is_err());
     }
 
     /// 4th review P1 (issuecomment-6772921046): duplicate played-card ID in
-    /// validate_free_action must not Pass.
+    /// check_free_action must not Pass.
     /// Drive a real free action transition, then tamper by pushing a duplicate
     /// of an existing played card. The exact Vec equality check must catch this.
     #[test]
@@ -1771,7 +1864,7 @@ mod tests {
         )
         .expect("free action must apply");
         // Verify this is a legitimate free action transition.
-        assert_eq!(validate_free_action(&post, &pre, actor), Verdict::Pass);
+        assert_eq!(check_free_action(&post, &pre, actor), Verdict::Pass);
         // Check actor has played cards to duplicate.
         if post.public.players[actor].played_cards.is_empty() {
             panic!("actor has no played cards after free action — test needs different seed");
@@ -1780,14 +1873,14 @@ mod tests {
         let existing_id = post.public.players[actor].played_cards[0].clone();
         post.public.players[actor].played_cards.push(existing_id);
         // The exact Vec equality check must produce a definite Fail.
-        let verdict = validate_free_action(&post, &pre, actor);
+        let verdict = check_free_action(&post, &pre, actor);
         assert!(
             matches!(verdict, Verdict::Fail(_)),
             "duplicate played card in free action must be definite Fail (got {verdict:?})"
         );
         // Full validation must also reject.
-        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
-        assert!(validate_full(&post).is_err());
+        assert!(check_free_action_or_full(&post, &pre, actor).is_err());
+        assert!(check_full(&post).is_err());
     }
 
     /// A plain mid-round (pre, post) pair: same round, quota not exhausted.
@@ -1822,11 +1915,11 @@ mod tests {
         post.public.used.insert(Space::WesternQuarry);
         // Verify the full validator rejects this state.
         assert!(
-            validate_full(&post).is_err(),
+            check_full(&post).is_err(),
             "full validator must reject unrevealed WesternQuarry"
         );
         // Incremental validation must NOT return Pass.
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert!(
             matches!(verdict, Verdict::Fail(_) | Verdict::Unsure),
             "unrevealed WesternQuarry must not Pass (got {verdict:?})"
@@ -1880,11 +1973,11 @@ mod tests {
         post.public.used.insert(Space::Copse);
         // Verify the full validator rejects this state.
         assert!(
-            validate_full(&post).is_err(),
+            check_full(&post).is_err(),
             "full validator must reject Copse when disabled"
         );
         // Incremental validation must NOT return Pass.
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert!(
             matches!(verdict, Verdict::Fail(_) | Verdict::Unsure),
             "disabled Copse must not Pass (got {verdict:?})"
@@ -1897,7 +1990,7 @@ mod tests {
         let (pre, post) = mid_round_pair();
         // Forest is a regular space (BASE). The added space in mid_round_pair
         // should already be valid, so just verify Pass.
-        assert_eq!(validate_incremental(&post, &pre), Verdict::Pass);
+        assert_eq!(check_incremental(&post, &pre), Verdict::Pass);
     }
 
     /// Regression (card accumulation state, PR #357-series follow-up): a work
@@ -1917,7 +2010,7 @@ mod tests {
             .entry("B118".to_string())
             .or_default()
             .insert(crate::model::Good::Wood, 1);
-        let verdict = validate_incremental(&post, &pre);
+        let verdict = check_incremental(&post, &pre);
         assert_ne!(
             verdict,
             Verdict::Pass,
@@ -1968,7 +2061,7 @@ mod tests {
         )
         .expect("free action must apply");
         // Sanity: the legitimate free action passes.
-        assert_eq!(validate_free_action(&post, &pre, actor), Verdict::Pass);
+        assert_eq!(check_free_action(&post, &pre, actor), Verdict::Pass);
         // Now tamper: add a card accumulation entry.
         post.public
             .card_accumulations
@@ -1977,11 +2070,160 @@ mod tests {
             .entry("X000".to_string())
             .or_default()
             .insert(crate::model::Good::Clay, 2);
-        let verdict = validate_free_action(&post, &pre, actor);
+        let verdict = check_free_action(&post, &pre, actor);
         assert!(
             matches!(verdict, Verdict::Fail(_)),
             "changed card_accumulations in free action must be definite Fail (got {verdict:?})"
         );
-        assert!(validate_free_action_or_full(&post, &pre, actor).is_err());
+        assert!(check_free_action_or_full(&post, &pre, actor).is_err());
+    }
+    /// Layer-1 contract (design decision 3, stage C): across real
+    /// fixed-seed games and player counts, every layer-1 verdict satisfies
+    /// the documented contract:
+    /// - Pass   => layer 2 (`check_full`) accepts the same state (soundness);
+    /// - Fail   => a definite violation, and the fallback wrapper rejects;
+    /// - Unsure => not an acceptance: the `*_or_full` wrapper must agree
+    ///   with `check_full` verbatim, never accepting what it rejects.
+    #[test]
+    fn incremental_layer_contract_holds_over_real_games() {
+        for players in [2usize, 3, 4] {
+            for seed in [7u64, 23, 101] {
+                for (pre, post) in transitions(players, seed, 20) {
+                    match check_incremental(&post, &pre) {
+                        Verdict::Pass => assert_eq!(
+                            check_full(&post),
+                            Ok(()),
+                            "Pass must imply full acceptance (players={players} seed={seed})"
+                        ),
+                        Verdict::Fail(_) => assert!(
+                            check_incremental_or_full(&post, &pre).is_err(),
+                            "Fail must reject via the wrapper (players={players} seed={seed})"
+                        ),
+                        Verdict::Unsure => assert_eq!(
+                            check_incremental_or_full(&post, &pre),
+                            check_full(&post),
+                            "Unsure must defer to the full layer verbatim (players={players} seed={seed})"
+                        ),
+                    }
+                }
+            }
+        }
+    }
+
+    /// Layer-2 contract: `check_full` is exactly `Game::validate` — the same
+    /// accept/reject decision and the same arbiter message — and every other
+    /// layer defers to it verbatim (it is the fallback target of layer 1 and
+    /// gate 1 of layer 3, never re-implemented per caller).
+    #[test]
+    fn full_layer_contract_is_the_complete_arbiter() {
+        let game = cardless(3, 37);
+        let mut broken = game.clone();
+        broken.public.round = 99;
+        assert_eq!(check_full(&game), game.validate());
+        assert_eq!(check_full(&game), Ok(()));
+        assert_eq!(check_full(&broken), broken.validate());
+        assert!(check_full(&broken).is_err());
+        // A definite layer-1 violation propagates its own message (full
+        // validation is not even needed), and either way the wrapper rejects.
+        let (pre, mut post) = mid_round_pair();
+        post.public.players[pre.public.active_player].card_points += 1;
+        assert!(check_incremental_or_full(&post, &pre).is_err());
+        assert!(check_full(&post).is_err());
+        // The Unsure path defers to layer 2 verbatim: the wrapper decides
+        // exactly what `check_full` decides — no second implementation.
+        let (pre2, mut post2) = mid_round_pair();
+        let other = (pre2.public.active_player + 1) % pre2.public.players.len();
+        post2.public.players[other].supply.food += 10;
+        assert!(matches!(check_incremental(&post2, &pre2), Verdict::Unsure));
+        assert_eq!(
+            check_incremental_or_full(&post2, &pre2),
+            check_full(&post2),
+            "the Unsure fallback must defer to the full layer verbatim"
+        );
+    }
+
+    /// Layer-3 contract: a committed game with a complete logged history
+    /// passes all three gates at every checkpoint; a log with a dropped
+    /// event fails at the replay gate by gate 2's exact message (which a
+    /// gate-3 `load_json` failure cannot impersonate); a tampered save
+    /// fails to load (the mechanism gate 3 relies on).
+    #[test]
+    fn replay_layer_contract_round_trip_consistency() {
+        let mut game = cardless(2, 83);
+        let mut rng = ChaCha8Rng::seed_from_u64(0x5EED);
+        for _ in 0..6 {
+            let actor = game.public.active_player;
+            let obs = game.observation(actor).unwrap();
+            let legal = game.legal_spaces();
+            let space = RandomPolicy
+                .select(&obs, &legal, &mut rng)
+                .expect("legal space");
+            let action = CardChoiceDetails
+                .produce(&obs, space)
+                .expect("legal detail");
+            game.apply(action).expect("action must apply");
+            // Every intermediate committed state is a trust boundary.
+            check_replay(&game)
+                .unwrap_or_else(|error| panic!("check_replay failed mid-game: {error}"));
+        }
+        assert!(game.log.events.len() >= 6, "setup: logged actions");
+
+        // Dropping the last event desynchronizes the log from the state:
+        // the replay gate must reject it — and that gate specifically.
+        //
+        // Gate 2's hash-mismatch message names the replayed log
+        // ("replayed state hash differs from the recorded state"), while
+        // gate 3's load-side replay failure says "saved game differs from
+        // logged action replay" and gate 3's own mismatch says "restored
+        // state hash differs from the saved state". A `contains("replay")`
+        // style assertion cannot tell gate 2 from gate 3's load-side
+        // replay failure, so this negative control pins the exact gate-2
+        // message instead: the two gates stay mutually non-substitutable.
+        let mut truncated = game.clone();
+        truncated.log.events.pop();
+        // Gate 1 still accepts the mutated state, so the mutation cannot
+        // short-circuit into a layer-2 rejection before gate 2 runs.
+        assert_eq!(
+            check_full(&truncated),
+            Ok(()),
+            "the truncated log must leave the state itself acceptable, so only gate 2 can fire"
+        );
+        let error =
+            check_replay(&truncated).expect_err("a truncated log must fail replay validation");
+        assert_eq!(
+            error, "replayed state hash differs from the recorded state",
+            "a truncated log must fail at the replay gate (gate 2), not gate 1 or gate 3"
+        );
+
+        // Negative-control specificity probe (the PR #430 P2 fix): the
+        // SAME mutant, evaluated one gate later, fails inside
+        // `load_json`'s own event-chain replay — an error that also
+        // contains the word "replay". The old `contains("replay")`
+        // assertion therefore accepted a gate-3 failure as if it were
+        // gate 2, so it could not pin the gate. The gate-2 assertion
+        // above must reject it, so the two gates remain discriminated by
+        // exact message, never by a shared substring.
+        let gate3_replay_failure =
+            Game::load_json(&truncated.save_json().expect("save must succeed"))
+                .expect_err("a truncated log must also fail the save/load round-trip");
+        assert_ne!(
+            gate3_replay_failure, "replayed state hash differs from the recorded state",
+            "a gate-3 load-side replay failure must not satisfy the gate-2 assertion; got: {gate3_replay_failure}"
+        );
+        assert!(
+            gate3_replay_failure.contains("replay"),
+            "this gate-3 failure is exactly the kind the pre-fix `contains(\"replay\")` assertion wrongly accepted as gate 2; got: {gate3_replay_failure}"
+        );
+
+        // Tampering with the serialized save: `load_json` (the gate-3
+        // mechanism) must reject it.
+        let saved = game.save_json().expect("save must succeed");
+        let mut value: serde_json::Value = serde_json::from_str(&saved).expect("valid json");
+        value["public"]["round"] = serde_json::json!(99);
+        let tampered = serde_json::to_string(&value).expect("serialize");
+        assert!(
+            Game::load_json(&tampered).is_err(),
+            "a tampered save must not load"
+        );
     }
 }

@@ -656,7 +656,7 @@ impl PublicState {
 impl PublicState {
     /// Compute the set of available action spaces for this public state.
     /// Used by both `Game::validate` (full validation) and
-    /// `crate::validation::validate_incremental` (incremental validation)
+    /// `crate::validation::check_incremental` (incremental validation)
     /// to ensure the same availability logic is applied consistently.
     pub(crate) fn available_spaces(
         &self,
@@ -2178,9 +2178,9 @@ impl Game {
         // worker/space delta). Every other mid-round law is unchanged for both
         // segments (validation.rs).
         if resume.space_applied {
-            crate::validation::validate_incremental_resume_completion_or_full(&next, self)?;
+            crate::validation::check_incremental_resume_completion_or_full(&next, self)?;
         } else {
-            crate::validation::validate_incremental_or_full(&next, self)?;
+            crate::validation::check_incremental_or_full(&next, self)?;
         }
         // The `work` event for this paused action is recorded by
         // `resolve_pending_and_resume` (with the paused hash as `after`), not
