@@ -368,6 +368,7 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
+                crate::cards::CardEffect::OnPlayPlowField { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerGain { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
@@ -542,11 +543,12 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
                         }
+                        crate::cards::CardEffect::OnPlayPlowField { fields, .. } => *fields,
                         // A140: the amount is read from the public
-                                                // accumulations at resolution time, not fixed here.
-                                                crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
-                                                // Chapter 1 round-start cards: no direct resource amount to validate
-                                                | crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        // accumulations at resolution time, not fixed here.
+                        crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
+                        // Chapter 1 round-start cards: no direct resource amount to validate
+                        | crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
                         | crate::cards::CardEffect::StartRoundCopyUnusedRoundSpace { .. }
                         | crate::cards::CardEffect::StartRoundPlayOccupationIfLessonsUnderused {
                             ..

@@ -58,6 +58,10 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // phase. Its placement plan is derived and applied via place_animals
         // (the play executor cannot represent a play-time pause).
         CardEffect::OnPlayGainAnimal { .. } => TriggerPhase::Before,
+        // On-play plow fields are instantaneous play-time effects — Before
+        // phase. Placement is derived from the board via auto_plow_fields and
+        // never needs a player decision at play time.
+        CardEffect::OnPlayPlowField { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -551,6 +555,10 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_per_count(ctx, player, count_kind, good, *amount)?,
+                CardEffect::OnPlayPlowField { .. } => {
+                    // Handled by apply_on_play_effects in cards.rs during dispatch_play
+                    EffectResult::Resolved
+                }
                 CardEffect::OnPlayGainAnimal { animal, amount } => {
                     handle_on_play_gain_animal(ctx, animal, *amount)?
                 }
@@ -1093,6 +1101,7 @@ fn effect_condition_holds(
         // nothing (no double grant, no rounding).
         CardEffect::OnPlayGainIfRoomCount { rooms, .. } => player.rooms() == usize::from(*rooms),
         CardEffect::OnPlayGainAnimal { .. } => true,
+        CardEffect::OnPlayPlowField { .. } => true,
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
@@ -1250,6 +1259,11 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainAnimal { animal, amount } => {
                 handle_on_play_gain_animal(ctx, animal, *amount)?
             }
+            CardEffect::OnPlayPlowField {
+                fields,
+                adjacent,
+                vegetable_only,
+            } => handle_on_play_plow_field(ctx, *fields, *adjacent, *vegetable_only)?,
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1615,6 +1629,7 @@ fn handle_prerequisite(
         crate::cards::CardRequirement::MinimumImprovements(min) => {
             crate::cards::improvement_count_in_front(ctx.card_set, p) >= u32::from(*min)
         }
+        crate::cards::CardRequirement::ExactFieldCount(n) => p.fields() == usize::from(*n),
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
         crate::cards::CardRequirement::MaximumPlayers(_) => true, // Validated at card set level
     };
@@ -1931,6 +1946,21 @@ fn handle_on_play_gain_animal(
     let plan = auto_animal_plan(ctx.player, *animal, amount);
     crate::engine::place_animals(ctx.player, &plan, amount)
         .map_err(|e| format!("on-play animal placement failed: {e}"))?;
+    Ok(EffectResult::Resolved)
+}
+
+/// Handle on-play plow field (A002 移動耕作 / B068 マメ畑 / C017 新しい畑):
+/// plow `fields` field(s) deterministically via [`crate::engine::auto_plow_fields`].
+/// Instantaneous play-time effect — never pauses.
+fn handle_on_play_plow_field(
+    ctx: &mut DispatchContext<'_>,
+    fields: u32,
+    adjacent: bool,
+    vegetable_only: bool,
+) -> Result<EffectResult, String> {
+    let _placed = crate::engine::auto_plow_fields(ctx.player, fields, adjacent, vegetable_only)?;
+    // Budget is consumed by the caller; the placement itself is recorded by
+    // the board mutation. Returning Resolved keeps the play chain atomic.
     Ok(EffectResult::Resolved)
 }
 

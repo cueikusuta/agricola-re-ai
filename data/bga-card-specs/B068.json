@@ -82,7 +82,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-14",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "This card becomes 1 field where only vegetables can be planted."
   }
 }

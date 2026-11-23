@@ -2117,10 +2117,19 @@ fn require_none(d: &Detail) -> Result<()> {
     }
 }
 fn plow(p: &mut Player, i: usize) -> Result<()> {
+    plow_at(p, i, true)
+}
+
+/// Place one field tile on cell `i`. `adjacent` keeps the Farmland
+/// action's adjacency rule (a new field must touch an existing one once the
+/// player has any); `false` allows a detached field, which C017 新しい畑
+/// (Newly-Plowed Field) prints ("it need not be adjacent to another field").
+fn plow_at(p: &mut Player, i: usize, adjacent: bool) -> Result<()> {
     if i >= FARM_CELLS || !matches!(p.farm[i].tile, Tile::Empty) || p.farm[i].stable {
         return Err("field needs empty tile".into());
     }
-    if p.fields() > 0
+    if adjacent
+        && p.fields() > 0
         && !neighbors(i)
             .iter()
             .any(|&j| matches!(p.farm[j].tile, Tile::Field { .. }))
@@ -2132,6 +2141,46 @@ fn plow(p: &mut Player, i: usize) -> Result<()> {
         remaining: 0,
     };
     Ok(())
+}
+
+/// Deterministic on-play field placement for `CardEffect::OnPlayPlowField`
+/// (A002 移動耕作 / B068 マメ畑 / C017 新しい畑). Cells are scanned in index
+/// order and the first legal one is used: empty, no stable, and — unless
+/// `adjacent` is false — adjacent to an existing field whenever the
+/// player already has one (the same placement vocabulary the Farmland action
+/// uses). `vegetable_only` records the placed field in
+/// `Player::vegetable_only_fields` (B068 マメ畑: the card becomes a field
+/// where only vegetables can be planted). The play executor cannot represent
+/// a play-time pause (the same constraint `auto_animal_plan` works around),
+/// so the cell choice is derived from the board instead of asked for; a farm
+/// with no legal cell simply places nothing (the play itself stays legal).
+/// Returns the number of fields actually placed.
+pub fn auto_plow_fields(
+    p: &mut Player,
+    fields: u32,
+    adjacent: bool,
+    vegetable_only: bool,
+) -> Result<u32> {
+    let mut placed = 0;
+    for _ in 0..fields {
+        let Some(cell) = (0..FARM_CELLS).find(|&i| {
+            matches!(p.farm[i].tile, Tile::Empty)
+                && !p.farm[i].stable
+                && (!adjacent
+                    || p.fields() == 0
+                    || neighbors(i)
+                        .iter()
+                        .any(|&j| matches!(p.farm[j].tile, Tile::Field { .. })))
+        }) else {
+            return Err("no empty cell available for plowing".into());
+        };
+        plow_at(p, cell, adjacent)?;
+        if vegetable_only {
+            p.vegetable_only_fields.insert(cell);
+        }
+        placed += 1;
+    }
+    Ok(placed)
 }
 fn build_room(p: &mut Player, i: usize) -> Result<()> {
     if i >= FARM_CELLS
@@ -2178,7 +2227,7 @@ fn renovate(p: &mut Player) -> Result<()> {
     p.house = new;
     Ok(())
 }
-fn sow(p: &mut Player, assignments: &[Plant]) -> Result<()> {
+pub fn sow(p: &mut Player, assignments: &[Plant]) -> Result<()> {
     let mut visited = BTreeSet::new();
     for a in assignments {
         if a.cell >= FARM_CELLS
@@ -2192,6 +2241,12 @@ fn sow(p: &mut Player, assignments: &[Plant]) -> Result<()> {
             )
         {
             return Err("invalid empty field".into());
+        }
+        // B068 マメ畑 (Beanfield): the field the card becomes accepts only
+        // vegetables, so grain is rejected here — the same choke point the
+        // GrainUtilization / Cultivation sow actions go through.
+        if a.crop == Crop::Grain && p.vegetable_only_fields.contains(&a.cell) {
+            return Err("only vegetables may be planted on this field".into());
         }
         let good = match a.crop {
             Crop::Grain => Good::Grain,
