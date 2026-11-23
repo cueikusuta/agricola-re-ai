@@ -5964,7 +5964,9 @@ mod verified_band_d_tests {
     #[test]
     fn band_d_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["D100", "D105", "D109", "D032", "D034", "D065", "D030", "D007"] {
+        for id in [
+            "D100", "D105", "D109", "D032", "D034", "D065", "D030", "D007",
+        ] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -6210,6 +6212,8 @@ mod verified_band_d_tests {
             game.state_hash(),
             "the pass-left move and the round-table gain must replay identically"
         );
+    }
+
     /// D065 spec parity (data/bga-card-specs/D065.json): cost wood 1, printed
     /// points 0, no prerequisites; the single harvest effect carries the
     /// printed threshold 2 and gain grain 1.
