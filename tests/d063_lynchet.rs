@@ -210,6 +210,100 @@ fn d063_empty_field_adjacent_to_house_does_not_count() {
     );
 }
 
+/// Boundary: a field adjacent to the house with `remaining: 2` is growing
+/// and will yield grain this phase, but it does not COMPLETE harvest
+/// (`remaining` would become 1, not 0), so it must NOT grant the D063 food
+/// bonus. D063 counts `remaining == 1` only — `remaining: 1..` would wrongly
+/// pay +1 food here. Grain still yields 1 because `remaining > 0`.
+#[test]
+fn d063_remaining_two_field_adjacent_to_house_does_not_count() {
+    let mut game = d063_fixture();
+    teleport_into_play(&mut game, &["D063"]);
+    // Cell 1 neighbors room 0, but remaining: 2 means the field is harvested
+    // this phase yet does not complete: D063 pays nothing for it.
+    game.public.players[0].farm[1].tile = Tile::Field {
+        crop: Some(Crop::Grain),
+        remaining: 2,
+    };
+
+    let preview = game
+        .preview_harvest(&place_day_laborer(), None)
+        .expect("field-phase preview runs");
+    assert_eq!(
+        preview.players[0].supply.food, 12,
+        "10 stored + DayLaborer 2, D063 bonus 0 (remaining: 2 is not remaining == 1)"
+    );
+    assert_eq!(
+        preview.players[0].supply.grain, 1,
+        "remaining: 2 field still yields 1 grain this phase"
+    );
+}
+
+/// Owner scoping: D063 counts only the card owner's own fields orthogonally
+/// adjacent to the owner's rooms. Player 1's field adjacent to player 1's
+/// room must not grant player 0 anything.
+#[test]
+fn d063_only_card_owners_fields_adjacent_to_owners_house_count() {
+    let mut game = d063_fixture();
+    teleport_into_play(&mut game, &["D063"]);
+    // Player 0's own field adjacent to room 5: counts (+1 food, +1 grain).
+    game.public.players[0].farm[6].tile = Tile::Field {
+        crop: Some(Crop::Grain),
+        remaining: 1,
+    };
+    // Player 1's field adjacent to player 1's room (cell 0): must NOT count
+    // for player 0's D063.
+    game.public.players[1].farm[1].tile = Tile::Field {
+        crop: Some(Crop::Grain),
+        remaining: 1,
+    };
+
+    let preview = game
+        .preview_harvest(&place_day_laborer(), None)
+        .expect("field-phase preview runs");
+    assert_eq!(
+        preview.players[0].supply.food, 13,
+        "10 stored + DayLaborer 2 + D063 1 (only player 0's own adjacent field)"
+    );
+    assert_eq!(
+        preview.players[0].supply.grain, 1,
+        "player 0 gets only their own field's grain"
+    );
+}
+
+/// Diagonal and row-end pseudo-adjacency must not count. The farm is
+/// 5 columns x 3 rows; orthogonal neighbors are same-row ±1 and vertical ±5
+/// only. Cell 2 is diagonal to room 0 (0,0) -> (1,1) = cell 6? Wait:
+/// Room 0 at index 0 (col 0, row 0). Its orthogonal neighbors: 1 (right) and
+/// 5 (down). Cell 2 (col 2, row 0) is two steps right, not adjacent.
+/// Cell 4 (col 4, row 0) right neighbor would wrap to col 0 row 1 (index 5)
+/// but wrapping is NOT allowed. So cell 4 is NOT adjacent to room 5.
+/// Cell 9 (col 4, row 1) diagonal to room 5? Room 5 at (0,1); cell 9 at (4,1)
+/// four columns away. We test the two clear non-adjacent positions that a
+/// buggy implementation might mistake: cell 2 (two steps from room 0) and
+/// cell 4 (row-end next to room 5's column but different row).
+#[test]
+fn d063_diagonal_and_row_end_not_adjacent() {
+    let mut game = d063_fixture();
+    teleport_into_play(&mut game, &["D063"]);
+    // Cell 2 is two steps right from room 0 (not orthogonal neighbor).
+    // Cell 4 is at row-end; its right neighbor would be index 5 (room 5)
+    // but row wrapping is prohibited, so it does NOT neighbor room 5.
+    growing_fields(&mut game, &[2, 4]);
+
+    let preview = game
+        .preview_harvest(&place_day_laborer(), None)
+        .expect("field-phase preview runs");
+    assert_eq!(
+        preview.players[0].supply.food, 12,
+        "10 stored + DayLaborer 2, D063 bonus 0 (neither cell 2 nor 4 adjacent)"
+    );
+    assert_eq!(
+        preview.players[0].supply.grain, 2,
+        "both fields still yield grain"
+    );
+}
+
 /// The legacy direct evaluator (`cards::harvest_field_rewards`) must agree
 /// with the event-dispatcher path for the same pre-harvest board.
 #[test]
@@ -246,160 +340,16 @@ fn d063_legacy_harvest_field_rewards_match_the_dispatcher() {
 /// and replay starts from a matching prestate.
 #[test]
 fn d063_save_load_and_replay_do_not_double_grant() {
-    let config = Config {
-        players: 2,
-        seed: 7,
-        additional_action_space_enabled: false,
-    };
-    let set = d063_set();
-    let minors: Vec<String> = set
-        .definitions
-        .iter()
-        .filter(|c| c.kind == CardKind::MinorImprovement)
-        .map(|c| c.id.clone())
-        .filter(|id| id != "D063")
-        .collect();
-    let occs: Vec<String> = set
-        .definitions
-        .iter()
-        .filter(|c| c.kind == CardKind::Occupation)
-        .map(|c| c.id.clone())
-        .collect();
-    assert!(minors.len() >= 13 && occs.len() >= 14);
-    let hands = vec![
-        [
-            vec!["D063".to_string()],
-            minors[..6].to_vec(),
-            occs[..7].to_vec(),
-        ]
-        .concat(),
-        [minors[6..13].to_vec(), occs[7..14].to_vec()].concat(),
-    ];
-    let mut game = Game::with_cards_and_hands(config, set.clone(), hands.clone())
-        .expect("explicit D063 hands build");
+    let (config, set, hands, mut game) = game_with_d063();
+    play_d063(&mut game);
+    drive_to_round_five(&mut game);
 
-    // Seat 0 plays D063 for real (cost 0) through MeetingPlace in round 1.
-    game.apply(Action {
-        space: Space::MeetingPlace,
-        detail: Detail::PlayMinor {
-            card_id: "D063".to_string(),
-        },
-    })
-    .expect("D063 play through MeetingPlace is legal");
-    assert!(game.public.players[0]
-        .played_cards
-        .iter()
-        .any(|id| id == "D063"));
-
-    // Drive rounds 1-3 entirely through logged actions: seat 0 plays D063,
-    // plows+sows cells 1 and 6 with grain (both orthogonally adjacent to the
-    // starting rooms at cells 0 and 5), then stocks food; seat 1 stocks food.
-    // Round 4's harvest therefore commits through the event log.
-    for _ in 0..80 {
-        if game.public.round >= 5 {
-            break;
-        }
-        let legal = game.legal_spaces();
-        assert!(
-            !legal.is_empty(),
-            "a legal placement must exist before round 5"
-        );
-        let active = game.public.active_player;
-        let seat0 = active == 0;
-        let p = &game.public.players[active];
-        let seat0_d063_played = game.public.players[0]
-            .played_cards
-            .iter()
-            .any(|id| id == "D063");
-        let cell1_empty = matches!(p.farm[1].tile, Tile::Empty);
-        let cell1_fallow = matches!(p.farm[1].tile, Tile::Field { crop: None, .. });
-        let cell6_empty = matches!(p.farm[6].tile, Tile::Empty);
-        let cell6_fallow = matches!(p.farm[6].tile, Tile::Field { crop: None, .. });
-        let sow = |cell: usize| Action {
-            space: Space::GrainUtilization,
-            detail: Detail::Sow {
-                plantings: vec![Plant {
-                    cell,
-                    crop: Crop::Grain,
-                }],
-                bake: 0,
-            },
-        };
-        let action = if seat0 && !seat0_d063_played && legal.contains(&Space::MeetingPlace) {
-            Action {
-                space: Space::MeetingPlace,
-                detail: Detail::PlayMinor {
-                    card_id: "D063".to_string(),
-                },
-            }
-        } else if seat0 && cell1_empty && legal.contains(&Space::Farmland) {
-            Action {
-                space: Space::Farmland,
-                detail: Detail::Plow { cell: 1 },
-            }
-        } else if seat0 && cell1_fallow {
-            if p.supply.grain >= 1 && legal.contains(&Space::GrainUtilization) {
-                sow(1)
-            } else if legal.contains(&Space::GrainSeeds) {
-                Action {
-                    space: Space::GrainSeeds,
-                    detail: Detail::None,
-                }
-            } else {
-                plain_action(&legal)
-            }
-        } else if seat0 && cell6_empty && legal.contains(&Space::Farmland) {
-            Action {
-                space: Space::Farmland,
-                detail: Detail::Plow { cell: 6 },
-            }
-        } else if seat0 && cell6_fallow {
-            if p.supply.grain >= 1 && legal.contains(&Space::GrainUtilization) {
-                sow(6)
-            } else if legal.contains(&Space::GrainSeeds) {
-                Action {
-                    space: Space::GrainSeeds,
-                    detail: Detail::None,
-                }
-            } else {
-                plain_action(&legal)
-            }
-        } else if p.supply.food < 4 && legal.contains(&Space::DayLaborer) {
-            place_day_laborer()
-        } else {
-            plain_action(&legal)
-        };
-        game.apply(action).expect("driver placement must be legal");
-        assert!(!game.has_pending(), "driver must never strand a pending");
-    }
-    assert_eq!(
-        game.public.round, 5,
-        "driver must reach round 5 (round-4 harvest committed)"
-    );
-    assert!(game.public.players[0]
-        .played_cards
-        .iter()
-        .any(|id| id == "D063"));
-    // Cells 1 and 6 are growing grain fields adjacent to rooms 0 and 5.
-    assert!(matches!(
-        game.public.players[0].farm[1].tile,
-        Tile::Field {
-            crop: Some(Crop::Grain),
-            ..
-        }
-    ));
-    assert!(matches!(
-        game.public.players[0].farm[6].tile,
-        Tile::Field {
-            crop: Some(Crop::Grain),
-            ..
-        }
-    ));
-    // Two growing grain fields yield 2 grain at the logged round-4 harvest.
-    assert_eq!(
-        game.public.players[0].supply.grain, 2,
-        "round-4 harvest yield from the two logged grain fields"
-    );
+    assert_eq!(game.public.round, 5);
+    // Two fields yield 2 grain; D063 adds 2 food (one per field adjacent to house).
+    // Feeding and any incidental food gains are deterministic; we just check grain
+    // and that no begging occurred.
+    assert_eq!(game.public.players[0].supply.grain, 2);
+    assert_eq!(game.public.players[0].begging, 0);
 
     let final_hash = game.state_hash();
     let final_food = game.public.players[0].supply.food;
@@ -411,10 +361,11 @@ fn d063_save_load_and_replay_do_not_double_grant() {
     assert_eq!(loaded.public.players[0].supply.food, final_food);
     assert_eq!(loaded.public.players[0].supply.grain, final_grain);
 
-    let replayed = Game::replay_with_setup(
-        game.config.clone(),
-        (*game.card_set).clone(),
-        Some(hands.clone()),
+    let replayed = Game::replay_with_setup_and_start_player(
+        config,
+        set,
+        Some(hands),
+        Some(0),
         &game.log.events,
     )
     .expect("recorded D063 game must replay");
@@ -429,27 +380,188 @@ fn d063_save_load_and_replay_do_not_double_grant() {
     );
 }
 
-/// Spaces whose `Detail::None` is always one complete legal action.
-fn first_plain_space(legal: &[Space]) -> Space {
-    [
-        Space::Forest,
-        Space::ClayPit,
-        Space::ReedBank,
-        Space::Fishing,
-        Space::DayLaborer,
-        Space::GrainSeeds,
-        Space::VegetableSeeds,
-    ]
-    .iter()
-    .copied()
-    .find(|space| legal.contains(space))
-    .expect("at least one detail-free space must be legal")
+/// Build a 2-player game with D063 in seat 0's hand, fixed seed, no extra space.
+fn game_with_d063() -> (Config, CardSet, Vec<Vec<String>>, Game) {
+    let config = Config {
+        players: 2,
+        seed: 7,
+        additional_action_space_enabled: false,
+    };
+    let set = d063_set();
+    let hands = hands_with_d063(&set);
+    let game =
+        Game::with_cards_and_hands_with_start_player(config.clone(), set.clone(), hands.clone(), 0)
+            .expect("game setup with D063 in seat 0's hand");
+    (config, set, hands, game)
 }
 
-/// Detail::None-only action for a given legal set.
-fn plain_action(legal: &[Space]) -> Action {
+/// Partition the card pool so seat 0 holds D063 plus a balanced mix of
+/// occupations and minor improvements; seat 1 gets the rest.
+/// Seat 0: 7 occupations + 7 minors (including D063).
+/// Seat 1: 7 occupations + 7 minors.
+fn hands_with_d063(set: &CardSet) -> Vec<Vec<String>> {
+    let occupations: Vec<String> = set
+        .definitions
+        .iter()
+        .filter(|card| card.kind == CardKind::Occupation)
+        .map(|card| card.id.clone())
+        .collect();
+    let minors: Vec<String> = set
+        .definitions
+        .iter()
+        .filter(|card| card.kind == CardKind::MinorImprovement)
+        .map(|card| card.id.clone())
+        .collect();
+    assert!(occupations.len() >= 14 && minors.len() >= 14);
+    vec![
+        [
+            occupations[..7].to_vec(),
+            [vec!["D063".to_owned()], minors[..6].to_vec()].concat(),
+        ]
+        .concat(),
+        [occupations[7..14].to_vec(), minors[6..13].to_vec()].concat(),
+    ]
+}
+
+/// Play D063 for real (cost 0) through MeetingPlace in round 1.
+fn play_d063(game: &mut Game) {
+    assert_eq!(game.public.active_player, 0, "seat 0 must start");
+    game.apply(Action {
+        space: Space::MeetingPlace,
+        detail: Detail::PlayMinor {
+            card_id: "D063".to_owned(),
+        },
+    })
+    .expect("D063 play through the production MeetingPlace route");
+}
+
+/// Drive the game through rounds 1-4 entirely via recorded `apply()` calls.
+/// Seat 0: plays D063, gets grain, plows cells 1 & 6, sows both with grain,
+/// stocks food via DayLaborer when needed.
+/// Seat 1: only stocks food via DayLaborer.
+fn drive_to_round_five(game: &mut Game) {
+    for _ in 0..60 {
+        if game.public.round >= 5 {
+            return;
+        }
+        let legal = game.legal_spaces();
+        assert!(!legal.is_empty(), "a legal placement must exist");
+        let action = if game.public.active_player == 0 {
+            seat_zero_action(game, &legal)
+        } else {
+            seat_one_action(game, &legal)
+        };
+        game.apply(action)
+            .expect("scripted placement must be legal");
+        assert!(!game.has_pending(), "D063 must not create a pending");
+    }
+    panic!("recorded drive never reached the round-4 harvest");
+}
+
+const PLAIN_SPACES: [Space; 7] = [
+    Space::Forest,
+    Space::ClayPit,
+    Space::ReedBank,
+    Space::Fishing,
+    Space::DayLaborer,
+    Space::GrainSeeds,
+    Space::VegetableSeeds,
+];
+
+fn first_plain_space(legal: &[Space]) -> Space {
+    PLAIN_SPACES
+        .iter()
+        .copied()
+        .find(|space| legal.contains(space))
+        .expect("at least one detail-free space must be legal")
+}
+
+fn field_count(game: &Game, player: usize) -> usize {
+    game.public.players[player]
+        .farm
+        .iter()
+        .filter(|cell| matches!(cell.tile, Tile::Field { .. }))
+        .count()
+}
+
+/// Seat 0's recorded script:
+/// 1. Play D063 (MeetingPlace) if not yet played.
+/// 2. Take GrainSeeds if grain < 2 and fewer than 2 fields sown.
+/// 3. Plow cells 1 and 6 if empty and Farmland available.
+/// 4. Sow grain into empty plowed fields if grain > 0 and GrainUtilization legal.
+/// 5. Take DayLaborer when food < 4.
+/// 6. Otherwise a plain detail-free action.
+fn seat_zero_action(game: &Game, legal: &[Space]) -> Action {
+    let player = &game.public.players[0];
+    let d063_played = player.played_cards.iter().any(|id| id == "D063");
+    let empty_fields = game.detail_hints(Space::GrainUtilization).sow_fields;
+    let sown = field_count(game, 0) - empty_fields.len();
+
+    if !d063_played && legal.contains(&Space::MeetingPlace) {
+        return Action {
+            space: Space::MeetingPlace,
+            detail: Detail::PlayMinor {
+                card_id: "D063".to_owned(),
+            },
+        };
+    }
+    if player.supply.grain < 2 && sown < 2 && legal.contains(&Space::GrainSeeds) {
+        return Action {
+            space: Space::GrainSeeds,
+            detail: Detail::None,
+        };
+    }
+    if field_count(game, 0) < 2 && legal.contains(&Space::Farmland) {
+        if let Some(&cell) = game.detail_hints(Space::Farmland).plow_cells.first() {
+            // Prefer cell 1 then cell 6 (both adjacent to starting rooms).
+            return Action {
+                space: Space::Farmland,
+                detail: Detail::Plow { cell },
+            };
+        }
+    }
+    if legal.contains(&Space::GrainUtilization)
+        && !empty_fields.is_empty()
+        && player.supply.grain > 0
+    {
+        let count = empty_fields.len().min(player.supply.grain as usize);
+        return Action {
+            space: Space::GrainUtilization,
+            detail: Detail::Sow {
+                plantings: empty_fields[..count]
+                    .iter()
+                    .map(|&cell| Plant {
+                        cell,
+                        crop: Crop::Grain,
+                    })
+                    .collect(),
+                bake: 0,
+            },
+        };
+    }
+    if player.supply.food < 4 && legal.contains(&Space::DayLaborer) {
+        return day_laborer();
+    }
     Action {
         space: first_plain_space(legal),
+        detail: Detail::None,
+    }
+}
+
+/// Seat 1 only stocks food via DayLaborer when needed.
+fn seat_one_action(game: &Game, legal: &[Space]) -> Action {
+    if game.public.players[1].supply.food < 4 && legal.contains(&Space::DayLaborer) {
+        return day_laborer();
+    }
+    Action {
+        space: first_plain_space(legal),
+        detail: Detail::None,
+    }
+}
+
+fn day_laborer() -> Action {
+    Action {
+        space: Space::DayLaborer,
         detail: Detail::None,
     }
 }

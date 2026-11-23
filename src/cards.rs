@@ -2860,7 +2860,7 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                                 farm_cell.tile,
                                 Tile::Field {
                                     crop: Some(_),
-                                    remaining: 1..
+                                    remaining: 1
                                 }
                             );
                             let adjacent_to_house =

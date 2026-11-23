@@ -2395,7 +2395,7 @@ fn handle_harvest_field_gain(
                     farm_cell.tile,
                     crate::model::Tile::Field {
                         crop: Some(_),
-                        remaining: 1..
+                        remaining: 1
                     }
                 );
                 let adjacent_to_house = crate::model::neighbors(cell).iter().any(|&neighbor| {
@@ -3936,7 +3936,7 @@ pub mod legacy {
                                     farm_cell.tile,
                                     crate::model::Tile::Field {
                                         crop: Some(_),
-                                        remaining: 1..
+                                        remaining: 1
                                     }
                                 );
                                 let adjacent_to_house =
