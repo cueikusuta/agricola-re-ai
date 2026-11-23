@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "card_id": "C108",
+  "cases": [
+    {
+      "id": "C108-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C108"
+      },
+      "expected": {
+        "note": "basic effect verification"
+      }
+    },
+    {
+      "id": "C108-edge",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C108"
+      },
+      "expected": {
+        "note": "boundary/conditional effect verification"
+      }
+    }
+  ]
+}

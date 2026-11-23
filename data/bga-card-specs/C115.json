@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "card_id": "C115",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "種まき人",
+    "name_en": "Sower"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2974",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_action",
+      "conditions": [
+        {
+          "predicate": "action_is",
+          "params": {
+            "action": "build_major_improvement"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "reed",
+            "amount": 1,
+            "on_card": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "other",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "reed_on_card_to_sow_or_supply"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "any_time",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [
+      "effects.1.modeling: 葦がカード上に蓄積し、いつでも供給へ移動または「種まき」アクションと交換可能。カード上在庫のモデリング未確定"
+    ],
+    "test_case_ids": [
+      "C115-normal",
+      "C115-edge"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Each time you build a major improvement, place 1 reed from the general supply on that card. At any time, you can move the reed to your supply or exchange it for a \"Sow\" action."
+  }
+}

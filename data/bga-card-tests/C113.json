@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "card_id": "C113",
+  "cases": [
+    {
+      "id": "C113-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C113"
+      },
+      "expected": {
+        "note": "basic effect verification"
+      }
+    },
+    {
+      "id": "C113-edge",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C113"
+      },
+      "expected": {
+        "note": "boundary/conditional effect verification"
+      }
+    }
+  ]
+}

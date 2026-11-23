@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "card_id": "C120",
+  "cases": [
+    {
+      "id": "C120-normal",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C120"
+      },
+      "expected": {
+        "note": "basic effect verification"
+      }
+    },
+    {
+      "id": "C120-edge",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "C120"
+      },
+      "expected": {
+        "note": "boundary/conditional effect verification"
+      }
+    }
+  ]
+}

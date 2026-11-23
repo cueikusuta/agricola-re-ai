@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "card_id": "C109",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "シュナップス蒸留者",
+    "name_en": "Schnapps Distiller"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2980",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "feeding_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": [
+              {
+                "good": "vegetable",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "food",
+                "amount": 5
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.trigger_phase: 日本語は「収穫の畑フェイズ時」、英語は「各収穫の給餌フェイズ」。同型のC059は給餌フェイズで確定。分類表では「給餌フェイズ（英語・C059と同型）」との判断だが仕様上の phase 明示が必要"
+    ],
+    "test_case_ids": [
+      "C109-normal",
+      "C109-edge"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "In the feeding phase of each harvest, you can use this card to turn exactly 1 vegetable into 5 food."
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "card_id": "C105",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "かご運び",
+    "name_en": "Basket Carrier"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2984",
+        "language": "ja",
+        "checked_on": "2026-11-23",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-23",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest",
+      "conditions": [
+        {
+          "predicate": "once_per_harvest",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "buy_resources",
+            "resources": [
+              {
+                "good": "wood",
+                "amount": 1
+              },
+              {
+                "good": "reed",
+                "amount": 1
+              },
+              {
+                "good": "grain",
+                "amount": 1
+              }
+            ],
+            "cost": {
+              "good": "food",
+              "amount": 2
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_harvest",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "C105-normal",
+      "C105-edge"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-23",
+    "implementation_status": "not_started",
+    "notes": "Once each harvest, you can buy 1 wood, 1 reed, and 1 grain for 2 food total."
+  }
+}
