@@ -24,7 +24,8 @@ use agricola_re_ai::cards::{
     apply_on_play_effects, can_play, verified_band_b_cards, CardDefinition, CardEffect, CardKind,
     CardRequirement, CardSet,
 };
-use agricola_re_ai::model::{Good, Player};
+use agricola_re_ai::engine::{Action, Detail};
+use agricola_re_ai::model::{Config, Game, Good, Player, Space};
 use agricola_re_ai::registry::build_default_registry;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -273,4 +274,210 @@ fn b049_legacy_path_negative_control() {
     let mut player = b049_player(&["B049", "occ1"]);
     apply_on_play_effects(&set, &mut player, "B049").expect("apply B049 via legacy path");
     assert_food_only(&player, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Persistent save / resume / replay tests for B049 天秤.
+// ---------------------------------------------------------------------------
+// These exercise the real Game persistence boundary
+// (`save_json` → `load_json` → `replay_with_setup`) and assert that B049's
+// +2 food grant survives a full save/resume/replay round trip. B049 is used
+// with its real prerequisite (`MaximumOccupations(0)`) and real effect
+// (`AfterPlacementGainIfImprovementsEqualOccupations { food, 2 }`); its cost
+// is lowered to free in the test card set so the card can be played at round
+// 1 without a wood source, keeping the test focused on effect persistence
+// rather than resource acquisition.
+
+/// Real B049 definition with the cost lowered to free for the persistence
+/// tests (prerequisite and effect are identical to the official card).
+fn b049_free_def() -> CardDefinition {
+    let mut b049 = verified_band_b_cards()
+        .into_iter()
+        .find(|card| card.id == "B049")
+        .expect("B049 must be defined in verified_band_b_cards");
+    b049.cost = vec![];
+    b049
+}
+
+fn filler_occ(id: &str) -> CardDefinition {
+    CardDefinition {
+        use_limit: None,
+        id: id.to_owned(),
+        kind: CardKind::Occupation,
+        cost: vec![],
+        points: 0,
+        effects: vec![],
+    }
+}
+
+fn filler_minor(id: &str) -> CardDefinition {
+    CardDefinition {
+        use_limit: None,
+        id: id.to_owned(),
+        kind: CardKind::MinorImprovement,
+        cost: vec![],
+        points: 0,
+        effects: vec![],
+    }
+}
+
+/// Card set for the persistence tests: B049 plus filler occupations and
+/// minor improvements so each seat can be dealt exactly 7 + 7 cards.
+fn b049_persist_set() -> CardSet {
+    let mut definitions = vec![b049_free_def()];
+    for i in 0..7 {
+        definitions.push(filler_occ(&format!("p0_occ_{i}")));
+    }
+    for i in 0..6 {
+        definitions.push(filler_minor(&format!("p0_minor_{i}")));
+    }
+    for i in 0..7 {
+        definitions.push(filler_occ(&format!("p1_occ_{i}")));
+    }
+    for i in 0..7 {
+        definitions.push(filler_minor(&format!("p1_minor_{i}")));
+    }
+    CardSet { definitions }
+}
+
+/// Player 0: [B049 + 6 filler minors, 7 occupations] (7 minors / 7 occs).
+/// Player 1: [7 occupations, 7 filler minors].
+fn b049_persist_hands() -> Vec<Vec<String>> {
+    let p0_minors: Vec<String> = std::iter::once("B049".to_owned())
+        .chain((0..6).map(|i| format!("p0_minor_{i}")))
+        .collect();
+    let p0_occs: Vec<String> = (0..7).map(|i| format!("p0_occ_{i}")).collect();
+    let p1_occs: Vec<String> = (0..7).map(|i| format!("p1_occ_{i}")).collect();
+    let p1_minors: Vec<String> = (0..7).map(|i| format!("p1_minor_{i}")).collect();
+    vec![[p0_minors, p0_occs].concat(), [p1_occs, p1_minors].concat()]
+}
+
+/// Round 1: P0 plays B049 (free minor), P1 takes DayLaborer, P0 plays an
+/// occupation. After B049 is in play (1 improvement) and occ_0 is played
+/// (1 occupation), counts are equal so B049 grants +2 food.
+fn play_b049_grant_sequence(game: &mut Game, initial_food: u32) {
+    game.apply(Action {
+        space: Space::MeetingPlace,
+        detail: Detail::PlayMinor {
+            card_id: "B049".into(),
+        },
+    })
+    .unwrap();
+    assert_eq!(
+        game.public.players[0].supply.food, initial_food,
+        "B049's own play must not grant"
+    );
+    // P1 passes the turn (no card required).
+    game.apply(Action {
+        space: Space::DayLaborer,
+        detail: Detail::None,
+    })
+    .unwrap();
+    // P0 plays the first occupation: 1 improvement (B049) == 1 occupation → +2 food.
+    game.apply(Action {
+        space: Space::Lessons,
+        detail: Detail::PlayOccupation {
+            card_id: "p0_occ_0".into(),
+        },
+    })
+    .unwrap();
+    assert_eq!(
+        game.public.players[0].supply.food,
+        initial_food + 2,
+        "equal counts must grant +2 food"
+    );
+}
+
+#[test]
+fn b049_persist_own_play_no_grant_survives_roundtrip() {
+    // Only B049 is played: its own placement must not grant food, and that
+    // must hold after save → load (resume) and replay.
+    let config = Config {
+        players: 2,
+        seed: 91,
+        ..Config::default()
+    };
+    let set = b049_persist_set();
+    let hands = b049_persist_hands();
+    let mut game = Game::with_cards_and_hands(config.clone(), set.clone(), hands.clone()).unwrap();
+    let initial_food = game.public.players[0].supply.food;
+    game.apply(Action {
+        space: Space::MeetingPlace,
+        detail: Detail::PlayMinor {
+            card_id: "B049".into(),
+        },
+    })
+    .unwrap();
+    assert_eq!(
+        game.public.players[0].supply.food, initial_food,
+        "B049's own play must not grant"
+    );
+
+    let hash = game.state_hash();
+    let loaded = Game::load_json(&game.save_json().unwrap()).unwrap();
+    assert_eq!(
+        loaded.state_hash(),
+        hash,
+        "load_json (resume) must reproduce state_hash"
+    );
+    assert_eq!(
+        loaded.public.players[0].supply.food, initial_food,
+        "no grant must survive resume"
+    );
+
+    let events = game.log.events.clone();
+    let replayed = Game::replay_with_setup(config, set, Some(hands), &events).unwrap();
+    assert_eq!(
+        replayed.state_hash(),
+        hash,
+        "replay must reproduce state_hash"
+    );
+    assert_eq!(
+        replayed.public.players[0].supply.food, initial_food,
+        "no grant must survive replay"
+    );
+}
+
+#[test]
+fn b049_persist_equal_counts_grant_survives_roundtrip() {
+    // B049 + one occupation → 1 improvement == 1 occupation → +2 food, and
+    // the grant survives save → load (resume) and replay.
+    let config = Config {
+        players: 2,
+        seed: 92,
+        ..Config::default()
+    };
+    let set = b049_persist_set();
+    let hands = b049_persist_hands();
+    let mut game = Game::with_cards_and_hands(config.clone(), set.clone(), hands.clone()).unwrap();
+    let initial_food = game.public.players[0].supply.food;
+    play_b049_grant_sequence(&mut game, initial_food);
+    assert_eq!(game.public.players[0].supply.food, initial_food + 2);
+
+    let hash = game.state_hash();
+    let loaded = Game::load_json(&game.save_json().unwrap()).unwrap();
+    assert_eq!(
+        loaded.state_hash(),
+        hash,
+        "load_json (resume) must reproduce state_hash"
+    );
+    assert_eq!(
+        loaded.public.players[0].supply.food,
+        initial_food + 2,
+        "grant must survive resume"
+    );
+    loaded.validate().expect("loaded game must validate");
+
+    let events = game.log.events.clone();
+    let replayed = Game::replay_with_setup(config, set, Some(hands), &events).unwrap();
+    assert_eq!(
+        replayed.state_hash(),
+        hash,
+        "replay must reproduce state_hash"
+    );
+    assert_eq!(
+        replayed.public.players[0].supply.food,
+        initial_food + 2,
+        "grant must survive replay"
+    );
 }
