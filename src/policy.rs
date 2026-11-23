@@ -631,6 +631,15 @@ fn card_priority(
                                     // Fires on any player's use of the space; approximate with per-round expectation
                                     card_good_value(*good) * i64::from(*amount) * horizon / 4
                                 }
+                                CardEffect::AfterAnyWorkerGainByCountIfNotActor {
+                                    base_good,
+                                    base_amount,
+                                    ..
+                                } => {
+                                    // B143: fires on any player's use of Hollow;
+                                    // value the base clay gain at per-round expectation.
+                                    card_good_value(*base_good) * i64::from(*base_amount) * horizon / 4
+                                }
                                 CardEffect::HarvestStartGainIfFields { good, amount, .. } => {
                                                                     // Conditional on field count; optimistic half-weight
                                                                     card_good_value(*good) * i64::from(*amount) * horizon / 2

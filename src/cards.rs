@@ -394,6 +394,23 @@ pub enum CardEffect {
         /// The good granted (food on the printed card).
         good: Good,
     },
+    /// B143 粘土守 (Clay Warden): on any player's use of `space` (Hollow),
+    /// each non-actor owner gains `base_good` x `base_amount`; additionally,
+    /// each non-actor owner gains `extra_3p_good` x `extra_3p_amount` in a 3p
+    /// game, or `extra_4p_good` x `extra_4p_amount` in a 4p game. The actor
+    /// never gains from this effect. 2p ineligibility is expressed by a
+    /// separate `Prerequisite { MinimumPlayers(3) }` effect, not by this
+    /// variant, so the variant itself is player-count agnostic and reads the
+    /// count from `players.len()` at dispatch time.
+    AfterAnyWorkerGainByCountIfNotActor {
+        space: Space,
+        base_good: Good,
+        base_amount: u32,
+        extra_3p_good: Good,
+        extra_3p_amount: u32,
+        extra_4p_good: Good,
+        extra_4p_amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -483,6 +500,9 @@ impl CardEffect {
             CardEffect::OnPlayGainIfRoomCount { .. } => "on_play_gain_if_room_count",
             CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                 "after_worker_gain_other_accumulation_food"
+            }
+            CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
+                "after_any_worker_gain_by_count_if_not_actor"
             }
         }
     }
@@ -745,6 +765,10 @@ impl CardSet {
 
                         CardEffect::AfterAnyWorkerGain { amount, .. }
                         | CardEffect::AfterAnyWorkerOthersGain { amount, .. }
+                        | CardEffect::AfterAnyWorkerGainByCountIfNotActor {
+                            base_amount: amount,
+                            ..
+                        }
                         | CardEffect::HarvestStartGainIfFields { amount, .. }
                         | CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { amount, .. } => {
                             *amount
@@ -5151,6 +5175,30 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 gain(Space::ClayPit, Good::Wood, 1),
                 gain(Space::Hollow, Good::Wood, 1),
                 gain(Space::ClayPit, Good::Reed, 1),
+            ],
+        },
+        // B143 粘土守 (Clay Warden): on another player's Hollow use, each
+        // non-actor owner gains clay 1; 3p -> +1 clay (clay 2 total), 4p ->
+        // +1 food (clay 1 + food 1). Only available at 3+ players.
+        CardDefinition {
+            use_limit: None,
+            id: "B143".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::AfterAnyWorkerGainByCountIfNotActor {
+                    space: Space::Hollow,
+                    base_good: Good::Clay,
+                    base_amount: 1,
+                    extra_3p_good: Good::Clay,
+                    extra_3p_amount: 1,
+                    extra_4p_good: Good::Food,
+                    extra_4p_amount: 1,
+                },
             ],
         },
         // B006 採石場見学 (Excursion to the Quarry): cost 2 food; prerequisite:

@@ -94,6 +94,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // Any-player worker triggers — After phase (fired by dispatch_after_worker_any_player)
         CardEffect::AfterAnyWorkerGain { .. } => TriggerPhase::After,
         CardEffect::AfterAnyWorkerOthersGain { .. } => TriggerPhase::After,
+        CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => TriggerPhase::After,
         // Harvest start field check — After phase (fired by dispatch_harvest_field)
         CardEffect::HarvestStartGainIfFields { .. } => TriggerPhase::After,
         // End game scoring — After phase
@@ -705,7 +706,8 @@ fn resolve_phase_scan(
                 // dispatch_after_worker_any_player, not the generic phase scan.
                 // HarvestStartGainIfFields is handled in dispatch_harvest_field via the generic scan.
                 CardEffect::AfterAnyWorkerGain { .. }
-                | CardEffect::AfterAnyWorkerOthersGain { .. } => {
+                | CardEffect::AfterAnyWorkerOthersGain { .. }
+                | CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
                     panic!(
                         "{:?} should be handled in special dispatch, not generic phase resolution",
                         effect
@@ -1001,6 +1003,7 @@ fn effect_condition_holds(
         // Return false here to prevent double-triggering.
         CardEffect::AfterAnyWorkerGain { .. } => false,
         CardEffect::AfterAnyWorkerOthersGain { .. } => false,
+        CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => false,
         // HarvestStartGainIfFields is handled in dispatch_harvest_field via the generic scan.
         CardEffect::HarvestStartGainIfFields { .. } => trigger.site == EventKind::Harvest,
         CardEffect::StartRoundGain { house, rooms, .. } => {
@@ -1400,7 +1403,9 @@ pub fn execute_chosen_triggers(
             // AfterAnyWorkerGain / AfterAnyWorkerOthersGain are handled in
             // dispatch_after_worker_any_player, not the generic phase scan.
             // HarvestStartGainIfFields is handled in dispatch_harvest_field via the generic scan.
-            CardEffect::AfterAnyWorkerGain { .. } | CardEffect::AfterAnyWorkerOthersGain { .. } => {
+            CardEffect::AfterAnyWorkerGain { .. }
+            | CardEffect::AfterAnyWorkerOthersGain { .. }
+            | CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
                 panic!(
                     "{:?} should be handled in special dispatch, not generic phase resolution",
                     effect
@@ -1986,6 +1991,51 @@ fn handle_after_any_worker_others_gain(
                 .ok_or("resource overflow")?;
             p.supply.set(*good, next);
         }
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B143 粘土守 (Clay Warden): on any player's use of `space`, each non-actor
+/// owner gains `base_good` x `base_amount`; additionally each non-actor owner
+/// gains `extra_3p_good` x `extra_3p_amount` in a 3p game, or
+/// `extra_4p_good` x `extra_4p_amount` in a 4p game. The actor never gains.
+/// Player count is read from `players.len()` at dispatch time; 2p
+/// ineligibility is enforced by the separate MinimumPlayers(3) prerequisite.
+#[allow(clippy::too_many_arguments)]
+fn handle_after_any_worker_gain_by_count_if_not_actor(
+    players: &mut [Player],
+    actor: usize,
+    card_owner: usize,
+    space: &Space,
+    base_good: &Good,
+    base_amount: u32,
+    extra_3p_good: &Good,
+    extra_3p_amount: u32,
+    extra_4p_good: &Good,
+    extra_4p_amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space != Some(*space) {
+        return Ok(EffectResult::Resolved);
+    }
+    // The actor never gains from this effect.
+    if card_owner == actor {
+        return Ok(EffectResult::Resolved);
+    }
+    let grant = |p: &mut Player, good: &Good, amount: u32| -> Result<(), String> {
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+        Ok(())
+    };
+    grant(&mut players[card_owner], base_good, base_amount)?;
+    match players.len() {
+        3 => grant(&mut players[card_owner], extra_3p_good, extra_3p_amount)?,
+        4 => grant(&mut players[card_owner], extra_4p_good, extra_4p_amount)?,
+        _ => {}
     }
     Ok(EffectResult::Resolved)
 }
@@ -2969,7 +3019,7 @@ pub fn dispatch_play(
 #[allow(clippy::too_many_arguments)]
 fn dispatch_after_worker_any_player(
     card_set: &CardSet,
-    _actor: usize,
+    actor: usize,
     space: Space,
     _cards: &mut crate::cards::CardState,
     players: &mut [Player],
@@ -2993,18 +3043,10 @@ fn dispatch_after_worker_any_player(
                 continue;
             };
             for effect in &card.effects {
-                // Only handle the two new variants
-                let (effect_space, good, amount) = match effect {
-                    CardEffect::AfterAnyWorkerGain {
-                        space,
-                        good,
-                        amount,
-                    } => (*space, *good, *amount),
-                    CardEffect::AfterAnyWorkerOthersGain {
-                        space,
-                        good,
-                        amount,
-                    } => (*space, *good, *amount),
+                let effect_space = match effect {
+                    CardEffect::AfterAnyWorkerGain { space, .. } => *space,
+                    CardEffect::AfterAnyWorkerOthersGain { space, .. } => *space,
+                    CardEffect::AfterAnyWorkerGainByCountIfNotActor { space, .. } => *space,
                     _ => continue,
                 };
 
@@ -3022,24 +3064,49 @@ fn dispatch_after_worker_any_player(
 
                 // Apply effect based on variant
                 match effect {
-                    CardEffect::AfterAnyWorkerGain { .. } => {
+                    CardEffect::AfterAnyWorkerGain { good, amount, .. } => {
                         // Grant to card owner
                         let p = &mut players[card_owner];
                         let next = p
                             .supply
-                            .get(good)
-                            .checked_add(amount)
+                            .get(*good)
+                            .checked_add(*amount)
                             .ok_or("resource overflow")?;
-                        p.supply.set(good, next);
+                        p.supply.set(*good, next);
                     }
-                    CardEffect::AfterAnyWorkerOthersGain { .. } => {
+                    CardEffect::AfterAnyWorkerOthersGain { good, amount, .. } => {
                         // Grant to all players EXCEPT card owner
                         handle_after_any_worker_others_gain(
                             players,
                             card_owner,
                             &effect_space,
-                            &good,
-                            amount,
+                            good,
+                            *amount,
+                            trigger,
+                        )?;
+                    }
+                    CardEffect::AfterAnyWorkerGainByCountIfNotActor {
+                        base_good,
+                        base_amount,
+                        extra_3p_good,
+                        extra_3p_amount,
+                        extra_4p_good,
+                        extra_4p_amount,
+                        ..
+                    } => {
+                        // Grant to the card owner unless they are the actor,
+                        // plus the player-count dependent extra (3p vs 4p).
+                        handle_after_any_worker_gain_by_count_if_not_actor(
+                            players,
+                            actor,
+                            card_owner,
+                            &effect_space,
+                            base_good,
+                            *base_amount,
+                            extra_3p_good,
+                            *extra_3p_amount,
+                            extra_4p_good,
+                            *extra_4p_amount,
                             trigger,
                         )?;
                     }

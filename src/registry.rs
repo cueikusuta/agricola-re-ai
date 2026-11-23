@@ -373,6 +373,9 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
                     EventKind::WorkerPlaced
                 }
+                crate::cards::CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 // A140 ショベル運搬人: after-worker dynamic-count effect.
                 crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                     EventKind::WorkerPlaced
@@ -523,6 +526,9 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
+                        | crate::cards::CardEffect::AfterAnyWorkerGainByCountIfNotActor {
+                            base_amount: amount, ..
+                        }
                         | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. }
                         | crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms {
                             amount, ..
