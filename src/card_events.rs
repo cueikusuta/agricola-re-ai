@@ -7642,21 +7642,6 @@ mod tests {
         assert_eq!(c.players[0].fields(), 1, "one field plowed");
     }
 
-    /// A003 ペーパーナイフ (Paper Knife): cost 1 wood, pick 1 of 3 occupations from hand and play free.
-    /// TODO: Full integration test requires proper hand setup in dispatch_play context.
-    #[test]
-    #[ignore]
-    fn a003_paper_knife_plays_occupation_from_hand() {
-        // Requires proper hand context in dispatch_play; tested via handler unit test instead.
-    }
-
-    /// A003 ペーパーナイフ: no occupation in hand -> only wood cost paid, A003 goes to played.
-    #[test]
-    #[ignore]
-    fn a003_paper_knife_no_occupation_in_hand() {
-        // Requires proper hand context in dispatch_play; tested via handler unit test instead.
-    }
-
     /// A006 納屋 (Storage Barn): on play, gain 1 stone per Well, 1 wood per Joinery, 1 clay per Pottery, 1 reed per Basketry.
     #[test]
     fn a006_storage_barn_gains_for_owned_improvements() {
@@ -7791,5 +7776,1282 @@ mod tests {
         assert_eq!(c.players[0].supply.food, 0);
         assert_eq!(c.players[0].supply.grain, 0);
         assert_eq!(c.players[0].supply.wood, 0, "1 wood cost paid");
+    }
+
+    /// PR #389 静的レビュー P2: `cards::play` を使わず、エンジンの本番経路
+    /// (`play_validate_pay` → `play_from_hand` → `dispatch_play` →
+    /// `update_card_points_on_play`; `engine::execute_work` と同一構成) で
+    /// A001/A002/A003/A006/A007 と Part-2 復元カードの端到端テスト。
+    mod a_deck_real_play_path_tests {
+        use super::*;
+        use crate::card_zones::CardMoveCtx;
+
+        /// engine::execute_work の MeetingPlace / Lessons / GrowWithMinor 経路と同一構成:
+        /// 妥当性検証＋代金支払い → 手札から場へ → ディスパッチ → ポイント更新。
+        #[allow(clippy::too_many_arguments)] // mirrors dispatch_play's signature
+        fn play_path(
+            set: &CardSet,
+            cards: &mut crate::cards::CardState,
+            players: &mut [Player],
+            market: &mut Vec<Improvement>,
+            well: &mut BTreeMap<u8, Vec<usize>>,
+            player: usize,
+            id: &str,
+            kind: CardKind,
+            extra_food: u32,
+            budget: &mut u32,
+            uses: &mut BTreeMap<String, u32>,
+            limits: &BTreeMap<String, u32>,
+            pending: &mut Option<PendingDecision>,
+            rng: &mut ChaCha8Rng,
+        ) -> Result<(), String> {
+            crate::cards::play_validate_pay(
+                set,
+                &mut cards.hands[player],
+                &mut players[player],
+                id,
+                kind,
+                extra_food,
+            )?;
+            let mut zone = CardMoveCtx {
+                cards,
+                players,
+                improvement_market: market,
+            };
+            crate::card_zones::play_from_hand(&mut zone, player, id)?;
+            dispatch_play(
+                set,
+                player,
+                id,
+                extra_food,
+                cards,
+                players,
+                market,
+                well,
+                1,
+                &BTreeSet::new(),
+                budget,
+                uses,
+                limits,
+                pending,
+                rng,
+            )?;
+            let card = set.definition(id).ok_or("unknown card")?;
+            crate::cards::update_card_points_on_play(&mut players[player], card.points)?;
+            Ok(())
+        }
+
+        fn a_set() -> CardSet {
+            CardSet {
+                definitions: crate::cards::verified_a_onplay_simple_cards(),
+            }
+        }
+
+        /// A001 雨除け: 1セル牧草地が0枚 -> 効果不適用（対象なし）、コストなし。
+        #[test]
+        fn a001_zero_one_cell_pasture_no_effect() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.cards.hands[0].push("A001".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A001",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert!(
+                !c.players[0].farm.iter().any(|cell| cell.stable),
+                "no 1-cell pasture: no stable built (no eligible target)"
+            );
+            assert_eq!(c.players[0].supply.wood, 0, "free stable: no wood cost");
+            assert!(c.players[0].played_cards.is_empty());
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A001"],
+                "post-play: card moves to left neighbor's hand"
+            );
+        }
+
+        /// A001: 1セル牧草地が1枚 -> 無料で厩舎建設、左隣へ移動。
+        #[test]
+        fn a001_one_one_cell_pasture_builds_free_stable() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.cards.hands[0].push("A001".to_string());
+            c.players[0].pastures.push(crate::model::Pasture {
+                id: 0,
+                cells: vec![4],
+                animal: None,
+                quantity: 0,
+            });
+            c.players[0].farm[4].tile = Tile::Pasture { id: 0 };
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A001",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert!(
+                c.players[0].farm[4].stable,
+                "stable built on the 1-cell pasture"
+            );
+            assert_eq!(c.players[0].supply.wood, 0, "no wood cost for free stable");
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A001"],
+                "card moves to left neighbor's hand"
+            );
+        }
+
+        /// A001: 1セル牧草地が複数 -> 1つにだけ厩舎（重複建設なし）。
+        #[test]
+        fn a001_multiple_one_cell_pastures_single_stable() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.cards.hands[0].push("A001".to_string());
+            for (id, cell) in [(0, 4usize), (1, 7)] {
+                c.players[0].pastures.push(crate::model::Pasture {
+                    id,
+                    cells: vec![cell],
+                    animal: None,
+                    quantity: 0,
+                });
+                c.players[0].farm[cell].tile = Tile::Pasture { id };
+            }
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A001",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            let stables = (c.players[0].farm[4].stable as u8) + (c.players[0].farm[7].stable as u8);
+            assert_eq!(
+                stables, 1,
+                "exactly one stable across multiple 1-cell pastures"
+            );
+            assert_eq!(c.players[0].supply.wood, 0, "no wood cost");
+        }
+
+        /// A002 移動耕作: 合法セル0 -> 何も耕さずコストのみ支払い。
+        #[test]
+        fn a002_zero_legal_cells_only_cost_paid() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.players[0].supply.food = 2;
+            c.cards.hands[0].push("A002".to_string());
+            // 全セルを部屋で埋めて耕作可能セルを0にする。
+            for i in 0..crate::model::FARM_CELLS {
+                c.players[0].farm[i].tile = Tile::Room;
+            }
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A002",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.food, 0, "2 food cost paid");
+            assert_eq!(c.players[0].fields(), 0, "no cell plowed");
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A002"],
+                "card moves to left neighbor's hand"
+            );
+        }
+
+        /// A002: 合法セル1 -> その1区画だけ耕す。
+        #[test]
+        fn a002_one_legal_cell_plows_one_field() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.players[0].supply.food = 2;
+            c.cards.hands[0].push("A002".to_string());
+            // セル4だけ空き、それ以外は部屋。
+            for i in 0..crate::model::FARM_CELLS {
+                c.players[0].farm[i].tile = Tile::Room;
+            }
+            c.players[0].farm[4].tile = Tile::Empty;
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A002",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.food, 0, "2 food cost paid");
+            assert_eq!(c.players[0].fields(), 1, "exactly one field plowed");
+            assert!(
+                matches!(c.players[0].farm[4].tile, Tile::Field { crop: None, .. }),
+                "cell 4 plowed"
+            );
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A002"],
+                "card moves to left neighbor's hand"
+            );
+        }
+
+        /// A002: 合法セル複数 -> amount(1) 区画だけ耕す（多耕しなし）。
+        #[test]
+        fn a002_multiple_legal_cells_plows_only_one() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.players[0].supply.food = 2;
+            c.cards.hands[0].push("A002".to_string());
+            for i in 0..crate::model::FARM_CELLS {
+                c.players[0].farm[i].tile = Tile::Room;
+            }
+            for cell in [4usize, 5, 6] {
+                c.players[0].farm[cell].tile = Tile::Empty;
+            }
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A002",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.food, 0, "2 food cost paid");
+            assert_eq!(
+                c.players[0].fields(),
+                1,
+                "only one field plowed despite multiple candidates"
+            );
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A002"],
+                "card moves to left neighbor's hand"
+            );
+        }
+
+        /// テスト用職業カード: 高コスト（通常はプレイ不可）を A003 で無料プレイする。
+        fn a003_occupation(id: &str, good: Good, amount: u32) -> CardDefinition {
+            CardDefinition {
+                use_limit: None,
+                id: id.to_string(),
+                kind: CardKind::Occupation,
+                cost: vec![(Good::Wood, 9)],
+                points: 0,
+                effects: vec![CardEffect::OnPlayGain { good, amount }],
+                post_play: PostPlayDestination::PlayedArea,
+            }
+        }
+
+        fn a003_set() -> CardSet {
+            CardSet {
+                definitions: vec![
+                    CardDefinition {
+                        use_limit: None,
+                        id: "A003".to_string(),
+                        kind: CardKind::MinorImprovement,
+                        cost: vec![(Good::Wood, 1)],
+                        points: 0,
+                        effects: vec![CardEffect::OnPlayPickAndPlayOccupation { sample_size: 3 }],
+                        post_play: PostPlayDestination::LeftNeighborHand,
+                    },
+                    a003_occupation("O1", Good::Food, 1),
+                    a003_occupation("O2", Good::Clay, 1),
+                    a003_occupation("O3", Good::Reed, 1),
+                    a003_occupation("O4", Good::Wood, 1),
+                ],
+            }
+        }
+
+        /// A003: 職業0枚 -> 木1枚だけ支払い、何もプレイされず左隣へ。
+        #[test]
+        fn a003_no_occupation_cost_only() {
+            let set = a003_set();
+            let mut c = Ctx::new();
+            c.players[0].supply.wood = 1;
+            c.cards.hands[0].push("A003".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A003",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.wood, 0, "1 wood paid for A003");
+            assert_eq!(c.players[0].supply.food, 0, "no occupation played");
+            assert!(c.players[0].played_cards.is_empty());
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A003"],
+                "card moves to left neighbor's hand"
+            );
+        }
+
+        /// A003: 職業1枚 -> その職業を無料でプレイし効果を得る。
+        #[test]
+        fn a003_one_occupation_played_free() {
+            let set = a003_set();
+            let mut c = Ctx::new();
+            c.players[0].supply.wood = 1;
+            c.cards.hands[0].push("A003".to_string());
+            c.cards.hands[0].push("O1".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A003",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(
+                c.players[0].supply.wood, 0,
+                "A003's wood paid; O1's cost (9 wood) not paid -> played free"
+            );
+            assert_eq!(c.players[0].supply.food, 1, "O1's on-play gain applied");
+            assert_eq!(
+                c.players[0].played_cards,
+                vec!["O1"],
+                "chosen occupation moved to played area"
+            );
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A003"],
+                "A003 moves to left neighbor's hand"
+            );
+        }
+
+        /// A003: 職業2枚 -> 1枚が選択・無料プレイ。
+        #[test]
+        fn a003_two_occupations_one_played() {
+            let set = a003_set();
+            let mut c = Ctx::new();
+            c.players[0].supply.wood = 1;
+            c.cards.hands[0].push("A003".to_string());
+            c.cards.hands[0].push("O1".to_string());
+            c.cards.hands[0].push("O2".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A003",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(
+                c.players[0].supply.wood, 0,
+                "A003's wood paid; chosen occupation played free"
+            );
+            assert_eq!(
+                c.players[0].played_cards.len(),
+                1,
+                "exactly one occupation played"
+            );
+            assert!(c.players[0]
+                .played_cards
+                .iter()
+                .any(|id| id == "O1" || id == "O2"));
+            assert!(
+                c.cards.hands[0].iter().any(|id| id == "O1" || id == "O2"),
+                "unplayed occupation stays in hand"
+            );
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A003"],
+                "A003 moves to left neighbor's hand"
+            );
+        }
+
+        /// A003: 職業3枚 -> sample_size(3) が全員対象、1枚選択・無料プレイ。
+        #[test]
+        fn a003_three_occupations_all_sampled() {
+            let set = a003_set();
+            let mut c = Ctx::new();
+            c.players[0].supply.wood = 1;
+            c.cards.hands[0].push("A003".to_string());
+            for id in ["O1", "O2", "O3"] {
+                c.cards.hands[0].push(id.to_string());
+            }
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A003",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(
+                c.players[0].supply.wood, 0,
+                "A003's wood paid; chosen occupation played free"
+            );
+            assert_eq!(c.players[0].played_cards.len(), 1);
+            assert!(
+                c.players[0]
+                    .played_cards
+                    .iter()
+                    .any(|id| matches!(id.as_str(), "O1" | "O2" | "O3")),
+                "pick from all 3 candidates (sample_size=3 covers all)"
+            );
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A003"],
+                "A003 moves to left neighbor's hand"
+            );
+        }
+
+        /// A003: 職業4枚 -> sample_size(3) のうちから1枚選択、4枚目は手札に残る。
+        #[test]
+        fn a003_four_occupations_samples_three() {
+            let set = a003_set();
+            let mut c = Ctx::new();
+            c.players[0].supply.wood = 1;
+            for id in ["A003", "O1", "O2", "O3", "O4"] {
+                c.cards.hands[0].push(id.to_string());
+            }
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A003",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(
+                c.players[0].supply.wood, 0,
+                "A003's wood paid; chosen occupation played free"
+            );
+            assert_eq!(c.players[0].played_cards.len(), 1);
+            assert!(
+                c.players[0]
+                    .played_cards
+                    .iter()
+                    .any(|id| { matches!(id.as_str(), "O1" | "O2" | "O3") }),
+                "pick from the first 3 candidates only (sample_size=3)"
+            );
+            assert!(
+                c.cards.hands[0].iter().any(|id| id == "O4"),
+                "O4 outside the sample stays in hand"
+            );
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A003"],
+                "A003 moves to left neighbor's hand"
+            );
+        }
+
+        /// A003: 同一シード・同一手札なら同じ職業が選ばれる（ランダム選択の再現性）。
+        #[test]
+        fn a003_random_selection_reproducible_with_fixed_seed() {
+            let mut results = Vec::new();
+            for _ in 0..2 {
+                let set = a003_set();
+                let mut c = Ctx::new(); // 同じシード 0xC0FFEE
+                c.players[0].supply.wood = 1;
+                for id in ["A003", "O1", "O2", "O3", "O4"] {
+                    c.cards.hands[0].push(id.to_string());
+                }
+                let mut market = vec![];
+                let mut well = BTreeMap::new();
+                let mut pending = None;
+                play_path(
+                    &set,
+                    &mut c.cards,
+                    &mut c.players,
+                    &mut market,
+                    &mut well,
+                    0,
+                    "A003",
+                    CardKind::MinorImprovement,
+                    0,
+                    &mut c.budget,
+                    &mut c.uses,
+                    &c.limits,
+                    &mut pending,
+                    &mut c.rng,
+                )
+                .unwrap();
+                results.push((
+                    c.players[0].played_cards.clone(),
+                    (
+                        c.players[0].supply.food,
+                        c.players[0].supply.clay,
+                        c.players[0].supply.reed,
+                        c.players[0].supply.wood,
+                    ),
+                ));
+            }
+            assert_eq!(
+                results[0], results[1],
+                "fixed seed -> identical random pick across identical setups"
+            );
+        }
+
+        /// A006 納屋: 該当設備0/1/複数ごとに一致する資源を獲得。
+        #[test]
+        fn a006_storage_barn_no_improvements_no_gain() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.cards.hands[0].push("A006".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A006",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(
+                (
+                    c.players[0].supply.stone,
+                    c.players[0].supply.wood,
+                    c.players[0].supply.clay,
+                    c.players[0].supply.reed
+                ),
+                (0, 0, 0, 0),
+                "no improvements: no gain"
+            );
+            assert_eq!(
+                c.cards.hands[1],
+                vec!["A006"],
+                "card moves to left neighbor's hand"
+            );
+        }
+
+        #[test]
+        fn a006_storage_barn_one_improvement() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.players[0].improvements.push(Improvement::Well);
+            c.cards.hands[0].push("A006".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A006",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.stone, 1, "1 stone for Well");
+            assert_eq!(
+                (
+                    c.players[0].supply.wood,
+                    c.players[0].supply.clay,
+                    c.players[0].supply.reed
+                ),
+                (0, 0, 0),
+                "other goods untouched"
+            );
+        }
+
+        #[test]
+        fn a006_storage_barn_multiple_improvements() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.players[0].improvements.push(Improvement::Well);
+            c.players[0].improvements.push(Improvement::Pottery);
+            c.players[0].improvements.push(Improvement::Joinery);
+            c.players[0].improvements.push(Improvement::Basketry);
+            c.cards.hands[0].push("A006".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A006",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.stone, 1, "1 stone for Well");
+            assert_eq!(c.players[0].supply.clay, 1, "1 clay for Pottery");
+            assert_eq!(c.players[0].supply.wood, 1, "1 wood for Joinery");
+            assert_eq!(c.players[0].supply.reed, 1, "1 reed for Basketry");
+        }
+
+        /// A007 園芸用ナイフ: 空畑では作物別獲得が発生しない。
+        #[test]
+        fn a007_empty_field_no_gain() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.players[0].supply.wood = 1;
+            c.cards.hands[0].push("A007".to_string());
+            c.players[0].farm[4].tile = Tile::Field {
+                crop: None,
+                remaining: 0,
+            };
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A007",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.food, 0, "unsown field: no food");
+            assert_eq!(c.players[0].supply.grain, 0, "unsown field: no grain");
+            assert_eq!(c.players[0].supply.wood, 0, "1 wood cost paid");
+        }
+
+        /// A007: 穀物畑・野菜畑それぞれから複数獲得。
+        #[test]
+        fn a007_fields_by_crop() {
+            let set = a_set();
+            let mut c = Ctx::new();
+            c.players[0].supply.wood = 1;
+            c.cards.hands[0].push("A007".to_string());
+            c.players[0].farm[1].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 2,
+            };
+            c.players[0].farm[2].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 2,
+            };
+            c.players[0].farm[3].tile = Tile::Field {
+                crop: Some(Crop::Vegetable),
+                remaining: 1,
+            };
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A007",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.food, 2, "1 food per grain field x2");
+            assert_eq!(
+                c.players[0].supply.grain, 1,
+                "1 grain per vegetable field x1"
+            );
+            assert_eq!(c.players[0].supply.wood, 0, "1 wood cost paid");
+        }
+
+        // ---- Part-2 復元カード: 基本動作（本番ディスパッチ経路）----
+
+        /// B064 水車の輪: GrainUtilization 使用かつ Fishing が使用済み -> 食料+2。
+        #[test]
+        fn b064_mill_wheel_food_when_fishing_used() {
+            let set = CardSet {
+                definitions: crate::cards::verified_worker_bonus_cards(4),
+            };
+            let mut c = Ctx::new();
+            c.players[0].supply.wood = 2;
+            c.cards.hands[0].push("B064".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "B064",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.wood, 0, "B064 cost: 2 wood");
+            assert!(c.players[0].played_cards.contains(&"B064".to_string()));
+
+            // 釣りを使った後の穀物利用 -> 食料+2。
+            let mut used = BTreeSet::new();
+            used.insert(Space::Fishing);
+            dispatch_after_worker(
+                &set,
+                0,
+                Space::GrainUtilization,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                1,
+                &used,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                false,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.food, 2, "B064: food +2 after fishing");
+        }
+
+        #[test]
+        fn b064_mill_wheel_no_food_without_fishing() {
+            let set = CardSet {
+                definitions: crate::cards::verified_worker_bonus_cards(4),
+            };
+            let mut c = Ctx::new();
+            c.players[0].supply.wood = 2;
+            c.cards.hands[0].push("B064".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "B064",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            let used = BTreeSet::new(); // 釣り未使用
+            dispatch_after_worker(
+                &set,
+                0,
+                Space::GrainUtilization,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                1,
+                &used,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                false,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.food, 0, "B064: no food without fishing");
+        }
+
+        /// C141 羊の世話人: どのプレイヤーの SheepMarket 使用でも所有者が穀物+1。
+        #[test]
+        fn c141_sheep_provider_any_player_gains_grain() {
+            let set = CardSet {
+                definitions: crate::cards::verified_multiplayer_passive_cards(3),
+            };
+            let mut c = Ctx::new();
+            // C141 は 3+ 人用プールに含まれる職業（コスト0）。play_path で場に出す。
+            c.cards.hands[0].push("C141".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "C141",
+                CardKind::Occupation,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert!(c.players[0].played_cards.contains(&"C141".to_string()));
+
+            // 所有者の羊市場使用 -> 所有者が穀物+1。
+            let used = BTreeSet::new();
+            dispatch_after_worker(
+                &set,
+                0,
+                Space::SheepMarket,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                1,
+                &used,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                false,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.grain, 1, "C141: owner gains 1 grain");
+            assert_eq!(c.players[1].supply.grain, 0, "other players unaffected");
+        }
+
+        /// A050 ミルクがめ: どのプレイヤーの CattleMarket 使用でも所有者食料+3、他プレイヤー食料+1。
+        #[test]
+        fn a050_milk_jug_owner_and_others_benefit() {
+            let set = CardSet {
+                definitions: crate::cards::verified_round_and_harvest_cards(),
+            };
+            let mut c = Ctx::new();
+            c.players[0].supply.clay = 1;
+            c.cards.hands[0].push("A050".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "A050",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.clay, 0, "A050 cost: 1 clay");
+
+            let used = BTreeSet::new();
+            dispatch_after_worker(
+                &set,
+                0,
+                Space::CattleMarket,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                1,
+                &used,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                false,
+            )
+            .unwrap();
+            assert_eq!(c.players[0].supply.food, 3, "A050: owner gains 3 food");
+            assert_eq!(
+                c.players[1].supply.food, 1,
+                "A050: other player gains 1 food"
+            );
+        }
+
+        /// D061 わらの俵?: 収穫開始時に穀物畑3枚以上で食料+2。
+        #[test]
+        fn d061_bale_of_straw_threshold_met() {
+            let set = CardSet {
+                definitions: crate::cards::verified_round_and_harvest_cards(),
+            };
+            let mut c = Ctx::new();
+            c.cards.hands[0].push("D061".to_string());
+            // 3枚の種付け済み穀物畑。
+            for cell in [1usize, 2, 3] {
+                c.players[0].farm[cell].tile = Tile::Field {
+                    crop: Some(Crop::Grain),
+                    remaining: 1,
+                };
+            }
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "D061",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            dispatch_harvest_field(
+                &set,
+                0,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                1,
+                &BTreeSet::new(),
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+            )
+            .unwrap();
+            assert_eq!(
+                c.players[0].supply.food, 2,
+                "D061: food +2 at harvest start"
+            );
+        }
+
+        #[test]
+        fn d061_bale_of_straw_below_threshold_no_gain() {
+            let set = CardSet {
+                definitions: crate::cards::verified_round_and_harvest_cards(),
+            };
+            let mut c = Ctx::new();
+            c.cards.hands[0].push("D061".to_string());
+            // 2枚のみ: 閾値3に届かず。
+            c.players[0].farm[1].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            };
+            c.players[0].farm[2].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            };
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "D061",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            dispatch_harvest_field(
+                &set,
+                0,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                1,
+                &BTreeSet::new(),
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+            )
+            .unwrap();
+            assert_eq!(
+                c.players[0].supply.food, 0,
+                "D061: below threshold, no gain"
+            );
+        }
+
+        /// C083 若牛: on play で牛2頭獲得、得点-3。
+        #[test]
+        fn c083_early_cattle_gain_two_cattle_and_minus_three_points() {
+            let set = CardSet {
+                definitions: crate::cards::verified_band_c_cards(),
+            };
+            let mut c = Ctx::new();
+            // 既存の牛牧場（2セル、空き容量あり）を用意: 配置先パスチャが存在しないと失敗する。
+            c.players[0].pastures.push(crate::model::Pasture {
+                id: 0,
+                cells: vec![1, 2],
+                animal: Some(Animal::Cattle),
+                quantity: 0,
+            });
+            c.players[0].farm[1].tile = Tile::Pasture { id: 0 };
+            c.players[0].farm[2].tile = Tile::Pasture { id: 0 };
+            c.cards.hands[0].push("C083".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "C083",
+                CardKind::MinorImprovement,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+            assert_eq!(
+                c.players[0].animal_count(Animal::Cattle),
+                2,
+                "C083: cattle x2"
+            );
+            assert_eq!(c.players[0].card_points, -3, "C083: -3 points");
+        }
+
+        /// C147 牛飼い: CattleMarket 使用後、配置決定の保留（ChooseAnimalPlacement）を返す。
+        #[test]
+        fn c147_cowherd_pauses_for_placement_decision() {
+            let set = CardSet {
+                definitions: crate::cards::verified_band_c_cards(),
+            };
+            let mut c = Ctx::new();
+            c.cards.hands[0].push("C147".to_string());
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            play_path(
+                &set,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                0,
+                "C147",
+                CardKind::Occupation,
+                0,
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                &mut c.rng,
+            )
+            .unwrap();
+
+            let result = dispatch_after_worker(
+                &set,
+                0,
+                Space::CattleMarket,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                1,
+                &BTreeSet::new(),
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                false,
+            );
+            assert!(
+                matches!(result, Ok(crate::pending::Transition::Paused(_))),
+                "C147: AfterWorkerGainAnimal pauses for placement decision"
+            );
+            if let Ok(crate::pending::Transition::Paused(decision)) = result {
+                assert!(
+                    matches!(
+                        decision.kind,
+                        crate::pending::PendingKind::ChooseAnimalPlacement { .. }
+                    ),
+                    "C147: pause kind is ChooseAnimalPlacement"
+                );
+            }
+        }
     }
 }
