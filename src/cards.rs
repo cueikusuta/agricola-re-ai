@@ -171,6 +171,48 @@ pub enum CardEffect {
         grain_field_food: u32,
         vegetable_field_grain: u32,
     },
+    /// C141 羊の世話人 / A050 ミルクがめ (self half): each time ANY player uses
+    /// the specified space, the card owner gains `amount` of `good`. Unlike
+    /// `AfterWorkerGain` which only fires when the card owner themselves uses
+    /// the space, this variant fires for any player's use (including the owner).
+    AfterAnyWorkerGain {
+        space: Space,
+        good: Good,
+        amount: u32,
+    },
+    /// A050 ミルクがめ (others half): each time ANY player uses the specified
+    /// space, all players EXCEPT the card owner gain `amount` of `good`.
+    /// This is a separate variant to keep the effect vocabulary focused and
+    /// avoid widening `AfterAnyWorkerGain` with an `others_amount` field.
+    AfterAnyWorkerOthersGain {
+        space: Space,
+        good: Good,
+        amount: u32,
+    },
+    /// D061 わらのたわら (Bale of Straw): at the start of each harvest, if the
+    /// card owner has at least `threshold` fields sown with `crop`, gain
+    /// `amount` of `good`. The condition is evaluated in the handler because
+    /// it requires inspecting the player's farm state.
+    HarvestStartGainIfFields {
+        crop: Crop,
+        threshold: u8,
+        good: Good,
+        amount: u32,
+    },
+    /// C083 若牛 (Early Cattle): on play, gain `amount` of `animal` (cattle).
+    /// The player must provide an AnimalPlan for placement.
+    OnPlayGainAnimal {
+        animal: Animal,
+        amount: u32,
+    },
+    /// C147 牛の飼育士 (Cowherd): each time the owner uses `space` (CattleMarket),
+    /// gain `amount` of `animal` (cattle). The player must provide an AnimalPlan
+    /// for placement.
+    AfterWorkerGainAnimal {
+        space: Space,
+        animal: Animal,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -217,6 +259,11 @@ impl CardEffect {
                 "on_play_gain_per_matching_improvement"
             }
             CardEffect::OnPlayGainPerFieldType { .. } => "on_play_gain_per_field_type",
+            CardEffect::AfterAnyWorkerGain { .. } => "after_any_worker_gain",
+            CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
+            CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
+            CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
+            CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
         }
     }
 }
@@ -462,6 +509,11 @@ impl CardSet {
                             grain_field_food,
                             vegetable_field_grain,
                         } => *grain_field_food.max(vegetable_field_grain),
+                        CardEffect::OnPlayGainAnimal { .. } => 1,
+                        CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
+                        CardEffect::AfterAnyWorkerGain { amount, .. } => *amount,
+                        CardEffect::AfterAnyWorkerOthersGain { amount, .. } => *amount,
+                        CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
                     };
                     amount == 0 || amount > 30
                 })
@@ -2133,6 +2185,23 @@ pub fn verified_worker_bonus_cards(_players: usize) -> Vec<CardDefinition> {
                 gain(Space::GrainUtilization, Good::Wood, 1),
             ],
         ),
+        // B064 (Mill Wheel): after_worker grain_utilization if fishing was
+        // used -> gain food 2. Restored from main (PR #389 deleted this
+        // implemented card; the static review requires the restore).
+        CardDefinition {
+            use_limit: None,
+            id: "B064".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 2)],
+            points: 1,
+            effects: vec![CardEffect::AfterWorkerGainIfUsed {
+                space: Space::GrainUtilization,
+                required_space: Space::Fishing,
+                good: Good::Food,
+                amount: 2,
+            }],
+            post_play: PostPlayDestination::PlayedArea,
+        },
     ];
     cards
 }
@@ -2163,10 +2232,11 @@ mod verified_worker_bonus_tests {
         let two = verified_worker_bonus_cards(2);
         let three = verified_worker_bonus_cards(3);
         let four = verified_worker_bonus_cards(4);
-        // Only A116, A119, A122 are in this pool now (no player-count gating)
-        assert_eq!(two.len(), 3);
-        assert_eq!(three.len(), 3);
-        assert_eq!(four.len(), 3);
+        // A116, A119, A122, B064 are in this pool now (no player-count gating)
+        // (B064 Mill Wheel restored by the PR #389 static-review fix)
+        assert_eq!(two.len(), 4);
+        assert_eq!(three.len(), 4);
+        assert_eq!(four.len(), 4);
     }
 
     #[test]
@@ -2486,6 +2556,46 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 amount: 1,
                 house: None,
                 rooms: Some(2),
+            }],
+            post_play: PostPlayDestination::PlayedArea,
+        },
+        // A050 (Milk Jug): each time ANY player uses the CattleMarket the
+        // owner gains 3 food; every other player gains 1 food. Restored from
+        // main (PR #389 deleted this implemented card).
+        CardDefinition {
+            use_limit: None,
+            id: "A050".into(),
+            kind: minor,
+            cost: vec![(Good::Clay, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterAnyWorkerGain {
+                    space: Space::CattleMarket,
+                    good: Good::Food,
+                    amount: 3,
+                },
+                CardEffect::AfterAnyWorkerOthersGain {
+                    space: Space::CattleMarket,
+                    good: Good::Food,
+                    amount: 1,
+                },
+            ],
+            post_play: PostPlayDestination::PlayedArea,
+        },
+        // D061 (Bale of Straw): at the start of each harvest, if the owner has
+        // at least 3 fields sown with grain, gain 2 food. Restored from main
+        // (PR #389 deleted this implemented card).
+        CardDefinition {
+            use_limit: None,
+            id: "D061".into(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::HarvestStartGainIfFields {
+                crop: Crop::Grain,
+                threshold: 3,
+                good: Good::Food,
+                amount: 2,
             }],
             post_play: PostPlayDestination::PlayedArea,
         },
@@ -2907,13 +3017,17 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 40);
+        // PR #389 static-review fix: the six deleted cards were restored —
+        // B064 (worker bonus), A050/D061 (round-and-harvest pool) join the
+        // two-player preset (+3 minors); C083/C147 live in the band-C pool
+        // and C141 in the multiplayer pool, so neither is in this A/B preset.
+        assert_eq!(set.definitions.len(), 43);
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::MinorImprovement)
                 .count(),
-            24
+            27
         );
         assert_eq!(
             set.definitions
@@ -3171,6 +3285,34 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                     amount: 1,
                 },
             ],
+        ),
+        // C083 (Early Cattle): minor improvement, -3 points, on play gain 2
+        // cattle (auto-placed via AnimalPlan, no play-time pause). Restored
+        // from main (PR #389 deleted this implemented card).
+        CardDefinition {
+            use_limit: None,
+            id: "C083".to_owned(),
+            kind: minor,
+            cost: vec![],
+            points: -3,
+            effects: vec![CardEffect::OnPlayGainAnimal {
+                animal: Animal::Cattle,
+                amount: 2,
+            }],
+            post_play: PostPlayDestination::PlayedArea,
+        },
+        // C147 (Cowherd): occupation, 0 points, each use of CattleMarket
+        // grants 1 cattle (pauses for the placement decision). Restored from
+        // main (PR #389 deleted this implemented card).
+        card(
+            "C147",
+            occupation,
+            vec![],
+            vec![CardEffect::AfterWorkerGainAnimal {
+                space: Space::CattleMarket,
+                animal: Animal::Cattle,
+                amount: 1,
+            }],
         ),
     ]
 }
@@ -4903,22 +5045,41 @@ pub fn verified_multiplayer_passive_cards(players: usize) -> Vec<CardDefinition>
     if players < 3 {
         return vec![];
     }
-    vec![CardDefinition {
-        use_limit: None,
-        id: "A143".into(),
-        kind: CardKind::Occupation,
-        cost: vec![],
-        points: 0,
-        effects: vec![
-            CardEffect::Prerequisite {
-                rule: CardRequirement::MinimumPlayers(3),
-            },
-            CardEffect::Passive {
-                rule: PassiveRule::StoneDiscount(1),
-            },
-        ],
-        post_play: PostPlayDestination::PlayedArea,
-    }]
+    vec![
+        CardDefinition {
+            use_limit: None,
+            id: "A143".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::Passive {
+                    rule: PassiveRule::StoneDiscount(1),
+                },
+            ],
+            post_play: PostPlayDestination::PlayedArea,
+        },
+        // C141 (Sheep Provider): each time ANY player uses the SheepMarket,
+        // the card owner gains 1 grain. PR #388 pinned the spec eligibility
+        // (2=no, 3/4=yes), so the definition lives in this 3+ player pool:
+        // registry-resolvable yet excluded from the two-player preset.
+        CardDefinition {
+            use_limit: None,
+            id: "C141".into(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterAnyWorkerGain {
+                space: Space::SheepMarket,
+                good: Good::Grain,
+                amount: 1,
+            }],
+            post_play: PostPlayDestination::PlayedArea,
+        },
+    ]
 }
 #[cfg(test)]
 mod m6_extra_passive_tests {

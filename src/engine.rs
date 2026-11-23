@@ -1559,6 +1559,7 @@ impl Game {
                             &mut self.public.card_uses,
                             &self.card_use_limits,
                             &mut self.pending,
+                            &mut self.rng.round,
                         )?;
                         // Update card points
                         let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1628,6 +1629,7 @@ impl Game {
                     &mut self.public.card_uses,
                     &self.card_use_limits,
                     &mut self.pending,
+                    &mut self.rng.round,
                 )?;
                 // Update card points
                 let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1740,6 +1742,7 @@ impl Game {
                         &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
+                        &mut self.rng.round,
                     )?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1825,6 +1828,7 @@ impl Game {
                         &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
+                        &mut self.rng.round,
                     )?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;

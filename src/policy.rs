@@ -540,10 +540,19 @@ fn card_priority(
                         | CardEffect::Prerequisite { .. }
                         // A001–A007 on-play simple effects: immediate gains/actions evaluated at play time
                         | CardEffect::OnPlayBuildStableInPasture { .. }
-                        | CardEffect::OnPlayPlowField { .. }
-                        | CardEffect::OnPlayPickAndPlayOccupation { .. }
-                        | CardEffect::OnPlayGainPerMatchingImprovement { .. }
-                        | CardEffect::OnPlayGainPerFieldType { .. } => 0,
+                                                | CardEffect::OnPlayPlowField { .. }
+                                                | CardEffect::OnPlayPickAndPlayOccupation { .. }
+                                                | CardEffect::OnPlayGainPerMatchingImprovement { .. }
+                                                | CardEffect::OnPlayGainPerFieldType { .. }
+                                                // C083 OnPlayGainAnimal
+                                                | CardEffect::OnPlayGainAnimal { .. }
+                                                // C147 AfterWorkerGainAnimal
+                                                | CardEffect::AfterWorkerGainAnimal { .. }
+                                                // C141/A050 AfterAnyWorkerGain/AfterAnyWorkerOthersGain
+                                                | CardEffect::AfterAnyWorkerGain { .. }
+                                                | CardEffect::AfterAnyWorkerOthersGain { .. }
+                                                // D061 HarvestStartGainIfFields
+                                                | CardEffect::HarvestStartGainIfFields { .. } => 0,
                 #[cfg(test)]
                 // Test-only probe; never part of a real evaluated pool.
                 CardEffect::PendingProbe { .. } => 0,

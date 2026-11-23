@@ -7,7 +7,10 @@ use agricola_re_ai::{Config, Game};
 #[test]
 fn verified_pool_has_fourteen_unique_occupations_and_minors() {
     let set = verified_basic_card_set(2).unwrap();
-    assert_eq!(set.definitions.len(), 40);
+    // PR #389 static-review fix restored B064/A050/D061 (all minor improvements)
+    // to the two-player pack: pool size 40 -> 43, minor count 24 -> 27,
+    // occupation count unchanged at 16.
+    assert_eq!(set.definitions.len(), 43);
     assert_eq!(
         set.definitions
             .iter()
@@ -20,7 +23,7 @@ fn verified_pool_has_fourteen_unique_occupations_and_minors() {
             .iter()
             .filter(|c| c.kind == CardKind::MinorImprovement)
             .count(),
-        24
+        27
     );
     assert!(verified_basic_card_set(3).is_err());
 }

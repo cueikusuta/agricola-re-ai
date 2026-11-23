@@ -1653,6 +1653,7 @@ impl Game {
                             actor: player,
                             card_owner: player,
                             beneficiary: player,
+                            rng: Some(&mut next.rng.round),
                         };
                         let trigger = crate::card_events::PhaseTriggerData {
                             space: None,
@@ -1786,6 +1787,7 @@ impl Game {
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
+                        rng: Some(&mut next.rng.round),
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: None,
@@ -1894,6 +1896,7 @@ impl Game {
                         actor: player,
                         card_owner: player,
                         beneficiary: player,
+                        rng: Some(&mut next.rng.round),
                     };
                     let trigger = crate::card_events::PhaseTriggerData {
                         space: Some(completion.action.space),
@@ -2237,6 +2240,7 @@ impl Game {
                     actor: pending.player,
                     card_owner,
                     beneficiary: card_owner,
+                    rng: Some(&mut self.rng.round),
                 };
 
                 // Execute in chosen order

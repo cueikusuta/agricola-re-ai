@@ -25,6 +25,8 @@ use agricola_re_ai::cards::{
 };
 use agricola_re_ai::model::{Crop, Good, House, Improvement, Player, Tile};
 use agricola_re_ai::registry::build_default_registry;
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn new_set(defs: Vec<CardDefinition>) -> CardSet {
@@ -81,6 +83,7 @@ fn dispatch_card(set: &CardSet, player: &mut Player, hand: &mut [String], id: &s
     let mut uses = BTreeMap::new();
     let limits = BTreeMap::new();
     let mut pending = None;
+    let mut rng = ChaCha8Rng::seed_from_u64(0);
     dispatch_play(
         set,
         0,
@@ -96,6 +99,7 @@ fn dispatch_card(set: &CardSet, player: &mut Player, hand: &mut [String], id: &s
         &mut uses,
         &limits,
         &mut pending,
+        &mut rng,
     )
     .unwrap_or_else(|e| panic!("dispatch_play {id}: {e}"));
     *player = players[0].clone();
@@ -542,6 +546,7 @@ fn dispatch_card_result(
     let mut uses = BTreeMap::new();
     let limits = BTreeMap::new();
     let mut pending = None;
+    let mut rng = ChaCha8Rng::seed_from_u64(0);
     dispatch_play(
         set,
         0,
@@ -557,6 +562,7 @@ fn dispatch_card_result(
         &mut uses,
         &limits,
         &mut pending,
+        &mut rng,
     )
 }
 

@@ -284,11 +284,20 @@ impl CardRegistryBuilder {
                                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                                 | crate::cards::CardEffect::OnPlayGainPerCount { .. }
                                 // A001–A007 on-play simple effects
-                                | crate::cards::CardEffect::OnPlayBuildStableInPasture { .. }
-                                | crate::cards::CardEffect::OnPlayPlowField { .. }
-                                | crate::cards::CardEffect::OnPlayPickAndPlayOccupation { .. }
-                                | crate::cards::CardEffect::OnPlayGainPerMatchingImprovement { .. }
-                                | crate::cards::CardEffect::OnPlayGainPerFieldType { .. } => EventKind::CardPlayed,
+                                                                | crate::cards::CardEffect::OnPlayBuildStableInPasture { .. }
+                                                                | crate::cards::CardEffect::OnPlayPlowField { .. }
+                                                                | crate::cards::CardEffect::OnPlayPickAndPlayOccupation { .. }
+                                                                | crate::cards::CardEffect::OnPlayGainPerMatchingImprovement { .. }
+                                                                | crate::cards::CardEffect::OnPlayGainPerFieldType { .. }
+                                                                // C083 OnPlayGainAnimal
+                                                                | crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
+                                                                // C147 AfterWorkerGainAnimal
+                                                                | crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
+                                                                // C141/A050 AfterAnyWorkerGain/AfterAnyWorkerOthersGain
+                                                                | crate::cards::CardEffect::AfterAnyWorkerGain { .. }
+                                                                | crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => EventKind::WorkerPlaced,
+                                                                // D061 HarvestStartGainIfFields
+                                                                | crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -411,11 +420,20 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. } => *amount,
                         // New on-play simple gain effects (M10 Chapter 1) - no amount field
-                        crate::cards::CardEffect::OnPlayBuildStableInPasture { .. }
-                        | crate::cards::CardEffect::OnPlayPlowField { .. }
-                        | crate::cards::CardEffect::OnPlayPickAndPlayOccupation { .. }
-                        | crate::cards::CardEffect::OnPlayGainPerMatchingImprovement { .. }
-                        | crate::cards::CardEffect::OnPlayGainPerFieldType { .. } => 1,
+                                                crate::cards::CardEffect::OnPlayBuildStableInPasture { .. }
+                                                | crate::cards::CardEffect::OnPlayPlowField { .. }
+                                                | crate::cards::CardEffect::OnPlayPickAndPlayOccupation { .. }
+                                                | crate::cards::CardEffect::OnPlayGainPerMatchingImprovement { .. }
+                                                | crate::cards::CardEffect::OnPlayGainPerFieldType { .. }
+                                                // C083 OnPlayGainAnimal
+                                                | crate::cards::CardEffect::OnPlayGainAnimal { .. } => 1,
+                                                // C147 AfterWorkerGainAnimal
+                                                | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
+                                                // C141/A050 AfterAnyWorkerGain/AfterAnyWorkerOthersGain
+                                                | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. } => *amount,
+                                                | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. } => *amount,
+                                                // D061 HarvestStartGainIfFields
+                                                | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. } => *amount,
                     };
                     amount == 0 || amount > 30
                 })

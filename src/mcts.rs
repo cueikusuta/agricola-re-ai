@@ -1187,8 +1187,9 @@ mod tests {
         // excluded from the verified pool, so the sample_game distribution is unchanged.
         // Updated: added A042 Forest Lake Hut to verified_minor_worker_cards (pool size 33->34)
         // Updated: added A001-A007 on-play simple gain cards to verified_a_onplay_simple_cards (pool size 35->40)
+        // Updated: PR #389 static-review fix restored B064/A050/D061 to the two-player pool (pool size 40->43)
         assert_eq!(
-            digest, "775345ef163590ff21753eb582fc08973c8642d8e8dfb4a7e55b66923743f2ce",
+            digest, "826111d2e7ab356a7dbe95481b34978dff0e2b09cd1633564dc86d45b3c639df",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
