@@ -8032,8 +8032,8 @@ mod tests {
             c.players[0].supply.food = 2;
             c.cards.hands[0].push("A002".to_string());
             // 全セルを部屋で埋めて耕作可能セルを0にする。
-            for i in 0..crate::model::FARM_CELLS {
-                c.players[0].farm[i].tile = Tile::Room;
+            for cell in &mut c.players[0].farm {
+                cell.tile = Tile::Room;
             }
             let mut market = vec![];
             let mut well = BTreeMap::new();
@@ -8072,8 +8072,8 @@ mod tests {
             c.players[0].supply.food = 2;
             c.cards.hands[0].push("A002".to_string());
             // セル4だけ空き、それ以外は部屋。
-            for i in 0..crate::model::FARM_CELLS {
-                c.players[0].farm[i].tile = Tile::Room;
+            for cell in &mut c.players[0].farm {
+                cell.tile = Tile::Room;
             }
             c.players[0].farm[4].tile = Tile::Empty;
             let mut market = vec![];
@@ -8116,8 +8116,8 @@ mod tests {
             let mut c = Ctx::new();
             c.players[0].supply.food = 2;
             c.cards.hands[0].push("A002".to_string());
-            for i in 0..crate::model::FARM_CELLS {
-                c.players[0].farm[i].tile = Tile::Room;
+            for cell in &mut c.players[0].farm {
+                cell.tile = Tile::Room;
             }
             for cell in [4usize, 5, 6] {
                 c.players[0].farm[cell].tile = Tile::Empty;
