@@ -468,7 +468,6 @@ impl CardEffect {
 
             CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
             CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
-            CardEffect::AfterAnyWorkerGain { .. } => "after_any_worker_gain",
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
             CardEffect::AfterImprovementPlayedGain { .. } => "after_improvement_played_gain",
@@ -771,7 +770,9 @@ impl CardSet {
                         | CardEffect::AfterHarvestBakeGain { amount }
                         | CardEffect::OnPlayGainPerCount { amount, .. }
                         | CardEffect::AfterImprovementPlayedGain { amount, .. }
-                        | CardEffect::AfterHarvestGain { amount, .. }
+                        | CardEffect::OnPlayGainAnimal { amount, .. }
+                        | CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
+                        CardEffect::AfterHarvestGain { amount, .. }
                         | CardEffect::AfterHarvestGainIfAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfFamilyAndRooms { amount, .. }
                         | CardEffect::StartRoundGainIfLessonsOccupants { amount, .. }
@@ -797,7 +798,7 @@ impl CardSet {
                         CardEffect::OnPlayChoiceGain { options } => {
                             options.iter().map(|o| o.amount).max().unwrap_or(1)
                         }
-                        | CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { amount, .. } => {
+                        CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { amount, .. } => {
                             *amount
                         }
                         // A140: the amount is read from the public
@@ -4126,29 +4127,6 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
             vec![],
             PassiveRule::RoomCost(3),
         ),
-        // C083 若牛 (Early Cattle): minor improvement, -3 points, on play gain 2 cattle.
-        CardDefinition {
-            use_limit: None,
-            id: "C083".to_owned(),
-            kind: minor,
-            cost: vec![],
-            points: -3,
-            effects: vec![CardEffect::OnPlayGainAnimal {
-                animal: Animal::Cattle,
-                amount: 2,
-            }],
-        },
-        // C147 牛の飼育士 (Cowherd): occupation, 0 points, each time owner uses CattleMarket gain 1 cattle.
-        card(
-            "C147",
-            occupation,
-            vec![],
-            vec![CardEffect::AfterWorkerGainAnimal {
-                space: Space::CattleMarket,
-                animal: Animal::Cattle,
-                amount: 1,
-            }],
-        ),
     ]
 }
 #[cfg(test)]
@@ -4791,12 +4769,35 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 },
             ],
         ),
+        // C083 若牛 (Early Cattle): minor improvement, -3 points, on play gain 2 cattle.
+        CardDefinition {
+            use_limit: None,
+            id: "C083".to_owned(),
+            kind: minor,
+            cost: vec![],
+            points: -3,
+            effects: vec![CardEffect::OnPlayGainAnimal {
+                animal: Animal::Cattle,
+                amount: 2,
+            }],
+        },
+        // C147 牛の飼育士 (Cowherd): occupation, 0 points, each time owner uses CattleMarket gain 1 cattle.
+        card(
+            "C147",
+            occupation,
+            vec![],
+            vec![CardEffect::AfterWorkerGainAnimal {
+                space: Space::CattleMarket,
+                animal: Animal::Cattle,
+                amount: 1,
+            }],
+        ),
         // C006 石取り作業 (Stone Clearing): cost food1, prerequisite 1 occupation
         // played; on play place 1 stone on each empty field, harvested at next
         // field phase (fields count as cultivated until then). Pass left.
         card(
             "C006",
-            minor,
+            CardKind::MinorImprovement,
             vec![(Good::Food, 1)],
             vec![
                 CardEffect::Prerequisite {
@@ -4814,7 +4815,7 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
         // Pass left.
         card(
             "C007",
-            minor,
+            CardKind::MinorImprovement,
             vec![(Good::Wood, 1)],
             vec![
                 CardEffect::Prerequisite {
@@ -5382,46 +5383,93 @@ mod verified_band_c_tests {
     /// holds dummies.
     fn production_hands(focus: &str) -> Vec<Vec<String>> {
         let definitions = production_definitions();
-        let mut minors: Vec<String> = definitions
+        let band_minors: Vec<String> = definitions
             .iter()
             .filter(|c| c.kind == CardKind::MinorImprovement && c.id.starts_with('C'))
             .map(|c| c.id.clone())
             .collect();
-        minors.retain(|id| id != focus);
-        let mut hand0: Vec<String> = vec![focus.to_string()];
-        hand0.extend(minors.iter().take(4).cloned());
-        hand0.extend(["M9X0", "M9X1"].iter().map(|s| s.to_string()));
-        assert_eq!(hand0.len(), 7, "seat 0 must hold seven minor improvements");
-        let occ0: Vec<String> = definitions
+        let band_occs: Vec<String> = definitions
             .iter()
             .filter(|c| c.kind == CardKind::Occupation && c.id.starts_with('C'))
             .map(|c| c.id.clone())
             .collect();
-        hand0.extend(occ0.iter().take(3).cloned());
-        hand0.extend(
-            ["O9X0", "O9X1", "O9X2", "O9X3"]
-                .iter()
-                .map(|s| s.to_string()),
+        let dummy_minors: Vec<String> = definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::MinorImprovement && c.id.starts_with("M9X"))
+            .map(|c| c.id.clone())
+            .collect();
+        let dummy_occs: Vec<String> = definitions
+            .iter()
+            .filter(|c| c.kind == CardKind::Occupation && c.id.starts_with("O9X"))
+            .map(|c| c.id.clone())
+            .collect();
+
+        // Deal the real band-C cards across the seats first (each exactly
+        // once), then top every seat up to seven of each kind from the
+        // generated dummy pool. Dummy ids are taken from the pool instead of
+        // being hard-coded: main keeps adding band-C cards (C083/C147), which
+        // shrinks the pool the top-up in `production_definitions` generates.
+        let mut minors0: Vec<String> = vec![focus.to_string()];
+        let mut minors1: Vec<String> = Vec::new();
+        let mut occs0: Vec<String> = Vec::new();
+        let mut occs1: Vec<String> = Vec::new();
+        let mut minors = band_minors.into_iter().filter(|id| id != focus);
+        minors0.extend(minors.by_ref().take(4));
+        minors1.extend(minors);
+        assert!(
+            minors1.len() <= 7,
+            "band-C minor pool exceeds the two-seat deal (seat 1 would hold more than seven)"
         );
+        let mut occs = band_occs.into_iter();
+        occs0.extend(occs.by_ref().take(3));
+        occs1.extend(occs);
+        assert!(
+            occs1.len() <= 7,
+            "band-C occupation pool exceeds the two-seat deal (seat 1 would hold more than seven)"
+        );
+        let mut dummy_minors = dummy_minors.into_iter();
+        while minors0.len() < 7 {
+            minors0.push(
+                dummy_minors
+                    .next()
+                    .expect("dummy minor pool must top seat 0 up to seven"),
+            );
+        }
+        while minors1.len() < 7 {
+            minors1.push(
+                dummy_minors
+                    .next()
+                    .expect("dummy minor pool must top seat 1 up to seven"),
+            );
+        }
+        let mut dummy_occs = dummy_occs.into_iter();
+        while occs0.len() < 7 {
+            occs0.push(
+                dummy_occs
+                    .next()
+                    .expect("dummy occupation pool must top seat 0 up to seven"),
+            );
+        }
+        while occs1.len() < 7 {
+            occs1.push(
+                dummy_occs
+                    .next()
+                    .expect("dummy occupation pool must top seat 1 up to seven"),
+            );
+        }
+        minors0.extend(occs0);
+        minors1.extend(occs1);
         assert_eq!(
-            hand0.len(),
+            minors0.len(),
             14,
             "seat 0 must hold seven minors + seven occupations"
         );
-        // Seat 1 gets the leftovers: the one band-C minor seat 0 did not take
-        // (minors[4], the fifth non-focus band-C minor) plus six dummies.
-        let minor_rest = minors.get(4).cloned().expect("six band-C minors");
-        let mut hand1: Vec<String> = vec![minor_rest];
-        hand1.extend(["M9X2", "M9X3", "M9X4", "M9X5", "M9X6", "M9X7"].map(|s| s.to_string()));
-        hand1.extend(
-            ["O9X4", "O9X5", "O9X6", "O9X7", "O9X8", "O9X9", "O9X10"].map(|s| s.to_string()),
-        );
         assert_eq!(
-            hand1.len(),
+            minors1.len(),
             14,
             "seat 1 must hold seven minors + seven occupations"
         );
-        vec![hand0, hand1]
+        vec![minors0, minors1]
     }
 
     #[test]

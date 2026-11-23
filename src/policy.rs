@@ -548,6 +548,14 @@ fn card_good_value(good: Good) -> i64 {
     }
 }
 
+fn card_animal_value(animal: Animal) -> i64 {
+    match animal {
+        Animal::Sheep => 4,
+        Animal::Boar => 5,
+        Animal::Cattle => 6,
+    }
+}
+
 /// Score the card's actual immediate resource/point change after payments,
 /// then add a bounded forecast for explicitly recurring or passive effects.
 /// This avoids treating conditional on-play rewards as unconditional.

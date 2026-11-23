@@ -1673,6 +1673,7 @@ impl Game {
                             &mut self.public.card_uses,
                             &self.card_use_limits,
                             &mut self.pending,
+                            false,
                         )?;
                         crate::cards::apply_choice_gain(
                             &mut self.public.players[id],
@@ -2083,6 +2084,7 @@ impl Game {
                         &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
+                        false,
                     )?;
                     // Apply the chosen on-play gain option (C007).
                     crate::cards::apply_choice_gain(
