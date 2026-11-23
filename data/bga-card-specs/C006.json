@@ -90,7 +90,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-13",
-    "implementation_status": "in_progress",
+    "implementation_status": "not_started",
     "notes": "Place 1 stone on every empty field; collect them at the next field phase (fields count as cultivated until then); pass left."
   }
 }
