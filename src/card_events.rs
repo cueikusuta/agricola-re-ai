@@ -106,6 +106,11 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. } => TriggerPhase::After,
         CardEffect::StartRoundExchangeForFoodAndPoints { .. } => TriggerPhase::After,
         CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => TriggerPhase::After,
+        // Dormant: harvest-feeding effects (D012, A062, C055, C059, C063,
+        // D062, D084) are executed plan-free/plan-driven by the engine's
+        // harvest step (harvest.rs), not via the phase scan.
+        CardEffect::HarvestFeedingGain { .. }
+        | CardEffect::HarvestFeedingOptionalExchange { .. } => TriggerPhase::After,
     }
 }
 
@@ -800,6 +805,10 @@ fn resolve_phase_scan(
                     *num_spaces,
                     trigger_data,
                 )?,
+                // Dormant: harvest-feeding effects are executed by the engine's
+                // harvest step (harvest.rs), not via the phase scan.
+                CardEffect::HarvestFeedingGain { .. }
+                | CardEffect::HarvestFeedingOptionalExchange { .. } => EffectResult::Resolved,
                 CardEffect::EndGameBonus { .. } => {
                     // Scoring is handled separately in evaluation; no runtime effect.
                     EffectResult::Resolved
@@ -1123,6 +1132,10 @@ fn effect_condition_holds(
         }
         CardEffect::StartRoundExchangeForFoodAndPoints { .. } => false,
         CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => false,
+        // Dormant: harvest-feeding effects are executed by the engine's
+        // harvest step (harvest.rs); never triggerable via the phase scan.
+        CardEffect::HarvestFeedingGain { .. }
+        | CardEffect::HarvestFeedingOptionalExchange { .. } => false,
         #[cfg(test)]
         CardEffect::PendingProbe { .. } => true,
     }
@@ -1495,6 +1508,10 @@ pub fn execute_chosen_triggers(
                 *num_spaces,
                 trigger_data,
             )?,
+            // Dormant: harvest-feeding effects are executed by the engine's
+            // harvest step (harvest.rs), not via the phase scan.
+            CardEffect::HarvestFeedingGain { .. }
+            | CardEffect::HarvestFeedingOptionalExchange { .. } => EffectResult::Resolved,
             CardEffect::EndGameBonus { .. } => {
                 // Scoring is handled separately in evaluation; no runtime effect.
                 EffectResult::Resolved

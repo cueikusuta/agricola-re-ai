@@ -402,7 +402,9 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
-                | crate::cards::CardEffect::EndGameBonus { .. } => continue,
+                | crate::cards::CardEffect::EndGameBonus { .. }
+                | crate::cards::CardEffect::HarvestFeedingGain { .. }
+                | crate::cards::CardEffect::HarvestFeedingOptionalExchange { .. } => continue,
                 #[cfg(test)]
                 crate::cards::CardEffect::PendingProbe { .. } => continue,
             };
@@ -557,8 +559,16 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
                             ..
                         } => 1,
-                    };
-                    amount == 0 || amount > 30
+                        | crate::cards::CardEffect::HarvestFeedingGain { amount, .. } => *amount,
+                                                | crate::cards::CardEffect::HarvestFeedingOptionalExchange { options, .. } => {
+                                                    options
+                                                        .iter()
+                                                        .map(|option| option.receive_food + if option.receive_animal { 1 } else { 0 })
+                                                        .max()
+                                                        .unwrap_or(1)
+                                                }
+                                            };
+                                            amount == 0 || amount > 30
                 })
                 || card.effects.iter().any(|effect| {
                     matches!(

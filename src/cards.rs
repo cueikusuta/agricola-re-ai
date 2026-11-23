@@ -394,6 +394,41 @@ pub enum CardEffect {
         /// The good granted (food on the printed card).
         good: Good,
     },
+    /// D012 搾乳所 (Milking Place): +1 food in the feeding phase of each
+    /// harvest (automatic, no decision). A148 羊飼い (Shepherd): +1 sheep in
+    /// the feeding phase of each harvest. Resolved plan-free by the engine's
+    /// harvest step; the phase scan stays dormant.
+    HarvestFeedingGain {
+        /// If set, the good granted each feeding phase (D012).
+        good: Option<Good>,
+        /// Amount of the good granted.
+        amount: u32,
+        /// If set, the animal granted each feeding phase (A148).
+        animal: Option<Animal>,
+    },
+    /// Feeding-phase owner-chosen exchanges (A062, C055, C059, C063, D062,
+    /// D084): the owner chooses one printed option (or declines). Executed
+    /// plan-driven via `FeedingPlan` by the engine's harvest step; the phase
+    /// scan stays dormant.
+    HarvestFeedingOptionalExchange {
+        options: Vec<FeedingExchangeOption>,
+    },
+}
+
+/// One printed option of a harvest-feeding owner-chosen exchange.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct FeedingExchangeOption {
+    /// Goods paid from the owner's supply.
+    pub give: Vec<(Good, u32)>,
+    /// Take 1 grain from a standing grain field instead of from supply.
+    pub take_field_grain: bool,
+    /// Food granted.
+    pub receive_food: u32,
+    /// Bonus points granted.
+    pub receive_points: i32,
+    /// One animal of a type the owner already owns.
+    pub receive_animal: bool,
 }
 
 impl CardEffect {
@@ -439,6 +474,10 @@ impl CardEffect {
                 "after_harvest_choose_gain_if_at_least"
             }
             CardEffect::HarvestFieldOptionalExchange { .. } => "harvest_field_optional_exchange",
+            CardEffect::HarvestFeedingGain { .. } => "harvest_feeding_gain",
+            CardEffect::HarvestFeedingOptionalExchange { .. } => {
+                "harvest_feeding_optional_exchange"
+            }
 
             CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
             CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
@@ -760,6 +799,14 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
                         | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
                         | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 1,
+                        CardEffect::HarvestFeedingGain { amount, .. } => *amount,
+                        CardEffect::HarvestFeedingOptionalExchange { options, .. } => options
+                            .iter()
+                            .map(|option| {
+                                option.receive_food + if option.receive_animal { 1 } else { 0 }
+                            })
+                            .max()
+                            .unwrap_or(1),
                     };
                     amount == 0 || amount > 30
                 })
@@ -4584,6 +4631,83 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         ),
+        // C055 アトリエ (Studio): cost 1 clay and 1 reed, 1 printed point; in
+        // each feeding phase the owner may convert exactly 1 wood or clay
+        // into 2 food, or 1 stone into 3 food (BGA spec C055,
+        // harvest_feeding optional exchange).
+        CardDefinition {
+            use_limit: None,
+            id: "C055".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Clay, 1), (Good::Reed, 1)],
+            points: 1,
+            effects: vec![CardEffect::HarvestFeedingOptionalExchange {
+                options: vec![
+                    FeedingExchangeOption {
+                        give: vec![(Good::Wood, 1)],
+                        take_field_grain: false,
+                        receive_food: 2,
+                        receive_points: 0,
+                        receive_animal: false,
+                    },
+                    FeedingExchangeOption {
+                        give: vec![(Good::Clay, 1)],
+                        take_field_grain: false,
+                        receive_food: 2,
+                        receive_points: 0,
+                        receive_animal: false,
+                    },
+                    FeedingExchangeOption {
+                        give: vec![(Good::Stone, 1)],
+                        take_field_grain: false,
+                        receive_food: 3,
+                        receive_points: 0,
+                        receive_animal: false,
+                    },
+                ],
+            }],
+        },
+        // C059 シュナップス蒸留所 (Schnapps Distillery): cost 2 stone and 1
+        // vegetable, 2 printed points; in each feeding phase the owner may
+        // cook 1 vegetable into 5 food (BGA spec C059). The end-game scoring
+        // half (1 point at 5 vegetables, 2 at 6) is not yet wired to the
+        // runtime scorer and is tracked as follow-up work.
+        CardDefinition {
+            use_limit: None,
+            id: "C059".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Stone, 2), (Good::Vegetable, 1)],
+            points: 2,
+            effects: vec![CardEffect::HarvestFeedingOptionalExchange {
+                options: vec![FeedingExchangeOption {
+                    give: vec![(Good::Vegetable, 1)],
+                    take_field_grain: false,
+                    receive_food: 5,
+                    receive_points: 0,
+                    receive_animal: false,
+                }],
+            }],
+        },
+        // C063 クラフトビール醸造所 (Craft Brewery): cost 2 wood and 1 clay;
+        // in each feeding phase the owner may brew 1 grain from supply and 1
+        // grain from a standing grain field into 4 food and 2 points
+        // (BGA spec C063).
+        CardDefinition {
+            use_limit: None,
+            id: "C063".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Wood, 2), (Good::Clay, 1)],
+            points: 0,
+            effects: vec![CardEffect::HarvestFeedingOptionalExchange {
+                options: vec![FeedingExchangeOption {
+                    give: vec![(Good::Grain, 1)],
+                    take_field_grain: true,
+                    receive_food: 4,
+                    receive_points: 2,
+                    receive_animal: false,
+                }],
+            }],
+        },
     ]
 }
 #[cfg(test)]
@@ -4899,6 +5023,86 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // D012 搾乳所 (Milking Place): cost 1 grain, 1 printed point;
+        // +1 food in the feeding phase of each harvest (BGA spec D012,
+        // harvest_feeding gain). The printed passive "no animals in the
+        // house" is not modeled (the engine has no house-animal state) and
+        // is tracked as follow-up work.
+        CardDefinition {
+            use_limit: None,
+            id: "D012".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Grain, 1)],
+            points: 1,
+            effects: vec![CardEffect::HarvestFeedingGain {
+                good: Some(Good::Food),
+                amount: 1,
+                animal: None,
+            }],
+        },
+        // D062 ビールタップ (Beer Tap): cost 1 wood; +2 food on play; in
+        // each feeding phase the owner may exchange exactly 2/3/4 grain for
+        // 3/6/9 food (one shared choice, BGA spec D062).
+        card(
+            "D062",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1)],
+            vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 2,
+                },
+                CardEffect::HarvestFeedingOptionalExchange {
+                    options: vec![
+                        FeedingExchangeOption {
+                            give: vec![(Good::Grain, 2)],
+                            take_field_grain: false,
+                            receive_food: 3,
+                            receive_points: 0,
+                            receive_animal: false,
+                        },
+                        FeedingExchangeOption {
+                            give: vec![(Good::Grain, 3)],
+                            take_field_grain: false,
+                            receive_food: 6,
+                            receive_points: 0,
+                            receive_animal: false,
+                        },
+                        FeedingExchangeOption {
+                            give: vec![(Good::Grain, 4)],
+                            take_field_grain: false,
+                            receive_food: 9,
+                            receive_points: 0,
+                            receive_animal: false,
+                        },
+                    ],
+                },
+            ],
+        ),
+        // D084 飼料ペレット (Feed Pellets): cost 0; +1 sheep on play
+        // (placed into an existing pasture/stable); in each feeding phase
+        // the owner may convert 1 vegetable into 1 animal of a type already
+        // owned (BGA spec D084).
+        card(
+            "D084",
+            CardKind::MinorImprovement,
+            vec![],
+            vec![
+                CardEffect::OnPlayGainAnimal {
+                    animal: Animal::Sheep,
+                    amount: 1,
+                },
+                CardEffect::HarvestFeedingOptionalExchange {
+                    options: vec![FeedingExchangeOption {
+                        give: vec![(Good::Vegetable, 1)],
+                        take_field_grain: false,
+                        receive_food: 0,
+                        receive_points: 0,
+                        receive_animal: true,
+                    }],
+                },
+            ],
+        ),
     ]
 }
 
