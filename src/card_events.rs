@@ -65,6 +65,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterWorkerGainIfUsed { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainAnimal { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => TriggerPhase::After,
         // Round start — After phase (happens after round begins)
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
@@ -588,6 +589,20 @@ fn resolve_phase_scan(
                     animal,
                     amount,
                 } => handle_after_worker_gain_animal(ctx, space, animal, *amount, trigger_data)?,
+                CardEffect::AfterWorkerGainIfOwnsAnimal {
+                    space,
+                    animal,
+                    good,
+                    amount,
+                } => handle_after_worker_gain_if_owns_animal(
+                    ctx,
+                    player,
+                    space,
+                    animal,
+                    good,
+                    *amount,
+                    trigger_data,
+                )?,
                 CardEffect::StartRoundGain {
                     good,
                     amount,
@@ -1096,6 +1111,9 @@ fn effect_condition_holds(
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
+        CardEffect::AfterWorkerGainIfOwnsAnimal { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
@@ -1284,6 +1302,20 @@ pub fn execute_chosen_triggers(
                 animal,
                 amount,
             } => handle_after_worker_gain_animal(ctx, space, animal, *amount, trigger_data)?,
+            CardEffect::AfterWorkerGainIfOwnsAnimal {
+                space,
+                animal,
+                good,
+                amount,
+            } => handle_after_worker_gain_if_owns_animal(
+                ctx,
+                player,
+                space,
+                animal,
+                good,
+                *amount,
+                trigger_data,
+            )?,
             CardEffect::StartRoundGain {
                 good,
                 amount,
@@ -1864,6 +1896,35 @@ fn handle_after_worker_gain_other_accumulation_food(
         .checked_add(amount)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// A066 餌皿 (Feeding Dish): after the owner uses `space`, if the owner
+/// already keeps `animal` (`player.animal_count(animal) > 0`), grant
+/// `amount` of `good` to the card owner only. The after-worker scan runs
+/// after the worker action resolved, so animals taken at that same market
+/// are included in the count (after_event snapshot). Non-matching spaces
+/// and non-owner players grant nothing.
+fn handle_after_worker_gain_if_owns_animal(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    space: &Space,
+    animal: &Animal,
+    good: &Good,
+    amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        let p = &mut ctx.player;
+        if p.animal_count(*animal) > 0 {
+            let next = p
+                .supply
+                .get(*good)
+                .checked_add(amount)
+                .ok_or("resource overflow")?;
+            p.supply.set(*good, next);
+        }
+    }
     Ok(EffectResult::Resolved)
 }
 

@@ -558,6 +558,9 @@ fn card_priority(
                                 | CardEffect::AfterOccupationGainPerFoodCost { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
+                                CardEffect::AfterWorkerGainIfOwnsAnimal { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                }
                                 // C068 書棚: fixed gain per occupation played; similar heuristic to
                                 // PerFoodCost but without food-cost scaling.
                                 | CardEffect::AfterOccupationGain { good, amount, .. } => {
