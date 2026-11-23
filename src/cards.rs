@@ -380,6 +380,20 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// A140 ショベル運搬人 (Shovel Bearer): after the owner uses `space`
+    /// (ClayPit or Hollow), gain `good` (food) equal to the clay standing on
+    /// the OTHER clay accumulation space (ClayPit use reads Hollow, Hollow
+    /// use reads ClayPit). The printed card pays the opposite accumulation's
+    /// current clay count, so the amount is dynamic and deliberately not
+    /// folded into `AfterWorkerGain`'s fixed `amount`: the handler reads it
+    /// from the public accumulations map the after-worker dispatcher threads
+    /// read-only through `DispatchContext`. Only available at 3+ players.
+    AfterWorkerGainOtherAccumulationFood {
+        /// The accumulation space the owner used (clay_pit or hollow).
+        space: Space,
+        /// The good granted (food on the printed card).
+        good: Good,
+    },
 }
 
 impl CardEffect {
@@ -467,6 +481,9 @@ impl CardEffect {
                 "start_round_gain_if_no_harvest_and_animals"
             }
             CardEffect::OnPlayGainIfRoomCount { .. } => "on_play_gain_if_room_count",
+            CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
+                "after_worker_gain_other_accumulation_food"
+            }
         }
     }
 }
@@ -539,6 +556,13 @@ pub enum HarvestFieldRule {
     /// A118 樹木庭師 (Treegardener): fixed amount per harvest field phase,
     /// independent of field count or crop state.
     Fixed,
+    /// A112 大鎌使い (Scythe Worker): one multiplier step per grain field
+    /// whose crop is still growing. The dispatcher runs before crops are
+    /// removed, and each growing grain field yields exactly one grain this
+    /// field phase, so counting `remaining >= 1` grain fields here equals
+    /// the grain the fields yield — the card pays 1 extra grain per such
+    /// field. Grain in the supply and empty fields are not counted.
+    GrainFieldsGrowing,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -725,8 +749,11 @@ impl CardSet {
                         | CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { amount, .. } => {
                             *amount
                         }
+                        // A140: the amount is read from the public
+                        // accumulations at resolution time, not fixed here.
                         // Chapter 1 round-start cards: no direct resource amount to validate
-                        CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
+                        | CardEffect::StartRoundPlowFieldIfHouse { .. }
                         | CardEffect::StartRoundCopyUnusedRoundSpace { .. }
                         | CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. }
                         | CardEffect::StartRoundPlayCardIfStoneHouse { .. }
@@ -2725,6 +2752,26 @@ fn vegetable_yield(player: &Player) -> u32 {
         .count() as u32
 }
 
+/// Grain fields the field phase is about to harvest: fields planted with
+/// grain whose crop is still growing (one grain per field). Read pre-harvest
+/// state, before any crops are removed. Supply grain and empty fields are
+/// not counted.
+fn grain_fields_growing(player: &Player) -> u32 {
+    player
+        .farm
+        .iter()
+        .filter(|cell| {
+            matches!(
+                cell.tile,
+                Tile::Field {
+                    crop: Some(Crop::Grain),
+                    remaining: 1..,
+                }
+            )
+        })
+        .count() as u32
+}
+
 /// Called before taking crops from fields; livestock and field layouts still
 /// represent the state at the start of the field phase.
 pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), String> {
@@ -2795,6 +2842,9 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                             .count() as u32
                     }
                     HarvestFieldRule::Fixed => 1,
+                    // A112 大鎌使い: one step per growing grain field (the
+                    // same pre-harvest count the dispatcher handler uses).
+                    HarvestFieldRule::GrainFieldsGrowing => grain_fields_growing(player),
                 };
                 safe_gain(
                     player,
@@ -3248,6 +3298,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3269,6 +3320,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3290,6 +3342,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3329,6 +3382,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3352,6 +3406,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3375,6 +3430,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -4917,6 +4973,30 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // A112 大鎌使い (Scythe Worker): gain 1 grain when playing this card;
+        // in each field phase gain 1 extra grain per growing grain field (the
+        // dispatcher runs before crops are removed, so the count equals the
+        // grain the fields yield this phase). Spec: data/bga-card-specs/
+        // A112.json (on_play grain 1 + harvest_field_phase grain per grain
+        // field), cost/prereq none, 0 points.
+        CardDefinition {
+            use_limit: None,
+            id: "A112".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::GrainFieldsGrowing,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+            ],
+        },
         // A117 木材調達人 (Wood Carrier): 1 wood per improvement already in
         // front of the owner when playing this card.
         CardDefinition {
@@ -4981,6 +5061,32 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 CardEffect::OnPlayGain {
                     good: Good::Vegetable,
                     amount: 1,
+                },
+            ],
+        },
+        // A140 ショベル運搬人 (Shovel Bearer): after using ClayPit, food equal
+        // to the clay left on Hollow; after using Hollow, food equal to the
+        // clay left on ClayPit (the printed card pays the OTHER accumulation's
+        // clay count; agricola.cloudfree.jp ?p=3285). The amount is dynamic,
+        // read from the public accumulations at resolution time. Only
+        // available at 3+ players.
+        CardDefinition {
+            use_limit: None,
+            id: "A140".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::AfterWorkerGainOtherAccumulationFood {
+                    space: Space::ClayPit,
+                    good: Good::Food,
+                },
+                CardEffect::AfterWorkerGainOtherAccumulationFood {
+                    space: Space::Hollow,
+                    good: Good::Food,
                 },
             ],
         },
@@ -6444,7 +6550,7 @@ mod verified_band_a_tests {
     #[test]
     fn band_a_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["A099", "A101", "A106", "A117", "A155"] {
+        for id in ["A099", "A101", "A106", "A117", "A140", "A155"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
