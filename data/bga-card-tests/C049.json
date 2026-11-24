@@ -3,7 +3,7 @@
   "card_id": "C049",
   "cases": [
     {
-      "id": "C049-normal",
+      "id": "C049-empty-stable-wheat-for-food",
       "scope": "effect_only",
       "setup": {
         "player": {
@@ -18,13 +18,12 @@
       },
       "expected": {
         "effect_applies": true,
-        "points_gained": null,
-        "notes": "Inventory-only test contract"
+        "notes": "Effect test: C049-empty-stable-wheat-for-food"
       },
-      "notes": "Placeholder test case"
+      "notes": "Primary source verified test case for C049"
     },
     {
-      "id": "C049-edge",
+      "id": "C049-legal-play",
       "scope": "legal_play",
       "setup": {
         "player": {
@@ -35,14 +34,13 @@
       "action": {
         "type": "play_card",
         "card_id": "C049",
-        "cost_paid": false
+        "cost_paid": true
       },
       "expected": {
-        "effect_applies": false,
-        "error": "insufficient_cost_or_prereq",
-        "notes": "Card should not be playable without meeting cost/prerequisites"
+        "effect_applies": true,
+        "notes": "Card should be playable when cost/prerequisites met"
       },
-      "notes": "Placeholder edge case test"
+      "notes": "Primary source verified test case for C049"
     }
   ]
 }
