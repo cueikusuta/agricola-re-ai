@@ -63,8 +63,8 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": ["Q-3: E118「アクションスペースで食料を得るたびに木材1」。仕様は「食料を得るスペース全般」だが、現在のRust実装は日雇い・漁・小劇場・資材市場の4スペース固定で、文献（BGA wiki 寸評：アーチ道・森の宿屋などカードスペースも含む）より狭い。implementation_status=implemented は維持し、実装差分を本欄に注記する。実装拡張（全スペース対応）か4スペース固定の正当化かは人間の判断待ち（docs/eband-spec-create-ch02.md Q-3）。"],
     "test_case_ids": [
       "E118-fishing",
       "E118-no-food-space",

@@ -54,6 +54,7 @@ E帯（E001–E168）のうち `main` に仕様JSONが無い **E110–E120 の11
 - 典拠: https://agricola.cloudfree.jp/?p=2635
 - 選択肢: (a) 全スペース（カードスペース含む）へ実装を広げる、(b) 4スペース固定を正とする、(c) 現状維持で注記のみ
 - 影響: 実装とテストの対象、森林宿屋・アーチ道などのカード連携。
+- 注記先: `data/bga-card-specs/E118.json` の `review.unresolved_fields`（`review.status=needs_resolution`、`implementation_status=implemented` は維持）。
 
 ### Q-4: E120「これ以降の6ラウンド」で残りラウンドが6未満の場合
 
