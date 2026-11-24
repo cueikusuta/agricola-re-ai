@@ -1559,20 +1559,29 @@ impl Game {
         // enforced instead of re-running the availability filter, which by
         // definition excludes the action's own used space.
         if let crate::pending::Continuation::PostWork {
-            completion, resume, ..
+            player,
+            completion,
+            resume,
+            ..
         } = &pending.continuation
         {
             let space = completion.action.space;
+            let available = self.available_spaces_for_resume();
             if resume.space_applied {
                 if !self.public.used.contains(&space) {
                     return Err(format!(
                         "resume claims space {space:?} already applied, but it is not marked used"
                     ));
                 }
-            } else if !self.available_spaces_for_resume().contains(&space) {
+            } else if !available.contains(&space)
+                && !self.passive_shared_space_allowed(*player, space)
+            {
+                // A025/A026 shared entry: the target space is already in
+                // `used` (another player occupies it), so the availability
+                // filter cannot see it; the same passive gate the original
+                // apply used keeps the resume legal.
                 return Err(format!(
-                    "resume cannot use space {:?}: not available at resume time",
-                    space
+                    "resume cannot use space {space:?}: not available at resume time"
                 ));
             }
         }
@@ -1628,10 +1637,12 @@ impl Game {
                     "resume claims space {space:?} already applied, but it is not marked used"
                 ));
             }
-        } else if !available.contains(&space) {
+        } else if !available.contains(&space) && !self.passive_shared_space_allowed(player, space) {
+            // A025/A026 shared entry: same passive-gate exception as the
+            // pre-resume re-check in `resolve_pending_and_resume` — the
+            // target space is in `used` by definition when it is shared.
             return Err(format!(
-                "resume cannot use space {:?}: not available at resume time",
-                space
+                "resume cannot use space {space:?}: not available at resume time"
             ));
         }
         // Re-apply the work action to advance used/workers_placed and run
@@ -1643,8 +1654,12 @@ impl Game {
         // (`space_applied == true`) must find it already in place — enforced
         // by the guard above — and must not re-apply it (Round 2 P0-2).
         if !resume.space_applied {
-            next.public.used.insert(completion.action.space);
-            next.public.workers_placed[player] += 1;
+            // Same shared bookkeeping as the one-shot apply path (A025
+            // chronological-first record, occupant counts, used set) so a
+            // paused-then-resumed placement cannot skip the Bassinet
+            // consumption or the space occupancy tracking.
+            next.consume_bassinet_share(player, completion.action.space);
+            next.commit_worker_placement(player, completion.action.space);
         }
         let will_harvest = next.public.workers_placed == next.public.work_quota
             && HARVEST_ROUNDS.contains(&next.public.round);
