@@ -7,12 +7,11 @@ use agricola_re_ai::{Config, Game};
 #[test]
 fn verified_pool_has_fourteen_unique_occupations_and_minors() {
     let set = verified_basic_card_set(2).unwrap();
-    // PR #385 added A118/C066; review fix (e) removed A145 (3+ players only).
-    // After merge with main (PR #393 etc.), additional cards are included:
-    // C141, A050, D061, C083, C147, A109, etc.
-    // StartRoundGainIf* wave (B114/A157/A049/C067): B114/A049/C067 join the
-    // preset (41 -> 44); A157 is 4 players only and stays out.
-    assert_eq!(set.definitions.len(), 44);
+    // Merged pool (PR #405 conflict resolution): origin/main's preset
+    // (44 = 19 occ + 25 minor at 3cc93d4) plus this branch's A031 ->
+    // 45 = 19 occ + 26 minor. Counts are measured from the merged
+    // verified_basic_card_set(2) pool, not derived by hand.
+    assert_eq!(set.definitions.len(), 45);
     assert_eq!(
         set.definitions
             .iter()
@@ -25,7 +24,7 @@ fn verified_pool_has_fourteen_unique_occupations_and_minors() {
             .iter()
             .filter(|c| c.kind == CardKind::MinorImprovement)
             .count(),
-        25
+        26
     );
     assert!(verified_basic_card_set(3).is_err());
 }

@@ -1192,8 +1192,12 @@ mod tests {
         // preset (spec eligibility "2": "no"), pool size 38->37.
         // Updated: StartRoundGainIf* wave — B114/A049/C067 joined the
         // two-player preset (A157 stays out, 4 players only), pool size 37->41.
+        // Updated: PR #405 (ch07 end-scoring bonuses) merge — main and this
+        // branch both added B064/C141/A050/D061 (identical definitions merged
+        // as one copy), and this branch added A031 on top of main's preset:
+        // the two-player pool is now 45 cards (19 occ + 26 minor).
         assert_eq!(
-            digest, "310a31bdb04fa7fa2abec2a215396065daf5874819f413c6f669247f5f55deff",
+            digest, "abd29c2a9f401952af8c51d35edd4ab7f669dc25799b7f2acd7707bca2665000",
             "sample_game distribution changed — update this test only if intentional"
         );
     }

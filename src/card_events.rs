@@ -5847,7 +5847,10 @@ mod tests {
         let mut game = Game::with_cards_and_hands(
             Config {
                 players: 2,
-                seed: 1,
+                // The hands are forced above (seat 0 holds B121 + A078), so the
+                // seed only drives the game RNG streams via `from_card_state`
+                // (round deck, AI stream) — it no longer decides the deal.
+                seed: 13,
                 additional_action_space_enabled: false,
             },
             set,

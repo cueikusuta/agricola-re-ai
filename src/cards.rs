@@ -663,6 +663,9 @@ pub enum ScoreBonusRule {
     HouseMaterial,
     UnfencedStables,
     ImprovementCount,
+    /// A031 担保 (Debt Security): 1 bonus point per major improvement, capped at
+    /// the number of unused farmyard spaces (empty cells without a stable).
+    MajorImprovementsCappedByUnusedFarmyardSpaces,
     SparePastureCapacity,
     LaterOccupations,
     /// D100 君主 (Sovereign): 1 bonus point per scoring category that has
@@ -1613,6 +1616,12 @@ pub fn verified_scoring_cards(players: usize) -> Vec<CardDefinition> {
     }
     let mut cards = vec![
         scoring(
+            "A031",
+            CardKind::MinorImprovement,
+            vec![(Good::Food, 2)],
+            ScoreBonusRule::MajorImprovementsCappedByUnusedFarmyardSpaces,
+        ),
+        scoring(
             "A032",
             CardKind::MinorImprovement,
             vec![(Good::Wood, 2)],
@@ -1720,6 +1729,15 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         9 => 7,
                         _ => 9,
                     }
+                }
+                ScoreBonusRule::MajorImprovementsCappedByUnusedFarmyardSpaces => {
+                    let major_improvements = player.improvements.len() as i32;
+                    let unused_farmyard_spaces = player
+                        .farm
+                        .iter()
+                        .filter(|cell| matches!(cell.tile, Tile::Empty) && !cell.stable)
+                        .count() as i32;
+                    major_improvements.min(unused_farmyard_spaces)
                 }
                 ScoreBonusRule::SparePastureCapacity => player
                     .pastures
@@ -2009,6 +2027,120 @@ mod verified_scoring_card_tests {
             "after_occ".into(),
         ];
         assert_eq!(end_game_bonus(&set, &player), 1);
+    }
+
+    #[test]
+    fn a031_major_improvements_capped_by_unused_farmyard_spaces() {
+        // Default farm: 15 cells, 2 rooms -> 13 unused spaces; 3 major improvements -> 3 points.
+        assert_eq!(
+            score_card("A031", |p| {
+                p.improvements.push(Improvement::Fireplace2);
+                p.improvements.push(Improvement::Fireplace3);
+                p.improvements.push(Improvement::Hearth4);
+            }),
+            3
+        );
+        // 5 major improvements but only 2 unused spaces -> capped at 2.
+        assert_eq!(
+            score_card("A031", |p| {
+                p.improvements.push(Improvement::Fireplace2);
+                p.improvements.push(Improvement::Fireplace3);
+                p.improvements.push(Improvement::Hearth4);
+                p.improvements.push(Improvement::Hearth5);
+                p.improvements.push(Improvement::ClayOven);
+                p.farm.truncate(3); // [Room, Empty, Empty] -> 2 unused spaces
+            }),
+            2
+        );
+    }
+
+    #[test]
+    fn a032_pasture_area_boundaries() {
+        assert_eq!(score_card("A032", |_| {}), 0);
+        assert_eq!(
+            score_card("A032", |p| {
+                p.pastures.push(Pasture {
+                    id: 0,
+                    cells: (0..5).collect(),
+                    animal: None,
+                    quantity: 0,
+                })
+            }),
+            0
+        );
+        assert_eq!(
+            score_card("A032", |p| {
+                p.pastures.push(Pasture {
+                    id: 0,
+                    cells: (0..6).collect(),
+                    animal: None,
+                    quantity: 0,
+                })
+            }),
+            1
+        );
+        assert_eq!(
+            score_card("A032", |p| {
+                p.pastures.push(Pasture {
+                    id: 0,
+                    cells: (0..10).collect(),
+                    animal: None,
+                    quantity: 0,
+                })
+            }),
+            4
+        );
+    }
+
+    #[test]
+    fn a098_unfenced_stables_count() {
+        assert_eq!(score_card("A098", |_| {}), 0);
+        assert_eq!(
+            score_card("A098", |p| {
+                p.farm[2].stable = true;
+                p.farm[4].stable = true;
+            }),
+            2
+        );
+    }
+
+    #[test]
+    fn a133_improvement_count_boundaries() {
+        let mut set = CardSet {
+            definitions: verified_scoring_cards(3),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "test_minor".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        });
+        // 4 total improvements (0 minors + 4 built) -> 0 points.
+        let mut player = Player::new(0, 0);
+        player.played_cards.push("A133".into());
+        player.improvements.extend([
+            Improvement::Fireplace2,
+            Improvement::Fireplace3,
+            Improvement::Hearth4,
+            Improvement::Hearth5,
+        ]);
+        assert_eq!(end_game_bonus(&set, &player), 0);
+        // 5 total -> 2 points.
+        player.played_cards.push("test_minor".into());
+        assert_eq!(end_game_bonus(&set, &player), 2);
+        // 6 total -> 3 points.
+        player.improvements.push(Improvement::ClayOven);
+        assert_eq!(end_game_bonus(&set, &player), 3);
+        // 9 total (1 minor + 7 built) -> 7 points.
+        player.improvements.extend([
+            Improvement::StoneOven,
+            Improvement::Joinery,
+            Improvement::Pottery,
+        ]);
+        assert_eq!(end_game_bonus(&set, &player), 7);
+        assert!(!verified_scoring_cards(2).iter().any(|c| c.id == "A133"));
     }
 }
 
@@ -2371,16 +2503,14 @@ mod verified_minor_worker_tests {
         let mut set = CardSet {
             definitions: verified_minor_worker_cards(2),
         };
-        for i in 1..=3 {
-            set.definitions.push(CardDefinition {
-                use_limit: None,
-                id: format!("occ{i}"),
-                kind: CardKind::Occupation,
-                cost: vec![],
-                points: 0,
-                effects: vec![],
-            });
-        }
+        set.definitions.extend((1..=3).map(|i| CardDefinition {
+            use_limit: None,
+            id: format!("occ{i}"),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        }));
         let card = set.definition("B077").unwrap();
         let mut p = Player::new(0, 1);
         p.played_cards.extend(["occ1".into(), "occ2".into()]);
@@ -4290,16 +4420,14 @@ mod passive_cards_tests {
         let mut set = CardSet {
             definitions: verified_round_and_harvest_cards(),
         };
-        for i in 0..4 {
-            set.definitions.push(CardDefinition {
-                use_limit: None,
-                id: format!("occ{i}"),
-                kind: CardKind::Occupation,
-                cost: vec![],
-                points: 0,
-                effects: vec![],
-            });
-        }
+        set.definitions.extend((0..4).map(|i| CardDefinition {
+            use_limit: None,
+            id: format!("occ{i}"),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+        }));
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
         assert!(can_play(&set, set.definition("B050").unwrap(), &p, 0));
@@ -4526,10 +4654,11 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        // PR #385 review fix (e): A145 is 3+ players only (eligibility
-        // "2": "no"), so the preset is 37 = 17 occupations + 20 minors.
-        // After merge with main (PR #393 etc.), additional cards are included:
-        // C141, A050, D061, C083, C147, A109, etc.
+        // The two-player preset after merging origin/main (3cc93d4): main's
+        // pool (44 = 19 occ + 25 minor) plus this branch's A031 ->
+        // 45 = 19 occ + 26 minor. Counts are measured from the merged
+        // verified_basic_card_set(2) pool (PR #405 conflict resolution), not
+        // derived by hand.
         let total = set.definitions.len();
         let occ = set
             .definitions
@@ -4541,12 +4670,9 @@ mod simple_occupation_tests {
             .iter()
             .filter(|x| x.kind == CardKind::MinorImprovement)
             .count();
-        // B114/A049/C067 (StartRoundGainIf* wave) join the two-player preset;
-        // A157 stays out (4 players only), so the count is 41 + 3 = 44
-        // (occupations 18 + 1, minors 23 + 2).
-        assert_eq!(total, 44);
+        assert_eq!(total, 45);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 25);
+        assert_eq!(minor, 26);
         assert!(verified_basic_card_set(3).is_err());
     }
 }
@@ -7171,14 +7297,12 @@ mod verified_band_d_tests {
         // Reset and test pastures boundary: 3 pastures = 3 pts, 4 pastures = 4 pts
         let mut p2 = Player::new(0, 0);
         p2.played_cards.push("D100".into());
-        for i in 0..3 {
-            p2.pastures.push(crate::model::Pasture {
-                id: i,
-                cells: vec![(10 + i * 2) as usize, (11 + i * 2) as usize],
-                animal: None,
-                quantity: 0,
-            });
-        }
+        p2.pastures.extend((0..3).map(|i| crate::model::Pasture {
+            id: i,
+            cells: vec![(10 + i * 2) as usize, (11 + i * 2) as usize],
+            animal: None,
+            quantity: 0,
+        }));
         assert_eq!(
             end_game_bonus(&set, &p2),
             0,
@@ -8905,12 +9029,12 @@ mod p1_2_repro_tests {
         );
         }
 
-        // 2p プリセットのハッシュは変更不可（39 defs、content_hash 不変条件）
+        // 2p プリセットのハッシュは変更不可（45 defs、content_hash 不変条件）
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
             preset.content_hash(),
-            "d92847a8d127cc236d65b7df53d4af775d62a0015d8ab099b565e2465ad0d965",
-            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067 joined the preset and A157 was excluded as 4p-only; previous pin 323dbecb after PR #385 + d3c237c9 main merge)"
+            "042996c03a61d19f4c4c87c59d7779b173af2b66bb38b45e7bc846faffd56801",
+            "2-player preset content hash (PR #405 merge: re-measured after A031 joined the preset on top of origin/main's 44-card pool (19 occ + 25 minor), giving 45 = 19 occ + 26 minor; previous pin d92847a8 on main after the StartRoundGainIf* wave B114/A049/C067)"
         );
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
