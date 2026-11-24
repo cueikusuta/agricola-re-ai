@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "card_id": "E075",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "石斧",
+    "name_en": "Stone Axe"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2678",
+        "language": "ja",
+        "checked_on": "2026-11-19",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-19",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": null,
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 2
+        }
+      }
+    ],
+    "printed_points": 1,
+    "alternative_cost_notes": "1 木 / 1 レンガ（OR費用。台帳 cost=unknown（R-2）、書式 \"1 木, 1_レンガ\" はカンマ＋アンダースコア混在（R-3）。候補: 木1 または レンガ1。通常費用は未確定）"
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "space": "wood_accumulation"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "return_stone_to_gain_wood",
+            "give_good": "stone",
+            "give_amount": 1,
+            "give_target": "general_supply",
+            "receive_good": "wood",
+            "receive_amount": 3,
+            "additional": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each time you use a wood accumulation space, you may return 1 stone to the general supply to get 3 additional wood."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "play.cost: ledger cost=unknown (R-2); the wiki shows only the OR alternative cost, in the mixed format '1 木, 1_レンガ' (R-3). Candidate costs: 1 wood OR 1 brick. Base resource cost and its structure are unresolved",
+      "bga.eligibility: ledger eligible_2/3/4 and eligibility_basis are all unknown (R-E1); preserved as unknown, not inferred"
+    ],
+    "test_case_ids": [
+      "E075-use-space-pay-stone",
+      "E075-use-space-no-stone"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-19",
+    "implementation_status": "not_started",
+    "notes": "Cost OR 1 wood / 1 brick (base cost unknown, see unresolved). Each time you use a wood accumulation space, you may return 1 stone to the general supply to get 3 additional wood."
+  }
+}

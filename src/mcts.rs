@@ -1187,11 +1187,17 @@ mod tests {
         // excluded from the verified pool, so the sample_game distribution is unchanged.
         // Updated: added A042 Forest Lake Hut to verified_minor_worker_cards (pool size 33->34)
         // Updated: added A121 Brick Stamping to verified_minor_worker_cards (pool size 34->35)
-        // Updated: added B064 Waterwheel + C141 Sheep Provider + A050 Milk Jug + D061 Bale of Straw
-        // to the verified pools (worker_bonus + round_and_harvest, pool size 35->39)
-        // Updated: added A031 to verified_scoring_cards (pool size 39->40)
+        // Updated: added A118/A145/C066 to verified_round_and_harvest_cards (pool size 35->38)
+        // Updated: PR #385 review fix (e) — A145 removed from the two-player
+        // preset (spec eligibility "2": "no"), pool size 38->37.
+        // Updated: StartRoundGainIf* wave — B114/A049/C067 joined the
+        // two-player preset (A157 stays out, 4 players only), pool size 37->41.
+        // Updated: PR #405 (ch07 end-scoring bonuses) merge — main and this
+        // branch both added B064/C141/A050/D061 (identical definitions merged
+        // as one copy), and this branch added A031 on top of main's preset:
+        // the two-player pool is now 45 cards (19 occ + 26 minor).
         assert_eq!(
-            digest, "b0a2027f816496826ed2b3af15fddb2f970ed0568320821b3e3a4237e08dff51",
+            digest, "abd29c2a9f401952af8c51d35edd4ab7f669dc25799b7f2acd7707bca2665000",
             "sample_game distribution changed — update this test only if intentional"
         );
     }

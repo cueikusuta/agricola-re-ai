@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "card_id": "D085",
+  "cases": [
+    {
+      "id": "D085-5-occupations-no-slot",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 5
+      },
+      "action": {
+        "trigger": "occupation_count_check"
+      },
+      "expected": {
+        "residence_slots_granted": 0
+      },
+      "notes": "5 occupations -> no residence slot yet"
+    },
+    {
+      "id": "D085-6-occupations-grant-slot",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 6
+      },
+      "action": {
+        "trigger": "occupation_count_check"
+      },
+      "expected": {
+        "residence_slots_granted": 1
+      },
+      "notes": "6 occupations -> grants 1 residence slot"
+    },
+    {
+      "id": "D085-draft-variant-7-occupations",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 6,
+        "draft_variant": true
+      },
+      "action": {
+        "trigger": "occupation_count_check"
+      },
+      "expected": {
+        "residence_slots_granted": 0,
+        "note": "draft variant requires 7 occupations"
+      },
+      "notes": "Draft variant: needs 7 occupations for residence slot"
+    }
+  ]
+}

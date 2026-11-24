@@ -140,16 +140,13 @@ fn plow_accepts_any_legal_first_field_and_rejects_a_detached_second_field() {
 /* ------------------------------------------------------------------- sow */
 
 #[test]
+// Fixtures set tiles by farm-grid cell index; keep the explicit index form.
+#[allow(clippy::needless_range_loop)]
 fn sow_accepts_partial_and_crop_mixed_allocations_the_default_policy_skips() {
     let mut game = new_game(2, 11, false);
     let owner = actor(&game);
     reveal(&mut game, RoundCard::GrainUtilization);
-    for cell in game.public.players[owner]
-        .farm
-        .iter_mut()
-        .take(3 + 1)
-        .skip(1)
-    {
+    for cell in game.public.players[owner].farm.iter_mut().take(4).skip(1) {
         cell.tile = empty_field();
     }
     game.public.players[owner].supply.grain = 1;
@@ -205,16 +202,13 @@ fn sow_accepts_partial_and_crop_mixed_allocations_the_default_policy_skips() {
 }
 
 #[test]
+// Fixtures set tiles by farm-grid cell index; keep the explicit index form.
+#[allow(clippy::needless_range_loop)]
 fn sow_rejects_missing_seed_and_duplicate_targets_atomically() {
     let mut game = new_game(2, 12, false);
     let owner = actor(&game);
     reveal(&mut game, RoundCard::GrainUtilization);
-    for cell in game.public.players[owner]
-        .farm
-        .iter_mut()
-        .take(2 + 1)
-        .skip(1)
-    {
+    for cell in game.public.players[owner].farm.iter_mut().take(3).skip(1) {
         cell.tile = empty_field();
     }
     game.public.players[owner].supply.grain = 1;

@@ -70,7 +70,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
-    "notes": "At the end of each harvest: 1 reed from the general supply."
+    "implementation_status": "tested",
+    "notes": "At the end of each harvest: 1 reed from the general supply. Fires from the post-field harvest-tail dispatch (after feeding/breeding), not at the field phase (PR #385 review fix)."
   }
 }

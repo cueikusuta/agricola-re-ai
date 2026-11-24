@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "D095",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "現場監督",
+    "name_en": "Site Manager"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2826",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "build_improvement",
+            "options": "any_major_improvement",
+            "cost": "original",
+            "notes": "出した時に大進歩を建てる"
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "substitute_cost",
+            "action": "substitute_building_materials_with_food",
+            "material_from": ["wood", "clay", "reed", "stone"],
+            "material_to": "food",
+            "scope": "one_each_per_type",
+            "notes": "その費用の建設資材を各種1つまで食料1で代用できる"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "出した時効果: 大進歩を建設し、建設資材各1つまで食料1で代用可"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[1].params.kind=other: substitute_cost で『建設資材各種1つまで食料1で代用』という上限付き置換の実装詳細（各資源種別ごとに1つまで、合計4つまで、どの順序で適用するか）が語彙外",
+      "effects[0].steps[0].params: build_improvement で 'any_major_improvement' 指定時の合法手チェック（手札・市場の大進歩のみ）とコスト支払いフロー",
+      "classification: 段階外（単一サイト: 出したとき/大進歩の建設+コスト代用）だが、置換上限のスコープ（各資源1つずつ計4つか、合計で1つか）が文献で要確認"
+    ],
+    "test_case_ids": [
+      "D095-build-major-improvement-substitute-wood",
+      "D095-substitute-all-four-materials",
+      "D095-cannot-substitute-more-than-one-per-type"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: none. Points: 0. Effect: On play, build a major improvement. For its cost, each building material (wood/clay/reed/stone) may be substituted with 1 food, up to 1 of each type. Trigger: on_play. Unresolved: substitution scope per type vs total, major improvement legality check, cost payment flow with substitution."
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "card_id": "D072",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "厩舎肥料",
+    "name_en": "Stable Manure"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2849",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "max": 1
+        }
+      }
+    ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "harvest_field_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "any_harvested",
+            "amount": {
+              "op": "count",
+              "args": ["stable"]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_harvest",
+      "duration": "instant",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "回る進歩: use once then pass to left neighbor"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params.amount: count of stables as dynamic amount per harvest not fully formalized",
+      "effects[0].steps[0].params.good: 'any_harvested' means matching the type harvested from each field - needs precise definition",
+      "play.prerequisites: occupation_count max=1 for '職業最大1' needs confirmation"
+    ],
+    "test_case_ids": [
+      "D072-no-stables-no-bonus",
+      "D072-one-stable-one-extra",
+      "D072-two-stables-two-extra"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: at most 1 occupation. Effect: During harvest field phase, gain 1 extra good per field harvested, up to the number of stables (not fenced pastures). Passes to left neighbor. Extra good matches the type harvested from each field. Weak ban status."
+  }
+}

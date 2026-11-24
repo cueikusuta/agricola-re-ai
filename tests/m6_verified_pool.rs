@@ -7,20 +7,24 @@ use agricola_re_ai::{Config, Game};
 #[test]
 fn verified_pool_has_fourteen_unique_occupations_and_minors() {
     let set = verified_basic_card_set(2).unwrap();
-    assert_eq!(set.definitions.len(), 40);
+    // Merged pool (PR #405 conflict resolution): origin/main's preset
+    // (44 = 19 occ + 25 minor at 3cc93d4) plus this branch's A031 ->
+    // 45 = 19 occ + 26 minor. Counts are measured from the merged
+    // verified_basic_card_set(2) pool, not derived by hand.
+    assert_eq!(set.definitions.len(), 45);
     assert_eq!(
         set.definitions
             .iter()
             .filter(|c| c.kind == CardKind::Occupation)
             .count(),
-        17
+        19
     );
     assert_eq!(
         set.definitions
             .iter()
             .filter(|c| c.kind == CardKind::MinorImprovement)
             .count(),
-        23
+        26
     );
     assert!(verified_basic_card_set(3).is_err());
 }

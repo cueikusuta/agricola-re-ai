@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "card_id": "E090",
+  "cases": [
+    {
+      "id": "E090-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 3,
+        "fields": 1
+      },
+      "action": {
+        "play": "E090",
+        "breed_2_offspring": true,
+        "pay_food_for_plow": true
+      },
+      "expected": {
+        "food": 2,
+        "fields": 2
+      }
+    },
+    {
+      "id": "E090-single-offspring",
+      "scope": "effect_only",
+      "setup": {
+        "food": 3,
+        "fields": 1
+      },
+      "action": {
+        "play": "E090",
+        "breed_1_offspring": true
+      },
+      "expected": {
+        "food": 3,
+        "fields": 1
+      }
+    },
+    {
+      "id": "E090-multiple-breeding",
+      "scope": "effect_only",
+      "setup": {
+        "food": 5,
+        "fields": 1
+      },
+      "action": {
+        "breed_2_offspring": true,
+        "breed_2_offspring_again": true,
+        "pay_food_for_plow_twice": true
+      },
+      "expected": {
+        "food": 3,
+        "fields": 3
+      }
+    }
+  ]
+}

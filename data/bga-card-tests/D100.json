@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "card_id": "D100",
+  "cases": [
+    {
+      "id": "D100-scoring-one-category-at-4",
+      "scope": "effect_only",
+      "setup": {
+        "scoring_categories": {
+          "fields": 4,
+          "pastures": 2,
+          "grain": 3,
+          "vegetables": 1,
+          "sheep": 0,
+          "wild_boar": 0,
+          "cattle": 0,
+          "unused_spaces": 0,
+          "fences": 0,
+          "rooms": 2,
+          "people": 3,
+          "cards": 5
+        }
+      },
+      "action": {
+        "trigger": "end_scoring"
+      },
+      "expected": {
+        "bonus_points": 1,
+        "notes": "Only fields category at 4 points -> +1 bonus"
+      },
+      "notes": "One category (fields) at max 4 points. Gain 1 bonus point."
+    },
+    {
+      "id": "D100-scoring-multiple-categories-at-4",
+      "scope": "effect_only",
+      "setup": {
+        "scoring_categories": {
+          "fields": 4,
+          "pastures": 4,
+          "grain": 4,
+          "vegetables": 2,
+          "sheep": 1,
+          "wild_boar": 0,
+          "cattle": 0,
+          "unused_spaces": 0,
+          "fences": 0,
+          "rooms": 4,
+          "people": 3,
+          "cards": 5
+        }
+      },
+      "action": {
+        "trigger": "end_scoring"
+      },
+      "expected": {
+        "bonus_points": 4,
+        "notes": "Fields, pastures, grain, rooms all at 4 -> +4 bonus"
+      },
+      "notes": "Four categories at 4 points. Gain 4 bonus points (1 per category)."
+    },
+    {
+      "id": "D100-scoring-category-at-5",
+      "scope": "effect_only",
+      "setup": {
+        "scoring_categories": {
+          "fields": 5,
+          "pastures": 3,
+          "grain": 2,
+          "vegetables": 1,
+          "sheep": 0,
+          "wild_boar": 0,
+          "cattle": 0,
+          "unused_spaces": 0,
+          "fences": 0,
+          "rooms": 2,
+          "people": 3,
+          "cards": 5
+        }
+      },
+      "action": {
+        "trigger": "end_scoring"
+      },
+      "expected": {
+        "bonus_points": 0,
+        "notes": "Fields at 5 (>4), not exactly 4. Unresolved: whether >=4 or ==4 counts"
+      },
+      "notes": "Category at 5 points. Ambiguity: does '最大の4点に達している' mean exactly 4 or at least 4?"
+    }
+  ]
+}

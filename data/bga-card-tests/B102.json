@@ -33,6 +33,22 @@
       "expected": {
         "owner_reed_delta": 2
       }
+    },
+    {
+      "id": "B102-normal-four-players",
+      "scope": "legal_play",
+      "setup": {
+        "players": 4,
+        "hand": [
+          "B102"
+        ]
+      },
+      "action": {
+        "play_occupation": "B102"
+      },
+      "expected": {
+        "owner_sheep_delta": 2
+      }
     }
   ]
 }

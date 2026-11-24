@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "card_id": "E073",
+  "cases": [
+    {
+      "id": "E073-harvest-all",
+      "scope": "effect_only",
+      "setup": {
+        "fields": {
+          "A": "grain_3"
+        }
+      },
+      "action": {
+        "play": "E073",
+        "harvest_phase": "choose_A"
+      },
+      "expected": {
+        "harvested_from_A": 3,
+        "field_A_empty": true
+      },
+      "notes": "Exactly one field is chosen; all crops in it are harvested at once."
+    },
+    {
+      "id": "E073-other-fields-untouched",
+      "scope": "effect_only",
+      "setup": {
+        "fields": {
+          "A": "grain_2",
+          "B": "vegetable_1"
+        }
+      },
+      "action": {
+        "play": "E073",
+        "harvest_phase": "choose_A"
+      },
+      "expected": {
+        "field_A_empty": true,
+        "field_B_goods": 1
+      },
+      "notes": "Fields other than the chosen one are not affected."
+    }
+  ]
+}

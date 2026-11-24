@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "card_id": "D114",
+  "cases": [
+    {
+      "id": "D114-on-play-stack",
+      "scope": "effect_only",
+      "setup": {
+        "card_stock": {}
+      },
+      "action": {
+        "play": "D114"
+      },
+      "expected": {
+        "card_stock": {"grain": 2, "vegetable": 2}
+      },
+      "notes": "On play, stack 2 grain and 2 vegetable on card"
+    },
+    {
+      "id": "D114-buy-grain",
+      "scope": "effect_only",
+      "setup": {
+        "food": 5,
+        "grain": 0,
+        "card_stock": {"grain": 2, "vegetable": 2}
+      },
+      "action": {
+        "use_free_action": "D114",
+        "buy": "grain"
+      },
+      "expected": {
+        "food_delta": -2,
+        "grain_delta": 1,
+        "card_stock": {"grain": 1, "vegetable": 2}
+      },
+      "notes": "Anytime: spend 2 food, take 1 grain from card (max 2)"
+    },
+    {
+      "id": "D114-buy-veg",
+      "scope": "effect_only",
+      "setup": {
+        "food": 5,
+        "vegetable": 0,
+        "card_stock": {"grain": 2, "vegetable": 2}
+      },
+      "action": {
+        "use_free_action": "D114",
+        "buy": "vegetable"
+      },
+      "expected": {
+        "food_delta": -3,
+        "vegetable_delta": 1,
+        "card_stock": {"grain": 2, "vegetable": 1}
+      },
+      "notes": "Anytime: spend 3 food, take 1 vegetable from card (max 2)"
+    },
+    {
+      "id": "D114-stock-exhausted",
+      "scope": "effect_only",
+      "setup": {
+        "food": 10,
+        "grain": 0,
+        "card_stock": {"grain": 0, "vegetable": 0}
+      },
+      "action": {
+        "use_free_action": "D114",
+        "buy": "grain"
+      },
+      "expected": {
+        "food_delta": 0,
+        "grain_delta": 0,
+        "effect_not_triggered": true,
+        "notes": "Card stock exhausted, cannot buy"
+      }
+    }
+  ]
+}
