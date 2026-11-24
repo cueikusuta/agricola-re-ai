@@ -729,6 +729,7 @@ fn card_priority(
                                 CardEffect::StartRoundGainIfFamilyAndRooms { good, amount, .. }
                                 | CardEffect::StartRoundGainIfLessonsOccupants { good, amount, .. }
                                 | CardEffect::StartRoundGainIfAccumulationGrew { good, amount, .. }
+                                | CardEffect::StartRoundGainIfAccumulationAtLeast { good, amount, .. }
                                 | CardEffect::StartRoundGainIfNoHarvestAndAnimals {
                                     good,
                                     amount,
