@@ -51,11 +51,11 @@
         "choose": "vegetable"
       },
       "expected": {
-        "food_delta": -1,
+        "food_delta": 0,
         "goods_gained": 0,
         "purchase_allowed": false
       },
-      "notes": "With less food than the family size the purchase is not legal."
+      "notes": "With less food than the family size the purchase is not legal, so no food is spent and nothing is gained."
     }
   ]
 }
