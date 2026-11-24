@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "card_id": "E119",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "土地相続人",
+    "name_en": "Land Heir"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2634",
+        "language": "ja",
+        "checked_on": "2026-11-24",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-24",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "current_round_lte",
+          "params": {
+            "n": 4
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "action": "place_on_round_space",
+            "round": 9,
+            "resources": [
+              { "good": "wood", "amount": 4 },
+              { "good": "clay", "amount": 4 }
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "If played in round 4 or earlier, place 4 wood and 4 clay on round 9 space."
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "round_is",
+          "params": {
+            "n": 9
+          }
+        },
+        {
+          "predicate": "round_space_has_placed_good",
+          "params": {
+            "good": "wood"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 4
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "At start of round 9, gain the 4 wood placed there."
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "round_is",
+          "params": {
+            "n": 9
+          }
+        },
+        {
+          "predicate": "round_space_has_placed_good",
+          "params": {
+            "good": "clay"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "clay",
+            "amount": 4
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 2,
+      "decision_owner": "none",
+      "notes": "At start of round 9, gain the 4 clay placed there."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: predicate 'current_round_lte' is custom; engine must evaluate round number at play time",
+      "effects[0].steps[0].operation: 'other' with 'place_on_round_space' action is custom; engine must support placing resources on future round spaces",
+      "effects[1-2].conditions: predicates 'round_is' and 'round_space_has_placed_good' are custom; exact vocabulary for round-specific resource retrieval TBD",
+      "effects[0].trigger: if played in round 5+, no resources are placed and round 9 triggers do nothing"
+    ],
+    "test_case_ids": [
+      "E119-play-round-4-get-resources",
+      "E119-play-round-5-no-resources",
+      "E119-round-9-collection"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-24",
+    "implementation_status": "not_started",
+    "notes": "If played in round 4 or earlier, place 4 wood and 4 clay on round 9 space; at start of round 9, gain them. If played round 5+, no effect. Classified as Stage 4 (P7) in classification doc."
+  }
+}

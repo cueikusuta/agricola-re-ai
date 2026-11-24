@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "card_id": "E115",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "種の下僕",
+    "name_en": "Seed Servant"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2638",
+        "language": "ja",
+        "checked_on": "2026-11-24",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-24",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "space_is",
+          "params": {
+            "space": "grain_seeds"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "bake_bread"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Each time you use the Grain Seeds action space, gain a Bake Bread action."
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "space_is",
+          "params": {
+            "space": "vegetable_seeds"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "grant_action",
+          "target": "owner",
+          "params": {
+            "action": "sow"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Each time you use the Vegetable Seeds action space, gain a Sow action."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger: 'after_worker_space' with space_is predicate used provisionally; exact vocabulary for 'Grain Seeds' and 'Vegetable Seeds' action spaces TBD",
+      "effects[0].steps[0].operation: 'grant_action' used; whether granted action is immediate additional action or a token for later use needs engine mapping",
+      "effects[1].steps[0].operation: same as above for Sow action"
+    ],
+    "test_case_ids": [
+      "E115-grain-seeds-grants-bake",
+      "E115-vegetable-seeds-grants-sow",
+      "E115-not-triggered-on-other-seed-spaces"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-24",
+    "implementation_status": "not_started",
+    "notes": "Grain Seeds -> Bake Bread action. Vegetable Seeds -> Sow action. Each use grants one additional action. Classified as Stage 4 (P9) in classification doc."
+  }
+}

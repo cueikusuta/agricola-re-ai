@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "card_id": "E112",
+  "cases": [
+    {
+      "id": "E112-steal-from-supply",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "grain_fields": [
+          { "grain": 2 }
+        ]
+      },
+      "action": {
+        "trigger": "harvest_field_phase",
+        "field_index": 0
+      },
+      "expected": {
+        "gains": {
+          "grain": 1
+        },
+        "field_grain_unchanged": true
+      },
+      "notes": "Harvest grain field -> take 1 grain from supply, field keeps its grain."
+    },
+    {
+      "id": "E112-field-retains-grain",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "grain_fields": [
+          { "grain": 3 }
+        ]
+      },
+      "action": {
+        "trigger": "harvest_field_phase",
+        "field_index": 0,
+        "use_ability": true
+      },
+      "expected": {
+        "gains": {
+          "grain": 1
+        },
+        "field_after": {
+          "grain": 3
+        }
+      },
+      "notes": "Field retains all grain when ability is used; only 1 grain taken from supply."
+    },
+    {
+      "id": "E112-not-triggered-on-vegetable-field",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "vegetable_fields": [
+          { "vegetable": 2 }
+        ]
+      },
+      "action": {
+        "trigger": "harvest_field_phase",
+        "field_index": 0
+      },
+      "expected": {
+        "gains": {
+          "vegetable": 2
+        },
+        "ability_not_triggered": true
+      },
+      "notes": "Ability only triggers on grain fields, not vegetable fields."
+    }
+  ]
+}
