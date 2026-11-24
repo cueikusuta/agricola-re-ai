@@ -453,6 +453,21 @@ pub enum CardEffect {
     OnPlayGrantAction {
         action: GrantedAction,
     },
+    /// D054 マスの池 (Trout Pool): at each round start, if the `space`
+    /// accumulation holds at least `min`, gain `amount` of `good` from the
+    /// general supply. Unlike A049 営巣地 (`StartRoundGainIfAccumulationGrew`)
+    /// there is no "grew this round" requirement: the printed card pays on the
+    /// standing accumulation alone. The condition is judged inside the handler
+    /// from the public accumulations map the round-start dispatcher threads
+    /// read-only through `DispatchContext` (runtime-only, never serialized);
+    /// the map is never mutated, and any dispatch path without the map grants
+    /// nothing.
+    StartRoundGainIfAccumulationAtLeast {
+        space: Space,
+        min: u32,
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -551,6 +566,9 @@ impl CardEffect {
                 "after_any_worker_gain_by_count_if_not_actor"
             }
             CardEffect::OnPlayGrantAction { .. } => "on_play_grant_action",
+            CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => {
+                "start_round_gain_if_accumulation_at_least"
+            }
         }
     }
 }
@@ -704,6 +722,15 @@ pub enum ScoreBonusRule {
     /// major improvements. Appended at the enum tail so existing serde
     /// variants and saved-game bytes are unchanged.
     MajorImprovementsBottomRowThresholds,
+    /// B153 寮長 (Housemaster): at final scoring, sum the major-improvement
+    /// scores after doubling the lowest single one (one only, even when the
+    /// lowest score is tied), then take 1/2/3/4 bonus points at a doubled
+    /// total of 5/7/9/11 or more. With no major improvement there is
+    /// nothing to double and no bonus. The ordinary major-improvement
+    /// points stay in their own scoring category (`score.rs`); this bonus
+    /// is added separately by `score_with_cards`. Appended at the enum tail
+    /// so existing serde variants and saved-game bytes are unchanged.
+    MajorImprovementsLowestDoubledThresholds,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -819,6 +846,7 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfFamilyAndRooms { amount, .. }
                         | CardEffect::StartRoundGainIfLessonsOccupants { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
+                        | CardEffect::StartRoundGainIfAccumulationAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
@@ -1839,6 +1867,24 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         n if n >= 5 => 8,
                         _ => 0,
                     }
+                }
+                ScoreBonusRule::MajorImprovementsLowestDoubledThresholds => {
+                    // B153 寮長 (Housemaster): the lowest single score is
+                    // doubled (exactly one, even when the lowest score is
+                    // tied), then each of the thresholds 5/7/9/11 pays its
+                    // point once, so the bonus is the count of thresholds
+                    // met (1/2/3/4). No major improvement -> nothing to
+                    // double and a total of 0 -> no bonus.
+                    let mut scores: Vec<i32> = player
+                        .improvements
+                        .iter()
+                        .map(|improvement| improvement.points())
+                        .collect();
+                    if let Some(lowest) = scores.iter_mut().min() {
+                        *lowest *= 2;
+                    }
+                    let total: i32 = scores.iter().sum();
+                    [5, 7, 9, 11].iter().filter(|&&t| total >= t).count() as i32
                 }
             },
             _ => 0,
@@ -3455,6 +3501,23 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         },
+        // D054 マスの池 (Trout Pool): at the start of each work phase, if the
+        // Fishing accumulation holds at least 3 food, gain 1 food. The
+        // accumulation is read-only through the round-start dispatch; no
+        // "grew this round" requirement (unlike A049 営巣地).
+        CardDefinition {
+            use_limit: None,
+            id: "D054".into(),
+            kind: minor,
+            cost: vec![(Good::Clay, 2)],
+            points: 1,
+            effects: vec![CardEffect::StartRoundGainIfAccumulationAtLeast {
+                space: Space::Fishing,
+                min: 3,
+                good: Good::Food,
+                amount: 1,
+            }],
+        },
     ]
 }
 
@@ -4120,12 +4183,29 @@ mod round_and_harvest_card_tests {
             }]
         ));
 
-        // Two-player preset: B114/A049/C067 are in (2p eligible per spec),
+        // D054 マスの池: Fishing accumulation >= 3 -> 1 food, no grew-this-round
+        // requirement (unlike A049 営巣地 above).
+        let d054 = find("D054");
+        assert_eq!(d054.kind, CardKind::MinorImprovement);
+        assert_eq!(d054.cost, vec![(Good::Clay, 2)]);
+        assert_eq!(d054.points, 1);
+        assert!(matches!(
+            d054.effects.as_slice(),
+            [CardEffect::StartRoundGainIfAccumulationAtLeast {
+                space: Space::Fishing,
+                min: 3,
+                good: Good::Food,
+                amount: 1,
+            }]
+        ));
+
+        // Two-player preset: B114/A049/C067/D054 are in (2p eligible per spec),
         // A157 is out (spec eligibility "2"/"3": "no", "4": "yes").
         let preset = verified_basic_card_set(2).unwrap();
         assert!(preset.definition("B114").is_some());
         assert!(preset.definition("A049").is_some());
         assert!(preset.definition("C067").is_some());
+        assert!(preset.definition("D054").is_some());
         assert!(preset.definition("A157").is_none());
     }
 }
@@ -4533,9 +4613,11 @@ mod simple_occupation_tests {
         // B114/A049/C067 (StartRoundGainIf* wave) join the two-player preset;
         // A157 stays out (4 players only), so the count is 41 + 3 = 44
         // (occupations 18 + 1, minors 23 + 2).
-        assert_eq!(total, 44);
+        // D054 マスの池 (spec eligibility "2": "yes") joins the preset as a
+        // minor: 44 -> 45 total (occupations unchanged, minors 25 -> 26).
+        assert_eq!(total, 45);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 25);
+        assert_eq!(minor, 26);
         assert!(verified_basic_card_set(3).is_err());
     }
 }
@@ -6540,6 +6622,31 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // B153 寮長 (Housemaster): no cost, no printed points; at final
+        // scoring, sum the major-improvement scores after doubling the
+        // lowest single one (one only, even when the lowest score is tied)
+        // and take 1/2/3/4 bonus points at a doubled total of 5/7/9/11 or
+        // more (BGA Agricola card wiki; agricola.cloudfree.jp ?p=3104,
+        // cross-checked against the English list page). Only available at
+        // 4 players (spec eligibility 2/3 = no, 4 = yes); the 2/3-player
+        // registry projection drops the card through the MinimumPlayers(4)
+        // prerequisite, and no new saved field or PendingDecision is
+        // introduced.
+        CardDefinition {
+            use_limit: None,
+            id: "B153".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::MajorImprovementsLowestDoubledThresholds,
+                },
+            ],
+        },
     ]
 }
 
@@ -6719,7 +6826,7 @@ mod verified_band_b_tests {
         // A155 sits in the A-deck band pool rather than the B-deck one, but it
         // is covered here too: neither band pool may leak into the A/B
         // two-player preset.
-        for id in ["B122", "B142", "B144", "B058", "A155"] {
+        for id in ["B122", "B142", "B144", "B058", "A155", "B153"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -6840,6 +6947,109 @@ mod verified_band_b_tests {
         };
         harvest_field_rewards(&set, &mut q).unwrap();
         assert_eq!(q.supply.food, 0, "a non-owner never gains B058 food");
+    }
+
+    /// B153 寮長 (Housemaster): occupation, no cost, no printed points, the
+    /// MinimumPlayers(4) prerequisite plus the doubled-lowest end-game bonus.
+    #[test]
+    fn b153_is_four_player_occupation_with_doubled_lowest_bonus() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let card = set.definition("B153").unwrap();
+        assert_eq!(card.kind, CardKind::Occupation);
+        assert_eq!(card.cost, vec![]);
+        assert_eq!(card.points, 0);
+        assert_eq!(
+            card.effects,
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::MajorImprovementsLowestDoubledThresholds,
+                },
+            ]
+        );
+    }
+
+    /// Thresholds 5/7/9/11 pay 1/2/3/4 on the doubled total; the ordinary
+    /// major-improvement points are not touched by the bonus.
+    #[test]
+    fn b153_thresholds_five_seven_nine_eleven() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        // All-1-point majors: n copies double the lowest one, so the doubled
+        // total is n + 1 (4/6/8/10 copies land exactly on 5/7/9/11).
+        let bonus = |count: usize| {
+            let mut p = Player::new(0, 0);
+            p.played_cards.push("B153".into());
+            p.improvements = vec![Improvement::Fireplace2; count];
+            end_game_bonus(&set, &p)
+        };
+        assert_eq!(bonus(0), 0, "no major improvement -> no bonus");
+        assert_eq!(bonus(3), 0, "doubled total 4 < 5");
+        assert_eq!(bonus(4), 1, "doubled total 5 -> +1");
+        assert_eq!(bonus(5), 1, "doubled total 6 still +1");
+        assert_eq!(bonus(6), 2, "doubled total 7 -> +2");
+        assert_eq!(bonus(7), 2, "doubled total 8 still +2");
+        assert_eq!(bonus(8), 3, "doubled total 9 -> +3");
+        assert_eq!(bonus(9), 3, "doubled total 10 still +3");
+        assert_eq!(bonus(10), 4, "doubled total 11 -> +4");
+    }
+
+    /// The spec's [2, 3, 4] example: double the lowest score (2 -> 4), the
+    /// doubled total is 11, and the stacked thresholds pay 4 points.
+    #[test]
+    fn b153_doubles_the_lowest_score_and_pays_the_top_threshold() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B153".into());
+        p.improvements.extend([
+            Improvement::ClayOven,
+            Improvement::StoneOven,
+            Improvement::Well,
+        ]);
+        assert_eq!(end_game_bonus(&set, &p), 4, "doubled total 11 -> +4");
+    }
+
+    /// A tied lowest score is doubled exactly once (BGA plays it that way:
+    /// Well + ClayOven + Basketry scores 4+4+2 = 10 -> +3, not 12 -> +4).
+    #[test]
+    fn b153_doubles_only_one_of_the_tied_lowest_scores() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B153".into());
+        p.improvements.extend([
+            Improvement::Well,
+            Improvement::ClayOven,
+            Improvement::Basketry,
+        ]);
+        assert_eq!(end_game_bonus(&set, &p), 3, "4+4+2 = 10 -> +3");
+        // Two tied lowest scores: ClayOven 2 + Basketry 2 tie, StoneOven 3;
+        // only one of the tied 2s doubles, so 4+2+3 = 9 -> +3. Doubling
+        // both tied scores would give 4+4+3 = 11 -> +4, which BGA does not
+        // pay (the wiki play report for 4+2+2 paid 3, not 4).
+        let mut q = Player::new(0, 0);
+        q.played_cards.push("B153".into());
+        q.improvements.extend([
+            Improvement::ClayOven,
+            Improvement::Basketry,
+            Improvement::StoneOven,
+        ]);
+        assert_eq!(end_game_bonus(&set, &q), 3, "4+2+3 = 9 -> +3");
+        // A lone 1-point major doubles to 2: Well 4 + Fireplace2 -> 4+2 = 6,
+        // which clears only the 5 threshold (6 < 7).
+        let mut r = Player::new(0, 0);
+        r.played_cards.push("B153".into());
+        r.improvements
+            .extend([Improvement::Well, Improvement::Fireplace2]);
+        assert_eq!(end_game_bonus(&set, &r), 1, "4+2 = 6 -> +1");
     }
 }
 
@@ -8825,8 +9035,8 @@ mod p1_2_repro_tests {
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
             preset.content_hash(),
-            "d92847a8d127cc236d65b7df53d4af775d62a0015d8ab099b565e2465ad0d965",
-            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067 joined the preset and A157 was excluded as 4p-only; previous pin 323dbecb after PR #385 + d3c237c9 main merge)"
+            "b6723ba1864e3e0cf08c116ffaed6431a2e7b6dcef58f00e152234defc6b2f5d",
+            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067/D054 joined the preset and A157 was excluded as 4p-only)"
         );
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
