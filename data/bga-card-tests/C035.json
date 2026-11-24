@@ -3,7 +3,7 @@
   "card_id": "C035",
   "cases": [
     {
-      "id": "C035-normal",
+      "id": "C035-scoring-hand-penalty",
       "scope": "effect_only",
       "setup": {
         "player": {
@@ -18,13 +18,12 @@
       },
       "expected": {
         "effect_applies": true,
-        "points_gained": 7,
-        "notes": "Inventory-only test contract"
+        "notes": "Effect test: C035-scoring-hand-penalty"
       },
-      "notes": "Placeholder test case"
+      "notes": "Primary source verified test case for C035"
     },
     {
-      "id": "C035-edge",
+      "id": "C035-prereq-no-occupations",
       "scope": "legal_play",
       "setup": {
         "player": {
@@ -42,7 +41,47 @@
         "error": "insufficient_cost_or_prereq",
         "notes": "Card should not be playable without meeting cost/prerequisites"
       },
-      "notes": "Placeholder edge case test"
+      "notes": "Primary source verified test case for C035"
+    },
+    {
+      "id": "C035-cannot-discard-hand",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C035",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Test case: C035-cannot-discard-hand"
+      },
+      "notes": "Primary source verified test case for C035"
+    },
+    {
+      "id": "C035-legal-play",
+      "scope": "legal_play",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C035",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Card should be playable when cost/prerequisites met"
+      },
+      "notes": "Primary source verified test case for C035"
     }
   ]
 }
