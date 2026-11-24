@@ -751,7 +751,6 @@ impl Game {
         use crate::hints::{FenceHints, FenceProposal};
         let p = &self.public.players[self.public.active_player];
         let free = p.free_fence_wood;
-        let budget = p.supply.wood.saturating_add(free);
         let remaining = 15usize.saturating_sub(p.fences.len());
         let mut proposals: Vec<FenceProposal> = Vec::new();
         let mut extendable = BTreeSet::new();
@@ -773,16 +772,16 @@ impl Game {
         };
         // Splits first: they are rare but important, so never crowd them out.
         if let Some(regions) = split_candidate(p) {
-            if let Some(proposal) = fence_proposal(p, budget, regions, None, "split") {
+            if let Some(proposal) = fence_proposal(p, regions, None, "split") {
                 proposals.push(proposal);
             }
         }
         if let Some((regions, occupancy)) = split_occupied_candidate(p) {
-            if let Some(proposal) = fence_proposal(p, budget, regions, Some(occupancy), "split") {
+            if let Some(proposal) = fence_proposal(p, regions, Some(occupancy), "split") {
                 proposals.push(proposal);
             }
         } else if let Some((regions, occupancy)) = general_split_candidate(p) {
-            if let Some(proposal) = fence_proposal(p, budget, regions, Some(occupancy), "split") {
+            if let Some(proposal) = fence_proposal(p, regions, Some(occupancy), "split") {
                 proposals.push(proposal);
             }
         }
@@ -806,7 +805,7 @@ impl Game {
                 if !p.pastures.is_empty() && !touches_existing(&[a, b]) {
                     continue;
                 }
-                if let Some(proposal) = fence_proposal(p, budget, vec![vec![a, b]], None, "new") {
+                if let Some(proposal) = fence_proposal(p, vec![vec![a, b]], None, "new") {
                     proposals.push(proposal);
                     multi += 1;
                 }
@@ -824,7 +823,7 @@ impl Game {
             if !p.pastures.is_empty() && !touches_existing(&[i]) {
                 continue;
             }
-            if let Some(proposal) = fence_proposal(p, budget, vec![vec![i]], None, "new") {
+            if let Some(proposal) = fence_proposal(p, vec![vec![i]], None, "new") {
                 proposals.push(proposal);
                 singles += 1;
             }
@@ -2677,18 +2676,48 @@ fn fence_edges(p: &Player, regions: &[Vec<usize>]) -> Option<BTreeSet<(u8, u8)>>
     Some(edges)
 }
 
+/// Fence segments the player still has to pay for after their free fence
+/// wood (A088 生け垣管理人) is applied. Only the NEW segments of one fencing
+/// action count; existing fence segments are never charged.
+pub(crate) fn fence_due(p: &Player, segments: u32) -> u32 {
+    segments.saturating_sub(p.free_fence_wood)
+}
+
+/// Whether the player can pay for `segments` NEW fence segments right now.
+/// Without the A016 substitution this is the wood due; with it, the due may
+/// be paid in clay instead. The two materials are never mixed within one
+/// payment and never both charged, so the check takes whichever single
+/// material can cover the whole due.
+pub(crate) fn fence_affordable(p: &Player, segments: u32) -> bool {
+    let due = fence_due(p, segments);
+    due <= p.supply.wood || (p.fence_material_substitution && due <= p.supply.clay)
+}
+
+/// Pay for `segments` NEW fence segments: free fence wood first, then the
+/// material per the player's substitution. A016 踏み粘土 pays the same
+/// number of clay as the wood due without deducting wood; wood stays the
+/// fallback when clay cannot cover the whole due, so a substitution holder
+/// never loses a fencing action they could pay in wood.
+fn pay_fence_segments(p: &mut Player, segments: u32) -> Result<()> {
+    let due = fence_due(p, segments);
+    if p.fence_material_substitution && due <= p.supply.clay {
+        p.supply.pay(Good::Clay, due)
+    } else {
+        p.supply.pay(Good::Wood, due)
+    }
+}
+
 /// A priced fencing proposal, or `None` if it is unaffordable or over the
 /// 15-segment limit.
 fn fence_proposal(
     p: &Player,
-    budget: u32,
     regions: Vec<Vec<usize>>,
     occupancy: Option<Vec<PastureOccupancy>>,
     kind: &str,
 ) -> Option<crate::hints::FenceProposal> {
     let edges = fence_edges(p, &regions)?;
     let cost = edges.difference(&p.fences).count() as u32;
-    if cost == 0 || cost > budget || p.fences.len() + cost as usize > 15 {
+    if cost == 0 || !fence_affordable(p, cost) || p.fences.len() + cost as usize > 15 {
         return None;
     }
     Some(crate::hints::FenceProposal {
@@ -2715,8 +2744,7 @@ pub fn single_cell_pasture(p: &Player) -> Option<usize> {
         }
         let edges = boundary(&[i]);
         let extra = edges.difference(&p.fences).count();
-        extra <= (p.supply.wood.saturating_add(p.free_fence_wood)) as usize
-            && p.fences.len() + extra <= 15
+        fence_affordable(p, extra as u32) && p.fences.len() + extra <= 15
     })
 }
 fn connected(cells: &[usize]) -> bool {
@@ -2866,8 +2894,10 @@ fn build_pastures(
     if edges.len() > 15 {
         return Err("fence limit 15".into());
     }
-    p.supply
-        .pay(Good::Wood, (cost as u32).saturating_sub(p.free_fence_wood))?;
+    // Pay for the NEW segments only: free fence wood first, then wood — or
+    // clay instead of wood while A016 踏み粘土 is played. Existing fences
+    // are never charged again and the two materials are never both deducted.
+    pay_fence_segments(p, cost as u32)?;
     let mut next_id = p.pastures.iter().map(|q| q.id).max().map_or(0, |n| n + 1);
     let mut assigned_ids = BTreeSet::new();
     let mut updated = Vec::new();
@@ -2974,9 +3004,7 @@ pub fn split_candidate(p: &Player) -> Option<Vec<Vec<usize>>> {
                 .union(&boundary(&rest))
                 .filter(|e| !p.fences.contains(e))
                 .count();
-            if cost <= (p.supply.wood.saturating_add(p.free_fence_wood)) as usize
-                && p.fences.len() + cost <= 15
-            {
+            if fence_affordable(p, cost as u32) && p.fences.len() + cost <= 15 {
                 return Some(vec![rest, vec![one]]);
             }
         }
@@ -2991,7 +3019,13 @@ pub fn split_candidate(p: &Player) -> Option<Vec<Vec<usize>>> {
 pub fn general_split_candidate(
     player: &Player,
 ) -> Option<(Vec<Vec<usize>>, Vec<PastureOccupancy>)> {
-    if player.fences.len() >= 15 || player.supply.wood == 0 && player.free_fence_wood == 0 {
+    // A016 substitution holders can pay a new fence segment in clay, so only a
+    // player with no wood, no clay and no free fence wood is excluded here.
+    if player.fences.len() >= 15
+        || player.supply.wood == 0
+            && player.free_fence_wood == 0
+            && (!player.fence_material_substitution || player.supply.clay == 0)
+    {
         return None;
     }
     for pasture in &player.pastures {
@@ -3018,9 +3052,7 @@ pub fn general_split_candidate(
             let mut edges = boundary(&first);
             edges.extend(boundary(&second));
             let added = edges.difference(&player.fences).count();
-            if player.fences.len() + added > 15
-                || added > (player.supply.wood.saturating_add(player.free_fence_wood)) as usize
-            {
+            if player.fences.len() + added > 15 || !fence_affordable(player, added as u32) {
                 continue;
             }
             let first_capacity = player.pasture_capacity(&Pasture {
@@ -3077,9 +3109,7 @@ pub fn split_occupied_candidate(p: &Player) -> Option<(Vec<Vec<usize>>, Vec<Past
                 .copied()
                 .collect::<BTreeSet<_>>();
             let additional = new_edges.difference(&p.fences).count();
-            if p.fences.len() + additional > 15
-                || additional > (p.supply.wood.saturating_add(p.free_fence_wood)) as usize
-            {
+            if p.fences.len() + additional > 15 || !fence_affordable(p, additional as u32) {
                 continue;
             }
             let remaining_area = Pasture {
