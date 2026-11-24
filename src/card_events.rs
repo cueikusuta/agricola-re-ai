@@ -73,6 +73,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGainIfFamilyAndRooms { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfLessonsOccupants { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfAccumulationGrew { .. } => TriggerPhase::After,
+        CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => TriggerPhase::After,
         // Fired only by the play dispatcher's dedicated after-play scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
@@ -652,6 +653,16 @@ fn resolve_phase_scan(
                 } => handle_start_round_gain_if_accumulation_grew(
                     ctx, player, *space, *min, good, *amount,
                 )?,
+                // D054 マスの池: accumulation >= min (no grew-this-round
+                // requirement) -> gain.
+                CardEffect::StartRoundGainIfAccumulationAtLeast {
+                    space,
+                    min,
+                    good,
+                    amount,
+                } => handle_start_round_gain_if_accumulation_at_least(
+                    ctx, player, *space, *min, good, *amount,
+                )?,
                 // C067 ミネラルフィーダー: non-harvest round + pasture animals.
                 CardEffect::StartRoundGainIfNoHarvestAndAnimals {
                     animal,
@@ -1070,6 +1081,9 @@ fn effect_condition_holds(
         CardEffect::StartRoundGainIfAccumulationGrew { .. } => {
             trigger.site == EventKind::RoundStart
         }
+        CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => {
+            trigger.site == EventKind::RoundStart
+        }
         CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
             trigger.site == EventKind::RoundStart
         }
@@ -1386,6 +1400,16 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_start_round_gain_if_accumulation_grew(
+                ctx, player, *space, *min, good, *amount,
+            )?,
+            // D054 マスの池: accumulation >= min (no grew-this-round
+            // requirement) -> gain.
+            CardEffect::StartRoundGainIfAccumulationAtLeast {
+                space,
+                min,
+                good,
+                amount,
+            } => handle_start_round_gain_if_accumulation_at_least(
                 ctx, player, *space, *min, good, *amount,
             )?,
             // C067 ミネラルフィーダー: non-harvest round + pasture animals.
@@ -2364,6 +2388,36 @@ fn handle_start_round_gain_if_accumulation_grew(
         .unwrap_or(0);
     let per_round = space.accumulation().map(|(_, n)| n).unwrap_or(0);
     if current >= min && current > per_round {
+        let p = &mut ctx.player;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// D054 マスの池 (Trout Pool): at round start, if the `space` accumulation
+/// holds at least `min` (no "grew this round" requirement — unlike A049
+/// 営巣地 above), gain `amount` of `good`. The accumulation map is read
+/// read-only through `DispatchContext`; dispatches without the map grant
+/// nothing, and the map is never mutated. Food comes from the general
+/// supply, never depleting the space's standing food.
+fn handle_start_round_gain_if_accumulation_at_least(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    space: Space,
+    min: u32,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let current = ctx
+        .accumulations
+        .and_then(|map| map.get(&space).copied())
+        .unwrap_or(0);
+    if current >= min {
         let p = &mut ctx.player;
         let next = p
             .supply

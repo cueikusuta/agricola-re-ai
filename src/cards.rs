@@ -445,6 +445,21 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
+    /// D054 マスの池 (Trout Pool): at each round start, if the `space`
+    /// accumulation holds at least `min`, gain `amount` of `good` from the
+    /// general supply. Unlike A049 営巣地 (`StartRoundGainIfAccumulationGrew`)
+    /// there is no "grew this round" requirement: the printed card pays on the
+    /// standing accumulation alone. The condition is judged inside the handler
+    /// from the public accumulations map the round-start dispatcher threads
+    /// read-only through `DispatchContext` (runtime-only, never serialized);
+    /// the map is never mutated, and any dispatch path without the map grants
+    /// nothing.
+    StartRoundGainIfAccumulationAtLeast {
+        space: Space,
+        min: u32,
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -541,6 +556,9 @@ impl CardEffect {
             CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => "after_worker_gain_if_owns_animal",
             CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
                 "after_any_worker_gain_by_count_if_not_actor"
+            }
+            CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => {
+                "start_round_gain_if_accumulation_at_least"
             }
         }
     }
@@ -819,6 +837,7 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfFamilyAndRooms { amount, .. }
                         | CardEffect::StartRoundGainIfLessonsOccupants { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
+                        | CardEffect::StartRoundGainIfAccumulationAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
@@ -3466,6 +3485,23 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         },
+        // D054 マスの池 (Trout Pool): at the start of each work phase, if the
+        // Fishing accumulation holds at least 3 food, gain 1 food. The
+        // accumulation is read-only through the round-start dispatch; no
+        // "grew this round" requirement (unlike A049 営巣地).
+        CardDefinition {
+            use_limit: None,
+            id: "D054".into(),
+            kind: minor,
+            cost: vec![(Good::Clay, 2)],
+            points: 1,
+            effects: vec![CardEffect::StartRoundGainIfAccumulationAtLeast {
+                space: Space::Fishing,
+                min: 3,
+                good: Good::Food,
+                amount: 1,
+            }],
+        },
     ]
 }
 
@@ -4131,12 +4167,29 @@ mod round_and_harvest_card_tests {
             }]
         ));
 
-        // Two-player preset: B114/A049/C067 are in (2p eligible per spec),
+        // D054 マスの池: Fishing accumulation >= 3 -> 1 food, no grew-this-round
+        // requirement (unlike A049 営巣地 above).
+        let d054 = find("D054");
+        assert_eq!(d054.kind, CardKind::MinorImprovement);
+        assert_eq!(d054.cost, vec![(Good::Clay, 2)]);
+        assert_eq!(d054.points, 1);
+        assert!(matches!(
+            d054.effects.as_slice(),
+            [CardEffect::StartRoundGainIfAccumulationAtLeast {
+                space: Space::Fishing,
+                min: 3,
+                good: Good::Food,
+                amount: 1,
+            }]
+        ));
+
+        // Two-player preset: B114/A049/C067/D054 are in (2p eligible per spec),
         // A157 is out (spec eligibility "2"/"3": "no", "4": "yes").
         let preset = verified_basic_card_set(2).unwrap();
         assert!(preset.definition("B114").is_some());
         assert!(preset.definition("A049").is_some());
         assert!(preset.definition("C067").is_some());
+        assert!(preset.definition("D054").is_some());
         assert!(preset.definition("A157").is_none());
     }
 }
@@ -4544,9 +4597,11 @@ mod simple_occupation_tests {
         // B114/A049/C067 (StartRoundGainIf* wave) join the two-player preset;
         // A157 stays out (4 players only), so the count is 41 + 3 = 44
         // (occupations 18 + 1, minors 23 + 2).
-        assert_eq!(total, 44);
+        // D054 マスの池 (spec eligibility "2": "yes") joins the preset as a
+        // minor: 44 -> 45 total (occupations unchanged, minors 25 -> 26).
+        assert_eq!(total, 45);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 25);
+        assert_eq!(minor, 26);
         assert!(verified_basic_card_set(3).is_err());
     }
 }
@@ -8909,8 +8964,8 @@ mod p1_2_repro_tests {
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
             preset.content_hash(),
-            "d92847a8d127cc236d65b7df53d4af775d62a0015d8ab099b565e2465ad0d965",
-            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067 joined the preset and A157 was excluded as 4p-only; previous pin 323dbecb after PR #385 + d3c237c9 main merge)"
+            "b6723ba1864e3e0cf08c116ffaed6431a2e7b6dcef58f00e152234defc6b2f5d",
+            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067/D054 joined the preset and A157 was excluded as 4p-only)"
         );
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
