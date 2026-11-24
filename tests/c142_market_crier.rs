@@ -16,16 +16,36 @@
 //! - C142 is out of the 2-player pool and of verified_basic_card_set
 
 use agricola_re_ai::card_events::dispatch_after_worker;
-use agricola_re_ai::cards::{verified_band_c_cards, verified_basic_card_set, CardEffect, CardSet};
+use agricola_re_ai::cards::{
+    verified_band_c_cards, verified_basic_card_set, CardDefinition, CardEffect, CardKind,
+    CardRequirement, CardSet,
+};
 use agricola_re_ai::model::{Config, Game, Good, Player, Space};
 use agricola_re_ai::pending::{PendingDecision, PendingKind, PendingResolution, Transition};
 use agricola_re_ai::registry::{build_default_registry, CardPool};
 use serde_json::json;
 
 fn c142_set() -> CardSet {
-    CardSet {
-        definitions: verified_band_c_cards(),
-    }
+    let mut definitions = verified_band_c_cards();
+    definitions.push(CardDefinition {
+        use_limit: None,
+        id: "C142".to_string(),
+        kind: CardKind::Occupation,
+        cost: vec![],
+        points: 0,
+        effects: vec![
+            CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumPlayers(3),
+            },
+            CardEffect::AfterWorkerOptionalBundleGain {
+                space: Space::GrainSeeds,
+                owner_goods: vec![(Good::Grain, 1), (Good::Vegetable, 1)],
+                others_good: Good::Grain,
+                others_amount: 1,
+            },
+        ],
+    });
+    CardSet { definitions }
 }
 
 /// Dispatch the after-worker chain for `actor` on `space` with `owner`
