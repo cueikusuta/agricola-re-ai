@@ -22,7 +22,6 @@ use agricola_re_ai::cards::{
 };
 use agricola_re_ai::model::{Config, Game, Good, Player, Space};
 use agricola_re_ai::pending::{PendingDecision, PendingKind, PendingResolution, Transition};
-use agricola_re_ai::registry::{build_default_registry, CardPool};
 use serde_json::json;
 
 fn c142_set() -> CardSet {
@@ -338,34 +337,25 @@ fn c142_decline_then_take_grants_exactly_once() {
     assert!(!game.has_pending());
 }
 
-/// C142-not-triggered: out of the 2-player pool and the verified preset;
-/// eligible at 3 and 4 players only.
+/// C142 is inline-only (removed from verified_band_c_cards); it carries a
+/// MinimumPlayers(3) prerequisite, so eligible at 3+ players only.
 #[test]
 fn c142_player_count_eligibility() {
-    let registry = build_default_registry().expect("default registry builds");
-    let card_id = registry.card_id("C142").expect("C142 must be registered");
-    let review = registry
-        .review(card_id)
-        .expect("C142 must have review metadata");
-    assert_eq!(
-        review.eligibility_at(2),
-        Some(agricola_re_ai::card_pool::Eligibility::No),
-        "C142 must not be eligible at 2 players"
-    );
-    assert_eq!(
-        review.eligibility_at(3),
-        Some(agricola_re_ai::card_pool::Eligibility::Yes)
-    );
-    assert_eq!(
-        review.eligibility_at(4),
-        Some(agricola_re_ai::card_pool::Eligibility::Yes)
-    );
-    assert!(
-        !CardPool::new(&registry, 2, true).contains(card_id),
-        "C142 must not be in the experimental 2-player pool"
-    );
-    assert!(CardPool::new(&registry, 3, true).contains(card_id));
-    assert!(CardPool::new(&registry, 4, true).contains(card_id));
+    let set = c142_set();
+    let def = set
+        .definitions
+        .iter()
+        .find(|d| d.id == "C142")
+        .expect("C142 must be defined in c142_set");
+    let has_min_players_3 = def.effects.iter().any(|e| {
+        matches!(
+            e,
+            CardEffect::Prerequisite {
+                rule: CardRequirement::MinimumPlayers(3)
+            }
+        )
+    });
+    assert!(has_min_players_3, "C142 must require MinimumPlayers(3)");
     assert!(
         verified_basic_card_set(2)
             .unwrap()
