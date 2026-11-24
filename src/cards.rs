@@ -632,6 +632,10 @@ pub enum HarvestFieldRule {
     /// the grain the fields yield — the card pays 1 extra grain per such
     /// field. Grain in the supply and empty fields are not counted.
     GrainFieldsGrowing,
+    /// D038 搾乳台 (Milking Stool): at each harvest field phase, cattle count
+    /// 0/1/2/3/4/5/6+ yields 0/1/1/2/2/3/3 food (tiers reached at 1/3/5
+    /// cattle; the highest reached tier only is applied).
+    CattleThresholds,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -695,6 +699,9 @@ pub enum ScoreBonusRule {
     /// major improvements. Appended at the enum tail so existing serde
     /// variants and saved-game bytes are unchanged.
     MajorImprovementsBottomRowThresholds,
+    /// D038 搾乳台 (Milking Stool): at scoring, 1 bonus point per 2 cattle
+    /// (`animal_count(Cattle) / 2`, truncated; sheep/boar not mixed in).
+    CattlePairs,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1823,6 +1830,10 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         n if n >= 5 => 8,
                         _ => 0,
                     }
+                }
+                ScoreBonusRule::CattlePairs => {
+                    // D038: 1 point per 2 cattle, truncated; sheep/boar excluded.
+                    player.animal_count(Animal::Cattle) as i32 / 2
                 }
             },
             _ => 0,
@@ -3058,6 +3069,16 @@ pub fn harvest_field_rewards(set: &CardSet, player: &mut Player) -> Result<(), S
                     // A112 大鎌使い: one step per growing grain field (the
                     // same pre-harvest count the dispatcher handler uses).
                     HarvestFieldRule::GrainFieldsGrowing => grain_fields_growing(player),
+                    // D038 搾乳台: tiers at 1/3/5 cattle -> 1/2/3 food,
+                    // highest reached tier only.
+                    HarvestFieldRule::CattleThresholds => {
+                        match player.animal_count(Animal::Cattle) {
+                            0 => 0,
+                            1 | 2 => 1,
+                            3 | 4 => 2,
+                            _ => 3,
+                        }
+                    }
                 };
                 safe_gain(
                     player,
@@ -6057,6 +6078,24 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // D038 搾乳台 (Milking Stool): cost 1 wood; at each harvest field
+        // phase, 1/2/3 food for at least 1/3/5 cattle; at scoring, 1 point
+        // per 2 cattle (truncated).
+        card(
+            "D038",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1)],
+            vec![
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::CattleThresholds,
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::CattlePairs,
+                },
+            ],
+        ),
     ]
 }
 
