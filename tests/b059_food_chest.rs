@@ -351,9 +351,17 @@ fn drive_to_finished(game: &mut Game) {
 #[test]
 fn b059_major_improvement_grant_survives_resume_without_double_count() {
     let (config, set, hands, mut game) = game_with_b059();
+    // The start player begins with the engine's initial food (2 per
+    // `Player::new`). Rewriting the post-setup supply directly would not
+    // be recorded in the action log and would desync the full replay, so
+    // read the setup value and expect the grant on top of it. The script
+    // only secures wood before B059 (a recorded Forest placement), so no
+    // food changes before the play and the expectation is initial + 4.
+    let initial_food = game.public.players[0].supply.food;
 
     // Drive until B059 is played and assert the one-time grant on the spot.
     let mut plays = 0;
+    let mut wood_before_play = 0;
     while !game.public.players[0]
         .played_cards
         .iter()
@@ -365,15 +373,64 @@ fn b059_major_improvement_grant_survives_resume_without_double_count() {
             !game.public.finished,
             "the game ended before B059 could be played"
         );
+        wood_before_play = game.public.players[0].supply.wood;
         apply_recorded(&mut game);
     }
     let p = &game.public.players[0];
     assert_eq!(
-        p.supply.food, 4,
-        "the Major Improvement action grants 4 food exactly once"
+        p.supply.food,
+        initial_food + 4,
+        "the Major Improvement action grants 4 food exactly once on top of the setup value"
     );
-    assert_eq!(p.supply.wood, 0, "cost wood 1 is paid");
+    assert_eq!(
+        p.supply.wood,
+        wood_before_play - 1,
+        "cost wood 1 is paid from the wood secured by recorded placements"
+    );
     let grant_food = p.supply.food;
+
+    // Resume immediately after the grant: save/load and a full replay of
+    // the action log recorded so far must reproduce the exact state hash
+    // and the food count at the B059 play, proving the space-dependent
+    // grant survives a resume without firing a second time.
+    let grant_hash = game.state_hash();
+    let grant_loaded = Game::load_json(&game.save_json().expect("save after grant"))
+        .expect("post-grant game must resume");
+    assert_eq!(
+        grant_loaded.state_hash(),
+        grant_hash,
+        "resume right after the grant must reproduce the state hash"
+    );
+    assert_eq!(
+        grant_loaded.public.players[0].supply.food, grant_food,
+        "resume right after the grant must reproduce food"
+    );
+    assert!(grant_loaded.public.players[0]
+        .played_cards
+        .iter()
+        .any(|id| id == "B059"));
+
+    let grant_replayed = Game::replay_with_setup_and_start_player(
+        config.clone(),
+        set.clone(),
+        Some(hands.clone()),
+        Some(0),
+        &game.log.events,
+    )
+    .expect("recorded B059 game must replay up to the grant");
+    assert_eq!(
+        grant_replayed.state_hash(),
+        grant_hash,
+        "replay up to the grant must reproduce the state hash"
+    );
+    assert_eq!(
+        grant_replayed.public.players[0].supply.food, grant_food,
+        "replay up to the grant must reproduce food"
+    );
+    assert!(grant_replayed.public.players[0]
+        .played_cards
+        .iter()
+        .any(|id| id == "B059"));
 
     drive_to_finished(&mut game);
     assert!(game.public.finished, "drive must reach the final harvest");
@@ -383,13 +440,9 @@ fn b059_major_improvement_grant_survives_resume_without_double_count() {
         .iter()
         .any(|id| id == "B059"));
 
-    // B059's one-time grant (plus later Day Laborer / Fishing placements,
-    // minus feedings) is folded into the final food count. Any double grant
-    // during resume or replay moves the food count off this value.
-    assert!(
-        game.public.players[0].supply.food >= grant_food,
-        "the recorded grant stays in the final food count"
-    );
+    // Feedings after the grant consume food freely, so the final count is
+    // not a fixed anchor. What proves no double grant is the exact state
+    // hash / food reproduction across save/load and full replay below.
     let final_hash = game.state_hash();
     let final_food = game.public.players[0].supply.food;
 
