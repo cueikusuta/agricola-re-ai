@@ -325,7 +325,9 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. }
-                | crate::cards::CardEffect::OnPlayGainIfRound { .. } => EventKind::CardPlayed,
+| crate::cards::CardEffect::OnPlayGainIfRound { .. }
+| crate::cards::CardEffect::OnPlayChoiceGain { .. }
+| crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
                     EventKind::ImprovementPlayed
                 }
@@ -372,6 +374,16 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerGain { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                // A140 ショベル運搬人: after-worker dynamic-count effect.
+                crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => {
                     EventKind::WorkerPlaced
                 }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
@@ -503,6 +515,7 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterOccupationGain { amount, .. }
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
@@ -523,6 +536,9 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
+                        | crate::cards::CardEffect::AfterAnyWorkerGainByCountIfNotActor {
+                            base_amount: amount, ..
+                        }
                         | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. }
                         | crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms {
                             amount, ..
@@ -539,10 +555,19 @@ impl CardRegistryBuilder {
                             amount,
                             ..
                         }
-                        | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. }
+| crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. }
                         | crate::cards::CardEffect::OnPlayGainIfRound { amount, .. } => *amount,
+                        crate::cards::CardEffect::OnPlayAddStoneToEmptyFields {
+                            amount, ..
+                        } => *amount,
+                        crate::cards::CardEffect::OnPlayChoiceGain { options } => {
+                            options.iter().map(|o| o.amount).max().unwrap_or(1)
+                        }
+                        // A140: the amount is read from the public
+                        // accumulations at resolution time, not fixed here.
+                        crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
                         // Chapter 1 round-start cards: no direct resource amount to validate
-                        crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        | crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
                         | crate::cards::CardEffect::StartRoundCopyUnusedRoundSpace { .. }
                         | crate::cards::CardEffect::StartRoundPlayOccupationIfLessonsUnderused {
                             ..
