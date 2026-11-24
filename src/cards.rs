@@ -445,6 +445,18 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
+    /// On-play per-good threshold gain: for each good in `goods`, if the
+    /// owner already holds at least `threshold` of it, gain `amount` of
+    /// that good. Judged per good against the owner's own supply (not
+    /// resource totals); goods below threshold grant nothing. No new
+    /// persistent field or PendingDecision. Used by B105
+    /// (food/grain/vegetable/reed/wood, threshold 2, amount 1) and E006
+    /// (wood/clay/reed/stone, threshold 4, amount 1).
+    OnPlayGainEachWithAtLeast {
+        goods: Vec<Good>,
+        threshold: u32,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -496,6 +508,7 @@ impl CardEffect {
             CardEffect::HarvestFieldOptionalExchange { .. } => "harvest_field_optional_exchange",
 
             CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
+            CardEffect::OnPlayGainEachWithAtLeast { .. } => "on_play_gain_each_with_at_least",
             CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
@@ -812,6 +825,7 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
+                        CardEffect::OnPlayGainEachWithAtLeast { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
@@ -1479,6 +1493,17 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 amount,
             } if player.rooms() == usize::from(*rooms) => {
                 safe_gain(player, *good, *amount)?;
+            }
+            CardEffect::OnPlayGainEachWithAtLeast {
+                goods,
+                threshold,
+                amount,
+            } => {
+                for good in goods {
+                    if player.supply.get(*good) >= *threshold {
+                        safe_gain(player, *good, *amount)?;
+                    }
+                }
             }
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 let bonus = improvement_count_in_front(set, player)
@@ -6469,6 +6494,29 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // B105 箱造り (Case Builder): cost 0; on play, for each of
+        // food/grain/vegetable/reed/wood the owner already holds at least 2
+        // of, gain 1 of that good. Goods below threshold 2 grant nothing.
+        // Judged per good against the owner's own supply. Eligible at all
+        // player counts (spec 2/3/4 = yes).
+        CardDefinition {
+            use_limit: None,
+            id: "B105".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGainEachWithAtLeast {
+                goods: vec![
+                    Good::Food,
+                    Good::Grain,
+                    Good::Vegetable,
+                    Good::Reed,
+                    Good::Wood,
+                ],
+                threshold: 2,
+                amount: 1,
+            }],
+        },
     ]
 }
 
@@ -6888,6 +6936,27 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::ExactFamilyMembers,
             }],
+        },
+        // E006 再集計 (Recount): cost 0; on play, for each of wood/clay/
+        // reed/stone the owner already holds at least 4 of, gain 1 of that
+        // good, then pass the card to the left neighbor's hand
+        // (PostPlayPassLeft). The card does not remain in the owner's
+        // played_cards. Spec eligibility 2/3/4 = unknown, so no
+        // MinimumPlayers prerequisite is expressed here.
+        CardDefinition {
+            use_limit: None,
+            id: "E006".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGainEachWithAtLeast {
+                    goods: vec![Good::Wood, Good::Clay, Good::Reed, Good::Stone],
+                    threshold: 4,
+                    amount: 1,
+                },
+                CardEffect::PostPlayPassLeft,
+            ],
         },
     ]
 }
