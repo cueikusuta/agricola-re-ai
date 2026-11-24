@@ -445,6 +445,18 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
+    /// A057 搾乳施設 (Milking Parlor): on play, the amount paired with the
+    /// highest threshold the owner's `animal` count reaches is gained once.
+    /// Sheep and cattle are counted by separate variants (the printed card
+    /// pays per animal type, never mixed), and only the single highest stage
+    /// reached applies — stages never stack. The spec's three printed stages
+    /// travel as data in `thresholds` (BGA spec A057: sheep 1/3/4+ -> 2/3/4
+    /// food, cattle 1/2/3+ -> 2/3/4 food).
+    OnPlayGainAnimalThreshold {
+        animal: Animal,
+        thresholds: [AnimalThreshold; 3],
+        good: Good,
+    },
 }
 
 impl CardEffect {
@@ -542,6 +554,7 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
                 "after_any_worker_gain_by_count_if_not_actor"
             }
+            CardEffect::OnPlayGainAnimalThreshold { .. } => "on_play_gain_animal_threshold",
         }
     }
 }
@@ -568,11 +581,22 @@ pub enum CountKind {
 /// "gain 3 food" or "1 food per sheep"). When `per_animal` is `Some`, the gained
 /// amount is `amount * player.animal_count(per_animal)` rather than a fixed
 /// `amount`.
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChoiceGainOption {
     pub good: Good,
     pub amount: u32,
     pub per_animal: Option<Animal>,
+}
+
+/// One stage of an animal-count threshold table (A057 搾乳施設 / Milking
+/// Parlor): when the owner reaches `threshold` of the counted animal, the
+/// stage pays `amount` of the gained good. Mirrors the spec JSON stage
+/// objects ({threshold, amount}).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AnimalThreshold {
+    pub threshold: u32,
+    pub amount: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -653,6 +677,14 @@ pub enum CardRequirement {
     MinimumPlayers(u8),
     MaximumPlayers(u8),
     MinimumImprovements(u8),
+    /// A057 搾乳施設 (Milking Parlor): prerequisite is at least `n` unused
+    /// farmyard spaces. A space is unused exactly when the engine also treats
+    /// it as free for rooms (`engine::build_room`): `Tile::Empty` and no
+    /// stable standing on it — a stable already occupies the space, and
+    /// rooms, fields and pastures are used spaces. Counted inside the
+    /// player's farm, so both `can_play` and the dispatcher prerequisite
+    /// handler can evaluate it.
+    MinimumUnusedFarmyardSpaces(u8),
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -850,6 +882,13 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
                         | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
                         | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 1,
+                        // A057 搾乳施設: the paid amount comes from the reached
+                        // threshold stage, so bound the highest printed stage.
+                        CardEffect::OnPlayGainAnimalThreshold { thresholds, .. } => thresholds
+                            .iter()
+                            .map(|stage| stage.amount)
+                            .max()
+                            .unwrap_or(1),
                     };
                     amount == 0 || amount > 30
                 })
@@ -1338,6 +1377,18 @@ pub(crate) fn sown_field_count(player: &Player) -> usize {
         .count()
 }
 
+/// Count unused farmyard spaces: `Tile::Empty` spaces that carry no stable.
+/// This is the same free-space predicate the engine uses for rooms
+/// (`engine::build_room`), so a stable standing on an otherwise empty space
+/// counts as used. Rooms, fields and pastures are used spaces.
+pub(crate) fn unused_farmyard_spaces(player: &Player) -> usize {
+    player
+        .farm
+        .iter()
+        .filter(|cell| matches!(cell.tile, Tile::Empty) && !cell.stable)
+        .count()
+}
+
 pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_food: u32) -> bool {
     if !affordable(card, player, extra_food) {
         return false;
@@ -1370,6 +1421,9 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
             CardRequirement::MinimumPlayers(_) => true,
             CardRequirement::MaximumPlayers(_) => true,
             CardRequirement::PastureCount(n) => player.pastures.len() >= usize::from(*n),
+            CardRequirement::MinimumUnusedFarmyardSpaces(n) => {
+                unused_farmyard_spaces(player) >= usize::from(*n)
+            }
         }
     })
 }
@@ -1537,6 +1591,25 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
             CardEffect::PostPlayPassLeft => {
                 // Zone-move metadata: the engine play arm performs the hand
                 // pass after the play transaction; nothing to resolve here.
+            }
+            // A057 搾乳施設: only the highest reached stage of the animal
+            // threshold table applies, once (sheep and cattle are separate
+            // effects and never mixed).
+            CardEffect::OnPlayGainAnimalThreshold {
+                animal,
+                thresholds,
+                good,
+            } => {
+                let count = player.animal_count(*animal);
+                let amount = thresholds
+                    .iter()
+                    .filter(|stage| count >= stage.threshold)
+                    .map(|stage| stage.amount)
+                    .max()
+                    .unwrap_or(0);
+                if amount > 0 {
+                    safe_gain(player, *good, amount)?;
+                }
             }
             _ => {}
         }
@@ -6280,9 +6353,61 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // A057 搾乳施設 (Milking Parlor): cost 2 wood, requires at least 4
+        // unused farmyard spaces, prints 1 VP. On play, 1/3/4+ sheep give
+        // 2/3/4 food and 1/2/3+ cattle give 2/3/4 food; per animal type only
+        // the highest stage reached applies once, and sheep and cattle are
+        // never mixed (agricola.cloudfree.jp ?p=3368).
+        CardDefinition {
+            use_limit: None,
+            id: "A057".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 2)],
+            points: 1,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumUnusedFarmyardSpaces(4),
+                },
+                CardEffect::OnPlayGainAnimalThreshold {
+                    animal: Animal::Sheep,
+                    thresholds: [
+                        AnimalThreshold {
+                            threshold: 1,
+                            amount: 2,
+                        },
+                        AnimalThreshold {
+                            threshold: 3,
+                            amount: 3,
+                        },
+                        AnimalThreshold {
+                            threshold: 4,
+                            amount: 4,
+                        },
+                    ],
+                    good: Good::Food,
+                },
+                CardEffect::OnPlayGainAnimalThreshold {
+                    animal: Animal::Cattle,
+                    thresholds: [
+                        AnimalThreshold {
+                            threshold: 1,
+                            amount: 2,
+                        },
+                        AnimalThreshold {
+                            threshold: 2,
+                            amount: 3,
+                        },
+                        AnimalThreshold {
+                            threshold: 3,
+                            amount: 4,
+                        },
+                    ],
+                    good: Good::Food,
+                },
+            ],
+        },
     ]
 }
-
 /// B-deck band 121-168 cards whose printed effects are fully expressible with
 /// the current typed effect vocabulary (BGA Agricola card wiki;
 /// B122 p=3135, B142 p=3207, B144 p=3113). Kept out of the A/B two-player
