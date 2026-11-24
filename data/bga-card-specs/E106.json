@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "card_id": "E106",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "急ぎの売り手",
+    "name_en": "Emergency Seller"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2647",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "exchange_building_resources_for_food",
+            "rates": {
+              "wood": 2,
+              "clay": 2,
+              "reed": 3,
+              "stone": 3
+            },
+            "max_total": {
+              "op": "family_count"
+            },
+            "allow_mixed": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "Up to one building resource per family member may be sold: wood/clay for 2 food, reed/stone for 3 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E106-two-exchanges",
+      "E106-decline",
+      "E106-family-cap"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "On play, optionally sell up to family-size building resources: wood/clay -> 2 food, reed/stone -> 3 food."
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "card_id": "E101",
+  "cases": [
+    {
+      "id": "E101-round-1",
+      "scope": "effect_only",
+      "setup": {
+        "round": 1
+      },
+      "action": {
+        "play": "E101"
+      },
+      "expected": {
+        "points_delta": 5,
+        "occupations_locked": true
+      },
+      "notes": "Round 1 is in stage 1, so five stages have not started."
+    },
+    {
+      "id": "E101-round-5",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "E101"
+      },
+      "expected": {
+        "points_delta": 4
+      },
+      "notes": "Round 5 starts stage 2; four stages remain."
+    },
+    {
+      "id": "E101-occupation-blocked",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "E101",
+        "then": "play_occupation"
+      },
+      "expected": {
+        "play_rejected": true
+      },
+      "notes": "Further occupations are forbidden until the end of the game."
+    }
+  ]
+}

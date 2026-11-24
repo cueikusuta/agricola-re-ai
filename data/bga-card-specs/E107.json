@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "card_id": "E107",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "土地調査士",
+    "name_en": "Land Surveyor"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2646",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_field_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "custom",
+              "args": [
+                "threshold_table",
+                "field_count",
+                {
+                  "2": 1,
+                  "4": 2,
+                  "6": 3,
+                  "7": 4
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At the field phase of each harvest, 2/4/6/7 or more fields give 1/2/3/4 food."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E107-two-fields",
+      "E107-six-fields",
+      "E107-one-field"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "implemented",
+    "notes": "Field-phase food by field-count thresholds 2/4/6/7 -> 1/2/3/4."
+  }
+}

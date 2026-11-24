@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "E104",
+  "cases": [
+    {
+      "id": "E104-played-early",
+      "scope": "effect_only",
+      "setup": {
+        "round": 3
+      },
+      "action": {
+        "play": "E104"
+      },
+      "expected": {
+        "round_11_vegetables": 3
+      },
+      "notes": "Played in round 3, so the vegetables are placed."
+    },
+    {
+      "id": "E104-played-late",
+      "scope": "effect_only",
+      "setup": {
+        "round": 5
+      },
+      "action": {
+        "play": "E104"
+      },
+      "expected": {
+        "round_11_vegetables": 0
+      },
+      "notes": "Played after round 4, so nothing is placed."
+    },
+    {
+      "id": "E104-collect-round-11",
+      "scope": "effect_only",
+      "setup": {
+        "round": 11,
+        "round_11_vegetables": 3
+      },
+      "action": {
+        "play": "E104",
+        "round_start": true
+      },
+      "expected": {
+        "vegetable_delta": 3,
+        "round_11_vegetables": 0
+      },
+      "notes": "The placed vegetables are collected at the start of round 11."
+    }
+  ]
+}

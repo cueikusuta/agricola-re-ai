@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "card_id": "E102",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "獲得者",
+    "name_en": "Acquirer"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2651",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "round_start",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": {
+              "op": "family_count"
+            }
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "kind": "gain_good",
+                "good": "wood",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "clay",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "reed",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "stone",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "sheep",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "wild_boar",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "cattle",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "grain",
+                "amount": 1
+              },
+              {
+                "kind": "gain_good",
+                "good": "vegetable",
+                "amount": 1
+              }
+            ],
+            "choose_one": true,
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "At the start of each round the owner may pay food equal to the family size and take one good of their choice. Animals still need accommodation."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E102-buy-cattle",
+      "E102-decline",
+      "E102-cannot-pay"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "At the start of each round, optionally pay food equal to the family size to buy one good."
+  }
+}
