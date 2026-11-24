@@ -1554,6 +1554,7 @@ CARDS = {
     },
     "D038": {
         "post": "played_area",
+        "implementation_status": "implemented",
         "effects": [
             effect("harvest_field_phase",
                    [gain("food", table("cattle", {"1": 1, "3": 2, "5": 3}))],
