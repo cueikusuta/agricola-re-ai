@@ -323,6 +323,7 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainPerStored { .. }
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
                 | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
+                | crate::cards::CardEffect::OnPlayGainIfRemainingRounds { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
@@ -476,9 +477,10 @@ impl CardRegistryBuilder {
                         #[cfg(test)]
                         crate::cards::CardEffect::PendingProbe { .. } => 1,
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
-                        | crate::cards::CardEffect::OnPlayGainIfHouse { amount, .. }
-                        | crate::cards::CardEffect::OnPlayGainIfRoomCount { amount, .. }
-                        | crate::cards::CardEffect::StartRoundGain { amount, .. }
+                                                | crate::cards::CardEffect::OnPlayGainIfHouse { amount, .. }
+                                                | crate::cards::CardEffect::OnPlayGainIfRoomCount { amount, .. }
+                                                | crate::cards::CardEffect::OnPlayGainIfRemainingRounds { amount, .. }
+                                                | crate::cards::CardEffect::StartRoundGain { amount, .. }
                         | crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound {
                             amount,
                             ..

@@ -540,13 +540,14 @@ fn card_priority(
     let horizon = i64::from(15u8.saturating_sub(round)).min(5);
     for effect in &card.effects {
         value += match effect {
-                // Exact gains and discounted costs were simulated above.
-                                CardEffect::OnPlayGain { .. }
-                                                | CardEffect::OnPlayGainPerStored { .. }
-                                                | CardEffect::OnPlayGainIfHouse { .. }
-                                                | CardEffect::OnPlayGainIfRoomCount { .. }
-                                                | CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                                                | CardEffect::Prerequisite { .. } => 0,
+                    // Exact gains and discounted costs were simulated above.
+                                    CardEffect::OnPlayGain { .. }
+                                                    | CardEffect::OnPlayGainPerStored { .. }
+                                                    | CardEffect::OnPlayGainIfHouse { .. }
+                                                    | CardEffect::OnPlayGainIfRoomCount { .. }
+                                                    | CardEffect::OnPlayGainIfRemainingRounds { .. }
+                                                    | CardEffect::OnPlayGainPerImprovementPlayed { .. }
+                                                    | CardEffect::Prerequisite { .. } => 0,
                 #[cfg(test)]
                 // Test-only probe; never part of a real evaluated pool.
                 CardEffect::PendingProbe { .. } => 0,

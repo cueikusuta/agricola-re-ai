@@ -52,6 +52,9 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // B073 贈り物かご's room-count table is an instantaneous play-time
         // effect — Before phase, same as the other on-play gains.
         CardEffect::OnPlayGainIfRoomCount { .. } => TriggerPhase::Before,
+        // A135 家畜官 (Animal Reeve): on-play remaining-rounds table is an
+        // instantaneous play-time effect — Before phase.
+        CardEffect::OnPlayGainIfRemainingRounds { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => TriggerPhase::Before,
         CardEffect::OnPlayGainPerCount { .. } => TriggerPhase::Before,
         // On-play animal gain is an instantaneous play-time effect — Before
@@ -543,6 +546,17 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_on_play_gain_if_room_count(ctx, player, *rooms, good, *amount)?,
+                CardEffect::OnPlayGainIfRemainingRounds {
+                    remaining_rounds,
+                    good,
+                    amount,
+                } => handle_on_play_gain_if_remaining_rounds(
+                    ctx,
+                    player,
+                    *remaining_rounds,
+                    good,
+                    *amount,
+                )?,
                 CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                     handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
                 }
@@ -1092,6 +1106,14 @@ fn effect_condition_holds(
         // room count exactly resolves; rows for other room counts grant
         // nothing (no double grant, no rounding).
         CardEffect::OnPlayGainIfRoomCount { rooms, .. } => player.rooms() == usize::from(*rooms),
+        // A135 家畜官: only the table row matching the owner's current
+        // remaining rounds (including current round) exactly resolves.
+        CardEffect::OnPlayGainIfRemainingRounds {
+            remaining_rounds, ..
+        } => {
+            let remaining = 15u8.saturating_sub(round);
+            remaining == *remaining_rounds
+        }
         CardEffect::OnPlayGainAnimal { .. } => true,
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
@@ -1239,6 +1261,17 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_on_play_gain_if_room_count(ctx, player, *rooms, good, *amount)?,
+            CardEffect::OnPlayGainIfRemainingRounds {
+                remaining_rounds,
+                good,
+                amount,
+            } => handle_on_play_gain_if_remaining_rounds(
+                ctx,
+                player,
+                *remaining_rounds,
+                good,
+                *amount,
+            )?,
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 handle_on_play_gain_per_improvement_played(ctx, player, good, *amount)?
             }
@@ -1698,6 +1731,35 @@ fn handle_on_play_gain_if_room_count(
         p.rooms(),
         usize::from(rooms),
         "handler must only run for the row matching the room count"
+    );
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(amount)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// A135 家畜官 (Animal Reeve): one table row of the on-play remaining-rounds
+/// gain. The generic scan (effect_condition_holds) only routes the row whose
+/// `remaining_rounds` matches the owner exactly (15 - round), so this handler
+/// applies the gain unconditionally for the routed row and the other rows
+/// never reach it.
+fn handle_on_play_gain_if_remaining_rounds(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    remaining_rounds: u8,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    // The condition scan already verified that 15 - round == remaining_rounds.
+    // We can assert this in debug builds for safety.
+    debug_assert_eq!(
+        15u8.saturating_sub(ctx.round),
+        remaining_rounds,
+        "handler must only run for the row matching the remaining rounds"
     );
     let next = p
         .supply
