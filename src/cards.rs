@@ -416,6 +416,18 @@ pub enum CardEffect {
         /// The good granted (food on the printed card).
         good: Good,
     },
+    /// A066 餌皿 (Feeding Dish): after the owner uses a sheep/pig/cattle
+    /// market, if the owner already keeps that animal type
+    /// (`player.animal_count(kind) > 0` after the event resolves — animals
+    /// taken at that same market count), gain `amount` of `good` (printed:
+    /// 1 grain). One variant per market fixes the space→animal mapping; no
+    /// new persistent field or PendingDecision is introduced.
+    AfterWorkerGainIfOwnsAnimal {
+        space: Space,
+        animal: Animal,
+        good: Good,
+        amount: u32,
+    },
     /// B143 粘土守 (Clay Warden): on any player's use of `space` (Hollow),
     /// each non-actor owner gains `base_good` x `base_amount`; additionally,
     /// each non-actor owner gains `extra_3p_good` x `extra_3p_amount` in a 3p
@@ -526,6 +538,7 @@ impl CardEffect {
             CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                 "after_worker_gain_other_accumulation_food"
             }
+            CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => "after_worker_gain_if_owns_animal",
             CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
                 "after_any_worker_gain_by_count_if_not_actor"
             }
@@ -799,6 +812,7 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
+                        CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -1553,6 +1567,17 @@ pub fn after_worker(set: &CardSet, player: &mut Player, space: Space) -> Result<
             } = effect
             {
                 if *trigger == space {
+                    safe_gain(player, *good, *amount)?;
+                }
+            }
+            if let CardEffect::AfterWorkerGainIfOwnsAnimal {
+                space: trigger,
+                animal,
+                good,
+                amount,
+            } = effect
+            {
+                if *trigger == space && player.animal_count(*animal) > 0 {
                     safe_gain(player, *good, *amount)?;
                 }
             }
@@ -6220,6 +6245,38 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 CardEffect::AfterWorkerGainOtherAccumulationFood {
                     space: Space::Hollow,
                     good: Good::Food,
+                },
+            ],
+        },
+        // A066 餌皿 (Feeding Dish): cost 1 wood, no prerequisites, 0 points.
+        // After using a sheep/pig/cattle market while already keeping that
+        // animal type, gain 1 grain. Snapshot is after_event: animals taken
+        // at that same market count. One variant per market fixes the
+        // space→animal mapping; the effect targets the card owner only.
+        CardDefinition {
+            use_limit: None,
+            id: "A066".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterWorkerGainIfOwnsAnimal {
+                    space: Space::SheepMarket,
+                    animal: Animal::Sheep,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerGainIfOwnsAnimal {
+                    space: Space::PigMarket,
+                    animal: Animal::Boar,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerGainIfOwnsAnimal {
+                    space: Space::CattleMarket,
+                    animal: Animal::Cattle,
+                    good: Good::Grain,
+                    amount: 1,
                 },
             ],
         },
