@@ -322,8 +322,15 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::OnPlayGain { .. }
                 | crate::cards::CardEffect::OnPlayGainPerStored { .. }
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
+                | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayChoiceGain { .. }
+                | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. }
+                | crate::cards::CardEffect::PostPlayPassLeft => EventKind::CardPlayed,
+                crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
+                    EventKind::ImprovementPlayed
+                }
                 crate::cards::CardEffect::StartRoundGain { .. } => EventKind::RoundStart,
                 crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => {
                     EventKind::RoundStart
@@ -331,7 +338,16 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::StartRoundGainIfNoMinorPlayed { .. } => {
                     EventKind::RoundStart
                 }
+                crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms { .. }
+                | crate::cards::CardEffect::StartRoundGainIfLessonsOccupants { .. }
+                | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew { .. }
+                | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
+                    EventKind::RoundStart
+                }
                 crate::cards::CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => {
+                    EventKind::Harvest
+                }
+                crate::cards::CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast { .. } => {
                     EventKind::Harvest
                 }
                 crate::cards::CardEffect::AfterOccupationGainPerFoodCost { .. } => {
@@ -360,9 +376,38 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
                     EventKind::WorkerPlaced
                 }
+                crate::cards::CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                // A140 ショベル運搬人: after-worker dynamic-count effect.
+                crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
-                crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
-                    EventKind::ImprovementPlayed
+                // Chapter 1 round-start cards
+                crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundCopyUnusedRoundSpace { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundPlayOccupationIfLessonsUnderused { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundPlayCardIfStoneHouse { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundExchangeForFoodAndPoints { .. } => {
+                    EventKind::RoundStart
+                }
+                crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => {
+                    EventKind::RoundStart
                 }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
@@ -441,6 +486,7 @@ impl CardRegistryBuilder {
                         crate::cards::CardEffect::PendingProbe { .. } => 1,
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
                         | crate::cards::CardEffect::OnPlayGainIfHouse { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainIfRoomCount { amount, .. }
                         | crate::cards::CardEffect::StartRoundGain { amount, .. }
                         | crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound {
                             amount,
@@ -453,6 +499,10 @@ impl CardRegistryBuilder {
                             amount,
                             ..
                         }
+                        | crate::cards::CardEffect::HarvestFieldGainIfGrainHarvestedAtLeast {
+                            amount,
+                            ..
+                        }
                         | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed {
                             amount, ..
                         }
@@ -462,6 +512,7 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterOccupationGain { amount, .. }
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
@@ -482,10 +533,51 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
+                        | crate::cards::CardEffect::AfterAnyWorkerGainByCountIfNotActor {
+                            base_amount: amount, ..
+                        }
                         | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. }
+                        | crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms {
+                            amount, ..
+                        }
+                        | crate::cards::CardEffect::StartRoundGainIfLessonsOccupants {
+                            amount,
+                            ..
+                        }
+                        | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew {
+                            amount,
+                            ..
+                        }
+                        | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals {
+                            amount,
+                            ..
+                        }
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
                         }
+                        crate::cards::CardEffect::OnPlayAddStoneToEmptyFields {
+                            amount, ..
+                        } => *amount,
+                        crate::cards::CardEffect::OnPlayChoiceGain { options } => {
+                            options.iter().map(|o| o.amount).max().unwrap_or(1)
+                        }
+                        // Zone-move metadata carries no gain amount.
+                        crate::cards::CardEffect::PostPlayPassLeft => 1,
+                        // A140: the amount is read from the public
+                        // accumulations at resolution time, not fixed here.
+                        crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
+                        // Chapter 1 round-start cards: no direct resource amount to validate
+                        | crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        | crate::cards::CardEffect::StartRoundCopyUnusedRoundSpace { .. }
+                        | crate::cards::CardEffect::StartRoundPlayOccupationIfLessonsUnderused {
+                            ..
+                        }
+                        | crate::cards::CardEffect::StartRoundPlayCardIfStoneHouse { .. }
+                        | crate::cards::CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
+                        | crate::cards::CardEffect::StartRoundExchangeForFoodAndPoints { .. }
+                        | crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
+                            ..
+                        } => 1,
                     };
                     amount == 0 || amount > 30
                 })
@@ -841,6 +933,8 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
         crate::cards::verified_round_and_harvest_cards(),
         crate::cards::verified_passive_cards(),
         crate::cards::verified_extra_simple_cards(),
+        // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064)
+        crate::cards::verified_round_start_cards(),
         crate::cards::verified_band_c_cards(),
         crate::cards::verified_band_d_cards(),
         crate::cards::verified_band_e_cards(),
@@ -891,7 +985,6 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
             review,
         )?;
     }
-
     builder.freeze()
 }
 
@@ -902,7 +995,7 @@ fn merge_card_variants(
     variants: Vec<(usize, CardDefinition)>,
 ) -> (CardDefinition, Vec<usize>) {
     use crate::cards::{CardEffect, CardRequirement};
-    use crate::model::{Good, Space};
+    use crate::model::Space;
 
     // Group by player count
     let mut by_players: BTreeMap<usize, CardDefinition> = BTreeMap::new();
@@ -949,38 +1042,26 @@ fn merge_card_variants(
             eligible_players = vec![2, 3, 4];
         }
         "B102" => {
-            // B102: 2p=Clay3, 3p=Reed2, 4p=Sheep2 (per official spec)
-            // Cards.rs only defines 2p variant; 3p variant added via registry.
-            // 4p effect (Sheep 2) requires OnPlayGainAnimal which is not implemented.
-            // Therefore B102 is NOT eligible for 4 players (eligible_at_4 = No).
+            // B102: 2p=Clay3, 3p=Reed2, 4p=Sheep2 (per official spec).
+            // cards.rs ships one plain variant per player count; each variant's
+            // effects are guarded here behind paired Minimum/MaximumPlayers
+            // prerequisites, so the merged card projects exactly one series at
+            // any player count. OnPlayGainAnimal (4p sheep) reuses the existing
+            // C083 on-play auto-placement path, so B102 is eligible at 4 too.
             merged_effects.clear();
+            for (&players, card) in &by_players {
+                let count = players as u8;
+                merged_effects.push(CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(count),
+                });
+                merged_effects.push(CardEffect::Prerequisite {
+                    rule: CardRequirement::MaximumPlayers(count),
+                });
+                merged_effects.extend(card.effects.iter().cloned());
+            }
 
-            // 2 players: Clay 3
-            merged_effects.push(CardEffect::Prerequisite {
-                rule: CardRequirement::MinimumPlayers(2),
-            });
-            merged_effects.push(CardEffect::Prerequisite {
-                rule: CardRequirement::MaximumPlayers(2),
-            });
-            merged_effects.push(CardEffect::OnPlayGain {
-                good: Good::Clay,
-                amount: 3,
-            });
-
-            // 3 players: Reed 2
-            merged_effects.push(CardEffect::Prerequisite {
-                rule: CardRequirement::MinimumPlayers(3),
-            });
-            merged_effects.push(CardEffect::Prerequisite {
-                rule: CardRequirement::MaximumPlayers(3),
-            });
-            merged_effects.push(CardEffect::OnPlayGain {
-                good: Good::Reed,
-                amount: 2,
-            });
-
-            // Eligible for 2 and 3 players only (4p effect not implemented)
-            eligible_players = vec![2, 3];
+            // Eligible for 2, 3 and 4 players (one implemented variant each)
+            eligible_players = vec![2, 3, 4];
         }
         _ => {
             // For other cards, check if effects differ by player count

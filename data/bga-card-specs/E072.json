@@ -20,14 +20,14 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2681",
         "language": "ja",
-        "checked_on": "2026-11-19",
-        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+        "checked_on": "2026-11-24",
+        "note": "third-party BGA wiki card page; re-checked 2026-11-24 (page rev. 2024/10/10). Confirmed: cost 1 wood (コスト: 1 木), prerequisite 2 occupations (条件: 職業2), points 1 (勝利点: 1), effect = 'このカードは畑である。各収穫の畑フェイズで、このカードから品物1以上を収穫したならば、食料1を得る。' (this card is a field; during each harvest's field phase, if at least 1 good is harvested from this card, gain 1 food)."
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-19",
-        "note": "English list page row used to cross-check the card id, name and effect text"
+        "checked_on": "2026-11-24",
+        "note": "English list page row re-checked 2026-11-24 (list rev. 2026/06/12). Confirmed effect text: 'This card is a field. During the field phase of each harvest, if you harvest at least 1 good from this card, you also get 1 food.' List row carries no cost/prereq/points columns."
       }
     ]
   },
@@ -109,16 +109,16 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects: card-as-field modeling is not covered by the vocabulary; whether and how a minor improvement acts as a farmyard field is undecided (BQ-7 / R-C1)",
-      "effects.1.granularity: the per-harvest 'at least 1 good harvested from this card -> 1 food' hook depends on the card-field harvest granularity, which is undecided (BQ-7)"
+      "effects: card-as-field modeling ('this card is a field') is not covered by the effect vocabulary (BQ-7 / R-C1). Re-checked 2026-11-24: JA p=2681 + EN list confirm 'このカードは畑である / This card is a field'; residual is engine-design, not literature-decidable.",
+      "effects.1.granularity: source confirms '各収穫の畑フェイズで、このカードから品物1以上を収穫したならば、食料1を得る / During the field phase of each harvest, if you harvest at least 1 good from this card, you also get 1 food'; the per-card-field harvest granularity in the engine remains undecided (BQ-7)."
     ],
     "test_case_ids": [
       "E072-harvest-food",
       "E072-no-harvest-no-food"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-19",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "This card is a field. During each harvest's field phase, if at least 1 good is harvested from this card, gain 1 food."
+    "notes": "Cost: 1 wood (JA table: コスト=1 木). Prerequisite: 2 occupations (JA table: 条件=職業2). Printed points: 1 (JA table: 勝利点=1). Effect: this card is a field; during each harvest's field phase, if at least 1 good was harvested from this card, gain 1 food. Sources: JA p=2681 (rev. 2024/10/10), EN cardlist_en/ (rev. 2026/06/12), both re-checked 2026-11-24. Third-party BGA wiki cross-check only; not official Lookout verification. Remaining gaps are card-as-field modeling and card-field harvest granularity — see unresolved_fields. status stays needs_resolution."
   }
 }

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "card_id": "E098",
+  "cases": [
+    {
+      "id": "E098-first-occupation",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 0,
+        "improvements_owned": 3,
+        "bonus_points": 0
+      },
+      "action": {
+        "play": "E098"
+      },
+      "expected": {
+        "occupations_played": 1,
+        "bonus_points": 3
+      }
+    },
+    {
+      "id": "E098-not-first",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 1,
+        "improvements_owned": 3,
+        "bonus_points": 0
+      },
+      "action": {
+        "play": "E098"
+      },
+      "expected": {
+        "occupations_played": 2,
+        "bonus_points": 0
+      }
+    },
+    {
+      "id": "E098-multiple-improvements",
+      "scope": "effect_only",
+      "setup": {
+        "occupations_played": 0,
+        "improvements_owned": 5,
+        "bonus_points": 0
+      },
+      "action": {
+        "play": "E098"
+      },
+      "expected": {
+        "occupations_played": 1,
+        "bonus_points": 5
+      }
+    }
+  ]
+}

@@ -349,6 +349,43 @@ pub fn deal_initial_hands(
     Ok(())
 }
 
+/// zone move; the engine play arms call this after the play chain completes).
+pub fn handle_post_play_destination(
+    ctx: &mut CardMoveCtx<'_>,
+    card_set: &crate::cards::CardSet,
+    player: usize,
+    card_id: &str,
+    num_players: usize,
+) -> Result<(), CardZoneError> {
+    use crate::cards::CardEffect;
+    let Some(card) = card_set.definition(card_id) else {
+        return Ok(());
+    };
+    if !card
+        .effects
+        .iter()
+        .any(|effect| matches!(effect, CardEffect::PostPlayPassLeft))
+    {
+        return Ok(());
+    }
+    if num_players == 0 {
+        return Err(CardZoneError::InvalidMove(format!(
+            "post-play pass of {card_id} requires at least one player"
+        )));
+    }
+    let left_neighbor = (player + num_players - 1) % num_players;
+    let owner = &mut ctx.players[player];
+    let Some(pos) = owner.played_cards.iter().position(|x| x == card_id) else {
+        return Err(CardZoneError::CardNotInZone(
+            card_id.to_string(),
+            CardZone::Played { player },
+        ));
+    };
+    owner.played_cards.remove(pos);
+    ctx.cards.hands[left_neighbor].push(card_id.to_string());
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
