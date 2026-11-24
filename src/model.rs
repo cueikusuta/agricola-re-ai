@@ -601,6 +601,14 @@ pub struct PublicState {
     /// to check space occupancy. Cleared at round start.
     #[serde(default)]
     pub space_occupants: BTreeMap<Space, u8>,
+    /// A025 Bassinet: the first NON-accumulating space a worker was placed
+    /// on this round, in chronological use order. `space_occupants` is a
+    /// BTreeMap and carries no time information, so the "first used" space
+    /// (official text: 各労働フェイズに最初に使われた累積でないアクションスペース)
+    /// is recorded here instead of being derived from pool order.
+    /// Cleared at round start; `serde(default)` keeps pre-A025 saves loading.
+    #[serde(default)]
+    pub first_non_accum_space_used: Option<Space>,
     pub players: Vec<Player>,
     pub improvement_market: Vec<Improvement>,
     pub work_quota: Vec<u8>,
@@ -923,6 +931,7 @@ impl Game {
             accumulations: BTreeMap::new(),
             animal_accumulations: BTreeMap::new(),
             space_occupants: BTreeMap::new(),
+            first_non_accum_space_used: None,
             players,
             improvement_market: Improvement::ALL.to_vec(),
             work_quota: vec![2; config.players],
@@ -1272,6 +1281,9 @@ impl Game {
         }
         // Reset per-round space occupancy tracker for A025/A026.
         self.public.space_occupants.clear();
+        // Reset the chronological first-non-accumulating-space record for
+        // A025 (next work phase starts from scratch).
+        self.public.first_non_accum_space_used = None;
         // Per-card use limits use the round as their period, so the ledger is
         // cleared when a new round opens.
         self.public.card_uses.clear();

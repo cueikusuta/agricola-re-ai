@@ -552,21 +552,14 @@ impl Game {
                 && crate::cards::can_play(&self.card_set, c, me, 0)
         });
         // Check for A025 (Bassinet) and A026 (Sleeping Corner) passive effects.
-        let has_bassinet = me.played_cards.iter().any(|id| {
-            self.card_set.definition(id).is_some_and(|c| {
-                c.effects.iter().any(|e| {
-                    matches!(
-                        e,
-                        crate::cards::CardEffect::Passive {
-                            rule: crate::cards::PassiveRule::BassinetFirstOccupied
-                        }
-                    )
-                })
-            })
-        });
-        // A025 Bassinet: at most one space per round — the first non-accumulating
-        // space (in space_pool order) occupied by exactly one person. The owner
-        // may enter that space even though it is already used.
+        let has_bassinet = self.player_has_passive(
+            self.public.active_player,
+            crate::cards::PassiveRule::BassinetFirstOccupied,
+        );
+        // A025 Bassinet: at most one space per round — the first
+        // non-accumulating space used CHRONOLOGICALLY this work phase, while
+        // it is occupied by exactly one person. The owner may enter that space
+        // even though it is already used.
         let bassinet_target = if has_bassinet && !me.bassinet_first_occupied_used {
             self.bassinet_first_shared_space(self.public.active_player)
         } else {
@@ -650,11 +643,14 @@ impl Game {
         list
     }
 
-    /// A025 Bassinet: the single space this player may enter this round because
-    /// it is the first non-accumulating space (in `space_pool` order) that is
-    /// occupied by exactly one person. Returns `None` when the player has no
-    /// Bassinet, already used the ability this round, or no qualifying space
-    /// exists.
+    /// A025 Bassinet: the single space this player may enter this round —
+    /// the first non-accumulating space used CHRONOLOGICALLY in the work
+    /// phase (recorded in [`PublicState::first_non_accum_space_used`]), while
+    /// it is occupied by exactly one person. Returns `None` when the player
+    /// has no Bassinet, already used the ability this round, no
+    /// non-accumulating space has been used yet, or that space no longer
+    /// holds exactly one person (a later-used space can never qualify: only
+    /// the first one is covered).
     fn bassinet_first_shared_space(&self, player: usize) -> Option<Space> {
         let me = &self.public.players[player];
         let has_bassinet = me.played_cards.iter().any(|id| {
@@ -672,11 +668,78 @@ impl Game {
         if !has_bassinet || me.bassinet_first_occupied_used {
             return None;
         }
-        let players = self.config.players;
-        self.space_pool().into_iter().find(|&s| {
-            let occupied = self.public.space_occupants.get(&s).copied().unwrap_or(0);
-            occupied == 1 && s.accumulation_for(players).is_none()
+        let first = self.public.first_non_accum_space_used?;
+        // Defensive: the recorder only stores non-accumulating spaces, but a
+        // hand-built state (or an old save migrated by `serde(default)`) must
+        // never turn an accumulating space into a share target.
+        if first.accumulation_for(self.config.players).is_some() {
+            return None;
+        }
+        let occupied = self
+            .public
+            .space_occupants
+            .get(&first)
+            .copied()
+            .unwrap_or(0);
+        (occupied == 1).then_some(first)
+    }
+
+    /// Whether `player` holds a played card granting `rule` (A025 Bassinet).
+    fn player_has_passive(&self, player: usize, rule: crate::cards::PassiveRule) -> bool {
+        self.public.players[player].played_cards.iter().any(|id| {
+            self.card_set.definition(id).is_some_and(|c| {
+                c.effects.iter().any(|e| {
+                    matches!(
+                        e,
+                        crate::cards::CardEffect::Passive { rule: r } if *r == rule
+                    )
+                })
+            })
         })
+    }
+
+    /// A025 Bassinet bookkeeping shared by EVERY worker-placement commit site
+    /// (`apply_with_plans_impl`, `preview_harvest`, `resume_post_work`): if
+    /// this placement enters an already-used space through the Bassinet
+    /// exception, consume the once-per-round ability. Must run BEFORE
+    /// [`Self::commit_worker_placement`] increments the occupant count — the
+    /// exception requires exactly one occupant BEFORE the sharer arrives.
+    pub(crate) fn consume_bassinet_share(&mut self, player: usize, space: Space) {
+        if self.public.players[player].bassinet_first_occupied_used {
+            return;
+        }
+        if !self.player_has_passive(player, crate::cards::PassiveRule::BassinetFirstOccupied) {
+            return;
+        }
+        let occupied = self
+            .public
+            .space_occupants
+            .get(&space)
+            .copied()
+            .unwrap_or(0);
+        if occupied != 1 || space.accumulation_for(self.config.players).is_some() {
+            return;
+        }
+        if Some(space) != self.bassinet_first_shared_space(player) {
+            return;
+        }
+        self.public.players[player].bassinet_first_occupied_used = true;
+    }
+
+    /// Space/worker bookkeeping shared by every worker-placement commit site
+    /// (`apply_with_plans_impl`, `preview_harvest`, `resume_post_work`) so the
+    /// round's chronological first-non-accumulating-space record (A025), the
+    /// occupant count (A025/A026) and the used set can never drift between
+    /// paths.
+    pub(crate) fn commit_worker_placement(&mut self, player: usize, space: Space) {
+        if self.public.first_non_accum_space_used.is_none()
+            && space.accumulation_for(self.config.players).is_none()
+        {
+            self.public.first_non_accum_space_used = Some(space);
+        }
+        self.public.used.insert(space);
+        *self.public.space_occupants.entry(space).or_default() += 1;
+        self.public.workers_placed[player] += 1;
     }
 
     /// Whether `player` may place on an already-used `space` via A025 Bassinet
@@ -684,7 +747,7 @@ impl Game {
     /// Sleeping Corner (the Wish-for-Children space with one occupant).
     /// Shared by `legal_spaces`, the apply gate and `preview_harvest` so every
     /// entry point agrees.
-    fn passive_shared_space_allowed(&self, player: usize, space: Space) -> bool {
+    pub(crate) fn passive_shared_space_allowed(&self, player: usize, space: Space) -> bool {
         let me = &self.public.players[player];
         let occupied = self
             .public
@@ -698,19 +761,7 @@ impl Game {
         if me.has_sleeping_corner && space == Space::FamilyGrowthWithRoom {
             return true;
         }
-        let has_bassinet = me.played_cards.iter().any(|id| {
-            self.card_set.definition(id).is_some_and(|c| {
-                c.effects.iter().any(|e| {
-                    matches!(
-                        e,
-                        crate::cards::CardEffect::Passive {
-                            rule: crate::cards::PassiveRule::BassinetFirstOccupied
-                        }
-                    )
-                })
-            })
-        });
-        has_bassinet
+        self.player_has_passive(player, crate::cards::PassiveRule::BassinetFirstOccupied)
             && !me.bassinet_first_occupied_used
             && space.accumulation_for(self.config.players).is_none()
             && Some(space) == self.bassinet_first_shared_space(player)
@@ -1114,38 +1165,12 @@ impl Game {
                 return Ok(Transition::Paused(pending));
             }
         }
-        // A025 Bassinet: if this space was already used by exactly 1 other player
-        // and is non-accumulating, mark the ability as used for this round.
-        let occupied_before = next
-            .public
-            .space_occupants
-            .get(&action.space)
-            .copied()
-            .unwrap_or(0);
-        let is_accumulating = action.space.accumulation_for(next.config.players).is_some();
-        let has_bassinet = next.public.players[player].played_cards.iter().any(|id| {
-            next.card_set.definition(id).is_some_and(|c| {
-                c.effects.iter().any(|e| {
-                    matches!(
-                        e,
-                        crate::cards::CardEffect::Passive {
-                            rule: crate::cards::PassiveRule::BassinetFirstOccupied
-                        }
-                    )
-                })
-            })
-        });
-        if has_bassinet
-            && !next.public.players[player].bassinet_first_occupied_used
-            && !is_accumulating
-            && occupied_before == 1
-            && Some(action.space) == self.bassinet_first_shared_space(player)
-        {
-            next.public.players[player].bassinet_first_occupied_used = true;
-        }
-        next.public.used.insert(action.space);
-        *next.public.space_occupants.entry(action.space).or_default() += 1;
-        next.public.workers_placed[player] += 1;
+        // A025 Bassinet: consume the once-per-round ability when this
+        // placement enters the round's first non-accumulating space through
+        // the shared-entry exception, then run the shared space/worker
+        // bookkeeping (chronological-first record, occupants, used set).
+        next.consume_bassinet_share(player, action.space);
+        next.commit_worker_placement(player, action.space);
         let will_harvest = next.public.workers_placed == next.public.work_quota
             && HARVEST_ROUNDS.contains(&next.public.round);
         if !will_harvest && (forced.is_some() || forced_breeding.is_some()) {
@@ -1247,37 +1272,9 @@ impl Game {
         if let Transition::Paused(_) = transition {
             return Err("preview cannot handle paused decision".into());
         }
-        // A025 Bassinet: same logic as in apply_with_plans_impl.
-        let occupied_before = next
-            .public
-            .space_occupants
-            .get(&action.space)
-            .copied()
-            .unwrap_or(0);
-        let is_accumulating = action.space.accumulation_for(next.config.players).is_some();
-        let has_bassinet = next.public.players[id].played_cards.iter().any(|card_id| {
-            next.card_set.definition(card_id).is_some_and(|c| {
-                c.effects.iter().any(|e| {
-                    matches!(
-                        e,
-                        crate::cards::CardEffect::Passive {
-                            rule: crate::cards::PassiveRule::BassinetFirstOccupied
-                        }
-                    )
-                })
-            })
-        });
-        if has_bassinet
-            && !next.public.players[id].bassinet_first_occupied_used
-            && !is_accumulating
-            && occupied_before == 1
-            && Some(action.space) == next.bassinet_first_shared_space(id)
-        {
-            next.public.players[id].bassinet_first_occupied_used = true;
-        }
-        next.public.used.insert(action.space);
-        *next.public.space_occupants.entry(action.space).or_default() += 1;
-        next.public.workers_placed[id] += 1;
+        // A025 Bassinet: same shared logic as in apply_with_plans_impl.
+        next.consume_bassinet_share(id, action.space);
+        next.commit_worker_placement(id, action.space);
         next.harvest_fields()?;
         if let Some(plans) = feeding {
             next.feed_after_fields(plans)?;
@@ -3967,6 +3964,133 @@ mod grow_with_minor_regression_tests {
             })
             .is_ok());
         assert!(game.public.players[0].bassinet_first_occupied_used);
+    }
+
+    /// P1-4 (engine path): A025 "first" is CHRONOLOGICAL — the first
+    /// non-accumulating space actually USED this work phase, not the first in
+    /// `space_pool` order. Accumulating spaces (Fishing) never qualify as the
+    /// target and never consume the slot.
+    #[test]
+    fn a025_bassinet_engine_chronological_first_used_space() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 23,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .unwrap();
+        game.public.active_player = 0;
+        game.public.players[0].played_cards.push("A025".to_string());
+
+        // Opponent uses GrainSeeds (pool index 5) FIRST, then DayLaborer
+        // (pool index 4). Chronologically GrainSeeds is "the first used",
+        // despite DayLaborer ranking earlier in space_pool order.
+        game.public.active_player = 1;
+        assert!(game
+            .apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert!(game
+            .apply(Action {
+                space: Space::DayLaborer,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert_eq!(
+            game.public.space_occupants.get(&Space::DayLaborer).copied(),
+            Some(1)
+        );
+        assert_eq!(
+            game.public.space_occupants.get(&Space::GrainSeeds).copied(),
+            Some(1)
+        );
+        assert_eq!(
+            game.public.first_non_accum_space_used,
+            Some(Space::GrainSeeds)
+        );
+
+        // Only GrainSeeds (chronologically first) is enterable by player 0.
+        game.public.active_player = 0;
+        let legal = game.legal_spaces();
+        assert!(legal.contains(&Space::GrainSeeds));
+        assert!(!legal.contains(&Space::DayLaborer));
+        assert!(game
+            .apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert!(game.public.players[0].bassinet_first_occupied_used);
+        assert!(game
+            .apply(Action {
+                space: Space::DayLaborer,
+                detail: Detail::None,
+            })
+            .is_err());
+
+        // Round start clears the chronological record too.
+        game.start_round().unwrap();
+        assert_eq!(game.public.first_non_accum_space_used, None);
+    }
+
+    /// P1-4 (engine path): A025 ignores accumulating spaces when finding the
+    /// first used space. Fishing used first does not become the target;
+    /// GrainSeeds used next does.
+    #[test]
+    fn a025_bassinet_engine_accumulating_space_never_target() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 29,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .unwrap();
+        game.public.active_player = 0;
+        game.public.players[0].played_cards.push("A025".to_string());
+
+        // Fishing (accumulating) first, GrainSeeds second — both occupied by
+        // the opponent with exactly 1 person.
+        game.public.active_player = 1;
+        assert!(game
+            .apply(Action {
+                space: Space::Fishing,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert!(game
+            .apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert_eq!(
+            game.public.first_non_accum_space_used,
+            Some(Space::GrainSeeds)
+        );
+
+        game.public.active_player = 0;
+        assert!(game
+            .apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert!(game.public.players[0].bassinet_first_occupied_used);
+        // Fishing stays illegal (used, not the bassinet target).
+        assert!(game
+            .apply(Action {
+                space: Space::Fishing,
+                detail: Detail::None,
+            })
+            .is_err());
     }
 
     /// P2-6 / P3-7 (engine path): A026 Sleeping Corner covers the Wish for

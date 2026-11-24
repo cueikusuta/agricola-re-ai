@@ -23,6 +23,8 @@ fn card_accumulations_field_exists_and_serializes() {
         accumulations: std::collections::BTreeMap::new(),
         animal_accumulations: std::collections::BTreeMap::new(),
         space_occupants: std::collections::BTreeMap::new(),
+        // New field - will cause compile error until added
+        first_non_accum_space_used: None,
         players: vec![],
         improvement_market: vec![],
         work_quota: vec![2, 2],
