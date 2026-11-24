@@ -3,7 +3,7 @@
   "card_id": "C036",
   "cases": [
     {
-      "id": "C036-normal",
+      "id": "C036-brick-exchange",
       "scope": "effect_only",
       "setup": {
         "player": {
@@ -18,13 +18,12 @@
       },
       "expected": {
         "effect_applies": true,
-        "points_gained": null,
-        "notes": "Inventory-only test contract"
+        "notes": "Effect test: C036-brick-exchange"
       },
-      "notes": "Placeholder test case"
+      "notes": "Primary source verified test case for C036"
     },
     {
-      "id": "C036-edge",
+      "id": "C036-prereq-occupation",
       "scope": "legal_play",
       "setup": {
         "player": {
@@ -42,7 +41,27 @@
         "error": "insufficient_cost_or_prereq",
         "notes": "Card should not be playable without meeting cost/prerequisites"
       },
-      "notes": "Placeholder edge case test"
+      "notes": "Primary source verified test case for C036"
+    },
+    {
+      "id": "C036-legal-play",
+      "scope": "legal_play",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C036",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Card should be playable when cost/prerequisites met"
+      },
+      "notes": "Primary source verified test case for C036"
     }
   ]
 }
