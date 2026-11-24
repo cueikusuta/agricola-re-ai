@@ -1042,6 +1042,18 @@ fn merge_card_variants(
             // Eligible for 2, 3 and 4 players (one implemented variant each)
             eligible_players = vec![2, 3, 4];
         }
+        "D035" => {
+            // D035 飼料部屋 (Fodder Chamber): per-player-count livestock
+            // threshold (2p: 7 animals/point, 3p: 5, 4p: 4). Every
+            // player-count variant carries the same cards.rs definition
+            // (all three guarded runs), so one variant suffices; eligibility
+            // covers all supported player counts and the per-player-run
+            // guards project exactly one end-game bonus per game.
+            if let Some(card) = by_players.get(&2) {
+                merged_effects = card.effects.clone();
+            }
+            eligible_players = vec![2, 3, 4];
+        }
         _ => {
             // For other cards, check if effects differ by player count
             // If they do, we'd need more sophisticated merging, but for now
