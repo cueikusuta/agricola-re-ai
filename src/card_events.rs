@@ -66,6 +66,8 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterWorkerGainAnimal { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => TriggerPhase::After,
+        // A068 アスパラガスの贈り物: after-worker conditional gain — After phase.
+        CardEffect::AfterWorkerGainIfFencesAtLeastRound { .. } => TriggerPhase::After,
         // Round start — After phase (happens after round begins)
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
@@ -611,6 +613,20 @@ fn resolve_phase_scan(
                     *amount,
                     trigger_data,
                 )?,
+                // A068 アスパラガスの贈り物: the fence-count condition needs the
+                // round and the post-action fence count, both available here.
+                CardEffect::AfterWorkerGainIfFencesAtLeastRound {
+                    space,
+                    good,
+                    amount,
+                } => handle_after_worker_gain_if_fences_at_least_round(
+                    ctx,
+                    player,
+                    space,
+                    good,
+                    *amount,
+                    trigger_data,
+                )?,
                 CardEffect::StartRoundGain {
                     good,
                     amount,
@@ -1140,6 +1156,12 @@ fn effect_condition_holds(
         CardEffect::AfterWorkerGainIfOwnsAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
+        // A068 アスパラガスの贈り物: the fence-count-vs-round threshold is judged
+        // in the handler (it needs the round number), so the scan gates the
+        // site and space only, mirroring the A066 pattern.
+        CardEffect::AfterWorkerGainIfFencesAtLeastRound { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
@@ -1343,6 +1365,20 @@ pub fn execute_chosen_triggers(
                 player,
                 space,
                 animal,
+                good,
+                *amount,
+                trigger_data,
+            )?,
+            // A068 アスパラガスの贈り物: the fence-count condition needs the
+            // round and the post-action fence count, both available here.
+            CardEffect::AfterWorkerGainIfFencesAtLeastRound {
+                space,
+                good,
+                amount,
+            } => handle_after_worker_gain_if_fences_at_least_round(
+                ctx,
+                player,
+                space,
                 good,
                 *amount,
                 trigger_data,
@@ -1695,6 +1731,18 @@ fn handle_prerequisite(
         }
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
         crate::cards::CardRequirement::PastureCount(n) => p.pastures.len() >= usize::from(*n),
+        // A068 アスパラガスの贈り物: empty fields are plowed fields with no crop
+        // and no C006 stone (a stone field counts as sown, not empty).
+        crate::cards::CardRequirement::MinimumEmptyFields(min) => {
+            p.farm
+                .iter()
+                .filter(|cell| {
+                    matches!(cell.tile, crate::model::Tile::Field { crop: None, .. })
+                        && cell.field_stones == 0
+                })
+                .count()
+                >= usize::from(*min)
+        }
         crate::cards::CardRequirement::MaximumPlayers(_) => true, // Validated at card set level
     };
 
@@ -1990,6 +2038,34 @@ fn handle_after_worker_gain_if_owns_animal(
                 .ok_or("resource overflow")?;
             p.supply.set(*good, next);
         }
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// A068 アスパラガスの贈り物 (Asparagus Gift): after the owner uses `space`
+/// (Fencing), if the fences standing AFTER the action resolved number at
+/// least the current round (`player.fences.len() >= ctx.round`,
+/// snapshot=after_event: fences built at this same Fencing action count),
+/// grant `amount` of `good` (printed: 1 vegetable) to the card owner only.
+/// `round > fences` grants nothing, and non-matching spaces or non-owner
+/// players grant nothing (this handler is reached solely for the owner's own
+/// played cards).
+fn handle_after_worker_gain_if_fences_at_least_round(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    space: &Space,
+    good: &Good,
+    amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) && usize::from(ctx.round) <= ctx.player.fences.len() {
+        let p = &mut ctx.player;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
     }
     Ok(EffectResult::Resolved)
 }

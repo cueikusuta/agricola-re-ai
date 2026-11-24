@@ -607,6 +607,17 @@ fn card_priority(
                                 CardEffect::AfterWorkerGainIfOwnsAnimal { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
+                                // A068 アスパラガスの贈り物: the fence-count-vs-round
+                                // condition depends on farm history the heuristic cannot
+                                // read; value the gain optimistically at one grant per
+                                // remaining round, mirroring the sibling conditional arm.
+                                CardEffect::AfterWorkerGainIfFencesAtLeastRound {
+                                    good,
+                                    amount,
+                                    ..
+                                } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon
+                                }
                                 // C068 書棚: fixed gain per occupation played; similar heuristic to
                                 // PerFoodCost but without food-cost scaling.
                                 | CardEffect::AfterOccupationGain { good, amount, .. } => {

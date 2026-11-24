@@ -445,6 +445,20 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
+    /// A068 アスパラガスの贈り物 (Asparagus Gift): after the owner uses
+    /// `space` (Fencing), if the number of fences standing AFTER the action
+    /// resolved (`player.fences.len() >= round`, snapshot=after_event: fences
+    /// built at this same Fencing action count) is at least the current round
+    /// number, gain `amount` of `good` (printed: 1 vegetable). `round >
+    /// fences` does not fire. The owner-side play-time precondition ("at
+    /// least one empty field") is a separate `Prerequisite {
+    /// MinimumEmptyFields(1) }` effect, so this variant needs no new
+    /// persistent field or PendingDecision.
+    AfterWorkerGainIfFencesAtLeastRound {
+        space: Space,
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -541,6 +555,9 @@ impl CardEffect {
             CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => "after_worker_gain_if_owns_animal",
             CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
                 "after_any_worker_gain_by_count_if_not_actor"
+            }
+            CardEffect::AfterWorkerGainIfFencesAtLeastRound { .. } => {
+                "after_worker_gain_if_fences_at_least_round"
             }
         }
     }
@@ -653,6 +670,11 @@ pub enum CardRequirement {
     MinimumPlayers(u8),
     MaximumPlayers(u8),
     MinimumImprovements(u8),
+    /// A068 アスパラガスの贈り物 (Asparagus Gift): the player must have at
+    /// least `n` EMPTY fields — plowed `Tile::Field { crop: None }` cells with
+    /// no C006 stone planted on them (`field_stones == 0`; a stone field
+    /// counts as sown, not empty, per spec `empty_field_count`).
+    MinimumEmptyFields(u8),
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -813,6 +835,7 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
+                        CardEffect::AfterWorkerGainIfFencesAtLeastRound { amount, .. } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -1370,6 +1393,19 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
             CardRequirement::MinimumPlayers(_) => true,
             CardRequirement::MaximumPlayers(_) => true,
             CardRequirement::PastureCount(n) => player.pastures.len() >= usize::from(*n),
+            // A068 アスパラガスの贈り物: empty fields are plowed fields with no
+            // crop and no C006 stone (a stone field counts as sown).
+            CardRequirement::MinimumEmptyFields(min) => {
+                player
+                    .farm
+                    .iter()
+                    .filter(|cell| {
+                        matches!(cell.tile, Tile::Field { crop: None, .. })
+                            && cell.field_stones == 0
+                    })
+                    .count()
+                    >= usize::from(*min)
+            }
         }
     })
 }
@@ -6276,6 +6312,29 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                     space: Space::CattleMarket,
                     animal: Animal::Cattle,
                     good: Good::Grain,
+                    amount: 1,
+                },
+            ],
+        },
+        // A068 アスパラガスの贈り物 (Asparagus Gift): no cost, no bonus points.
+        // Play precondition: at least one empty (plowed, unplanted, stoneless)
+        // field. After the owner uses Fencing, if the fences standing after the
+        // action resolved number at least the current round, gain 1 vegetable.
+        // Snapshot is after_event: fences built at this same Fencing action
+        // count toward the threshold (spec data/bga-card-specs/A068.json).
+        CardDefinition {
+            use_limit: None,
+            id: "A068".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumEmptyFields(1),
+                },
+                CardEffect::AfterWorkerGainIfFencesAtLeastRound {
+                    space: Space::Fencing,
+                    good: Good::Vegetable,
                     amount: 1,
                 },
             ],
