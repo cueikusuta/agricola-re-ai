@@ -179,6 +179,7 @@ fn dispatch_aw(
         game.public.round,
         start_player,
         &game.public.used,
+        &game.public.accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &mut game.public.card_uses_game,
@@ -692,9 +693,20 @@ fn a021_family_growth_space_does_not_trigger() {
     game.public.players[owner].farm[1].tile = Tile::Room;
     game.public.players[owner].family = 1;
 
+    let family_before = game.public.players[owner].family;
+    let food_before = game.public.players[owner].supply.food;
+
     let transition = dispatch_aw(&mut game, owner, Space::FamilyGrowthWithRoom, 0).unwrap();
     assert_eq!(transition, Transition::Completed);
     assert!(game.pending.is_none());
+    assert_eq!(
+        game.public.players[owner].family, family_before,
+        "A021 must not grow family on FamilyGrowthWithRoom"
+    );
+    assert_eq!(
+        game.public.players[owner].supply.food, food_before,
+        "A021 must not add food on FamilyGrowthWithRoom"
+    );
 }
 
 #[test]
