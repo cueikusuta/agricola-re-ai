@@ -6406,6 +6406,31 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // B058 雑草掻き (Crack Weeder): cost 1 wood; on play gain 1 food, and
+        // at each harvest field phase gain 1 extra food per vegetable taken
+        // from the fields (BGA Agricola card wiki; agricola.cloudfree.jp
+        // ?p=3199, cross-checked against the English list page). Same typed
+        // vocabulary as C106 じゃがいも収穫者: OnPlayGain plus HarvestFieldGain
+        // with HarvestFieldRule::VegetablesHarvested, so no new variant, event
+        // kind or saved field is introduced. Eligible at all player counts.
+        CardDefinition {
+            use_limit: None,
+            id: "B058".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::VegetablesHarvested,
+                    good: Good::Food,
+                    amount: 1,
+                },
+            ],
+        },
         // B073 贈り物かご (Gift Basket): cost 1 reed, 1 VP; prerequisite: at
         // least 3 occupations played. On play, if the owner has exactly
         // 2/3/4/5 rooms, gain 1 vegetable/food/grain/vegetable. Each table
@@ -6623,12 +6648,127 @@ mod verified_band_b_tests {
         // A155 sits in the A-deck band pool rather than the B-deck one, but it
         // is covered here too: neither band pool may leak into the A/B
         // two-player preset.
-        for id in ["B122", "B142", "B144", "A155"] {
+        for id in ["B122", "B142", "B144", "B058", "A155"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
             );
         }
+    }
+
+    #[test]
+    fn b058_is_minor_improvement_costing_wood_one_with_no_prerequisite() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let card = set.definition("B058").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        assert!(
+            !card
+                .effects
+                .iter()
+                .any(|e| matches!(e, CardEffect::Prerequisite { .. })),
+            "B058 has no prerequisite (spec: prerequisites [])"
+        );
+        // Exactly the C106 vocabulary: OnPlayGain + HarvestFieldGain
+        // (VegetablesHarvested); no new variant, event kind or saved field.
+        assert_eq!(
+            card.effects,
+            vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::VegetablesHarvested,
+                    good: Good::Food,
+                    amount: 1,
+                },
+            ]
+        );
+    }
+
+    /// B058-normal: the play path grants food 1 and pays the wood 1 cost.
+    #[test]
+    fn b058_play_grants_one_food_and_pays_wood_one() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        let mut hand = vec!["B058".to_owned()];
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "B058",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.supply.food, 1);
+        assert_eq!(p.supply.wood, 0, "cost wood 1 is paid");
+        assert_eq!(p.played_cards, vec!["B058"]);
+    }
+
+    /// B058-harvest: two growing vegetable fields grant 2 extra food; a grain
+    /// field and vegetables already standing in the supply must not count.
+    #[test]
+    fn b058_harvest_grants_one_food_per_taken_vegetable() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B058".into());
+        p.supply.vegetable = 5; // supply stock must never be miscounted
+                                // 野菜畑2（生育中）＋麦畑1 → 野菜2に対して食料2。
+        p.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        p.farm[3].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 3,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 2, "two vegetable fields -> +2 food");
+        assert_eq!(p.supply.vegetable, 5, "supply vegetables are untouched");
+        assert_eq!(p.supply.grain, 0, "a grain field yields nothing for B058");
+    }
+
+    /// B058-zero: a field phase that takes no vegetables grants no food, and
+    /// a player without the card never gains the owner's bonus.
+    #[test]
+    fn b058_harvest_grants_zero_without_taken_vegetables() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B058".into());
+        p.supply.vegetable = 4; // only on supply, not in fields
+        p.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 0, "grain/empty fields -> no B058 food");
+        let mut q = Player::new(1, 0);
+        q.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        harvest_field_rewards(&set, &mut q).unwrap();
+        assert_eq!(q.supply.food, 0, "a non-owner never gains B058 food");
     }
 }
 

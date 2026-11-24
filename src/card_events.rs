@@ -6480,6 +6480,145 @@ mod tests {
         );
     }
 
+    /// B058 雑草掻き via the production harvest-field dispatcher: 1 extra food
+    /// per vegetable the field phase is about to yield (same
+    /// VegetablesHarvested rule as C106, reached from the band B pool).
+    #[test]
+    fn b058_harvest_field_food_per_taken_vegetable_via_dispatcher() {
+        use crate::model::{Crop, Tile};
+        let set = CardSet {
+            definitions: crate::cards::verified_band_b_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B058".into()];
+        c.players[0].supply.vegetable = 5; // supply stock must not be counted
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        c.players[0].farm[3].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 3,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 2,
+            "two growing vegetable fields must grant 2 food"
+        );
+        assert_eq!(
+            c.players[0].supply.vegetable, 5,
+            "vegetables standing in the supply must not be miscounted"
+        );
+    }
+
+    /// B058-zero path through the dispatcher: a field phase that takes no
+    /// vegetables grants nothing, even with vegetables standing in the
+    /// supply and a grain field present.
+    #[test]
+    fn b058_harvest_field_zero_gain_when_no_vegetable_taken() {
+        use crate::model::{Crop, Tile};
+        let set = CardSet {
+            definitions: crate::cards::verified_band_b_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B058".into()];
+        c.players[0].supply.vegetable = 4; // only on supply, not in fields
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        c.players[0].farm[2].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_harvest_field(
+            &set,
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "grain/empty fields -> no B058 food"
+        );
+    }
+
+    /// Reproduction guard (same as C106): B058's HarvestFieldGain must not fire
+    /// on dispatch_after_worker.
+    #[test]
+    fn b058_harvest_field_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_b_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B058".into()];
+        c.players[0].farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2,
+        };
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        let accumulations = BTreeMap::new();
+        used.insert(Space::DayLaborer);
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &accumulations,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B058 HarvestFieldGain must not fire on after_worker"
+        );
+    }
+
     /// C116 調度品職人 via the production play dispatcher: each later
     /// occupation play grants 1 wood per food paid as its occupation cost.
     #[test]
