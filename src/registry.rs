@@ -341,6 +341,7 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms { .. }
                 | crate::cards::CardEffect::StartRoundGainIfLessonsOccupants { .. }
                 | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew { .. }
+                | crate::cards::CardEffect::StartRoundGainIfAccumulationAtLeast { .. }
                 | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
                     EventKind::RoundStart
                 }
@@ -381,6 +382,9 @@ impl CardRegistryBuilder {
                 }
                 // A140 ショベル運搬人: after-worker dynamic-count effect.
                 crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => {
                     EventKind::WorkerPlaced
                 }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
@@ -513,6 +517,7 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterOccupationGain { amount, .. }
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
@@ -545,6 +550,10 @@ impl CardRegistryBuilder {
                             ..
                         }
                         | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew {
+                            amount,
+                            ..
+                        }
+                        | crate::cards::CardEffect::StartRoundGainIfAccumulationAtLeast {
                             amount,
                             ..
                         }

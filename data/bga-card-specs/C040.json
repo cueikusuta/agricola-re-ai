@@ -20,75 +20,110 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3049",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
   },
   "play": {
-    "action": "minor_improvement",
-    "cost": null,
-    "prerequisites": [
+      "action": "minor_improvement",
+      "cost": null,
+      "prerequisites": [
       {
-        "predicate": "custom",
+        "predicate": "occupations_played_count",
         "params": {
-          "text": "職業を出していない"
-        }
+          "count": 0
+        },
+        "negate": false
       }
     ],
     "printed_points": 1,
-    "alternative_cost_notes": null
+    "alternative_cost_notes": "1 wheat OR 1 reed (choose one when playing)"
   },
   "effects": [
     {
-      "trigger": "end_scoring",
-      "conditions": [],
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "cost_paid_with",
+          "params": {
+            "resource": "wheat"
+          },
+          "negate": false
+        }
+      ],
       "steps": [
         {
-          "operation": "gain_points",
+          "operation": "gain_resource",
           "target": "owner",
           "params": {
-            "points": {
-              "op": "constant",
-              "args": [
-                1
-              ]
-            }
+            "resource": "vegetable",
+            "amount": 1
           }
         }
       ],
       "optional": false,
-      "frequency": "end_of_game",
-      "duration": "permanent",
-      "snapshot": "live_state",
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "notes": "When paying cost with wheat, immediately gain 1 vegetable"
+    },
+    {
+      "trigger": "on_play",
+      "conditions": [
+        {
+          "predicate": "cost_paid_with",
+          "params": {
+            "resource": "reed"
+          },
+          "negate": false
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "resource": "wood",
+            "amount": 4
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "When paying cost with reed, immediately gain 4 wood"
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility",
-      "play.cost.exact"
-    ],
+      "status": "needs_resolution",
+      "unresolved_fields": ["play.cost"],
     "test_case_ids": [
-      "C040-normal",
-      "C040-edge"
+      "C040-cost-wheat-gain-veg",
+      "C040-cost-reed-gain-wood",
+      "C040-prereq-no-occupations",
+      "C040-printed-points",
+      "C040-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3049. Alternative cost: 1 wheat OR 1 reed."
   }
 }

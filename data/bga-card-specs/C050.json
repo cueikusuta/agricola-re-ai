@@ -20,26 +20,36 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3039",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
   },
   "play": {
     "action": "minor_improvement",
-    "cost": null,
+    "cost": [],
     "prerequisites": [
       {
-        "predicate": "custom",
+        "predicate": "stables_count",
         "params": {
-          "text": "厩3と牧場3"
-        }
+          "count": 3
+        },
+        "negate": false
+      },
+      {
+        "predicate": "pastures_count",
+        "params": {
+          "count": 3
+        },
+        "negate": false
       }
     ],
     "printed_points": 1,
@@ -47,48 +57,74 @@
   },
   "effects": [
     {
-      "trigger": "end_scoring",
+      "trigger": "on_play",
       "conditions": [],
       "steps": [
         {
-          "operation": "gain_points",
+          "operation": "gain_resource",
           "target": "owner",
           "params": {
-            "points": {
-              "op": "constant",
+            "resource": "food",
+            "amount": {
+              "op": "count",
               "args": [
-                1
+                "rounds_not_yet_started"
               ]
             }
           }
         }
       ],
       "optional": false,
-      "frequency": "end_of_game",
-      "duration": "permanent",
-      "snapshot": "live_state",
+      "frequency": "once",
+      "duration": "instant",
+      "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "notes": "When played, immediately gain 1 food per round not yet started"
+    },
+    {
+      "trigger": "any_time",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "exchange",
+          "target": "owner",
+          "params": {
+            "give": {
+              "sheep": 1,
+              "boar": 1
+            },
+            "receive": {
+              "cattle": 1
+            }
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "unlimited",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "Anytime, may exchange 1 sheep + 1 boar for 1 cattle"
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility",
-      "play.cost.exact"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "C050-normal",
-      "C050-edge"
+      "C050-on-play-rounds-food",
+      "C050-sheep-boar-for-cattle",
+      "C050-prereq-stables-pastures",
+      "C050-printed-points",
+      "C050-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3039. Free card (no cost). Prereq: 3 stables and 3 pastures."
   }
 }

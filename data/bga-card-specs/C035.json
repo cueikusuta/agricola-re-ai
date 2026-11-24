@@ -20,13 +20,15 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3054",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
@@ -41,10 +43,11 @@
     ],
     "prerequisites": [
       {
-        "predicate": "custom",
+        "predicate": "occupations_played_count",
         "params": {
-          "text": "職業なし"
-        }
+          "count": 0
+        },
+        "negate": false
       }
     ],
     "printed_points": 7,
@@ -60,9 +63,15 @@
           "target": "owner",
           "params": {
             "points": {
-              "op": "constant",
+              "op": "multiply",
               "args": [
-                7
+                {
+                  "op": "count",
+                  "args": [
+                    "hand_cards"
+                  ]
+                },
+                -1
               ]
             }
           }
@@ -74,25 +83,24 @@
       "snapshot": "live_state",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "notes": "At scoring: -1 point per card in hand. Cannot discard unplayed cards from hand."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "C035-normal",
-      "C035-edge"
+      "C035-scoring-hand-penalty",
+      "C035-prereq-no-occupations",
+      "C035-cannot-discard-hand",
+      "C035-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3054. If already discarded from hand, cannot play this card."
   }
 }

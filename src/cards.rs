@@ -416,6 +416,18 @@ pub enum CardEffect {
         /// The good granted (food on the printed card).
         good: Good,
     },
+    /// A066 餌皿 (Feeding Dish): after the owner uses a sheep/pig/cattle
+    /// market, if the owner already keeps that animal type
+    /// (`player.animal_count(kind) > 0` after the event resolves — animals
+    /// taken at that same market count), gain `amount` of `good` (printed:
+    /// 1 grain). One variant per market fixes the space→animal mapping; no
+    /// new persistent field or PendingDecision is introduced.
+    AfterWorkerGainIfOwnsAnimal {
+        space: Space,
+        animal: Animal,
+        good: Good,
+        amount: u32,
+    },
     /// B143 粘土守 (Clay Warden): on any player's use of `space` (Hollow),
     /// each non-actor owner gains `base_good` x `base_amount`; additionally,
     /// each non-actor owner gains `extra_3p_good` x `extra_3p_amount` in a 3p
@@ -432,6 +444,21 @@ pub enum CardEffect {
         extra_3p_amount: u32,
         extra_4p_good: Good,
         extra_4p_amount: u32,
+    },
+    /// D054 マスの池 (Trout Pool): at each round start, if the `space`
+    /// accumulation holds at least `min`, gain `amount` of `good` from the
+    /// general supply. Unlike A049 営巣地 (`StartRoundGainIfAccumulationGrew`)
+    /// there is no "grew this round" requirement: the printed card pays on the
+    /// standing accumulation alone. The condition is judged inside the handler
+    /// from the public accumulations map the round-start dispatcher threads
+    /// read-only through `DispatchContext` (runtime-only, never serialized);
+    /// the map is never mutated, and any dispatch path without the map grants
+    /// nothing.
+    StartRoundGainIfAccumulationAtLeast {
+        space: Space,
+        min: u32,
+        good: Good,
+        amount: u32,
     },
     /// A065 ペレット種子: after an unconditional sow action, gain `amount` of `good`.
     /// Fired from the after-worker scan when the action space is a sow space and
@@ -539,8 +566,12 @@ impl CardEffect {
             CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                 "after_worker_gain_other_accumulation_food"
             }
+            CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => "after_worker_gain_if_owns_animal",
             CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
                 "after_any_worker_gain_by_count_if_not_actor"
+            }
+            CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => {
+                "start_round_gain_if_accumulation_at_least"
             }
             CardEffect::AfterSowGain { .. } => "after_sow_gain",
             CardEffect::AfterSowGainPerDistinctCrop { .. } => "after_sow_gain_per_distinct_crop",
@@ -697,6 +728,15 @@ pub enum ScoreBonusRule {
     /// major improvements. Appended at the enum tail so existing serde
     /// variants and saved-game bytes are unchanged.
     MajorImprovementsBottomRowThresholds,
+    /// B153 寮長 (Housemaster): at final scoring, sum the major-improvement
+    /// scores after doubling the lowest single one (one only, even when the
+    /// lowest score is tied), then take 1/2/3/4 bonus points at a doubled
+    /// total of 5/7/9/11 or more. With no major improvement there is
+    /// nothing to double and no bonus. The ordinary major-improvement
+    /// points stay in their own scoring category (`score.rs`); this bonus
+    /// is added separately by `score_with_cards`. Appended at the enum tail
+    /// so existing serde variants and saved-game bytes are unchanged.
+    MajorImprovementsLowestDoubledThresholds,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -812,8 +852,10 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfFamilyAndRooms { amount, .. }
                         | CardEffect::StartRoundGainIfLessonsOccupants { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
+                        | CardEffect::StartRoundGainIfAccumulationAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
+                        CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -1573,6 +1615,17 @@ pub fn after_worker(set: &CardSet, player: &mut Player, space: Space) -> Result<
                     safe_gain(player, *good, *amount)?;
                 }
             }
+            if let CardEffect::AfterWorkerGainIfOwnsAnimal {
+                space: trigger,
+                animal,
+                good,
+                amount,
+            } = effect
+            {
+                if *trigger == space && player.animal_count(*animal) > 0 {
+                    safe_gain(player, *good, *amount)?;
+                }
+            }
         }
     }
     Ok(())
@@ -1815,6 +1868,24 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         n if n >= 5 => 8,
                         _ => 0,
                     }
+                }
+                ScoreBonusRule::MajorImprovementsLowestDoubledThresholds => {
+                    // B153 寮長 (Housemaster): the lowest single score is
+                    // doubled (exactly one, even when the lowest score is
+                    // tied), then each of the thresholds 5/7/9/11 pays its
+                    // point once, so the bonus is the count of thresholds
+                    // met (1/2/3/4). No major improvement -> nothing to
+                    // double and a total of 0 -> no bonus.
+                    let mut scores: Vec<i32> = player
+                        .improvements
+                        .iter()
+                        .map(|improvement| improvement.points())
+                        .collect();
+                    if let Some(lowest) = scores.iter_mut().min() {
+                        *lowest *= 2;
+                    }
+                    let total: i32 = scores.iter().sum();
+                    [5, 7, 9, 11].iter().filter(|&&t| total >= t).count() as i32
                 }
             },
             _ => 0,
@@ -3431,6 +3502,23 @@ pub fn verified_round_and_harvest_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         },
+        // D054 マスの池 (Trout Pool): at the start of each work phase, if the
+        // Fishing accumulation holds at least 3 food, gain 1 food. The
+        // accumulation is read-only through the round-start dispatch; no
+        // "grew this round" requirement (unlike A049 営巣地).
+        CardDefinition {
+            use_limit: None,
+            id: "D054".into(),
+            kind: minor,
+            cost: vec![(Good::Clay, 2)],
+            points: 1,
+            effects: vec![CardEffect::StartRoundGainIfAccumulationAtLeast {
+                space: Space::Fishing,
+                min: 3,
+                good: Good::Food,
+                amount: 1,
+            }],
+        },
     ]
 }
 
@@ -4102,12 +4190,29 @@ mod round_and_harvest_card_tests {
             }]
         ));
 
-        // Two-player preset: B114/A049/C067 are in (2p eligible per spec),
+        // D054 マスの池: Fishing accumulation >= 3 -> 1 food, no grew-this-round
+        // requirement (unlike A049 営巣地 above).
+        let d054 = find("D054");
+        assert_eq!(d054.kind, CardKind::MinorImprovement);
+        assert_eq!(d054.cost, vec![(Good::Clay, 2)]);
+        assert_eq!(d054.points, 1);
+        assert!(matches!(
+            d054.effects.as_slice(),
+            [CardEffect::StartRoundGainIfAccumulationAtLeast {
+                space: Space::Fishing,
+                min: 3,
+                good: Good::Food,
+                amount: 1,
+            }]
+        ));
+
+        // Two-player preset: B114/A049/C067/D054 are in (2p eligible per spec),
         // A157 is out (spec eligibility "2"/"3": "no", "4": "yes").
         let preset = verified_basic_card_set(2).unwrap();
         assert!(preset.definition("B114").is_some());
         assert!(preset.definition("A049").is_some());
         assert!(preset.definition("C067").is_some());
+        assert!(preset.definition("D054").is_some());
         assert!(preset.definition("A157").is_none());
     }
 }
@@ -4515,9 +4620,11 @@ mod simple_occupation_tests {
         // B114/A049/C067 (StartRoundGainIf* wave) join the two-player preset;
         // A157 stays out (4 players only), so the count is 41 + 3 = 44
         // (occupations 18 + 1, minors 23 + 2).
-        assert_eq!(total, 44);
+        // D054 マスの池 (spec eligibility "2": "yes") joins the preset as a
+        // minor: 44 -> 45 total (occupations unchanged, minors 25 -> 26).
+        assert_eq!(total, 45);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 25);
+        assert_eq!(minor, 26);
         assert!(verified_basic_card_set(3).is_err());
     }
 }
@@ -6259,6 +6366,38 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         },
+        // A066 餌皿 (Feeding Dish): cost 1 wood, no prerequisites, 0 points.
+        // After using a sheep/pig/cattle market while already keeping that
+        // animal type, gain 1 grain. Snapshot is after_event: animals taken
+        // at that same market count. One variant per market fixes the
+        // space→animal mapping; the effect targets the card owner only.
+        CardDefinition {
+            use_limit: None,
+            id: "A066".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterWorkerGainIfOwnsAnimal {
+                    space: Space::SheepMarket,
+                    animal: Animal::Sheep,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerGainIfOwnsAnimal {
+                    space: Space::PigMarket,
+                    animal: Animal::Boar,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerGainIfOwnsAnimal {
+                    space: Space::CattleMarket,
+                    animal: Animal::Cattle,
+                    good: Good::Grain,
+                    amount: 1,
+                },
+            ],
+        },
     ]
 }
 
@@ -6385,6 +6524,31 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // B058 雑草掻き (Crack Weeder): cost 1 wood; on play gain 1 food, and
+        // at each harvest field phase gain 1 extra food per vegetable taken
+        // from the fields (BGA Agricola card wiki; agricola.cloudfree.jp
+        // ?p=3199, cross-checked against the English list page). Same typed
+        // vocabulary as C106 じゃがいも収穫者: OnPlayGain plus HarvestFieldGain
+        // with HarvestFieldRule::VegetablesHarvested, so no new variant, event
+        // kind or saved field is introduced. Eligible at all player counts.
+        CardDefinition {
+            use_limit: None,
+            id: "B058".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::VegetablesHarvested,
+                    good: Good::Food,
+                    amount: 1,
+                },
+            ],
+        },
         // B073 贈り物かご (Gift Basket): cost 1 reed, 1 VP; prerequisite: at
         // least 3 occupations played. On play, if the owner has exactly
         // 2/3/4/5 rooms, gain 1 vegetable/food/grain/vegetable. Each table
@@ -6420,6 +6584,31 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                     rooms: 5,
                     good: Good::Vegetable,
                     amount: 1,
+                },
+            ],
+        },
+        // B153 寮長 (Housemaster): no cost, no printed points; at final
+        // scoring, sum the major-improvement scores after doubling the
+        // lowest single one (one only, even when the lowest score is tied)
+        // and take 1/2/3/4 bonus points at a doubled total of 5/7/9/11 or
+        // more (BGA Agricola card wiki; agricola.cloudfree.jp ?p=3104,
+        // cross-checked against the English list page). Only available at
+        // 4 players (spec eligibility 2/3 = no, 4 = yes); the 2/3-player
+        // registry projection drops the card through the MinimumPlayers(4)
+        // prerequisite, and no new saved field or PendingDecision is
+        // introduced.
+        CardDefinition {
+            use_limit: None,
+            id: "B153".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::MajorImprovementsLowestDoubledThresholds,
                 },
             ],
         },
@@ -6602,12 +6791,230 @@ mod verified_band_b_tests {
         // A155 sits in the A-deck band pool rather than the B-deck one, but it
         // is covered here too: neither band pool may leak into the A/B
         // two-player preset.
-        for id in ["B122", "B142", "B144", "A155"] {
+        for id in ["B122", "B142", "B144", "B058", "A155", "B153"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
             );
         }
+    }
+
+    #[test]
+    fn b058_is_minor_improvement_costing_wood_one_with_no_prerequisite() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let card = set.definition("B058").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        assert!(
+            !card
+                .effects
+                .iter()
+                .any(|e| matches!(e, CardEffect::Prerequisite { .. })),
+            "B058 has no prerequisite (spec: prerequisites [])"
+        );
+        // Exactly the C106 vocabulary: OnPlayGain + HarvestFieldGain
+        // (VegetablesHarvested); no new variant, event kind or saved field.
+        assert_eq!(
+            card.effects,
+            vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 1,
+                },
+                CardEffect::HarvestFieldGain {
+                    rule: HarvestFieldRule::VegetablesHarvested,
+                    good: Good::Food,
+                    amount: 1,
+                },
+            ]
+        );
+    }
+
+    /// B058-normal: the play path grants food 1 and pays the wood 1 cost.
+    #[test]
+    fn b058_play_grants_one_food_and_pays_wood_one() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        let mut hand = vec!["B058".to_owned()];
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "B058",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.supply.food, 1);
+        assert_eq!(p.supply.wood, 0, "cost wood 1 is paid");
+        assert_eq!(p.played_cards, vec!["B058"]);
+    }
+
+    /// B058-harvest: two growing vegetable fields grant 2 extra food; a grain
+    /// field and vegetables already standing in the supply must not count.
+    #[test]
+    fn b058_harvest_grants_one_food_per_taken_vegetable() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B058".into());
+        p.supply.vegetable = 5; // supply stock must never be miscounted
+                                // 野菜畑2（生育中）＋麦畑1 → 野菜2に対して食料2。
+        p.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 2,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        p.farm[3].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 3,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 2, "two vegetable fields -> +2 food");
+        assert_eq!(p.supply.vegetable, 5, "supply vegetables are untouched");
+        assert_eq!(p.supply.grain, 0, "a grain field yields nothing for B058");
+    }
+
+    /// B058-zero: a field phase that takes no vegetables grants no food, and
+    /// a player without the card never gains the owner's bonus.
+    #[test]
+    fn b058_harvest_grants_zero_without_taken_vegetables() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B058".into());
+        p.supply.vegetable = 4; // only on supply, not in fields
+        p.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        harvest_field_rewards(&set, &mut p).unwrap();
+        assert_eq!(p.supply.food, 0, "grain/empty fields -> no B058 food");
+        let mut q = Player::new(1, 0);
+        q.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        harvest_field_rewards(&set, &mut q).unwrap();
+        assert_eq!(q.supply.food, 0, "a non-owner never gains B058 food");
+    }
+
+    /// B153 寮長 (Housemaster): occupation, no cost, no printed points, the
+    /// MinimumPlayers(4) prerequisite plus the doubled-lowest end-game bonus.
+    #[test]
+    fn b153_is_four_player_occupation_with_doubled_lowest_bonus() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let card = set.definition("B153").unwrap();
+        assert_eq!(card.kind, CardKind::Occupation);
+        assert_eq!(card.cost, vec![]);
+        assert_eq!(card.points, 0);
+        assert_eq!(
+            card.effects,
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::MajorImprovementsLowestDoubledThresholds,
+                },
+            ]
+        );
+    }
+
+    /// Thresholds 5/7/9/11 pay 1/2/3/4 on the doubled total; the ordinary
+    /// major-improvement points are not touched by the bonus.
+    #[test]
+    fn b153_thresholds_five_seven_nine_eleven() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        // All-1-point majors: n copies double the lowest one, so the doubled
+        // total is n + 1 (4/6/8/10 copies land exactly on 5/7/9/11).
+        let bonus = |count: usize| {
+            let mut p = Player::new(0, 0);
+            p.played_cards.push("B153".into());
+            p.improvements = vec![Improvement::Fireplace2; count];
+            end_game_bonus(&set, &p)
+        };
+        assert_eq!(bonus(0), 0, "no major improvement -> no bonus");
+        assert_eq!(bonus(3), 0, "doubled total 4 < 5");
+        assert_eq!(bonus(4), 1, "doubled total 5 -> +1");
+        assert_eq!(bonus(5), 1, "doubled total 6 still +1");
+        assert_eq!(bonus(6), 2, "doubled total 7 -> +2");
+        assert_eq!(bonus(7), 2, "doubled total 8 still +2");
+        assert_eq!(bonus(8), 3, "doubled total 9 -> +3");
+        assert_eq!(bonus(9), 3, "doubled total 10 still +3");
+        assert_eq!(bonus(10), 4, "doubled total 11 -> +4");
+    }
+
+    /// The spec's [2, 3, 4] example: double the lowest score (2 -> 4), the
+    /// doubled total is 11, and the stacked thresholds pay 4 points.
+    #[test]
+    fn b153_doubles_the_lowest_score_and_pays_the_top_threshold() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B153".into());
+        p.improvements.extend([
+            Improvement::ClayOven,
+            Improvement::StoneOven,
+            Improvement::Well,
+        ]);
+        assert_eq!(end_game_bonus(&set, &p), 4, "doubled total 11 -> +4");
+    }
+
+    /// A tied lowest score is doubled exactly once (BGA plays it that way:
+    /// Well + ClayOven + Basketry scores 4+4+2 = 10 -> +3, not 12 -> +4).
+    #[test]
+    fn b153_doubles_only_one_of_the_tied_lowest_scores() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B153".into());
+        p.improvements.extend([
+            Improvement::Well,
+            Improvement::ClayOven,
+            Improvement::Basketry,
+        ]);
+        assert_eq!(end_game_bonus(&set, &p), 3, "4+4+2 = 10 -> +3");
+        // Two tied lowest scores: ClayOven 2 + Basketry 2 tie, StoneOven 3;
+        // only one of the tied 2s doubles, so 4+2+3 = 9 -> +3. Doubling
+        // both tied scores would give 4+4+3 = 11 -> +4, which BGA does not
+        // pay (the wiki play report for 4+2+2 paid 3, not 4).
+        let mut q = Player::new(0, 0);
+        q.played_cards.push("B153".into());
+        q.improvements.extend([
+            Improvement::ClayOven,
+            Improvement::Basketry,
+            Improvement::StoneOven,
+        ]);
+        assert_eq!(end_game_bonus(&set, &q), 3, "4+2+3 = 9 -> +3");
+        // A lone 1-point major doubles to 2: Well 4 + Fireplace2 -> 4+2 = 6,
+        // which clears only the 5 threshold (6 < 7).
+        let mut r = Player::new(0, 0);
+        r.played_cards.push("B153".into());
+        r.improvements
+            .extend([Improvement::Well, Improvement::Fireplace2]);
+        assert_eq!(end_game_bonus(&set, &r), 1, "4+2 = 6 -> +1");
     }
 }
 
@@ -8909,8 +9316,8 @@ mod p1_2_repro_tests {
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
             preset.content_hash(),
-            "d92847a8d127cc236d65b7df53d4af775d62a0015d8ab099b565e2465ad0d965",
-            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067 joined the preset and A157 was excluded as 4p-only; previous pin 323dbecb after PR #385 + d3c237c9 main merge)"
+            "b6723ba1864e3e0cf08c116ffaed6431a2e7b6dcef58f00e152234defc6b2f5d",
+            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067/D054 joined the preset and A157 was excluded as 4p-only)"
         );
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
