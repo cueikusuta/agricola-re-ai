@@ -6889,6 +6889,31 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 rule: ScoreBonusRule::ExactFamilyMembers,
             }],
         },
+        // E077 根掘り鍬 (Mattock): cost 1 wood; each time the owner gets reed
+        // or stone from an action space, gain 1 additional clay
+        // (agricola.cloudfree.jp ?p=2676). The engine's core-action Space->Good
+        // entries that supply reed or stone are exactly these four: ReedBank
+        // (reed) and WesternQuarry/EasternQuarry (stone) via
+        // `Space::accumulation`, plus ResourceMarket (stone at 2 players, a
+        // reed-or-stone choice at 3, reed+stone at 4) via
+        // `engine::execute_work` — every other space's core action supplies
+        // wood, clay, food, grain, vegetables, animals or nothing. Card-granted
+        // spaces and gains from other players stay out of scope, so the
+        // existing `AfterWorkerGain` variant fires exactly once per use of
+        // each listed space and no new variant/save field is needed.
+        CardDefinition {
+            use_limit: None,
+            id: "E077".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                gain(Space::ReedBank, Good::Clay, 1),
+                gain(Space::WesternQuarry, Good::Clay, 1),
+                gain(Space::EasternQuarry, Good::Clay, 1),
+                gain(Space::ResourceMarket, Good::Clay, 1),
+            ],
+        },
     ]
 }
 
@@ -7652,6 +7677,67 @@ mod verified_band_e_tests {
         after_worker(&set, &mut p, Space::Forest).unwrap();
         after_worker(&set, &mut p, Space::GrainSeeds).unwrap();
         assert_eq!(p.supply.wood, 4);
+    }
+
+    #[test]
+    fn e077_clay_per_reed_or_stone_action_space() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E077".into());
+        // 葦原・採石場西・採石場東・資材市場の各使用で clay 1。
+        for space in [
+            Space::ReedBank,
+            Space::WesternQuarry,
+            Space::EasternQuarry,
+            Space::ResourceMarket,
+        ] {
+            after_worker(&set, &mut p, space).unwrap();
+        }
+        assert_eq!(p.supply.clay, 4);
+        // 1使用=1発火。同じスペースを再度使えば再度発火する。
+        after_worker(&set, &mut p, Space::ReedBank).unwrap();
+        assert_eq!(p.supply.clay, 5);
+        // 木材・食料・穀物・野菜など非対象スペースでは発動しない。
+        for space in [
+            Space::Forest,
+            Space::Copse,
+            Space::Grove,
+            Space::Fishing,
+            Space::DayLaborer,
+            Space::GrainSeeds,
+            Space::VegetableSeeds,
+            Space::Lessons,
+        ] {
+            after_worker(&set, &mut p, space).unwrap();
+        }
+        assert_eq!(p.supply.clay, 5);
+    }
+
+    #[test]
+    fn e077_has_no_prerequisite_and_is_absent_from_two_player_preset() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let card = set.definition("E077").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        assert!(card.effects.iter().all(|effect| matches!(
+            effect,
+            CardEffect::AfterWorkerGain {
+                good: Good::Clay,
+                amount: 1,
+                ..
+            }
+        )));
+        assert_eq!(card.effects.len(), 4);
+        let preset = verified_basic_card_set(2).unwrap();
+        assert!(
+            preset.definition("E077").is_none(),
+            "E077 must stay out of the A/B two-player preset"
+        );
     }
 
     #[test]
