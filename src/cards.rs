@@ -722,6 +722,29 @@ pub enum ScoreBonusRule {
     /// is added separately by `score_with_cards`. Appended at the enum tail
     /// so existing serde variants and saved-game bytes are unchanged.
     MajorImprovementsLowestDoubledThresholds,
+    /// C030 木骨の屋敷 (Half-Timbered House): 1 bonus point per stone room at
+    /// scoring (a room counts only while the player lives in a stone house;
+    /// wood/clay houses hold no stone rooms, exactly as `StoneRoomsExceedPeople`
+    /// reads them). The card belongs to exclusive group `stone_house_bonus`,
+    /// so the per-room bonus is paid for at most one card of that group —
+    /// see `ScoreExclusiveGroup`. Appended at the enum tail so existing serde
+    /// variants and saved-game bytes are unchanged.
+    StoneRooms,
+}
+
+/// Mutually exclusive end-game bonus groups: when a player has played several
+/// cards belonging to the same group, only the FIRST card in play order
+/// (`Player::played_cards`) resolves; the rest contribute 0. The Agricola rule
+/// behind `StoneHouseBonus` is that stone-house bonus points are granted by
+/// one card only (BGA spec C030 note; docs/impl-source-check.md S-12 records
+/// the same exclusivity clause on D034's source page). New groups are appended
+/// at the enum tail so existing serialized bytes stay unchanged.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScoreExclusiveGroup {
+    /// Stone-house bonus cards (e.g. C030 木骨の屋敷): 1 point per stone room,
+    /// payable once across the group.
+    StoneHouseBonus,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1699,6 +1722,8 @@ pub fn end_game_bonus(set: &CardSet, player: &Player) -> i32 {
 /// scale with the size of the card pool.
 pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &Player) -> i32 {
     let definition = |id: &String| definitions.iter().find(|card| &card.id == id);
+    let mut used_exclusive_groups: std::collections::BTreeSet<ScoreExclusiveGroup> =
+        std::collections::BTreeSet::new();
     player
         .played_cards
         .iter()
@@ -1850,6 +1875,21 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         4 => 5,
                         n if n >= 5 => 8,
                         _ => 0,
+                    }
+                }
+                ScoreBonusRule::StoneRooms => {
+                    // Exclusive group: stone_house_bonus — only the first card in play order pays.
+                    let group = ScoreExclusiveGroup::StoneHouseBonus;
+                    if used_exclusive_groups.contains(&group) {
+                        0
+                    } else {
+                        used_exclusive_groups.insert(group);
+                        // Stone rooms only count while the player lives in a stone house.
+                        if matches!(player.house, House::Stone) {
+                            player.rooms() as i32
+                        } else {
+                            0
+                        }
                     }
                 }
                 ScoreBonusRule::MajorImprovementsLowestDoubledThresholds => {
@@ -4969,6 +5009,24 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 CardEffect::PostPlayPassLeft,
             ],
         ),
+        // C030 木骨の屋敷 (Half-Timbered House): minor improvement, 0 points,
+        // cost 1 wood + 1 clay + 2 stone + 1 reed;
+        // at end scoring, 1 point per stone room. Belongs to exclusive group stone_house_bonus.
+        CardDefinition {
+            use_limit: None,
+            id: "C030".to_owned(),
+            kind: minor,
+            cost: vec![
+                (Good::Wood, 1),
+                (Good::Clay, 1),
+                (Good::Stone, 2),
+                (Good::Reed, 1),
+            ],
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::StoneRooms,
+            }],
+        },
     ]
 }
 #[cfg(test)]
@@ -5112,7 +5170,7 @@ mod verified_band_c_tests {
     #[test]
     fn band_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["C076", "C106", "C111", "C116"] {
+        for id in ["C076", "C106", "C111", "C116", "C083", "C147", "C030"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -5472,6 +5530,124 @@ mod verified_band_c_tests {
                 amount: 1,
             }]
         );
+    }
+
+    #[test]
+    fn c030_has_cost_and_end_game_bonus() {
+        let set = set();
+        let card = set.definition("C030").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(
+            card.cost,
+            vec![
+                (Good::Wood, 1),
+                (Good::Clay, 1),
+                (Good::Stone, 2),
+                (Good::Reed, 1),
+            ]
+        );
+        assert_eq!(card.points, 0);
+        assert_eq!(
+            card.effects,
+            vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::StoneRooms
+            }]
+        );
+    }
+
+    #[test]
+    fn c030_normal_stone_rooms_score() {
+        let set = CardSet {
+            definitions: verified_band_c_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("C030".into());
+        p.house = House::Stone;
+        // Player::new starts with 2 rooms (farm[0], farm[5])
+        assert_eq!(p.rooms(), 2);
+        assert_eq!(end_game_bonus(&set, &p), 2);
+        // Add 3 more rooms to reach 5 total (spec C030-normal: 5 stone rooms -> 5 points)
+        for cell in p.farm.iter_mut().skip(1).take(3) {
+            cell.tile = Tile::Room;
+        }
+        assert_eq!(p.rooms(), 5);
+        assert_eq!(end_game_bonus(&set, &p), 5);
+    }
+
+    #[test]
+    fn c030_zero_stone_rooms_in_non_stone_house() {
+        let set = CardSet {
+            definitions: verified_band_c_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("C030".into());
+        // Wood house (default) has 0 stone rooms even with extra rooms
+        for cell in p.farm.iter_mut().skip(1).take(3) {
+            cell.tile = Tile::Room;
+        }
+        assert_eq!(p.rooms(), 5);
+        assert_eq!(end_game_bonus(&set, &p), 0);
+        // Clay house also has 0 stone rooms
+        p.house = House::Clay;
+        assert_eq!(end_game_bonus(&set, &p), 0);
+    }
+
+    #[test]
+    fn c030_exclusive_group_other_card_applied_first_yields_zero() {
+        // Simulate another stone-house bonus card (same exclusive group) played before C030
+        let mut set = CardSet {
+            definitions: verified_band_c_cards(),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "FAKE_OTHER_STONE_HOUSE".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::StoneRooms,
+            }],
+        });
+        let mut p = Player::new(0, 0);
+        // Other card first, then C030
+        p.played_cards.push("FAKE_OTHER_STONE_HOUSE".into());
+        p.played_cards.push("C030".into());
+        p.house = House::Stone;
+        for cell in p.farm.iter_mut().skip(1).take(3) {
+            cell.tile = Tile::Room;
+        }
+        assert_eq!(p.rooms(), 5);
+        // Other card applied first -> C030 yields 0
+        assert_eq!(end_game_bonus(&set, &p), 5);
+    }
+
+    #[test]
+    fn c030_exclusive_group_c030_first_other_yields_zero() {
+        // Simulate another stone-house bonus card played after C030
+        let mut set = CardSet {
+            definitions: verified_band_c_cards(),
+        };
+        set.definitions.push(CardDefinition {
+            use_limit: None,
+            id: "FAKE_OTHER_STONE_HOUSE".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::StoneRooms,
+            }],
+        });
+        let mut p = Player::new(0, 0);
+        // C030 first, then other card
+        p.played_cards.push("C030".into());
+        p.played_cards.push("FAKE_OTHER_STONE_HOUSE".into());
+        p.house = House::Stone;
+        for cell in p.farm.iter_mut().skip(1).take(3) {
+            cell.tile = Tile::Room;
+        }
+        assert_eq!(p.rooms(), 5);
+        // C030 applied first -> other card yields 0, total 5
+        assert_eq!(end_game_bonus(&set, &p), 5);
     }
     /// Pad the verified band-C pool up to the validated deck size (7 cards
     /// of each kind per player) with inert dummy definitions so the contract
