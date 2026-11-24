@@ -700,8 +700,7 @@ CARDS = {
                    optional=True, freq="every_use", dur="permanent", order=1,
                    decision="owner"),
         ],
-        "notes": "Gain 1 food on play; each renovation may add a stable without paying wood. Chapter 1 (restack 2026-11-23): the on-play 1-food gain is implemented with the existing OnPlayGain variant; the after_renovation free-stable half awaits its trigger chapter.",
-        "implementation_status": "in_progress",
+        "notes": "Gain 1 food on play; each renovation may add a stable without paying wood. Full implementation (after_renovation free-stable step) is delegated to PR #452 (m10/hermes-ch-renovation-followup, AfterRenovationGain); PR #454 drops the OnPlayGain definition here (restack ch02 4-card composition).",
         "tests": [
             case("B016-normal", {"food": 0}, {"play": "B016"}, {"food_delta": 1}),
             case("B016-renovate", {"stables": 0}, {"renovate": 1, "build_stable": True},

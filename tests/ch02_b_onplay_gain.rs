@@ -1,4 +1,4 @@
-//! Tests for ch02 第2章 cards (B016/B054/B117/B151/B160) added by the
+//! Tests for ch02 第2章 cards (B054/B117/B151/B160) added by the
 //! restack session 2026-11-23 (B-deck on-play simple gains, chapter 1).
 //!
 //! Every card below prints exactly one constant `gain_resource` step on its
@@ -10,7 +10,7 @@
 //!
 //! Sources (third-party BGA wiki card pages recorded in each spec JSON, checked
 //! 2026-11-09 / 2026-11-14; NOT official Lookout text):
-//! B016.json (p=3241), B054.json (p=3203), B117.json (p=3140), B151.json
+//! B054.json (p=3203), B117.json (p=3140), B151.json
 //! (p=3106), B160.json (p=3097).
 //!
 //! Covers, per card: registry reachability, definition/spec parity, the
@@ -47,13 +47,7 @@ struct ChapterCard {
     amount: u32,
 }
 
-const CHAPTER_CARDS: [ChapterCard; 5] = [
-    ChapterCard {
-        id: "B016",
-        cost: &[(Good::Wood, 1)],
-        good: Good::Food,
-        amount: 1,
-    },
+const CHAPTER_CARDS: [ChapterCard; 4] = [
     ChapterCard {
         id: "B054",
         cost: &[(Good::Wood, 1)],
@@ -201,7 +195,7 @@ fn ch02_cards_reachable_via_default_registry() {
             .unwrap_or_else(|| panic!("{id} must be retrievable by CardId"));
         assert_eq!(card.external_id, id, "round-trip external_id for {id}");
         let expected_kind = match id {
-            "B016" | "B054" => CardKind::MinorImprovement,
+            "B054" => CardKind::MinorImprovement,
             _ => CardKind::Occupation,
         };
         assert_eq!(card.kind, expected_kind, "{id} kind must match the spec");
@@ -270,14 +264,6 @@ fn ch02_definitions_match_spec_parity() {
 }
 
 #[test]
-fn b016_grants_one_food_on_play() {
-    let set = chapter_set();
-    let mut player = Player::new(0, 0);
-    apply_on_play_effects(&set, &mut player, "B016").expect("apply B016");
-    assert_only_good(&player, Good::Food, 1);
-}
-
-#[test]
 fn b054_grants_exactly_two_food_on_play() {
     let set = chapter_set();
     let mut player = Player::new(0, 0);
@@ -307,22 +293,6 @@ fn b160_grants_one_grain_on_play() {
     let mut player = Player::new(0, 0);
     apply_on_play_effects(&set, &mut player, "B160").expect("apply B160");
     assert_only_good(&player, Good::Grain, 1);
-}
-
-#[test]
-fn b016_cost_boundary_requires_the_printed_wood() {
-    let set = chapter_set();
-    let card = chapter_card("B016");
-    let mut player = player_with(Good::Wood, 1);
-    assert!(
-        can_play(&set, &card, &player, 0),
-        "exactly 1 wood must make B016 playable"
-    );
-    player.supply.wood = 0;
-    assert!(
-        !can_play(&set, &card, &player, 0),
-        "the printed 1-wood cost is still required"
-    );
 }
 
 #[test]
@@ -408,9 +378,9 @@ fn b151_and_b160_player_count_guard_boundary() {
 #[test]
 fn ch02_pool_projection_by_player_count() {
     for (players, expected_ids) in [
-        (2usize, &["B016", "B054", "B117"][..]),
-        (3, &["B016", "B054", "B117"][..]),
-        (4, &["B016", "B054", "B117", "B151", "B160"][..]),
+        (2usize, &["B054", "B117"][..]),
+        (3, &["B054", "B117"][..]),
+        (4, &["B054", "B117", "B151", "B160"][..]),
     ] {
         let set = card_set_for_game(players, true);
         for id in expected_ids {

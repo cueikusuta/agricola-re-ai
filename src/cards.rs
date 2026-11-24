@@ -5246,21 +5246,6 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
         // printed effects live on other triggers and stay unwired here
         // (spec implementation_status = in_progress; follow-up noted inline).
 
-        // B016 解体ハンマー (Mining Hammer): cost 1 wood; on play gain 1 food.
-        // Eligibility 2/3/4 = yes (B-deck 1-84 rule). Still prints an
-        // after_renovation "may add 1 stable without paying wood" step, which
-        // belongs to the after_renovation chapter (follow-up).
-        CardDefinition {
-            use_limit: None,
-            id: "B016".to_owned(),
-            kind: CardKind::MinorImprovement,
-            cost: vec![(Good::Wood, 1)],
-            points: 0,
-            effects: vec![CardEffect::OnPlayGain {
-                good: Good::Food,
-                amount: 1,
-            }],
-        },
         // B054 肥料運搬車 (Tumbrel): cost 1 wood; on play gain 2 food.
         // Eligibility 2/3/4 = yes. Still prints an after_sow "1 food per
         // stable" step (follow-up; the harvest/sow chapter owns that trigger).
