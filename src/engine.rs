@@ -236,15 +236,21 @@ fn room_material(p: &Player) -> Good {
         House::Stone => Good::Stone,
     }
 }
-fn next_house(h: House) -> Option<(House, Good)> {
+fn next_house(h: House, has_conservator: bool) -> Option<(House, Good)> {
     match h {
-        House::Wood => Some((House::Clay, Good::Clay)),
+        House::Wood => {
+            if has_conservator {
+                Some((House::Stone, Good::Stone))
+            } else {
+                Some((House::Clay, Good::Clay))
+            }
+        }
         House::Clay => Some((House::Stone, Good::Stone)),
         House::Stone => None,
     }
 }
 fn can_renovate(p: &Player) -> bool {
-    next_house(p.house)
+    next_house(p.house, p.has_conservator)
         .map(|(_, g)| {
             let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
                 p.stone_cost_discount
@@ -545,8 +551,54 @@ impl Game {
             c.kind == crate::cards::CardKind::MinorImprovement
                 && crate::cards::can_play(&self.card_set, c, me, 0)
         });
+        // Check for A025 (Bassinet) and A026 (Sleeping Corner) passive effects.
+        let has_bassinet = me.played_cards.iter().any(|id| {
+            self.card_set.definition(id).is_some_and(|c| {
+                c.effects.iter().any(|e| {
+                    matches!(
+                        e,
+                        crate::cards::CardEffect::Passive {
+                            rule: crate::cards::PassiveRule::BassinetFirstOccupied
+                        }
+                    )
+                })
+            })
+        });
+        // A025 Bassinet: at most one space per round — the first non-accumulating
+        // space (in space_pool order) occupied by exactly one person. The owner
+        // may enter that space even though it is already used.
+        let bassinet_target = if has_bassinet && !me.bassinet_first_occupied_used {
+            self.bassinet_first_shared_space(self.public.active_player)
+        } else {
+            None
+        };
+        // A026 Sleeping Corner: the "Wish for Children" space —
+        // FamilyGrowthWithRoom (Basic Wish for Children, room required) only.
+        // "Urgent Wish for Children" / ModestFamilyGrowth is a different action
+        // space and is not covered by 「子供がほしい」.
+        let sleeping_target = me.has_sleeping_corner
+            && self
+                .public
+                .space_occupants
+                .get(&Space::FamilyGrowthWithRoom)
+                .copied()
+                .unwrap_or(0)
+                == 1;
+        let sleeping_target = sleeping_target.then_some(Space::FamilyGrowthWithRoom);
+        // Already-used spaces this player may still enter this round via A025/A026.
+        for target in [bassinet_target, sleeping_target].into_iter().flatten() {
+            if !list.contains(&target) {
+                list.push(target);
+            }
+        }
         list.retain(|&s| {
-            if self.public.used.contains(&s)
+            let occupied = self.public.space_occupants.get(&s).copied().unwrap_or(0);
+            let is_accumulating = s.accumulation_for(players).is_some();
+            // A025 Bassinet: only the first qualifying space is enterable.
+            let bassinet_allows = Some(s) == bassinet_target && !is_accumulating && occupied == 1;
+            // A026 Sleeping Corner: the Wish-for-Children space with one occupant.
+            let sleeping_corner_allows = Some(s) == sleeping_target && occupied == 1;
+            if (self.public.used.contains(&s) && !bassinet_allows && !sleeping_corner_allows)
                 || s.additional_for(players) && group_occupied(&self.public.used, players)
             {
                 return false;
@@ -575,13 +627,20 @@ impl Game {
                     })
                 }
                 Space::FamilyGrowthWithRoom => {
-                    me.family < 5 && me.rooms() + usize::from(me.extra_housing) > me.family as usize
+                    me.family < 5
+                        && me.rooms()
+                            + usize::from(me.extra_housing)
+                            + usize::from(me.homekeeper_extra_capacity())
+                            > me.family as usize
                 }
                 Space::FamilyGrowthNoRoom => me.family < 5,
                 Space::ModestFamilyGrowth => {
                     self.public.round >= 5
                         && me.family < 5
-                        && me.rooms() + usize::from(me.extra_housing) > me.family as usize
+                        && me.rooms()
+                            + usize::from(me.extra_housing)
+                            + usize::from(me.homekeeper_extra_capacity())
+                            > me.family as usize
                 }
                 Space::Cultivation => available_field(me) || can_sow(me),
                 Space::HouseRedevelopment | Space::FarmRedevelopment => can_renovate(me),
@@ -590,6 +649,73 @@ impl Game {
         });
         list
     }
+
+    /// A025 Bassinet: the single space this player may enter this round because
+    /// it is the first non-accumulating space (in `space_pool` order) that is
+    /// occupied by exactly one person. Returns `None` when the player has no
+    /// Bassinet, already used the ability this round, or no qualifying space
+    /// exists.
+    fn bassinet_first_shared_space(&self, player: usize) -> Option<Space> {
+        let me = &self.public.players[player];
+        let has_bassinet = me.played_cards.iter().any(|id| {
+            self.card_set.definition(id).is_some_and(|c| {
+                c.effects.iter().any(|e| {
+                    matches!(
+                        e,
+                        crate::cards::CardEffect::Passive {
+                            rule: crate::cards::PassiveRule::BassinetFirstOccupied
+                        }
+                    )
+                })
+            })
+        });
+        if !has_bassinet || me.bassinet_first_occupied_used {
+            return None;
+        }
+        let players = self.config.players;
+        self.space_pool().into_iter().find(|&s| {
+            let occupied = self.public.space_occupants.get(&s).copied().unwrap_or(0);
+            occupied == 1 && s.accumulation_for(players).is_none()
+        })
+    }
+
+    /// Whether `player` may place on an already-used `space` via A025 Bassinet
+    /// (first non-accumulating single-occupant space, once per round) or A026
+    /// Sleeping Corner (the Wish-for-Children space with one occupant).
+    /// Shared by `legal_spaces`, the apply gate and `preview_harvest` so every
+    /// entry point agrees.
+    fn passive_shared_space_allowed(&self, player: usize, space: Space) -> bool {
+        let me = &self.public.players[player];
+        let occupied = self
+            .public
+            .space_occupants
+            .get(&space)
+            .copied()
+            .unwrap_or(0);
+        if occupied != 1 {
+            return false;
+        }
+        if me.has_sleeping_corner && space == Space::FamilyGrowthWithRoom {
+            return true;
+        }
+        let has_bassinet = me.played_cards.iter().any(|id| {
+            self.card_set.definition(id).is_some_and(|c| {
+                c.effects.iter().any(|e| {
+                    matches!(
+                        e,
+                        crate::cards::CardEffect::Passive {
+                            rule: crate::cards::PassiveRule::BassinetFirstOccupied
+                        }
+                    )
+                })
+            })
+        });
+        has_bassinet
+            && !me.bassinet_first_occupied_used
+            && space.accumulation_for(self.config.players).is_none()
+            && Some(space) == self.bassinet_first_shared_space(player)
+    }
+
     /// One-shot transactional apply that CANNOT represent a card-effect
     /// interrupt.
     ///
@@ -855,7 +981,9 @@ impl Game {
         allow_pause: bool,
     ) -> std::result::Result<Transition, String> {
         let player = self.public.active_player;
-        if !self.available_spaces().contains(&action.space) {
+        if !self.available_spaces().contains(&action.space)
+            && !self.passive_shared_space_allowed(player, action.space)
+        {
             return Err(format!("illegal space {:?}", action.space));
         }
         let mut next = self.clone();
@@ -986,7 +1114,37 @@ impl Game {
                 return Ok(Transition::Paused(pending));
             }
         }
+        // A025 Bassinet: if this space was already used by exactly 1 other player
+        // and is non-accumulating, mark the ability as used for this round.
+        let occupied_before = next
+            .public
+            .space_occupants
+            .get(&action.space)
+            .copied()
+            .unwrap_or(0);
+        let is_accumulating = action.space.accumulation_for(next.config.players).is_some();
+        let has_bassinet = next.public.players[player].played_cards.iter().any(|id| {
+            next.card_set.definition(id).is_some_and(|c| {
+                c.effects.iter().any(|e| {
+                    matches!(
+                        e,
+                        crate::cards::CardEffect::Passive {
+                            rule: crate::cards::PassiveRule::BassinetFirstOccupied
+                        }
+                    )
+                })
+            })
+        });
+        if has_bassinet
+            && !next.public.players[player].bassinet_first_occupied_used
+            && !is_accumulating
+            && occupied_before == 1
+            && Some(action.space) == self.bassinet_first_shared_space(player)
+        {
+            next.public.players[player].bassinet_first_occupied_used = true;
+        }
         next.public.used.insert(action.space);
+        *next.public.space_occupants.entry(action.space).or_default() += 1;
         next.public.workers_placed[player] += 1;
         let will_harvest = next.public.workers_placed == next.public.work_quota
             && HARVEST_ROUNDS.contains(&next.public.round);
@@ -1074,7 +1232,11 @@ impl Game {
         action: &Action,
         feeding: Option<&[FeedingPlan]>,
     ) -> Result<PublicState> {
-        if !self.will_harvest_after_work() || !self.available_spaces().contains(&action.space) {
+        let id = self.public.active_player;
+        if !self.will_harvest_after_work()
+            || (!self.available_spaces().contains(&action.space)
+                && !self.passive_shared_space_allowed(id, action.space))
+        {
             return Err("not a legal last placement before harvest".into());
         }
         let mut next = self.clone();
@@ -1085,7 +1247,36 @@ impl Game {
         if let Transition::Paused(_) = transition {
             return Err("preview cannot handle paused decision".into());
         }
+        // A025 Bassinet: same logic as in apply_with_plans_impl.
+        let occupied_before = next
+            .public
+            .space_occupants
+            .get(&action.space)
+            .copied()
+            .unwrap_or(0);
+        let is_accumulating = action.space.accumulation_for(next.config.players).is_some();
+        let has_bassinet = next.public.players[id].played_cards.iter().any(|card_id| {
+            next.card_set.definition(card_id).is_some_and(|c| {
+                c.effects.iter().any(|e| {
+                    matches!(
+                        e,
+                        crate::cards::CardEffect::Passive {
+                            rule: crate::cards::PassiveRule::BassinetFirstOccupied
+                        }
+                    )
+                })
+            })
+        });
+        if has_bassinet
+            && !next.public.players[id].bassinet_first_occupied_used
+            && !is_accumulating
+            && occupied_before == 1
+            && Some(action.space) == next.bassinet_first_shared_space(id)
+        {
+            next.public.players[id].bassinet_first_occupied_used = true;
+        }
         next.public.used.insert(action.space);
+        *next.public.space_occupants.entry(action.space).or_default() += 1;
         next.public.workers_placed[id] += 1;
         next.harvest_fields()?;
         if let Some(plans) = feeding {
@@ -2141,7 +2332,11 @@ fn build_stable(p: &mut Player, i: usize) -> Result<()> {
     Ok(())
 }
 fn grow(p: &mut Player, room_only: bool) -> Result<()> {
-    if p.family >= 5 || room_only && p.rooms() + usize::from(p.extra_housing) <= p.family as usize {
+    if p.family >= 5
+        || room_only
+            && p.rooms() + usize::from(p.extra_housing) + usize::from(p.homekeeper_extra_capacity())
+                <= p.family as usize
+    {
         return Err("family growth not permitted".into());
     }
     p.family += 1;
@@ -2149,7 +2344,7 @@ fn grow(p: &mut Player, room_only: bool) -> Result<()> {
     Ok(())
 }
 fn renovate(p: &mut Player) -> Result<()> {
-    let (new, g) = next_house(p.house).ok_or("stone is final house")?;
+    let (new, g) = next_house(p.house, p.has_conservator).ok_or("stone is final house")?;
     let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
         p.stone_cost_discount
     } else {
@@ -3681,6 +3876,362 @@ mod grow_with_minor_regression_tests {
             "modest family growth is only available from round 5"
         );
         assert!(!game.public.used.contains(&Space::ModestFamilyGrowth));
+    }
+
+    /// P2-6 (engine path): A025 Bassinet — the owner may enter the FIRST
+    /// non-accumulating space occupied by exactly one person, once per round.
+    /// Occupied spaces are otherwise illegal, so without the flag this action
+    /// is rejected; accumulating spaces never qualify; start_round resets it.
+    #[test]
+    fn a025_bassinet_engine_enters_first_single_occupied_space_once_per_round() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 7,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .unwrap();
+        game.public.active_player = 0;
+        game.public.players[0].played_cards.push("A025".to_string());
+
+        // Opponent occupies two NON-accumulating single-person spaces:
+        // DayLaborer (pool index 4) then GrainSeeds (pool index 5). Fishing is
+        // accumulating and never qualifies for Bassinet.
+        game.public.active_player = 1;
+        assert!(game
+            .apply(Action {
+                space: Space::DayLaborer,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert!(game
+            .apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert_eq!(
+            game.public.space_occupants.get(&Space::GrainSeeds).copied(),
+            Some(1)
+        );
+
+        // Only the FIRST qualifying space (DayLaborer) is enterable by player 0.
+        game.public.active_player = 0;
+        let legal = game.legal_spaces();
+        assert!(legal.contains(&Space::DayLaborer));
+        assert!(!legal.contains(&Space::GrainSeeds));
+        // GrainSeeds is not first: entering it is rejected even though the flag
+        // is still unused.
+        assert!(game
+            .apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .is_err());
+        assert!(!game.public.players[0].bassinet_first_occupied_used);
+        // Entering DayLaborer consumes the once-per-round ability.
+        assert!(game
+            .apply(Action {
+                space: Space::DayLaborer,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert!(game.public.players[0].bassinet_first_occupied_used);
+        // GrainSeeds stays illegal after the ability is used this round.
+        assert!(game
+            .apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .is_err());
+
+        // Round start resets the flag and the occupancy tracker.
+        game.start_round().unwrap();
+        assert!(!game.public.players[0].bassinet_first_occupied_used);
+        assert!(game.public.space_occupants.is_empty());
+        game.public.active_player = 1;
+        assert!(game
+            .apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .is_ok());
+        game.public.active_player = 0;
+        assert!(game
+            .apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert!(game.public.players[0].bassinet_first_occupied_used);
+    }
+
+    /// P2-6 / P3-7 (engine path): A026 Sleeping Corner covers the Wish for
+    /// Children space (FamilyGrowthWithRoom — "Basic Wish for Children", room
+    /// required) only. ModestFamilyGrowth is a different action space and is
+    /// intentionally NOT covered.
+    #[test]
+    fn a026_sleeping_corner_engine_wish_for_children_only() {
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 11,
+                additional_action_space_enabled: true,
+            },
+            set,
+        )
+        .unwrap();
+        game.public.revealed.push(RoundCard::MajorImprovement);
+        game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
+        game.public.revealed.push(RoundCard::Fencing);
+        game.public.revealed.push(RoundCard::GrainUtilization);
+        game.public.round = 5;
+        // Keep the 14-card invariant: init drew 1 card during start_round,
+        // we pushed 4 more to revealed, so remove those 4 from hidden deck.
+        for c in [
+            RoundCard::MajorImprovement,
+            RoundCard::FamilyGrowthWithRoom,
+            RoundCard::Fencing,
+            RoundCard::GrainUtilization,
+        ] {
+            game.hidden_round_deck.retain(|&deck_c| deck_c != c);
+        }
+
+        // Both players need rooms > family to use family growth spaces.
+        // Player 0 also needs 2 grain fields to play A026 (prerequisite).
+        for pid in 0..2 {
+            let p = &mut game.public.players[pid];
+            p.farm[1].tile = Tile::Room;
+            p.farm[2].tile = Tile::Room;
+            p.farm[3].tile = Tile::Room;
+        }
+        game.public.players[0].farm[0].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        game.public.players[0].farm[5].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        game.public.players[0].supply.wood = 1; // A026 cost
+
+        // Force A026 into player 0's hand (idempotent: avoid duplicates if
+        // the random deal already gave it to someone).
+        if !game.cards.hands[0].iter().any(|id| id == "A026") {
+            game.cards.hands[0].push("A026".to_string());
+        }
+        game.cards.undealt.retain(|id| id != "A026");
+        for hand in game.cards.hands.iter_mut().skip(1) {
+            hand.retain(|id| id != "A026");
+        }
+        game.public.active_player = 0;
+        game.apply(Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinor {
+                card_id: "A026".to_string(),
+            },
+        })
+        .unwrap_or_else(|e| panic!("A026 engine play failed: {e}"));
+        assert!(game.public.players[0].has_sleeping_corner);
+
+        // Opponent occupies the Wish-for-Children space.
+        game.public.active_player = 1;
+        assert!(game
+            .apply(Action {
+                space: Space::FamilyGrowthWithRoom,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert_eq!(
+            game.public
+                .space_occupants
+                .get(&Space::FamilyGrowthWithRoom)
+                .copied(),
+            Some(1)
+        );
+
+        // Player 0 shares the occupied Wish-for-Children space.
+        game.public.active_player = 0;
+        assert!(game
+            .apply(Action {
+                space: Space::FamilyGrowthWithRoom,
+                detail: Detail::None,
+            })
+            .is_ok());
+        assert_eq!(game.public.players[0].family, 3);
+
+        // Sleeping Corner does NOT cover ModestFamilyGrowth.
+        // Manually occupy ModestFamilyGrowth for player 1 (bypassing apply
+        // to avoid round-deck validation complexity in this test).
+        game.public.used.insert(Space::ModestFamilyGrowth);
+        *game
+            .public
+            .space_occupants
+            .entry(Space::ModestFamilyGrowth)
+            .or_default() += 1;
+        game.public.active_player = 0;
+        assert!(game
+            .apply(Action {
+                space: Space::ModestFamilyGrowth,
+                detail: Detail::None,
+            })
+            .is_err());
+    }
+
+    /// P2-6 (engine path): A085 Homekeeper — exactly one clay or stone room
+    /// orthogonally adjacent to both a field and a pasture holds one more
+    /// person; a wood house or a non-adjacent room grants nothing.
+    #[test]
+    fn a085_homekeeper_engine_extra_capacity() {
+        // Unit-level: homekeeper_extra_capacity itself.
+        let mut p = Player::new(0, 0);
+        p.farm[0].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        p.farm[1].tile = Tile::Room;
+        p.farm[2].tile = Tile::Pasture { id: 1 };
+        assert_eq!(p.homekeeper_extra_capacity(), 0); // no Homekeeper
+        p.has_homekeeper = true;
+        assert_eq!(p.homekeeper_extra_capacity(), 0); // wood house: rooms are wood
+        p.house = House::Clay;
+        assert_eq!(p.homekeeper_extra_capacity(), 1); // clay room next to field+pasture
+        p.farm[6].tile = Tile::Room;
+        p.farm[4].tile = Tile::Field {
+            crop: Some(Crop::Vegetable),
+            remaining: 1,
+        };
+        p.farm[8].tile = Tile::Pasture { id: 2 };
+        assert_eq!(p.homekeeper_extra_capacity(), 1); // still exactly one room counted
+
+        // Engine path: rooms == family, no spare room -> Homekeeper makes the
+        // difference. Cell 1's neighbors are [0, 2, 6]: field at 0, pasture at 2.
+        let set = verified_basic_card_set(2).unwrap();
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 13,
+                additional_action_space_enabled: false,
+            },
+            set,
+        )
+        .unwrap();
+        {
+            let p0 = &mut game.public.players[0];
+            p0.house = House::Clay;
+            p0.farm[0].tile = Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            };
+            p0.farm[1].tile = Tile::Room;
+            p0.farm[2].tile = Tile::Pasture { id: 1 };
+            p0.farm[5].tile = Tile::Empty; // clear default Room at cell 5
+            p0.farm[6].tile = Tile::Room; // adjacent to cell 1 (neighbors [0,2,6])
+                                          // Register the pasture so validate_player_state passes.
+            p0.pastures.push(crate::model::Pasture {
+                id: 1,
+                cells: vec![2],
+                animal: None,
+                quantity: 0,
+            });
+            p0.fences = crate::model::pasture_border(&[2usize]);
+            // farm layout: rooms [1,6] connected, field [0], pasture [2]
+            // cell 1's neighbors [0,2,6]: field at 0, pasture at 2 → Homekeeper qualifies
+            assert_eq!(p0.rooms(), 2);
+            assert_eq!(p0.family, 2);
+        }
+        game.public.revealed.push(RoundCard::FamilyGrowthWithRoom);
+        game.public.active_player = 0;
+        assert!(game
+            .apply(Action {
+                space: Space::FamilyGrowthWithRoom,
+                detail: Detail::None,
+            })
+            .is_err()); // no spare room, no Homekeeper yet
+        game.public.players[0].has_homekeeper = true;
+        game.public.active_player = 0;
+        assert!(game
+            .apply(Action {
+                space: Space::FamilyGrowthWithRoom,
+                detail: Detail::None,
+            })
+            .is_ok()); // 2 rooms + 1 Homekeeper capacity > 2 family
+        assert_eq!(game.public.players[0].family, 3);
+    }
+
+    /// P2-6 (engine path): A087 Conservator — wooden house may be renovated
+    /// directly to stone at the usual stone renovation cost; without it wood ->
+    /// clay first, clay -> stone as before.
+    #[test]
+    fn a087_conservator_engine_wood_to_stone_renovation() {
+        let set = verified_basic_card_set(2).unwrap();
+        // With Conservator: play via the engine (Lessons -> PlayOccupation ->
+        // Before phase -> handle_passive sets has_conservator).
+        let mut game = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 17,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+        )
+        .unwrap();
+        game.cards.hands[0].push("A087".to_string());
+        game.cards.undealt.retain(|id| id != "A087");
+        game.public.active_player = 0;
+        game.public.revealed.push(RoundCard::HouseRedevelopment);
+        assert!(game
+            .apply(Action {
+                space: Space::Lessons,
+                detail: Detail::PlayOccupation {
+                    card_id: "A087".to_string(),
+                },
+            })
+            .is_ok());
+        assert!(game.public.players[0].has_conservator);
+        assert_eq!(game.public.players[0].house, House::Wood);
+        assert_eq!(game.public.players[0].rooms(), 2);
+        game.public.players[0].supply.stone = 2;
+        game.public.players[0].supply.reed = 1; // renovate costs 1 reed
+        game.public.active_player = 0; // reset active player after first apply advanced it
+        let action = Action {
+            space: Space::HouseRedevelopment,
+            detail: Detail::Renovate {
+                bonus_improvement: None,
+                instant_bake: 0,
+                pastures: vec![],
+            },
+        };
+        assert!(game.apply(action.clone()).is_ok());
+        assert_eq!(game.public.players[0].house, House::Stone);
+        assert_eq!(game.public.players[0].supply.stone, 0); // 2 rooms at stone cost
+
+        // Without Conservator: wood -> clay first (normal clay-house path).
+        let mut game2 = Game::with_cards(
+            Config {
+                players: 2,
+                seed: 19,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+        )
+        .unwrap();
+        {
+            let p0 = &mut game2.public.players[0];
+            p0.supply.clay = 2;
+            p0.supply.reed = 1; // renovate costs 1 reed
+            assert!(!p0.has_conservator);
+        }
+        game2.public.active_player = 0;
+        game2.public.revealed.push(RoundCard::HouseRedevelopment);
+        assert!(game2.apply(action.clone()).is_ok());
+        let p0 = &mut game2.public.players[0];
+        assert_eq!(p0.house, House::Clay);
+        assert_eq!(p0.supply.clay, 0);
     }
 
     #[test]

@@ -201,6 +201,14 @@ pub struct Player {
     pub stone_cost_discount: u32,
     #[serde(default)]
     pub extra_housing: u8,
+    #[serde(default)]
+    pub bassinet_first_occupied_used: bool,
+    #[serde(default)]
+    pub has_sleeping_corner: bool,
+    #[serde(default)]
+    pub has_homekeeper: bool,
+    #[serde(default)]
+    pub has_conservator: bool,
     pub begging: u32,
     /// Snapshot of total crop goods in fields at the end of the final harvest
     /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
@@ -238,6 +246,10 @@ impl Player {
             major_stone_discount_by_rooms: false,
             stone_cost_discount: 0,
             extra_housing: 0,
+            bassinet_first_occupied_used: false,
+            has_sleeping_corner: false,
+            has_homekeeper: false,
+            has_conservator: false,
             begging: 0,
             field_goods_before_final_harvest: None,
         }
@@ -295,6 +307,29 @@ impl Player {
                     _ => 0,
                 })
                 .sum::<u32>()
+    }
+    /// A085 Homekeeper: returns 1 if the player has the Homekeeper occupation
+    /// and has at least one clay or stone room orthogonally adjacent to both
+    /// a field and a pasture. Only one such room counts.
+    pub fn homekeeper_extra_capacity(&self) -> u8 {
+        if !self.has_homekeeper {
+            return 0;
+        }
+        for (i, cell) in self.farm.iter().enumerate() {
+            if matches!(cell.tile, Tile::Room) && self.house != House::Wood {
+                let neighbors = neighbors(i);
+                let has_field = neighbors
+                    .iter()
+                    .any(|&j| matches!(self.farm[j].tile, Tile::Field { .. }));
+                let has_pasture = neighbors
+                    .iter()
+                    .any(|&j| matches!(self.farm[j].tile, Tile::Pasture { .. }));
+                if has_field && has_pasture {
+                    return 1;
+                }
+            }
+        }
+        0
     }
 }
 
@@ -562,6 +597,10 @@ pub struct PublicState {
     pub revealed: Vec<RoundCard>,
     pub accumulations: BTreeMap<Space, u32>,
     pub animal_accumulations: BTreeMap<Space, u32>,
+    /// Number of workers placed on each space this round. Used by A025/A026
+    /// to check space occupancy. Cleared at round start.
+    #[serde(default)]
+    pub space_occupants: BTreeMap<Space, u8>,
     pub players: Vec<Player>,
     pub improvement_market: Vec<Improvement>,
     pub work_quota: Vec<u8>,
@@ -883,6 +922,7 @@ impl Game {
             revealed: vec![],
             accumulations: BTreeMap::new(),
             animal_accumulations: BTreeMap::new(),
+            space_occupants: BTreeMap::new(),
             players,
             improvement_market: Improvement::ALL.to_vec(),
             work_quota: vec![2; config.players],
@@ -1226,6 +1266,12 @@ impl Game {
         let card = self.hidden_round_deck.pop().expect("14 rounds only");
         self.public.revealed.push(card);
         self.public.used.clear();
+        // Reset per-round Bassinet (A025) flag for all players.
+        for p in &mut self.public.players {
+            p.bassinet_first_occupied_used = false;
+        }
+        // Reset per-round space occupancy tracker for A025/A026.
+        self.public.space_occupants.clear();
         // Per-card use limits use the round as their period, so the ledger is
         // cleared when a new round opens.
         self.public.card_uses.clear();

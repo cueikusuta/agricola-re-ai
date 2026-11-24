@@ -1220,6 +1220,22 @@ fn handle_passive(
         }
         crate::cards::PassiveRule::StoneDiscount(n) => p.stone_cost_discount += n,
         crate::cards::PassiveRule::HousingSpace(n) => p.extra_housing += n,
+        // A025 Bassinet: per-round state (bassinet_first_occupied_used) is
+        // reset at round start; nothing to do on play.
+        crate::cards::PassiveRule::BassinetFirstOccupied => {}
+        // A026 Sleeping Corner: flag is consulted by engine `legal_spaces` and
+        // the apply gate.
+        crate::cards::PassiveRule::SleepingCornerWishForChildren => {
+            p.has_sleeping_corner = true;
+        }
+        // A085 Homekeeper: flag is consulted by `Player::homekeeper_extra_capacity`.
+        crate::cards::PassiveRule::HomekeeperRoomCapacity => {
+            p.has_homekeeper = true;
+        }
+        // A087 Conservator: flag is consulted by `next_house` / `can_renovate`.
+        crate::cards::PassiveRule::ConservatorWoodToStone => {
+            p.has_conservator = true;
+        }
     }
     Ok(EffectResult::Resolved)
 }
@@ -2418,6 +2434,18 @@ pub mod legacy {
                     }
                     crate::cards::PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                     crate::cards::PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                    crate::cards::PassiveRule::BassinetFirstOccupied => {}
+                    // A026 Sleeping Corner / A085 Homekeeper / A087 Conservator:
+                    // flags are set here so Path 3 matches Path 1 and the engine path.
+                    crate::cards::PassiveRule::SleepingCornerWishForChildren => {
+                        player.has_sleeping_corner = true;
+                    }
+                    crate::cards::PassiveRule::HomekeeperRoomCapacity => {
+                        player.has_homekeeper = true;
+                    }
+                    crate::cards::PassiveRule::ConservatorWoodToStone => {
+                        player.has_conservator = true;
+                    }
                 },
                 _ => {}
             }
@@ -4312,13 +4340,57 @@ mod tests {
         use crate::pending::{PendingResolution, Transition};
 
         let set = crate::cards::verified_basic_card_set(2).expect("verified card set");
-        let mut game = Game::with_cards(
+        // Construct explicit hands: each player needs 7 occupations + 7 minors.
+        // Player 0 gets A078 (minor) and B121 (occupation) for the test scenario.
+        let p0_occupations = vec![
+            "A085".to_string(),
+            "A087".to_string(),
+            "A088".to_string(),
+            "A098".to_string(),
+            "A110".to_string(),
+            "A116".to_string(),
+            "B121".to_string(),
+        ];
+        let p0_minors = vec![
+            "A005".to_string(),
+            "A012".to_string(),
+            "A025".to_string(),
+            "A026".to_string(),
+            "A032".to_string(),
+            "A038".to_string(),
+            "A078".to_string(),
+        ];
+        let p1_occupations = vec![
+            "A119".to_string(),
+            "A121".to_string(),
+            "A122".to_string(),
+            "A125".to_string(),
+            "B095".to_string(),
+            "B098".to_string(),
+            "B099".to_string(),
+        ];
+        let p1_minors = vec![
+            "A042".to_string(),
+            "A050".to_string(),
+            "A051".to_string(),
+            "A063".to_string(),
+            "A067".to_string(),
+            "A075".to_string(),
+            "A077".to_string(),
+        ];
+        let mut p0_hand = p0_occupations.clone();
+        p0_hand.extend(p0_minors.clone());
+        let mut p1_hand = p1_occupations.clone();
+        p1_hand.extend(p1_minors.clone());
+        let hands = vec![p0_hand, p1_hand];
+        let mut game = Game::with_cards_and_hands(
             Config {
                 players: 2,
-                seed: 47, // seed 47 gives player 0 both A078 and B121 (with the expanded verified pool)
+                seed: 47,
                 additional_action_space_enabled: false,
             },
-            set,
+            set.clone(),
+            hands,
         )
         .expect("game creation must succeed");
         game.public.active_player = 0;
@@ -5588,6 +5660,124 @@ mod tests {
         );
         // Expected: 10 + 3 = 13
         assert_eq!(legacy_wood, 13, "expected 3 wood from 3 improvements");
+    }
+
+    /// P0-2 regression: passive flags (A026/A085/A087) must be set identically
+    /// by Path 1 (`cards::play`), Path 2 (`dispatch_play`) and Path 3
+    /// (`legacy::apply_on_play_effects_legacy`). A025 sets no player flag on
+    /// play; it is included to assert all three paths agree it stays off.
+    #[allow(clippy::type_complexity)]
+    #[test]
+    fn a025_a026_a085_a087_passive_flags_match_across_three_paths() {
+        use std::collections::{BTreeMap, BTreeSet};
+
+        let set = crate::cards::CardSet {
+            definitions: crate::cards::verified_passive_cards(),
+        };
+        let cases: &[(&str, CardKind, &dyn Fn(&Player) -> bool)] = &[
+            ("A025", CardKind::MinorImprovement, &|p: &Player| {
+                !p.bassinet_first_occupied_used
+            }),
+            ("A026", CardKind::MinorImprovement, &|p: &Player| {
+                p.has_sleeping_corner
+            }),
+            ("A085", CardKind::Occupation, &|p: &Player| p.has_homekeeper),
+            ("A087", CardKind::Occupation, &|p: &Player| {
+                p.has_conservator
+            }),
+        ];
+        for &(id, kind, expect) in cases {
+            // Common prerequisites/supplies: A026 needs 2 grain fields; all
+            // four cards are affordable.
+            let fresh_player = || {
+                let mut p = Player::new(0, 0);
+                p.supply.wood = 3;
+                p.supply.reed = 3;
+                p.farm[1].tile = Tile::Field {
+                    crop: Some(Crop::Grain),
+                    remaining: 2,
+                };
+                p.farm[2].tile = Tile::Field {
+                    crop: Some(Crop::Grain),
+                    remaining: 1,
+                };
+                p
+            };
+
+            // Path 1: legacy cards::play
+            {
+                let mut p = fresh_player();
+                let mut hand = vec![id.to_string()];
+                crate::cards::play(&set, &mut hand, &mut p, id, kind, 0)
+                    .unwrap_or_else(|e| panic!("path1 {id}: {e}"));
+                assert!(expect(&p), "path1 flag not set for {id}");
+            }
+
+            // Path 2: engine dispatcher (play_validate_pay + play_from_hand +
+            // dispatch_play -> Before phase -> handle_passive).
+            {
+                let p = fresh_player();
+                let mut cards = crate::cards::CardState {
+                    hands: vec![vec![id.to_string()]],
+                    undealt: vec![],
+                };
+                let mut players = vec![p];
+                let mut market = vec![];
+                let mut well = BTreeMap::new();
+                let mut uses = BTreeMap::new();
+                let limits = BTreeMap::new();
+                let mut budget = 64u32;
+                let mut pending = None;
+                {
+                    let mut ctx = crate::card_zones::CardMoveCtx {
+                        cards: &mut cards,
+                        players: &mut players,
+                        improvement_market: &mut market,
+                    };
+                    crate::cards::play_validate_pay(
+                        &set,
+                        &mut ctx.cards.hands[0],
+                        &mut ctx.players[0],
+                        id,
+                        kind,
+                        0,
+                    )
+                    .unwrap_or_else(|e| panic!("path2 validate {id}: {e}"));
+                    crate::card_zones::play_from_hand(&mut ctx, 0, id)
+                        .unwrap_or_else(|e| panic!("path2 play_from_hand {id}: {e}"));
+                    dispatch_play(
+                        &set,
+                        0,
+                        id,
+                        0,
+                        ctx.cards,
+                        ctx.players,
+                        ctx.improvement_market,
+                        &mut well,
+                        1,
+                        &BTreeSet::new(),
+                        &mut budget,
+                        &mut uses,
+                        &limits,
+                        &mut pending,
+                    )
+                    .unwrap_or_else(|e| panic!("path2 dispatch {id}: {e}"));
+                    let card = set.definition(id).unwrap();
+                    crate::cards::update_card_points_on_play(&mut ctx.players[0], card.points)
+                        .unwrap_or_else(|e| panic!("path2 points {id}: {e}"));
+                }
+                assert!(expect(&players[0]), "path2 flag not set for {id}");
+            }
+
+            // Path 3: legacy module apply_on_play_effects_legacy
+            {
+                let mut p = fresh_player();
+                let mut hand = vec![id.to_string()];
+                legacy::apply_on_play_effects_legacy(&set, &mut hand, &mut p, id, kind, 0)
+                    .unwrap_or_else(|e| panic!("path3 {id}: {e}"));
+                assert!(expect(&p), "path3 flag not set for {id}");
+            }
+        }
     }
 
     /// Reproduction test for PR #326 P0: HarvestFieldGain should NOT fire on

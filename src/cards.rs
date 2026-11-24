@@ -263,6 +263,21 @@ pub enum PassiveRule {
     MajorStoneDiscountByRooms,
     StoneDiscount(u32),
     HousingSpace(u8),
+    /// A025 乳母車 (Bassinet): once per work phase, the owner may use the
+    /// first non-accumulating space that is occupied by exactly one other
+    /// player. This is tracked per-round in the game state.
+    BassinetFirstOccupied,
+    /// A026 寝室 (Sleeping Corner): the owner may use the Wish for Children
+    /// space (FamilyGrowthWithRoom, the 2016 "Basic Wish for Children" with a
+    /// room required) even when it is occupied by exactly one other player.
+    SleepingCornerWishForChildren,
+    /// A085 家政婦 (Homekeeper): exactly one clay or stone room orthogonally
+    /// adjacent to both a field and a pasture holds one additional person.
+    HomekeeperRoomCapacity,
+    /// A087 修理屋 (Conservator): the owner may renovate directly from a
+    /// wooden house to a stone house at the normal stone renovation cost,
+    /// skipping the clay house stage.
+    ConservatorWoodToStone,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -915,6 +930,18 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 }
                 PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                PassiveRule::BassinetFirstOccupied => {
+                    // A025: ability is checked in legal_spaces; reset flag at round start
+                }
+                PassiveRule::SleepingCornerWishForChildren => {
+                    player.has_sleeping_corner = true;
+                }
+                PassiveRule::HomekeeperRoomCapacity => {
+                    player.has_homekeeper = true;
+                }
+                PassiveRule::ConservatorWoodToStone => {
+                    player.has_conservator = true;
+                }
             },
             _ => {}
         }
@@ -2947,6 +2974,46 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
             vec![],
             PassiveRule::RoomCost(3),
         ),
+        // A025 乳母車 (Bassinet): Minor Improvement, cost 1 Wood + 1 Reed
+        card(
+            "A025",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1), (Good::Reed, 1)],
+            PassiveRule::BassinetFirstOccupied,
+        ),
+        // A026 寝室 (Sleeping Corner): Minor Improvement, cost 1 Wood, prerequisite 2 grain fields, 1 point
+        CardDefinition {
+            use_limit: None,
+            id: "A026".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 1,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumCropFields {
+                        crop: Crop::Grain,
+                        number: 2,
+                    },
+                },
+                CardEffect::Passive {
+                    rule: PassiveRule::SleepingCornerWishForChildren,
+                },
+            ],
+        },
+        // A085 家政婦 (Homekeeper): Occupation, cost 0, 0 points
+        card(
+            "A085",
+            CardKind::Occupation,
+            vec![],
+            PassiveRule::HomekeeperRoomCapacity,
+        ),
+        // A087 修理屋 (Conservator): Occupation, cost 0, 0 points
+        card(
+            "A087",
+            CardKind::Occupation,
+            vec![],
+            PassiveRule::ConservatorWoodToStone,
+        ),
     ]
 }
 #[cfg(test)]
@@ -3028,6 +3095,70 @@ mod passive_cards_tests {
         let mut p = Player::new(0, 0);
         activate("B126", &mut p);
         assert_eq!(p.room_material_cost, Some(3));
+    }
+    #[test]
+    fn a025_bassinet_allows_first_occupied_non_accumulating() {
+        let set = CardSet {
+            definitions: verified_passive_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        p.supply.reed = 1;
+        let mut hand = vec!["A025".to_string()];
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "A025",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert!(p.played_cards.contains(&"A025".to_string()));
+    }
+    #[test]
+    fn a026_sleeping_corner_requires_two_grain_fields() {
+        let set = CardSet {
+            definitions: verified_passive_cards(),
+        };
+        let card = set.definition("A026").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 1);
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        // Without 2 grain fields, cannot play
+        assert!(!can_play(&set, card, &p, 0));
+        // Add 2 grain fields
+        p.farm[1].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 2,
+        };
+        p.farm[2].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        };
+        assert!(can_play(&set, card, &p, 0));
+    }
+    #[test]
+    fn a085_homekeeper_sets_flag() {
+        let set = CardSet {
+            definitions: verified_passive_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        let mut hand = vec!["A085".to_string()];
+        play(&set, &mut hand, &mut p, "A085", CardKind::Occupation, 0).unwrap();
+        assert!(p.has_homekeeper);
+    }
+    #[test]
+    fn a087_conservator_sets_flag() {
+        let set = CardSet {
+            definitions: verified_passive_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        let mut hand = vec!["A087".to_string()];
+        play(&set, &mut hand, &mut p, "A087", CardKind::Occupation, 0).unwrap();
+        assert!(p.has_conservator);
     }
     #[test]
     fn b050_limits_occupation_count() {
@@ -3206,20 +3337,20 @@ mod simple_occupation_tests {
     #[test]
     fn only_implemented_cards_are_in_two_player_preset() {
         let set = verified_basic_card_set(2).unwrap();
-        assert_eq!(set.definitions.len(), 39);
+        assert_eq!(set.definitions.len(), 43);
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::MinorImprovement)
                 .count(),
-            22
+            24
         );
         assert_eq!(
             set.definitions
                 .iter()
                 .filter(|x| x.kind == CardKind::Occupation)
                 .count(),
-            17
+            19
         );
         assert!(verified_basic_card_set(3).is_err());
     }

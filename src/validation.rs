@@ -165,14 +165,41 @@ fn validate_incremental_impl(post: &Game, pre: &Game, expect: DeltaExpectation) 
         return Verdict::Fail("a used space disappeared mid-round".into());
     }
     let added: Vec<_> = post.public.used.difference(&pre.public.used).collect();
-    if added.len() != expect.used_added {
+    let used_added_ok = if added.len() == expect.used_added {
+        true
+    } else if added.is_empty() && expect.worker_delta == 1 {
+        // A025 Bassinet / A026 Sleeping Corner re-entry: the actor enters an
+        // already-used space, so `used` doesn't grow but `workers_placed` does.
+        // Legal only when the actor has the corresponding passive card.
+        let actor = pre.public.active_player;
+        pre.public.players[actor].played_cards.iter().any(|id| {
+            pre.card_set.definition(id).is_some_and(|c| {
+                c.effects.iter().any(|e| {
+                    matches!(
+                        e,
+                        crate::cards::CardEffect::Passive {
+                            rule: crate::cards::PassiveRule::BassinetFirstOccupied
+                        }
+                    ) || matches!(
+                        e,
+                        crate::cards::CardEffect::Passive {
+                            rule: crate::cards::PassiveRule::SleepingCornerWishForChildren
+                        }
+                    )
+                })
+            })
+        })
+    } else {
+        false
+    };
+    if !used_added_ok {
         return Verdict::Fail(if expect.used_added == 1 {
             "a work move must add exactly one used space".into()
         } else {
             "a resumed completion must not add a used space".into()
         });
     }
-    if expect.used_added == 1 {
+    if expect.used_added == 1 && added.len() == 1 {
         let added_space = added[0];
         // 6b. The added space must be available (same logic as full validation).
         // Pre is assumed valid, so we only need to check the newly added space.

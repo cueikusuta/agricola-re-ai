@@ -1187,10 +1187,10 @@ mod tests {
         // excluded from the verified pool, so the sample_game distribution is unchanged.
         // Updated: added A042 Forest Lake Hut to verified_minor_worker_cards (pool size 33->34)
         // Updated: added A121 Brick Stamping to verified_minor_worker_cards (pool size 34->35)
-        // Updated: added B064 Waterwheel + C141 Sheep Provider + A050 Milk Jug + D061 Bale of Straw
-        // to the verified pools (worker_bonus + round_and_harvest, pool size 35->39)
+        // Updated: added A025 Bassinet, A026 Sleeping Corner, A085 Homekeeper, A087 Conservator
+        // to verified_passive_cards (pool size 39->43)
         assert_eq!(
-            digest, "26895709ce7d07c170a1cefdf39dfe53a2d04b8a1e18bcb5a7e6c9adcb9151f0",
+            digest, "ad934d23ec4f414224668603fc3e542b80de99ce4d4b1de7267ebdec3ac322f2",
             "sample_game distribution changed — update this test only if intentional"
         );
     }

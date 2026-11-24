@@ -81,7 +81,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "implemented",
     "notes": "Exactly one clay or stone room orthogonally adjacent to both a field and a pasture holds one more person."
   }
 }

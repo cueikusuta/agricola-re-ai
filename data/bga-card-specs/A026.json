@@ -84,7 +84,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
-    "notes": "Wish for Children spaces stay usable when one other player occupies them."
+    "implementation_status": "implemented",
+    "notes": "Wish for Children spaces stay usable when one other player occupies them. Implemented for FamilyGrowthWithRoom (the 2016 \"Basic Wish for Children\", room required) only: ModestFamilyGrowth is a distinct extra action space, not named \"wish_for_children\" in the spec vocabulary, so it is intentionally excluded (see PR notes)."
   }
 }
