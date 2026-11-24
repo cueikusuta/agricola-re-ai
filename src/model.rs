@@ -191,6 +191,14 @@ pub struct Pasture {
     pub animal: Option<Animal>,
     pub quantity: u32,
 }
+/// serde skip helper for `Player::animal_acquisition_bonus_points`: a zero
+/// total serializes as absent, so pre-A153/B154 saves stay byte-identical and
+/// the v5 state hash is unchanged (same pattern as D032's
+/// `field_goods_before_final_harvest`).
+fn animal_bonus_points_is_zero(points: &i32) -> bool {
+    *points == 0
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Player {
     pub id: usize,
@@ -207,6 +215,23 @@ pub struct Player {
     pub played_cards: Vec<String>,
     #[serde(default)]
     pub card_points: i32,
+    /// Bonus points from `AfterAnimalAcquisitionBonusPoints` cards (A153 /
+    /// B154), awarded immediately on the after-animal-acquisition trigger and
+    /// summed into the `cards` scoring category at game end. Kept separate
+    /// from `card_points` because `card_points` must equal the printed-points
+    /// sum of played cards at all times (`validate_card_points`).
+    /// `skip_serializing_if` keeps a zero total out of JSON so pre-A153/B154
+    /// saves stay byte-identical and the v5 state hash is unchanged (the
+    /// D032 `field_goods_before_final_harvest` pattern).
+    #[serde(default, skip_serializing_if = "animal_bonus_points_is_zero")]
+    pub animal_acquisition_bonus_points: i32,
+    /// Card ids for which an `AfterAnimalAcquisitionBonusPoints` bonus
+    /// (A153 豚持ち / B154 羊持ち) has already been awarded this game
+    /// (once_per_game frequency in the spec). Same skip rationale as
+    /// `animal_acquisition_bonus_points`: an empty ledger serializes as
+    /// absent, keeping legacy saves and the v5 hash stable.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub animal_acquisition_bonus_fired: BTreeSet<String>,
     #[serde(default)]
     pub pasture_capacity_bonus: u32,
     #[serde(default)]
@@ -252,6 +277,8 @@ impl Player {
             improvements: vec![],
             played_cards: vec![],
             card_points: 0,
+            animal_acquisition_bonus_points: 0,
+            animal_acquisition_bonus_fired: BTreeSet::new(),
             pasture_capacity_bonus: 0,
             free_fence_wood: 0,
             improvement_wood_discount: 0,
@@ -2538,7 +2565,12 @@ impl Game {
                         + plan.cook
                         + plan.discard,
                 )
-                .map_err(|e| format!("animal placement failed: {e}"))
+                .map_err(|e| format!("animal placement failed: {e}"))?;
+                // A153/B154: pending-resolution placement completed — the spec
+                // trigger `after_animal_acquisition` evaluates after every
+                // acquisition route.
+                crate::card_events::award_animal_acquisition_bonuses(&self.card_set, player)?;
+                Ok(())
             }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }

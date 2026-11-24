@@ -445,22 +445,43 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
-    /// D054 マスの池 (Trout Pool): at each round start, if the `space`
-    /// accumulation holds at least `min`, gain `amount` of `good` from the
-    /// general supply. Unlike A049 営巣地 (`StartRoundGainIfAccumulationGrew`)
-    /// there is no "grew this round" requirement: the printed card pays on the
-    /// standing accumulation alone. The condition is judged inside the handler
-    /// from the public accumulations map the round-start dispatcher threads
-    /// read-only through `DispatchContext` (runtime-only, never serialized);
-    /// the map is never mutated, and any dispatch path without the map grants
-    /// nothing.
-    StartRoundGainIfAccumulationAtLeast {
-        space: Space,
-        min: u32,
-        good: Good,
-        amount: u32,
-    },
-}
+            /// D054 マスの池 (Trout Pool): at each round start, if the `space`
+            /// accumulation holds at least `min`, gain `amount` of `good` from the
+            /// general supply. Unlike A049 営巣地 (`StartRoundGainIfAccumulationGrew`)
+            /// there is no "grew this round" requirement: the printed card pays on the
+            /// standing accumulation alone. The condition is judged inside the handler
+            /// from the public accumulations map the round-start dispatcher threads
+            /// read-only through `DispatchContext` (runtime-only, never serialized);
+            /// the map is never mutated, and any dispatch path without the map grants
+            /// nothing.
+            StartRoundGainIfAccumulationAtLeast {
+                space: Space,
+                min: u32,
+                good: Good,
+                amount: u32,
+            },
+            /// A153 豚持ち (Pig Owner) / B154 羊持ち (Sheep Keeper): after any animal
+            /// acquisition applied through `place_animals`, if the card owner has at
+            /// least `threshold` of `animal`, award `points` bonus points (and `food`
+            /// food when non-zero) to the owner. Re-evaluated on every acquisition
+            /// scan; awarded once per game per card (tracked on
+            /// `Player::animal_acquisition_bonus_fired`).
+            ///
+            /// Fire routes: market/accumulation spaces (`engine::execute_work`),
+            /// card-granted placement (`engine::place_animals` via on-play and the
+            /// pending-resolution path), and breeding births (`harvest::harvest`).
+            /// Each calls `card_events::award_animal_acquisition_bonuses` directly
+            /// after placement — no new event site, no serialization change.
+            ///
+            /// Serialization compatibility: appended as the final variant so that
+            /// existing variants' serialized representation is unaffected.
+            AfterAnimalAcquisitionBonusPoints {
+                animal: Animal,
+                threshold: u32,
+                points: i32,
+                food: u32,
+            },
+    }
 
 impl CardEffect {
     /// Stable public name for this implemented effect category. Used to build
@@ -512,6 +533,9 @@ impl CardEffect {
 
             CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
             CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
+            CardEffect::AfterAnimalAcquisitionBonusPoints { .. } => {
+                "after_animal_acquisition_bonus_points"
+            }
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
             CardEffect::AfterImprovementPlayedGain { .. } => "after_improvement_played_gain",
@@ -671,6 +695,15 @@ pub enum CardRequirement {
     MinimumPlayers(u8),
     MaximumPlayers(u8),
     MinimumImprovements(u8),
+    /// Strict upper bound on a species count ("fewer than N"), the mirror of
+    /// [`CardRequirement::MinimumAnimals`] (B154 羊持ち: playable only with
+    /// fewer than 7 sheep — the spec's `animal_count_less` predicate).
+    /// Appended as the final variant so existing variants' serialized
+    /// representation is unaffected.
+    AnimalCountLess {
+        animal: Animal,
+        number: u32,
+    },
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -812,7 +845,8 @@ impl CardSet {
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
-                        | CardEffect::Passive { .. } => 1,
+                        | CardEffect::Passive { .. }
+                        | CardEffect::AfterAnimalAcquisitionBonusPoints { .. } => 1,
                         #[cfg(test)]
                         CardEffect::PendingProbe { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
@@ -1391,6 +1425,9 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
                     })
                     .count()
                     >= usize::from(*number)
+            }
+            CardRequirement::AnimalCountLess { animal, number } => {
+                player.animal_count(*animal) < *number
             }
             CardRequirement::MinimumImprovements(min) => {
                 improvement_count_in_front(set, player) >= u32::from(*min)
@@ -6279,6 +6316,28 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 amount: 3,
             }],
         },
+        // A153 豚持ち (Pig Owner): after any animal acquisition, if the owner
+        // has at least 5 wild boars, +3 bonus points. Once per game.
+        // Spec eligibility (data/bga-card-specs/A153.json) is 4 players only;
+        // encoded as `MinimumPlayers(4)`, the same pattern A155/A143 use.
+        CardDefinition {
+            use_limit: None,
+            id: "A153".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::AfterAnimalAcquisitionBonusPoints {
+                    animal: Animal::Boar,
+                    threshold: 5,
+                    points: 3,
+                    food: 0,
+                },
+            ],
+        },
         // A008 食材かご (Food Basket): cost 1 reed; prerequisites 2 occupations and
         // 2 improvements in front; on play gain 1 grain and 1 vegetable.
         CardDefinition {
@@ -6551,33 +6610,62 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
-        // B153 寮長 (Housemaster): no cost, no printed points; at final
-        // scoring, sum the major-improvement scores after doubling the
-        // lowest single one (one only, even when the lowest score is tied)
-        // and take 1/2/3/4 bonus points at a doubled total of 5/7/9/11 or
-        // more (BGA Agricola card wiki; agricola.cloudfree.jp ?p=3104,
-        // cross-checked against the English list page). Only available at
-        // 4 players (spec eligibility 2/3 = no, 4 = yes); the 2/3-player
-        // registry projection drops the card through the MinimumPlayers(4)
-        // prerequisite, and no new saved field or PendingDecision is
-        // introduced.
-        CardDefinition {
-            use_limit: None,
-            id: "B153".to_owned(),
-            kind: CardKind::Occupation,
-            cost: vec![],
-            points: 0,
-            effects: vec![
-                CardEffect::Prerequisite {
-                    rule: CardRequirement::MinimumPlayers(4),
+                // B153 寮長 (Housemaster): no cost, no printed points; at final
+                // scoring, sum the major-improvement scores after doubling the
+                // lowest single one (one only, even when the lowest score is tied)
+                // and take 1/2/3/4 bonus points at a doubled total of 5/7/9/11 or
+                // more (BGA Agricola card wiki; agricola.cloudfree.jp ?p=3104,
+                // cross-checked against the English list page). Only available at
+                // 4 players (spec eligibility 2/3 = no, 4 = yes); the 2/3-player
+                // registry projection drops the card through the MinimumPlayers(4)
+                // prerequisite, and no new saved field or PendingDecision is
+                // introduced.
+                CardDefinition {
+                    use_limit: None,
+                    id: "B153".to_owned(),
+                    kind: CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![
+                        CardEffect::Prerequisite {
+                            rule: CardRequirement::MinimumPlayers(4),
+                        },
+                        CardEffect::EndGameBonus {
+                            rule: ScoreBonusRule::MajorImprovementsLowestDoubledThresholds,
+                        },
+                    ],
                 },
-                CardEffect::EndGameBonus {
-                    rule: ScoreBonusRule::MajorImprovementsLowestDoubledThresholds,
+                // B154 羊持ち (Sheep Keeper): playable only with fewer than 7 sheep
+                // (spec prerequisite `animal_count_less`); after any animal acquisition,
+                // if the owner has at least 7 sheep, +3 bonus points and 2 food.
+                // Once per game. Spec eligibility is 4 players only; encoded as
+                // `MinimumPlayers(4)`, the same pattern A155/A143 use.
+                CardDefinition {
+                    use_limit: None,
+                    id: "B154".to_owned(),
+                    kind: CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![
+                        CardEffect::Prerequisite {
+                            rule: CardRequirement::MinimumPlayers(4),
+                        },
+                        CardEffect::Prerequisite {
+                            rule: CardRequirement::AnimalCountLess {
+                                animal: Animal::Sheep,
+                                number: 7,
+                            },
+                        },
+                        CardEffect::AfterAnimalAcquisitionBonusPoints {
+                            animal: Animal::Sheep,
+                            threshold: 7,
+                            points: 3,
+                            food: 2,
+                        },
+                    ],
                 },
-            ],
-        },
-    ]
-}
+            ]
+        }
 
 /// Test module for verified_band_b_cards.
 #[cfg(test)]
