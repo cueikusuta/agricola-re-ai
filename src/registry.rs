@@ -342,6 +342,7 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms { .. }
                 | crate::cards::CardEffect::StartRoundGainIfLessonsOccupants { .. }
                 | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew { .. }
+                | crate::cards::CardEffect::StartRoundGainIfAccumulationAtLeast { .. }
                 | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
                     EventKind::RoundStart
                 }
@@ -547,6 +548,10 @@ impl CardRegistryBuilder {
                             ..
                         }
                         | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew {
+                            amount,
+                            ..
+                        }
+                        | crate::cards::CardEffect::StartRoundGainIfAccumulationAtLeast {
                             amount,
                             ..
                         }
