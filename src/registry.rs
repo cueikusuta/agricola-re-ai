@@ -325,6 +325,7 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayGainEachWithAtLeast { .. }
                 | crate::cards::CardEffect::OnPlayChoiceGain { .. }
                 | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. }
                 | crate::cards::CardEffect::PostPlayPassLeft => EventKind::CardPlayed,
@@ -488,6 +489,7 @@ impl CardRegistryBuilder {
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
                         | crate::cards::CardEffect::OnPlayGainIfHouse { amount, .. }
                         | crate::cards::CardEffect::OnPlayGainIfRoomCount { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainEachWithAtLeast { amount, .. }
                         | crate::cards::CardEffect::StartRoundGain { amount, .. }
                         | crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound {
                             amount,

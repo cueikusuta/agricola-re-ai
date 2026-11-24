@@ -58,6 +58,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // phase. Its placement plan is derived and applied via place_animals
         // (the play executor cannot represent a play-time pause).
         CardEffect::OnPlayGainAnimal { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayGainEachWithAtLeast { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -565,6 +566,13 @@ fn resolve_phase_scan(
                     handle_on_play_gain_animal(ctx, animal, *amount)?
                 }
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
+                CardEffect::OnPlayGainEachWithAtLeast {
+                    goods,
+                    threshold,
+                    amount,
+                } => {
+                    handle_on_play_gain_each_with_at_least(ctx, player, goods, *threshold, *amount)?
+                }
                 CardEffect::AfterWorkerGain {
                     space,
                     good,
@@ -1160,6 +1168,7 @@ fn effect_condition_holds(
         // On-play effects always trigger when played — condition holds immediately.
         CardEffect::OnPlayChoiceGain { .. } => true,
         CardEffect::OnPlayAddStoneToEmptyFields { .. } => true,
+        CardEffect::OnPlayGainEachWithAtLeast { .. } => true,
         // PostPlayPassLeft is pure zone-move metadata: hold trivially.
         CardEffect::PostPlayPassLeft => true,
         // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064).
@@ -1314,6 +1323,11 @@ pub fn execute_chosen_triggers(
                 handle_on_play_gain_animal(ctx, animal, *amount)?
             }
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
+            CardEffect::OnPlayGainEachWithAtLeast {
+                goods,
+                threshold,
+                amount,
+            } => handle_on_play_gain_each_with_at_least(ctx, player, goods, *threshold, *amount)?,
             CardEffect::AfterWorkerGain {
                 space,
                 good,
@@ -2082,6 +2096,27 @@ fn handle_on_play_gain_animal(
     let plan = auto_animal_plan(ctx.player, *animal, amount);
     crate::engine::place_animals(ctx.player, &plan, amount)
         .map_err(|e| format!("on-play animal placement failed: {e}"))?;
+    Ok(EffectResult::Resolved)
+}
+
+fn handle_on_play_gain_each_with_at_least(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    goods: &[Good],
+    threshold: u32,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    for good in goods {
+        if p.supply.get(*good) >= threshold {
+            let next = p
+                .supply
+                .get(*good)
+                .checked_add(amount)
+                .ok_or("resource overflow")?;
+            p.supply.set(*good, next);
+        }
+    }
     Ok(EffectResult::Resolved)
 }
 
