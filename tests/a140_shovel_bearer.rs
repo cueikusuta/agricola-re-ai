@@ -28,7 +28,7 @@ fn dispatch(
     played_by: &[usize],
     actor: usize,
     space: Space,
-    accumulations: &BTreeMap<Space, u32>,
+    accumulations: &mut BTreeMap<Space, u32>,
 ) -> Vec<Player> {
     let mut cards = CardState::default();
     let mut players = vec![Player::new(0, 0), Player::new(1, 0), Player::new(2, 0)];
@@ -58,6 +58,7 @@ fn dispatch(
         &limits,
         &mut pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .expect("dispatch_after_worker must succeed");
     players
@@ -67,13 +68,13 @@ fn dispatch(
 fn a140_normal_both_directions_via_dispatch() {
     let set = set_with_a140();
 
-    let accums = BTreeMap::from([(Space::ClayPit, 0), (Space::Hollow, 2)]);
-    let players = dispatch(&set, &[0], 0, Space::ClayPit, &accums);
+    let mut accums = BTreeMap::from([(Space::ClayPit, 0), (Space::Hollow, 2)]);
+    let players = dispatch(&set, &[0], 0, Space::ClayPit, &mut accums);
     assert_eq!(players[0].supply.food, 2, "ClayPit reads Hollow");
     assert_eq!(players[0].supply.clay, 0, "the effect grants only food");
 
-    let accums = BTreeMap::from([(Space::ClayPit, 3), (Space::Hollow, 0)]);
-    let players = dispatch(&set, &[0], 0, Space::Hollow, &accums);
+    let mut accums = BTreeMap::from([(Space::ClayPit, 3), (Space::Hollow, 0)]);
+    let players = dispatch(&set, &[0], 0, Space::Hollow, &mut accums);
     assert_eq!(players[0].supply.food, 3, "Hollow reads ClayPit");
     assert_eq!(players[0].supply.clay, 0);
 }
@@ -81,8 +82,8 @@ fn a140_normal_both_directions_via_dispatch() {
 #[test]
 fn a140_empty_other_accumulation_grants_zero() {
     let set = set_with_a140();
-    let accums = BTreeMap::from([(Space::ClayPit, 0), (Space::Hollow, 0)]);
-    let players = dispatch(&set, &[0], 0, Space::Hollow, &accums);
+    let mut accums = BTreeMap::from([(Space::ClayPit, 0), (Space::Hollow, 0)]);
+    let players = dispatch(&set, &[0], 0, Space::Hollow, &mut accums);
     assert_eq!(players[0].supply.food, 0);
     for good in [
         Good::Wood,
@@ -95,19 +96,19 @@ fn a140_empty_other_accumulation_grants_zero() {
         assert_eq!(players[0].supply.get(good), 0, "{good:?} must be untouched");
     }
 
-    let players = dispatch(&set, &[0], 0, Space::ClayPit, &BTreeMap::new());
+    let players = dispatch(&set, &[0], 0, Space::ClayPit, &mut BTreeMap::new());
     assert_eq!(players[0].supply.food, 0, "a missing entry is also zero");
 }
 
 #[test]
 fn a140_never_reads_the_used_side_leftover() {
     let set = set_with_a140();
-    let accums = BTreeMap::from([(Space::ClayPit, 5), (Space::Hollow, 0)]);
-    let players = dispatch(&set, &[0], 0, Space::ClayPit, &accums);
+    let mut accums = BTreeMap::from([(Space::ClayPit, 5), (Space::Hollow, 0)]);
+    let players = dispatch(&set, &[0], 0, Space::ClayPit, &mut accums);
     assert_eq!(players[0].supply.food, 0, "used-side clay is not food");
 
-    let accums = BTreeMap::from([(Space::ClayPit, 0), (Space::Hollow, 4)]);
-    let players = dispatch(&set, &[0], 0, Space::Hollow, &accums);
+    let mut accums = BTreeMap::from([(Space::ClayPit, 0), (Space::Hollow, 4)]);
+    let players = dispatch(&set, &[0], 0, Space::Hollow, &mut accums);
     assert_eq!(
         players[0].supply.food, 0,
         "mirror used-side clay is not food"
@@ -117,14 +118,14 @@ fn a140_never_reads_the_used_side_leftover() {
 #[test]
 fn a140_only_owner_and_only_matching_space_benefit() {
     let set = set_with_a140();
-    let accums = BTreeMap::from([(Space::ClayPit, 2), (Space::Hollow, 3)]);
+    let mut accums = BTreeMap::from([(Space::ClayPit, 2), (Space::Hollow, 3)]);
 
-    let players = dispatch(&set, &[0, 1], 0, Space::ClayPit, &accums);
+    let players = dispatch(&set, &[0, 1], 0, Space::ClayPit, &mut accums);
     assert_eq!(players[0].supply.food, 3);
     assert_eq!(players[1].supply.food, 0, "non-actor owner gets nothing");
     assert_eq!(players[2].supply.food, 0, "non-owner gets nothing");
 
-    let players = dispatch(&set, &[0], 0, Space::Forest, &accums);
+    let players = dispatch(&set, &[0], 0, Space::Forest, &mut accums);
     assert_eq!(
         players[0].supply.food, 0,
         "unrelated actions do not trigger"

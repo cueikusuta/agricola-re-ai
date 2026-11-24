@@ -3631,12 +3631,13 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.grain, 1);
@@ -3653,12 +3654,13 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.grain, 2);
@@ -3675,12 +3677,13 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.grain, 2);
@@ -3715,12 +3718,13 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.food, 3); // self: 3
@@ -3739,12 +3743,13 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.food, 6); // 3 + 3
@@ -3763,12 +3768,13 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.food, 6);
@@ -3939,7 +3945,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             2,
             &used,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3986,7 +3992,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             2,
             used,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -4012,7 +4018,7 @@ mod round_and_harvest_card_tests {
     }
 
     // --- A049 営巣地 (Nest Site): ReedBank >= 1 and grew -> 1 food ---
-    fn a049_round_start_food(accumulations: &std::collections::BTreeMap<Space, u32>) -> u32 {
+    fn a049_round_start_food(accumulations: &mut std::collections::BTreeMap<Space, u32>) -> u32 {
         use crate::card_events::dispatch_start_round;
         use crate::cards::CardState;
         use std::collections::BTreeMap;
@@ -4050,17 +4056,17 @@ mod round_and_harvest_card_tests {
     #[test]
     fn a049_gains_food_when_the_reed_bank_refill_lands_on_a_non_empty_bank() {
         // Positive: 2 reeds = this round's refill landed on a non-empty bank.
-        let grew = std::collections::BTreeMap::from([(Space::ReedBank, 2)]);
-        assert_eq!(a049_round_start_food(&grew), 1);
+        let mut grew = std::collections::BTreeMap::from([(Space::ReedBank, 2)]);
+        assert_eq!(a049_round_start_food(&mut grew), 1);
         // Boundary/positive: multi-round untouched growth also fires.
-        let grew_more = std::collections::BTreeMap::from([(Space::ReedBank, 4)]);
-        assert_eq!(a049_round_start_food(&grew_more), 1);
+        let mut grew_more = std::collections::BTreeMap::from([(Space::ReedBank, 4)]);
+        assert_eq!(a049_round_start_food(&mut grew_more), 1);
         // Negative: 1 reed means the refill landed on an empty bank.
-        let fresh = std::collections::BTreeMap::from([(Space::ReedBank, 1)]);
-        assert_eq!(a049_round_start_food(&fresh), 0);
+        let mut fresh = std::collections::BTreeMap::from([(Space::ReedBank, 1)]);
+        assert_eq!(a049_round_start_food(&mut fresh), 0);
         // Negative: empty bank (accumulation_at_least unmet).
-        let empty = std::collections::BTreeMap::new();
-        assert_eq!(a049_round_start_food(&empty), 0);
+        let mut empty = std::collections::BTreeMap::new();
+        assert_eq!(a049_round_start_food(&mut empty), 0);
     }
 
     // --- C067 ミネラルフィーダー (Mineral Feeder): non-harvest round +
@@ -4097,7 +4103,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             round,
             &used,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -6688,12 +6694,13 @@ mod verified_b_afterworker_simple_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         *player = players[0].clone();
@@ -6794,12 +6801,13 @@ mod verified_b_afterworker_simple_tests {
             &mut well,
             5, // round 5
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // Food scheduled on rounds 6, 7, 8
@@ -6832,12 +6840,13 @@ mod verified_b_afterworker_simple_tests {
             &mut well,
             5,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         used_spaces.clear();
@@ -6852,12 +6861,13 @@ mod verified_b_afterworker_simple_tests {
             &mut well,
             5,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // Each use schedules 3 food, so 2 uses = 6 food on each of rounds 6,7,8
@@ -6866,6 +6876,85 @@ mod verified_b_afterworker_simple_tests {
         assert_eq!(well.get(&8), Some(&vec![0, 0]));
     }
 
+    // P1-2 (PR #425 Round 1 review): a card-scheduled well reservation must
+    // land in BOTH `delayed_well` (the source of truth) and the public mirror
+    // `well_food_schedule` (PR #265 Finding A — buy_improvement writes both),
+    // and `start_round` must grant the real food from the source of truth.
+    #[test]
+    fn b047_schedule_writes_both_well_maps_and_grants_food() {
+        use crate::model::{Config, Game};
+
+        let s = set();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("B047".into());
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        let mut well = BTreeMap::new();
+        let mut mirror = BTreeMap::new();
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5, // round 5 -> reserves rounds 6, 7, 8
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut mirror,
+        )
+        .unwrap();
+
+        // Both maps carry the identical reservation (no public-only divergence).
+        for round in [6u8, 7, 8] {
+            assert_eq!(
+                well.get(&round),
+                Some(&vec![0]),
+                "delayed_well must hold round {round}"
+            );
+            assert_eq!(
+                mirror.get(&round),
+                Some(&vec![0]),
+                "public mirror must hold round {round}"
+            );
+        }
+        assert_eq!(well, mirror, "mirror must equal the source of truth");
+
+        // start_round grants the real food from the source of truth and consumes
+        // both entries (same pattern as
+        // mcts::tests::start_round_preserves_well_and_card_limits).
+        let mut game = Game::with_cards(
+            Config {
+                seed: 7,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+        game.public.round = 5;
+        game.delayed_well = well;
+        game.public.well_food_schedule = mirror;
+        let food_before = game.public.players[0].supply.food;
+        game.start_round().expect("start_round must succeed");
+        assert_eq!(game.public.round, 6);
+        assert_eq!(
+            game.public.players[0].supply.food,
+            food_before + 1,
+            "the reserved well food must be granted when round 6 starts"
+        );
+        assert!(!game.delayed_well.contains_key(&6));
+        assert!(!game.public.well_food_schedule.contains_key(&6));
+    }
     #[test]
     fn b047_not_triggered_by_other_spaces() {
         let s = set();
@@ -6888,12 +6977,13 @@ mod verified_b_afterworker_simple_tests {
             &mut well,
             5,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert!(well.is_empty());
@@ -7008,12 +7098,13 @@ mod verified_b_afterworker_simple_tests {
             &mut well,
             5, // round 5
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // Food scheduled on rounds 6, 7, 8, 9, 10, 11
@@ -7049,12 +7140,13 @@ mod verified_b_afterworker_simple_tests {
             &mut well,
             5,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert!(well.is_empty(), "no food scheduled when grain not paid");
@@ -7085,12 +7177,13 @@ mod verified_b_afterworker_simple_tests {
             &mut well,
             12,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(well.get(&13), Some(&vec![0]));
@@ -7122,12 +7215,13 @@ mod verified_b_afterworker_simple_tests {
             &mut well,
             5,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert!(well.is_empty());

@@ -472,12 +472,13 @@ impl Game {
             &mut self.delayed_well,
             self.public.round,
             &self.public.used,
-            &self.public.accumulations,
+            &mut self.public.accumulations,
             &mut self.event_budget,
             &mut self.public.card_uses,
             &self.card_use_limits,
             &mut self.pending,
             allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
+            &mut self.public.well_food_schedule,
         )?;
         if let Transition::Paused(_) = result {
             return Ok((result, Some(crate::pending::ChainStep::AfterWorker)));

@@ -136,9 +136,19 @@ pub struct DispatchContext<'a> {
     /// round-start dispatcher for accumulation-grew conditions (A049 営巣地)
     /// and by the after-worker dispatcher for dynamic-count effects
     /// (A140 ショベル運搬人 reads the OTHER clay accumulation). `None` on
-    /// every other dispatch path. This is a runtime-only borrow: the struct
-    /// is never serialized, so save/observation formats are untouched.
-    pub accumulations: Option<&'a std::collections::BTreeMap<Space, u32>>,
+    /// every other dispatch path. Writable because B017 森林鋤 returns the
+    /// paid wood to the used accumulation space (spec `return_to:
+    /// accumulation_space`); read-only consumers just borrow through it.
+    /// Runtime-only borrow: the struct is never serialized, so
+    /// save/observation formats are untouched.
+    pub accumulations: Option<&'a mut std::collections::BTreeMap<Space, u32>>,
+    /// Public mirror of `delayed_well` (PR #265 Finding A: `delayed_well` is the
+    /// private source of truth, `PublicState::well_food_schedule` its public
+    /// mirror). Provided by the after-worker dispatcher, whose handlers can
+    /// schedule well food (B047/B060); `None` on dispatch paths that cannot
+    /// fire those effects. Handlers that reserve well food write BOTH maps so
+    /// observations (MCTS, save/restore) stay in sync with the source of truth.
+    pub well_food_schedule: Option<&'a mut BTreeMap<u8, Vec<usize>>>,
     pub event_budget: &'a mut u32,
     pub card_uses: &'a mut BTreeMap<String, u32>,
     /// Declared per-card limits. Absent card = no per-period limit.
@@ -437,7 +447,8 @@ fn resolve_phase_scan(
             delayed_well: ctx.delayed_well,
             round: ctx.round,
             used_spaces: ctx.used_spaces,
-            accumulations: ctx.accumulations,
+            accumulations: ctx.accumulations.as_deref_mut(),
+            well_food_schedule: ctx.well_food_schedule.as_deref_mut(),
             event_budget: ctx.event_budget,
             card_uses: ctx.card_uses,
             card_use_limits: ctx.card_use_limits,
@@ -2065,6 +2076,7 @@ fn handle_after_worker_gain_other_accumulation_food(
     };
     let amount = ctx
         .accumulations
+        .as_deref()
         .and_then(|map| map.get(&other).copied())
         .unwrap_or(0);
     if amount == 0 {
@@ -2247,6 +2259,13 @@ fn handle_after_worker_schedule_food(
     if trigger.space == Some(*space) {
         let current_round = ctx.round;
         let beneficiary = ctx.beneficiary;
+        // PR #265 Finding A: delayed_well is the source of truth, but the
+        // public mirror must carry the same reservation (buy_improvement
+        // writes both; a card-scheduled reservation is no different).
+        let mirror = ctx
+            .well_food_schedule
+            .as_mut()
+            .ok_or("after-worker well schedule requires the public mirror")?;
         for i in 1..=rounds {
             let target_round = current_round + i as u8;
             if target_round <= 14 {
@@ -2254,6 +2273,7 @@ fn handle_after_worker_schedule_food(
                     .entry(target_round)
                     .or_default()
                     .push(beneficiary);
+                mirror.entry(target_round).or_default().push(beneficiary);
             }
         }
     }
@@ -2304,9 +2324,14 @@ fn handle_after_worker_pay_to_schedule_food(
                 .checked_sub(pay_amount)
                 .ok_or("resource underflow")?;
             p.supply.set(*pay_good, next);
-            // Schedule food
+            // Schedule food — PR #265 Finding A: write source of truth AND
+            // public mirror (buy_improvement pattern).
             let current_round = ctx.round;
             let beneficiary = ctx.beneficiary;
+            let mirror = ctx
+                .well_food_schedule
+                .as_mut()
+                .ok_or("after-worker well schedule requires the public mirror")?;
             for i in 1..=rounds {
                 let target_round = current_round + i as u8;
                 if target_round <= 14 {
@@ -2314,6 +2339,7 @@ fn handle_after_worker_pay_to_schedule_food(
                         .entry(target_round)
                         .or_default()
                         .push(beneficiary);
+                    mirror.entry(target_round).or_default().push(beneficiary);
                 }
             }
         }
@@ -2625,6 +2651,7 @@ fn handle_start_round_gain_if_accumulation_grew(
 ) -> Result<EffectResult, String> {
     let current = ctx
         .accumulations
+        .as_deref()
         .and_then(|map| map.get(&space).copied())
         .unwrap_or(0);
     let per_round = space.accumulation().map(|(_, n)| n).unwrap_or(0);
@@ -3117,6 +3144,7 @@ fn handle_start_round_gain_if_goods_on_round_spaces(
     // in (`None` elsewhere), so the Option gates the check naturally.
     let has_round_space_goods = trigger_data.revealed_round_cards.iter().any(|card| {
         ctx.accumulations
+            .as_deref()
             .is_some_and(|map| map.get(&Space::from(*card)).is_some_and(|&n| n > 0))
     });
     if has_round_space_goods {
@@ -3221,6 +3249,7 @@ pub fn dispatch_play(
         round,
         used_spaces,
         accumulations: None,
+        well_food_schedule: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3520,15 +3549,20 @@ pub fn dispatch_after_worker(
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     // Public space accumulations (space -> amount) as they stand after the
-    // core action resolved, threaded read-only for dynamic-count effects
-    // (A140 ショベル運搬人 reads the OTHER clay accumulation). Runtime-only
-    // borrow: the dispatcher never mutates or serializes it.
-    accumulations: &std::collections::BTreeMap<Space, u32>,
+    // core action resolved, threaded read-write: A140 ショベル運搬人 reads the
+    // OTHER clay accumulation and B017 森林鋤 returns the paid wood to the used
+    // space. Runtime-only borrow: the dispatcher never serializes it.
+    accumulations: &mut std::collections::BTreeMap<Space, u32>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
     allow_choose_trigger_order_pause: bool,
+    // Public mirror of `delayed_well` (PR #265 Finding A: `delayed_well` is
+    // the private source of truth, `PublicState::well_food_schedule` its
+    // public mirror). Handlers that schedule well food (B047/B060) write BOTH
+    // maps; the dispatcher forwards this into `DispatchContext`.
+    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
 ) -> Result<Transition, String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
@@ -3557,6 +3591,7 @@ pub fn dispatch_after_worker(
         round,
         used_spaces,
         accumulations: Some(accumulations),
+        well_food_schedule: Some(well_food_schedule),
         event_budget,
         card_uses,
         card_use_limits,
@@ -3608,6 +3643,7 @@ pub fn dispatch_after_worker(
         round,
         used_spaces,
         accumulations: Some(accumulations),
+        well_food_schedule: Some(well_food_schedule),
         event_budget,
         card_uses,
         card_use_limits,
@@ -3640,7 +3676,7 @@ pub fn dispatch_start_round(
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
-    accumulations: &std::collections::BTreeMap<Space, u32>,
+    accumulations: &mut std::collections::BTreeMap<Space, u32>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
@@ -3661,6 +3697,7 @@ pub fn dispatch_start_round(
             round,
             used_spaces,
             accumulations: Some(accumulations),
+            well_food_schedule: None,
             event_budget,
             card_uses,
             card_use_limits,
@@ -3743,6 +3780,7 @@ pub fn dispatch_after_clay_construction(
         round,
         used_spaces,
         accumulations: None,
+        well_food_schedule: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3819,6 +3857,7 @@ pub fn dispatch_harvest_field(
         round,
         used_spaces,
         accumulations: None,
+        well_food_schedule: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3897,6 +3936,7 @@ pub fn dispatch_after_harvest_complete(
         round,
         used_spaces,
         accumulations: None,
+        well_food_schedule: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3966,6 +4006,7 @@ pub fn dispatch_after_harvest_bake(
         round,
         used_spaces,
         accumulations: None,
+        well_food_schedule: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -4449,12 +4490,13 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -4496,7 +4538,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -4549,7 +4591,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -4697,12 +4739,13 @@ mod tests {
                 &mut well,
                 1,
                 &used,
-                &std::collections::BTreeMap::new(),
+                &mut std::collections::BTreeMap::new(),
                 &mut c.budget,
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
                 false, // test: not post-work chain
+                &mut std::collections::BTreeMap::new(),
             )
             .unwrap();
             assert_eq!(
@@ -4740,7 +4783,7 @@ mod tests {
             &mut well,
             2,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -4950,12 +4993,13 @@ mod tests {
                     &mut well,
                     1,
                     &used,
-                    &std::collections::BTreeMap::new(),
+                    &mut std::collections::BTreeMap::new(),
                     &mut c.budget,
                     &mut c.uses,
                     &c.limits,
                     &mut pending,
                     false, // test: not post-work chain
+                    &mut std::collections::BTreeMap::new(),
                 )
                 .unwrap();
 
@@ -4994,7 +5038,7 @@ mod tests {
                 &mut well,
                 round,
                 &std::collections::BTreeSet::new(),
-                &std::collections::BTreeMap::new(),
+                &mut std::collections::BTreeMap::new(),
                 &mut c.budget,
                 &mut c.uses,
                 &c.limits,
@@ -5250,7 +5294,7 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -5314,7 +5358,7 @@ mod tests {
             &mut BTreeMap::new(),
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -5375,12 +5419,13 @@ mod tests {
             &mut well,
             1,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         );
 
         // The chain should pause with a pending decision
@@ -5465,12 +5510,13 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -5502,12 +5548,13 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -5568,12 +5615,13 @@ mod tests {
             &mut well,
             1,
             &used_spaces,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -5603,12 +5651,13 @@ mod tests {
             &mut well,
             1,
             &used_spaces,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -5662,7 +5711,7 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -5692,7 +5741,7 @@ mod tests {
             &mut well,
             2,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -5767,12 +5816,13 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -5809,12 +5859,13 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -6680,7 +6731,7 @@ mod tests {
                 &mut well,
                 round,
                 &BTreeSet::new(),
-                &std::collections::BTreeMap::new(),
+                &mut std::collections::BTreeMap::new(),
                 &mut c.budget,
                 &mut c.uses,
                 &c.limits,
@@ -6859,7 +6910,7 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut used = std::collections::BTreeSet::new();
-        let accumulations = BTreeMap::new();
+        let mut accumulations = BTreeMap::new();
         used.insert(Space::DayLaborer);
         let mut pending = None;
         dispatch_after_worker(
@@ -6872,12 +6923,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &accumulations,
+            &mut accumulations,
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -7520,12 +7572,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // C106 has HarvestFieldGain (VegetablesHarvested) which should ONLY fire
@@ -7562,12 +7615,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // B057 has StartRoundGain which should ONLY fire on round start, NOT on
@@ -7603,12 +7657,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // C111 has StartRoundGainIfFoodAtLeastRound which should ONLY fire on
@@ -7646,12 +7701,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // B118 has 2 rooms by default; the event_kind check prevents firing.
@@ -7686,12 +7742,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -7736,12 +7793,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // B050 has HarvestFieldGain (Animals) which should ONLY fire on harvest
@@ -7789,12 +7847,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -7836,12 +7895,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -7883,12 +7943,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -7924,12 +7985,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -7971,12 +8033,13 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -8047,7 +8110,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -8172,7 +8235,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -8206,7 +8269,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -8289,7 +8352,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,

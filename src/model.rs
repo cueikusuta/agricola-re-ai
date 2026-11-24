@@ -1422,7 +1422,7 @@ impl Game {
                 &mut self.delayed_well,
                 self.public.round,
                 &self.public.used,
-                &self.public.accumulations,
+                &mut self.public.accumulations,
                 &mut self.event_budget,
                 &mut self.public.card_uses,
                 &self.card_use_limits,
@@ -1826,6 +1826,7 @@ impl Game {
         let mut players = next.public.players.clone();
         let mut improvement_market = next.public.improvement_market.clone();
         let mut delayed_well = next.delayed_well.clone();
+        let mut well_food_schedule = next.public.well_food_schedule.clone();
         let round = next.public.round;
         let used_spaces = next.public.used.clone();
         let mut event_budget = next.event_budget;
@@ -1866,6 +1867,7 @@ impl Game {
                             delayed_well: &mut delayed_well,
                             round,
                             used_spaces: &used_spaces,
+                            well_food_schedule: Some(&mut well_food_schedule),
                             accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
@@ -1925,6 +1927,7 @@ impl Game {
                             next.cards = cards;
                             next.public.improvement_market = improvement_market;
                             next.delayed_well = delayed_well;
+                            next.public.well_food_schedule = well_food_schedule;
                             next.event_budget = event_budget;
                             next.public.card_uses = card_uses;
                             return self.commit_second_pause(
@@ -1975,6 +1978,7 @@ impl Game {
                             next.cards = cards;
                             next.public.improvement_market = improvement_market;
                             next.delayed_well = delayed_well;
+                            next.public.well_food_schedule = well_food_schedule;
                             next.event_budget = event_budget;
                             next.public.card_uses = card_uses;
                             return self.commit_second_pause(
@@ -2001,6 +2005,7 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
+                        well_food_schedule: Some(&mut well_food_schedule),
                         round,
                         accumulations: None,
                         used_spaces: &used_spaces,
@@ -2059,6 +2064,7 @@ impl Game {
                         next.cards = cards;
                         next.public.improvement_market = improvement_market;
                         next.delayed_well = delayed_well;
+                        next.public.well_food_schedule = well_food_schedule;
                         next.event_budget = event_budget;
                         next.public.card_uses = card_uses;
                         return self.commit_second_pause(
@@ -2115,9 +2121,10 @@ impl Game {
                         delayed_well: &mut delayed_well,
                         // A140 ショベル運搬人 reads the OTHER clay accumulation
                         // at resolution time; the paused state already reflects
+                        well_food_schedule: Some(&mut well_food_schedule),
                         // the core action's take, so the current public map is
                         // exactly what the original dispatch saw.
-                        accumulations: Some(&next.public.accumulations),
+                        accumulations: Some(&mut next.public.accumulations),
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -2175,6 +2182,7 @@ impl Game {
                         next.cards = cards;
                         next.public.improvement_market = improvement_market;
                         next.delayed_well = delayed_well;
+                        next.public.well_food_schedule = well_food_schedule;
                         next.event_budget = event_budget;
                         next.public.card_uses = card_uses;
                         return self.commit_second_pause(
@@ -2230,6 +2238,7 @@ impl Game {
         next.cards = cards;
         next.public.improvement_market = improvement_market;
         next.delayed_well = delayed_well;
+        next.public.well_food_schedule = well_food_schedule;
         next.event_budget = event_budget;
         next.public.card_uses = card_uses;
         next.pending = pending; // Should remain None
@@ -2471,10 +2480,11 @@ impl Game {
                     round: self.public.round,
                     used_spaces: &self.public.used,
                     // A140 ショベル運搬人 reads the OTHER clay accumulation
+                    well_food_schedule: Some(&mut self.public.well_food_schedule),
                     // at resolution time; the paused state was committed after
                     // the core action's take, so the current public map holds
                     // exactly the amounts the original scan saw.
-                    accumulations: Some(&self.public.accumulations),
+                    accumulations: Some(&mut self.public.accumulations),
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,
