@@ -966,6 +966,7 @@ CARDS = {
                    order=1),
         ],
         "notes": "1/3/4+ sheep give 2/3/4 food and 1/2/3+ cattle give 2/3/4 food.",
+        "implementation_status": "tested",
         "tests": [
             case("A057-normal", {"sheep": 3, "cattle": 2}, {"play": "A057"},
                  {"food_delta": 6}),

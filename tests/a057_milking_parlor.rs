@@ -139,8 +139,8 @@ fn a057_prerequisite_unused_farmyard_spaces() {
     // A stable on an empty space counts as used: with rooms everywhere else,
     // four stables on the only four empty cells leave 0 unused spaces.
     let mut player = player_with_farm(2, &empties);
-    for i in 6..=14 {
-        player.farm[i] = Cell {
+    for cell in player.farm.iter_mut().take(15).skip(6) {
+        *cell = Cell {
             tile: Tile::Room,
             stable: false,
             stable_animal: None,
@@ -352,8 +352,8 @@ fn a057_engine_play_grants_food_via_meeting_place() {
 fn a057_engine_play_fails_when_prerequisite_or_cost_unmet() {
     // Prerequisite unmet: 11 rooms leaves 3 unused spaces.
     let (mut game, _set) = a057_engine_game();
-    for i in 1..=11 {
-        game.public.players[0].farm[i] = Cell {
+    for cell in game.public.players[0].farm.iter_mut().take(12).skip(1) {
+        *cell = Cell {
             tile: Tile::Room,
             stable: false,
             stable_animal: None,
@@ -376,8 +376,8 @@ fn a057_engine_play_fails_when_prerequisite_or_cost_unmet() {
 
     // Cost unmet on a fresh farm.
     let (mut game, _set) = a057_engine_game();
-    for i in 0..15 {
-        game.public.players[0].farm[i] = Cell {
+    for cell in game.public.players[0].farm.iter_mut().take(15) {
+        *cell = Cell {
             tile: Tile::Empty,
             stable: false,
             stable_animal: None,
@@ -403,11 +403,12 @@ fn a057_engine_play_fails_when_prerequisite_or_cost_unmet() {
 
 // ---------------- Save/load/replay integrity ----------------
 
-/// Seat 0 script (no deck-order assumption: the SheepMarket round depends on
-/// the seed/shuffle):
-/// - R0: Forest (wood 3), then build a stable on cell 1 (wood 2).
-/// - First round with SheepMarket revealed: take 1 sheep into the stable
-///   (the market accumulation is exactly 1 on its reveal round).
+/// Seat 0 script (deterministic for the fixed seed/2 players used by this
+/// test; no deck-order assumption beyond the SheepMarket accumulation check):
+/// - Gather wood (Forest), then build a stable on cell 1 exactly once
+///   (wood 2). The stable must exist before any sheep is taken into it.
+/// - First SheepMarket reveal with accumulation == 1: take 1 sheep into
+///   cell 1's stable.
 /// - Afterwards: MeetingPlace -> play A057 (wood 2, food +2 for the sheep).
 fn seat_zero_a057_action(game: &Game, legal: &[Space]) -> Action {
     let player = &game.public.players[0];
@@ -420,25 +421,30 @@ fn seat_zero_a057_action(game: &Game, legal: &[Space]) -> Action {
     }
     let used = &game.public.used;
     let sheep = player.animal_count(Animal::Sheep);
-    // Round 0: Forest first, then a stable.
-    if game.public.round == 0 {
-        if !used.contains(&Space::Forest) {
+    let wood = player.supply.wood;
+    let stable_done = player.farm[1].stable;
+    // Build the stable on cell 1 exactly once. Gather wood first if needed.
+    if !stable_done {
+        if wood < 2 && !used.contains(&Space::Forest) {
             return Action {
                 space: Space::Forest,
                 detail: Detail::None,
             };
         }
-        return Action {
-            space: Space::FarmExpansion,
-            detail: Detail::Build {
-                rooms: vec![],
-                stables: vec![1],
-            },
-        };
+        if legal.contains(&Space::FarmExpansion) && wood >= 2 {
+            return Action {
+                space: Space::FarmExpansion,
+                detail: Detail::Build {
+                    rooms: vec![],
+                    stables: vec![1],
+                },
+            };
+        }
     }
     // First revealed SheepMarket: accumulation is exactly 1 -> one sheep into
-    // the stable at cell 1.
+    // the stable at cell 1 (only once the stable exists).
     if sheep == 0
+        && stable_done
         && legal.contains(&Space::SheepMarket)
         && game.public.animal_accumulations.get(&Space::SheepMarket) == Some(&1)
     {
@@ -455,7 +461,7 @@ fn seat_zero_a057_action(game: &Game, legal: &[Space]) -> Action {
         };
     }
     // Play A057 once we own sheep and can afford the wood cost.
-    if sheep > 0 && legal.contains(&Space::MeetingPlace) && player.supply.wood >= 2 {
+    if sheep > 0 && legal.contains(&Space::MeetingPlace) && wood >= 2 {
         return Action {
             space: Space::MeetingPlace,
             detail: Detail::PlayMinor {
@@ -463,8 +469,7 @@ fn seat_zero_a057_action(game: &Game, legal: &[Space]) -> Action {
             },
         };
     }
-    // Second action of a round: never reuse a space. Forest first, else any
-    // plain space.
+    // Filler: gather wood first, then any basic space, else DayLaborer.
     if !used.contains(&Space::Forest) {
         return Action {
             space: Space::Forest,
