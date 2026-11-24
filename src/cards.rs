@@ -695,6 +695,26 @@ pub enum ScoreBonusRule {
     /// major improvements. Appended at the enum tail so existing serde
     /// variants and saved-game bytes are unchanged.
     MajorImprovementsBottomRowThresholds,
+    /// C031 書斎 (Writing Chamber): bonus points equal to the total negative
+    /// points of the canonical scoring table, capped at the stored amount
+    /// (7 on the printed card). The negative total sums the negative
+    /// category values (empty category rows, unused farm spaces, begging
+    /// markers); positive categories never offset it, and the bonus never
+    /// cancels the negatives themselves — it is added as a separate
+    /// `card_bonus` entry by `score_with_cards`. Appended at the enum tail
+    /// so existing serde variants and saved-game bytes are unchanged.
+    NegativePointsTotalCapped(u32),
+    /// C033 緑化計画 (Greening Plan): 1/2/3/5 bonus points when the final
+    /// farm holds 2/4/5/6+ empty fields. An empty field is a plowed field
+    /// without a crop that carries no C006 石取り作業 stones (stones count
+    /// the field as cultivated until the next field phase), mirroring the
+    /// empty-field judgment of `sown_field_count`; unused farmyard spaces
+    /// (`Tile::Empty`) are not fields and never count. Tiered semantics
+    /// mirror E107's `FieldCountThresholds`: the amount of the highest
+    /// threshold reached, so 3 empty fields stay on the 2-field tier.
+    /// Appended at the enum tail so existing serde variants and saved-game
+    /// bytes are unchanged.
+    EmptyFieldsTiered,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1821,6 +1841,47 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         3 => 2,
                         4 => 5,
                         n if n >= 5 => 8,
+                        _ => 0,
+                    }
+                }
+                ScoreBonusRule::NegativePointsTotalCapped(cap) => {
+                    // C031 書斎 (Writing Chamber): read the canonical scoring
+                    // table (score.rs is the single source of truth) and sum
+                    // only the negative category values: empty category rows,
+                    // unused farm spaces (-1 each) and begging markers (-3
+                    // each). Positive categories never offset the negative
+                    // total, and this bonus never cancels the negatives
+                    // themselves — `score_with_cards` adds it as a separate
+                    // card_bonus entry.
+                    let categories = &crate::score::score(player).categories;
+                    let negative_total: i32 = categories
+                        .values()
+                        .filter(|value| **value < 0)
+                        .map(|value| -*value)
+                        .sum();
+                    negative_total.min(*cap as i32)
+                }
+                ScoreBonusRule::EmptyFieldsTiered => {
+                    // C033 緑化計画 (Greening Plan): empty fields are plowed
+                    // fields without a crop that carry no C006 stones (stones
+                    // count the field as cultivated until the next field
+                    // phase, the same judgment `sown_field_count` uses).
+                    // Unused farmyard spaces (Tile::Empty) are not fields.
+                    // Tiers: 2/4/5/6+ empty fields -> 1/2/3/5 points, with
+                    // 3 fields staying on the 2-field tier.
+                    let empty_fields = player
+                        .farm
+                        .iter()
+                        .filter(|cell| {
+                            matches!(cell.tile, Tile::Field { crop: None, .. })
+                                && cell.field_stones == 0
+                        })
+                        .count();
+                    match empty_fields {
+                        n if n >= 6 => 5,
+                        5 => 3,
+                        4 => 2,
+                        2 | 3 => 1,
                         _ => 0,
                     }
                 }
@@ -4886,6 +4947,29 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 },
                 CardEffect::PostPlayPassLeft,
             ],
+        ),
+        // C031 書斎 (Writing Chamber): cost 2 wood; at scoring, bonus points
+        // equal to the total negative points of the scoring table, capped at
+        // 7 (BGA spec C031: end_scoring gain_points
+        // min[count negative_points_total, 7]).
+        card(
+            "C031",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 2)],
+            vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::NegativePointsTotalCapped(7),
+            }],
+        ),
+        // C033 緑化計画 (Greening Plan): cost 3 food; at scoring, 1/2/3/5
+        // bonus points for 2/4/5/6+ empty fields (BGA spec C033: end_scoring
+        // gain_points custom empty_fields_tiered_bonus).
+        card(
+            "C033",
+            CardKind::MinorImprovement,
+            vec![(Good::Food, 3)],
+            vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::EmptyFieldsTiered,
+            }],
         ),
     ]
 }
