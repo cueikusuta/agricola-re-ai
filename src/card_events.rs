@@ -1877,6 +1877,25 @@ fn handle_passive(
         }
         crate::cards::PassiveRule::StoneDiscount(n) => p.stone_cost_discount += n,
         crate::cards::PassiveRule::HousingSpace(n) => p.extra_housing += n,
+        crate::cards::PassiveRule::FirstRenovationStoneDiscount {
+            min_wooden_rooms,
+            discount,
+            direct_to_stone,
+        } => {
+            let params = crate::model::FirstRenovationStoneDiscount {
+                min_wooden_rooms: *min_wooden_rooms,
+                discount: *discount,
+                direct_to_stone: *direct_to_stone,
+            };
+            p.first_renovation_stone = match p.first_renovation_stone {
+                None => Some(params),
+                Some(existing) => Some(crate::model::FirstRenovationStoneDiscount {
+                    min_wooden_rooms: existing.min_wooden_rooms.min(params.min_wooden_rooms),
+                    discount: existing.discount.saturating_add(params.discount),
+                    direct_to_stone: existing.direct_to_stone || params.direct_to_stone,
+                }),
+            };
+        }
     }
     Ok(EffectResult::Resolved)
 }
@@ -3855,6 +3874,27 @@ pub mod legacy {
                     }
                     crate::cards::PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                     crate::cards::PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                    crate::cards::PassiveRule::FirstRenovationStoneDiscount {
+                        min_wooden_rooms,
+                        discount,
+                        direct_to_stone,
+                    } => {
+                        let params = crate::model::FirstRenovationStoneDiscount {
+                            min_wooden_rooms: *min_wooden_rooms,
+                            discount: *discount,
+                            direct_to_stone: *direct_to_stone,
+                        };
+                        player.first_renovation_stone = match player.first_renovation_stone {
+                            None => Some(params),
+                            Some(existing) => Some(crate::model::FirstRenovationStoneDiscount {
+                                min_wooden_rooms: existing
+                                    .min_wooden_rooms
+                                    .min(params.min_wooden_rooms),
+                                discount: existing.discount.saturating_add(params.discount),
+                                direct_to_stone: existing.direct_to_stone || params.direct_to_stone,
+                            }),
+                        };
+                    }
                 },
                 _ => {}
             }

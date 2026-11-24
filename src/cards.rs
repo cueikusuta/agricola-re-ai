@@ -1,7 +1,9 @@
 //! Card-set metadata is supplied by callers; copyrighted card text is never bundled.
 //! This is a deliberately small deterministic effect vocabulary, not a claim that
 //! the full Agricola Revised deck has been implemented.
-use crate::model::{Animal, Crop, Good, House, Improvement, Player, Space, Tile};
+use crate::model::{
+    Animal, Crop, FirstRenovationStoneDiscount, Good, House, Improvement, Player, Space, Tile,
+};
 use crate::registry::{
     build_default_registry, card_set_from_pool, card_set_from_registry, CardId, CardPool,
     CardRegistry,
@@ -586,6 +588,14 @@ pub enum PassiveRule {
     MajorStoneDiscountByRooms,
     StoneDiscount(u32),
     HousingSpace(u8),
+    /// C013 木製スライドハンマー (Wood Slide Hammer): first renovation from
+    /// a wooden house with at least `min_wooden_rooms` rooms may go directly
+    /// to stone paying `discount` less stone. Separate from `StoneDiscount`.
+    FirstRenovationStoneDiscount {
+        min_wooden_rooms: u32,
+        discount: u32,
+        direct_to_stone: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1517,6 +1527,27 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 }
                 PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                PassiveRule::FirstRenovationStoneDiscount {
+                    min_wooden_rooms,
+                    discount,
+                    direct_to_stone,
+                } => {
+                    let params = FirstRenovationStoneDiscount {
+                        min_wooden_rooms: *min_wooden_rooms,
+                        discount: *discount,
+                        direct_to_stone: *direct_to_stone,
+                    };
+                    player.first_renovation_stone = match player.first_renovation_stone {
+                        None => Some(params),
+                        Some(existing) => Some(FirstRenovationStoneDiscount {
+                            min_wooden_rooms: existing
+                                .min_wooden_rooms
+                                .min(params.min_wooden_rooms),
+                            discount: existing.discount.saturating_add(params.discount),
+                            direct_to_stone: existing.direct_to_stone || params.direct_to_stone,
+                        }),
+                    };
+                }
             },
             CardEffect::OnPlayAddStoneToEmptyFields { good: _, amount } => {
                 for cell in &mut player.farm {
@@ -4176,6 +4207,16 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
             vec![],
             PassiveRule::RoomCost(3),
         ),
+        card(
+            "C013",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1)],
+            PassiveRule::FirstRenovationStoneDiscount {
+                min_wooden_rooms: 5,
+                discount: 2,
+                direct_to_stone: true,
+            },
+        ),
     ]
 }
 #[cfg(test)]
@@ -4515,11 +4556,12 @@ mod simple_occupation_tests {
             .filter(|x| x.kind == CardKind::MinorImprovement)
             .count();
         // B114/A049/C067 (StartRoundGainIf* wave) join the two-player preset;
-        // A157 stays out (4 players only), so the count is 41 + 3 = 44
-        // (occupations 18 + 1, minors 23 + 2).
-        assert_eq!(total, 44);
+        // A157 stays out (4 players only); C013 (Wood Slide Hammer) is
+        // eligible for all player counts, so the count is 44 + 1 = 45
+        // (occupations 19, minors 25 + 1).
+        assert_eq!(total, 45);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 25);
+        assert_eq!(minor, 26);
         assert!(verified_basic_card_set(3).is_err());
     }
 }
@@ -8750,12 +8792,12 @@ mod p1_2_repro_tests {
         );
         }
 
-        // 2p プリセットのハッシュは変更不可（39 defs、content_hash 不変条件）
+        // 2p プリセットのハッシュは変更不可（40 defs、content_hash 不変条件）
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
             preset.content_hash(),
-            "d92847a8d127cc236d65b7df53d4af775d62a0015d8ab099b565e2465ad0d965",
-            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067 joined the preset and A157 was excluded as 4p-only; previous pin 323dbecb after PR #385 + d3c237c9 main merge)"
+            "495479d45c64b269df0e5857b05b008ab2a9c1cf5b46a73d2f09428f1c8f498b",
+            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067 joined the preset and A157 was excluded as 4p-only; C013 added as 2p-eligible minor; previous pin 323dbecb after PR #385 + d3c237c9 main merge)"
         );
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。

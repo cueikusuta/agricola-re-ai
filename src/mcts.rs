@@ -1192,8 +1192,11 @@ mod tests {
         // preset (spec eligibility "2": "no"), pool size 38->37.
         // Updated: StartRoundGainIf* wave — B114/A049/C067 joined the
         // two-player preset (A157 stays out, 4 players only), pool size 37->41.
+        // Updated: added C013 Wood Slide Hammer to verified_passive_cards — it
+        // enters the default card pool for all player counts, shifting the
+        // sample_game distribution (intentional: C013 is implemented).
         assert_eq!(
-            digest, "310a31bdb04fa7fa2abec2a215396065daf5874819f413c6f669247f5f55deff",
+            digest, "93f50fd3813f436c7c7fd3269b4a8576c570550e3124adbd7723a1ce6e2deb06",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
