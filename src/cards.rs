@@ -5567,8 +5567,8 @@ mod verified_band_c_tests {
         assert_eq!(p.rooms(), 2);
         assert_eq!(end_game_bonus(&set, &p), 2);
         // Add 3 more rooms to reach 5 total (spec C030-normal: 5 stone rooms -> 5 points)
-        for i in 1..4 {
-            p.farm[i].tile = Tile::Room;
+        for cell in p.farm.iter_mut().skip(1).take(3) {
+            cell.tile = Tile::Room;
         }
         assert_eq!(p.rooms(), 5);
         assert_eq!(end_game_bonus(&set, &p), 5);
@@ -5582,8 +5582,8 @@ mod verified_band_c_tests {
         let mut p = Player::new(0, 0);
         p.played_cards.push("C030".into());
         // Wood house (default) has 0 stone rooms even with extra rooms
-        for i in 1..4 {
-            p.farm[i].tile = Tile::Room;
+        for cell in p.farm.iter_mut().skip(1).take(3) {
+            cell.tile = Tile::Room;
         }
         assert_eq!(p.rooms(), 5);
         assert_eq!(end_game_bonus(&set, &p), 0);
@@ -5613,8 +5613,8 @@ mod verified_band_c_tests {
         p.played_cards.push("FAKE_OTHER_STONE_HOUSE".into());
         p.played_cards.push("C030".into());
         p.house = House::Stone;
-        for i in 1..4 {
-            p.farm[i].tile = Tile::Room;
+        for cell in p.farm.iter_mut().skip(1).take(3) {
+            cell.tile = Tile::Room;
         }
         assert_eq!(p.rooms(), 5);
         // Other card applied first -> C030 yields 0
@@ -5642,8 +5642,8 @@ mod verified_band_c_tests {
         p.played_cards.push("C030".into());
         p.played_cards.push("FAKE_OTHER_STONE_HOUSE".into());
         p.house = House::Stone;
-        for i in 1..4 {
-            p.farm[i].tile = Tile::Room;
+        for cell in p.farm.iter_mut().skip(1).take(3) {
+            cell.tile = Tile::Room;
         }
         assert_eq!(p.rooms(), 5);
         // C030 applied first -> other card yields 0, total 5
