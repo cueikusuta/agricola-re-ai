@@ -87,7 +87,7 @@
   ],
   "checked_by": "BGA wiki cross-check (JA and EN pages)",
   "checked_on": "2026-11-14",
-  "implementation_status": "not_started",
+  "implementation_status": "in_progress",
   "notes": "1 bonus point per vegetable harvested while all farmyard spaces are used (farmyard_all_used + vegetable_taken_from_field precedent B058). Ban status 'strong' recorded as metadata. Third-party BGA wiki check only; not official Lookout verification."
  }
 }

@@ -104,6 +104,7 @@ pub fn score(p: &Player) -> Score {
     );
     c.insert("craft_bonus".into(), craft_bonus(p));
     c.insert("cards".into(), p.card_points);
+    c.insert("bonus_points".into(), p.bonus_points);
     c.insert("begging".into(), -(p.begging as i32) * 3);
     let total = c.values().sum();
     Score {

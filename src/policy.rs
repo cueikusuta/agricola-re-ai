@@ -656,6 +656,7 @@ fn card_priority(
                                 | CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. }
                                 | CardEffect::StartRoundExchangeForFoodAndPoints { .. }
                                 | CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => 0,
+                                CardEffect::HarvestFieldGainPointsIfFarmyardFull { .. } => 0,
                                 // B114/A157/A049/C067: conditional round-start gains
                                 // (B114 family+rooms, A157 Lessons occupants, A049
                                 // accumulation grew, C067 non-harvest + pasture
