@@ -6513,6 +6513,34 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // B037 大農場の称号 (Grange): minor improvement, no cost, 3 printed
+        // points; on play the owner gains 1 food. Uses the existing
+        // `OnPlayGain` variant only: no new effect variant, event kind or
+        // saved field (agricola.cloudfree.jp ?p=3220 + /cardlist_en/, checked
+        // 2026-11-09; data/bga-card-specs/B037.json).
+        //
+        // Hold (data/bga-card-specs/B037.json review.unresolved_fields, same
+        // pattern as B007/C005): the spec's play prerequisites (field_count
+        // n=6 + all_animal_types) are deliberately NOT enforced. The
+        // `CardRequirement` vocabulary has no bare field-tile count and no
+        // all-animal-types rule, and this chapter adds no new variant, so the
+        // play stays unguarded until a vocabulary follow-up lands. The spec
+        // test contract's `B037-not-triggered` case (play_rejected with 5
+        // field tiles / 3 animal types) is pinned engine-side as
+        // no-double-grant on later unrelated actions and on save/resume and
+        // event replay instead; see the `b037_*` tests in
+        // tests/ch03_onplay_per_count.rs.
+        CardDefinition {
+            use_limit: None,
+            id: "B037".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 3,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 1,
+            }],
+        },
         // B058 雑草掻き (Crack Weeder): cost 1 wood; on play gain 1 food, and
         // at each harvest field phase gain 1 extra food per vegetable taken
         // from the fields (BGA Agricola card wiki; agricola.cloudfree.jp
