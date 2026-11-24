@@ -445,6 +445,24 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
+    /// B059 食料箱 (Food Chest): on play, gain `major_amount` of `good` when
+    /// the play went through the Major Improvement action space and
+    /// `other_amount` of `good` through every other space (Meeting Place
+    /// "Minor Improvement" action, family growth, ...). The amount is decided
+    /// from the actual play `Space` the dispatcher received
+    /// (`dispatch_play`'s `play_space` argument) — B059 being a minor
+    /// improvement must NOT force the smaller amount, because minor
+    /// improvements are usually played through the Meeting Place. The legacy
+    /// `cards::play` / `apply_on_play_effects` helpers carry no space input,
+    /// so their space-less plays resolve the `other_amount` branch (see
+    /// `apply_on_play_effects_with_space`); a dedicated variant keeps every
+    /// existing variant's serialized shape byte-identical for saves and
+    /// content hashes.
+    OnPlayGainByImprovementActionSpace {
+        good: Good,
+        major_amount: u32,
+        other_amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -541,6 +559,9 @@ impl CardEffect {
             CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => "after_worker_gain_if_owns_animal",
             CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
                 "after_any_worker_gain_by_count_if_not_actor"
+            }
+            CardEffect::OnPlayGainByImprovementActionSpace { .. } => {
+                "on_play_gain_by_improvement_action_space"
             }
         }
     }
@@ -812,6 +833,11 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
+                        CardEffect::OnPlayGainByImprovementActionSpace {
+                            major_amount,
+                            other_amount,
+                            ..
+                        } => (*major_amount).max(*other_amount),
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
@@ -1444,7 +1470,27 @@ pub(crate) fn play_validate_pay(
 
 /// Apply on-play (Before phase) effects for a card that has been moved to played.
 /// Called by the event dispatcher after the card is in the played zone.
+/// Space-less callers (the legacy `cards::play` chain used by evaluation and
+/// policy simulations) resolve space-dependent effects at their non-major
+/// branch; see [`apply_on_play_effects_with_space`] for the space-carrying
+/// form the production play paths should prefer.
 pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Result<(), String> {
+    apply_on_play_effects_with_space(set, player, id, None)
+}
+
+/// Same as [`apply_on_play_effects`], but the caller states which action
+/// space the play went through (`play_space = None` when no space is known,
+/// e.g. a pure API simulation). The space decides B059 食料箱's gain:
+/// `Space::MajorImprovement` takes `major_amount`, every other space (or no
+/// space at all) takes `other_amount`. It is exactly the input the production
+/// `dispatch_play` receives from the engine's play arms, so the legacy and
+/// dispatcher paths decide from the same space and stay consistent.
+pub fn apply_on_play_effects_with_space(
+    set: &CardSet,
+    player: &mut Player,
+    id: &str,
+    play_space: Option<Space>,
+) -> Result<(), String> {
     let card = set.definition(id).ok_or("unknown card")?;
     for effect in &card.effects {
         match effect {
@@ -1537,6 +1583,26 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
             CardEffect::PostPlayPassLeft => {
                 // Zone-move metadata: the engine play arm performs the hand
                 // pass after the play transaction; nothing to resolve here.
+            }
+            // B059 食料箱: the gain depends on the action space the play went
+            // through (Major Improvement -> major_amount, everything else ->
+            // other_amount). Same decision rule as the dispatcher arm in
+            // card_events.rs, read from the same `play_space` input, so the
+            // legacy path and the engine path never disagree and
+            // save/load/replay keep one answer. A space-less play (`None`)
+            // is not a Major Improvement action, so it takes the smaller
+            // `other_amount` branch.
+            CardEffect::OnPlayGainByImprovementActionSpace {
+                good,
+                major_amount,
+                other_amount,
+            } => {
+                let amount = if play_space == Some(Space::MajorImprovement) {
+                    *major_amount
+                } else {
+                    *other_amount
+                };
+                safe_gain(player, *good, amount)?;
             }
             _ => {}
         }
@@ -6431,6 +6497,25 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // B059 食料箱 (Food Chest): cost 1 wood; on play gain 4 food when the
+        // play went through the Major Improvement action space, otherwise 2
+        // food (BGA Agricola card wiki; agricola.cloudfree.jp ?p=3198,
+        // cross-checked against the English list page). The space-dependent
+        // amount is one OnPlayGainByImprovementActionSpace effect decided from
+        // the actual play space, so no new variant per branch, event kind or
+        // saved field is introduced. Eligible at all player counts.
+        CardDefinition {
+            use_limit: None,
+            id: "B059".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGainByImprovementActionSpace {
+                good: Good::Food,
+                major_amount: 4,
+                other_amount: 2,
+            }],
+        },
         // B073 贈り物かご (Gift Basket): cost 1 reed, 1 VP; prerequisite: at
         // least 3 occupations played. On play, if the owner has exactly
         // 2/3/4/5 rooms, gain 1 vegetable/food/grain/vegetable. Each table
@@ -6648,7 +6733,7 @@ mod verified_band_b_tests {
         // A155 sits in the A-deck band pool rather than the B-deck one, but it
         // is covered here too: neither band pool may leak into the A/B
         // two-player preset.
-        for id in ["B122", "B142", "B144", "B058", "A155"] {
+        for id in ["B122", "B142", "B144", "B058", "B059", "A155"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
@@ -6769,6 +6854,103 @@ mod verified_band_b_tests {
         };
         harvest_field_rewards(&set, &mut q).unwrap();
         assert_eq!(q.supply.food, 0, "a non-owner never gains B058 food");
+    }
+
+    #[test]
+    fn b059_is_minor_improvement_costing_wood_one_with_no_prerequisite() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let card = set.definition("B059").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        assert!(
+            !card
+                .effects
+                .iter()
+                .any(|e| matches!(e, CardEffect::Prerequisite { .. })),
+            "B059 has no prerequisite (spec: prerequisites [])"
+        );
+        // Exactly one space-dependent on-play effect: 4 food on the Major
+        // Improvement space, 2 food elsewhere. No new variant per branch, no
+        // new event kind, no new saved field.
+        assert_eq!(
+            card.effects,
+            vec![CardEffect::OnPlayGainByImprovementActionSpace {
+                good: Good::Food,
+                major_amount: 4,
+                other_amount: 2,
+            }]
+        );
+    }
+
+    /// B059-normal: a play through the Major Improvement action space grants
+    /// 4 food. B059 is a minor improvement, but the space — not the card
+    /// kind — decides the amount, so the space-aware legacy helper must read
+    /// the same input the production dispatcher receives.
+    #[test]
+    fn b059_play_grants_four_food_via_the_major_improvement_space() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B059".into());
+        apply_on_play_effects_with_space(&set, &mut p, "B059", Some(Space::MajorImprovement))
+            .expect("apply B059 through the Major Improvement space");
+        assert_eq!(p.supply.food, 4);
+    }
+
+    /// B059-other: every non-major play space (Meeting Place "Minor
+    /// Improvement" action, family growth with a minor, or a space-less API
+    /// simulation) grants 2 food.
+    #[test]
+    fn b059_play_grants_two_food_via_other_spaces() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        for space in [
+            Some(Space::MeetingPlace),
+            Some(Space::FamilyGrowthWithRoom),
+            Some(Space::Lessons),
+            None,
+        ] {
+            let mut p = Player::new(0, 0);
+            p.played_cards.push("B059".into());
+            apply_on_play_effects_with_space(&set, &mut p, "B059", space)
+                .expect("apply B059 through a non-major play space");
+            assert_eq!(
+                p.supply.food, 2,
+                "space {space:?} must grant the other_amount"
+            );
+        }
+    }
+
+    /// The space-less legacy `play` chain (used by evaluation and policy
+    /// simulations) resolves the non-major branch and still pays the cost.
+    #[test]
+    fn b059_space_less_legacy_play_pays_wood_one_and_grants_two_food() {
+        let set = CardSet {
+            definitions: verified_band_b_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        let mut hand = vec!["B059".to_owned()];
+        play(
+            &set,
+            &mut hand,
+            &mut p,
+            "B059",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(
+            p.supply.food, 2,
+            "a space-less play is not a Major Improvement action"
+        );
+        assert_eq!(p.supply.wood, 0, "cost wood 1 is paid");
+        assert_eq!(p.played_cards, vec!["B059"]);
     }
 }
 

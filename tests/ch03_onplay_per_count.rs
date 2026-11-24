@@ -95,6 +95,7 @@ fn dispatch_card(set: &CardSet, player: &mut Player, hand: &mut [String], id: &s
         &limits,
         &mut pending,
         true, // is_improvement_action: tests simulate improvement action path
+        None, // play_space: no space (API-level dispatcher test)
     )
     .unwrap_or_else(|e| panic!("dispatch_play {id}: {e}"));
     *player = players[0].clone();
@@ -543,6 +544,7 @@ fn dispatch_card_result(
         &limits,
         &mut pending,
         true, // is_improvement_action: tests simulate improvement action path
+        None, // play_space: no space (API-level dispatcher test)
     )
 }
 

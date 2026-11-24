@@ -58,6 +58,10 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // phase. Its placement plan is derived and applied via place_animals
         // (the play executor cannot represent a play-time pause).
         CardEffect::OnPlayGainAnimal { .. } => TriggerPhase::Before,
+        // B059 食料箱: an instantaneous play-time effect like the other
+        // on-play gains — Before phase. The gained amount is decided from the
+        // play space the dispatcher received, read inside the handler.
+        CardEffect::OnPlayGainByImprovementActionSpace { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -534,6 +538,24 @@ fn resolve_phase_scan(
                 }
                 CardEffect::OnPlayGain { good, amount } => {
                     handle_on_play_gain(ctx, player, good, *amount)?
+                }
+                CardEffect::OnPlayGainByImprovementActionSpace {
+                    good,
+                    major_amount,
+                    other_amount,
+                } => {
+                    // B059 食料箱: the amount depends on the action space this
+                    // play went through (Major Improvement -> major_amount,
+                    // every other space -> other_amount), read from the real
+                    // play space dispatch_play received (trigger_data.space).
+                    // B059 being a minor improvement does not force the
+                    // smaller amount.
+                    let amount = if trigger_data.space == Some(Space::MajorImprovement) {
+                        *major_amount
+                    } else {
+                        *other_amount
+                    };
+                    handle_on_play_gain(ctx, player, good, amount)?
                 }
                 CardEffect::OnPlayGainPerStored {
                     stored,
@@ -1126,6 +1148,10 @@ fn effect_condition_holds(
         CardEffect::OnPlayGainPerStored { .. } => true,
         CardEffect::OnPlayGainPerImprovementPlayed { .. } => true,
         CardEffect::OnPlayGainPerCount { .. } => true,
+        // B059 食料箱: the gain always fires on play; the play space only
+        // decides which amount the handler grants, so the condition holds
+        // unconditionally.
+        CardEffect::OnPlayGainByImprovementActionSpace { .. } => true,
         CardEffect::OnPlayGainIfHouse { house, rooms, .. } => {
             player.house == *house && player.rooms() == usize::from(*rooms)
         }
@@ -1268,6 +1294,22 @@ pub fn execute_chosen_triggers(
             }
             CardEffect::OnPlayGain { good, amount } => {
                 handle_on_play_gain(ctx, player, good, *amount)?
+            }
+            CardEffect::OnPlayGainByImprovementActionSpace {
+                good,
+                major_amount,
+                other_amount,
+            } => {
+                // B059 食料箱: same space-based decision as the scan arm
+                // above (Major Improvement -> major_amount, every other
+                // space -> other_amount), read from the real play space
+                // dispatch_play received (trigger_data.space).
+                let amount = if trigger_data.space == Some(Space::MajorImprovement) {
+                    *major_amount
+                } else {
+                    *other_amount
+                };
+                handle_on_play_gain(ctx, player, good, amount)?
             }
             CardEffect::OnPlayGainPerStored {
                 stored,
@@ -2944,6 +2986,12 @@ pub fn dispatch_play(
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
     is_improvement_action: bool,
+    // The action space the play went through (e.g. Space::MajorImprovement
+    // for a minor played via the Major Improvement action). None when the
+    // caller has no space (API/tests). B059 食料箱 gain is decided from this
+    // input: Major Improvement takes the larger amount, every other space
+    // the smaller one.
+    play_space: Option<Space>,
 ) -> Result<(), String> {
     // Clone players for all_players parameter to avoid borrow checker issues
     let all_players = players.to_vec();
@@ -2966,7 +3014,7 @@ pub fn dispatch_play(
     };
 
     let trigger = PhaseTriggerData {
-        space: None,
+        space: play_space,
         improvement: None,
         baked: false,
         previous_player: None,
@@ -3762,6 +3810,9 @@ pub mod legacy {
     /// `kind`/`extra_food` are accepted to mirror the legacy `cards::play`
     /// signature used by the equivalence tests; the legacy effect loop never
     /// read them (cost payment happened before it in cards::play).
+    /// `play_space` is the action space the play went through; B059 食料箱
+    /// decides its gain from it exactly like the production dispatcher, so
+    /// the equivalence paths compare the same input.
     pub fn apply_on_play_effects_legacy(
         set: &CardSet,
         hand: &mut Vec<String>,
@@ -3769,6 +3820,7 @@ pub mod legacy {
         id: &str,
         _kind: crate::cards::CardKind,
         _extra_food: u32,
+        play_space: Option<Space>,
     ) -> Result<(), String> {
         // This mirrors the original cards::play effect loop (Before phase effects)
         let card = set.definition(id).ok_or("unknown card")?;
@@ -3780,6 +3832,28 @@ pub mod legacy {
                         .get(*good)
                         .checked_add(*amount)
                         .ok_or("card resource overflow")?;
+                    player.supply.set(*good, next);
+                }
+                CardEffect::OnPlayGainByImprovementActionSpace {
+                    good,
+                    major_amount,
+                    other_amount,
+                } => {
+                    // B059 食料箱: same space-based decision as the
+                    // production dispatcher arm — Major Improvement ->
+                    // major_amount, every other space -> other_amount — so
+                    // the legacy and dispatcher paths agree for the same
+                    // play space input.
+                    let amount = if play_space == Some(Space::MajorImprovement) {
+                        *major_amount
+                    } else {
+                        *other_amount
+                    };
+                    let next = player
+                        .supply
+                        .get(*good)
+                        .checked_add(amount)
+                        .ok_or("resource overflow")?;
                     player.supply.set(*good, next);
                 }
                 CardEffect::OnPlayGainPerStored {
@@ -4934,6 +5008,7 @@ mod tests {
                 &limits,
                 &mut pending,
                 true,
+                None,
             )
             .unwrap();
             let card = set.definition("M1").unwrap();
@@ -6618,6 +6693,236 @@ mod tests {
             "B058 HarvestFieldGain must not fire on after_worker"
         );
     }
+    /// B059-normal via the production play dispatcher: a play through the
+    /// Major Improvement action space grants 4 food. The decision comes from
+    /// the real play space, not from B059 being a minor improvement.
+    #[test]
+    fn b059_play_via_major_improvement_space_grants_four_food() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_b_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B059".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_play(
+            &set,
+            0,
+            "B059",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            2,
+            &BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            true,                          // is_improvement_action
+            Some(Space::MajorImprovement), // play_space
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 4,
+            "the Major Improvement action space must grant 4 food"
+        );
+    }
+
+    /// B059-other via the play dispatcher: the Meeting Place "Minor
+    /// Improvement" action grants 2 food, not 4 — B059 is a minor
+    /// improvement, but the space, not the card kind, decides the amount.
+    #[test]
+    fn b059_play_via_meeting_place_grants_two_food() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_b_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B059".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_play(
+            &set,
+            0,
+            "B059",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            2,
+            &BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            true,                      // is_improvement_action
+            Some(Space::MeetingPlace), // play_space
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 2,
+            "the Meeting Place minor-improvement action must grant 2 food"
+        );
+    }
+
+    /// A space-less dispatcher call (API-level, no action space) resolves the
+    /// non-major branch: 2 food.
+    #[test]
+    fn b059_play_without_space_grants_two_food() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_b_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B059".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut pending = None;
+        dispatch_play(
+            &set,
+            0,
+            "B059",
+            0,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            2,
+            &BTreeSet::new(),
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            true, // is_improvement_action
+            None, // play_space: no action space known
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 2,
+            "a space-less play is not a Major Improvement action"
+        );
+    }
+
+    /// Other spaces must not fire the on-play gain: using a worker space
+    /// while B059 sits played grants nothing.
+    #[test]
+    fn b059_gain_does_not_fire_on_after_worker() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_b_cards(),
+        };
+        let mut c = Ctx::new();
+        c.players[0].played_cards = vec!["B059".into()];
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut used = std::collections::BTreeSet::new();
+        used.insert(Space::DayLaborer);
+        let accumulations = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &set,
+            0,
+            Space::DayLaborer,
+            &mut c.cards,
+            &mut c.players,
+            &mut market,
+            &mut well,
+            4,
+            &used,
+            &accumulations,
+            &mut c.budget,
+            &mut c.uses,
+            &c.limits,
+            &mut pending,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            c.players[0].supply.food, 0,
+            "B059 on-play gain must not fire on an after-worker event"
+        );
+    }
+
+    /// Equivalence: the legacy module path and the production dispatcher
+    /// decide B059 from the same play-space input (4 via the Major
+    /// Improvement space, 2 via the Meeting Place), and the space-less
+    /// cards::play chain resolves its documented non-major branch (2).
+    #[test]
+    fn equivalence_b059_paths_share_the_play_space_input() {
+        let set = CardSet {
+            definitions: crate::cards::verified_band_b_cards(),
+        };
+        for (space, expected) in [
+            (Some(Space::MajorImprovement), 4u32),
+            (Some(Space::MeetingPlace), 2),
+        ] {
+            // Path 1: legacy module, same play-space input.
+            let mut legacy_hand = vec!["B059".to_string()];
+            let mut legacy = Player::new(0, 0);
+            legacy::apply_on_play_effects_legacy(
+                &set,
+                &mut legacy_hand,
+                &mut legacy,
+                "B059",
+                CardKind::MinorImprovement,
+                0,
+                space,
+            )
+            .unwrap();
+            // Path 2: production dispatcher, same play-space input.
+            let mut c = Ctx::new();
+            c.players[0].played_cards = vec!["B059".into()];
+            let mut market = vec![];
+            let mut well = BTreeMap::new();
+            let mut pending = None;
+            dispatch_play(
+                &set,
+                0,
+                "B059",
+                0,
+                &mut c.cards,
+                &mut c.players,
+                &mut market,
+                &mut well,
+                2,
+                &BTreeSet::new(),
+                &mut c.budget,
+                &mut c.uses,
+                &c.limits,
+                &mut pending,
+                true, // is_improvement_action
+                space,
+            )
+            .unwrap();
+            assert_eq!(
+                legacy.supply.food, expected,
+                "legacy module must decide from the same play space"
+            );
+            assert_eq!(
+                c.players[0].supply.food, expected,
+                "dispatcher must decide from the same play space"
+            );
+        }
+        // Path 3: the space-less cards::play chain takes the non-major branch
+        // and still pays the printed cost.
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        let mut hand = vec!["B059".to_owned()];
+        crate::cards::play(
+            &set,
+            &mut hand,
+            &mut p,
+            "B059",
+            CardKind::MinorImprovement,
+            0,
+        )
+        .unwrap();
+        assert_eq!(p.supply.food, 2, "space-less play grants the other_amount");
+        assert_eq!(p.supply.wood, 0, "cost wood 1 is paid");
+        assert_eq!(p.played_cards, vec!["B059"]);
+    }
 
     /// C116 調度品職人 via the production play dispatcher: each later
     /// occupation play grants 1 wood per food paid as its occupation cost.
@@ -6659,6 +6964,7 @@ mod tests {
             &limits,
             &mut pending,
             false,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -6683,6 +6989,7 @@ mod tests {
             &limits,
             &mut pending,
             true,
+            None,
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 3, "occupation cost 3 -> 3 wood");
@@ -6704,6 +7011,7 @@ mod tests {
             &limits,
             &mut pending,
             false,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -6758,6 +7066,7 @@ mod tests {
             &limits,
             &mut pending,
             false,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -6811,6 +7120,7 @@ mod tests {
             &limits,
             &mut pending,
             false,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -6860,6 +7170,7 @@ mod tests {
             &limits,
             &mut pending,
             false,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -6914,6 +7225,7 @@ mod tests {
             &limits,
             &mut pending,
             false,
+            None,
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 5, "no improvements -> 0 wood");
@@ -6945,6 +7257,7 @@ mod tests {
             &limits,
             &mut pending,
             false,
+            None,
         )
         .unwrap();
         assert_eq!(c.players[0].supply.wood, 7, "1 minor + 1 base -> 2 wood");
@@ -6977,6 +7290,7 @@ mod tests {
             &limits,
             &mut pending,
             false,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -7182,6 +7496,7 @@ mod tests {
                 &limits,
                 &mut pending,
                 false,
+                None,
             )
             .unwrap();
             let card = set.definition("A117").unwrap();
@@ -7199,6 +7514,7 @@ mod tests {
             "A117",
             CardKind::Occupation,
             0,
+            None, // play_space: A117 has no space-dependent effect
         )
         .unwrap();
         let legacy_mod_wood = legacy3.supply.wood;

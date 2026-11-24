@@ -1595,7 +1595,8 @@ impl Game {
                             &mut self.public.card_uses,
                             &self.card_use_limits,
                             &mut self.pending,
-                            true, // is_improvement_action
+                            true,                      // is_improvement_action
+                            Some(Space::MeetingPlace), // play_space
                         )?;
                         // Update card points
                         let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1674,6 +1675,7 @@ impl Game {
                             &self.card_use_limits,
                             &mut self.pending,
                             false,
+                            Some(Space::MeetingPlace), // play_space (Meeting Place)
                         )?;
                         crate::cards::apply_choice_gain(
                             &mut self.public.players[id],
@@ -1764,7 +1766,8 @@ impl Game {
                     &mut self.public.card_uses,
                     &self.card_use_limits,
                     &mut self.pending,
-                    false, // is_improvement_action
+                    false,       // is_improvement_action
+                    Some(space), // play_space (Lessons / ExtraLessons)
                 )?;
                 // Update card points
                 let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -1878,7 +1881,8 @@ impl Game {
                         &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
-                        false, // is_improvement_action
+                        false,       // is_improvement_action
+                        Some(space), // play_space (family growth space)
                     )?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -2002,7 +2006,8 @@ impl Game {
                         &mut self.public.card_uses,
                         &self.card_use_limits,
                         &mut self.pending,
-                        true, // is_improvement_action
+                        true,                          // is_improvement_action
+                        Some(Space::MajorImprovement), // play_space
                     )?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
@@ -2085,6 +2090,7 @@ impl Game {
                         &self.card_use_limits,
                         &mut self.pending,
                         false,
+                        Some(Space::MajorImprovement), // play_space
                     )?;
                     // Apply the chosen on-play gain option (C007).
                     crate::cards::apply_choice_gain(
