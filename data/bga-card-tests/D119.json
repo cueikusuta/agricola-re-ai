@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "card_id": "D119",
+  "cases": [
+    {
+      "id": "D119-choose-wood",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0,
+        "reed": 0
+      },
+      "action": {
+        "trigger": "before_worker_space",
+        "space": "fence_build",
+        "choose": "gain_wood"
+      },
+      "expected": {
+        "wood_delta": 2,
+        "reed_delta": 0,
+        "notes": "Choose gain 2 wood before using fence build space"
+      }
+    },
+    {
+      "id": "D119-choose-exchange-2-wood",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4,
+        "reed": 0
+      },
+      "action": {
+        "trigger": "before_worker_space",
+        "space": "build_room",
+        "choose": "exchange",
+        "exchange_wood": 2
+      },
+      "expected": {
+        "wood_delta": -2,
+        "reed_delta": 2,
+        "notes": "Have 4 wood, exchange 2 wood for 2 reed (1:1)"
+      }
+    },
+    {
+      "id": "D119-choose-exchange-1-wood",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 1,
+        "reed": 0
+      },
+      "action": {
+        "trigger": "before_worker_space",
+        "space": "fence_build",
+        "choose": "exchange",
+        "exchange_wood": 1
+      },
+      "expected": {
+        "wood_delta": -1,
+        "reed_delta": 1,
+        "notes": "Have only 1 wood, exchange 1 wood for 1 reed"
+      }
+    },
+    {
+      "id": "D119-no-wood-to-exchange",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 0,
+        "reed": 0
+      },
+      "action": {
+        "trigger": "before_worker_space",
+        "space": "build_room",
+        "choose": "exchange"
+      },
+      "expected": {
+        "wood_delta": 0,
+        "reed_delta": 0,
+        "notes": "No wood to exchange, exchange option does nothing"
+      }
+    }
+  ]
+}

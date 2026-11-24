@@ -20,13 +20,15 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3044",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
@@ -39,60 +41,55 @@
         "amount": 1
       }
     ],
-    "prerequisites": null,
+    "prerequisites": [],
     "printed_points": 0,
     "alternative_cost_notes": null
   },
   "effects": [
     {
-      "trigger": "end_scoring",
-      "conditions": [],
+      "trigger": "action_space_used",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "name": "日雇い労働者"
+          },
+          "negate": false
+        }
+      ],
       "steps": [
         {
-          "operation": "gain_points",
-          "target": "owner",
+          "operation": "modify_capacity",
+          "target": "board",
           "params": {
-            "points": {
-              "op": "per",
-              "args": [
-                {
-                  "op": "count",
-                  "args": [
-                    "unknown_metric"
-                  ]
-                },
-                1
-              ]
-            }
+            "rounds_ahead": 4,
+            "resource": "food",
+            "amount": 1
           }
         }
       ],
       "optional": false,
-      "frequency": "end_of_game",
+      "frequency": "per_use",
       "duration": "permanent",
-      "snapshot": "live_state",
+      "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "notes": "Each time you use '日雇い労働者' action space, place 1 food on each of the next 4 round spaces. Gain that food at the start of those rounds."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility",
-      "play.prerequisites.exact"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "C045-normal",
-      "C045-edge"
+      "C045-day-laborer-food",
+      "C045-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3044"
   }
 }

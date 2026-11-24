@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "card_id": "D075",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "樹木畑",
+    "name_en": "Wood Field"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2846",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "min": 1
+        }
+      }
+    ],
+    "printed_points": 1,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "passive",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "board",
+          "params": {
+            "kind": "count_as_field",
+            "amount": 2,
+            "crop_type": "wood",
+            "sow_harvest_like": "grain"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "always",
+      "duration": "permanent",
+      "snapshot": "live_state",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area",
+    "notes": "カード畑: counts as a field for wood, sown/harvested like grain"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params: count_as_field with crop_type='wood' and sow_harvest_like='grain' needs vocabulary confirmation",
+      "effects[0].steps[0].params.amount: '2' means counts as 2 fields for wood capacity - needs formal definition",
+      "post_play.destination: 'played_area' for card field vs 'left_neighbor_hand' for rotating improvement needs rule confirmation"
+    ],
+    "test_case_ids": [
+      "D075-sow-wood-harvest-wood",
+      "D075-counts-as-2-fields",
+      "D075-sow-like-grain"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: 1 food. Prereq: at least 1 occupation. Printed points: 1. Effect: This card is a field that counts as 2 fields for wood. Wood is sown and harvested like grain. Stage 2: card field. Stays in play area as ongoing field."
+  }
+}

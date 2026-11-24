@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "card_id": "D106",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "ウイスキー蒸留者",
+    "name_en": "Whisky Distiller"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2815",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "BGA wiki card page; effect: anytime pay 1 grain to place 4 food on round+2 space"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": null,
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: anytime trigger window undefined (free action API not specified); classification stage 4 P7 round reservation + start of round gain"
+    ],
+    "test_case_ids": [
+      "D106-basic-reservation",
+      "D106-round-boundary-14"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Anytime free action window (trigger timing, consecutive execution, cancellation, replay hash) not defined per vocabulary. Classification: stage 4 P7 (anytime + round reservation + start of round gain). Uses PS, TR-SITE, STACK. MQ-08: round 14+ reservation handling unresolved."
+  }
+}

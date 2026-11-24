@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "card_id": "D087",
+  "cases": [
+    {
+      "id": "D087-4-rooms-no-action",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 4
+      },
+      "action": {
+        "trigger": "passive_check"
+      },
+      "expected": {
+        "free_room_action_granted": false
+      },
+      "notes": "4 rooms -> condition not met"
+    },
+    {
+      "id": "D087-5-rooms-grant-free-room",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 5
+      },
+      "action": {
+        "trigger": "passive_check",
+        "choose_action": "build_room_free"
+      },
+      "expected": {
+        "free_room_action_granted": true,
+        "room_built": true,
+        "cost_paid": false
+      },
+      "notes": "5 rooms -> grant free room build action once per game"
+    },
+    {
+      "id": "D087-6-rooms-grant-free-room",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 6
+      },
+      "action": {
+        "trigger": "passive_check",
+        "choose_action": "build_room_free"
+      },
+      "expected": {
+        "free_room_action_granted": true
+      },
+      "notes": "6 rooms (>=5) -> condition met"
+    },
+    {
+      "id": "D087-used-once-no-second-use",
+      "scope": "effect_only",
+      "setup": {
+        "rooms": 5,
+        "free_room_already_used": true
+      },
+      "action": {
+        "trigger": "passive_check"
+      },
+      "expected": {
+        "free_room_action_granted": false,
+        "reason": "already used once per game"
+      },
+      "notes": "Once per game limit enforced"
+    }
+  ]
+}

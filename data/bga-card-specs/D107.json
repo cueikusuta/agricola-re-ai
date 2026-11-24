@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "card_id": "D107",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "釣鐘鋳造師",
+    "name_en": "Bellfounder"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2814",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "BGA wiki card page; effect: each return home phase, if have 1+ brick, may discard all for 3 food or 1 VP"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "returning_home_phase",
+      "conditions": [
+        {
+          "predicate": "resource_greater_than",
+          "params": {
+            "good": "brick",
+            "than": 0
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "steps": [
+                  {
+                    "operation": "spend_resource",
+                    "target": "owner",
+                    "params": {
+                      "good": "brick",
+                      "amount": {"op": "resource_count", "args": ["brick"]}
+                    }
+                  },
+                  {
+                    "operation": "gain_resource",
+                    "target": "owner",
+                    "params": {
+                      "good": "food",
+                      "amount": 3
+                    }
+                  }
+                ]
+              },
+              {
+                "steps": [
+                  {
+                    "operation": "spend_resource",
+                    "target": "owner",
+                    "params": {
+                      "good": "brick",
+                      "amount": {"op": "resource_count", "args": ["brick"]}
+                    }
+                  },
+                  {
+                    "operation": "gain_points",
+                    "target": "owner",
+                    "params": {
+                      "points": 1
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "notes": "Choose: discard all bricks for 3 food OR discard all bricks for 1 VP"
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+      "status": "needs_resolution",
+      "unresolved_fields": [
+        "effects: whether 'all bricks' includes bricks on this card (STACK) unresolved - no MQ-14 reference exists in repository"
+      ],
+      "test_case_ids": [
+        "D107-choose-food",
+        "D107-choose-vp",
+        "D107-no-brick"
+      ],
+      "checked_by": "AI source comparison",
+      "checked_on": "2026-11-20",
+      "implementation_status": "not_started",
+      "notes": "Classification: stage 3 (return home phase). Uses RH. Whether 'all bricks' includes bricks on this card (STACK) is unresolved."
+    }
+}

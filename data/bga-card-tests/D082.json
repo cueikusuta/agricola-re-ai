@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "card_id": "D082",
+  "cases": [
+    {
+      "id": "D082-pay-return-boar",
+      "scope": "legal_play",
+      "setup": {
+        "wild_boar": 1
+      },
+      "action": {
+        "play": "D082",
+        "pay": { "action": "return_boar", "amount": 1 }
+      },
+      "expected": {
+        "play_allowed": true,
+        "wild_boar_delta": -1
+      },
+      "notes": "Pay by returning 1 wild boar to supply (provisional)"
+    },
+    {
+      "id": "D082-pay-cook-boar",
+      "scope": "legal_play",
+      "setup": {
+        "wild_boar": 1,
+        "fireplace_or_cooking_hearth": true
+      },
+      "action": {
+        "play": "D082",
+        "pay": { "action": "cook_boar", "amount": 1 }
+      },
+      "expected": {
+        "play_allowed": true,
+        "wild_boar_delta": -1,
+        "food_gained": 3
+      },
+      "notes": "Pay by cooking 1 wild boar (provisional - MQ-12 unresolved: requires fireplace/hearth, yields 3 food)"
+    },
+    {
+      "id": "D082-renovation-discount",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "when_buying",
+        "context": "renovation_improvement",
+        "original_cost": { "wood": 2, "clay": 2 }
+      },
+      "expected": {
+        "effective_cost": { "wood": 1, "clay": 1 },
+        "discount_applied": 1
+      },
+      "notes": "Renovation improvement: each building resource costs 1 less (substituted with clay)"
+    },
+    {
+      "id": "D082-fence-discount",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "trigger": "when_buying",
+        "context": "farm_redevelopment_fence",
+        "original_cost": { "wood": 4 }
+      },
+      "expected": {
+        "effective_cost": { "wood": 1 },
+        "discount_applied": 3
+      },
+      "notes": "Farm redevelopment fence: costs 3 wood less"
+    }
+  ]
+}

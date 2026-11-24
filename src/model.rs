@@ -66,6 +66,23 @@ pub enum Good {
     Grain,
     Vegetable,
 }
+
+/// Decode a `Good` from the `{:?}` (Debug) name card payloads carry, such
+/// as the A118 exchange context written by the dispatcher. Unknown names
+/// are a hard error so a mismatch can never silently drop a payment
+/// (PR #385 review P3).
+fn good_from_debug_name(name: &str) -> Result<Good, String> {
+    match name {
+        "Wood" => Ok(Good::Wood),
+        "Clay" => Ok(Good::Clay),
+        "Reed" => Ok(Good::Reed),
+        "Stone" => Ok(Good::Stone),
+        "Food" => Ok(Good::Food),
+        "Grain" => Ok(Good::Grain),
+        "Vegetable" => Ok(Good::Vegetable),
+        other => Err(format!("unknown good '{other}' in card payload")),
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Animal {
@@ -152,6 +169,10 @@ pub struct Cell {
     pub tile: Tile,
     pub stable: bool,
     pub stable_animal: Option<Animal>,
+    /// Stones placed on this field (e.g. by C006 石取り作業 / Stone Clearing),
+    /// harvested at the next field phase. Meaningful only for `Tile::Field`.
+    #[serde(default)]
+    pub field_stones: u32,
 }
 impl Default for Cell {
     fn default() -> Self {
@@ -159,6 +180,7 @@ impl Default for Cell {
             tile: Tile::Empty,
             stable: false,
             stable_animal: None,
+            field_stones: 0,
         }
     }
 }
@@ -611,6 +633,49 @@ pub struct PublicState {
     pub card_accumulations: BTreeMap<usize, BTreeMap<String, BTreeMap<Good, u32>>>,
 }
 
+/// Cell as the LOG_VERSION=5 hash tuple serialized it (three fields).
+/// `Cell::field_stones` (C006 石取り作業, PR #363) is deliberately excluded:
+/// its serde bytes must not shift v5 `state_hash` values, so legacy fixtures
+/// keep verifying (same pattern as 332f8114 `PlayerHashMaterialV5`).
+#[derive(Serialize)]
+pub(crate) struct CellHashMaterialV5<'a> {
+    tile: &'a Tile,
+    stable: &'a bool,
+    stable_animal: &'a Option<Animal>,
+}
+
+/// Player as the LOG_VERSION=5 hash tuple serialized it, in declaration
+/// order, projecting `farm` through [`CellHashMaterialV5`]. Field additions
+/// after v5 that carry serde `default`/`skip_serializing_if` attributes
+/// (e.g. `field_goods_before_final_harvest`) are serialized here with the
+/// same attributes so hash values stay identical to the v5 byte stream.
+#[derive(Serialize)]
+pub(crate) struct PlayerHashMaterialV5<'a> {
+    id: &'a usize,
+    family: &'a u8,
+    newborns: &'a u8,
+    house: &'a House,
+    supply: &'a Supply,
+    farm: Vec<CellHashMaterialV5<'a>>,
+    pastures: &'a Vec<Pasture>,
+    pet: &'a Option<Animal>,
+    fences: &'a BTreeSet<(u8, u8)>,
+    improvements: &'a Vec<Improvement>,
+    played_cards: &'a Vec<String>,
+    card_points: &'a i32,
+    pasture_capacity_bonus: &'a u32,
+    free_fence_wood: &'a u32,
+    improvement_wood_discount: &'a u32,
+    wooden_room_cost: &'a Option<u32>,
+    room_material_cost: &'a Option<u32>,
+    major_stone_discount_by_rooms: &'a bool,
+    stone_cost_discount: &'a u32,
+    extra_housing: &'a u8,
+    begging: &'a u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    field_goods_before_final_harvest: &'a Option<u32>,
+}
+
 /// The exact `PublicState` field set the LOG_VERSION=5 `state_hash` tuple
 /// serialized, in declaration order. Serializing this mirror produces
 /// byte-identical JSON to serializing the 13-field v5 `PublicState`, so
@@ -627,7 +692,7 @@ pub(crate) struct PublicStateHashMaterialV5<'a> {
     revealed: &'a Vec<RoundCard>,
     accumulations: &'a BTreeMap<Space, u32>,
     animal_accumulations: &'a BTreeMap<Space, u32>,
-    players: &'a Vec<Player>,
+    players: Vec<PlayerHashMaterialV5<'a>>,
     improvement_market: &'a Vec<Improvement>,
     work_quota: &'a Vec<u8>,
     workers_placed: &'a Vec<u8>,
@@ -646,7 +711,42 @@ impl PublicState {
             revealed: &self.revealed,
             accumulations: &self.accumulations,
             animal_accumulations: &self.animal_accumulations,
-            players: &self.players,
+            players: self
+                .players
+                .iter()
+                .map(|p| PlayerHashMaterialV5 {
+                    id: &p.id,
+                    family: &p.family,
+                    newborns: &p.newborns,
+                    house: &p.house,
+                    supply: &p.supply,
+                    farm: p
+                        .farm
+                        .iter()
+                        .map(|c| CellHashMaterialV5 {
+                            tile: &c.tile,
+                            stable: &c.stable,
+                            stable_animal: &c.stable_animal,
+                        })
+                        .collect(),
+                    pastures: &p.pastures,
+                    pet: &p.pet,
+                    fences: &p.fences,
+                    improvements: &p.improvements,
+                    played_cards: &p.played_cards,
+                    card_points: &p.card_points,
+                    pasture_capacity_bonus: &p.pasture_capacity_bonus,
+                    free_fence_wood: &p.free_fence_wood,
+                    improvement_wood_discount: &p.improvement_wood_discount,
+                    wooden_room_cost: &p.wooden_room_cost,
+                    room_material_cost: &p.room_material_cost,
+                    major_stone_discount_by_rooms: &p.major_stone_discount_by_rooms,
+                    stone_cost_discount: &p.stone_cost_discount,
+                    extra_housing: &p.extra_housing,
+                    begging: &p.begging,
+                    field_goods_before_final_harvest: &p.field_goods_before_final_harvest,
+                })
+                .collect(),
             improvement_market: &self.improvement_market,
             work_quota: &self.work_quota,
             workers_placed: &self.workers_placed,
@@ -659,7 +759,7 @@ impl PublicState {
 impl PublicState {
     /// Compute the set of available action spaces for this public state.
     /// Used by both `Game::validate` (full validation) and
-    /// `crate::validation::validate_incremental` (incremental validation)
+    /// `crate::validation::check_incremental` (incremental validation)
     /// to ensure the same availability logic is applied consistently.
     pub(crate) fn available_spaces(
         &self,
@@ -814,6 +914,11 @@ impl Game {
         if !(2..=4).contains(&config.players) {
             return Err("players must be 2..=4".into());
         }
+        // Player-count projection happens exactly once, here at the game
+        // entry point: every game owns a set already projected for its
+        // player count, and raw/unprojectable sets are rejected instead of
+        // being treated as validated (PR #368 close verdict).
+        let card_set = card_set.projected_for_players(config.players)?;
         card_set.validate(config.players)?;
         let cards = CardState::deal(&card_set, config.seed, config.players);
         Self::from_card_state(config, Arc::new(card_set), cards, None, None)
@@ -831,6 +936,9 @@ impl Game {
         if !(2..=4).contains(&config.players) {
             return Err("players must be 2..=4".into());
         }
+        // Projection happens exactly once at this game entry point, matching
+        // Game::with_cards (PR #368 close verdict).
+        let card_set = card_set.projected_for_players(config.players)?;
         card_set.validate(config.players)?;
         if hands.len() != config.players {
             return Err("explicit hands must match the player count".into());
@@ -849,6 +957,9 @@ impl Game {
         if !(2..=4).contains(&config.players) || start_player >= config.players {
             return Err("invalid drafted start player or player count".into());
         }
+        // Projection happens exactly once at this game entry point, matching
+        // Game::with_cards (PR #368 close verdict).
+        let card_set = card_set.projected_for_players(config.players)?;
         card_set.validate(config.players)?;
         if hands.len() != config.players {
             return Err("explicit hands must match the player count".into());
@@ -1311,10 +1422,12 @@ impl Game {
                 &mut self.delayed_well,
                 self.public.round,
                 &self.public.used,
+                &self.public.accumulations,
                 &mut self.event_budget,
                 &mut self.public.card_uses,
                 &self.card_use_limits,
                 &mut self.pending,
+                &self.public.revealed,
             )
             // Before this change the same failure was a panic here; keeping the
             // expect would turn a rules error into a crash, so record it as a
@@ -1753,6 +1866,7 @@ impl Game {
                             delayed_well: &mut delayed_well,
                             round,
                             used_spaces: &used_spaces,
+                            accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
                             card_use_limits: &card_use_limits,
@@ -1769,6 +1883,8 @@ impl Game {
                             used_spaces: used_spaces.clone(),
                             site: crate::registry::EventKind::Bake,
                             event_kind: crate::registry::EventKind::Bake,
+                            revealed_round_cards: Vec::new(),
+                            c066_take_food_instead: false,
                         };
                         // After phase. If THIS is the paused step and the pause
                         // was in the After phase (a resolved ChooseTriggerOrder,
@@ -1886,6 +2002,7 @@ impl Game {
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
                         round,
+                        accumulations: None,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
@@ -1903,6 +2020,8 @@ impl Game {
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::ClayConstruction,
                         event_kind: crate::registry::EventKind::ClayConstruction,
+                        revealed_round_cards: Vec::new(),
+                        c066_take_food_instead: false,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -1994,6 +2113,11 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
+                        // A140 ショベル運搬人 reads the OTHER clay accumulation
+                        // at resolution time; the paused state already reflects
+                        // the core action's take, so the current public map is
+                        // exactly what the original dispatch saw.
+                        accumulations: Some(&next.public.accumulations),
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -2012,6 +2136,8 @@ impl Game {
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
+                        revealed_round_cards: Vec::new(),
+                        c066_take_food_instead: false,
                     };
                     // After phase. If THIS is the paused step and the pause was
                     // in the After phase (resolved ChooseTriggerOrder, Issue
@@ -2159,9 +2285,9 @@ impl Game {
         // worker/space delta). Every other mid-round law is unchanged for both
         // segments (validation.rs).
         if resume.space_applied {
-            crate::validation::validate_incremental_resume_completion_or_full(&next, self)?;
+            crate::validation::check_incremental_resume_completion_or_full(&next, self)?;
         } else {
-            crate::validation::validate_incremental_or_full(&next, self)?;
+            crate::validation::check_incremental_or_full(&next, self)?;
         }
         // The `work` event for this paused action is recorded by
         // `resolve_pending_and_resume` (with the paused hash as `after`), not
@@ -2344,6 +2470,11 @@ impl Game {
                     delayed_well: &mut self.delayed_well,
                     round: self.public.round,
                     used_spaces: &self.public.used,
+                    // A140 ショベル運搬人 reads the OTHER clay accumulation
+                    // at resolution time; the paused state was committed after
+                    // the core action's take, so the current public map holds
+                    // exactly the amounts the original scan saw.
+                    accumulations: Some(&self.public.accumulations),
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,
@@ -2365,9 +2496,55 @@ impl Game {
                 )?;
                 Ok(())
             }
-            (PendingKind::Custom { .. }, PendingResolution::Custom { .. }) => {
-                // Extensible: custom effects handle their own payload.
-                Ok(())
+            (PendingKind::Custom { .. }, PendingResolution::Custom { payload }) => {
+                // Check if this is an A118 harvest field optional exchange
+                if pending.context.get("type").and_then(|v| v.as_str())
+                    == Some("harvest_field_optional_exchange")
+                {
+                    let confirmed = payload
+                        .get("confirmed")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    if confirmed {
+                        let cost_str = pending.context.get("cost").and_then(|v| v.as_str());
+                        let cost_amount = pending
+                            .context
+                            .get("cost_amount")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32;
+                        let gain_str = pending.context.get("gain").and_then(|v| v.as_str());
+                        let gain_amount = pending
+                            .context
+                            .get("gain_amount")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(0) as u32;
+
+                        // Parse Good from the Debug name the payload
+                        // carries. An unknown name is a hard error, not a
+                        // silent drop (PR #385 review P3): the payload is
+                        // engine-written, so failure means tampering or an
+                        // untaught variant.
+                        let cost_good = cost_str.map(good_from_debug_name).transpose()?;
+                        let gain_good = gain_str.map(good_from_debug_name).transpose()?;
+
+                        if let (Some(cost_good), Some(gain_good)) = (cost_good, gain_good) {
+                            let player = &mut self.public.players[pending.player];
+                            // Pay cost
+                            player.supply.pay(cost_good, cost_amount)?;
+                            // Gain resource
+                            let next = player
+                                .supply
+                                .get(gain_good)
+                                .checked_add(gain_amount)
+                                .ok_or("resource overflow")?;
+                            player.supply.set(gain_good, next);
+                        }
+                    }
+                    Ok(())
+                } else {
+                    // Extensible: other custom effects handle their own payload
+                    Ok(())
+                }
             }
             (
                 PendingKind::ChooseAnimalPlacement { .. },

@@ -14,12 +14,7 @@
 //!   `verified` here; that requires an official source recorded by `#115`.
 //! - Cards absent from the registry are treated as `unverified` (fail closed),
 //!   never as usable.
-use crate::cards::{
-    verified_extra_simple_cards, verified_immediate_resource_cards, verified_minor_worker_cards,
-    verified_multiplayer_passive_cards, verified_passive_cards, verified_round_and_harvest_cards,
-    verified_scoring_cards, verified_simple_occupations, verified_worker_bonus_cards,
-    CardDefinition, CardKind, CardSet,
-};
+use crate::cards::{CardDefinition, CardKind, CardSet};
 use crate::registry::{CardPool, CardRegistry};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -130,26 +125,12 @@ impl CardReview {
 
 /// All card definitions the engine currently implements, deduplicated by id.
 ///
-/// The union is derived from the same constructors used to build playable
-/// decks, so it cannot silently drift from the options the engine can run.
+/// This is derived from the single source of truth: the default registry.
+/// Returns all 60 implemented cards with player-count-appropriate effects
+/// expressed via prerequisites.
 pub fn builtin_implemented_cards() -> Vec<CardDefinition> {
-    let mut cards = Vec::new();
-    // Union over every supported player count so player-count-specific cards
-    // are included as well (for example a two-player-only occupation).
-    for players in 2..=4 {
-        cards.extend(verified_scoring_cards(players));
-        cards.extend(verified_minor_worker_cards(players));
-        cards.extend(verified_worker_bonus_cards(players));
-        cards.extend(verified_simple_occupations(players));
-        cards.extend(verified_multiplayer_passive_cards(players));
-    }
-    cards.extend(verified_immediate_resource_cards());
-    cards.extend(verified_round_and_harvest_cards());
-    cards.extend(verified_passive_cards());
-    cards.extend(verified_extra_simple_cards());
-    let mut seen = BTreeSet::new();
-    cards.retain(|card| seen.insert(card.id.clone()));
-    cards
+    let registry = crate::cards::default_registry();
+    registry.iter().map(|c| c.to_card_definition()).collect()
 }
 
 /// Build a registry that marks every supplied card `unverified`.

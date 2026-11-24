@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "card_id": "D070",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "わら肥料",
+    "name_en": "Straw Manure"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2851",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [
+      {
+        "predicate": "field_count",
+        "params": {
+          "n": 2
+        }
+      }
+    ],
+    "printed_points": 0,
+    "alternative_cost_notes": null
+  },
+  "effects": [
+    {
+      "trigger": "harvest_field_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "choice",
+            "options": [
+              {
+                "action": "pay_and_gain_vegetable",
+                "cost": { "good": "grain", "amount": 1 },
+                "effect": {
+                  "operation": "other",
+                  "params": {
+                    "kind": "add_good_to_single_crop_type_fields",
+                    "crop_type": "vegetable",
+                    "amount_per_field": 1,
+                    "max_fields": 2,
+                    "same_type": true
+                  }
+                }
+              },
+              {
+                "action": "decline",
+                "effect": null
+              }
+            ]
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "instant",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand",
+    "notes": "回る進歩: use once then pass to left neighbor"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].params.options[0].effect: add_good_to_single_crop_type_fields with max_fields=2 needs vocabulary confirmation",
+      "effects[0].trigger: harvest_field_phase timing for 'before field phase' vs standard harvest_field_phase needs clarification",
+      "effects[0].conditions: how to identify vegetable fields (vegetable_field_count) not in vocabulary"
+    ],
+    "test_case_ids": [
+      "D070-pay-grain-gain-vegetable",
+      "D070-decline",
+      "D070-insufficient-grain"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Cost: none. Prereq: 2 fields. Effect: Before each harvest field phase, may pay 1 grain to add 1 vegetable to up to 2 vegetable fields. Passes to left neighbor after use. Vocabulary for 'up to 2 vegetable fields' and 'before field phase' timing needs formalization."
+  }
+}

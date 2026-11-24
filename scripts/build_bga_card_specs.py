@@ -514,6 +514,7 @@ CARDS = {
                    freq="every_use", dur="permanent", order=1),
         ],
         "notes": "Gain 1 grain on play; in each field phase harvest 1 extra grain per grain field.",
+        "implementation_status": "tested",
         "tests": [
             case("A112-normal", {"grain": 0}, {"play": "A112"}, {"grain_delta": 1}),
             case("A112-harvest", {"grain_fields": 2}, {"harvest_field_phase": 1},
@@ -3325,14 +3326,15 @@ CARDS = {
     "A118": {
         "post": "played_area",
         "effects": [
-            effect("harvest_field_phase", [gain("wood", 1)]),
+            effect("harvest_field_phase", [gain("wood", 1)], freq="every_harvest"),
             effect("harvest_field_phase",
                    [exchange(give=[{"good": "food", "amount": 1}],
                              receive=[{"good": "wood", "amount": 1}])],
                    optional=True, freq="every_harvest", dur="permanent", order=1,
                    decision="owner", notes="up to twice per harvest"),
         ],
-        "notes": "Field phase: 1 wood; may buy up to 2 more wood for 1 food each.",
+        "notes": "Field phase: 1 wood; may buy up to 2 more wood for 1 food each. The optional exchange is engine-plan-driven (FeedingPlan::a118_wood_buys, capped at 2) and never surfaces a PendingDecision during the harvest (PR #385 review fix).",
+        "implementation_status": "tested",
         "tests": [
             case("A118-normal", {"wood": 0, "food": 2}, {"run_harvest": True, "buy": 2},
                  {"wood_delta": 3, "food_delta": -2}),
@@ -3642,7 +3644,8 @@ CARDS = {
             effect("after_harvest", [gain("reed", 1)],
                    freq="every_harvest", dur="permanent"),
         ],
-        "notes": "At the end of each harvest: 1 reed from the general supply.",
+        "notes": "At the end of each harvest: 1 reed from the general supply. Fires from the post-field harvest-tail dispatch (after feeding/breeding), not at the field phase (PR #385 review fix).",
+        "implementation_status": "tested",
         "tests": [
             case("A145-normal", {"reed": 0}, {"run_harvest": True}, {"reed_delta": 1}),
         ],
