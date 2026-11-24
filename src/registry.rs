@@ -383,6 +383,9 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                     EventKind::WorkerPlaced
                 }
+                crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
                 // Chapter 1 round-start cards
                 crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. } => {
@@ -517,6 +520,7 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterOccupationGain { amount, .. }
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
