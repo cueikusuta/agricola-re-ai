@@ -72,12 +72,14 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": ["E100 日英不一致: spec の condition は `resource_at_least_any`（wood/clay/reed/stone/grain/vegetable のうち 1 つ以上）だが、英語一覧と分類正本の E100 行は 6 品物各 1 つ以上と読めて日英条件が不一致。出典確定まで condition は変更せず all-six も暫定採用しない。BGA wiki 日英ページおよび公式ルールの典拠を要確認。"],
     "test_case_ids": [
       "E100-grain-in-stock",
       "E100-empty-stock",
-      "E100-animals-only"
+      "E100-animals-only",
+      "E100-wood-only",
+      "E100-all-six"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-21",

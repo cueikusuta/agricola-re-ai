@@ -37,20 +37,17 @@
       "conditions": [],
       "steps": [
         {
-          "operation": "spend_resource",
-          "target": "owner",
-          "params": {
-            "good": "food",
-            "amount": {
-              "op": "family_count"
-            }
-          }
-        },
-        {
           "operation": "other",
           "target": "owner",
           "params": {
+            "action": "buy_one_good_if_affordable",
             "kind": "choice",
+            "pay": {
+              "good": "food",
+              "amount": {
+                "op": "family_count"
+              }
+            },
             "options": [
               {
                 "kind": "gain_good",
@@ -99,7 +96,9 @@
               }
             ],
             "choose_one": true,
-            "amount": 1
+            "amount": 1,
+            "if_cannot_pay": "no_spend_no_gain",
+            "notes": "ラウンド開始時に家族数と同じ食料を支払って任意の品物1を購入（任意）。食料が家族数に満たない場合は支払いを発生させず、品物も獲得しない（E102-cannot-pay: food_delta 0）。"
           }
         }
       ],
