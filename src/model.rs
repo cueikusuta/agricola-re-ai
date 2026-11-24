@@ -223,6 +223,12 @@ pub struct Player {
     pub stone_cost_discount: u32,
     #[serde(default)]
     pub extra_housing: u8,
+    /// Actions granted to this player by on_play `grant_action` effects that
+    /// have not yet been consumed. Runtime-only: deliberately skipped by serde
+    /// so no new persisted/save state is introduced in this chapter. Grants
+    /// are recorded when the card is played and removed when executed.
+    #[serde(skip)]
+    pub granted_actions: Vec<GrantedAction>,
     pub begging: u32,
     /// Snapshot of total crop goods in fields at the end of the final harvest
     /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
@@ -260,10 +266,62 @@ impl Player {
             major_stone_discount_by_rooms: false,
             stone_cost_discount: 0,
             extra_housing: 0,
+            granted_actions: vec![],
             begging: 0,
             field_goods_before_final_harvest: None,
         }
     }
+
+    /// Execute a single action previously granted by an on_play
+    /// `grant_action` effect. Returns `Ok(())` once performed; if the action
+    /// cannot be performed (e.g. no eligible field to sow), it is a no-op
+    /// rather than an error — the grant was already recorded when the card
+    /// was played. Executing the grant consumes it: the matching recorded
+    /// grant is removed whether or not the action changed anything.
+    pub fn execute_granted_action(&mut self, action: &GrantedAction) -> Result<(), String> {
+        // Consume the recorded grant (first match; `GrantedAction` derives
+        // PartialEq, so identical grants resolve to the same entry).
+        if let Some(index) = self.granted_actions.iter().position(|a| a == action) {
+            self.granted_actions.swap_remove(index);
+        }
+        match action {
+            GrantedAction::MajorImprovement { .. } => {
+                // The actual major-improvement build is a separate action that
+                // pays its cost and occupies an action space; this chapter only
+                // records the grant. Nothing to mutate here.
+                Ok(())
+            }
+            GrantedAction::Renovation => {
+                self.house = match self.house {
+                    House::Wood => House::Clay,
+                    House::Clay => House::Stone,
+                    other => other,
+                };
+                Ok(())
+            }
+            GrantedAction::Sow { fields } => {
+                let mut sown = 0;
+                for cell in &mut self.farm {
+                    if sown >= *fields {
+                        break;
+                    }
+                    if matches!(cell.tile, Tile::Field { crop: None, .. }) {
+                        if self.supply.get(Good::Grain) < 1 {
+                            break;
+                        }
+                        cell.tile = Tile::Field {
+                            crop: Some(Crop::Grain),
+                            remaining: 1,
+                        };
+                        self.supply.pay(Good::Grain, 1)?;
+                        sown += 1;
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+
     pub fn rooms(&self) -> usize {
         self.farm
             .iter()
@@ -318,6 +376,23 @@ impl Player {
                 })
                 .sum::<u32>()
     }
+}
+
+/// An action granted to a player by an on_play `grant_action` card effect.
+/// The grant is recorded when the card is played (`Player.granted_actions`)
+/// and consumed by `Player::execute_granted_action`. It is deliberately not
+/// persisted (see `Player.granted_actions`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GrantedAction {
+    /// Grant a Major Improvement action. `only` restricts which improvement
+    /// may be built (e.g. `Some(Improvement::Fireplace2)` for fireplace only);
+    /// `None` means any major improvement.
+    MajorImprovement { only: Option<Improvement> },
+    /// Grant a Renovation (home upgrade) action.
+    Renovation,
+    /// Grant a Sow action for `fields` fields.
+    Sow { fields: u8 },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
