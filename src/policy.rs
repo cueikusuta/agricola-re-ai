@@ -591,6 +591,9 @@ fn card_priority(
                                                 | CardEffect::OnPlayGainPerStored { .. }
                                                 | CardEffect::OnPlayGainIfHouse { .. }
                                                 | CardEffect::OnPlayGainIfRoomCount { .. }
+                                                // A057 搾乳施設: the animal-threshold gain is
+                                                // resolved for real by the simulation above.
+                                                | CardEffect::OnPlayGainAnimalThreshold { .. }
                                                 | CardEffect::OnPlayGainPerImprovementPlayed { .. }
                                                 | CardEffect::Prerequisite { .. } => 0,
                 #[cfg(test)]

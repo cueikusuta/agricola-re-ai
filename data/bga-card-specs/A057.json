@@ -140,7 +140,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "tested",
     "notes": "1/3/4+ sheep give 2/3/4 food and 1/2/3+ cattle give 2/3/4 food."
   }
 }

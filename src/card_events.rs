@@ -58,6 +58,9 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // phase. Its placement plan is derived and applied via place_animals
         // (the play executor cannot represent a play-time pause).
         CardEffect::OnPlayGainAnimal { .. } => TriggerPhase::Before,
+        // A057 搾乳施設: on-play threshold gain is instantaneous at play
+        // time — Before phase, same as the other on-play gains.
+        CardEffect::OnPlayGainAnimalThreshold { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -563,6 +566,13 @@ fn resolve_phase_scan(
                 CardEffect::OnPlayGainAnimal { animal, amount } => {
                     handle_on_play_gain_animal(ctx, animal, *amount)?
                 }
+                // A057 搾乳施設: highest reached stage of the animal
+                // threshold table, applied once.
+                CardEffect::OnPlayGainAnimalThreshold {
+                    animal,
+                    thresholds,
+                    good,
+                } => handle_on_play_gain_animal_threshold(ctx, player, animal, thresholds, good)?,
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
                 CardEffect::AfterWorkerGain {
                     space,
@@ -1134,6 +1144,9 @@ fn effect_condition_holds(
         // nothing (no double grant, no rounding).
         CardEffect::OnPlayGainIfRoomCount { rooms, .. } => player.rooms() == usize::from(*rooms),
         CardEffect::OnPlayGainAnimal { .. } => true,
+        // A057 搾乳施設: the animal count is read inside the handler, so the
+        // condition scan reports the on-play effect as always triggerable.
+        CardEffect::OnPlayGainAnimalThreshold { .. } => true,
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
@@ -1299,6 +1312,13 @@ pub fn execute_chosen_triggers(
             CardEffect::OnPlayGainAnimal { animal, amount } => {
                 handle_on_play_gain_animal(ctx, animal, *amount)?
             }
+            // A057 搾乳施設: highest reached stage of the animal threshold
+            // table, applied once (same handler as the second pass arm).
+            CardEffect::OnPlayGainAnimalThreshold {
+                animal,
+                thresholds,
+                good,
+            } => handle_on_play_gain_animal_threshold(ctx, player, animal, thresholds, good)?,
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
             CardEffect::AfterWorkerGain {
                 space,
@@ -1695,6 +1715,9 @@ fn handle_prerequisite(
         }
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
         crate::cards::CardRequirement::PastureCount(n) => p.pastures.len() >= usize::from(*n),
+        crate::cards::CardRequirement::MinimumUnusedFarmyardSpaces(n) => {
+            crate::cards::unused_farmyard_spaces(p) >= usize::from(*n)
+        }
         crate::cards::CardRequirement::MaximumPlayers(_) => true, // Validated at card set level
     };
 
@@ -1855,6 +1878,40 @@ fn handle_on_play_gain_per_count(
         .supply
         .get(*good)
         .checked_add(bonus)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// A057 搾乳施設 (Milking Parlor): on play, the amount paired with the highest
+/// threshold the owner's `animal` count reaches is gained once. Sheep and
+/// cattle are resolved by separate effects and are never mixed; stages never
+/// stack — only the single highest reached stage pays, and a count below the
+/// first threshold grants nothing (A057-zero).
+fn handle_on_play_gain_animal_threshold(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    animal: &Animal,
+    thresholds: &[crate::cards::AnimalThreshold; 3],
+    good: &Good,
+) -> Result<EffectResult, String> {
+    let count = ctx.player.animal_count(*animal);
+    // Reached stages only, and just the largest one: the printed card pays a
+    // single amount per animal type instead of summing the stages.
+    let amount = thresholds
+        .iter()
+        .filter(|stage| count >= stage.threshold)
+        .map(|stage| stage.amount)
+        .max()
+        .unwrap_or(0);
+    if amount == 0 {
+        return Ok(EffectResult::Resolved);
+    }
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(amount)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
     Ok(EffectResult::Resolved)

@@ -325,6 +325,7 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayGainAnimalThreshold { .. }
                 | crate::cards::CardEffect::OnPlayChoiceGain { .. }
                 | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. }
                 | crate::cards::CardEffect::PostPlayPassLeft => EventKind::CardPlayed,
@@ -558,6 +559,11 @@ impl CardRegistryBuilder {
                         crate::cards::CardEffect::OnPlayAddStoneToEmptyFields {
                             amount, ..
                         } => *amount,
+                        // A057 搾乳施設: the amount comes from the reached
+                        // threshold stage, so bound the highest printed stage.
+                        crate::cards::CardEffect::OnPlayGainAnimalThreshold { thresholds, .. } => {
+                            thresholds.iter().map(|stage| stage.amount).max().unwrap_or(1)
+                        }
                         crate::cards::CardEffect::OnPlayChoiceGain { options } => {
                             options.iter().map(|o| o.amount).max().unwrap_or(1)
                         }
