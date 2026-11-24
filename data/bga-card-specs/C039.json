@@ -20,13 +20,15 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3050",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
@@ -41,10 +43,11 @@
     ],
     "prerequisites": [
       {
-        "predicate": "custom",
+        "predicate": "occupations_played_count",
         "params": {
-          "text": "職業1"
-        }
+          "count": 1
+        },
+        "negate": false
       }
     ],
     "printed_points": 0,
@@ -52,53 +55,49 @@
   },
   "effects": [
     {
-      "trigger": "end_scoring",
-      "conditions": [],
+      "trigger": "accumulation_space_used",
+      "conditions": [
+        {
+          "predicate": "accumulation_space_name",
+          "params": {
+            "name": "小劇場"
+          },
+          "negate": false
+        }
+      ],
       "steps": [
         {
           "operation": "gain_points",
           "target": "owner",
           "params": {
-            "points": {
-              "op": "per",
-              "args": [
-                {
-                  "op": "count",
-                  "args": [
-                    "unknown_metric"
-                  ]
-                },
-                1
-              ]
-            }
+            "points": 1
           }
         }
       ],
       "optional": false,
-      "frequency": "end_of_game",
+      "frequency": "per_use",
       "duration": "permanent",
-      "snapshot": "live_state",
+      "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "notes": "Each time you use the '小劇場' accumulation space, gain 1 bonus point. In 1-3 player games, this card counts as '小劇場' (same effect as Fishing)."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "C039-normal",
-      "C039-edge"
+      "C039-theater-bonus",
+      "C039-prereq-occupation",
+      "C039-1-3-player-theater",
+      "C039-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3050"
   }
 }

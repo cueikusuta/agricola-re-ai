@@ -20,13 +20,15 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3043",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
@@ -39,60 +41,49 @@
         "amount": 1
       }
     ],
-    "prerequisites": null,
+    "prerequisites": [],
     "printed_points": 0,
     "alternative_cost_notes": null
   },
   "effects": [
     {
-      "trigger": "end_scoring",
+      "trigger": "round_start",
       "conditions": [],
       "steps": [
         {
-          "operation": "gain_points",
+          "operation": "other",
           "target": "owner",
           "params": {
-            "points": {
-              "op": "per",
-              "args": [
-                {
-                  "op": "count",
-                  "args": [
-                    "unknown_metric"
-                  ]
-                },
-                1
-              ]
-            }
+            "action": "once_per_round_vegetable_for_point_and_food",
+            "vegetable_cost": 1,
+            "point_gain": 1,
+            "food_rounds": 2
           }
         }
       ],
-      "optional": false,
-      "frequency": "end_of_game",
+      "optional": true,
+      "frequency": "once_per_round",
       "duration": "permanent",
       "snapshot": "live_state",
       "order": 0,
-      "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "decision_owner": "owner",
+      "notes": "Once per round, may pay 1 vegetable to gain 1 bonus point. If so, place 1 food on each of the next 2 round spaces. Gain that food at the start of those rounds."
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility",
-      "play.prerequisites.exact"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "C046-normal",
-      "C046-edge"
+      "C046-vegetable-for-point-food",
+      "C046-once-per-round",
+      "C046-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3043"
   }
 }

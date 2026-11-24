@@ -20,13 +20,15 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3058",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
@@ -39,7 +41,7 @@
         "amount": 2
       }
     ],
-    "prerequisites": null,
+    "prerequisites": [],
     "printed_points": 0,
     "alternative_cost_notes": null
   },
@@ -53,15 +55,15 @@
           "target": "owner",
           "params": {
             "points": {
-              "op": "per",
+              "op": "min",
               "args": [
                 {
                   "op": "count",
                   "args": [
-                    "unknown_metric"
+                    "negative_points_total"
                   ]
                 },
-                1
+                7
               ]
             }
           }
@@ -73,26 +75,24 @@
       "snapshot": "live_state",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "notes": "At scoring, gain bonus points equal to total negative points (max 7)"
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility",
-      "play.prerequisites.exact"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "C031-normal",
-      "C031-edge"
+      "C031-scoring-negative-points",
+      "C031-scoring-cap-7",
+      "C031-scoring-no-negatives",
+      "C031-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3058"
   }
 }
