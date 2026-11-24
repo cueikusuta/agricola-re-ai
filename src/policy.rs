@@ -592,6 +592,10 @@ fn card_priority(
                                                 | CardEffect::OnPlayGainIfHouse { .. }
                                                 | CardEffect::OnPlayGainIfRoomCount { .. }
                                                 | CardEffect::OnPlayGainPerImprovementPlayed { .. }
+                                                // B059 食料箱: the exact gain was already simulated by
+                                                // cards::play above (its non-major branch, since the
+                                                // heuristic plays without a space); count 0 here.
+                                                | CardEffect::OnPlayGainByImprovementActionSpace { .. }
                                                 | CardEffect::Prerequisite { .. } => 0,
                 #[cfg(test)]
                 // Test-only probe; never part of a real evaluated pool.

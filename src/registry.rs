@@ -327,6 +327,7 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. }
                 | crate::cards::CardEffect::OnPlayChoiceGain { .. }
                 | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. }
+                | crate::cards::CardEffect::OnPlayGainByImprovementActionSpace { .. }
                 | crate::cards::CardEffect::PostPlayPassLeft => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
                     EventKind::ImprovementPlayed
@@ -520,6 +521,11 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterHarvestGainIfAtLeast { amount, .. } => {
                             *amount
                         }
+                        crate::cards::CardEffect::OnPlayGainByImprovementActionSpace {
+                            major_amount,
+                            other_amount,
+                            ..
+                        } => (*major_amount).max(*other_amount),
                         crate::cards::CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,

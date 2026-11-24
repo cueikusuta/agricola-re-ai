@@ -134,6 +134,7 @@ fn dispatch_b073(set: &CardSet, player: &mut Player) {
         &limits,
         &mut pending,
         true,
+        None, // play_space: no space (API-level dispatcher test)
     )
     .unwrap_or_else(|error| panic!("dispatch_play B073: {error}"));
     assert!(pending.is_none(), "B073 must not create a pending decision");

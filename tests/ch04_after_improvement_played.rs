@@ -89,6 +89,7 @@ fn dispatch_card(
         &limits,
         &mut pending,
         true, // is_improvement_action: tests simulate improvement action path
+        None, // play_space: no space (API-level dispatcher test)
     )
     .unwrap_or_else(|e| panic!("dispatch_play {id}: {e}"));
     *player = players[0].clone();
@@ -353,6 +354,7 @@ fn a109_not_triggered_by_family_growth_growwithminor() {
         &limits,
         &mut pending,
         false, // is_improvement_action: family growth path
+        None,  // play_space: no space (API-level dispatcher test)
     )
     .unwrap_or_else(|e| panic!("dispatch_play MI1: {e}"));
 
@@ -424,6 +426,7 @@ fn a109_triggers_on_major_improvement_play_minor() {
         &limits,
         &mut pending,
         true, // is_improvement_action: MajorImprovement + PlayMinor is an improvement action
+        None, // play_space: no space (API-level dispatcher test)
     )
     .unwrap_or_else(|e| panic!("dispatch_play MI1: {e}"));
 
