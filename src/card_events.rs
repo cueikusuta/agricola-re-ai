@@ -2573,6 +2573,13 @@ fn handle_harvest_field_gain(
                 )
             })
             .count() as u32,
+        // D038 搾乳台: tiers at 1/3/5 cattle -> 1/2/3 food, highest tier only.
+        crate::cards::HarvestFieldRule::CattleThresholds => match p.animal_count(Animal::Cattle) {
+            0 => 0,
+            1 | 2 => 1,
+            3 | 4 => 2,
+            _ => 3,
+        },
     };
     let gain = multiplier
         .checked_mul(amount)
@@ -4102,6 +4109,16 @@ pub mod legacy {
                             })
                             .count()
                             as u32,
+                        // D038 搾乳台: tiers at 1/3/5 cattle -> 1/2/3 food,
+                        // highest tier only.
+                        crate::cards::HarvestFieldRule::CattleThresholds => {
+                            match player.animal_count(crate::model::Animal::Cattle) {
+                                0 => 0,
+                                1 | 2 => 1,
+                                3 | 4 => 2,
+                                _ => 3,
+                            }
+                        }
                     };
                     let gain = multiplier
                         .checked_mul(*amount)

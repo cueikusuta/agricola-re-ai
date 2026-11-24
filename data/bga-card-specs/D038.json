@@ -117,7 +117,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "implemented",
     "notes": "Each harvest: 1/2/3 food for at least 1/3/5 cattle. At scoring: 1 point per 2 cattle."
   }
 }
