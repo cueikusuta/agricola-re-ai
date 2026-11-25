@@ -608,6 +608,11 @@ fn card_priority(
                                 CardEffect::AfterWorkerGainIfOwnsAnimal { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
+                                // A052: conditional on a standing pig-market accumulation;
+                                // value at the same conditional discount as A140/E111.
+                                CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 2
+                                }
                                 // C068 書棚: fixed gain per occupation played; similar heuristic to
                                 // PerFoodCost but without food-cost scaling.
                                 | CardEffect::AfterOccupationGain { good, amount, .. } => {

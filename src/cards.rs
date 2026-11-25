@@ -472,6 +472,27 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// A052 手投げ斧 (Throwing Axe): after the owner uses a wood accumulation
+    /// space (`space` = Forest / Copse / Grove) while the boar accumulation on
+    /// the `accumulation` animal market (PigMarket) holds at least `min`, gain
+    /// `amount` of `good` (printed: 2 food). The space gate is judged by the
+    /// generic condition scan; the handler reads the animal-market ledger the
+    /// after-worker dispatcher threads read-only through `DispatchContext` —
+    /// a missing entry or a count below `min` grants nothing, and the gain
+    /// lands on the card owner only (this handler is reached solely for the
+    /// owner's own played cards). The count is read after the worker action
+    /// resolved (after_event snapshot); the triggering action itself never
+    /// touches the pig market, so the standing count is the current one.
+    AfterWorkerGainIfAnimalAccumulationAtLeast {
+        /// The wood accumulation space the owner used (forest, copse, grove).
+        space: Space,
+        /// The animal market whose accumulation is read (pig_market).
+        accumulation: Space,
+        /// Minimum standing animals required (1 on the printed card).
+        min: u32,
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -572,6 +593,9 @@ impl CardEffect {
             }
             CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => {
                 "start_round_gain_if_accumulation_at_least"
+            }
+            CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => {
+                "after_worker_gain_if_animal_accumulation_at_least"
             }
         }
     }
@@ -855,6 +879,9 @@ impl CardSet {
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
                         CardEffect::OnPlayGainEachWithAtLeast { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
+                        CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                            amount, ..
+                        } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -3644,6 +3671,7 @@ mod round_and_harvest_card_tests {
             1,
             &used_spaces,
             &BTreeMap::new(),
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3666,6 +3694,7 @@ mod round_and_harvest_card_tests {
             1,
             &used_spaces,
             &BTreeMap::new(),
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3687,6 +3716,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
@@ -3728,6 +3758,7 @@ mod round_and_harvest_card_tests {
             1,
             &used_spaces,
             &BTreeMap::new(),
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3752,6 +3783,7 @@ mod round_and_harvest_card_tests {
             1,
             &used_spaces,
             &BTreeMap::new(),
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3775,6 +3807,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
@@ -6384,6 +6417,42 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                     animal: Animal::Cattle,
                     good: Good::Grain,
                     amount: 1,
+                },
+            ],
+        },
+        // A052 手投げ斧 (Throwing Axe): cost 1 wood, no prerequisites, 0 points.
+        // After using a wood accumulation space (Forest/Copse/Grove) while the
+        // Pig Market holds at least 1 boar, gain 2 food. One effect per space
+        // fixes the space gate; the handler reads the animal-market ledger
+        // (pig_market) threaded through DispatchContext by the after-worker
+        // dispatcher. Available at all player counts.
+        CardDefinition {
+            use_limit: None,
+            id: "A052".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                    space: Space::Forest,
+                    accumulation: Space::PigMarket,
+                    min: 1,
+                    good: Good::Food,
+                    amount: 2,
+                },
+                CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                    space: Space::Copse,
+                    accumulation: Space::PigMarket,
+                    min: 1,
+                    good: Good::Food,
+                    amount: 2,
+                },
+                CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                    space: Space::Grove,
+                    accumulation: Space::PigMarket,
+                    min: 1,
+                    good: Good::Food,
+                    amount: 2,
                 },
             ],
         },
