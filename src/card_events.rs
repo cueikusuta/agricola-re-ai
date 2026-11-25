@@ -58,6 +58,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         // phase. Its placement plan is derived and applied via place_animals
         // (the play executor cannot represent a play-time pause).
         CardEffect::OnPlayGainAnimal { .. } => TriggerPhase::Before,
+        CardEffect::OnPlayGainEachWithAtLeast { .. } => TriggerPhase::Before,
         // Passive effects are continuous — model as Before (no choices)
         CardEffect::Passive { .. } => TriggerPhase::Before,
         // Worker completion triggers — After phase
@@ -66,6 +67,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterWorkerGainAnimal { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => TriggerPhase::After,
         // Round start — After phase (happens after round begins)
         CardEffect::StartRoundGain { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfFoodAtLeastRound { .. } => TriggerPhase::After,
@@ -73,6 +75,7 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGainIfFamilyAndRooms { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfLessonsOccupants { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfAccumulationGrew { .. } => TriggerPhase::After,
+        CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => TriggerPhase::After,
         // Fired only by the play dispatcher's dedicated after-play scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
@@ -134,6 +137,13 @@ pub struct DispatchContext<'a> {
     /// every other dispatch path. This is a runtime-only borrow: the struct
     /// is never serialized, so save/observation formats are untouched.
     pub accumulations: Option<&'a std::collections::BTreeMap<Space, u32>>,
+    /// Public animal-market accumulations (space -> standing animals), the
+    /// pig/sheep/cattle ledger kept separately from `accumulations` because
+    /// animals are not goods. Provided by the after-worker dispatcher for
+    /// animal-accumulation conditions (A052 手投げ斧 reads the pig_market
+    /// count). `None` on every other dispatch path, and a missing entry or
+    /// zero count grants nothing. Runtime-only borrow, never serialized.
+    pub animal_accumulations: Option<&'a std::collections::BTreeMap<Space, u32>>,
     pub event_budget: &'a mut u32,
     pub card_uses: &'a mut BTreeMap<String, u32>,
     /// Declared per-card limits. Absent card = no per-period limit.
@@ -433,6 +443,7 @@ fn resolve_phase_scan(
             round: ctx.round,
             used_spaces: ctx.used_spaces,
             accumulations: ctx.accumulations,
+            animal_accumulations: ctx.animal_accumulations,
             event_budget: ctx.event_budget,
             card_uses: ctx.card_uses,
             card_use_limits: ctx.card_use_limits,
@@ -564,6 +575,13 @@ fn resolve_phase_scan(
                     handle_on_play_gain_animal(ctx, animal, *amount)?
                 }
                 CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
+                CardEffect::OnPlayGainEachWithAtLeast {
+                    goods,
+                    threshold,
+                    amount,
+                } => {
+                    handle_on_play_gain_each_with_at_least(ctx, player, goods, *threshold, *amount)?
+                }
                 CardEffect::AfterWorkerGain {
                     space,
                     good,
@@ -611,6 +629,24 @@ fn resolve_phase_scan(
                     *amount,
                     trigger_data,
                 )?,
+                // A052 手投げ斧: Forest/Copse/Grove use + pig_market accumulation
+                // >= min -> gain.
+                CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                    space,
+                    accumulation,
+                    min,
+                    good,
+                    amount,
+                } => handle_after_worker_gain_if_animal_accumulation_at_least(
+                    ctx,
+                    player,
+                    space,
+                    accumulation,
+                    *min,
+                    good,
+                    *amount,
+                    trigger_data,
+                )?,
                 CardEffect::StartRoundGain {
                     good,
                     amount,
@@ -650,6 +686,16 @@ fn resolve_phase_scan(
                     good,
                     amount,
                 } => handle_start_round_gain_if_accumulation_grew(
+                    ctx, player, *space, *min, good, *amount,
+                )?,
+                // D054 マスの池: accumulation >= min (no grew-this-round
+                // requirement) -> gain.
+                CardEffect::StartRoundGainIfAccumulationAtLeast {
+                    space,
+                    min,
+                    good,
+                    amount,
+                } => handle_start_round_gain_if_accumulation_at_least(
                     ctx, player, *space, *min, good, *amount,
                 )?,
                 // C067 ミネラルフィーダー: non-harvest round + pasture animals.
@@ -1070,6 +1116,9 @@ fn effect_condition_holds(
         CardEffect::StartRoundGainIfAccumulationGrew { .. } => {
             trigger.site == EventKind::RoundStart
         }
+        CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => {
+            trigger.site == EventKind::RoundStart
+        }
         CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
             trigger.site == EventKind::RoundStart
         }
@@ -1140,12 +1189,19 @@ fn effect_condition_holds(
         CardEffect::AfterWorkerGainIfOwnsAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
+        // A052 手投げ斧: the accumulation threshold needs the animal-market
+        // ledger, which this scan does not carry; the handler judges the count
+        // (A140/E111 pattern), so the scan only gates the site and space.
+        CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
         CardEffect::Passive { .. } => true,
         CardEffect::Prerequisite { .. } => true,
         CardEffect::EndGameBonus { .. } => true,
         // On-play effects always trigger when played — condition holds immediately.
         CardEffect::OnPlayChoiceGain { .. } => true,
         CardEffect::OnPlayAddStoneToEmptyFields { .. } => true,
+        CardEffect::OnPlayGainEachWithAtLeast { .. } => true,
         // PostPlayPassLeft is pure zone-move metadata: hold trivially.
         CardEffect::PostPlayPassLeft => true,
         // Chapter 1 round-start cards (A090/A151/A152/B097/B106/B135/C064).
@@ -1300,6 +1356,11 @@ pub fn execute_chosen_triggers(
                 handle_on_play_gain_animal(ctx, animal, *amount)?
             }
             CardEffect::Passive { rule } => handle_passive(ctx, player, rule)?,
+            CardEffect::OnPlayGainEachWithAtLeast {
+                goods,
+                threshold,
+                amount,
+            } => handle_on_play_gain_each_with_at_least(ctx, player, goods, *threshold, *amount)?,
             CardEffect::AfterWorkerGain {
                 space,
                 good,
@@ -1347,6 +1408,24 @@ pub fn execute_chosen_triggers(
                 *amount,
                 trigger_data,
             )?,
+            // A052 手投げ斧: Forest/Copse/Grove use + pig_market accumulation
+            // >= min -> gain.
+            CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                space,
+                accumulation,
+                min,
+                good,
+                amount,
+            } => handle_after_worker_gain_if_animal_accumulation_at_least(
+                ctx,
+                player,
+                space,
+                accumulation,
+                *min,
+                good,
+                *amount,
+                trigger_data,
+            )?,
             CardEffect::StartRoundGain {
                 good,
                 amount,
@@ -1386,6 +1465,16 @@ pub fn execute_chosen_triggers(
                 good,
                 amount,
             } => handle_start_round_gain_if_accumulation_grew(
+                ctx, player, *space, *min, good, *amount,
+            )?,
+            // D054 マスの池: accumulation >= min (no grew-this-round
+            // requirement) -> gain.
+            CardEffect::StartRoundGainIfAccumulationAtLeast {
+                space,
+                min,
+                good,
+                amount,
+            } => handle_start_round_gain_if_accumulation_at_least(
                 ctx, player, *space, *min, good, *amount,
             )?,
             // C067 ミネラルフィーダー: non-harvest round + pasture animals.
@@ -1966,6 +2055,45 @@ fn handle_after_worker_gain_other_accumulation_food(
     Ok(EffectResult::Resolved)
 }
 
+/// A052 手投げ斧 (Throwing Axe): after the owner uses `space` (Forest /
+/// Copse / Grove), if the `accumulation` animal market (pig_market) holds at
+/// least `min` standing animals, grant `amount` of `good` (printed: 2 food)
+/// to the card owner only. The boar count is read from the public
+/// animal-market ledger the after-worker dispatcher threads read-only
+/// through `DispatchContext` — a missing entry or a count below `min`
+/// grants nothing. Non-matching spaces and non-owner players grant nothing
+/// (this handler is reached solely for the owner's own played cards).
+#[allow(clippy::too_many_arguments)]
+fn handle_after_worker_gain_if_animal_accumulation_at_least(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    space: &Space,
+    accumulation: &Space,
+    min: u32,
+    good: &Good,
+    amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space != Some(*space) {
+        return Ok(EffectResult::Resolved);
+    }
+    let count = ctx
+        .animal_accumulations
+        .and_then(|map| map.get(accumulation).copied())
+        .unwrap_or(0);
+    if count < min {
+        return Ok(EffectResult::Resolved);
+    }
+    let p = &mut ctx.player;
+    let next = p
+        .supply
+        .get(*good)
+        .checked_add(amount)
+        .ok_or("resource overflow")?;
+    p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
 /// A066 餌皿 (Feeding Dish): after the owner uses `space`, if the owner
 /// already keeps `animal` (`player.animal_count(animal) > 0`), grant
 /// `amount` of `good` to the card owner only. The after-worker scan runs
@@ -2059,6 +2187,27 @@ fn handle_on_play_gain_animal(
     let plan = auto_animal_plan(ctx.player, *animal, amount);
     crate::engine::place_animals(ctx.player, &plan, amount)
         .map_err(|e| format!("on-play animal placement failed: {e}"))?;
+    Ok(EffectResult::Resolved)
+}
+
+fn handle_on_play_gain_each_with_at_least(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    goods: &[Good],
+    threshold: u32,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    for good in goods {
+        if p.supply.get(*good) >= threshold {
+            let next = p
+                .supply
+                .get(*good)
+                .checked_add(amount)
+                .ok_or("resource overflow")?;
+            p.supply.set(*good, next);
+        }
+    }
     Ok(EffectResult::Resolved)
 }
 
@@ -2365,6 +2514,36 @@ fn handle_start_round_gain_if_accumulation_grew(
         .unwrap_or(0);
     let per_round = space.accumulation().map(|(_, n)| n).unwrap_or(0);
     if current >= min && current > per_round {
+        let p = &mut ctx.player;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// D054 マスの池 (Trout Pool): at round start, if the `space` accumulation
+/// holds at least `min` (no "grew this round" requirement — unlike A049
+/// 営巣地 above), gain `amount` of `good`. The accumulation map is read
+/// read-only through `DispatchContext`; dispatches without the map grant
+/// nothing, and the map is never mutated. Food comes from the general
+/// supply, never depleting the space's standing food.
+fn handle_start_round_gain_if_accumulation_at_least(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    space: Space,
+    min: u32,
+    good: &Good,
+    amount: u32,
+) -> Result<EffectResult, String> {
+    let current = ctx
+        .accumulations
+        .and_then(|map| map.get(&space).copied())
+        .unwrap_or(0);
+    if current >= min {
         let p = &mut ctx.player;
         let next = p
             .supply
@@ -2957,6 +3136,7 @@ pub fn dispatch_play(
         round,
         used_spaces,
         accumulations: None,
+        animal_accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3260,6 +3440,12 @@ pub fn dispatch_after_worker(
     // (A140 ショベル運搬人 reads the OTHER clay accumulation). Runtime-only
     // borrow: the dispatcher never mutates or serializes it.
     accumulations: &std::collections::BTreeMap<Space, u32>,
+    // Public animal-market accumulations (space -> standing animals) as they
+    // stand after the core action resolved; the pig/sheep/cattle ledger kept
+    // separately from `accumulations` because animals are not goods. Threaded
+    // read-only for animal-accumulation conditions (A052 手投げ斧 reads the
+    // pig_market count). Runtime-only borrow: never mutated or serialized.
+    animal_accumulations: &std::collections::BTreeMap<Space, u32>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
@@ -3293,6 +3479,7 @@ pub fn dispatch_after_worker(
         round,
         used_spaces,
         accumulations: Some(accumulations),
+        animal_accumulations: Some(animal_accumulations),
         event_budget,
         card_uses,
         card_use_limits,
@@ -3344,6 +3531,7 @@ pub fn dispatch_after_worker(
         round,
         used_spaces,
         accumulations: Some(accumulations),
+        animal_accumulations: Some(animal_accumulations),
         event_budget,
         card_uses,
         card_use_limits,
@@ -3397,6 +3585,7 @@ pub fn dispatch_start_round(
             round,
             used_spaces,
             accumulations: Some(accumulations),
+            animal_accumulations: None,
             event_budget,
             card_uses,
             card_use_limits,
@@ -3479,6 +3668,7 @@ pub fn dispatch_after_clay_construction(
         round,
         used_spaces,
         accumulations: None,
+        animal_accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3555,6 +3745,7 @@ pub fn dispatch_harvest_field(
         round,
         used_spaces,
         accumulations: None,
+        animal_accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3633,6 +3824,7 @@ pub fn dispatch_after_harvest_complete(
         round,
         used_spaces,
         accumulations: None,
+        animal_accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3702,6 +3894,7 @@ pub fn dispatch_after_harvest_bake(
         round,
         used_spaces,
         accumulations: None,
+        animal_accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -4187,6 +4380,7 @@ mod tests {
             1,
             &std::collections::BTreeSet::new(),
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -4434,6 +4628,7 @@ mod tests {
                 &mut well,
                 1,
                 &used,
+                &std::collections::BTreeMap::new(),
                 &std::collections::BTreeMap::new(),
                 &mut c.budget,
                 &mut c.uses,
@@ -4687,6 +4882,7 @@ mod tests {
                     &mut well,
                     1,
                     &used,
+                    &std::collections::BTreeMap::new(),
                     &std::collections::BTreeMap::new(),
                     &mut c.budget,
                     &mut c.uses,
@@ -5111,6 +5307,7 @@ mod tests {
             1,
             &used,
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -5201,6 +5398,7 @@ mod tests {
             1,
             &std::collections::BTreeSet::new(),
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -5237,6 +5435,7 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
@@ -5304,6 +5503,7 @@ mod tests {
             1,
             &used_spaces,
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -5338,6 +5538,7 @@ mod tests {
             &mut well,
             1,
             &used_spaces,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
@@ -5503,6 +5704,7 @@ mod tests {
             1,
             &std::collections::BTreeSet::new(),
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -5544,6 +5746,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
@@ -6595,6 +6798,7 @@ mod tests {
         let mut well = BTreeMap::new();
         let mut used = std::collections::BTreeSet::new();
         let accumulations = BTreeMap::new();
+        let animal_accumulations = BTreeMap::new();
         used.insert(Space::DayLaborer);
         let mut pending = None;
         dispatch_after_worker(
@@ -6608,6 +6812,7 @@ mod tests {
             4,
             &used,
             &accumulations,
+            &animal_accumulations,
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -7254,6 +7459,7 @@ mod tests {
             4,
             &used,
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -7296,6 +7502,7 @@ mod tests {
             4,
             &used,
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -7336,6 +7543,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
@@ -7380,6 +7588,7 @@ mod tests {
             4,
             &used,
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -7419,6 +7628,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
@@ -7469,6 +7679,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
@@ -7523,6 +7734,7 @@ mod tests {
             4,
             &used,
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -7569,6 +7781,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
@@ -7617,6 +7830,7 @@ mod tests {
             4,
             &used,
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -7657,6 +7871,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
@@ -7704,6 +7919,7 @@ mod tests {
             &mut well,
             4,
             &used,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
@@ -9257,5 +9473,189 @@ mod tests {
             "C066 grain=5 default: +1 grain only (5 -> 6), not +2"
         );
         assert!(pending.is_none());
+    }
+}
+
+#[cfg(test)]
+mod a052_throwing_axe_tests {
+    use super::*;
+    use crate::cards::{verified_band_a_cards, CardDefinition, CardKind, CardSet, CardState};
+    use crate::model::{Good, Player, Space};
+    use std::collections::{BTreeMap, BTreeSet};
+
+    fn set_with_a052() -> CardSet {
+        CardSet {
+            definitions: verified_band_a_cards()
+                .into_iter()
+                .filter(|card| card.id == "A052")
+                .collect(),
+        }
+    }
+
+    fn a052_definition() -> CardDefinition {
+        set_with_a052()
+            .definitions
+            .into_iter()
+            .next()
+            .expect("A052 must exist in band A")
+    }
+
+    #[test]
+    fn a052_definition_matches_spec() {
+        let card = a052_definition();
+        assert_eq!(card.id, "A052");
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        assert!(card.effects.iter().any(|e| matches!(
+            e,
+            CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                space: Space::Forest,
+                accumulation: Space::PigMarket,
+                min: 1,
+                good: Good::Food,
+                amount: 2
+            }
+        )));
+        assert!(card.effects.iter().any(|e| matches!(
+            e,
+            CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                space: Space::Copse,
+                ..
+            }
+        )));
+        assert!(card.effects.iter().any(|e| matches!(
+            e,
+            CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                space: Space::Grove,
+                ..
+            }
+        )));
+    }
+
+    /// Dispatcher-level helper mirroring the engine's after-worker call site.
+    fn dispatch(
+        set: &CardSet,
+        actor: usize,
+        space: Space,
+        mut players: Vec<Player>,
+        boars: u32,
+    ) -> Vec<Player> {
+        // Card ownership is set explicitly by each test; this helper does not
+        // auto-grant A052 to every seat.
+        let mut cards = CardState::default();
+        let mut market = vec![];
+        let mut well = BTreeMap::new();
+        let mut budget = 100;
+        let mut uses = BTreeMap::new();
+        let limits = BTreeMap::new();
+        let mut pending = None;
+        let used = BTreeSet::new();
+        let accumulations = BTreeMap::new();
+        let mut animal_accumulations = BTreeMap::new();
+        if boars > 0 {
+            animal_accumulations.insert(Space::PigMarket, boars);
+        }
+        dispatch_after_worker(
+            set,
+            actor,
+            space,
+            &mut cards,
+            &mut players,
+            &mut market,
+            &mut well,
+            1,
+            &used,
+            &accumulations,
+            &animal_accumulations,
+            &mut budget,
+            &mut uses,
+            &limits,
+            &mut pending,
+            false,
+        )
+        .expect("dispatch_after_worker must succeed");
+        players
+    }
+
+    #[test]
+    fn a052_forest_with_one_boar_grants_two_food() {
+        let set = set_with_a052();
+        let mut players = vec![Player::new(0, 0), Player::new(1, 0)];
+        players[0].played_cards.push("A052".to_string());
+        let players = dispatch(&set, 0, Space::Forest, players, 1);
+        assert_eq!(
+            players[0].supply.food, 2,
+            "Forest + pig market >= 1 grants 2 food"
+        );
+        assert_eq!(players[1].supply.food, 0, "no card, no grant");
+    }
+
+    #[test]
+    fn a052_copse_with_one_boar_grants_two_food() {
+        let set = set_with_a052();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("A052".to_string());
+        let players = dispatch(&set, 0, Space::Copse, players, 1);
+        assert_eq!(
+            players[0].supply.food, 2,
+            "Copse + pig market >= 1 grants 2 food"
+        );
+    }
+
+    #[test]
+    fn a052_grove_with_one_boar_grants_two_food() {
+        let set = set_with_a052();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("A052".to_string());
+        let players = dispatch(&set, 0, Space::Grove, players, 1);
+        assert_eq!(
+            players[0].supply.food, 2,
+            "Grove + pig market >= 1 grants 2 food"
+        );
+    }
+
+    #[test]
+    fn a052_wood_space_without_boars_grants_nothing() {
+        let set = set_with_a052();
+        for space in [Space::Forest, Space::Copse, Space::Grove] {
+            let mut players = vec![Player::new(0, 0)];
+            players[0].played_cards.push("A052".to_string());
+            let players = dispatch(&set, 0, space, players, 0);
+            assert_eq!(
+                players[0].supply.food, 0,
+                "{space:?} with an empty pig market grants nothing"
+            );
+        }
+    }
+
+    #[test]
+    fn a052_non_wood_space_with_boars_grants_nothing() {
+        let set = set_with_a052();
+        for space in [Space::DayLaborer, Space::ClayPit, Space::SheepMarket] {
+            let mut players = vec![Player::new(0, 0)];
+            players[0].played_cards.push("A052".to_string());
+            let players = dispatch(&set, 0, space, players, 1);
+            assert_eq!(
+                players[0].supply.food, 0,
+                "{space:?} must not trigger A052 even with boars on the pig market"
+            );
+        }
+    }
+
+    #[test]
+    fn a052_only_card_owner_benefits() {
+        let set = set_with_a052();
+        // Seat 0 owns A052 but is NOT the actor; seat 1 is the actor using
+        // Forest but does not own the card. Only actor-owned cards fire, so
+        // neither seat gains food.
+        let mut players = vec![Player::new(0, 0), Player::new(1, 0)];
+        players[0].played_cards.push("A052".to_string());
+        let players = dispatch(&set, 1, Space::Forest, players, 1);
+        assert_eq!(
+            players[0].supply.food, 0,
+            "owner but not actor gets nothing"
+        );
+        assert_eq!(players[1].supply.food, 0, "actor without card gets nothing");
     }
 }

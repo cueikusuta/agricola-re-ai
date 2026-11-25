@@ -1190,10 +1190,12 @@ mod tests {
         // Updated: added A118/A145/C066 to verified_round_and_harvest_cards (pool size 35->38)
         // Updated: PR #385 review fix (e) — A145 removed from the two-player
         // preset (spec eligibility "2": "no"), pool size 38->37.
-        // Updated: StartRoundGainIf* wave — B114/A049/C067 joined the
+        // Updated: StartRoundGainIf* wave — B114/A049/C067/D054 joined the
         // two-player preset (A157 stays out, 4 players only), pool size 37->41.
+        // Updated: D026 大工の敷地 / E024 野心 added to the preset
+        // (PR #501, intentional pool change: 45 -> 47 total cards).
         assert_eq!(
-            digest, "310a31bdb04fa7fa2abec2a215396065daf5874819f413c6f669247f5f55deff",
+            digest, "7d23492da17c57c1210c5f90a19ca6f1c5c7a142a25d6913f951f3589391993b",
             "sample_game distribution changed — update this test only if intentional"
         );
     }
