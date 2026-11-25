@@ -1598,12 +1598,6 @@ impl Game {
                             &mut self.pending,
                             true, // is_improvement_action
                         )?;
-                        // Update card points
-                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                        crate::cards::update_card_points_on_play(
-                            &mut self.public.players[id],
-                            card.points,
-                        )?;
                         // Post-play pass (C006/C007 `PostPlayPassLeft`): pass
                         // the card to the left neighbor's hand.
                         {
@@ -1767,12 +1761,6 @@ impl Game {
                     &mut self.pending,
                     false, // is_improvement_action
                 )?;
-                // Update card points
-                let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                crate::cards::update_card_points_on_play(
-                    &mut self.public.players[id],
-                    card.points,
-                )?;
             }
             Space::DayLaborer => {
                 require_none(detail)?;
@@ -1880,12 +1868,6 @@ impl Game {
                         &self.card_use_limits,
                         &mut self.pending,
                         false, // is_improvement_action
-                    )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
                     )?;
                     // Post-play pass (C006/C007 `PostPlayPassLeft`): the same
                     // destination rule applies when the minor is played via
@@ -2005,12 +1987,6 @@ impl Game {
                         &mut self.pending,
                         true, // is_improvement_action
                     )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
-                    )?;
                     // Post-play pass (C006/C007 `PostPlayPassLeft`): pass the
                     // card to the left neighbor's hand after the play resolves.
                     {
@@ -2092,12 +2068,6 @@ impl Game {
                         &mut self.public.players[id],
                         &choice_options,
                         *option,
-                    )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
                     )?;
                     // Post-play pass (C006/C007 `PostPlayPassLeft`).
                     {
@@ -2949,6 +2919,59 @@ fn build_pastures(
         return Err("fencing must conserve existing animals".into());
     }
     Ok(())
+}
+
+/// Free single-cell pasture build (B002 小牧場 Mini Pasture): fence one empty
+/// farmyard cell into a pasture at no wood cost.
+///
+/// Rule constraints mirrored from `build_pastures` (2016 Lookout fencing):
+/// the cell must be an empty farmyard cell (no room/field), a stable on the
+/// cell is rejected so animal conservation never enters the picture, the new
+/// border segments must stay within the 15-segment fence limit, and the cell
+/// becomes a fresh empty pasture (`animal: None, quantity: 0`). Placement
+/// (which cell) is a detail decision made by the caller, not by this rule.
+pub(crate) fn build_free_single_cell_pasture(p: &mut Player, cell: usize) -> Result<()> {
+    if cell >= FARM_CELLS {
+        return Err("pasture cell out of range".into());
+    }
+    if !matches!(p.farm[cell].tile, Tile::Empty) {
+        return Err("a pasture can only be fenced on an empty farmyard cell".into());
+    }
+    if p.farm[cell].stable {
+        return Err("a stable cannot be fenced in by a free pasture build".into());
+    }
+    let edges = boundary(&[cell]);
+    if p.fences.len() + edges.iter().filter(|e| !p.fences.contains(*e)).count() > 15 {
+        return Err("fence limit 15".into());
+    }
+    let id = p.pastures.iter().map(|q| q.id).max().map_or(0, |n| {
+        n.checked_add(1).ok_or("pasture id overflow").unwrap()
+    });
+    p.farm[cell].tile = Tile::Pasture { id };
+    p.pastures.push(Pasture {
+        id,
+        cells: vec![cell],
+        animal: None,
+        quantity: 0,
+    });
+    p.fences.extend(edges);
+    Ok(())
+}
+
+/// Empty farmyard cells a free single-cell pasture (B002) may legally fence:
+/// empty, unstabled, and — when the player already owns a pasture — touching
+/// an existing pasture (2016 Lookout: new fences extend the fence network).
+pub(crate) fn free_single_cell_pasture_candidates(p: &Player) -> Vec<usize> {
+    (0..FARM_CELLS)
+        .filter(|&i| {
+            matches!(p.farm[i].tile, Tile::Empty)
+                && !p.farm[i].stable
+                && (p.pastures.is_empty()
+                    || neighbors(i)
+                        .iter()
+                        .any(|&j| matches!(p.farm[j].tile, Tile::Pasture { .. })))
+        })
+        .collect()
 }
 
 /// A deterministic candidate for an *empty* pasture split. An occupied
