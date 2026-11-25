@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "card_id": "E095",
+  "cases": [
+    {
+      "id": "E095-build-baking",
+      "scope": "effect_only",
+      "setup": {
+        "clay_oven_available": true,
+        "resources": { "clay": 3, "stone": 1 }
+      },
+      "action": {
+        "play": "E095",
+        "build_clay_oven": true
+      },
+      "expected": {
+        "clay_oven_built": true,
+        "resources_spent": { "clay": 3, "stone": 1 }
+      }
+    },
+    {
+      "id": "E095-other-player-grain-seeds",
+      "scope": "effect_only",
+      "setup": {
+        "baking_actions": 0
+      },
+      "action": {
+        "other_player_uses_grain_seeds": true
+      },
+      "expected": {
+        "baking_actions_gained": 1
+      }
+    },
+    {
+      "id": "E095-both",
+      "scope": "effect_only",
+      "setup": {
+        "stone_oven_available": true,
+        "resources": { "clay": 1, "stone": 3 }
+      },
+      "action": {
+        "play": "E095",
+        "build_stone_oven": true,
+        "other_player_uses_grain_seeds": 2
+      },
+      "expected": {
+        "stone_oven_built": true,
+        "resources_spent": { "clay": 1, "stone": 3 },
+        "baking_actions_gained": 2
+      }
+    }
+  ]
+}

@@ -237,6 +237,13 @@ impl Game {
                     }
                 }
             }
+            // C006 石取り作業 / Stone Clearing (BGA spec
+            // `harvest_at: "next_field_phase"`): stones placed on fields are
+            // collected by the owner at the field phase and the per-field
+            // counter is reset. Single source of truth shared with the legacy
+            // `cards::harvest_field_rewards` via
+            // [`crate::cards::harvest_field_stones`].
+            crate::cards::harvest_field_stones(&self.card_set, p)?;
         }
         Ok(())
     }
