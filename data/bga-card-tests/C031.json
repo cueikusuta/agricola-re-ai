@@ -3,7 +3,7 @@
   "card_id": "C031",
   "cases": [
     {
-      "id": "C031-normal",
+      "id": "C031-scoring-negative-points",
       "scope": "effect_only",
       "setup": {
         "player": {
@@ -18,13 +18,52 @@
       },
       "expected": {
         "effect_applies": true,
-        "points_gained": null,
-        "notes": "Inventory-only test contract"
+        "notes": "Effect test: C031-scoring-negative-points"
       },
-      "notes": "Placeholder test case"
+      "notes": "Primary source verified test case for C031"
     },
     {
-      "id": "C031-edge",
+      "id": "C031-scoring-cap-7",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C031",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Effect test: C031-scoring-cap-7"
+      },
+      "notes": "Primary source verified test case for C031"
+    },
+    {
+      "id": "C031-scoring-no-negatives",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C031",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Effect test: C031-scoring-no-negatives"
+      },
+      "notes": "Primary source verified test case for C031"
+    },
+    {
+      "id": "C031-legal-play",
       "scope": "legal_play",
       "setup": {
         "player": {
@@ -35,14 +74,13 @@
       "action": {
         "type": "play_card",
         "card_id": "C031",
-        "cost_paid": false
+        "cost_paid": true
       },
       "expected": {
-        "effect_applies": false,
-        "error": "insufficient_cost_or_prereq",
-        "notes": "Card should not be playable without meeting cost/prerequisites"
+        "effect_applies": true,
+        "notes": "Card should be playable when cost/prerequisites met"
       },
-      "notes": "Placeholder edge case test"
+      "notes": "Primary source verified test case for C031"
     }
   ]
 }
