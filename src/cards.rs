@@ -5027,6 +5027,29 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 CardEffect::PostPlayPassLeft,
             ],
         ),
+        // ---- Freebuff on_play gain chapter (2026-11-25) ----
+        // C026 脱穀棒 (Flail): cost 1 wood; on play gain 2 food. Follow-up:
+        // after Farmland or Cultivation, take an additional Bake Bread action.
+        card(
+            "C026",
+            minor,
+            vec![(Good::Wood, 1)],
+            vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 2,
+            }],
+        ),
+        // C086 家畜の餌係 (Livestock Feeder): no cost; on play gain 1 grain.
+        // Follow-up: each grain in supply may hold 1 animal of any type.
+        card(
+            "C086",
+            occupation,
+            vec![],
+            vec![CardEffect::OnPlayGain {
+                good: Good::Grain,
+                amount: 1,
+            }],
+        ),
     ]
 }
 #[cfg(test)]

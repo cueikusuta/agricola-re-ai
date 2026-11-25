@@ -18,3 +18,11 @@
   - B155 美術教師: `MinimumPlayers(4)`、wood 1 + reed 1。
 - `tests/onplay_gain_ch02_b.rs`: メタデータ・コスト・増分の 4 テスト成功。
 - 仕様 4 枚の `implementation_status` を `in_progress` に更新。
+
+## 第3章 C帯（C026, C086）
+
+- `src/cards.rs::verified_band_c_cards()` に on_play 獲得部分を追加。
+  - C026 脱穀棒: wood 1 コスト、food 2。
+  - C086 家畜の餌係: grain 1。
+- `tests/onplay_gain_ch03_c.rs`: コスト・増分の 2 テスト成功。
+- 仕様 2 枚の `implementation_status` を `in_progress` に更新。

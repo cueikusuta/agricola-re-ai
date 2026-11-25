@@ -92,7 +92,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "Gain 1 grain; each grain in supply can hold 1 animal of any type."
   }
 }
