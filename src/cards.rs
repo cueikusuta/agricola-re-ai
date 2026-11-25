@@ -445,25 +445,25 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
-        /// on_play `grant_action`: grants the owner an action (Major Improvement,
-        /// Renovation or Sow) that creates a PendingDecision for the player to
-        /// resolve via the normal pending decision mechanism (no longer uses
-        /// `Player::execute_granted_action`).
-        OnPlayGrantAction {
-            action: GrantedAction,
-        },
-        /// On-play per-good threshold gain: for each good in `goods`, if the
-        /// owner already holds at least `threshold` of it, gain `amount` of
-        /// that good. Judged per good against the owner's own supply (not
-        /// resource totals); goods below threshold grant nothing. No new
-        /// persistent field or PendingDecision. Used by B105
-        /// (food/grain/vegetable/reed/wood, threshold 2, amount 1) and E006
-        /// (wood/clay/reed/stone, threshold 4, amount 1).
-        OnPlayGainEachWithAtLeast {
-            goods: Vec<Good>,
-            threshold: u32,
-            amount: u32,
-        },
+    /// on_play `grant_action`: grants the owner an action (Major Improvement,
+    /// Renovation or Sow) that creates a PendingDecision for the player to
+    /// resolve via the normal pending decision mechanism (no longer uses
+    /// `Player::execute_granted_action`).
+    OnPlayGrantAction {
+        action: GrantedAction,
+    },
+    /// On-play per-good threshold gain: for each good in `goods`, if the
+    /// owner already holds at least `threshold` of it, gain `amount` of
+    /// that good. Judged per good against the owner's own supply (not
+    /// resource totals); goods below threshold grant nothing. No new
+    /// persistent field or PendingDecision. Used by B105
+    /// (food/grain/vegetable/reed/wood, threshold 2, amount 1) and E006
+    /// (wood/clay/reed/stone, threshold 4, amount 1).
+    OnPlayGainEachWithAtLeast {
+        goods: Vec<Good>,
+        threshold: u32,
+        amount: u32,
+    },
     /// D054 マスの池 (Trout Pool): at each round start, if the `space`
     /// accumulation holds at least `min`, gain `amount` of `good` from the
     /// general supply. Unlike A049 営巣地 (`StartRoundGainIfAccumulationGrew`)
