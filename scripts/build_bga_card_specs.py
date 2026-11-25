@@ -745,6 +745,11 @@ CARDS = {
         "post": "played_area",
         "effects": [effect("on_play", [gain("food", 1)])],
         "notes": "Gain 1 food on play; printed 3 points and requires 6 field tiles plus all animal types.",
+        "implementation_status": "tested",
+        "status": "partial",
+        "unresolved": [
+            "play 前提条件（field_count n=6 + all_animal_types）を CardRequirement 語彙が表現できないため未施行。語彙追加の後続 issue まで play は無 guard のまま（food 付与は1回のみ、tests/ch03_onplay_per_count.rs の b037_* テストで固定）。推測で前提条件を実装しない（AGENTS.md 第3項）"
+        ],
         "tests": [
             case("B037-normal", {"food": 0}, {"play": "B037"}, {"food_delta": 1}),
             case("B037-not-triggered", {"field_tiles": 5, "animal_types": 3},

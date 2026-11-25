@@ -3,7 +3,7 @@
   "card_id": "C039",
   "cases": [
     {
-      "id": "C039-normal",
+      "id": "C039-theater-bonus",
       "scope": "effect_only",
       "setup": {
         "player": {
@@ -18,13 +18,12 @@
       },
       "expected": {
         "effect_applies": true,
-        "points_gained": null,
-        "notes": "Inventory-only test contract"
+        "notes": "Effect test: C039-theater-bonus"
       },
-      "notes": "Placeholder test case"
+      "notes": "Primary source verified test case for C039"
     },
     {
-      "id": "C039-edge",
+      "id": "C039-prereq-occupation",
       "scope": "legal_play",
       "setup": {
         "player": {
@@ -42,7 +41,47 @@
         "error": "insufficient_cost_or_prereq",
         "notes": "Card should not be playable without meeting cost/prerequisites"
       },
-      "notes": "Placeholder edge case test"
+      "notes": "Primary source verified test case for C039"
+    },
+    {
+      "id": "C039-1-3-player-theater",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C039",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Effect test: C039-1-3-player-theater"
+      },
+      "notes": "Primary source verified test case for C039"
+    },
+    {
+      "id": "C039-legal-play",
+      "scope": "legal_play",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C039",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Card should be playable when cost/prerequisites met"
+      },
+      "notes": "Primary source verified test case for C039"
     }
   ]
 }

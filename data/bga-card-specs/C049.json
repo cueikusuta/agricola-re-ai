@@ -20,13 +20,15 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3040",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
@@ -39,60 +41,51 @@
         "amount": 1
       }
     ],
-    "prerequisites": null,
+    "prerequisites": [],
     "printed_points": 0,
     "alternative_cost_notes": null
   },
   "effects": [
     {
-      "trigger": "end_scoring",
+      "trigger": "harvest_feeding_phase",
       "conditions": [],
       "steps": [
         {
-          "operation": "gain_points",
+          "operation": "exchange",
           "target": "owner",
           "params": {
-            "points": {
-              "op": "per",
-              "args": [
-                {
-                  "op": "count",
-                  "args": [
-                    "unknown_metric"
-                  ]
-                },
-                1
-              ]
-            }
+            "give": {
+              "grain": 1
+            },
+            "receive": {
+              "food": 5
+            },
+            "per": "empty_unfenced_stable"
           }
         }
       ],
-      "optional": false,
-      "frequency": "end_of_game",
+      "optional": true,
+      "frequency": "per_harvest",
       "duration": "permanent",
       "snapshot": "live_state",
       "order": 0,
-      "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "decision_owner": "owner",
+      "notes": "At each harvest feeding phase, for each empty stable not enclosed by fences, may exchange 1 wheat for 5 food"
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility",
-      "play.prerequisites.exact"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "C049-normal",
-      "C049-edge"
+      "C049-empty-stable-wheat-for-food",
+      "C049-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3040"
   }
 }
