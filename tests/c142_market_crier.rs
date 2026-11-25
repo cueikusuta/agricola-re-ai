@@ -48,6 +48,7 @@ fn dispatch(
     let mut pending = None;
     let used = std::collections::BTreeSet::new();
     let accumulations = std::collections::BTreeMap::new();
+    let animal_accumulations = std::collections::BTreeMap::new();
     let transition = dispatch_after_worker(
         set,
         actor,
@@ -59,6 +60,7 @@ fn dispatch(
         1,
         &used,
         &accumulations,
+        &animal_accumulations,
         &mut budget,
         &mut uses,
         &limits,

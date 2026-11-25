@@ -325,6 +325,7 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                | crate::cards::CardEffect::OnPlayGainEachWithAtLeast { .. }
                 | crate::cards::CardEffect::OnPlayChoiceGain { .. }
                 | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. }
                 | crate::cards::CardEffect::PostPlayPassLeft => EventKind::CardPlayed,
@@ -341,6 +342,7 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms { .. }
                 | crate::cards::CardEffect::StartRoundGainIfLessonsOccupants { .. }
                 | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew { .. }
+                | crate::cards::CardEffect::StartRoundGainIfAccumulationAtLeast { .. }
                 | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
                     EventKind::RoundStart
                 }
@@ -387,6 +389,9 @@ impl CardRegistryBuilder {
                     EventKind::WorkerPlaced
                 }
                 crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => {
                     EventKind::WorkerPlaced
                 }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
@@ -490,6 +495,7 @@ impl CardRegistryBuilder {
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
                         | crate::cards::CardEffect::OnPlayGainIfHouse { amount, .. }
                         | crate::cards::CardEffect::OnPlayGainIfRoomCount { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainEachWithAtLeast { amount, .. }
                         | crate::cards::CardEffect::StartRoundGain { amount, .. }
                         | crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound {
                             amount,
@@ -516,6 +522,10 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                            amount,
+                            ..
+                        } => *amount,
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
@@ -548,6 +558,10 @@ impl CardRegistryBuilder {
                             ..
                         }
                         | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew {
+                            amount,
+                            ..
+                        }
+                        | crate::cards::CardEffect::StartRoundGainIfAccumulationAtLeast {
                             amount,
                             ..
                         }
