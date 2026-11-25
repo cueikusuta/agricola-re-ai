@@ -328,7 +328,8 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainEachWithAtLeast { .. }
                 | crate::cards::CardEffect::OnPlayChoiceGain { .. }
                 | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. }
-                | crate::cards::CardEffect::PostPlayPassLeft => EventKind::CardPlayed,
+                | crate::cards::CardEffect::PostPlayPassLeft
+                | crate::cards::CardEffect::OnPlayGrantAction { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
                     EventKind::ImprovementPlayed
                 }
@@ -576,7 +577,10 @@ impl CardRegistryBuilder {
                             options.iter().map(|o| o.amount).max().unwrap_or(1)
                         }
                         // Zone-move metadata carries no gain amount.
-                        crate::cards::CardEffect::PostPlayPassLeft => 1,
+                                                crate::cards::CardEffect::PostPlayPassLeft => 1,
+                                                // on_play grant_action grants an action (no resource
+                                                // amount to bound); validated as 1 like zone moves.
+                                                crate::cards::CardEffect::OnPlayGrantAction { .. } => 1,
                         // A140: the amount is read from the public
                         // accumulations at resolution time, not fixed here.
                         crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }

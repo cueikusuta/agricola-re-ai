@@ -11,7 +11,7 @@
 //! Source: docs/bga-card-specification.md and existing repo citations.
 
 use crate::cards::{CardEffect, CardSet};
-use crate::model::{Animal, Crop, Good, House, Player, Space, Tile};
+use crate::model::{Animal, Crop, Good, GrantedAction, House, Player, Space, Tile};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
 use crate::registry::EventKind;
 use serde::{Deserialize, Serialize};
@@ -118,6 +118,8 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGainIfGoodsOnRoundSpaces { .. } => TriggerPhase::After,
         CardEffect::StartRoundExchangeForFoodAndPoints { .. } => TriggerPhase::After,
         CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => TriggerPhase::After,
+        // on_play grant_action is instantaneous at play time — Before phase.
+        CardEffect::OnPlayGrantAction { .. } => TriggerPhase::Before,
     }
 }
 
@@ -890,6 +892,9 @@ fn resolve_phase_scan(
                     // Zone move executed by the engine play arm, not here.
                     EffectResult::Resolved
                 }
+                CardEffect::OnPlayGrantAction { action } => {
+                    handle_on_play_grant_action(ctx, player, action)?
+                }
             };
 
             // Handle pending interrupt: pause with the resume position.
@@ -1230,6 +1235,7 @@ fn effect_condition_holds(
         CardEffect::StartRoundPlaceFoodOnNextRoundSpaces { .. } => false,
         #[cfg(test)]
         CardEffect::PendingProbe { .. } => true,
+        CardEffect::OnPlayGrantAction { .. } => true,
     }
 }
 
@@ -1666,6 +1672,9 @@ pub fn execute_chosen_triggers(
                 // Zone move executed by the engine play arm, not here.
                 EffectResult::Resolved
             }
+            CardEffect::OnPlayGrantAction { action } => {
+                handle_on_play_grant_action(ctx, player, action)?
+            }
         };
 
         // Handle pending interrupt: pause with the resume position.
@@ -1806,6 +1815,19 @@ fn handle_on_play_gain(
         .checked_add(amount)
         .ok_or("resource overflow")?;
     p.supply.set(*good, next);
+    Ok(EffectResult::Resolved)
+}
+
+/// on_play `grant_action`: record the granted action on the owner for
+/// serialization. The actual resolution happens via a PendingDecision
+/// created after the play arm completes (see `create_grant_action_pending`).
+fn handle_on_play_grant_action(
+    ctx: &mut DispatchContext<'_>,
+    _player: usize,
+    action: &GrantedAction,
+) -> Result<EffectResult, String> {
+    let p = &mut ctx.player;
+    p.granted_actions.push(action.clone());
     Ok(EffectResult::Resolved)
 }
 

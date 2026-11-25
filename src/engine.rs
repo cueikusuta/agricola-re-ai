@@ -885,6 +885,79 @@ impl Game {
         // action, so each action starts from the full budget again.
         next.event_budget = crate::model::DEFAULT_EVENT_BUDGET;
         next.execute_work(player, &action)?;
+
+        // Check if a pending decision was created during execute_work (e.g., grant_action from on-play effect).
+        // If so, handle it before proceeding to post-work card effects.
+        if next.pending.is_some() {
+            if !allow_pause {
+                // One-shot apply cannot represent a pending decision.
+                // Reject BEFORE committing any state, so the game is byte-for-byte unchanged.
+                return Err(
+                    "action paused on a pending decision; apply cannot represent an \
+                             interrupt — use apply_with_plans and Game::resolve_pending_and_resume"
+                        .into(),
+                );
+            }
+            let previous_player = self.public.players[player].clone();
+            *self = next;
+            let decision_id = self.next_decision_id;
+            self.next_decision_id += 1;
+            let state_hash = self.state_hash();
+            if let Some(pending) = self.pending.as_mut() {
+                pending.id = decision_id;
+                pending.state_hash_before = state_hash;
+            }
+            // Build continuation for the work action completion
+            let after = crate::pending::ChainPosition {
+                card_index: 0,
+                effect_index: 0,
+            };
+            let resume = crate::pending::PostWorkResume {
+                step: crate::pending::ChainStep::AfterWorker,
+                phase: crate::card_events::TriggerPhase::Interrupt,
+                after,
+                space_applied: false,
+            };
+            let completion = Box::new(crate::pending::WorkCompletion {
+                action: action.clone(),
+                previous_player,
+                harvest_plans: forced.clone(),
+                breeding_plans: forced_breeding.clone(),
+                logged_before: if record {
+                    before.clone()
+                } else {
+                    String::new()
+                },
+            });
+            if let Some(pending) = self.pending.as_mut() {
+                pending.continuation = crate::pending::Continuation::PostWork {
+                    player,
+                    resume,
+                    completion,
+                };
+            }
+            // Record the work event with the paused state
+            if record {
+                let payload = serde_json::to_value(crate::engine::RecordedAction::Work {
+                    player,
+                    action: action.clone(),
+                    harvest_plans: forced.clone(),
+                    breeding_plans: forced_breeding.clone(),
+                })
+                .map_err(|e| e.to_string())?;
+                self.log.events.push(Event {
+                    player: Some(player),
+                    kind: "work".into(),
+                    payload,
+                    before: before.clone(),
+                    after: self.state_hash(),
+                });
+            }
+            return Ok(Transition::Paused(Box::new(
+                self.pending.as_ref().unwrap().clone(),
+            )));
+        }
+
         let (card_transition, pause_step) = next.apply_post_work_card_effects(
             player,
             &action,
@@ -1581,6 +1654,7 @@ impl Game {
                         play_from_hand(&mut ctx, id, card_id)?;
                         // Dispatch Replace/Before phases for the new card only
                         // MeetingPlace + PlayMinor is a "Minor Improvement" action → improvement action path
+                        let prev_grant_count = self.public.players[id].granted_actions.len();
                         dispatch_play(
                             &self.card_set,
                             id,
@@ -1598,6 +1672,8 @@ impl Game {
                             &mut self.pending,
                             true, // is_improvement_action
                         )?;
+                        // Check for any new grant_action effects and create pending
+                        check_and_create_grant_pending(self, id, card_id, prev_grant_count)?;
                         // Update card points
                         let card = self.card_set.definition(card_id).ok_or("unknown card")?;
                         crate::cards::update_card_points_on_play(
@@ -1659,6 +1735,7 @@ impl Game {
                             improvement_market: &mut self.public.improvement_market,
                         };
                         play_from_hand(&mut ctx, id, card_id)?;
+                        let prev_grant_count = self.public.players[id].granted_actions.len();
                         dispatch_play(
                             &self.card_set,
                             id,
@@ -1676,6 +1753,7 @@ impl Game {
                             &mut self.pending,
                             false,
                         )?;
+                        check_and_create_grant_pending(self, id, card_id, prev_grant_count)?;
                         crate::cards::apply_choice_gain(
                             &mut self.public.players[id],
                             &choice_options,
@@ -1750,6 +1828,7 @@ impl Game {
                 play_from_hand(&mut ctx, id, card_id)?;
                 // Dispatch Replace/Before phases for the new card only
                 // Lessons/ExtraLessons + PlayOccupation is an occupation action → NOT improvement action path
+                let prev_grant_count = self.public.players[id].granted_actions.len();
                 dispatch_play(
                     &self.card_set,
                     id,
@@ -1767,6 +1846,7 @@ impl Game {
                     &mut self.pending,
                     false, // is_improvement_action
                 )?;
+                check_and_create_grant_pending(self, id, card_id, prev_grant_count)?;
                 // Update card points
                 let card = self.card_set.definition(card_id).ok_or("unknown card")?;
                 crate::cards::update_card_points_on_play(
@@ -1864,6 +1944,7 @@ impl Game {
                     play_from_hand(&mut ctx, id, card_id)?;
                     // Dispatch Replace/Before phases
                     // FamilyGrowthWithRoom/ModestFamilyGrowth + GrowWithMinor is a family growth action → NOT improvement action path
+                    let prev_grant_count = self.public.players[id].granted_actions.len();
                     dispatch_play(
                         &self.card_set,
                         id,
@@ -1881,6 +1962,7 @@ impl Game {
                         &mut self.pending,
                         false, // is_improvement_action
                     )?;
+                    check_and_create_grant_pending(self, id, card_id, prev_grant_count)?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
                     crate::cards::update_card_points_on_play(
@@ -1988,6 +2070,7 @@ impl Game {
                     play_from_hand(&mut ctx, id, card_id)?;
                     // Dispatch Replace/Before phases
                     // MajorImprovement + PlayMinor is a "Minor Improvement" action (on Major Improvement space) → improvement action path
+                    let prev_grant_count = self.public.players[id].granted_actions.len();
                     dispatch_play(
                         &self.card_set,
                         id,
@@ -2005,6 +2088,7 @@ impl Game {
                         &mut self.pending,
                         true, // is_improvement_action
                     )?;
+                    check_and_create_grant_pending(self, id, card_id, prev_grant_count)?;
                     // Update card points
                     let card = self.card_set.definition(card_id).ok_or("unknown card")?;
                     crate::cards::update_card_points_on_play(
@@ -2070,6 +2154,7 @@ impl Game {
                     };
                     play_from_hand(&mut ctx, id, card_id)?;
                     // Dispatch Replace/Before phases
+                    let prev_grant_count = self.public.players[id].granted_actions.len();
                     dispatch_play(
                         &self.card_set,
                         id,
@@ -2087,6 +2172,7 @@ impl Game {
                         &mut self.pending,
                         false,
                     )?;
+                    check_and_create_grant_pending(self, id, card_id, prev_grant_count)?;
                     // Apply the chosen on-play gain option (C007).
                     crate::cards::apply_choice_gain(
                         &mut self.public.players[id],
@@ -2432,7 +2518,7 @@ fn grow(p: &mut Player, room_only: bool) -> Result<()> {
     p.newborns += 1;
     Ok(())
 }
-fn renovate(p: &mut Player) -> Result<()> {
+pub(crate) fn renovate(p: &mut Player) -> Result<()> {
     let (new, g) = next_house(p.house).ok_or("stone is final house")?;
     let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
         p.stone_cost_discount
@@ -2444,7 +2530,7 @@ fn renovate(p: &mut Player) -> Result<()> {
     p.house = new;
     Ok(())
 }
-fn sow(p: &mut Player, assignments: &[Plant]) -> Result<()> {
+pub(crate) fn sow(p: &mut Player, assignments: &[Plant]) -> Result<()> {
     let mut visited = BTreeSet::new();
     for a in assignments {
         if a.cell >= FARM_CELLS
@@ -2540,12 +2626,12 @@ fn bake_bread(p: &mut Player, amount: u32) -> Result<()> {
     }
     bake_allocated(p, &allocation)
 }
-struct PurchaseArgs<'a> {
-    instant_bake: u32,
-    allocation: Option<&'a [BakeAllocation]>,
-    mode: PurchaseMode,
+pub(crate) struct PurchaseArgs<'a> {
+    pub(crate) instant_bake: u32,
+    pub(crate) allocation: Option<&'a [BakeAllocation]>,
+    pub(crate) mode: PurchaseMode,
 }
-fn buy_improvement(
+pub(crate) fn buy_improvement(
     p: &mut Player,
     market: &mut Vec<Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
@@ -2615,6 +2701,55 @@ fn buy_improvement(
     }
     Ok(())
 }
+
+/// Create a PendingDecision for a granted action from an on-play grant_action effect.
+/// This is called after a play arm completes dispatch_play, using the grant that
+/// was recorded in Player.granted_actions during the Before phase.
+pub(crate) fn create_grant_action_pending(
+    game: &mut Game,
+    player: usize,
+    source_card: &str,
+    grant: &GrantedAction,
+) -> Result<()> {
+    use crate::pending::{PendingDecision, PendingKind};
+
+    // Store the ACTUAL grant (GrantedAction) with its constraints intact.
+    // Decision ID and state_hash_before are set to zero/empty here;
+    // the engine stamps them once at commit time (see apply_with_plans_impl).
+    let pending = PendingDecision::new(
+        0, // engine will assign real decision_id
+        player,
+        PendingKind::GrantAction {
+            source_card: source_card.to_string(),
+            action: grant.clone(),
+        },
+        String::new(), // engine will set real state_hash_before
+        serde_json::json!({ "source_card": source_card }),
+    );
+    game.pending = Some(pending);
+    Ok(())
+}
+
+/// Check for newly granted actions after a card play and create a pending
+/// decision for the first new grant (cards currently have at most one
+/// OnPlayGrantAction effect).
+pub(crate) fn check_and_create_grant_pending(
+    game: &mut Game,
+    player: usize,
+    card_id: &str,
+    prev_grant_count: usize,
+) -> Result<()> {
+    // Clone the new grants to avoid borrow checker issues
+    let new_grants: Vec<GrantedAction> =
+        game.public.players[player].granted_actions[prev_grant_count..].to_vec();
+    if let Some(grant) = new_grants.into_iter().next() {
+        create_grant_action_pending(game, player, card_id, &grant)?;
+        // Only create one pending per play; if multiple grants exist,
+        // they would be handled sequentially (but current cards have at most one).
+    }
+    Ok(())
+}
+
 /// Canonical fence segments, 6x4 lattice vertices. 5x3 cell grid.
 fn border(i: usize) -> [(u8, u8); 4] {
     let x = (i % 5) as u8;

@@ -2,7 +2,9 @@
 use crate::cards::{CardDefinition, CardSet, CardState};
 use crate::engine::is_bake_bread_detail;
 use crate::harvest::HarvestDetailPolicy;
-use crate::pending::{PendingDecision, PendingKind, PendingResolution, Transition};
+use crate::pending::{
+    GrantedActionChoice, PendingDecision, PendingKind, PendingResolution, Transition,
+};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -223,6 +225,11 @@ pub struct Player {
     pub stone_cost_discount: u32,
     #[serde(default)]
     pub extra_housing: u8,
+    /// Actions granted to this player by on_play `grant_action` effects that
+    /// have not yet been consumed. Serialized when non-empty so that pending
+    /// grant_action resolutions survive save/load/restore.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub granted_actions: Vec<GrantedAction>,
     pub begging: u32,
     /// Snapshot of total crop goods in fields at the end of the final harvest
     /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
@@ -260,10 +267,12 @@ impl Player {
             major_stone_discount_by_rooms: false,
             stone_cost_discount: 0,
             extra_housing: 0,
+            granted_actions: vec![],
             begging: 0,
             field_goods_before_final_harvest: None,
         }
     }
+
     pub fn rooms(&self) -> usize {
         self.farm
             .iter()
@@ -318,6 +327,25 @@ impl Player {
                 })
                 .sum::<u32>()
     }
+}
+
+/// An action granted to a player by an on_play `grant_action` card effect.
+/// The grant is recorded when the card is played and resolved via the
+/// pending decision mechanism (PendingKind::GrantAction). The legacy
+/// `Player.granted_actions` and `execute_granted_action` are deprecated.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GrantedAction {
+    /// Grant a Major Improvement action. `restriction` limits which improvement
+    /// may be built (e.g. `MajorImprovementRestriction::Fireplace` for fireplace only);
+    /// `MajorImprovementRestriction::Any` means any major improvement.
+    MajorImprovement {
+        restriction: crate::pending::MajorImprovementRestriction,
+    },
+    /// Grant a Renovation (home upgrade) action.
+    Renovation,
+    /// Grant a Sow action for `fields` fields.
+    Sow { fields: u8 },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -2543,6 +2571,158 @@ impl Game {
                         + plan.discard,
                 )
                 .map_err(|e| format!("animal placement failed: {e}"))
+            }
+            (
+                PendingKind::GrantAction {
+                    action: _granted_action,
+                    ..
+                },
+                PendingResolution::GrantAction { choice },
+            ) => {
+                let player = &mut self.public.players[pending.player];
+
+                // Find and consume the matching grant from granted_actions.
+                // The grant was pushed during the Before phase; we must remove exactly one.
+                let grant_index = player
+                    .granted_actions
+                    .iter()
+                    .position(|g| {
+                        matches!(
+                            (g, &choice),
+                            (
+                                crate::model::GrantedAction::MajorImprovement { .. },
+                                GrantedActionChoice::MajorImprovement { .. }
+                            ) | (
+                                crate::model::GrantedAction::Renovation,
+                                GrantedActionChoice::Renovation { .. }
+                            ) | (
+                                crate::model::GrantedAction::Sow { .. },
+                                GrantedActionChoice::Sow { .. }
+                            )
+                        )
+                    })
+                    .ok_or("no matching grant_action found in granted_actions")?;
+
+                // Remove the grant (consumed whether accepted or declined)
+                let grant = player.granted_actions.remove(grant_index);
+
+                // Now execute based on the REAL grant's constraints
+                match (grant, choice) {
+                    (
+                        crate::model::GrantedAction::MajorImprovement { restriction },
+                        GrantedActionChoice::MajorImprovement { improvement },
+                    ) => {
+                        let Some(imp) = improvement else {
+                            // Decline: grant already consumed, nothing else to do
+                            return Ok(());
+                        };
+                        // Validate against the grant's restriction
+                        match restriction {
+                            crate::pending::MajorImprovementRestriction::Fireplace => {
+                                if !matches!(imp, Improvement::Fireplace2 | Improvement::Fireplace3)
+                                {
+                                    return Err(
+                                        "grant_action major_improvement restricted to Fireplace"
+                                            .into(),
+                                    );
+                                }
+                            }
+                            crate::pending::MajorImprovementRestriction::Any => {
+                                // Any major improvement allowed (market availability checked below)
+                            }
+                        }
+                        // Check market availability
+                        if !self.public.improvement_market.contains(imp) {
+                            return Err("requested improvement not available in market".into());
+                        }
+                        // Snapshot player before improvement purchase for AfterClayConstruction dispatch
+                        let previous = player.clone();
+                        // Pay normal cost via buy_improvement with PurchaseMode::Pay
+                        let mut market = self.public.improvement_market.clone();
+                        crate::engine::buy_improvement(
+                            player,
+                            &mut market,
+                            &mut self.delayed_well,
+                            &mut self.public.well_food_schedule,
+                            self.public.round,
+                            *imp,
+                            crate::engine::PurchaseArgs {
+                                instant_bake: 0,
+                                allocation: None,
+                                mode: crate::engine::PurchaseMode::Pay,
+                            },
+                        )?;
+                        self.public.improvement_market = market;
+                        // Dispatch AfterClayConstruction for the granted major improvement
+                        crate::card_events::dispatch_after_clay_construction(
+                            &self.card_set,
+                            pending.player,
+                            &previous,
+                            Some(*imp),
+                            &mut self.cards,
+                            &mut self.public.players,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            self.public.round,
+                            &self.public.used,
+                            &mut self.event_budget,
+                            &mut self.public.card_uses,
+                            &self.card_use_limits,
+                            &mut self.pending,
+                            false, // grant resolution is atomic; no ChooseTriggerOrder pause
+                        )?;
+                        Ok(())
+                    }
+                    (
+                        crate::model::GrantedAction::Renovation,
+                        GrantedActionChoice::Renovation { accept },
+                    ) => {
+                        if *accept {
+                            // Snapshot player before renovation for AfterClayConstruction dispatch
+                            let previous = player.clone();
+                            // Check if renovation is possible (normal cost)
+                            crate::engine::renovate(player)?;
+                            // Dispatch AfterClayConstruction for the renovation (Clay->Stone triggers it)
+                            crate::card_events::dispatch_after_clay_construction(
+                                &self.card_set,
+                                pending.player,
+                                &previous,
+                                None, // renovation is not an improvement purchase
+                                &mut self.cards,
+                                &mut self.public.players,
+                                &mut self.public.improvement_market,
+                                &mut self.delayed_well,
+                                self.public.round,
+                                &self.public.used,
+                                &mut self.event_budget,
+                                &mut self.public.card_uses,
+                                &self.card_use_limits,
+                                &mut self.pending,
+                                false, // grant resolution is atomic; no ChooseTriggerOrder pause
+                            )?;
+                        } else {
+                            // Decline: grant already consumed, nothing else to do
+                        }
+                        Ok(())
+                    }
+                    (
+                        crate::model::GrantedAction::Sow { fields },
+                        GrantedActionChoice::Sow { plantings },
+                    ) => {
+                        // D003: at most `fields` plantings, empty = decline/no fields
+                        if plantings.is_empty() {
+                            // Decline or no fields available: grant already consumed
+                            Ok(())
+                        } else {
+                            // Validate against grant's fields limit
+                            if plantings.len() > fields as usize {
+                                return Err("grant_action sow exceeds granted field limit".into());
+                            }
+                            crate::engine::sow(player, plantings)
+                        }
+                    }
+                    _ => Err("granted action choice type mismatch".into()),
+                }
             }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }

@@ -1,7 +1,7 @@
 //! Card-set metadata is supplied by callers; copyrighted card text is never bundled.
 //! This is a deliberately small deterministic effect vocabulary, not a claim that
 //! the full Agricola Revised deck has been implemented.
-use crate::model::{Animal, Crop, Good, House, Improvement, Player, Space, Tile};
+use crate::model::{Animal, Crop, Good, GrantedAction, House, Improvement, Player, Space, Tile};
 use crate::registry::{
     build_default_registry, card_set_from_pool, card_set_from_registry, CardId, CardPool,
     CardRegistry,
@@ -445,6 +445,13 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
+    /// on_play `grant_action`: grants the owner an action (Major Improvement,
+    /// Renovation or Sow) that creates a PendingDecision for the player to
+    /// resolve via the normal pending decision mechanism (no longer uses
+    /// `Player::execute_granted_action`).
+    OnPlayGrantAction {
+        action: GrantedAction,
+    },
     /// On-play per-good threshold gain: for each good in `goods`, if the
     /// owner already holds at least `threshold` of it, gain `amount` of
     /// that good. Judged per good against the owner's own supply (not
@@ -591,6 +598,7 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
                 "after_any_worker_gain_by_count_if_not_actor"
             }
+            CardEffect::OnPlayGrantAction { .. } => "on_play_grant_action",
             CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => {
                 "start_round_gain_if_accumulation_at_least"
             }
@@ -902,6 +910,7 @@ impl CardSet {
                         // PostPlayPassLeft is a zone move, not a gain: no
                         // amount to bound.
                         CardEffect::PostPlayPassLeft => 1,
+                        CardEffect::OnPlayGrantAction { .. } => 1,
                         CardEffect::OnPlayChoiceGain { options } => {
                             options.iter().map(|o| o.amount).max().unwrap_or(1)
                         }
@@ -1617,6 +1626,12 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
             CardEffect::PostPlayPassLeft => {
                 // Zone-move metadata: the engine play arm performs the hand
                 // pass after the play transaction; nothing to resolve here.
+            }
+            CardEffect::OnPlayGrantAction { action } => {
+                // Record the granted action so the owner can consume it later
+                // via `Player::execute_granted_action`. The grant itself
+                // changes no resources or persistent state.
+                player.granted_actions.push(action.clone());
             }
             _ => {}
         }
@@ -6133,6 +6148,38 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 gain(Space::Cultivation, Good::Food, 2),
             ],
         ),
+        // D002 住居計画 (Dwelling Plan): cost 1 food; on play grant a Renovation
+        // action; pass left. (BGA spec D002: on_play grant_action renovation,
+        // post_play left_neighbor_hand.)
+        CardDefinition {
+            use_limit: None,
+            id: "D002".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGrantAction {
+                    action: GrantedAction::Renovation,
+                },
+                CardEffect::PostPlayPassLeft,
+            ],
+        },
+        // D003 あぜの溝 (Furrows): no cost; on play grant a Sow action for
+        // exactly 1 field; pass left. (BGA spec D003: on_play grant_action sow
+        // fields=1, post_play left_neighbor_hand.)
+        CardDefinition {
+            use_limit: None,
+            id: "D003".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGrantAction {
+                    action: GrantedAction::Sow { fields: 1 },
+                },
+                CardEffect::PostPlayPassLeft,
+            ],
+        },
         // D005 畑の粘土 (Clay from Fields): cost 1 food; on play gain 1 clay per sown field.
         card(
             "D005",
@@ -6358,6 +6405,29 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 },
                 CardEffect::OnPlayGain {
                     good: Good::Vegetable,
+                    amount: 1,
+                },
+            ],
+        },
+        // A139 窪地のみはり (Hollow Warden): no cost; on play grant a Major
+        // Improvement action restricted to a Fireplace; each Hollow use gains
+        // 1 food. (BGA spec A139: on_play grant_action major_improvement
+        // only=fireplace, plus after_worker_space hollow gain food 1.)
+        CardDefinition {
+            use_limit: None,
+            id: "A139".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGrantAction {
+                    action: GrantedAction::MajorImprovement {
+                        restriction: crate::pending::MajorImprovementRestriction::Fireplace,
+                    },
+                },
+                CardEffect::AfterWorkerGain {
+                    space: Space::Hollow,
+                    good: Good::Food,
                     amount: 1,
                 },
             ],

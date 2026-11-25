@@ -1022,15 +1022,16 @@ CARDS = {
         ],
     },
     "A139": {
-        "post": "played_area",
-        "effects": [
-            effect("on_play", [action("major_improvement", only="fireplace")]),
-            effect("after_worker_space", [gain("food", 1)],
-                   cond=[cond("worker_space_used", space="hollow")],
-                   freq="every_use", dur="permanent", order=1),
-        ],
-        "notes": "Gain a Major Improvement action restricted to a Fireplace; each Hollow use gives 1 food.",
-        "tests": [
+            "post": "played_area",
+            "effects": [
+                effect("on_play", [action("major_improvement", only="fireplace")]),
+                effect("after_worker_space", [gain("food", 1)],
+                       cond=[cond("worker_space_used", space="hollow")],
+                       freq="every_use", dur="permanent", order=1),
+            ],
+            "notes": "Gain a Major Improvement action restricted to a Fireplace; each Hollow use gives 1 food.",
+            "implementation_status": "in_progress",
+            "tests": [
             case("A139-normal", {"food": 0}, {"play": "A139"},
                  {"major_improvement_granted": True, "only": "fireplace"}),
             case("A139-hollow", {"food": 0}, {"use_space": "hollow"}, {"food_delta": 1}),
@@ -1306,10 +1307,11 @@ CARDS = {
         ],
     },
     "D002": {
-        "post": "left_neighbor_hand",
-        "effects": [effect("on_play", [action("renovation")])],
-        "notes": "Immediately take a Renovation action; pass left.",
-        "tests": [
+            "post": "left_neighbor_hand",
+            "effects": [effect("on_play", [action("renovation")])],
+            "notes": "Immediately take a Renovation action; pass left.",
+            "implementation_status": "in_progress",
+            "tests": [
             case("D002-normal", {"house": "wood", "clay": 2, "reed": 1},
                  {"play": "D002", "renovate": True},
                  {"house": "clay", "renovation_granted": True}),
@@ -1318,10 +1320,11 @@ CARDS = {
         ],
     },
     "D003": {
-        "post": "left_neighbor_hand",
-        "effects": [effect("on_play", [action("sow", fields=1)])],
-        "notes": "Immediately sow in exactly 1 field; pass left.",
-        "tests": [
+            "post": "left_neighbor_hand",
+            "effects": [effect("on_play", [action("sow", fields=1)])],
+            "notes": "Immediately sow in exactly 1 field; pass left.",
+            "implementation_status": "in_progress",
+            "tests": [
             case("D003-normal", {"empty_fields": 1, "grain": 1},
                  {"play": "D003", "sow": 1}, {"sown_fields": 1, "grain_delta": -1}),
             case("D003-no-field", {"empty_fields": 0, "grain": 1},

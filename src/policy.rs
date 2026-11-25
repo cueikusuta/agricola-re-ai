@@ -716,6 +716,11 @@ fn card_priority(
                                 CardEffect::OnPlayAddStoneToEmptyFields { .. } => 0,
                                 // PostPlayPassLeft is a zone move with no valuation.
                                 CardEffect::PostPlayPassLeft => 0,
+                                // on_play grant_action: the grant itself changes no resources; value it as
+                                // one extra action (a mid-weight space use, cf. `weight()` ~12–26) so the
+                                // grant cards are not quietly discarded by the heuristic. The actual granted
+                                // action's payoff is out of this heuristic's reach.
+                                CardEffect::OnPlayGrantAction { .. } => 12,
                                 CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
