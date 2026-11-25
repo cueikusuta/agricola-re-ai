@@ -105,7 +105,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "Gain 5 food on play; at the end of each non-harvest round pay 1 food or take a begging marker."
   }
 }

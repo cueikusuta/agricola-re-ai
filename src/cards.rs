@@ -6456,6 +6456,48 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // ---- Freebuff on_play gain chapter (2026-11-25) ----
+        // Only the printed on-play gain half is wired. Remaining printed
+        // triggers belong to their own chapters and stay unwired, so each
+        // spec implementation_status is `in_progress`.
+        // A054 信用貸し (Loan): no cost, at most 3 occupations played; on play
+        // gain 5 food. Follow-up: at the end of each non-harvest round pay
+        // 1 food or take a begging marker.
+        CardDefinition {
+            use_limit: None,
+            id: "A054".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MaximumOccupations(3),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 5,
+                },
+            ],
+        },
+        // A165 猪飼い (Boar Keeper): 4 players only; no cost; on play gain
+        // 1 food. Follow-up: free breeding at the end of round 12 when there
+        // is room.
+        CardDefinition {
+            use_limit: None,
+            id: "A165".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 1,
+                },
+            ],
+        },
     ]
 }
 
