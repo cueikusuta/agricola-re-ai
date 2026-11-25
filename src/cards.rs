@@ -4865,6 +4865,27 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 amount: 1,
             }],
         ),
+        // C142 てき屋 (Market Crier): each time the owner uses GrainSeeds, the
+        // owner may take 1 grain + 1 vegetable as a bundle; if taken, every
+        // other player gains 1 grain. Opt-in as a whole, decided by the owner.
+        // Band C card: eligible at 3+ players only (MinimumPlayers(3)),
+        // deliberately NOT in verified_basic_card_set.
+        card(
+            "C142",
+            occupation,
+            vec![],
+            vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::AfterWorkerOptionalBundleGain {
+                    space: Space::GrainSeeds,
+                    owner_goods: vec![(Good::Grain, 1), (Good::Vegetable, 1)],
+                    others_good: Good::Grain,
+                    others_amount: 1,
+                },
+            ],
+        ),
         // C006 石取り作業 (Stone Clearing): cost food1, prerequisite 1 occupation
         // played; on play place 1 stone on each empty field, harvested at next
         // field phase (fields count as cultivated until then). Pass left.
@@ -5419,7 +5440,23 @@ mod verified_band_c_tests {
     /// of each kind per player) with inert dummy definitions so the contract
     /// cases can drive the production `Game::apply` path.
     fn production_definitions() -> Vec<CardDefinition> {
-        let mut definitions = verified_band_c_cards();
+        // 2-player fixture: cards whose MinimumPlayers prerequisite exceeds the
+        // two seats have no active effects here, so `projected_for_players`
+        // would reject them (C142). Same convention as
+        // `audit_p2_1_exhaustive_tests::all_registry_cards_driven_through_production_paths`.
+        let mut definitions: Vec<CardDefinition> = verified_band_c_cards()
+            .into_iter()
+            .filter(|c| {
+                !c.effects.iter().any(|e| {
+                    matches!(
+                        e,
+                        CardEffect::Prerequisite {
+                            rule: CardRequirement::MinimumPlayers(min)
+                        } if *min > 2
+                    )
+                })
+            })
+            .collect();
         let minors = definitions
             .iter()
             .filter(|c| c.kind == CardKind::MinorImprovement)

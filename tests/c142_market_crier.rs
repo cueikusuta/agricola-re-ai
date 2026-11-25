@@ -16,35 +16,16 @@
 //! - C142 is out of the 2-player pool and of verified_basic_card_set
 
 use agricola_re_ai::card_events::dispatch_after_worker;
-use agricola_re_ai::cards::{
-    verified_band_c_cards, verified_basic_card_set, CardDefinition, CardEffect, CardKind,
-    CardRequirement, CardSet,
-};
+use agricola_re_ai::cards::{verified_band_c_cards, verified_basic_card_set, CardEffect, CardSet};
 use agricola_re_ai::model::{Config, Game, Good, Player, Space};
 use agricola_re_ai::pending::{PendingDecision, PendingKind, PendingResolution, Transition};
+use agricola_re_ai::registry::{build_default_registry, CardPool};
 use serde_json::json;
 
 fn c142_set() -> CardSet {
-    let mut definitions = verified_band_c_cards();
-    definitions.push(CardDefinition {
-        use_limit: None,
-        id: "C142".to_string(),
-        kind: CardKind::Occupation,
-        cost: vec![],
-        points: 0,
-        effects: vec![
-            CardEffect::Prerequisite {
-                rule: CardRequirement::MinimumPlayers(3),
-            },
-            CardEffect::AfterWorkerOptionalBundleGain {
-                space: Space::GrainSeeds,
-                owner_goods: vec![(Good::Grain, 1), (Good::Vegetable, 1)],
-                others_good: Good::Grain,
-                others_amount: 1,
-            },
-        ],
-    });
-    CardSet { definitions }
+    CardSet {
+        definitions: verified_band_c_cards(),
+    }
 }
 
 /// Dispatch the after-worker chain for `actor` on `space` with `owner`
@@ -337,25 +318,34 @@ fn c142_decline_then_take_grants_exactly_once() {
     assert!(!game.has_pending());
 }
 
-/// C142 is inline-only (removed from verified_band_c_cards); it carries a
-/// MinimumPlayers(3) prerequisite, so eligible at 3+ players only.
+/// C142-not-triggered: out of the 2-player pool and the verified preset;
+/// eligible at 3 and 4 players only.
 #[test]
 fn c142_player_count_eligibility() {
-    let set = c142_set();
-    let def = set
-        .definitions
-        .iter()
-        .find(|d| d.id == "C142")
-        .expect("C142 must be defined in c142_set");
-    let has_min_players_3 = def.effects.iter().any(|e| {
-        matches!(
-            e,
-            CardEffect::Prerequisite {
-                rule: CardRequirement::MinimumPlayers(3)
-            }
-        )
-    });
-    assert!(has_min_players_3, "C142 must require MinimumPlayers(3)");
+    let registry = build_default_registry().expect("default registry builds");
+    let card_id = registry.card_id("C142").expect("C142 must be registered");
+    let review = registry
+        .review(card_id)
+        .expect("C142 must have review metadata");
+    assert_eq!(
+        review.eligibility_at(2),
+        Some(agricola_re_ai::card_pool::Eligibility::No),
+        "C142 must not be eligible at 2 players"
+    );
+    assert_eq!(
+        review.eligibility_at(3),
+        Some(agricola_re_ai::card_pool::Eligibility::Yes)
+    );
+    assert_eq!(
+        review.eligibility_at(4),
+        Some(agricola_re_ai::card_pool::Eligibility::Yes)
+    );
+    assert!(
+        !CardPool::new(&registry, 2, true).contains(card_id),
+        "C142 must not be in the experimental 2-player pool"
+    );
+    assert!(CardPool::new(&registry, 3, true).contains(card_id));
+    assert!(CardPool::new(&registry, 4, true).contains(card_id));
     assert!(
         verified_basic_card_set(2)
             .unwrap()
