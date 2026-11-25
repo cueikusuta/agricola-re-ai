@@ -7,9 +7,9 @@
 
 use crate::breeding::BreedingPlan;
 use crate::card_events::TriggerPhase;
-use crate::engine::Action;
+use crate::engine::{Action, Plant};
 use crate::harvest::FeedingPlan;
-use crate::model::{Good, Player};
+use crate::model::{Good, Improvement, Player};
 use crate::registry::EventKind;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -176,6 +176,38 @@ pub enum PendingKind {
         /// Total amount of animals to place.
         amount: u32,
     },
+    /// Resolve a granted action from an on-play `grant_action` effect (A139, D002, D003).
+    /// The player chooses how to execute the granted action: purchase a major improvement,
+    /// accept/decline renovation, or sow crops in selected fields.
+    GrantAction {
+        /// Source card ID that granted this action.
+        source_card: String,
+        /// The type of granted action and its constraints.
+        action: GrantedActionChoice,
+    },
+}
+
+/// Restriction on which major improvement may be purchased.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MajorImprovementRestriction {
+    /// Any major improvement available in the market.
+    Any,
+    /// Only a Fireplace (Fireplace2 or Fireplace3).
+    Fireplace,
+}
+
+/// The player's choice for resolving a granted action.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum GrantedActionChoice {
+    /// Purchase a major improvement. `None` means decline the grant.
+    MajorImprovement { improvement: Option<Improvement> },
+    /// Accept or decline a renovation action.
+    Renovation { accept: bool },
+    /// Sow crops in selected fields. Empty = decline/no fields available.
+    /// For D003, at most one planting is valid.
+    Sow { plantings: Vec<Plant> },
 }
 
 /// A single gain option.
@@ -217,6 +249,7 @@ pub enum PendingResolution {
     ChooseTriggerOrder { chosen_order: Vec<usize> },
     Custom { payload: serde_json::Value },
     ChooseAnimalPlacement { plan: crate::engine::AnimalPlan },
+    GrantAction { choice: GrantedActionChoice },
 }
 
 impl PendingDecision {
@@ -285,6 +318,24 @@ impl PendingDecision {
                 PendingKind::ChooseAnimalPlacement { .. },
                 PendingResolution::ChooseAnimalPlacement { .. },
             ) => Ok(()),
+            (
+                PendingKind::GrantAction { action, .. },
+                PendingResolution::GrantAction { choice },
+            ) => {
+                // Validate that the choice matches the granted action type
+                match (action, choice) {
+                    (
+                        GrantedActionChoice::MajorImprovement { .. },
+                        GrantedActionChoice::MajorImprovement { .. },
+                    ) => Ok(()),
+                    (
+                        GrantedActionChoice::Renovation { .. },
+                        GrantedActionChoice::Renovation { .. },
+                    ) => Ok(()),
+                    (GrantedActionChoice::Sow { .. }, GrantedActionChoice::Sow { .. }) => Ok(()),
+                    _ => Err("granted action choice type mismatch".into()),
+                }
+            }
             _ => Err("resolution kind does not match pending decision kind".into()),
         }
     }
@@ -1433,7 +1484,7 @@ mod tests {
     #[test]
     fn resume_rejects_another_player_s_used_space() {
         use crate::engine::{Action, Detail};
-        use crate::model::{Config, Game, Good, Space};
+        use crate::model::{Config, Game, Space};
         use crate::pending::{
             ChainPosition, ChainStep, Continuation, GainOption, PendingDecision, PendingKind,
             PendingResolution, PostWorkResume, WorkCompletion,
@@ -1630,5 +1681,931 @@ mod tests {
         let trigger: crate::card_events::PhaseTriggerData = serde_json::from_str(json).unwrap();
         assert_eq!(trigger.site, EventKind::WorkerPlaced);
         assert_eq!(trigger.event_kind, EventKind::WorkerPlaced);
+    }
+
+    /// A139: grant_action major_improvement restricted to Fireplace.
+    /// Test Fireplace2 purchase with normal cost and market removal.
+    #[test]
+    fn grant_action_a139_fireplace2_purchase() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Improvement, Space};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        // Create a valid card set with 14 occupations and 14 minor improvements
+        let mut definitions = Vec::new();
+        definitions.push(CardDefinition {
+            use_limit: None,
+            id: "A139".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::MajorImprovement {
+                    restriction: crate::pending::MajorImprovementRestriction::Fireplace,
+                },
+            }],
+        });
+        // Add 13 more occupations to reach 14 total
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        // Add 14 minor improvements
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        // Create a game with the custom card set and exact initial hands
+        let active = 0;
+        let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![vec!["A139".to_string()], vec![]];
+        hands[0].extend(occ_ids.iter().take(6).cloned());
+        hands[0].extend(minor_ids[0..7].iter().cloned());
+        hands[1].extend(occ_ids[6..13].iter().cloned());
+        hands[1].extend(minor_ids[7..14].iter().cloned());
+
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 100,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands.clone(),
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = active;
+        game.public.start_player = active;
+        game.card_use_limits = set
+            .definitions
+            .iter()
+            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+            .collect();
+        // Ensure Fireplace2 is in market
+        game.public.improvement_market = vec![
+            Improvement::Fireplace2,
+            Improvement::Fireplace3,
+            Improvement::ClayOven,
+        ];
+        game.public.players[active].supply.clay = 10; // Enough for Fireplace2 (2 clay)
+
+        // Play A139 via Lessons
+        let action = Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation {
+                card_id: "A139".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        eprintln!("apply_with_plans result: {:?}", result);
+        eprintln!(
+            "granted_actions after play: {:?}",
+            game.public.players[active].granted_actions
+        );
+        eprintln!("pending after play: {:?}", game.pending);
+        assert!(
+            matches!(result, Ok(crate::pending::Transition::Paused(_))),
+            "should pause for grant_action, got: {:?}",
+            result
+        );
+
+        // Resolve: purchase Fireplace2
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::MajorImprovement {
+                improvement: Some(Improvement::Fireplace2),
+            },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution)
+            .expect("resume should succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+
+        // Verify Fireplace2 was purchased (moved from market to player, cost paid)
+        assert!(game.public.players[active]
+            .improvements
+            .contains(&Improvement::Fireplace2));
+        assert!(!game
+            .public
+            .improvement_market
+            .contains(&Improvement::Fireplace2));
+        assert_eq!(game.public.players[active].supply.clay, 8); // 10 - 2 = 8
+    }
+
+    /// A139: Fireplace3 also purchasable under Fireplace restriction.
+    #[test]
+    fn grant_action_a139_fireplace3_purchase() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Improvement, Space};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let a139 = CardDefinition {
+            use_limit: None,
+            id: "A139".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::MajorImprovement {
+                    restriction: crate::pending::MajorImprovementRestriction::Fireplace,
+                },
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![a139],
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 101,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = std::collections::BTreeMap::new();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec!["A139".to_string()], vec![]],
+            undealt: vec![],
+        };
+        game.public.improvement_market = vec![
+            Improvement::Fireplace2,
+            Improvement::Fireplace3,
+            Improvement::ClayOven,
+        ];
+        let active = game.public.active_player;
+        game.public.players[active].supply.clay = 10; // Enough for Fireplace3 (3 clay)
+
+        let action = Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation {
+                card_id: "A139".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+
+        // Resolve: purchase Fireplace3
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::MajorImprovement {
+                improvement: Some(Improvement::Fireplace3),
+            },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution)
+            .expect("resume should succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+
+        assert!(game.public.players[active]
+            .improvements
+            .contains(&Improvement::Fireplace3));
+        assert!(!game
+            .public
+            .improvement_market
+            .contains(&Improvement::Fireplace3));
+        assert_eq!(game.public.players[active].supply.clay, 7); // 10 - 3 = 7
+    }
+
+    /// A139: non-Fireplace selection rejected, pending preserved, then legal choice works.
+    #[test]
+    fn grant_action_a139_rejects_non_fireplace() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Improvement, Space};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let a139 = CardDefinition {
+            use_limit: None,
+            id: "A139".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::MajorImprovement {
+                    restriction: crate::pending::MajorImprovementRestriction::Fireplace,
+                },
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![a139],
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 102,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = std::collections::BTreeMap::new();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec!["A139".to_string()], vec![]],
+            undealt: vec![],
+        };
+        game.public.improvement_market = vec![
+            Improvement::Fireplace2,
+            Improvement::Fireplace3,
+            Improvement::ClayOven,
+        ];
+        let active = game.public.active_player;
+        game.public.players[active].supply.clay = 10;
+
+        let action = Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation {
+                card_id: "A139".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+
+        // Try to purchase ClayOven (not a Fireplace) - should be rejected
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::MajorImprovement {
+                improvement: Some(Improvement::ClayOven),
+            },
+        };
+        let err = game.resolve_pending_and_resume(resolution).unwrap_err();
+        assert!(err.contains("restricted to Fireplace"), "got: {err}");
+
+        // Pending should still be there
+        assert!(
+            game.has_pending(),
+            "pending must be preserved after rejection"
+        );
+
+        // Now choose Fireplace2 - should succeed
+        let resolution2 = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::MajorImprovement {
+                improvement: Some(Improvement::Fireplace2),
+            },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution2)
+            .expect("resume should succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+        assert!(game.public.players[active]
+            .improvements
+            .contains(&Improvement::Fireplace2));
+    }
+
+    /// A139: decline the grant (None improvement).
+    #[test]
+    fn grant_action_a139_decline() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Improvement, Space};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let a139 = CardDefinition {
+            use_limit: None,
+            id: "A139".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::MajorImprovement {
+                    restriction: crate::pending::MajorImprovementRestriction::Fireplace,
+                },
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![a139],
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 103,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = std::collections::BTreeMap::new();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec!["A139".to_string()], vec![]],
+            undealt: vec![],
+        };
+        game.public.improvement_market = vec![Improvement::Fireplace2, Improvement::Fireplace3];
+        let active = game.public.active_player;
+        let clay_before = game.public.players[active].supply.clay;
+
+        let action = Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation {
+                card_id: "A139".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+
+        // Decline: None improvement
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::MajorImprovement { improvement: None },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution)
+            .expect("resume should succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+
+        // No improvement purchased, clay unchanged
+        assert_eq!(game.public.players[active].supply.clay, clay_before);
+        assert_eq!(game.public.improvement_market.len(), 2); // Market unchanged
+    }
+
+    /// D002: grant_action renovation - accept with normal cost.
+    #[test]
+    fn grant_action_d002_renovation_accept() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Good, House, Space};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let d002 = CardDefinition {
+            use_limit: None,
+            id: "D002".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::Renovation,
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![d002],
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 104,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = std::collections::BTreeMap::new();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec!["D002".to_string()], vec![]],
+            undealt: vec![],
+        };
+        let active = game.public.active_player;
+        // Wood house -> Clay needs 1 reed + room_material_cost clay (5)
+        game.public.players[active].supply.food = 10;
+        game.public.players[active].supply.clay = 10;
+        game.public.players[active].supply.reed = 10;
+        game.public.players[active].house = House::Wood;
+
+        let action = Action {
+            space: Space::MeetingPlace,
+            detail: Detail::PlayMinor {
+                card_id: "D002".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+
+        // Accept renovation
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::Renovation { accept: true },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution)
+            .expect("resume should succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+
+        // House upgraded, cost paid
+        assert_eq!(game.public.players[active].house, House::Clay);
+        assert_eq!(game.public.players[active].supply.clay, 8); // 10 - 2 = 8
+        assert_eq!(game.public.players[active].supply.reed, 9); // 10 - 1 = 9
+    }
+
+    /// D002: grant_action renovation - decline.
+    #[test]
+    fn grant_action_d002_renovation_decline() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Good, House, Space};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let d002 = CardDefinition {
+            use_limit: None,
+            id: "D002".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::Renovation,
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![d002],
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 105,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = std::collections::BTreeMap::new();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec!["D002".to_string()], vec![]],
+            undealt: vec![],
+        };
+        let active = game.public.active_player;
+        game.public.players[active].house = House::Wood;
+        let wood_before = game.public.players[active].supply.wood;
+        let reed_before = game.public.players[active].supply.reed;
+
+        let action = Action {
+            space: Space::MeetingPlace,
+            detail: Detail::PlayMinor {
+                card_id: "D002".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+
+        // Decline renovation
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::Renovation { accept: false },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution)
+            .expect("resume should succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+
+        // House unchanged, resources unchanged
+        assert_eq!(game.public.players[active].house, House::Wood);
+        assert_eq!(game.public.players[active].supply.wood, wood_before);
+        assert_eq!(game.public.players[active].supply.reed, reed_before);
+    }
+
+    /// D003: grant_action sow - sow Grain in selected field, remaining=3.
+    #[test]
+    fn grant_action_d003_sow_grain() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail, Plant};
+        use crate::model::{Config, Crop, Game, Space, Tile};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        // Create a valid card set with 14 occupations and 14 minor improvements
+        let mut definitions = Vec::new();
+        definitions.push(CardDefinition {
+            use_limit: None,
+            id: "D003".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::Sow { fields: 1 },
+            }],
+        });
+        // Add 14 occupations
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        // Add 13 more minor improvements to reach 14 total (D003 + 13 = 14)
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        // Create a game with the custom card set and exact initial hands
+        let active = 0;
+        let occ_ids: Vec<String> = (1..=14).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=13).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![
+            vec!["D003".to_string()], // D003 is a minor
+            vec![],
+        ];
+        // Player 0: D003 (minor) + 6 more minors + 7 occupations = 14 cards
+        hands[0].extend(minor_ids[0..6].iter().cloned());
+        hands[0].extend(occ_ids[0..7].iter().cloned());
+        // Player 1: 7 minors + 7 occupations = 14 cards
+        hands[1].extend(minor_ids[6..13].iter().cloned());
+        hands[1].extend(occ_ids[7..14].iter().cloned());
+
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 106,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands.clone(),
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = active;
+        game.public.start_player = active;
+        game.card_use_limits = set
+            .definitions
+            .iter()
+            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+            .collect();
+        // Create an empty field at cell 2
+        game.public.players[active].farm[2].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        game.public.players[active].supply.grain = 5;
+
+        let action = Action {
+            space: Space::MeetingPlace,
+            detail: Detail::PlayMinor {
+                card_id: "D003".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+
+        // Sow Grain in field at cell 2
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::Sow {
+                plantings: vec![Plant {
+                    cell: 2,
+                    crop: Crop::Grain,
+                }],
+            },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution)
+            .expect("resume should succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+
+        // Field should have Grain with remaining=3, grain supply reduced by 1
+        assert!(matches!(
+            game.public.players[active].farm[2].tile,
+            Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 3
+            }
+        ));
+        assert_eq!(game.public.players[active].supply.grain, 4);
+    }
+
+    /// D003: grant_action sow - sow Vegetable in selected field, remaining=2.
+    #[test]
+    fn grant_action_d003_sow_vegetable() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail, Plant};
+        use crate::model::{Config, Crop, Game, Space, Tile};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let d003 = CardDefinition {
+            use_limit: None,
+            id: "D003".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::Sow { fields: 1 },
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![d003],
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 107,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = std::collections::BTreeMap::new();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec!["D003".to_string()], vec![]],
+            undealt: vec![],
+        };
+        let active = game.public.active_player;
+        game.public.players[active].farm[2].tile = Tile::Field {
+            crop: None,
+            remaining: 0,
+        };
+        game.public.players[active].supply.vegetable = 5;
+
+        let action = Action {
+            space: Space::MeetingPlace,
+            detail: Detail::PlayMinor {
+                card_id: "D003".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+
+        // Sow Vegetable in field at cell 2
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::Sow {
+                plantings: vec![Plant {
+                    cell: 2,
+                    crop: Crop::Vegetable,
+                }],
+            },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution)
+            .expect("resume should succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+
+        assert!(matches!(
+            game.public.players[active].farm[2].tile,
+            Tile::Field {
+                crop: Some(Crop::Vegetable),
+                remaining: 2
+            }
+        ));
+        assert_eq!(game.public.players[active].supply.vegetable, 4);
+    }
+
+    /// D003: grant_action sow - no fields available, empty plantings completes without consuming supply.
+    #[test]
+    fn grant_action_d003_no_fields() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Space};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let d003 = CardDefinition {
+            use_limit: None,
+            id: "D003".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::Sow { fields: 1 },
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![d003],
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 108,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = std::collections::BTreeMap::new();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec!["D003".to_string()], vec![]],
+            undealt: vec![],
+        };
+        let active = game.public.active_player;
+        // No empty fields
+        game.public.players[active].supply.grain = 5;
+        game.public.players[active].supply.vegetable = 5;
+        let grain_before = game.public.players[active].supply.grain;
+        let veg_before = game.public.players[active].supply.vegetable;
+
+        let action = Action {
+            space: Space::MeetingPlace,
+            detail: Detail::PlayMinor {
+                card_id: "D003".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+
+        // Empty plantings = decline/no fields
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::Sow { plantings: vec![] },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution)
+            .expect("resume should succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+
+        // Supplies unchanged
+        assert_eq!(game.public.players[active].supply.grain, grain_before);
+        assert_eq!(game.public.players[active].supply.vegetable, veg_before);
+    }
+
+    /// GrantAction resolution without a pending grant_action should be rejected.
+    #[test]
+    fn grant_action_rejects_without_pending() {
+        use crate::model::{Config, Game};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 109,
+            additional_action_space_enabled: false,
+        });
+        assert!(!game.has_pending());
+
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::MajorImprovement { improvement: None },
+        };
+        let err = game.resolve_pending_and_resume(resolution).unwrap_err();
+        assert!(err.contains("no pending decision"));
+    }
+
+    /// GrantAction pending survives save/load and resolves correctly with replay integrity.
+    #[test]
+    fn grant_action_save_load_resume_replay() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Improvement, Space};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let a139 = CardDefinition {
+            use_limit: None,
+            id: "A139".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::MajorImprovement {
+                    restriction: crate::pending::MajorImprovementRestriction::Fireplace,
+                },
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![a139],
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 110,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = std::collections::BTreeMap::new();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec!["A139".to_string()], vec![]],
+            undealt: vec![],
+        };
+        game.public.improvement_market = vec![Improvement::Fireplace2];
+        let active = game.public.active_player;
+        game.public.players[active].supply.clay = 10;
+
+        let action = Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation {
+                card_id: "A139".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+        assert!(game.has_pending());
+
+        let integrity_before = game.integrity_hash();
+        let state_hash_before = game.state_hash();
+
+        // Save
+        let saved = game.save_json().expect("save must succeed");
+
+        // Load
+        let mut restored = Game::load_json(&saved).expect("load must succeed");
+        assert_eq!(
+            restored.integrity_hash(),
+            integrity_before,
+            "integrity hash must survive save/load"
+        );
+        assert!(restored.has_pending(), "pending must survive save/load");
+        assert_eq!(
+            restored.state_hash(),
+            state_hash_before,
+            "state hash must match before resolution"
+        );
+
+        // Resolve on restored game
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::MajorImprovement {
+                improvement: Some(Improvement::Fireplace2),
+            },
+        };
+        let resume_result = restored
+            .resolve_pending_and_resume(resolution)
+            .expect("resume must succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+
+        // Replay from the beginning
+        let replayed = Game::replay_with_setup_and_start_player(
+            restored.config.clone(),
+            (*restored.card_set).clone(),
+            restored.log.initial_hands.clone(),
+            restored.log.initial_start_player_override,
+            &restored.log.events,
+        )
+        .expect("replay must succeed");
+
+        assert_eq!(
+            replayed.state_hash(),
+            restored.state_hash(),
+            "replay state hash must match"
+        );
+        assert_eq!(
+            replayed.integrity_hash(),
+            restored.integrity_hash(),
+            "replay integrity hash must match"
+        );
+        assert!(replayed.public.players[active]
+            .improvements
+            .contains(&Improvement::Fireplace2));
+        assert_eq!(replayed.public.players[active].supply.clay, 8);
+    }
+
+    /// Original action's space/worker not double-consumed during grant_action resume.
+    #[test]
+    fn grant_action_no_double_consume_space_worker() {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Improvement, Space};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let a139 = CardDefinition {
+            use_limit: None,
+            id: "A139".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::MajorImprovement {
+                    restriction: crate::pending::MajorImprovementRestriction::Fireplace,
+                },
+            }],
+        };
+        let set = CardSet {
+            definitions: vec![a139],
+        };
+
+        let mut game = Game::new(Config {
+            players: 2,
+            seed: 111,
+            additional_action_space_enabled: false,
+        });
+        game.card_set = std::sync::Arc::new(set.clone());
+        game.card_use_limits = std::collections::BTreeMap::new();
+        game.cards = crate::cards::CardState {
+            hands: vec![vec!["A139".to_string()], vec![]],
+            undealt: vec![],
+        };
+        game.public.improvement_market = vec![Improvement::Fireplace2];
+        let active = game.public.active_player;
+        game.public.players[active].supply.clay = 10;
+
+        // First worker action: Lessons to play A139
+        let action = Action {
+            space: Space::Lessons,
+            detail: Detail::PlayOccupation {
+                card_id: "A139".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+
+        // Space and worker should NOT be consumed yet (paused mid-action)
+        assert!(!game.public.used.contains(&Space::Lessons));
+        assert_eq!(game.public.workers_placed[active], 0);
+
+        // Resolve grant_action
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::MajorImprovement {
+                improvement: Some(Improvement::Fireplace2),
+            },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution)
+            .expect("resume should succeed");
+        assert_eq!(resume_result, crate::pending::Transition::Completed);
+
+        // NOW space and worker should be consumed exactly once
+        assert!(game.public.used.contains(&Space::Lessons));
+        assert_eq!(game.public.workers_placed[active], 1);
     }
 }

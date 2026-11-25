@@ -1753,9 +1753,9 @@ fn handle_on_play_gain(
     Ok(EffectResult::Resolved)
 }
 
-/// on_play `grant_action`: record the granted action on the owner so it can
-/// be consumed later via `Player::execute_granted_action`. The grant itself
-/// changes no resources or persistent state.
+/// on_play `grant_action`: record the granted action on the owner for
+/// serialization. The actual resolution happens via a PendingDecision
+/// created after the play arm completes (see `create_grant_action_pending`).
 fn handle_on_play_grant_action(
     ctx: &mut DispatchContext<'_>,
     _player: usize,

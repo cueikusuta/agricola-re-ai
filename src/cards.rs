@@ -6365,7 +6365,7 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
             effects: vec![
                 CardEffect::OnPlayGrantAction {
                     action: GrantedAction::MajorImprovement {
-                        only: Some(Improvement::Fireplace2),
+                        restriction: crate::pending::MajorImprovementRestriction::Fireplace,
                     },
                 },
                 CardEffect::AfterWorkerGain {
