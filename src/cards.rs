@@ -537,6 +537,19 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// B049 天秤 (Scales): each time the owner places an occupation or a
+    /// minor improvement AFTER this card, if the counts of improvements in
+    /// front (base improvements + played minor-improvement cards) and
+    /// occupations are equal, gain `amount` of `good`. Fired from the play
+    /// dispatcher's two dedicated after-play scans (the occupation scan and
+    /// the improvement scan); the legacy `cards::play` helper does not
+    /// re-scan earlier cards and therefore never fires it. The comparison
+    /// reads the state AFTER the new card's zone move, so both counts
+    /// include the newly placed card (snapshot=after_event).
+    AfterPlacementGainIfImprovementsEqualOccupations {
+        good: Good,
+        amount: u32,
+    },
 }
 
 impl CardEffect {
@@ -649,6 +662,9 @@ impl CardEffect {
             }
             CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => {
                 "after_worker_gain_if_animal_accumulation_at_least"
+            }
+            CardEffect::AfterPlacementGainIfImprovementsEqualOccupations { .. } => {
+                "after_placement_gain_if_improvements_equal_occupations"
             }
         }
     }
@@ -962,6 +978,10 @@ impl CardSet {
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
                             amount, ..
+                        } => *amount,
+                        CardEffect::AfterPlacementGainIfImprovementsEqualOccupations {
+                            amount,
+                            ..
                         } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
@@ -7079,6 +7099,26 @@ pub fn verified_b_onplay_simple_cards() -> Vec<CardDefinition> {
             }],
             post_play: PostPlayDestination::LeftNeighborHand,
         },
+        // B049 天秤 (Scales): cost 1 wood; prerequisite: no occupations
+        // played; each time an occupation or improvement is placed after
+        // this card, if the improvements in front and the occupations
+        // become equal in number, gain 2 food.
+        CardDefinition {
+            use_limit: None,
+            id: "B049".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MaximumOccupations(0),
+                },
+                CardEffect::AfterPlacementGainIfImprovementsEqualOccupations {
+                    good: Good::Food,
+                    amount: 2,
+                },
+            ],
+        },
         // ---- Chapter 1 (restack 2026-11-23): on-play simple gains ----
         // Cards below print exactly one constant gain_resource step on their
         // on_play trigger; each is modelled with the existing OnPlayGain
@@ -7337,7 +7377,7 @@ mod verified_band_b_tests {
         // A155 sits in the A-deck band pool rather than the B-deck one, but it
         // is covered here too: neither band pool may leak into the A/B
         // two-player preset.
-        for id in ["B122", "B142", "B144", "B058", "A155", "B153"] {
+        for id in ["B122", "B142", "B144", "B049", "B058", "A155", "B153"] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"

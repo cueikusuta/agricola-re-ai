@@ -1,101 +1,57 @@
-## 概要
+## 実装: B049 天秤 (Scales)
 
-帯内未実装 4 枚（A109/A118/C088/C115）＋ 実装済み記録漏れ 2 枚（A088/A110）について、
-外部レビュー（Arena 読み取り専用）の指摘 6 件を実コード・PR・ボードで照合し、
-記録の補完と A109 の実装を行った。
+### 概要
+B049 天秤 (Minor Improvement, cost 1 wood, points 0) を実装。
+- 前提: 職業を出していない (MaximumOccupations(0))
+- 効果: 職業または進歩を配置した後、進歩数（基礎進歩＋played minor improvement）と職業数が同数なら food 2
+- 既存の専用 after-play scan（職業用と improvement 用）から発火
 
-## Step 1: 指摘 6 件の照合結果
+### P2/P3 指摘の対応（PR #442 レビュー Round 1 / 追記）
+- **P2 永続テスト欠落**: `tests/b049_scales.rs` 新規 (10 件): レジストリ到達性・バンド定義、`can_play` 前提ゲート、dispatcher 職業スキャン (同数 +2 / 不同数 +0)、dispatcher 改進歩スキャン (同数 +2 / 不同数 +0)、後続無関係行動での再付与なし、B049 自身プレイ不発火、legacy 経路 negative control
+- **P2 fixture 数値不整合**: `data/bga-card-tests/B049.json` の expected を配置後計数に整合 (balance-occ {imp1/occ0}→2, balance-imp {imp1/occ2}→2, unbalanced {imp1/occ1}→0)
+- **P3 implementation_status 未更新**: `data/bga-card-specs/B049.json` と `data/bga-card-base-ledger.csv` の B049 を `not_started` → `implemented`
 
-| ID | (a) src/実装 | (b) spec JSON | (c) 保留記録 | (d) 台帳/一覧表 | 判定 | 根拠 |
-|---|---|---|---|---|---|---|
-| **A109 小商人** | **あり** (本 PR) | あり (`bga_checked`, `not_started`) | なし | あり (ledger, catalog) | **実在** | `git grep A109 src/` = 0; `data/bga-card-specs/A109.json` 存在・status確認; ledger行あり; catalog行あり (難易度3) |
-| **A118 樹木庭師** | なし | あり (`bga_checked`, `not_started`) | なし | あり (ledger, catalog) | **実在** | `git grep A118 src/` = 0; `data/bga-card-specs/A118.json` 存在・status確認; ledger行あり; catalog行あり (難易度3) |
-| **C088 見習い大工** | なし | **なし** (spec JSON 存在せず) | なし | あり (ledger, catalog) | **実在** | `git grep C088 src/` = 0; `data/bga-card-specs/` に C088.json なし; ledger行あり; catalog行あり (難易度3) |
-| **C115 種まき人** | なし | **なし** (spec JSON 存在せず) | なし | あり (ledger, catalog) | **実在** | `git grep C115 src/` = 0; `data/bga-card-specs/` に C115.json なし; ledger行あり; catalog行あり (難易度3) |
-| **A088 生け垣管理人** | あり (`PassiveRule::FenceWoodDiscount(3)`) | あり (`implemented`) | なし | あり (ledger, catalog) | **一部実在** (実装済み・記録欠落) | spec.implementation_status=implemented, ledger.implementation_status=implemented; 「文書に未記載」は実装欠落ではなく記録側の欠落 |
-| **A110 仕立屋** | あり (`AfterClayConstructionGain { food, 3 }`) | あり (`implemented`) | なし | あり (ledger, catalog) | **一部実在** (実装済み・記録欠落) | 同上 |
+### 変更ファイル
+- tests/b049_scales.rs: 新規 (B049 挙動の永続 Rust テスト 10 件)
+- src/cards.rs: 新 variant AfterPlacementGainIfImprovementsEqualOccupations、B049 定義を verified_band_b_cards() に追加
+- src/card_events.rs: handle_after_placement_gain_if_improvements_equal_occupations ハンドラ、dispatch_play の両スキャンに統合
+- src/registry.rs: EventKind::CardPlayed への索引付け、検証用 amount 抽出
+- src/policy.rs: ヒューリスティック値の計算
+- data/bga-card-tests/B049.json: fixture expected 値の修正
+- data/bga-card-specs/B049.json: `implementation_status` → `implemented`
+- data/bga-card-base-ledger.csv: B049 行 `implementation_status` → `implemented`
+- docs/bga-card-effect-vocabulary.md: improvements_equal_occupations 条件追加
 
-## Step 2: 記録の補完
+### テスト・ゲート（ローカル実測、HEAD `a6c5c3e` + 本修正）
+- cargo fmt --check ✅
+- cargo clippy --all-targets --all-features --locked -- -D warnings ✅ (warning 0 件)
+- cargo test --lib ✅ (480 passed, うち b049_scales 新規 10 件)
+- cargo test --test b049_scales ✅ (10 passed)
+- python scripts/validate_bga_card_specs.py (errors: []) ✅
+- python scripts/validate_card_catalog.py (errors: []) ✅
+- cargo test --test m6_verified_pool (3/3 passed) ✅
+- cargo test --lib mcts::tests::sample_game_distribution_digest_is_stable ✅
 
-新規ドキュメント `docs/outband-unimplemented-records.md` を作成し、6 枚すべての個別記録を記録した。
-- A109/A118/C088/C115: 未実装の理由・必要前提・次の一手
-- A088/A110: 実装済みであることを正式記録（DEEPAI_PROGRESS.md への記載は open PR 6 本と衝突するため行わない）
-
-## Step 3: A109 実装（最優先）
-
-**仕様**: 改進歩（大進歩/小進歩）が手札からプレイされるたび、3 食料を獲得。
-
-**変更内容**:
-1. `EventKind::ImprovementPlayed` 追加 (`src/registry.rs`)
-2. `CardEffect::AfterImprovementPlayedGain { good, amount }` 追加 (`src/cards.rs`)
-3. `effect_phase` / `effect_condition_holds` / `execute_chosen_triggers` 対応 (`src/card_events.rs`)
-4. `dispatch_play` に改進歩プレイ後の専用スキャン追加 (`src/card_events.rs`)
-3. イベントインデックス登録追加 (`src/registry.rs`)
-4. `verified_band_a_cards()` に A109 定義追加 (`src/cards.rs`)
-5. `src/policy.rs` ヒューリスティック対応
-6. **テスト追加** (`tests/ch04_after_improvement_played.rs`, 6 件):
-   - レジストリ到達性
-   - `apply_on_play_effects` 経路（on-play 効果なし）
-   - `dispatch_play` 経路: 正系（小進歩プレイで発火）
-   - `dispatch_play` 経路: 不発（職業プレイでは発火しない）
-   - `dispatch_play` 経路: 複数回発火
-   - `dispatch_play` 経路: 境界（A109 より前にプレイされた改進歩では発火しない）
-
-## 既存カード `t_49f032aa` との切り分け
-
-- A118 の実装は `t_49f032aa` (worker-kilo, ready, branch `m10/hermes-ch-harvest-followup`) の担当。本 PR では **A118 を実装しない**。
-- 記録のみを行う。
-
-## C088 / C115 の扱い
-
-- いずれも **spec JSON が存在しない** ため、仕様作成 (`data/bga-card-specs/<ID>.json` + tests JSON、`scripts/validate_bga_card_specs.py` 緑) が前提。
-- C115 はカード上在庫 (`card_accumulations`, PR #371 **merged 2026-11-19T06:20Z**) が前提（**main マージ済み**）。
-- C088 は費用軽減の順序記録 (LOG) が前提。
-- 基盤が main にないまま近似実装しない方針のため、**本 PR では実装せず**、記録に「仕様未作成のため実装不可」と理由を記載し、PR 本文の残件欄に送る。
-
-## ゲート確認（HEAD `39d9b19` 実測）
-
-- `cargo fmt --check` ✅
-- `cargo clippy --all-targets --all-features --locked -- -D warnings` ✅
-- 追加テスト `cargo test --test ch04_after_improvement_played` ✅ (10/10 passed: 8 dispatch-level + 2 engine-level)
-- 既存テスト `cargo test --lib` ✅ (442/442 passed)
-- `cargo test --test m6_verified_pool` ✅ (プール数・MCTS ダイジェスト・`state_hash` 不変)
-- `cargo test --lib mcts::tests::sample_game_distribution_digest_is_stable` ✅
-- `band_a_cards_are_absent_from_the_two_player_preset` ✅ (A109 は 2 人用プリセットに入らない)
-
-## Actions チェック結果（HEAD `39d9b19`、`gh api repos/cueikusuta/agricola-re-ai/commits/39d9b19ee6b2f323242a4fda7180db483659249e/check-runs` 実測）
+### Actions チェック結果（exact HEAD `e9a9a8c` の実測値、全必須チェック success）
 
 | チェック名 | 結論 | Run URL |
 |---|---|---|
-| CI required (aggregate) | skipped | — |
-| cargo test | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741648/job/136713344499 |
-| rustfmt | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741648/job/136713344511 |
-| clippy | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741648/job/136713344555 |
-| M1/M2/M7 seeded performance | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741648/job/136713344496 |
-| Pipeline gates (spec/catalog/blockers) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741682/job/136713297671 |
-| Detect changed files | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741648/job/136713297643 |
-| Python unittest discovery | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741650/job/136713297464 |
-| test (aggregate) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/44860741658/job/136713297340 |
-| shard | skipped | — |
+| CI required (aggregate) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137738550076 |
+| cargo test | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137737286487 |
+| rustfmt | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137737286361 |
+| clippy | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137737286418 |
+| M1/M2/M7 seeded performance | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137737286351 |
+| Pipeline gates (spec/catalog/blockers) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611540/job/137737206846 |
+| Detect changed files | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611740/job/137737207123 |
+| bga-spec-contract | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611445/job/137737206759 |
+| test (Paired AI Evaluation aggregate) | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611856/job/137737206331 |
+| Python unittest discovery | **success** | https://github.com/cueikusuta/agricola-re-ai/actions/runs/45187611454/job/137737206317 |
+| shard / aggregate (Paired AI Evaluation) | skipped | — |
 
-**全必須ゲート緑**。ローカル測定値のみではなく Actions の実測値・URL を記録。
+### 完了条件
+- P2/P3 指摘の全修正を本ブランチにコミット・push（force push なし、新規 PR なし、マージなし）
+- exact HEAD で必須 Actions が全 success（PR merge check 緑）
+- PR 本文に Actions run URL と実測結果を記録（別コミットで補完後、gh pr edit で反映）
+- 独立レビュー・マージは子カードに委譲（本 PR はマージしない）
 
-## 残件
-
-| カード | 状態 | ブロッカー |
-|---|---|---|
-| A118 | 記録のみ | `t_49f032aa` / PR #385 担当、仕様 JSON 修正（`frequency`, 購入上限）が前提 |
-| C088 | 未実装 | 仕様 JSON なし、LOG 基盤なし |
-| C115 | 未実装 | 仕様 JSON なし（カード上在庫 PR #371 は 2026-11-19T06:20Z に main マージ済み） |
-| A088 | 記録補正のみ | 実装済み・テスト済み |
-| A110 | 記録補正のみ | 実装済み・テスト済み (仕様データ残件 R-A4 は別 PR) |
-
-## PR 状態確認（Step 0）
-
-- PR #370: open, head=7204d1f, base=research/deepai-allstages-readiness
-- PR #375: open, head=176c9400, base=main
-- PR #376: open, head=6d97269a, base=research/deepai-allstages-merged (stacked on #370)
-- PR #371: **merged 2026-11-19T06:20Z**, merge commit `181253d4e179239c6b3128d60b242dcdd68095fb` (card_accumulations)
-- #370/#375/#376 は open。本 PR が触るファイル (`src/cards.rs`, `src/card_events.rs`, `src/registry.rs`, `tests/`) に触る同一関心の open PR はなし。
-
-**マージしない。レビュー待ちで完了。**
+Closes: 実装カード t_d3a9a61f

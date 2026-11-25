@@ -93,6 +93,9 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterOccupationGain { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
         // Improvement played from hand — After phase (fired by dispatch_play's after-play scan)
         CardEffect::AfterImprovementPlayedGain { .. } => TriggerPhase::After,
+        // B049 天秤 — After phase (fired by dispatch_play's two dedicated
+        // after-play scans)
+        CardEffect::AfterPlacementGainIfImprovementsEqualOccupations { .. } => TriggerPhase::After,
         // Clay construction purchase — After phase
         CardEffect::AfterClayConstructionGain { .. } => TriggerPhase::After,
         // Harvest/baking — After phase
@@ -547,6 +550,11 @@ fn resolve_phase_scan(
                 // scan for improvements owns it.
                 CardEffect::AfterImprovementPlayedGain { .. } => EffectResult::Resolved,
                 CardEffect::AfterOccupationGain { .. } => EffectResult::Resolved,
+                // B049 天秤: never fires via the generic phase scan;
+                // dispatch_play's two after-play scans own it.
+                CardEffect::AfterPlacementGainIfImprovementsEqualOccupations { .. } => {
+                    EffectResult::Resolved
+                }
                 #[cfg(test)]
                 CardEffect::PendingProbe { options } => {
                     handle_pending_probe(ctx, player, card_id, options.clone(), trigger_data)?
@@ -1192,6 +1200,10 @@ fn effect_condition_holds(
         // C068 書棚 fires only from dispatch_play's dedicated after-play
         // scan, never from the generic phase scan.
         CardEffect::AfterOccupationGain { .. } => false,
+        // B049 天秤 fires only from dispatch_play's two dedicated after-play
+        // scans (the occupation scan and the improvement scan), never from
+        // the generic phase scan.
+        CardEffect::AfterPlacementGainIfImprovementsEqualOccupations { .. } => false,
         CardEffect::AfterClayConstructionGain { .. } => {
             trigger.site == EventKind::ClayConstruction
                 && trigger.previous_player.as_ref().is_some_and(|prev| {
@@ -1377,6 +1389,11 @@ pub fn execute_chosen_triggers(
             // scan for improvements owns it.
             CardEffect::AfterImprovementPlayedGain { .. } => EffectResult::Resolved,
             CardEffect::AfterOccupationGain { .. } => EffectResult::Resolved,
+            // B049 天秤: never fires via the generic phase scan;
+            // dispatch_play's two after-play scans own it.
+            CardEffect::AfterPlacementGainIfImprovementsEqualOccupations { .. } => {
+                EffectResult::Resolved
+            }
             #[cfg(test)]
             CardEffect::PendingProbe { options } => {
                 handle_pending_probe(ctx, player, &trigger.card_id, options.clone(), trigger_data)?
@@ -3398,6 +3415,42 @@ fn handle_start_round_place_food_on_next_round_spaces(
     Ok(EffectResult::Resolved)
 }
 
+/// B049 天秤 (Scales): grant `amount` of `good` when the owner's
+/// improvements in front (base improvements + played minor-improvement
+/// cards) and occupations are equal in number. The state is read AFTER
+/// the newly placed card's zone move, so both counts include it — the
+/// printed timing is "become equal" after each placement
+/// (snapshot=after_event). Called from dispatch_play's two dedicated
+/// after-play scans only.
+fn handle_after_placement_gain_if_improvements_equal_occupations(
+    ctx: &mut DispatchContext<'_>,
+    id: &str,
+    good: Good,
+    amount: u32,
+) -> Result<(), String> {
+    let equal = usize::try_from(crate::cards::improvement_count_in_front(
+        ctx.card_set,
+        ctx.player,
+    ))
+    .is_ok_and(|improvements| {
+        improvements == crate::cards::occupation_count(ctx.card_set, ctx.player)
+    });
+    if !equal {
+        return Ok(());
+    }
+    consume_budget(ctx.event_budget)?;
+    let limit = ctx.card_use_limits.get(id).copied().unwrap_or(u32::MAX);
+    check_card_use(ctx.card_uses, id, limit)?;
+    let next = ctx
+        .player
+        .supply
+        .get(good)
+        .checked_add(amount)
+        .ok_or("resource overflow")?;
+    ctx.player.supply.set(good, next);
+    Ok(())
+}
+
 // --- Public Dispatcher Entry Points ---
 /// Dispatch all phases for a card play action.
 ///
@@ -3576,6 +3629,18 @@ pub fn dispatch_play(
                             .ok_or("resource overflow")?;
                         p.supply.set(*good, next);
                     }
+                    // B049 天秤: after this occupation's zone move, if the
+                    // improvements in front and the occupations are equal
+                    // (both counts include the new occupation), gain food.
+                    if let CardEffect::AfterPlacementGainIfImprovementsEqualOccupations {
+                        good,
+                        amount,
+                    } = effect
+                    {
+                        handle_after_placement_gain_if_improvements_equal_occupations(
+                            &mut ctx, id, *good, *amount,
+                        )?;
+                    }
                 }
             }
         }
@@ -3600,23 +3665,37 @@ pub fn dispatch_play(
                         continue;
                     };
                     for effect in &card.effects {
-                        let CardEffect::AfterImprovementPlayedGain { good, amount } = effect else {
-                            continue;
-                        };
-                        consume_budget(ctx.event_budget)?;
-                        let limit = ctx
-                            .card_use_limits
-                            .get(id.as_str())
-                            .copied()
-                            .unwrap_or(u32::MAX);
-                        check_card_use(ctx.card_uses, id, limit)?;
-                        let p = &mut ctx.player;
-                        let next = p
-                            .supply
-                            .get(*good)
-                            .checked_add(*amount)
-                            .ok_or("resource overflow")?;
-                        p.supply.set(*good, next);
+                        match effect {
+                            CardEffect::AfterImprovementPlayedGain { good, amount } => {
+                                consume_budget(ctx.event_budget)?;
+                                let limit = ctx
+                                    .card_use_limits
+                                    .get(id.as_str())
+                                    .copied()
+                                    .unwrap_or(u32::MAX);
+                                check_card_use(ctx.card_uses, id, limit)?;
+                                let p = &mut ctx.player;
+                                let next = p
+                                    .supply
+                                    .get(*good)
+                                    .checked_add(*amount)
+                                    .ok_or("resource overflow")?;
+                                p.supply.set(*good, next);
+                            }
+                            // B049 天秤: after this improvement's zone move, if
+                            // the improvements in front and the occupations are
+                            // equal (both counts include the new improvement),
+                            // gain food.
+                            CardEffect::AfterPlacementGainIfImprovementsEqualOccupations {
+                                good,
+                                amount,
+                            } => {
+                                handle_after_placement_gain_if_improvements_equal_occupations(
+                                    &mut ctx, id, *good, *amount,
+                                )?;
+                            }
+                            _ => {}
+                        }
                     }
                 }
             }

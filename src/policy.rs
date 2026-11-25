@@ -760,6 +760,14 @@ fn card_priority(
                                 CardEffect::AfterImprovementPlayedGain { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
+                                // B049 天秤: the grant needs an occupation or improvement
+                                // placement that rebalances the counts, so the same optimistic
+                                // per-remaining-round estimate bounds it.
+                                CardEffect::AfterPlacementGainIfImprovementsEqualOccupations {
+                                    good,
+                                    amount,
+                                    ..
+                                } => card_good_value(*good) * i64::from(*amount) * horizon,
                                 // Chapter 1 round-start cards: complex conditional effects not evaluated by heuristic
                                 CardEffect::StartRoundPlowFieldIfHouse { .. }
                                 | CardEffect::StartRoundCopyUnusedRoundSpace { .. }

@@ -136,6 +136,7 @@
 | `round_number` | `n` / `min` | ラウンド番号 |
 | `fence_count_at_least_round` | — | 建設本数がラウンド数以上 |
 | `harvests_equal_occupations` | — | 終了した収穫数と出した職業数が同数 |
+| `improvements_equal_occupations` | — | 前にある進歩数（基礎進歩＋プレイ済み小進歩）と出した職業数が同数。配置イベント後の状態で判定する（B049 で使用） |
 | `animal_count_at_least` | `animal`, `n` | 家畜数が `n` 以上 |
 | `declined_improvement` | `kind`（`minor` / `major`） | 進歩アクションを使わなかった |
 | `sow_unconditional` | — | 制約のない「種をまく」アクション |
