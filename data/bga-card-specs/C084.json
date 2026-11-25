@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "card_id": "C084",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "ライ麦飼料",
+    "name_en": "Perennial Rye"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "weak",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "no",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3005",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "occupation_count",
+        "params": {
+          "n": 2
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "round_end",
+      "conditions": [
+        {
+          "predicate": "round_has_no_harvest",
+          "params": {}
+        }
+      ],
+      "steps": [
+        {
+          "operation": "spend_resource",
+          "target": "owner",
+          "params": {
+            "good": "grain",
+            "amount": 1,
+            "otherwise": "skip_remaining_steps"
+          }
+        },
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "breed_exactly_one_animal_type",
+            "not_breeding_phase": true
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[1].operation=other kind=breed_exactly_one_animal_type (not in vocabulary; vocabulary has breed_animal but not 'exactly one type')",
+      "effects[0].steps[1].params.not_breeding_phase=true (semantic flag not in vocabulary)"
+    ],
+    "test_case_ids": [
+      "C084-normal",
+      "C084-boundary-harvest-round",
+      "C084-boundary-no-grain"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "At end of each round without harvest, optionally pay 1 grain to breed exactly 1 animal type (does not count as breeding phase). Stays in played area. Ban status: weak. Eligibility: 2=no, 3=yes, 4=yes. Classification: Stage 3 (RH)."
+  }
+}

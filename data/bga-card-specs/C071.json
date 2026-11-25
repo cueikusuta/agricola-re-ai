@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "card_id": "C071",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "液体肥料",
+    "name_en": "Slurry"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3018",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_start",
+      "conditions": [
+        {
+          "predicate": "raw_text",
+          "params": {
+            "text": "この収穫の繁殖フェイズで2種類以上の家畜が生まれた"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "grant_free_sow_action"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "left_neighbor_hand"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions[0].predicate=raw_text (no vocabulary for '2+ animal types bred in breeding phase')",
+      "effects[0].steps[0].operation=other kind=grant_free_sow_action (not in vocabulary)"
+    ],
+    "test_case_ids": [
+      "C071-normal",
+      "C071-boundary-single-type"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "During each harvest, if 2+ different animal types breed, gain a free Sow action. Passes left after play. Condition and effect need vocabulary extension."
+  }
+}

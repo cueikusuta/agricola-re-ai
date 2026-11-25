@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "card_id": "C084",
+  "cases": [
+    {
+      "id": "C084-normal",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2,
+        "animals": {"sheep": 2, "boar": 1},
+        "current_round": 5,
+        "round_has_harvest": false
+      },
+      "action": {
+        "end_round": true,
+        "pay_grain": 1,
+        "breed": "cattle"
+      },
+      "expected": {
+        "grain_spent": 1,
+        "grain_remaining": 1,
+        "cattle_gained": 1,
+        "counts_as_breeding_phase": false
+      },
+      "notes": "Round 5 (no harvest), pay 1 grain -> breed 1 cattle (not breeding phase)"
+    },
+    {
+      "id": "C084-boundary-harvest-round",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 2,
+        "current_round": 4,
+        "round_has_harvest": true
+      },
+      "action": {
+        "end_round": true
+      },
+      "expected": {
+        "effect_triggered": false
+      },
+      "notes": "Round 4 has harvest -> effect does not trigger"
+    },
+    {
+      "id": "C084-boundary-no-grain",
+      "scope": "effect_only",
+      "setup": {
+        "grain": 0,
+        "current_round": 5,
+        "round_has_harvest": false
+      },
+      "action": {
+        "end_round": true
+      },
+      "expected": {
+        "grain_spent": 0,
+        "animals_bred": 0
+      },
+      "notes": "No grain -> cannot pay, no breeding"
+    }
+  ]
+}

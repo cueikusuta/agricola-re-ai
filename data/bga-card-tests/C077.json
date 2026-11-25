@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "card_id": "C077",
+  "cases": [
+    {
+      "id": "C077-normal",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 5
+      },
+      "action": {
+        "play": "C077"
+      },
+      "expected": {
+        "clay_on_rounds": [6, 7, 8],
+        "clay_gained_round_6": 1,
+        "clay_gained_round_7": 1,
+        "clay_gained_round_8": 1
+      },
+      "notes": "Play in round 5 -> clay on rounds 6,7,8 -> gain 1 clay each at round start"
+    },
+    {
+      "id": "C077-boundary-late-game",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 13
+      },
+      "action": {
+        "play": "C077"
+      },
+      "expected": {
+        "clay_on_rounds": [14],
+        "clay_gained_round_14": 1
+      },
+      "notes": "Play in round 13 -> only round 14 remains -> clay on 1 round"
+    }
+  ]
+}

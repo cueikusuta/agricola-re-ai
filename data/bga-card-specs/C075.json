@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "card_id": "C075",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "薪",
+    "name_en": "Firewood"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3014",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "food",
+        "amount": 2
+      }
+    ],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "returning_home_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "stack_goods_on_card",
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "before_worker_space",
+      "conditions": [
+        {
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": ["fireplace", "cooking_hearth", "clay_oven"]
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "take_up_to_wood_from_card",
+            "max": 4,
+            "source": "this_card"
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].trigger=returning_home_phase (vocabulary has this trigger)",
+      "effects[1].steps[0].operation=other kind=take_up_to_wood_from_card (not in vocabulary)",
+      "effects[1].conditions[0].predicate=worker_space_used with spaces array (need to verify vocabulary supports array)"
+    ],
+    "test_case_ids": [
+      "C075-normal",
+      "C075-boundary-max-4",
+      "C075-boundary-no-wood-on-card"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "Each returning home phase: place 1 wood on card. Before building fireplace/cooking hearth/clay oven: optionally take up to 4 wood from card. Stays in played area. Classification: Stage 3 (RH)."
+  }
+}

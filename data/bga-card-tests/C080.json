@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "card_id": "C080",
+  "cases": [
+    {
+      "id": "C080-normal",
+      "scope": "effect_only",
+      "setup": {
+        "food": 3
+      },
+      "action": {
+        "plow": 1
+      },
+      "expected": {
+        "stone_gained": 1,
+        "food_spent": 1,
+        "food_remaining": 2
+      },
+      "notes": "Plow 1 field, pay 1 food -> gain 1 stone"
+    },
+    {
+      "id": "C080-boundary-no-food",
+      "scope": "effect_only",
+      "setup": {
+        "food": 0
+      },
+      "action": {
+        "plow": 1
+      },
+      "expected": {
+        "stone_gained": 0,
+        "food_spent": 0
+      },
+      "notes": "No food -> cannot pay, no stone gained"
+    },
+    {
+      "id": "C080-boundary-multiple-plow",
+      "scope": "effect_only",
+      "setup": {
+        "food": 5
+      },
+      "action": {
+        "plow": 3
+      },
+      "expected": {
+        "stone_gained": 3,
+        "food_spent": 3,
+        "food_remaining": 2
+      },
+      "notes": "Plow 3 fields, pay 1 food each -> gain 3 stone"
+    }
+  ]
+}

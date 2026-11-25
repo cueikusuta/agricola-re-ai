@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "card_id": "C081",
+  "identity": {
+    "kind": "minor_improvement",
+    "name_ja": "資源拠点",
+    "name_en": "Material Hub"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "yes",
+      "3": "yes",
+      "4": "yes"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=3008",
+        "language": "ja",
+        "checked_on": "2026-11-20",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-20",
+        "note": "English list page row used to cross-check the card id and name"
+      }
+    ]
+  },
+  "play": {
+    "action": "minor_improvement",
+    "cost": [
+      {
+        "good": "wood",
+        "amount": 1
+      },
+      {
+        "good": "clay",
+        "amount": 1
+      }
+    ],
+    "prerequisites": [
+      {
+        "predicate": "raw_text",
+        "params": {
+          "text": "ストックに葦1と石材1"
+        }
+      }
+    ],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "stack_goods_on_card",
+            "goods": [
+              {"good": "wood", "amount": 2},
+              {"good": "clay", "amount": 2},
+              {"good": "reed", "amount": 2},
+              {"good": "stone", "amount": 2}
+            ]
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "none"
+    },
+    {
+      "trigger": "after_worker_space",
+      "conditions": [
+        {
+          "predicate": "any_player",
+          "params": {}
+        },
+        {
+          "predicate": "raw_text",
+          "params": {
+            "text": "木材5以上 または レンガ4以上 または 葦3以上 または 石3以上 を獲得した"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "gain_matching_resource_from_card",
+            "thresholds": {
+              "wood": 5,
+              "clay": 4,
+              "reed": 3,
+              "stone": 3
+            }
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_use",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none"
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].steps[0].operation=stack_goods_on_card with multiple goods (vocabulary shows single good)",
+      "effects[1].conditions[1].predicate=raw_text (complex any-player threshold condition)",
+      "effects[1].steps[0].operation=other kind=gain_matching_resource_from_card (not in vocabulary)",
+      "effects[1].trigger=after_worker_space with any_player for resource gain thresholds (complex)"
+    ],
+    "test_case_ids": [
+      "C081-normal-wood",
+      "C081-normal-clay",
+      "C081-boundary-threshold"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-20",
+    "implementation_status": "not_started",
+    "notes": "On play: place 2 wood, 2 clay, 2 reed, 2 stone on card. Whenever any player gains >=5 wood / >=4 clay / >=3 reed / >=3 stone (in one action), gain 1 of that type from card. Stays in played area. Classification: Stage 2 (any-player, overlaps P6 accumulation)."
+  }
+}

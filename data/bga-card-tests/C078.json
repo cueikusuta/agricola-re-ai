@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "card_id": "C078",
+  "cases": [
+    {
+      "id": "C078-normal-early",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 1
+      },
+      "action": {
+        "play": "C078"
+      },
+      "expected": {
+        "reed_on_rounds": [6, 8, 10, 12, 14],
+        "reed_gained_round_6": 1,
+        "reed_gained_round_8": 1,
+        "reed_gained_round_10": 1,
+        "reed_gained_round_12": 1,
+        "reed_gained_round_14": 1
+      },
+      "notes": "Play in round 1 -> rounds 6,8,10,12,14 (1+5,7,9,11,13) -> 5 reeds total"
+    },
+    {
+      "id": "C078-boundary-late",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 8
+      },
+      "action": {
+        "play": "C078"
+      },
+      "expected": {
+        "reed_on_rounds": [13],
+        "reed_gained_round_13": 1
+      },
+      "notes": "Play in round 8 -> rounds 13,15,17,19,21 -> only round 13 <=14 -> 1 reed"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "card_id": "C075",
+  "cases": [
+    {
+      "id": "C075-normal",
+      "scope": "effect_only",
+      "setup": {
+        "wood_on_card": 3
+      },
+      "action": {
+        "build": "fireplace"
+      },
+      "expected": {
+        "wood_taken_from_card": 3,
+        "wood_on_card_remaining": 0
+      },
+      "notes": "3 wood on card, build fireplace -> take all 3 (up to 4)"
+    },
+    {
+      "id": "C075-boundary-max-4",
+      "scope": "effect_only",
+      "setup": {
+        "wood_on_card": 6
+      },
+      "action": {
+        "build": "cooking_hearth"
+      },
+      "expected": {
+        "wood_taken_from_card": 4,
+        "wood_on_card_remaining": 2
+      },
+      "notes": "6 wood on card, build cooking hearth -> take max 4, 2 remain"
+    },
+    {
+      "id": "C075-boundary-no-wood-on-card",
+      "scope": "effect_only",
+      "setup": {
+        "wood_on_card": 0
+      },
+      "action": {
+        "build": "clay_oven"
+      },
+      "expected": {
+        "wood_taken_from_card": 0,
+        "wood_on_card_remaining": 0
+      },
+      "notes": "No wood on card -> nothing to take"
+    }
+  ]
+}

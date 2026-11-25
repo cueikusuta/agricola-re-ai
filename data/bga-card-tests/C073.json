@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "card_id": "C073",
+  "cases": [
+    {
+      "id": "C073-normal-early-round",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 5,
+        "available_grain": 5
+      },
+      "action": {
+        "sow": {"unconstrained": true}
+      },
+      "expected": {
+        "grain_gained": 1,
+        "vegetable_gained": 0
+      },
+      "notes": "Round 5, unconstrained sow -> gain 1 grain"
+    },
+    {
+      "id": "C073-normal-late-round",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 12,
+        "available_grain": 5,
+        "available_vegetable": 3
+      },
+      "action": {
+        "sow": {"unconstrained": true}
+      },
+      "expected": {
+        "grain_gained": 1,
+        "vegetable_gained": 0
+      },
+      "notes": "Round 12, unconstrained sow -> gain 1 grain (or vegetable by choice)"
+    },
+    {
+      "id": "C073-boundary-constrained-sow",
+      "scope": "effect_only",
+      "setup": {
+        "current_round": 5,
+        "available_grain": 5
+      },
+      "action": {
+        "sow": {"unconstrained": false}
+      },
+      "expected": {
+        "grain_gained": 0,
+        "vegetable_gained": 0
+      },
+      "notes": "Constrained sow (e.g. from occupation) does not trigger the effect"
+    }
+  ]
+}
