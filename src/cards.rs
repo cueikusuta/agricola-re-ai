@@ -586,6 +586,13 @@ pub enum PassiveRule {
     MajorStoneDiscountByRooms,
     StoneDiscount(u32),
     HousingSpace(u8),
+    /// D026 大工の敷地 / E024 野心: allows building major improvements
+    /// when taking a Minor Improvement action (MeetingPlace).
+    /// If `joinery_and_well_only` is true (D026), only Joinery and Well are allowed.
+    /// If false (E024), any major improvement may be built.
+    AllowMajorViaMinor {
+        joinery_and_well_only: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1517,6 +1524,7 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 }
                 PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                PassiveRule::AllowMajorViaMinor { .. } => {}
             },
             CardEffect::OnPlayAddStoneToEmptyFields { good: _, amount } => {
                 for cell in &mut player.farm {
@@ -4517,9 +4525,10 @@ mod simple_occupation_tests {
         // B114/A049/C067 (StartRoundGainIf* wave) join the two-player preset;
         // A157 stays out (4 players only), so the count is 41 + 3 = 44
         // (occupations 18 + 1, minors 23 + 2).
-        assert_eq!(total, 44);
+        // D026 and E024 add 2 more minors: 44 + 2 = 46 (occupations 19, minors 27).
+        assert_eq!(total, 46);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 25);
+        assert_eq!(minor, 27);
         assert!(verified_basic_card_set(3).is_err());
     }
 }
@@ -4543,6 +4552,39 @@ pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
             cost: vec![(Good::Wood, 2), (Good::Stone, 2)],
             points: 2,
             effects: vec![CardEffect::AfterHarvestBakeGain { amount: 3 }],
+        },
+        // D026 大工の敷地 (Carpenter's Yard): cost 1 wood + 1 reed, 1 VP.
+        // Passive: when taking a Minor Improvement action (MeetingPlace), may build Joinery or Well.
+        CardDefinition {
+            use_limit: None,
+            id: "D026".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1), (Good::Reed, 1)],
+            points: 1,
+            effects: vec![CardEffect::Passive {
+                rule: PassiveRule::AllowMajorViaMinor {
+                    joinery_and_well_only: true,
+                },
+            }],
+        },
+        // E024 野心 (Ambition): prerequisite 2 occupations, 0 VP.
+        // Passive: when taking a Minor Improvement action (MeetingPlace), may build any major improvement.
+        CardDefinition {
+            use_limit: None,
+            id: "E024".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(2),
+                },
+                CardEffect::Passive {
+                    rule: PassiveRule::AllowMajorViaMinor {
+                        joinery_and_well_only: false,
+                    },
+                },
+            ],
         },
     ]
 }

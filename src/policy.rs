@@ -351,7 +351,6 @@ impl DetailPolicy for SimpleDetails {
             | Space::DayLaborer
             | Space::GrainSeeds
             | Space::VegetableSeeds
-            | Space::MeetingPlace
             | Space::WesternQuarry
             | Space::EasternQuarry
             | Space::Copse
@@ -361,6 +360,10 @@ impl DetailPolicy for SimpleDetails {
             | Space::FamilyGrowthWithRoom
             | Space::ModestFamilyGrowth
             | Space::FamilyGrowthNoRoom => Detail::None,
+            Space::MeetingPlace => match major_via_minor_buy(obs, p) {
+                Some(action) => action.detail,
+                None => Detail::None,
+            },
             Space::ResourceMarket => {
                 if obs.public.players.len() == 3 {
                     Detail::MarketChoice(Good::Stone)
@@ -764,6 +767,83 @@ fn preferred_card(
         .map(|(id, priority)| (id.clone(), priority))
 }
 
+/// D026 / E024 passive scope: which major improvements may be built with a
+/// Minor Improvement (MeetingPlace) action via a played AllowMajorViaMinor
+/// card. Queried from played card definitions — no persistent Player state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MajorViaMinorScope {
+    /// E024 野心: any major improvement in the market.
+    Any,
+    /// D026 大工の敷地: Joinery and Well only.
+    JoineryAndWell,
+}
+
+fn allow_major_via_minor_scope(obs: &Observation) -> Option<MajorViaMinorScope> {
+    let p = &obs.public.players[obs.player_id];
+    let mut any_major = false;
+    let mut joinery_and_well_only = false;
+    for card_id in &p.played_cards {
+        let Some(card) = obs.card_definitions.iter().find(|c| c.id == *card_id) else {
+            continue;
+        };
+        for e in &card.effects {
+            if let crate::cards::CardEffect::Passive {
+                rule:
+                    crate::cards::PassiveRule::AllowMajorViaMinor {
+                        joinery_and_well_only: only,
+                    },
+            } = e
+            {
+                if *only {
+                    joinery_and_well_only = true;
+                } else {
+                    any_major = true;
+                }
+            }
+        }
+    }
+    match (any_major, joinery_and_well_only) {
+        (true, _) => Some(MajorViaMinorScope::Any),
+        (false, true) => Some(MajorViaMinorScope::JoineryAndWell),
+        _ => None,
+    }
+}
+
+/// Deterministic major-improvement buy on MeetingPlace via the passive,
+/// reusing the same ranking as `improvement_choice`.
+fn major_via_minor_buy(obs: &Observation, p: &Player) -> Option<Action> {
+    let scope = allow_major_via_minor_scope(obs)?;
+    let market = &obs.public.improvement_market;
+    let improvement = match scope {
+        MajorViaMinorScope::Any => market
+            .iter()
+            .copied()
+            .filter(|&i| crate::engine::affordable(p, i))
+            .max_by_key(|&i| improvement_buy_value(i))?,
+        MajorViaMinorScope::JoineryAndWell => [Improvement::Joinery, Improvement::Well]
+            .into_iter()
+            .filter(|&i| market.contains(&i) && crate::engine::affordable(p, i))
+            .max_by_key(|&i| improvement_buy_value(i))?,
+    };
+    Some(Action {
+        space: Space::MeetingPlace,
+        detail: Detail::Buy {
+            improvement,
+            instant_bake: 0,
+        },
+    })
+}
+
+fn improvement_buy_value(i: Improvement) -> i32 {
+    match i {
+        Improvement::Hearth4 | Improvement::Hearth5 => 50,
+        Improvement::Fireplace2 | Improvement::Fireplace3 => 45,
+        Improvement::Well => 40,
+        Improvement::ClayOven | Improvement::StoneOven => 35,
+        _ => 20,
+    }
+}
+
 impl DetailPolicy for CardChoiceDetails {
     fn produce(&self, obs: &Observation, space: Space) -> Option<Action> {
         use crate::cards::CardKind;
@@ -792,7 +872,39 @@ impl DetailPolicy for CardChoiceDetails {
                     detail: Detail::PlayOccupation { card_id },
                 });
             }
-            Space::MeetingPlace | Space::MajorImprovement => {
+            Space::MeetingPlace => {
+                // D026 / E024 passive: a played AllowMajorViaMinor card lets the
+                // owner build a major improvement with this Minor Improvement
+                // space.
+                if let Some(action) = major_via_minor_buy(obs, &obs.public.players[obs.player_id]) {
+                    return Some(action);
+                }
+                if let Some((card_id, priority)) =
+                    preferred_card(obs, CardKind::MinorImprovement, 0)
+                {
+                    if priority >= 12 {
+                        // Choice cards (C007) need the choice as action data.
+                        if let Some(card) = (crate::cards::CardSet {
+                            definitions: obs.card_definitions.clone(),
+                        })
+                        .definition(&card_id)
+                        {
+                            if let Some(crate::cards::CardEffect::OnPlayChoiceGain { .. }) =
+                                card.effects.iter().find(|e| {
+                                    matches!(e, crate::cards::CardEffect::OnPlayChoiceGain { .. })
+                                })
+                            {
+                                return None;
+                            }
+                        }
+                        return Some(Action {
+                            space,
+                            detail: Detail::PlayMinor { card_id },
+                        });
+                    }
+                }
+            }
+            Space::MajorImprovement => {
                 if let Some((card_id, priority)) =
                     preferred_card(obs, CardKind::MinorImprovement, 0)
                 {
