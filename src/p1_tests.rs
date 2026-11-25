@@ -219,6 +219,7 @@ use crate::engine::{Action, Detail};
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         };
         let mut set = crate::cards::verified_basic_card_set(2).expect("basic set");
         // Two simultaneous AfterClayConstructionGain effects -> the After phase
@@ -233,6 +234,7 @@ use crate::engine::{Action, Detail};
                 CardEffect::AfterClayConstructionGain { good: Good::Food, amount: 1 },
                 CardEffect::AfterClayConstructionGain { good: Good::Wood, amount: 1 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         for i in 0..13 {
             set.definitions.push(filler(i, "FILLER_OCC"));
@@ -245,6 +247,7 @@ use crate::engine::{Action, Detail};
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             });
         }
         let hands = vec![
@@ -345,6 +348,7 @@ use crate::engine::{Action, Detail};
                 CardEffect::AfterHarvestBakeGain { amount: 1 },
                 CardEffect::AfterHarvestBakeGain { amount: 1 },
             ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         // Clay-construction bonus: fires when the owner upgrades clay->stone.
         set.definitions.push(CardDefinition {
@@ -357,6 +361,7 @@ use crate::engine::{Action, Detail};
                 good: Good::Food,
                 amount: 1,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         for i in 0..12 {
             set.definitions.push(CardDefinition {
@@ -366,6 +371,7 @@ use crate::engine::{Action, Detail};
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             });
         }
         for i in 0..14 {
@@ -376,6 +382,7 @@ use crate::engine::{Action, Detail};
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             });
         }
         let hands = vec![
@@ -537,6 +544,7 @@ fn p1_1_replay_poststate_hash_matches_after_save_load() {
             effects: vec![CardEffect::PendingProbe {
                 options: vec![(Good::Food, 2), (Good::Wood, 1)],
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         for i in 1..=13 {
             definitions.push(CardDefinition {
@@ -546,6 +554,7 @@ fn p1_1_replay_poststate_hash_matches_after_save_load() {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             });
         }
         for i in 1..=14 {
@@ -556,6 +565,7 @@ fn p1_1_replay_poststate_hash_matches_after_save_load() {
                 cost: vec![],
                 points: 1,
                 effects: vec![],
+                post_play: crate::cards::PostPlayDestination::PlayedArea,
             });
         }
         let set = CardSet { definitions };
