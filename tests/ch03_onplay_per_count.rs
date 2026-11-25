@@ -1,4 +1,5 @@
-//! Tests for ch03 OnPlayGainPerCount cards: C004, C005, D005, B006, B007
+//! Tests for ch03 OnPlayGainPerCount cards: C004, C005, D005, B006, B007,
+//! plus the B037 single-card chapter (plain OnPlayGain).
 //! (B004 薪の山 is held as needs_resolution — see P0-3).
 //!
 //! Covers, per card: registry reachability, effect-only play via
@@ -21,7 +22,7 @@
 use agricola_re_ai::card_events::dispatch_play;
 use agricola_re_ai::cards::{
     apply_on_play_effects, can_play, play, CardDefinition, CardEffect, CardKind, CardRequirement,
-    CardSet,
+    CardSet, PostPlayDestination,
 };
 use agricola_re_ai::model::{Crop, Good, House, Improvement, Player, Tile};
 use agricola_re_ai::registry::build_default_registry;
@@ -39,6 +40,7 @@ fn occ_def(id: &str) -> CardDefinition {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play: PostPlayDestination::PlayedArea,
     }
 }
 
@@ -50,6 +52,7 @@ fn minor_def(id: &str) -> CardDefinition {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play: PostPlayDestination::PlayedArea,
     }
 }
 
@@ -125,6 +128,32 @@ fn ch03_cards_reachable_via_default_registry() {
             "{id} must carry OnPlayGainPerCount"
         );
     }
+    // B037 reuses the plain OnPlayGain variant (no per-count scaling) and
+    // must be reachable through the default registry built from the verified
+    // band B list.
+    let b037_id = registry
+        .card_id("B037")
+        .unwrap_or_else(|| panic!("B037 must have a CardId"));
+    let b037 = registry
+        .get(b037_id)
+        .unwrap_or_else(|| panic!("B037 must be retrievable"));
+    assert_eq!(b037.external_id, "B037", "round-trip external_id for B037");
+    assert_eq!(
+        b037.kind,
+        CardKind::MinorImprovement,
+        "B037 must be MinorImprovement"
+    );
+    assert!(
+        b037.effects.iter().any(|e| matches!(
+            e,
+            CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 1
+            }
+        )),
+        "B037 must carry OnPlayGain {{ food, 1 }}"
+    );
+
     // B004 must NOT be registered (held as needs_resolution).
     assert!(
         registry.card_id("B004").is_none(),
@@ -148,6 +177,7 @@ fn c004_normal_occupations_3_wood_delta_3() {
                 good: Good::Wood,
                 amount: 1,
             }],
+            post_play: PostPlayDestination::PlayedArea,
         },
         occ_def("occ1"),
         occ_def("occ2"),
@@ -172,6 +202,7 @@ fn c004_zero_occupations_0_wood_delta_0() {
             good: Good::Wood,
             amount: 1,
         }],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0);
     apply_on_play_effects(&set, &mut player, "C004").expect("apply C004");
@@ -192,6 +223,7 @@ fn c004_dispatcher_route_grants_wood_per_occupation() {
                 good: Good::Wood,
                 amount: 1,
             }],
+            post_play: PostPlayDestination::PlayedArea,
         },
         occ_def("occ1"),
         occ_def("occ2"),
@@ -229,6 +261,7 @@ fn c005_normal_clay_rooms_2_plus_improvement_1_clay_delta_3() {
                 amount: 1,
             },
         ],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0);
     player.house = House::Clay; // default 2 rooms -> 2 clay rooms
@@ -256,6 +289,7 @@ fn c005_improvement_counts_played_minor_plus_major() {
                 good: Good::Clay,
                 amount: 1,
             }],
+            post_play: PostPlayDestination::PlayedArea,
         },
         minor_def("minor1"),
     ]);
@@ -283,6 +317,7 @@ fn c005_zero_clay_delta_0() {
             good: Good::Clay,
             amount: 1,
         }],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0); // wood house -> 0 clay rooms
     apply_on_play_effects(&set, &mut player, "C005").expect("apply C005");
@@ -304,6 +339,7 @@ fn d005_normal_sown_fields_2_clay_delta_2() {
             good: Good::Clay,
             amount: 1,
         }],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0);
     player.farm[1].tile = Tile::Field {
@@ -331,6 +367,7 @@ fn d005_zero_clay_delta_0() {
             good: Good::Clay,
             amount: 1,
         }],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0);
     apply_on_play_effects(&set, &mut player, "D005").expect("apply D005");
@@ -350,6 +387,7 @@ fn d005_dispatcher_route_grants_clay_per_sown_field() {
             good: Good::Clay,
             amount: 1,
         }],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0);
     player.farm[3].tile = Tile::Field {
@@ -385,6 +423,7 @@ fn b006_normal_family_3_stone_delta_3() {
                 amount: 1,
             },
         ],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 2);
     player.family = 3;
@@ -406,6 +445,7 @@ fn b006_boundary_family_2_stone_delta_2() {
             good: Good::Stone,
             amount: 1,
         }],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0);
     apply_on_play_effects(&set, &mut player, "B006").expect("apply B006");
@@ -430,6 +470,7 @@ fn b006_prerequisite_unmet_cannot_play() {
                 amount: 1,
             },
         ],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let card = set.definition("B006").unwrap();
     let mut player = Player::new(0, 10);
@@ -460,6 +501,7 @@ fn b006_prerequisite_met_can_play() {
                 good: Good::Stone,
                 amount: 1,
             }],
+            post_play: PostPlayDestination::PlayedArea,
         },
         occ_def("occ1"),
     ]);
@@ -490,6 +532,7 @@ fn b006_dispatcher_route_prerequisite_unmet() {
                 amount: 1,
             },
         ],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 5);
     let mut hand = vec!["B006".to_owned()];
@@ -565,6 +608,7 @@ fn b006_dispatcher_route_family_3_stone_delta_3() {
                     amount: 1,
                 },
             ],
+            post_play: PostPlayDestination::PlayedArea,
         },
         occ_def("occ1"),
     ]);
@@ -600,6 +644,7 @@ fn b007_normal_bottom_row_2_food_delta_4() {
                 amount: 1,
             },
         ],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0);
     player.improvements.push(Improvement::Joinery);
@@ -620,6 +665,7 @@ fn b007_zero_food_delta_2() {
             good: Good::Food,
             amount: 2,
         }],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0);
     apply_on_play_effects(&set, &mut player, "B007").expect("apply B007");
@@ -645,6 +691,7 @@ fn b007_dispatcher_route_bottom_row_2_food_delta_4() {
                 amount: 1,
             },
         ],
+        post_play: PostPlayDestination::PlayedArea,
     }]);
     let mut player = Player::new(0, 0);
     player.improvements.push(Improvement::Pottery);
@@ -655,6 +702,189 @@ fn b007_dispatcher_route_bottom_row_2_food_delta_4() {
         player.supply.food, 4,
         "dispatcher: bottom row 2 -> food_delta 4"
     );
+}
+
+// ---------------- B037 大農場の称号 ----------------
+
+#[test]
+fn b037_real_definition_pinned() {
+    // The real pool definition: minor improvement, free, 3 printed points,
+    // exactly one effect — the existing OnPlayGain { food, 1 } variant. See the
+    // B037 hold comment in src/cards.rs for the unenforced play prerequisites.
+    let defs = real_defs();
+    let card = real_card(&defs, "B037");
+    assert_eq!(
+        card.kind,
+        CardKind::MinorImprovement,
+        "B037 must be a minor improvement"
+    );
+    assert_eq!(card.points, 3, "B037 printed points must be 3");
+    assert_eq!(card.cost, vec![], "B037 cost must be free");
+    assert_eq!(card.effects.len(), 1, "B037 must carry exactly one effect");
+    assert!(
+        matches!(
+            card.effects[0],
+            CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 1
+            }
+        ),
+        "B037 must reuse the existing OnPlayGain variant"
+    );
+    // Hold: the spec's field_count n=6 + all_animal_types prerequisites are
+    // deliberately unenforced (the CardRequirement vocabulary cannot express
+    // them yet), so the card carries no Prerequisite effect and is playable
+    // with no fields and no animals.
+    assert!(
+        !card
+            .effects
+            .iter()
+            .any(|e| matches!(e, CardEffect::Prerequisite { .. })),
+        "B037 hold: no prerequisite effect is attached yet"
+    );
+    let set = new_set(defs.clone());
+    let player = player_with_food(0);
+    assert!(
+        can_play(&set, card, &player, 0),
+        "food 0 -> B037 playable (prerequisite hold)"
+    );
+}
+
+#[test]
+fn b037_normal_play_grants_food_1() {
+    // B037-normal via the direct effect path: food 0 -> 1 on play.
+    let set = new_set(real_defs());
+    let mut player = player_with_food(0);
+    apply_on_play_effects(&set, &mut player, "B037").expect("apply B037");
+    assert_eq!(player.supply.food, 1, "B037 play -> food_delta 1");
+}
+
+#[test]
+fn b037_dispatcher_route_grants_food_1() {
+    // B037-normal via the dispatcher route (the engine play path): the food
+    // gain must flow through `card_events::dispatch_play`, not only through
+    // the direct apply.
+    let set = new_set(real_defs());
+    let mut player = player_with_food(0);
+    let mut hand = vec!["B037".to_owned()];
+    dispatch_card(&set, &mut player, &mut hand, "B037");
+    assert_eq!(
+        player.supply.food, 1,
+        "dispatcher: B037 play -> food_delta 1"
+    );
+}
+
+#[test]
+fn b037_not_triggered_no_double_grant_after_unrelated_action_and_resume_replay() {
+    // The spec contract's B037-not-triggered case expects `play_rejected`
+    // with 5 field tiles / 3 animal types. The engine cannot express the
+    // printed play prerequisites yet (see the hold in src/cards.rs), so this
+    // chapter pins the engine-side part of the contract instead: once B037
+    // is played, no later unrelated action — including playing another minor
+    // improvement through the same after-play scan — and no save/resume or
+    // event replay may grant its food a second time.
+    use agricola_re_ai::engine::{Action, Detail};
+    use agricola_re_ai::model::{Config, Game, Space};
+
+    // Every other card is effect-free, so B037's OnPlayGain is the only food
+    // source in the set. 14 of each kind: a full 7-card hand per player.
+    let mut defs = Vec::new();
+    for i in 0..14 {
+        defs.push(CardDefinition {
+            use_limit: None,
+            id: format!("b037_occ_{i}"),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
+        });
+    }
+    for i in 0..13 {
+        defs.push(CardDefinition {
+            use_limit: None,
+            id: format!("b037_minor_{i}"),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![],
+            post_play: PostPlayDestination::PlayedArea,
+        });
+    }
+    defs.extend(real_defs().into_iter().filter(|card| card.id == "B037"));
+    let set = new_set(defs);
+
+    let config = Config {
+        players: 2,
+        seed: 33,
+        additional_action_space_enabled: false,
+    };
+    let mut game = Game::with_cards(config.clone(), set.clone()).unwrap();
+    let owner = game.public.active_player;
+    assert!(
+        game.observation(owner)
+            .unwrap()
+            .hand
+            .contains(&"B037".to_owned()),
+        "seed 33 must deal B037 to the starting active player"
+    );
+    let food_before = game.public.players[owner].supply.food;
+
+    // Play B037 through the improvement action: exactly one food.
+    game.apply(Action {
+        space: Space::MeetingPlace,
+        detail: Detail::PlayMinor {
+            card_id: "B037".to_owned(),
+        },
+    })
+    .unwrap();
+    assert_eq!(
+        game.public.players[owner].supply.food,
+        food_before + 1,
+        "playing B037 grants exactly one food"
+    );
+
+    // A later unrelated action by the other player — playing an effect-free
+    // occupation through the Lessons space — must not re-grant. (A second
+    // MeetingPlace action would be illegal: the space is used for the round.)
+    let other = game.public.active_player;
+    assert_ne!(other, owner, "turn must pass after the improvement action");
+    let filler = game
+        .observation(other)
+        .unwrap()
+        .hand
+        .iter()
+        .find(|id| id.starts_with("b037_occ_"))
+        .cloned()
+        .expect("the other player must hold an effect-free occupation");
+    game.apply(Action {
+        space: Space::Lessons,
+        detail: Detail::PlayOccupation { card_id: filler },
+    })
+    .unwrap();
+    assert_eq!(
+        game.public.players[owner].supply.food,
+        food_before + 1,
+        "a later unrelated action must not re-grant B037's food"
+    );
+
+    // Save / resume: no second grant.
+    let restored = Game::load_json(&game.save_json().unwrap()).unwrap();
+    assert_eq!(
+        restored.public.players[owner].supply.food,
+        food_before + 1,
+        "save/resume must not re-grant B037's food"
+    );
+    assert_eq!(restored.state_hash(), game.state_hash());
+
+    // Full event replay from the log: no second grant.
+    let replay = Game::replay_with_cards(config, set, &game.log.events).unwrap();
+    assert_eq!(
+        replay.public.players[owner].supply.food,
+        food_before + 1,
+        "event replay must not re-grant B037's food"
+    );
+    assert_eq!(replay.state_hash(), game.state_hash());
 }
 
 // ---------------- cost / prerequisite regression pins (Round 2, P1-2) ----------------
@@ -791,7 +1021,7 @@ fn b007_cost_zero_pinned() {
 fn spec_cost_prereq_parity_with_verified_cards() {
     let defs = real_defs();
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    for id in ["C004", "C005", "D005", "B006", "B007"] {
+    for id in ["C004", "C005", "D005", "B006", "B007", "B037"] {
         let path = root
             .join("data")
             .join("bga-card-specs")
@@ -840,6 +1070,29 @@ fn spec_cost_prereq_parity_with_verified_cards() {
                     rule: CardRequirement::MinimumOccupations(1)
                 }
             )));
+        } else if id == "B037" {
+            // The spec's play prerequisites (field_count n=6 +
+            // all_animal_types) are deliberately unenforced: the
+            // CardRequirement vocabulary cannot express them yet, so the
+            // implementation keeps the play unguarded. Pin the gap instead
+            // of hiding it (same pattern as B007/C005 unresolved fields).
+            assert_eq!(prerequisites.len(), 2, "B037: two prerequisites");
+            assert_eq!(
+                prerequisites[0]["predicate"].as_str().unwrap(),
+                "field_count"
+            );
+            assert_eq!(prerequisites[0]["params"]["n"].as_u64().unwrap(), 6);
+            assert_eq!(
+                prerequisites[1]["predicate"].as_str().unwrap(),
+                "all_animal_types"
+            );
+            assert!(
+                !card
+                    .effects
+                    .iter()
+                    .any(|e| matches!(e, CardEffect::Prerequisite { .. })),
+                "B037 hold: no prerequisite effect is attached yet"
+            );
         } else {
             assert!(
                 prerequisites.is_empty(),

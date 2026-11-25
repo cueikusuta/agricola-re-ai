@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "card_id": "E094",
+  "cases": [
+    {
+      "id": "E094-renovate-only",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "rooms": 3,
+        "resources": { "clay": 3, "reed": 1 }
+      },
+      "action": {
+        "play": "E094",
+        "renovate_to": "clay"
+      },
+      "expected": {
+        "house": "clay",
+        "resources_spent": { "clay": 3, "reed": 1 }
+      }
+    },
+    {
+      "id": "E094-fences-only",
+      "scope": "effect_only",
+      "setup": {
+        "wood": 4,
+        "fences": 0
+      },
+      "action": {
+        "play": "E094",
+        "build_fences": 3
+      },
+      "expected": {
+        "wood": 1,
+        "fences": 3
+      }
+    },
+    {
+      "id": "E094-both",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "rooms": 3,
+        "wood": 5,
+        "clay": 3,
+        "reed": 1,
+        "fences": 0
+      },
+      "action": {
+        "play": "E094",
+        "renovate_to": "clay",
+        "build_fences": 2
+      },
+      "expected": {
+        "house": "clay",
+        "wood": 3,
+        "clay": 0,
+        "reed": 0,
+        "fences": 2
+      }
+    }
+  ]
+}
