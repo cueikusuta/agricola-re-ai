@@ -2388,9 +2388,12 @@ fn plow_at(p: &mut Player, i: usize, adjacent: bool) -> Result<()> {
 /// `Player::vegetable_only_fields` (B068 マメ畑: the card becomes a field
 /// where only vegetables can be planted). The play executor cannot represent
 /// a play-time pause (the same constraint `auto_animal_plan` works around),
-/// so the cell choice is derived from the board instead of asked for; a farm
-/// with no legal cell simply places nothing (the play itself stays legal).
-/// Returns the number of fields actually placed.
+/// so the cell choice is derived from the board instead of asked for; if no
+/// legal cell remains before all `fields` are placed, the whole operation
+/// fails with `Err("no empty cell available for plowing")`: fields already
+/// placed stand (partial placement — the caller owns transaction/rollback,
+/// and the play path aborts the play on error).
+/// Returns the number of fields actually placed (equals `fields` on `Ok`).
 pub fn auto_plow_fields(
     p: &mut Player,
     fields: u32,
