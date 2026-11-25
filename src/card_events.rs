@@ -11,10 +11,7 @@
 //! Source: docs/bga-card-specification.md and existing repo citations.
 
 use crate::cards::{CardEffect, CardSet};
-use crate::engine::{
-    buy_improvement, major_cost, next_house, renovate, sow, Plant, PurchaseArgs, PurchaseMode,
-};
-use crate::model::{Animal, Crop, Good, GrantedAction, House, Improvement, Player, Space, Tile};
+use crate::model::{Animal, Crop, Good, GrantedAction, House, Player, Space, Tile};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
 use crate::registry::EventKind;
 use serde::{Deserialize, Serialize};
@@ -131,7 +128,6 @@ pub struct DispatchContext<'a> {
     pub cards: &'a mut crate::cards::CardState,
     pub improvement_market: &'a mut Vec<crate::model::Improvement>,
     pub delayed_well: &'a mut BTreeMap<u8, Vec<usize>>,
-    pub well_food_schedule: &'a mut BTreeMap<u8, Vec<usize>>,
     pub round: u8,
     pub used_spaces: &'a std::collections::BTreeSet<Space>,
     /// Public space accumulations (space -> amount). Provided by the
@@ -437,7 +433,6 @@ fn resolve_phase_scan(
             cards: ctx.cards,
             improvement_market: ctx.improvement_market,
             delayed_well: ctx.delayed_well,
-            well_food_schedule: ctx.well_food_schedule,
             round: ctx.round,
             used_spaces: ctx.used_spaces,
             accumulations: ctx.accumulations,
@@ -1758,93 +1753,16 @@ fn handle_on_play_gain(
     Ok(EffectResult::Resolved)
 }
 
-/// on_play `grant_action`: immediately execute the granted action (Major Improvement,
-/// Renovation, or Sow) using the same legality checks, costs, and state transitions
-/// as the normal action spaces. If the action cannot be performed (e.g., no eligible
-/// improvement in market, already Stone house, no empty field, insufficient resources),
-/// the grant is simply declined — no state change occurs, but the grant is consumed.
+/// on_play `grant_action`: record the granted action on the owner so it can
+/// be consumed later via `Player::execute_granted_action`. The grant itself
+/// changes no resources or persistent state.
 fn handle_on_play_grant_action(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
     action: &GrantedAction,
 ) -> Result<EffectResult, String> {
     let p = &mut ctx.player;
-    match action {
-        GrantedAction::MajorImprovement { only } => {
-            if let Some(improvement) = only {
-                // Check if the improvement is available in the market
-                if ctx.improvement_market.contains(improvement) {
-                    // Check affordability with discounts
-                    let cost = major_cost(p, *improvement);
-                    let can_afford = cost.iter().all(|(g, n)| p.supply.get(*g) >= *n);
-                    if can_afford {
-                        // Execute the purchase
-                        buy_improvement(
-                            p,
-                            ctx.improvement_market,
-                            ctx.delayed_well,
-                            ctx.well_food_schedule,
-                            ctx.round,
-                            *improvement,
-                            PurchaseArgs {
-                                instant_bake: 0,
-                                allocation: None,
-                                mode: PurchaseMode::Auto,
-                            },
-                        )?;
-                    }
-                    // If not affordable or not in market, grant is declined (no-op)
-                }
-                // If not in market, grant is declined (no-op)
-            }
-            // If only is None (any major improvement), grant is declined for now
-            // as the card specs don't have this case yet.
-        }
-        GrantedAction::Renovation => {
-            // Execute renovation if possible (not already Stone, can afford)
-            if let Some((new_house, good)) = next_house(p.house) {
-                let cost = (p.rooms() as u32).saturating_sub(if good == Good::Stone {
-                    p.stone_cost_discount
-                } else {
-                    0
-                });
-                if p.supply.reed >= 1 && p.supply.get(good) >= cost {
-                    renovate(p)?;
-                }
-                // If can't afford, grant is declined (no-op)
-            }
-            // If already Stone, grant is declined (no-op)
-        }
-        GrantedAction::Sow { fields } => {
-            // Find empty fields and sow grain (up to `fields` fields)
-            let mut sown = 0;
-            let mut assignments = Vec::new();
-            for (cell_idx, cell) in p.farm.iter().enumerate() {
-                if sown >= *fields {
-                    break;
-                }
-                if matches!(
-                    cell.tile,
-                    Tile::Field {
-                        crop: None,
-                        remaining: 0
-                    }
-                ) {
-                    if p.supply.grain >= 1 {
-                        assignments.push(Plant {
-                            cell: cell_idx,
-                            crop: Crop::Grain,
-                        });
-                        sown += 1;
-                    }
-                }
-            }
-            if !assignments.is_empty() {
-                sow(p, &assignments)?;
-            }
-            // If no empty fields or no grain, grant is declined (no-op)
-        }
-    }
+    p.granted_actions.push(action.clone());
     Ok(EffectResult::Resolved)
 }
 
@@ -3095,7 +3013,6 @@ pub fn dispatch_play(
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
-    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -3112,7 +3029,6 @@ pub fn dispatch_play(
         cards,
         improvement_market,
         delayed_well,
-        well_food_schedule,
         round,
         used_spaces,
         accumulations: None,
@@ -3449,7 +3365,6 @@ pub fn dispatch_after_worker(
         cards,
         improvement_market,
         delayed_well,
-        well_food_schedule: &mut BTreeMap::new(), // not used in after-worker path
         round,
         used_spaces,
         accumulations: Some(accumulations),
@@ -3501,7 +3416,6 @@ pub fn dispatch_after_worker(
         cards,
         improvement_market,
         delayed_well,
-        well_food_schedule: &mut BTreeMap::new(), // not used in after-worker path
         round,
         used_spaces,
         accumulations: Some(accumulations),
@@ -3555,7 +3469,6 @@ pub fn dispatch_start_round(
             cards,
             improvement_market,
             delayed_well,
-            well_food_schedule: &mut BTreeMap::new(), // not used in start-round path
             round,
             used_spaces,
             accumulations: Some(accumulations),
@@ -3622,7 +3535,6 @@ pub fn dispatch_after_clay_construction(
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
-    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -3639,7 +3551,6 @@ pub fn dispatch_after_clay_construction(
         cards,
         improvement_market,
         delayed_well,
-        well_food_schedule,
         round,
         used_spaces,
         accumulations: None,
@@ -3701,7 +3612,6 @@ pub fn dispatch_harvest_field(
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
-    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -3717,7 +3627,6 @@ pub fn dispatch_harvest_field(
         cards,
         improvement_market,
         delayed_well,
-        well_food_schedule,
         round,
         used_spaces,
         accumulations: None,
@@ -3781,7 +3690,6 @@ pub fn dispatch_after_harvest_complete(
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
-    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -3797,7 +3705,6 @@ pub fn dispatch_after_harvest_complete(
         cards,
         improvement_market,
         delayed_well,
-        well_food_schedule,
         round,
         used_spaces,
         accumulations: None,
@@ -3844,7 +3751,6 @@ pub fn dispatch_after_harvest_bake(
     players: &mut [Player],
     improvement_market: &mut Vec<crate::model::Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
-    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     event_budget: &mut u32,
@@ -3868,7 +3774,6 @@ pub fn dispatch_after_harvest_bake(
         cards,
         improvement_market,
         delayed_well,
-        well_food_schedule,
         round,
         used_spaces,
         accumulations: None,
@@ -4677,7 +4582,6 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
-            &mut BTreeMap::new(),
             8,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
@@ -4708,7 +4612,6 @@ mod tests {
             &mut c2.players,
             &mut market2,
             &mut well2,
-            &mut BTreeMap::new(),
             5,
             &std::collections::BTreeSet::new(),
             &mut c2.budget,
@@ -4751,7 +4654,6 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
-            &mut BTreeMap::new(),
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,
@@ -4788,7 +4690,6 @@ mod tests {
                 &mut c.players,
                 &mut market,
                 &mut well,
-                &mut BTreeMap::new(),
                 round,
                 &std::collections::BTreeSet::new(),
                 &mut c.budget,
@@ -4962,7 +4863,6 @@ mod tests {
                 &mut c.players,
                 &mut market,
                 &mut well,
-                &mut BTreeMap::new(),
                 8,
                 &std::collections::BTreeSet::new(),
                 &mut c.budget,
@@ -9190,7 +9090,6 @@ mod tests {
             &mut c.players,
             &mut market,
             &mut well,
-            &mut BTreeMap::new(),
             4,
             &std::collections::BTreeSet::new(),
             &mut c.budget,

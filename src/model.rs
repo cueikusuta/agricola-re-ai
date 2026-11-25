@@ -1917,7 +1917,6 @@ impl Game {
                             cards: &mut cards,
                             improvement_market: &mut improvement_market,
                             delayed_well: &mut delayed_well,
-                            well_food_schedule: &mut BTreeMap::new(),
                             round,
                             used_spaces: &used_spaces,
                             accumulations: None,
@@ -2055,7 +2054,6 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
-                        well_food_schedule: &mut BTreeMap::new(),
                         round,
                         accumulations: None,
                         used_spaces: &used_spaces,
@@ -2168,7 +2166,6 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
-                        well_food_schedule: &mut BTreeMap::new(),
                         // A140 ショベル運搬人 reads the OTHER clay accumulation
                         // at resolution time; the paused state already reflects
                         // the core action's take, so the current public map is
@@ -2524,7 +2521,6 @@ impl Game {
                     cards: &mut self.cards,
                     improvement_market: &mut self.public.improvement_market,
                     delayed_well: &mut self.delayed_well,
-                    well_food_schedule: &mut self.public.well_food_schedule,
                     round: self.public.round,
                     used_spaces: &self.public.used,
                     // A140 ショベル運搬人 reads the OTHER clay accumulation

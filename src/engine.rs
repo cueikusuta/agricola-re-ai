@@ -250,7 +250,7 @@ fn room_material(p: &Player) -> Good {
         House::Stone => Good::Stone,
     }
 }
-pub(crate) fn next_house(h: House) -> Option<(House, Good)> {
+fn next_house(h: House) -> Option<(House, Good)> {
     match h {
         House::Wood => Some((House::Clay, Good::Clay)),
         House::Clay => Some((House::Stone, Good::Stone)),
@@ -349,7 +349,7 @@ fn can_buy(p: &Player, market: &[Improvement]) -> bool {
                     .any(|c| matches!(c, Improvement::Fireplace2 | Improvement::Fireplace3))
     })
 }
-pub(crate) fn major_cost(p: &Player, i: Improvement) -> Vec<(Good, u32)> {
+fn major_cost(p: &Player, i: Improvement) -> Vec<(Good, u32)> {
     i.cost()
         .into_iter()
         .map(|(good, amount)| {
@@ -417,7 +417,6 @@ impl Game {
                 &mut self.public.players,
                 &mut self.public.improvement_market,
                 &mut self.delayed_well,
-                &mut self.public.well_food_schedule,
                 self.public.round,
                 &self.public.used,
                 &mut self.event_budget,
@@ -447,7 +446,6 @@ impl Game {
             &mut self.public.players,
             &mut self.public.improvement_market,
             &mut self.delayed_well,
-            &mut self.public.well_food_schedule,
             self.public.round,
             &self.public.used,
             &mut self.event_budget,
@@ -1591,7 +1589,6 @@ impl Game {
                             &mut self.public.players,
                             &mut self.public.improvement_market,
                             &mut self.delayed_well,
-                            &mut self.public.well_food_schedule,
                             self.public.round,
                             &self.public.used,
                             &mut self.event_budget,
@@ -1670,7 +1667,6 @@ impl Game {
                             &mut self.public.players,
                             &mut self.public.improvement_market,
                             &mut self.delayed_well,
-                            &mut self.public.well_food_schedule,
                             self.public.round,
                             &self.public.used,
                             &mut self.event_budget,
@@ -1762,7 +1758,6 @@ impl Game {
                     &mut self.public.players,
                     &mut self.public.improvement_market,
                     &mut self.delayed_well,
-                    &mut self.public.well_food_schedule,
                     self.public.round,
                     &self.public.used,
                     &mut self.event_budget,
@@ -1877,7 +1872,6 @@ impl Game {
                         &mut self.public.players,
                         &mut self.public.improvement_market,
                         &mut self.delayed_well,
-                        &mut self.public.well_food_schedule,
                         self.public.round,
                         &self.public.used,
                         &mut self.event_budget,
@@ -2002,7 +1996,6 @@ impl Game {
                         &mut self.public.players,
                         &mut self.public.improvement_market,
                         &mut self.delayed_well,
-                        &mut self.public.well_food_schedule,
                         self.public.round,
                         &self.public.used,
                         &mut self.event_budget,
@@ -2085,7 +2078,6 @@ impl Game {
                         &mut self.public.players,
                         &mut self.public.improvement_market,
                         &mut self.delayed_well,
-                        &mut self.public.well_food_schedule,
                         self.public.round,
                         &self.public.used,
                         &mut self.event_budget,
@@ -2439,7 +2431,7 @@ fn grow(p: &mut Player, room_only: bool) -> Result<()> {
     p.newborns += 1;
     Ok(())
 }
-pub(crate) fn renovate(p: &mut Player) -> Result<()> {
+fn renovate(p: &mut Player) -> Result<()> {
     let (new, g) = next_house(p.house).ok_or("stone is final house")?;
     let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
         p.stone_cost_discount
@@ -2451,7 +2443,7 @@ pub(crate) fn renovate(p: &mut Player) -> Result<()> {
     p.house = new;
     Ok(())
 }
-pub(crate) fn sow(p: &mut Player, assignments: &[Plant]) -> Result<()> {
+fn sow(p: &mut Player, assignments: &[Plant]) -> Result<()> {
     let mut visited = BTreeSet::new();
     for a in assignments {
         if a.cell >= FARM_CELLS
@@ -2547,12 +2539,12 @@ fn bake_bread(p: &mut Player, amount: u32) -> Result<()> {
     }
     bake_allocated(p, &allocation)
 }
-pub(crate) struct PurchaseArgs<'a> {
-    pub(crate) instant_bake: u32,
-    pub(crate) allocation: Option<&'a [BakeAllocation]>,
-    pub(crate) mode: PurchaseMode,
+struct PurchaseArgs<'a> {
+    instant_bake: u32,
+    allocation: Option<&'a [BakeAllocation]>,
+    mode: PurchaseMode,
 }
-pub(crate) fn buy_improvement(
+fn buy_improvement(
     p: &mut Player,
     market: &mut Vec<Improvement>,
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
