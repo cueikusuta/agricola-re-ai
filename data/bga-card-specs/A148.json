@@ -47,10 +47,7 @@
           "target": "board",
           "params": {
             "scope": "card",
-            "animal_capacity": {
-              "op": "count",
-              "args": ["completed_harvest"]
-            },
+            "animal_capacity": "unlimited",
             "until": "feeding_phase_of_harvest"
           }
         }
