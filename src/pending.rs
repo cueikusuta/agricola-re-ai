@@ -2580,7 +2580,9 @@ mod tests {
         hands[1].extend(occ_ids[6..13].iter().cloned());
         hands[1].extend(minor_ids[7..14].iter().cloned());
 
-        let mut game = Game::with_cards_and_hands(
+        // The start player is part of the constructor history, so replay can
+        // rebuild the exact initial state without post-construction overrides.
+        let mut game = Game::with_cards_and_hands_with_start_player(
             Config {
                 players: 2,
                 seed: 110,
@@ -2588,17 +2590,9 @@ mod tests {
             },
             set.clone(),
             hands.clone(),
+            active,
         )
         .expect("game creation must succeed");
-        game.public.active_player = active;
-        game.public.start_player = active;
-        game.card_use_limits = set
-            .definitions
-            .iter()
-            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
-            .collect();
-        game.public.improvement_market = Improvement::ALL.to_vec();
-        game.public.players[active].supply.clay = 10;
 
         // Play A139 via Lessons
         let action = Action {
@@ -2632,16 +2626,26 @@ mod tests {
             "state hash must match before resolution"
         );
 
-        // Resolve on restored game
+        // Decline: grant consumed, nothing built, clay unchanged.
         let resolution = PendingResolution::GrantAction {
-            choice: GrantedActionChoice::MajorImprovement {
-                improvement: Some(Improvement::Fireplace2),
-            },
+            choice: GrantedActionChoice::MajorImprovement { improvement: None },
         };
+        let clay_before = restored.public.players[active].supply.clay;
         let resume_result = restored
             .resolve_pending_and_resume(resolution)
             .expect("resume must succeed");
         assert_eq!(resume_result, crate::pending::Transition::Completed);
+        assert!(!restored.has_pending(), "grant must be consumed on decline");
+        assert_eq!(
+            restored.public.players[active].supply.clay, clay_before,
+            "clay unchanged on decline"
+        );
+        assert!(
+            !restored.public.players[active]
+                .improvements
+                .contains(&Improvement::Fireplace2),
+            "no fireplace built on decline"
+        );
 
         // Replay from the beginning
         let replayed = Game::replay_with_setup_and_start_player(
@@ -2663,10 +2667,201 @@ mod tests {
             restored.integrity_hash(),
             "replay integrity hash must match"
         );
-        assert!(replayed.public.players[active]
-            .improvements
-            .contains(&Improvement::Fireplace2));
-        assert_eq!(replayed.public.players[active].supply.clay, 8);
+        assert!(
+            !replayed.has_pending(),
+            "replay must not carry a pending grant"
+        );
+        assert!(
+            !replayed.public.players[active]
+                .improvements
+                .contains(&Improvement::Fireplace2),
+            "replay: no fireplace built on decline"
+        );
+        assert_eq!(
+            replayed.public.players[active].supply.clay, clay_before,
+            "replay: clay unchanged on decline"
+        );
+    }
+
+    /// D002 (Renovation) grant: a Clay->Stone upgrade must fire
+    /// `AfterClayConstructionGain` exactly once through the canonical resume
+    /// chain, with correct gain and no duplicate when the same decision
+    /// sequence is replayed on a fresh game.
+    ///
+    /// The granting player sits in a Clay house (fixture, mirroring the
+    /// existing p1_tests clay-construction setup) with an in-play test
+    /// occupation carrying `AfterClayConstructionGain { food, 2 }`. Playing a
+    /// Renovation-granting minor and accepting the grant upgrades the house to
+    /// Stone; the resume chain must fire the food gain exactly once.
+    #[test]
+    fn grant_action_d002_clay_to_stone_fires_after_clay_construction_gain_once() {
+        use crate::model::House;
+
+        let (game, food_before) = clay_to_stone_grant_game();
+
+        // Grant consumed, house upgraded to Stone, AfterClayConstructionGain
+        // fired exactly once (+2 food), normal renovation cost paid.
+        assert!(!game.has_pending(), "grant must be consumed on accept");
+        assert_eq!(game.public.players[0].house, House::Stone);
+        assert_eq!(
+            game.public.players[0].supply.food,
+            food_before + 2,
+            "AfterClayConstructionGain must fire exactly once (+2 food)"
+        );
+        assert_eq!(
+            game.public.players[0].supply.stone, 0,
+            "2 stone paid for Clay->Stone"
+        );
+        assert_eq!(
+            game.public.players[0].supply.reed, 0,
+            "1 reed paid for Clay->Stone"
+        );
+
+        // No duplicate when the same decision sequence is replayed on a fresh
+        // game: the identical sequence yields exactly the same single gain,
+        // not an additional one on top of an already-gained state.
+        let (replayed, _) = clay_to_stone_grant_game();
+        assert_eq!(
+            replayed.public.players[0].house,
+            game.public.players[0].house
+        );
+        assert_eq!(
+            replayed.public.players[0].supply.food, game.public.players[0].supply.food,
+            "replay must not duplicate the clay-construction gain"
+        );
+        assert_eq!(
+            replayed.public.players[0].supply.stone,
+            game.public.players[0].supply.stone
+        );
+        assert_eq!(
+            replayed.public.players[0].supply.reed,
+            game.public.players[0].supply.reed
+        );
+        assert!(
+            !replayed.has_pending(),
+            "replay must not carry a pending grant"
+        );
+    }
+
+    /// Builds a game where the granting player sits in a Clay house, holds a
+    /// Renovation-granting minor and an in-play `AfterClayConstructionGain {
+    /// food, 2 }` card, then plays the minor and accepts the grant (Clay ->
+    /// Stone). Post-construction fixture state is applied identically on every
+    /// call so repeated calls are true replays of the same decision sequence.
+    fn clay_to_stone_grant_game() -> (Game, u32) {
+        use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game, Good, House, Space};
+        use crate::pending::{GrantedActionChoice, PendingResolution};
+
+        let clay_card = CardDefinition {
+            use_limit: None,
+            id: "TEST_CLAY_GAIN".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterClayConstructionGain {
+                good: Good::Food,
+                amount: 2,
+            }],
+        };
+        let reno_card = CardDefinition {
+            use_limit: None,
+            id: "RENO_GRANT".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGrantAction {
+                action: crate::model::GrantedAction::Renovation,
+            }],
+        };
+        let mut definitions = vec![clay_card, reno_card];
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        // 14 occupations (clay_card + 13 fillers) and 14 minor improvements
+        // (reno_card + 13 fillers). Each seat is dealt exactly 7 occupations
+        // and 7 minor improvements (from_hands validates the draft shape).
+        let mut hands = vec![vec![], vec![]];
+        hands[0].push("TEST_CLAY_GAIN".to_string());
+        hands[0].push("RENO_GRANT".to_string());
+        hands[0].extend((1..=6).map(|i| format!("OCC_{i}")));
+        hands[0].extend((1..=6).map(|i| format!("MINOR_{i}")));
+        hands[1].extend((7..=13).map(|i| format!("MINOR_{i}")));
+        hands[1].extend((7..=13).map(|i| format!("OCC_{i}")));
+
+        let mut game = Game::with_cards_and_hands_with_start_player(
+            Config {
+                players: 2,
+                seed: 901,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands.clone(),
+            0,
+        )
+        .expect("game creation must succeed");
+
+        let active = 0;
+        // Fixture: Clay house with the means to renovate to Stone
+        // (2 stone + 1 reed for two rooms).
+        game.public.players[active].house = House::Clay;
+        game.public.players[active].supply.stone = 2;
+        game.public.players[active].supply.reed = 1;
+        let food_before = game.public.players[active].supply.food;
+        // The clay-construction card must be in play for its After effect to run.
+        game.cards.hands[0].retain(|id| id != "TEST_CLAY_GAIN");
+        game.public.players[active]
+            .played_cards
+            .push("TEST_CLAY_GAIN".into());
+
+        // Play the Renovation-granting minor -> grant decision pauses.
+        let action = Action {
+            space: Space::MeetingPlace,
+            detail: Detail::PlayMinor {
+                card_id: "RENO_GRANT".into(),
+            },
+        };
+        let result =
+            game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+        assert!(
+            matches!(result, Ok(crate::pending::Transition::Paused(_))),
+            "playing the renovation-granting minor must pause on the grant decision"
+        );
+        assert!(game.has_pending());
+
+        // Accept: Clay -> Stone fires AfterClayConstructionGain exactly once.
+        let resolution = PendingResolution::GrantAction {
+            choice: GrantedActionChoice::Renovation { accept: true },
+        };
+        let resume_result = game
+            .resolve_pending_and_resume(resolution)
+            .expect("resume must succeed");
+        assert_eq!(
+            resume_result,
+            crate::pending::Transition::Completed,
+            "renovation grant resume must complete"
+        );
+        (game, food_before)
     }
 
     /// Original action's space/worker not double-consumed during grant_action resume.

@@ -2635,6 +2635,8 @@ impl Game {
                         if !self.public.improvement_market.contains(imp) {
                             return Err("requested improvement not available in market".into());
                         }
+                        // Snapshot player before improvement purchase for AfterClayConstruction dispatch
+                        let previous = player.clone();
                         // Pay normal cost via buy_improvement with PurchaseMode::Pay
                         let mut market = self.public.improvement_market.clone();
                         crate::engine::buy_improvement(
@@ -2651,6 +2653,24 @@ impl Game {
                             },
                         )?;
                         self.public.improvement_market = market;
+                        // Dispatch AfterClayConstruction for the granted major improvement
+                        crate::card_events::dispatch_after_clay_construction(
+                            &self.card_set,
+                            pending.player,
+                            &previous,
+                            Some(*imp),
+                            &mut self.cards,
+                            &mut self.public.players,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            self.public.round,
+                            &self.public.used,
+                            &mut self.event_budget,
+                            &mut self.public.card_uses,
+                            &self.card_use_limits,
+                            &mut self.pending,
+                            false, // grant resolution is atomic; no ChooseTriggerOrder pause
+                        )?;
                         Ok(())
                     }
                     (
@@ -2658,12 +2678,32 @@ impl Game {
                         GrantedActionChoice::Renovation { accept },
                     ) => {
                         if *accept {
+                            // Snapshot player before renovation for AfterClayConstruction dispatch
+                            let previous = player.clone();
                             // Check if renovation is possible (normal cost)
-                            crate::engine::renovate(player)
+                            crate::engine::renovate(player)?;
+                            // Dispatch AfterClayConstruction for the renovation (Clay->Stone triggers it)
+                            crate::card_events::dispatch_after_clay_construction(
+                                &self.card_set,
+                                pending.player,
+                                &previous,
+                                None, // renovation is not an improvement purchase
+                                &mut self.cards,
+                                &mut self.public.players,
+                                &mut self.public.improvement_market,
+                                &mut self.delayed_well,
+                                self.public.round,
+                                &self.public.used,
+                                &mut self.event_budget,
+                                &mut self.public.card_uses,
+                                &self.card_use_limits,
+                                &mut self.pending,
+                                false, // grant resolution is atomic; no ChooseTriggerOrder pause
+                            )?;
                         } else {
                             // Decline: grant already consumed, nothing else to do
-                            Ok(())
                         }
+                        Ok(())
                     }
                     (
                         crate::model::GrantedAction::Sow { fields },
