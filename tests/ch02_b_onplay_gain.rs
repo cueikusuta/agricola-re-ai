@@ -21,8 +21,8 @@
 
 use agricola_re_ai::card_events::dispatch_play;
 use agricola_re_ai::cards::{
-    apply_on_play_effects, can_play, card_set_for_game, verified_band_b_cards, CardDefinition,
-    CardEffect, CardKind, CardRequirement, CardSet,
+    apply_on_play_effects, can_play, card_set_for_game, verified_b_onplay_simple_cards,
+    CardDefinition, CardEffect, CardKind, CardRequirement, CardSet,
 };
 use agricola_re_ai::model::{Good, Player};
 use agricola_re_ai::registry::{build_default_registry, CardPool};
