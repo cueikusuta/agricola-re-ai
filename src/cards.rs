@@ -7418,7 +7418,7 @@ mod p1_2_repro_tests {
             insert_cards(players, &verified_simple_occupations(players));
             insert_cards(players, &verified_multiplayer_passive_cards(players));
         }
-        let count_independent: [Vec<CardDefinition>; 10] = [
+        let count_independent: [Vec<CardDefinition>; 11] = [
             verified_immediate_resource_cards(),
             verified_round_and_harvest_cards(),
             verified_passive_cards(),
@@ -7430,6 +7430,8 @@ mod p1_2_repro_tests {
             verified_band_c_cards(),
             verified_band_d_cards(),
             verified_band_e_cards(),
+            // on_play build_stable cards (A001/C002/E001)
+            verified_build_stable_cards(),
         ];
         for cards in count_independent {
             for players in [2usize, 3, 4] {
