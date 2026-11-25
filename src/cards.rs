@@ -460,7 +460,7 @@ pub enum CardEffect {
         /// The good granted (food on the printed card).
         good: Good,
     },
-/// D012 搾乳所 (Milking Place): +1 food in the feeding phase of each
+    /// D012 搾乳所 (Milking Place): +1 food in the feeding phase of each
     /// harvest (automatic, no decision). Resolved plan-free by the engine's
     /// harvest step; the phase scan stays dormant.
     HarvestFeedingGain {
@@ -7533,6 +7533,104 @@ pub fn verified_b_onplay_simple_cards() -> Vec<CardDefinition> {
             post_play: PostPlayDestination::LeftNeighborHand,
         },
     ]
+}
+
+/// ---- Chapter 1 (restack 2026-11-23): on-play simple gains ----
+/// Cards below print exactly one constant gain_resource step on their
+/// on_play trigger; each is modelled with the existing OnPlayGain
+/// variant (no new variant / EventKind / saved field). Their remaining
+/// printed effects live on other triggers and stay unwired here
+/// (spec implementation_status = in_progress; follow-up noted inline).
+
+/// B054 肥料運搬車 (Tumbrel): cost 1 wood; on play gain 2 food.
+/// Eligibility 2/3/4 = yes. Still prints an after_sow "1 food per
+/// stable" step (follow-up; the harvest/sow chapter owns that trigger).
+pub fn verified_b_onplay_simple_cards_extended() -> Vec<CardDefinition> {
+    let mut cards = verified_b_onplay_simple_cards();
+    cards.extend(vec![
+        CardDefinition {
+            use_limit: None,
+            id: "B054".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 2,
+            }],
+            // post_play is left at PlayedArea: this card prints no pass-left
+            // effect yet (implementation_status = in_progress).
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // B117 情報屋 (Informant): occupation, no cost; on play gain 1 wood.
+        // Eligibility 2/3/4 = yes (85-126 rule). Still prints an
+        // after_work_phase "more stone than clay => 1 wood" step (follow-up;
+        // the round/work-phase chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B117".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Wood,
+                amount: 1,
+            }],
+            // post_play is left at PlayedArea: this card prints no pass-left
+            // effect yet (implementation_status = in_progress).
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // B151 小百姓 (Little Peasant): occupation, no cost; on play gain
+        // 1 stone. 4 players only (148-168 rule), so the effect is guarded by
+        // MinimumPlayers(4) and projects only at 4 players. Still prints the
+        // passive "all spaces except Meeting Place count as unoccupied while
+        // living in a 2-room wooden house" rule (follow-up; the passive
+        // chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B151".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Stone,
+                    amount: 1,
+                },
+            ],
+            // post_play is left at PlayedArea: this card prints no pass-left
+            // effect yet (implementation_status = in_progress).
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // B160 飲み屋の亭主 (Pub Owner): occupation, no cost; on play gain
+        // 1 grain. 4 players only (148-168 rule) -> MinimumPlayers(4) guard.
+        // Still prints the end_of_work_phase "Forest/Clay Pit/Reed Field all
+        // occupied => 1 grain" step (follow-up; the round_end/work-phase
+        // chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B160".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Grain,
+                    amount: 1,
+                },
+            ],
+            // post_play is left at PlayedArea: this card prints no pass-left
+            // effect yet (implementation_status = in_progress).
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+    ]);
+    cards
 }
 
 /// Test module for verified_band_b_cards.
