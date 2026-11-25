@@ -445,14 +445,25 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
-    /// on_play `grant_action`: grants the owner an action (Major Improvement,
-    /// Renovation or Sow) that can be consumed later via
-    /// `Player::execute_granted_action`. The grant is recorded in
-    /// `Player.granted_actions` when the effect resolves; the grant itself
-    /// changes no resources or persistent state.
-    OnPlayGrantAction {
-        action: GrantedAction,
-    },
+        /// on_play `grant_action`: grants the owner an action (Major Improvement,
+        /// Renovation or Sow) that creates a PendingDecision for the player to
+        /// resolve via the normal pending decision mechanism (no longer uses
+        /// `Player::execute_granted_action`).
+        OnPlayGrantAction {
+            action: GrantedAction,
+        },
+        /// On-play per-good threshold gain: for each good in `goods`, if the
+        /// owner already holds at least `threshold` of it, gain `amount` of
+        /// that good. Judged per good against the owner's own supply (not
+        /// resource totals); goods below threshold grant nothing. No new
+        /// persistent field or PendingDecision. Used by B105
+        /// (food/grain/vegetable/reed/wood, threshold 2, amount 1) and E006
+        /// (wood/clay/reed/stone, threshold 4, amount 1).
+        OnPlayGainEachWithAtLeast {
+            goods: Vec<Good>,
+            threshold: u32,
+            amount: u32,
+        },
     /// D054 マスの池 (Trout Pool): at each round start, if the `space`
     /// accumulation holds at least `min`, gain `amount` of `good` from the
     /// general supply. Unlike A049 営巣地 (`StartRoundGainIfAccumulationGrew`)
@@ -464,6 +475,27 @@ pub enum CardEffect {
     /// nothing.
     StartRoundGainIfAccumulationAtLeast {
         space: Space,
+        min: u32,
+        good: Good,
+        amount: u32,
+    },
+    /// A052 手投げ斧 (Throwing Axe): after the owner uses a wood accumulation
+    /// space (`space` = Forest / Copse / Grove) while the boar accumulation on
+    /// the `accumulation` animal market (PigMarket) holds at least `min`, gain
+    /// `amount` of `good` (printed: 2 food). The space gate is judged by the
+    /// generic condition scan; the handler reads the animal-market ledger the
+    /// after-worker dispatcher threads read-only through `DispatchContext` —
+    /// a missing entry or a count below `min` grants nothing, and the gain
+    /// lands on the card owner only (this handler is reached solely for the
+    /// owner's own played cards). The count is read after the worker action
+    /// resolved (after_event snapshot); the triggering action itself never
+    /// touches the pig market, so the standing count is the current one.
+    AfterWorkerGainIfAnimalAccumulationAtLeast {
+        /// The wood accumulation space the owner used (forest, copse, grove).
+        space: Space,
+        /// The animal market whose accumulation is read (pig_market).
+        accumulation: Space,
+        /// Minimum standing animals required (1 on the printed card).
         min: u32,
         good: Good,
         amount: u32,
@@ -519,6 +551,7 @@ impl CardEffect {
             CardEffect::HarvestFieldOptionalExchange { .. } => "harvest_field_optional_exchange",
 
             CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
+            CardEffect::OnPlayGainEachWithAtLeast { .. } => "on_play_gain_each_with_at_least",
             CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
@@ -568,6 +601,9 @@ impl CardEffect {
             CardEffect::OnPlayGrantAction { .. } => "on_play_grant_action",
             CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => {
                 "start_round_gain_if_accumulation_at_least"
+            }
+            CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => {
+                "after_worker_gain_if_animal_accumulation_at_least"
             }
         }
     }
@@ -849,7 +885,11 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfAccumulationAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
+                        CardEffect::OnPlayGainEachWithAtLeast { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
+                        CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                            amount, ..
+                        } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
                             amount,
                             upgrade_amount,
@@ -1517,6 +1557,17 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 amount,
             } if player.rooms() == usize::from(*rooms) => {
                 safe_gain(player, *good, *amount)?;
+            }
+            CardEffect::OnPlayGainEachWithAtLeast {
+                goods,
+                threshold,
+                amount,
+            } => {
+                for good in goods {
+                    if player.supply.get(*good) >= *threshold {
+                        safe_gain(player, *good, *amount)?;
+                    }
+                }
             }
             CardEffect::OnPlayGainPerImprovementPlayed { good, amount } => {
                 let bonus = improvement_count_in_front(set, player)
@@ -3635,6 +3686,7 @@ mod round_and_harvest_card_tests {
             1,
             &used_spaces,
             &BTreeMap::new(),
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3657,6 +3709,7 @@ mod round_and_harvest_card_tests {
             1,
             &used_spaces,
             &BTreeMap::new(),
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3678,6 +3731,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
@@ -3719,6 +3773,7 @@ mod round_and_harvest_card_tests {
             1,
             &used_spaces,
             &BTreeMap::new(),
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3743,6 +3798,7 @@ mod round_and_harvest_card_tests {
             1,
             &used_spaces,
             &BTreeMap::new(),
+            &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -3766,6 +3822,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
+            &BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
@@ -6433,6 +6490,42 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // A052 手投げ斧 (Throwing Axe): cost 1 wood, no prerequisites, 0 points.
+        // After using a wood accumulation space (Forest/Copse/Grove) while the
+        // Pig Market holds at least 1 boar, gain 2 food. One effect per space
+        // fixes the space gate; the handler reads the animal-market ledger
+        // (pig_market) threaded through DispatchContext by the after-worker
+        // dispatcher. Available at all player counts.
+        CardDefinition {
+            use_limit: None,
+            id: "A052".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                    space: Space::Forest,
+                    accumulation: Space::PigMarket,
+                    min: 1,
+                    good: Good::Food,
+                    amount: 2,
+                },
+                CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                    space: Space::Copse,
+                    accumulation: Space::PigMarket,
+                    min: 1,
+                    good: Good::Food,
+                    amount: 2,
+                },
+                CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                    space: Space::Grove,
+                    accumulation: Space::PigMarket,
+                    min: 1,
+                    good: Good::Food,
+                    amount: 2,
+                },
+            ],
+        },
     ]
 }
 
@@ -6559,6 +6652,34 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // B037 大農場の称号 (Grange): minor improvement, no cost, 3 printed
+        // points; on play the owner gains 1 food. Uses the existing
+        // `OnPlayGain` variant only: no new effect variant, event kind or
+        // saved field (agricola.cloudfree.jp ?p=3220 + /cardlist_en/, checked
+        // 2026-11-09; data/bga-card-specs/B037.json).
+        //
+        // Hold (data/bga-card-specs/B037.json review.unresolved_fields, same
+        // pattern as B007/C005): the spec's play prerequisites (field_count
+        // n=6 + all_animal_types) are deliberately NOT enforced. The
+        // `CardRequirement` vocabulary has no bare field-tile count and no
+        // all-animal-types rule, and this chapter adds no new variant, so the
+        // play stays unguarded until a vocabulary follow-up lands. The spec
+        // test contract's `B037-not-triggered` case (play_rejected with 5
+        // field tiles / 3 animal types) is pinned engine-side as
+        // no-double-grant on later unrelated actions and on save/resume and
+        // event replay instead; see the `b037_*` tests in
+        // tests/ch03_onplay_per_count.rs.
+        CardDefinition {
+            use_limit: None,
+            id: "B037".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 3,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 1,
+            }],
+        },
         // B058 雑草掻き (Crack Weeder): cost 1 wood; on play gain 1 food, and
         // at each harvest field phase gain 1 extra food per vegetable taken
         // from the fields (BGA Agricola card wiki; agricola.cloudfree.jp
@@ -6621,6 +6742,29 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                     amount: 1,
                 },
             ],
+        },
+        // B105 箱造り (Case Builder): cost 0; on play, for each of
+        // food/grain/vegetable/reed/wood the owner already holds at least 2
+        // of, gain 1 of that good. Goods below threshold 2 grant nothing.
+        // Judged per good against the owner's own supply. Eligible at all
+        // player counts (spec 2/3/4 = yes).
+        CardDefinition {
+            use_limit: None,
+            id: "B105".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGainEachWithAtLeast {
+                goods: vec![
+                    Good::Food,
+                    Good::Grain,
+                    Good::Vegetable,
+                    Good::Reed,
+                    Good::Wood,
+                ],
+                threshold: 2,
+                amount: 1,
+            }],
         },
         // B153 寮長 (Housemaster): no cost, no printed points; at final
         // scoring, sum the major-improvement scores after doubling the
@@ -7169,6 +7313,27 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::ExactFamilyMembers,
             }],
+        },
+        // E006 再集計 (Recount): cost 0; on play, for each of wood/clay/
+        // reed/stone the owner already holds at least 4 of, gain 1 of that
+        // good, then pass the card to the left neighbor's hand
+        // (PostPlayPassLeft). The card does not remain in the owner's
+        // played_cards. Spec eligibility 2/3/4 = unknown, so no
+        // MinimumPlayers prerequisite is expressed here.
+        CardDefinition {
+            use_limit: None,
+            id: "E006".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGainEachWithAtLeast {
+                    goods: vec![Good::Wood, Good::Clay, Good::Reed, Good::Stone],
+                    threshold: 4,
+                    amount: 1,
+                },
+                CardEffect::PostPlayPassLeft,
+            ],
         },
     ]
 }
