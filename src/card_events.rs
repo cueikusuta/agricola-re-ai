@@ -1785,6 +1785,9 @@ fn handle_prerequisite(
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
         crate::cards::CardRequirement::PastureCount(n) => p.pastures.len() >= usize::from(*n),
         crate::cards::CardRequirement::MaximumPlayers(_) => true, // Validated at card set level
+        crate::cards::CardRequirement::OwnsMajorImprovement(improvement) => {
+            p.improvements.contains(improvement)
+        }
     };
 
     if !ok {
