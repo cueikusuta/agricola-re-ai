@@ -42,7 +42,7 @@
       "trigger": "harvest_start",
       "conditions": [
         {
-          "predicate": "grain_field_count_at_least",
+          "predicate": "grain_field_count",
           "params": {
             "n": 1
           }

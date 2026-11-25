@@ -42,8 +42,15 @@
       "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "space_provides_food",
-          "params": {}
+          "predicate": "worker_space_used",
+          "params": {
+            "spaces": [
+              "day_laborer",
+              "fishing",
+              "traveling_players",
+              "resource_market"
+            ]
+          }
         }
       ],
       "steps": [
@@ -62,7 +69,7 @@
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none",
-      "notes": "Each time you use an action space that provides food, gain 1 additional wood. Includes Day Laborer, Fishing, Traveling Players, Resource Market, Archway, Forest Inn, etc."
+      "notes": "Each time you use one of the food-providing action spaces Day Laborer, Fishing, Traveling Players, or Resource Market, gain 1 additional wood. The BGA wiki commentary also lists Archway and Forest Inn as triggering spaces; both are outside the 2016 base board and are not enumerated in the condition."
     }
   ],
   "post_play": {
@@ -80,6 +87,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Each time you get food from an action space, gain 1 additional wood. Trigger spaces include Day Laborer, Fishing, Traveling Players, Resource Market, and any other space that provides food (e.g., Archway, Forest Inn). Classified as implemented in classification doc (stage outer per #375)."
+    "notes": "Each time you get food from an action space, gain 1 additional wood. The trigger spaces are enumerated as Day Laborer, Fishing, Traveling Players, and Resource Market — the same four spaces as the engine implementation (src/cards.rs verified_band_e_cards) and the base ledger role column (日雇い/漁/小劇場/資材市場). The BGA wiki commentary additionally lists Archway and Forest Inn as triggering spaces; both are outside the 2016 base board and are not enumerated in the condition. Classified as implemented in classification doc (stage outer per #375)."
   }
 }

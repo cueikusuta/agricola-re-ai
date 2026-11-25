@@ -42,7 +42,7 @@
       "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "space_is",
+          "predicate": "worker_space_used",
           "params": {
             "space": "grain_seeds"
           }
@@ -69,7 +69,7 @@
       "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "space_is",
+          "predicate": "worker_space_used",
           "params": {
             "space": "vegetable_seeds"
           }
@@ -99,7 +99,6 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects[0].trigger: 'after_worker_space' with space_is predicate used provisionally; exact vocabulary for 'Grain Seeds' and 'Vegetable Seeds' action spaces TBD",
       "effects[0].steps[0].operation: 'grant_action' used; whether granted action is immediate additional action or a token for later use needs engine mapping",
       "effects[1].steps[0].operation: same as above for Sow action"
     ],

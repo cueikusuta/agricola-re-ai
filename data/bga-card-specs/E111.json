@@ -99,8 +99,11 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: predicate 'minor_improvement_count' is not in the vocabulary; no existing predicate expresses 'no minor improvements in front of the owner' ('improvement_count' counts minor+major together) and the at-least convention of count predicates would make {n:0} trivially true, inverting the intended condition; the engine implements the check directly (StartRoundGainIfNoMinorPlayed), so the effect is confirmed and only the spec-side predicate is undefined",
+      "effects[1].conditions: same for the harvest-start trigger (engine: HarvestFieldGainIfNoMinorPlayed)"
+    ],
     "test_case_ids": [
       "E111-food-at-round-start",
       "E111-wood-at-harvest-start",

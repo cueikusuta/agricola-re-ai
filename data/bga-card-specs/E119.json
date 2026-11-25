@@ -147,7 +147,7 @@
     "unresolved_fields": [
       "effects[0].conditions: predicate 'current_round_lte' is custom; engine must evaluate round number at play time",
       "effects[0].steps[0].operation: 'other' with 'place_on_round_space' action is custom; engine must support placing resources on future round spaces",
-      "effects[1-2].conditions: predicates 'round_is' and 'round_space_has_placed_good' are custom; exact vocabulary for round-specific resource retrieval TBD",
+      "effects[1-2].conditions: predicate 'round_is' is custom; exact vocabulary for round-number equality TBD (round_space_has_placed_good is already in the vocabulary)",
       "effects[0].trigger: if played in round 5+, no resources are placed and round 9 triggers do nothing"
     ],
     "test_case_ids": [

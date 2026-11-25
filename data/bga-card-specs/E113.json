@@ -42,7 +42,7 @@
       "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "space_is",
+          "predicate": "worker_space_used",
           "params": {
             "space": "family_growth"
           }

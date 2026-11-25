@@ -133,7 +133,6 @@
     "unresolved_fields": [
       "effects[0].steps[0].operation: 'other' with 'place_alternating_on_next_round_spaces' is custom; engine must support placing alternating resources on sequential future round spaces",
       "effects[0].params.sequence: exact sequence of 6 placements (wood/clay/wood/clay/wood/clay) starting from next round",
-      "effects[1-2].conditions: predicate 'round_space_has_placed_good' is custom; engine must check round space for specific resource",
       "effects[1-2].trigger: if card played late (round 10+), fewer than 6 round spaces may be available"
     ],
     "test_case_ids": [
