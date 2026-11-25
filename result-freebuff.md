@@ -26,3 +26,11 @@
   - C086 家畜の餌係: grain 1。
 - `tests/onplay_gain_ch03_c.rs`: コスト・増分の 2 テスト成功。
 - 仕様 2 枚の `implementation_status` を `in_progress` に更新。
+
+## 第4章 D帯（D062, D117）
+
+- `src/cards.rs::verified_band_d_cards()` に on_play 獲得部分を追加。
+  - D062 ビールタップ: wood 1 コスト、food 2。
+  - D117 木の専門家: wood 2。
+- `tests/onplay_gain_ch04_d.rs`: コスト・増分の 2 テスト成功。
+- 仕様 2 枚の `implementation_status` を `in_progress` に更新。

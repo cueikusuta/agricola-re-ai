@@ -6220,6 +6220,29 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // ---- Freebuff on_play gain chapter (2026-11-25) ----
+        // D062 ビールタップ (Beer Tap): cost 1 wood; on play gain 2 food.
+        // Follow-up: in each feeding phase exchange 2/3/4 grain for 3/6/9 food.
+        card(
+            "D062",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1)],
+            vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 2,
+            }],
+        ),
+        // D117 木の専門家 (Wood Expert): no cost; on play gain 2 wood.
+        // Follow-up: a buying-time wood discount remains unwired.
+        card(
+            "D117",
+            CardKind::Occupation,
+            vec![],
+            vec![CardEffect::OnPlayGain {
+                good: Good::Wood,
+                amount: 2,
+            }],
+        ),
     ]
 }
 

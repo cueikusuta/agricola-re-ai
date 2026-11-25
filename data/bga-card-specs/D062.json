@@ -147,7 +147,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "Gain 2 food on play; in each feeding phase exchange exactly 2/3/4 grain for 3/6/9 food by one shared choice."
   }
 }

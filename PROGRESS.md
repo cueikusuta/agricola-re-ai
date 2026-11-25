@@ -25,7 +25,7 @@
 | 第1章 | A | A054, A165 | 完了・commit/push 済み |
 | 第2章 | B | B025, B103, B116, B155 | 完了・commit/push 済み |
 | 第3章 | C | C026, C086 | 完了・commit/push 済み |
-| 第4章 | D | D062, D117 | 未着手 |
+| 第4章 | D | D062, D117 | 完了・commit/push 済み |
 | 第5章 | E | E082 | 未着手 |
 | PR | — | 本文に実装一覧・除外理由・検証結果 | 未作成 |
 
@@ -38,7 +38,7 @@
 | 第1章 A | `cargo test --test onplay_gain_ch01_a` | 2 passed |
 | 第2章 B | `cargo test --test onplay_gain_ch02_b` | 4 passed |
 | 第3章 C | `cargo test --test onplay_gain_ch03_c` | 2 passed |
-| 第4章 D | 未実施 | — |
+| 第4章 D | `cargo test --test onplay_gain_ch04_d` | 2 passed |
 | 第5章 E | 未実施 | — |
 | PR 前 | `cargo fmt --check` / `cargo clippy --all-targets --all-features --locked -- -D warnings` / 新規テスト5本 | 未実施 |
 
