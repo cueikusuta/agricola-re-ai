@@ -3528,21 +3528,22 @@ CARDS = {
         ],
     },
     "A135": {
-        "post": "played_area",
-        "effects": [
-            effect("on_play", [gain("wood", table("remaining_rounds", {"1": 1, "3": 2, "6": 3, "9": 4}))]),
-            effect("end_scoring", [points(table("all_animal_threshold", {"2": 1, "3": 3, "4": 5}))],
-                   freq="end_of_game", dur="permanent", snap="live_state", order=1),
-        ],
-        "notes": "1/2/3/4 wood for 1/3/6/9 rounds left; at scoring 1/3/5 points for 2+/3+/4+ of each animal.",
-        "tests": [
-            case("A135-normal", {"remaining_rounds": 6}, {"play": "A135"}, {"wood_delta": 3}),
-            case("A135-score", {"sheep": 3, "wild_boar": 3, "cattle": 3},
-                 {"end_scoring": True}, {"points_delta": 3}),
-            case("A135-not-triggered", {"sheep": 2, "wild_boar": 3, "cattle": 3},
-                 {"end_scoring": True}, {"points_delta": 1}),
-        ],
-    },
+            "post": "played_area",
+            "effects": [
+                effect("on_play", [gain("wood", table("remaining_rounds", {"1": 1, "3": 2, "6": 3, "9": 4}))]),
+                effect("end_scoring", [points(table("all_animal_threshold", {"2": 1, "3": 3, "4": 5}))],
+                       freq="end_of_game", dur="permanent", snap="live_state", order=1),
+            ],
+            "notes": "1/2/3/4 wood for 1/3/6/9 rounds left; at scoring 1/3/5 points for 2+/3+/4+ of each animal.",
+            "implementation_status": "in_progress",
+            "tests": [
+                case("A135-normal", {"remaining_rounds": 6}, {"play": "A135"}, {"wood_delta": 3}),
+                case("A135-score", {"sheep": 3, "wild_boar": 3, "cattle": 3},
+                     {"end_scoring": True}, {"points_delta": 3}),
+                case("A135-not-triggered", {"sheep": 2, "wild_boar": 3, "cattle": 3},
+                     {"end_scoring": True}, {"points_delta": 1}),
+            ],
+        },
     "A136": {
         "post": "played_area",
         "effects": [

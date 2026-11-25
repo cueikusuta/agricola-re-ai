@@ -402,6 +402,18 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// A135 家畜官 (Animal Reeve): on play, if the number of remaining
+    /// rounds (including the current round) exactly equals `remaining_rounds`,
+    /// gain `amount` of `good`. The printed table (1->1, 3->2, 6->3, 9->4 wood)
+    /// is expressed as four effects of this variant, and only the one row whose
+    /// remaining-rounds count matches the owner exactly resolves. A dedicated
+    /// variant (instead of widening `OnPlayGainIfHouse`) keeps the serialized
+    /// shape of existing variants byte-identical for saves and content hashes.
+    OnPlayGainIfRemainingRounds {
+        remaining_rounds: u8,
+        good: Good,
+        amount: u32,
+    },
     /// A140 ショベル運搬人 (Shovel Bearer): after the owner uses `space`
     /// (ClayPit or Hollow), gain `good` (food) equal to the clay standing on
     /// the OTHER clay accumulation space (ClayPit use reads Hollow, Hollow
@@ -584,6 +596,7 @@ impl CardEffect {
                 "start_round_gain_if_no_harvest_and_animals"
             }
             CardEffect::OnPlayGainIfRoomCount { .. } => "on_play_gain_if_room_count",
+            CardEffect::OnPlayGainIfRemainingRounds { .. } => "on_play_gain_if_remaining_rounds",
             CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                 "after_worker_gain_other_accumulation_food"
             }
@@ -750,6 +763,12 @@ pub enum ScoreBonusRule {
     /// major improvements. Appended at the enum tail so existing serde
     /// variants and saved-game bytes are unchanged.
     MajorImprovementsBottomRowThresholds,
+    /// A135 家畜官 (Animal Reeve): at end scoring, if the owner has at least
+    /// 2 of EACH animal type (sheep, boar, cattle), gain 1 point; at least 3
+    /// of each, gain 3 points; at least 4 of each, gain 5 points. Only the
+    /// lowest reached threshold scores (not cumulative). Appended at the enum
+    /// tail so existing serde variants and saved-game bytes are unchanged.
+    AllAnimalThresholds,
     /// B153 寮長 (Housemaster): at final scoring, sum the major-improvement
     /// scores after doubling the lowest single one (one only, even when the
     /// lowest score is tied), then take 1/2/3/4 bonus points at a doubled
@@ -876,10 +895,11 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
-                        | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
-                        CardEffect::OnPlayGainEachWithAtLeast { amount, .. } => *amount,
-                        CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
-                        CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                        | CardEffect::OnPlayGainIfRoomCount { amount, .. }
+                        | CardEffect::OnPlayGainIfRemainingRounds { amount, .. }
+                        | CardEffect::OnPlayGainEachWithAtLeast { amount, .. }
+                        | CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. }
+                        | CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
                             amount, ..
                         } => *amount,
                         CardEffect::AfterHarvestChooseGainIfAtLeast {
@@ -1902,6 +1922,22 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         4 => 5,
                         n if n >= 5 => 8,
                         _ => 0,
+                    }
+                }
+                ScoreBonusRule::AllAnimalThresholds => {
+                    // A135 家畜官 (Animal Reeve): at scoring, if the owner has at least
+                    // 2 of EACH animal type (sheep, boar, cattle), gain 1 point; at least 3
+                    // of each, gain 3 points; at least 4 of each, gain 5 points. Only the
+                    // lowest reached threshold scores (not cumulative).
+                    let sheep = player.animal_count(Animal::Sheep);
+                    let boar = player.animal_count(Animal::Boar);
+                    let cattle = player.animal_count(Animal::Cattle);
+                    let min_count = sheep.min(boar).min(cattle);
+                    match min_count {
+                        0..=1 => 0,
+                        2 => 1,
+                        3 => 3,
+                        _ => 5,
                     }
                 }
                 ScoreBonusRule::MajorImprovementsLowestDoubledThresholds => {
@@ -6385,6 +6421,45 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 CardEffect::AfterWorkerGainOtherAccumulationFood {
                     space: Space::Hollow,
                     good: Good::Food,
+                },
+            ],
+        },
+        // A135 家畜官 (Animal Reeve): on play, gain wood based on remaining
+        // rounds (1->1, 3->2, 6->3, 9->4); at scoring, 1/3/5 points for
+        // 2+/3+/4+ of EACH animal type (sheep, boar, cattle). Only available
+        // at 3+ players (MinimumPlayers(3) guard).
+        CardDefinition {
+            use_limit: None,
+            id: "A135".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::OnPlayGainIfRemainingRounds {
+                    remaining_rounds: 1,
+                    good: Good::Wood,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGainIfRemainingRounds {
+                    remaining_rounds: 3,
+                    good: Good::Wood,
+                    amount: 2,
+                },
+                CardEffect::OnPlayGainIfRemainingRounds {
+                    remaining_rounds: 6,
+                    good: Good::Wood,
+                    amount: 3,
+                },
+                CardEffect::OnPlayGainIfRemainingRounds {
+                    remaining_rounds: 9,
+                    good: Good::Wood,
+                    amount: 4,
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::AllAnimalThresholds,
                 },
             ],
         },
