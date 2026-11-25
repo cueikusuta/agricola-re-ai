@@ -649,18 +649,32 @@ fn execute_harvest_feeding_exchanges(
                     player.card_points =
                         player.card_points.checked_add(2).ok_or("points overflow")?;
                 } else {
-                    // Supply grain unavailable: restore field grain (indivisible exchange fails)
+                    // Supply grain unavailable: restore field grain (indivisible exchange fails).
+                    // The field phase may have cleared the crop to `None` when the secured grain
+                    // was the last one on the field; restore it so the exchange is truly
+                    // "both or neither".
                     if let Some(cell) = player.farm.get_mut(cell_idx) {
-                        if let Tile::Field {
-                            crop: Some(Crop::Grain),
-                            mut remaining,
-                        } = cell.tile
-                        {
-                            remaining += 1;
-                            cell.tile = Tile::Field {
+                        match cell.tile {
+                            Tile::Field {
                                 crop: Some(Crop::Grain),
-                                remaining,
-                            };
+                                mut remaining,
+                            } => {
+                                remaining += 1;
+                                cell.tile = Tile::Field {
+                                    crop: Some(Crop::Grain),
+                                    remaining,
+                                };
+                            }
+                            Tile::Field {
+                                crop: None,
+                                remaining: 0,
+                            } => {
+                                cell.tile = Tile::Field {
+                                    crop: Some(Crop::Grain),
+                                    remaining: 1,
+                                };
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -1236,6 +1250,43 @@ mod harvest_feeding_tests {
             Tile::Field {
                 crop: Some(Crop::Grain),
                 remaining: 2
+            }
+        );
+    }
+
+    #[test]
+    fn c063_indivisible_exchange_restores_emptied_field_grain_when_supply_missing() {
+        // The field phase took the last grain from the field, clearing its crop to None.
+        // When supply grain is missing at feeding, the indivisible exchange fails and the
+        // field grain must be restored (crop back to Some(Grain), remaining 1).
+        let mut player = make_player_with_cards(&["C063"]);
+        player.supply.grain = 0;
+        player.farm[0] = Cell {
+            tile: Tile::Field {
+                crop: None,
+                remaining: 0,
+            },
+            stable: false,
+            stable_animal: None,
+            field_stones: 0,
+        };
+        let c063_field_cell = [Some(0)];
+        let plan = FeedingPlan {
+            c063_brew: true,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &c063_field_cell, &card_defs())
+            .unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.grain, 0);
+        assert_eq!(p.supply.food, 0);
+        assert_eq!(p.card_points, 0);
+        assert_eq!(
+            p.farm[0].tile,
+            Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
             }
         );
     }
