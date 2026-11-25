@@ -1190,14 +1190,14 @@ mod tests {
         // Updated: added A118/A145/C066 to verified_round_and_harvest_cards (pool size 35->38)
         // Updated: PR #385 review fix (e) — A145 removed from the two-player
         // preset (spec eligibility "2": "no"), pool size 38->37.
-        // Updated: StartRoundGainIf* wave — B114/A049/C067 joined the
+        // Updated: StartRoundGainIf* wave — B114/A049/C067/D054 joined the
         // two-player preset (A157 stays out, 4 players only), pool size 37->41.
         // Updated: D081/B016/A037 joined verified_round_and_harvest_cards and
-        // therefore the two-player verified preset (pool size 41->44).
-        assert_eq!(
-            digest, "2c1849000dd58e6892a5c7f82610579c61d519a76d514c7f734c4bcd0e4c2424",
-            "sample_game distribution changed — update this test only if intentional"
-        );
+                // therefore the two-player verified preset (pool size 41->44).
+                assert_eq!(
+                    digest, "152da3199c6baffe0872461354c2167d743f83123b7daa2b3339341080a4516e",
+                    "sample_game distribution changed — update this test only if intentional"
+                );
     }
 
     /// Compare two observations for public-information equality (shared by the
@@ -1570,6 +1570,7 @@ mod tests {
                 amount: 1,
             }],
             use_limit: Some(1),
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let card_set = CardSet { definitions };
 

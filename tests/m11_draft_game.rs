@@ -5,7 +5,7 @@
 //! separated from the production path: an unverified fixture card must never be
 //! accepted by the production card set.
 use agricola_re_ai::cards::{
-    verified_basic_card_set, CardDefinition, CardKind as DefKind, CardSet,
+    verified_basic_card_set, CardDefinition, CardKind as DefKind, CardSet, PostPlayDestination,
 };
 use agricola_re_ai::draft::{
     cpu_choice, cpu_pick, Direction, DraftMode, DraftPool, DraftRuleset, DraftSetup, DraftState,
@@ -53,6 +53,7 @@ fn fixture_card_set(pool: &DraftPool) -> CardSet {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play: PostPlayDestination::PlayedArea,
     };
     let mut definitions = Vec::new();
     for id in &pool.occupations {

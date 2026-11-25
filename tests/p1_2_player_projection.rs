@@ -66,6 +66,7 @@ fn raw_a155_definition() -> CardDefinition {
             gain(Space::TravelingPlayers, Good::Wood, 1),
             gain(Space::TravelingPlayers, Good::Grain, 1),
         ],
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     }
 }
 
@@ -363,6 +364,7 @@ fn minor_improvement_deal_minimum_boundary_is_pinned() {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
         })
         .collect();
 

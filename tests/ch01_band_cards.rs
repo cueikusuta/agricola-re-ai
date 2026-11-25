@@ -9,6 +9,7 @@ use agricola_re_ai::card_events::dispatch_after_worker;
 use agricola_re_ai::card_pool::Eligibility;
 use agricola_re_ai::cards::{
     after_worker, CardDefinition, CardEffect, CardKind, CardRequirement, CardSet,
+    PostPlayDestination,
 };
 use agricola_re_ai::model::{Config, Game, Good, Player, Space};
 use agricola_re_ai::pending::Transition;
@@ -37,6 +38,7 @@ fn ch01_card_set() -> CardSet {
                     gain(Space::TravelingPlayers, Good::Wood, 1),
                     gain(Space::TravelingPlayers, Good::Grain, 1),
                 ],
+                post_play: PostPlayDestination::PlayedArea,
             },
             // B122 鉱物学者 (Mineralogist): clay_pit/hollow -> stone; western/eastern_quarry -> clay. All player counts.
             CardDefinition {
@@ -51,6 +53,7 @@ fn ch01_card_set() -> CardSet {
                     gain(Space::WesternQuarry, Good::Clay, 1),
                     gain(Space::EasternQuarry, Good::Clay, 1),
                 ],
+                post_play: PostPlayDestination::PlayedArea,
             },
             // B142 八百屋 (Greengrocer): grain_seeds grants 1 vegetable. 3+ players only.
             CardDefinition {
@@ -65,6 +68,7 @@ fn ch01_card_set() -> CardSet {
                     },
                     gain(Space::GrainSeeds, Good::Vegetable, 1),
                 ],
+                post_play: PostPlayDestination::PlayedArea,
             },
             // B144 坑夫 (Collier): clay_pit/hollow -> wood; clay_pit -> reed. 3+ players only.
             CardDefinition {
@@ -81,6 +85,7 @@ fn ch01_card_set() -> CardSet {
                     gain(Space::Hollow, Good::Wood, 1),
                     gain(Space::ClayPit, Good::Reed, 1),
                 ],
+                post_play: PostPlayDestination::PlayedArea,
             },
         ],
     }
@@ -110,6 +115,7 @@ fn filler_card(kind: CardKind, index: usize) -> CardDefinition {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play: PostPlayDestination::PlayedArea,
     }
 }
 
@@ -404,6 +410,7 @@ fn dispatch_after_worker_b122_owner_triggers() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
@@ -439,6 +446,7 @@ fn dispatch_after_worker_b122_non_owner_no_trigger() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
@@ -471,6 +479,7 @@ fn dispatch_after_worker_b122_unrelated_space_no_trigger() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
@@ -502,6 +511,7 @@ fn dispatch_after_worker_b142_owner_grain_seeds() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
@@ -534,6 +544,7 @@ fn dispatch_after_worker_b142_owner_farmland_no_trigger() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
@@ -567,6 +578,7 @@ fn dispatch_after_worker_b144_owner_triggers() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
@@ -591,6 +603,7 @@ fn dispatch_after_worker_b144_owner_triggers() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
@@ -620,6 +633,7 @@ fn dispatch_after_worker_b144_non_owner_no_trigger() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
@@ -652,6 +666,7 @@ fn dispatch_after_worker_a155_owner_triggers() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
@@ -683,6 +698,7 @@ fn dispatch_after_worker_a155_non_owner_no_trigger() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
@@ -713,6 +729,7 @@ fn dispatch_after_worker_a155_unrelated_space_no_trigger() {
         game.public.round,
         &game.public.used,
         &game.public.accumulations,
+        &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
