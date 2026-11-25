@@ -1598,6 +1598,24 @@ impl Game {
                             &mut self.pending,
                             true, // is_improvement_action
                         )?;
+                        // Post-play pass (C006/C007 `PostPlayPassLeft`): pass
+                        // the card to the left neighbor's hand.
+                        {
+                            let num_players = self.public.players.len();
+                            let mut ctx = CardMoveCtx {
+                                cards: &mut self.cards,
+                                players: &mut self.public.players,
+                                improvement_market: &mut self.public.improvement_market,
+                            };
+                            crate::card_zones::handle_post_play_destination(
+                                &mut ctx,
+                                &self.card_set,
+                                id,
+                                card_id,
+                                num_players,
+                            )
+                            .map_err(|e| e.to_string())?;
+                        }
                     }
                     Detail::PlayMinorChoice { card_id, option } if self.card_set.enabled() => {
                         // Same chain as the MajorImprovement arm: option
@@ -1652,6 +1670,24 @@ impl Game {
                             &mut self.pending,
                             false,
                         )?;
+                        // Post-play pass (C006/C007 `PostPlayPassLeft`): pass
+                        // the card to the left neighbor's hand after the play resolves.
+                        {
+                            let num_players = self.public.players.len();
+                            let mut ctx = CardMoveCtx {
+                                cards: &mut self.cards,
+                                players: &mut self.public.players,
+                                improvement_market: &mut self.public.improvement_market,
+                            };
+                            crate::card_zones::handle_post_play_destination(
+                                &mut ctx,
+                                &self.card_set,
+                                id,
+                                card_id,
+                                num_players,
+                            )
+                            .map_err(|e| e.to_string())?;
+                        }
                         crate::cards::apply_choice_gain(
                             &mut self.public.players[id],
                             &choice_options,
@@ -1832,6 +1868,23 @@ impl Game {
                     )?;
                     // Post-play pass (C006/C007 `PostPlayPassLeft`): the same
                     // destination rule applies when the minor is played via
+                    // family growth.
+                    {
+                        let num_players = self.public.players.len();
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        crate::card_zones::handle_post_play_destination(
+                            &mut ctx,
+                            &self.card_set,
+                            id,
+                            card_id,
+                            num_players,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
                 } else if !matches!(detail, Detail::None) {
                     return Err("invalid growth details".into());
                 }
@@ -1931,6 +1984,24 @@ impl Game {
                         &mut self.pending,
                         true, // is_improvement_action
                     )?;
+                    // Post-play pass (C006/C007 `PostPlayPassLeft`): pass the
+                    // card to the left neighbor's hand after the play resolves.
+                    {
+                        let num_players = self.public.players.len();
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        crate::card_zones::handle_post_play_destination(
+                            &mut ctx,
+                            &self.card_set,
+                            id,
+                            card_id,
+                            num_players,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
                 }
                 Detail::PlayMinorChoice { card_id, option } if self.card_set.enabled() => {
                     // Choice-requiring cards (C007 刈り鋏): validate the option
@@ -1989,6 +2060,24 @@ impl Game {
                         &mut self.pending,
                         false,
                     )?;
+                    // Post-play pass (C006/C007 `PostPlayPassLeft`): pass the
+                    // card to the left neighbor's hand after the play resolves.
+                    {
+                        let num_players = self.public.players.len();
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        crate::card_zones::handle_post_play_destination(
+                            &mut ctx,
+                            &self.card_set,
+                            id,
+                            card_id,
+                            num_players,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
                     // Apply the chosen on-play gain option (C007).
                     crate::cards::apply_choice_gain(
                         &mut self.public.players[id],
