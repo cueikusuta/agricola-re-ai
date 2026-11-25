@@ -111,7 +111,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-19",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "On play gain 1 food. Each time you use the Day Laborer action space, you may exchange 1 building resource for a different one."
   }
 }

@@ -403,6 +403,7 @@ CARDS = {
         ],
     },
     "A054": {
+        "implementation_status": "in_progress",
         "post": "played_area",
         "effects": [
             effect("on_play", [gain("food", 5)]),
@@ -710,6 +711,7 @@ CARDS = {
         ],
     },
     "B025": {
+        "implementation_status": "in_progress",
         "post": "played_area",
         "effects": [
             effect("on_play", [gain("food", 1)]),
@@ -854,6 +856,7 @@ CARDS = {
         ],
     },
     "B103": {
+        "implementation_status": "in_progress",
         "post": "played_area",
         "effects": [
             effect("on_play", [gain("wood", 1), gain("reed", 1)]),
@@ -1253,6 +1256,7 @@ CARDS = {
         ],
     },
     "C026": {
+        "implementation_status": "in_progress",
         "post": "played_area",
         "effects": [
             effect("on_play", [gain("food", 2)]),
@@ -1280,6 +1284,7 @@ CARDS = {
         ],
     },
     "C086": {
+        "implementation_status": "in_progress",
         "post": "played_area",
         "effects": [
             effect("on_play", [gain("grain", 1)]),
@@ -2078,6 +2083,7 @@ CARDS = {
         ],
     },
     "D062": {
+        "implementation_status": "in_progress",
         "post": "played_area",
         "effects": [
             effect("on_play", [gain("food", 2)]),
@@ -3926,6 +3932,7 @@ CARDS = {
         ],
     },
     "A165": {
+        "implementation_status": "in_progress",
         "post": "played_area",
         "effects": [
             effect("on_play", [gain("food", 1)]),

@@ -5385,6 +5385,29 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                 CardEffect::PostPlayPassLeft,
             ],
         ),
+        // ---- Freebuff on_play gain chapter (2026-11-25) ----
+        // C026 脱穀棒 (Flail): cost 1 wood; on play gain 2 food. Follow-up:
+        // after Farmland or Cultivation, take an additional Bake Bread action.
+        card(
+            "C026",
+            minor,
+            vec![(Good::Wood, 1)],
+            vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 2,
+            }],
+        ),
+        // C086 家畜の餌係 (Livestock Feeder): no cost; on play gain 1 grain.
+        // Follow-up: each grain in supply may hold 1 animal of any type.
+        card(
+            "C086",
+            occupation,
+            vec![],
+            vec![CardEffect::OnPlayGain {
+                good: Good::Grain,
+                amount: 1,
+            }],
+        ),
     ]
 }
 #[cfg(test)]
@@ -6567,6 +6590,29 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
             ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
+        // ---- Freebuff on_play gain chapter (2026-11-25) ----
+        // D062 ビールタップ (Beer Tap): cost 1 wood; on play gain 2 food.
+        // Follow-up: in each feeding phase exchange 2/3/4 grain for 3/6/9 food.
+        card(
+            "D062",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1)],
+            vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 2,
+            }],
+        ),
+        // D117 木の専門家 (Wood Expert): no cost; on play gain 2 wood.
+        // Follow-up: a buying-time wood discount remains unwired.
+        card(
+            "D117",
+            CardKind::Occupation,
+            vec![],
+            vec![CardEffect::OnPlayGain {
+                good: Good::Wood,
+                amount: 2,
+            }],
+        ),
     ]
 }
 
@@ -6836,6 +6882,48 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 },
             ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // ---- Freebuff on_play gain chapter (2026-11-25) ----
+        // Only the printed on-play gain half is wired. Remaining printed
+        // triggers belong to their own chapters and stay unwired, so each
+        // spec implementation_status is `in_progress`.
+        // A054 信用貸し (Loan): no cost, at most 3 occupations played; on play
+        // gain 5 food. Follow-up: at the end of each non-harvest round pay
+        // 1 food or take a begging marker.
+        CardDefinition {
+            use_limit: None,
+            id: "A054".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MaximumOccupations(3),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 5,
+                },
+            ],
+        },
+        // A165 猪飼い (Boar Keeper): 4 players only; no cost; on play gain
+        // 1 food. Follow-up: free breeding at the end of round 12 when there
+        // is room.
+        CardDefinition {
+            use_limit: None,
+            id: "A165".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 1,
+                },
+            ],
         },
     ]
 }
@@ -7306,6 +7394,80 @@ pub fn verified_b_onplay_simple_cards() -> Vec<CardDefinition> {
             // post_play is left at PlayedArea: this card prints no pass-left
             // effect yet (implementation_status = in_progress).
             post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // ---- Freebuff on_play gain chapter (2026-11-25) ----
+        // Only the printed on-play gain half is wired here. Remaining printed
+        // triggers are follow-ups owned by their own chapters, so each spec
+        // implementation_status is `in_progress`.
+        // B025 パン焼き棒 (Bread Peel): cost 1 wood; on play gain 1 food.
+        // Follow-up: each occupation played grants an extra Bake Bread action.
+        CardDefinition {
+            use_limit: None,
+            id: "B025".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 1,
+            }],
+        },
+        // B103 畑の取引人 (Field Broker): no cost; on play gain 1 wood and
+        // 1 reed. Follow-up: declining a Minor/Major Improvement action gives
+        // 1 food / 1 vegetable instead.
+        CardDefinition {
+            use_limit: None,
+            id: "B103".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Wood,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Reed,
+                    amount: 1,
+                },
+            ],
+        },
+        // B116 岸辺の林業者 (Riverside Forester): no cost; on play gain
+        // 1 wood. Follow-up: each time the empty Reed Bank accumulation space
+        // receives reed, gain 1 wood.
+        CardDefinition {
+            use_limit: None,
+            id: "B116".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Wood,
+                amount: 1,
+            }],
+        },
+        // B155 美術教師 (Art Teacher): 4 players only; no cost; on play gain
+        // 1 wood and 1 reed. Follow-up: occupation costs may be paid with
+        // food from the Small Theater accumulation space.
+        CardDefinition {
+            use_limit: None,
+            id: "B155".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Wood,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Reed,
+                    amount: 1,
+                },
+            ],
         },
     ]
 }
@@ -7877,6 +8039,20 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
             // post_play is left at PlayedArea: this card prints no pass-left
             // effect (scoring-only card).
             post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // ---- Freebuff on_play gain chapter (2026-11-25) ----
+        // E082 不当利得 (Windfall): no cost; on play gain 1 food. Follow-up:
+        // each Day Laborer use may exchange 1 building resource for another.
+        CardDefinition {
+            use_limit: None,
+            id: "E082".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 1,
+            }],
         },
     ]
 }

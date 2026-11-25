@@ -103,7 +103,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-20",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "Classification: stage 4 P3 (on play + constant improvement cost substitution). Uses TR-SITE, DEF. Two effects: on_play gain 2 wood; when_buying substitute up to 2 wood with food per improvement."
   }
 }
