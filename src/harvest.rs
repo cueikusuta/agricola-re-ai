@@ -237,6 +237,13 @@ impl Game {
                     }
                 }
             }
+            // C006 石取り作業 / Stone Clearing (BGA spec
+            // `harvest_at: "next_field_phase"`): stones placed on fields are
+            // collected by the owner at the field phase and the per-field
+            // counter is reset. Single source of truth shared with the legacy
+            // `cards::harvest_field_rewards` via
+            // [`crate::cards::harvest_field_stones`].
+            crate::cards::harvest_field_stones(&self.card_set, p)?;
         }
         Ok(())
     }
@@ -267,7 +274,9 @@ impl Game {
         // standing grain field at the start of the field phase, before the
         // fields yield. Recorded per player so the feeding step knows the
         // field grain was secured (the supply half is settled there).
-        let mut c063_field_taken = vec![false; self.public.players.len()];
+        // For indivisible exchange: if supply grain is unavailable at feeding
+        // time, the field grain is restored (spec: both or neither).
+        let mut c063_field_cell = vec![None; self.public.players.len()];
         if self.card_set.enabled() {
             for (id, plan) in feeding.iter().enumerate() {
                 if !plan.c063_brew {
@@ -280,8 +289,8 @@ impl Game {
                 if !owns_c063 {
                     continue;
                 }
-                let mut found = None;
-                for cell in &mut self.public.players[id].farm {
+                let mut found_cell = None;
+                for (cell_idx, cell) in self.public.players[id].farm.iter_mut().enumerate() {
                     if let Tile::Field {
                         crop: Some(Crop::Grain),
                         mut remaining,
@@ -300,13 +309,13 @@ impl Game {
                                     remaining,
                                 }
                             };
-                            found = Some(());
+                            found_cell = Some(cell_idx);
                             break;
                         }
                     }
                 }
-                let Some(()) = found else { continue };
-                c063_field_taken[id] = true;
+                let Some(cell_idx) = found_cell else { continue };
+                c063_field_cell[id] = Some(cell_idx);
             }
         }
         self.harvest_fields()?;
@@ -327,7 +336,7 @@ impl Game {
                 p.supply.gain(Good::Wood, 1);
             }
         }
-        // Feeding-phase exchanges: automatic gains (D012, A148) and the owner-chosen
+        // Feeding-phase exchanges: automatic gains (D012) and the owner-chosen
         // exchanges (A062, C055, C059, C063, D062, D084). Runs before
         // feeding so converted food can cover the feeding cost. Every choice
         // is plan-driven and best-effort: an unaffordable or not-owned choice
@@ -335,7 +344,7 @@ impl Game {
         execute_harvest_feeding_exchanges(
             &mut self.public.players,
             feeding,
-            &c063_field_taken,
+            &c063_field_cell,
             &self.card_set.definitions,
         )?;
         self.feed_after_fields(feeding)?;
@@ -541,19 +550,21 @@ fn feed(p: &mut Player, plan: &FeedingPlan) -> Result<()> {
 }
 
 /// Resolve the feeding-phase effects granted during this harvest: automatic
-/// gains (D012, A148) and the owner-chosen exchanges (A062, C055, C059, C063,
+/// gains (D012) and the owner-chosen exchanges (A062, C055, C059, C063,
 /// D062, D084). Called from [`Game::harvest`] before [`feed`] so converted
 /// food can cover the feeding cost.
 ///
 /// Every choice is plan-driven and best-effort: a choice for a card the
 /// player does not own, or that the player cannot afford, resolves to
-/// nothing (spec tests A062-not-enough / D062-not-enough). `c063_field_taken`
+/// nothing (spec tests A062-not-enough / D062-not-enough). `c063_field_cell`
 /// is produced by the start-of-field-phase pass in [`Game::harvest`], which
 /// secures 1 grain from a standing grain field before the fields yield.
+/// For C063 indivisible exchange: if supply grain is unavailable, the field
+/// grain is restored using the stored cell index on the current player.
 fn execute_harvest_feeding_exchanges(
     players: &mut [Player],
     plans: &[FeedingPlan],
-    c063_field_taken: &[bool],
+    c063_field_cell: &[Option<usize>],
     card_definitions: &[CardDefinition],
 ) -> Result<()> {
     // Build a map from card_id to its effects for quick lookup.
@@ -565,32 +576,22 @@ fn execute_harvest_feeding_exchanges(
     for (id, (player, plan)) in players.iter_mut().zip(plans.iter()).enumerate() {
         let owns =
             |card_id: &str, played_cards: &[String]| played_cards.iter().any(|c| c == card_id);
-        // Collect automatic harvest feeding gains (D012 food, A148 sheep) first
+        // Collect automatic harvest feeding gains (D012 food) first
         // to avoid borrowing player while mutating it.
         let mut auto_gains = Vec::new();
         for cid in &player.played_cards {
             if let Some(effects) = card_effects.get(cid.as_str()) {
                 for effect in effects.iter() {
-                    if let CardEffect::HarvestFeedingGain {
-                        good,
-                        amount,
-                        animal,
-                    } = effect
-                    {
-                        auto_gains.push((*good, *amount, *animal));
+                    if let CardEffect::HarvestFeedingGain { good, amount } = effect {
+                        auto_gains.push((*good, *amount));
                     }
                 }
             }
         }
         // Apply collected automatic gains
-        for (good, amount, animal) in auto_gains {
+        for (good, amount) in auto_gains {
             if let Some(good) = good {
                 player.supply.gain(good, amount);
-            }
-            if let Some(animal) = animal {
-                if player.supply.food > 0 || true {
-                    let _ = place_one_animal(player, animal);
-                }
             }
         }
 
@@ -636,15 +637,34 @@ fn execute_harvest_feeding_exchanges(
 
         // C063 クラフトビール醸造所 (Craft Brewery): 1 grain from supply
         // plus the field grain secured at the start of the field phase ->
-        // 4 food and 2 bonus points.
-        if plan.c063_brew
-            && owns("C063", &player.played_cards)
-            && c063_field_taken[id]
-            && player.supply.grain >= 1
-        {
-            player.supply.grain -= 1;
-            player.supply.food = player.supply.food.checked_add(4).ok_or("food overflow")?;
-            player.card_points = player.card_points.checked_add(2).ok_or("points overflow")?;
+        // 4 food and 2 bonus points. Indivisible exchange: both grains must
+        // be available, otherwise the field grain is restored.
+        if plan.c063_brew && owns("C063", &player.played_cards) {
+            if let Some(cell_idx) = c063_field_cell[id] {
+                if player.supply.grain >= 1 {
+                    // Both grains available: consume supply grain, grant rewards
+                    player.supply.grain -= 1;
+                    player.supply.food =
+                        player.supply.food.checked_add(4).ok_or("food overflow")?;
+                    player.card_points =
+                        player.card_points.checked_add(2).ok_or("points overflow")?;
+                } else {
+                    // Supply grain unavailable: restore field grain (indivisible exchange fails)
+                    if let Some(cell) = player.farm.get_mut(cell_idx) {
+                        if let Tile::Field {
+                            crop: Some(Crop::Grain),
+                            mut remaining,
+                        } = cell.tile
+                        {
+                            remaining += 1;
+                            cell.tile = Tile::Field {
+                                crop: Some(Crop::Grain),
+                                remaining,
+                            };
+                        }
+                    }
+                }
+            }
         }
 
         // D062 ビールタップ (Beer Tap): exchange exactly 2/3/4 grain for
@@ -674,6 +694,7 @@ fn execute_harvest_feeding_exchanges(
         if let Some(animal) = plan.d084_animal {
             if owns("D084", &player.played_cards)
                 && player.supply.vegetable >= 1
+                && player.animal_count(animal) > 0
                 && place_one_animal(player, animal)
             {
                 player.supply.vegetable -= 1;
@@ -848,5 +869,485 @@ mod craft_option_tests {
         value.as_object_mut().unwrap().remove("extra_crafting");
         let recovered: FeedingPlan = serde_json::from_value(value).unwrap();
         assert!(recovered.extra_crafting.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod harvest_feeding_tests {
+    use super::*;
+    use crate::cards::{
+        CardDefinition, CardEffect, CardKind, FeedingExchangeOption, PostPlayDestination,
+    };
+    use crate::model::{Animal, Cell, Crop, Good, Pasture, Player, Tile};
+
+    fn make_player_with_cards(cards: &[&str]) -> Player {
+        let mut player = Player::new(0, 0);
+        for c in cards {
+            player.played_cards.push(c.to_string());
+        }
+        player
+    }
+
+    fn card_defs() -> Vec<CardDefinition> {
+        vec![
+            CardDefinition {
+                use_limit: None,
+                id: "A062".to_owned(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![(Good::Wood, 1)],
+                points: 0,
+                effects: vec![CardEffect::HarvestFeedingOptionalExchange {
+                    options: vec![
+                        FeedingExchangeOption {
+                            give: vec![(Good::Grain, 1)],
+                            take_field_grain: false,
+                            receive_food: 3,
+                            receive_points: 0,
+                            receive_animal: false,
+                        },
+                        FeedingExchangeOption {
+                            give: vec![(Good::Grain, 2)],
+                            take_field_grain: false,
+                            receive_food: 3,
+                            receive_points: 1,
+                            receive_animal: false,
+                        },
+                        FeedingExchangeOption {
+                            give: vec![(Good::Grain, 3)],
+                            take_field_grain: false,
+                            receive_food: 3,
+                            receive_points: 2,
+                            receive_animal: false,
+                        },
+                    ],
+                }],
+                post_play: PostPlayDestination::PlayedArea,
+            },
+            CardDefinition {
+                use_limit: None,
+                id: "C055".to_owned(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![(Good::Clay, 1), (Good::Reed, 1)],
+                points: 1,
+                effects: vec![CardEffect::HarvestFeedingOptionalExchange {
+                    options: vec![
+                        FeedingExchangeOption {
+                            give: vec![(Good::Wood, 1)],
+                            take_field_grain: false,
+                            receive_food: 2,
+                            receive_points: 0,
+                            receive_animal: false,
+                        },
+                        FeedingExchangeOption {
+                            give: vec![(Good::Clay, 1)],
+                            take_field_grain: false,
+                            receive_food: 2,
+                            receive_points: 0,
+                            receive_animal: false,
+                        },
+                        FeedingExchangeOption {
+                            give: vec![(Good::Stone, 1)],
+                            take_field_grain: false,
+                            receive_food: 3,
+                            receive_points: 0,
+                            receive_animal: false,
+                        },
+                    ],
+                }],
+                post_play: PostPlayDestination::PlayedArea,
+            },
+            CardDefinition {
+                use_limit: None,
+                id: "C059".to_owned(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![(Good::Stone, 2), (Good::Vegetable, 1)],
+                points: 2,
+                effects: vec![CardEffect::HarvestFeedingOptionalExchange {
+                    options: vec![FeedingExchangeOption {
+                        give: vec![(Good::Vegetable, 1)],
+                        take_field_grain: false,
+                        receive_food: 5,
+                        receive_points: 0,
+                        receive_animal: false,
+                    }],
+                }],
+                post_play: PostPlayDestination::PlayedArea,
+            },
+            CardDefinition {
+                use_limit: None,
+                id: "C063".to_owned(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![(Good::Wood, 2), (Good::Clay, 1)],
+                points: 0,
+                effects: vec![CardEffect::HarvestFeedingOptionalExchange {
+                    options: vec![FeedingExchangeOption {
+                        give: vec![(Good::Grain, 1)],
+                        take_field_grain: true,
+                        receive_food: 4,
+                        receive_points: 2,
+                        receive_animal: false,
+                    }],
+                }],
+                post_play: PostPlayDestination::PlayedArea,
+            },
+            CardDefinition {
+                use_limit: None,
+                id: "D012".to_owned(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::HarvestFeedingGain {
+                    good: Some(Good::Food),
+                    amount: 1,
+                }],
+                post_play: PostPlayDestination::PlayedArea,
+            },
+            CardDefinition {
+                use_limit: None,
+                id: "D062".to_owned(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![(Good::Grain, 1)],
+                points: 1,
+                effects: vec![CardEffect::HarvestFeedingOptionalExchange {
+                    options: vec![
+                        FeedingExchangeOption {
+                            give: vec![(Good::Grain, 2)],
+                            take_field_grain: false,
+                            receive_food: 3,
+                            receive_points: 0,
+                            receive_animal: false,
+                        },
+                        FeedingExchangeOption {
+                            give: vec![(Good::Grain, 3)],
+                            take_field_grain: false,
+                            receive_food: 6,
+                            receive_points: 0,
+                            receive_animal: false,
+                        },
+                        FeedingExchangeOption {
+                            give: vec![(Good::Grain, 4)],
+                            take_field_grain: false,
+                            receive_food: 9,
+                            receive_points: 0,
+                            receive_animal: false,
+                        },
+                    ],
+                }],
+                post_play: PostPlayDestination::PlayedArea,
+            },
+            CardDefinition {
+                use_limit: None,
+                id: "D084".to_owned(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::HarvestFeedingOptionalExchange {
+                    options: vec![FeedingExchangeOption {
+                        give: vec![(Good::Vegetable, 1)],
+                        take_field_grain: false,
+                        receive_food: 0,
+                        receive_points: 0,
+                        receive_animal: true,
+                    }],
+                }],
+                post_play: PostPlayDestination::PlayedArea,
+            },
+        ]
+    }
+
+    #[test]
+    fn a062_exchanges_grain_for_food_and_points() {
+        let mut player = make_player_with_cards(&["A062"]);
+        player.supply.grain = 3;
+        let plan = FeedingPlan {
+            a062_grain: 3,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.grain, 0);
+        assert_eq!(p.supply.food, 3);
+        assert_eq!(p.card_points, 2);
+    }
+
+    #[test]
+    fn a062_declines_when_zero() {
+        let mut player = make_player_with_cards(&["A062"]);
+        player.supply.grain = 3;
+        let plan = FeedingPlan {
+            a062_grain: 0,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.grain, 3);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn a062_fails_when_not_enough_grain() {
+        let mut player = make_player_with_cards(&["A062"]);
+        player.supply.grain = 1;
+        let plan = FeedingPlan {
+            a062_grain: 3,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.grain, 1);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn a062_fails_when_not_owned() {
+        let mut player = make_player_with_cards(&[]);
+        player.supply.grain = 3;
+        let plan = FeedingPlan {
+            a062_grain: 2,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.grain, 3);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn c055_converts_wood_clay_stone_to_food() {
+        for (give, expected_food) in [(Good::Wood, 2), (Good::Clay, 2), (Good::Stone, 3)] {
+            let mut player = make_player_with_cards(&["C055"]);
+            player.supply.set(give, 1);
+            let plan = FeedingPlan {
+                c055_convert: Some(give),
+                ..Default::default()
+            };
+            let mut players = [player];
+            execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs())
+                .unwrap();
+            let p = &mut players[0];
+            assert_eq!(p.supply.get(give), 0);
+            assert_eq!(p.supply.food, expected_food);
+        }
+    }
+
+    #[test]
+    fn c055_fails_when_not_enough_resource() {
+        let mut player = make_player_with_cards(&["C055"]);
+        player.supply.wood = 0;
+        let plan = FeedingPlan {
+            c055_convert: Some(Good::Wood),
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn c059_cooks_vegetable_to_food() {
+        let mut player = make_player_with_cards(&["C059"]);
+        player.supply.vegetable = 1;
+        let plan = FeedingPlan {
+            c059_cook: true,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.vegetable, 0);
+        assert_eq!(p.supply.food, 5);
+    }
+
+    #[test]
+    fn c059_fails_when_no_vegetable() {
+        let mut player = make_player_with_cards(&["C059"]);
+        player.supply.vegetable = 0;
+        let plan = FeedingPlan {
+            c059_cook: true,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.vegetable, 0);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn c063_indivisible_exchange_succeeds_with_both_grains() {
+        let mut player = make_player_with_cards(&["C063"]);
+        player.supply.grain = 1;
+        player.farm[0] = Cell {
+            tile: Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            },
+            stable: false,
+            stable_animal: None,
+            field_stones: 0,
+        };
+        let c063_field_cell = [Some(0)];
+        let plan = FeedingPlan {
+            c063_brew: true,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &c063_field_cell, &card_defs())
+            .unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.grain, 0);
+        assert_eq!(p.supply.food, 4);
+        assert_eq!(p.card_points, 2);
+    }
+
+    #[test]
+    fn c063_indivisible_exchange_restores_field_grain_when_supply_missing() {
+        let mut player = make_player_with_cards(&["C063"]);
+        player.supply.grain = 0;
+        player.farm[0] = Cell {
+            tile: Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 1,
+            },
+            stable: false,
+            stable_animal: None,
+            field_stones: 0,
+        };
+        let c063_field_cell = [Some(0)];
+        let plan = FeedingPlan {
+            c063_brew: true,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &c063_field_cell, &card_defs())
+            .unwrap();
+        let p = &mut players[0];
+        // Supply grain missing -> field grain restored, no food/points
+        assert_eq!(p.supply.grain, 0);
+        assert_eq!(p.supply.food, 0);
+        assert_eq!(p.card_points, 0);
+        assert_eq!(
+            p.farm[0].tile,
+            Tile::Field {
+                crop: Some(Crop::Grain),
+                remaining: 2
+            }
+        );
+    }
+
+    #[test]
+    fn d012_automatic_food_gain() {
+        let player = make_player_with_cards(&["D012"]);
+        let plan = FeedingPlan::default();
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.food, 1);
+    }
+
+    #[test]
+    fn d062_exchanges_grain_for_food() {
+        let mut player = make_player_with_cards(&["D062"]);
+        player.supply.grain = 4;
+        let plan = FeedingPlan {
+            d062_grain: 4,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.grain, 0);
+        assert_eq!(p.supply.food, 9);
+    }
+
+    #[test]
+    fn d062_fails_when_not_enough_grain() {
+        let mut player = make_player_with_cards(&["D062"]);
+        player.supply.grain = 2;
+        let plan = FeedingPlan {
+            d062_grain: 3,
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.grain, 2);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn d084_converts_vegetable_to_owned_animal() {
+        let mut player = make_player_with_cards(&["D084"]);
+        player.supply.vegetable = 1;
+        // Add a farm cell and pasture with capacity for 2 animals
+        player.farm.push(Cell::default());
+        let cell_idx = player.farm.len() - 1;
+        player.pastures.push(Pasture {
+            id: 0,
+            cells: vec![cell_idx],
+            animal: Some(Animal::Sheep),
+            quantity: 1,
+        });
+        let plan = FeedingPlan {
+            d084_animal: Some(Animal::Sheep),
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.vegetable, 0);
+        assert_eq!(p.pastures[0].quantity, 2);
+    }
+
+    #[test]
+    fn d084_fails_when_animal_type_not_owned() {
+        let mut player = make_player_with_cards(&["D084"]);
+        player.supply.vegetable = 1;
+        player.farm.push(Cell::default());
+        let cell_idx = player.farm.len() - 1;
+        player.pastures.push(Pasture {
+            id: 0,
+            cells: vec![cell_idx],
+            animal: Some(Animal::Sheep),
+            quantity: 1,
+        });
+        // Request cow but only own sheep
+        let plan = FeedingPlan {
+            d084_animal: Some(Animal::Cattle),
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.vegetable, 1); // not consumed
+        assert_eq!(p.pastures[0].quantity, 1);
+    }
+
+    #[test]
+    fn d084_fails_when_no_pasture_room() {
+        let mut player = make_player_with_cards(&["D084"]);
+        player.supply.vegetable = 1;
+        player.farm.push(Cell::default());
+        let cell_idx = player.farm.len() - 1;
+        // Capacity is 2 for 1 cell, so quantity=2 is at capacity
+        player.pastures.push(Pasture {
+            id: 0,
+            cells: vec![cell_idx],
+            animal: Some(Animal::Sheep),
+            quantity: 2,
+        }); // at capacity
+        let plan = FeedingPlan {
+            d084_animal: Some(Animal::Sheep),
+            ..Default::default()
+        };
+        let mut players = [player];
+        execute_harvest_feeding_exchanges(&mut players, &[plan], &[None], &card_defs()).unwrap();
+        let p = &mut players[0];
+        assert_eq!(p.supply.vegetable, 1); // not consumed
     }
 }

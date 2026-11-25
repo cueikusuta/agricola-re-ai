@@ -102,7 +102,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "Gain 1 sheep on play; each feeding phase may turn 1 vegetable into an animal of a type already owned."
   }
 }
