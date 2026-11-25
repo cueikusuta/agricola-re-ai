@@ -98,6 +98,6 @@
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
     "implementation_status": "not_started",
-    "notes": "Gain 1 food on play; each renovation may add a stable without paying wood."
+    "notes": "Gain 1 food on play; each renovation may add a stable without paying wood. Full implementation (after_renovation free-stable step) is delegated to PR #452 (m10/hermes-ch-renovation-followup, AfterRenovationGain); PR #454 drops the OnPlayGain definition here (restack ch02 4-card composition)."
   }
 }
