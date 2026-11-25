@@ -1598,12 +1598,6 @@ impl Game {
                             &mut self.pending,
                             true, // is_improvement_action
                         )?;
-                        // Update card points
-                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                        crate::cards::update_card_points_on_play(
-                            &mut self.public.players[id],
-                            card.points,
-                        )?;
                         // Post-play pass (C006/C007 `PostPlayPassLeft`): pass
                         // the card to the left neighbor's hand.
                         {
@@ -1676,16 +1670,8 @@ impl Game {
                             &mut self.pending,
                             false,
                         )?;
-                        crate::cards::apply_choice_gain(
-                            &mut self.public.players[id],
-                            &choice_options,
-                            *option,
-                        )?;
-                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                        crate::cards::update_card_points_on_play(
-                            &mut self.public.players[id],
-                            card.points,
-                        )?;
+                        // Post-play pass (C006/C007 `PostPlayPassLeft`): pass
+                        // the card to the left neighbor's hand after the play resolves.
                         {
                             let num_players = self.public.players.len();
                             let mut ctx = CardMoveCtx {
@@ -1702,6 +1688,11 @@ impl Game {
                             )
                             .map_err(|e| e.to_string())?;
                         }
+                        crate::cards::apply_choice_gain(
+                            &mut self.public.players[id],
+                            &choice_options,
+                            *option,
+                        )?;
                     }
                     _ => return Err("invalid starting-player details".into()),
                 }
@@ -1766,12 +1757,6 @@ impl Game {
                     &self.card_use_limits,
                     &mut self.pending,
                     false, // is_improvement_action
-                )?;
-                // Update card points
-                let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                crate::cards::update_card_points_on_play(
-                    &mut self.public.players[id],
-                    card.points,
                 )?;
             }
             Space::DayLaborer => {
@@ -1880,12 +1865,6 @@ impl Game {
                         &self.card_use_limits,
                         &mut self.pending,
                         false, // is_improvement_action
-                    )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
                     )?;
                     // Post-play pass (C006/C007 `PostPlayPassLeft`): the same
                     // destination rule applies when the minor is played via
@@ -2005,12 +1984,6 @@ impl Game {
                         &mut self.pending,
                         true, // is_improvement_action
                     )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
-                    )?;
                     // Post-play pass (C006/C007 `PostPlayPassLeft`): pass the
                     // card to the left neighbor's hand after the play resolves.
                     {
@@ -2087,19 +2060,8 @@ impl Game {
                         &mut self.pending,
                         false,
                     )?;
-                    // Apply the chosen on-play gain option (C007).
-                    crate::cards::apply_choice_gain(
-                        &mut self.public.players[id],
-                        &choice_options,
-                        *option,
-                    )?;
-                    // Update card points
-                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
-                    crate::cards::update_card_points_on_play(
-                        &mut self.public.players[id],
-                        card.points,
-                    )?;
-                    // Post-play pass (C006/C007 `PostPlayPassLeft`).
+                    // Post-play pass (C006/C007 `PostPlayPassLeft`): pass the
+                    // card to the left neighbor's hand after the play resolves.
                     {
                         let num_players = self.public.players.len();
                         let mut ctx = CardMoveCtx {
@@ -2116,6 +2078,12 @@ impl Game {
                         )
                         .map_err(|e| e.to_string())?;
                     }
+                    // Apply the chosen on-play gain option (C007).
+                    crate::cards::apply_choice_gain(
+                        &mut self.public.players[id],
+                        &choice_options,
+                        *option,
+                    )?;
                 }
                 Detail::Buy {
                     improvement,

@@ -390,6 +390,23 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// D007 三つ又の矛 (Trident): on play, gain `amount` of `good` when the
+    /// current round is exactly `round` (BGA spec `on_play` with the
+    /// round_in {3, 6, 9, 12} condition and the per-round food table
+    /// 3/4/5/6). Four effects express the table; the play-time condition scan
+    /// resolves only the one entry whose round matches the current round
+    /// exactly, so exactly one entry is ever triggerable and no other round
+    /// grants anything. Fired from the existing on-play (Before phase,
+    /// EventKind::CardPlayed) path; the round is engine-side public state, so
+    /// no new event kind or saved field is introduced. The legacy
+    /// `cards::play` projection cannot know the round and therefore never
+    /// fires it (same contract as the hand-dependent B-deck effects).
+    OnPlayGainIfRound {
+        round: u8,
+        good: Good,
+        amount: u32,
+    },
+
     /// B073 贈り物かご (Gift Basket): on play, if the owner has exactly
     /// `rooms` rooms, gain `amount` of `good`. The printed table
     /// (2 -> vegetable, 3 -> food, 4 -> grain, 5 -> vegetable; 1 each) is
@@ -583,6 +600,7 @@ impl CardEffect {
             CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
                 "start_round_gain_if_no_harvest_and_animals"
             }
+            CardEffect::OnPlayGainIfRound { .. } => "on_play_gain_if_round",
             CardEffect::OnPlayGainIfRoomCount { .. } => "on_play_gain_if_room_count",
             CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
                 "after_worker_gain_other_accumulation_food"
@@ -849,7 +867,9 @@ impl CardSet {
                         | CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
-                        | CardEffect::Passive { .. } => 1,
+                        | CardEffect::Passive { .. }
+                        // Zone-move metadata, not a gain: no amount to bound.
+                        | CardEffect::PostPlayPassLeft => 1,
                         #[cfg(test)]
                         CardEffect::PendingProbe { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
@@ -876,6 +896,7 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
+                        | CardEffect::OnPlayGainIfRound { amount, .. }
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
                         CardEffect::OnPlayGainEachWithAtLeast { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
@@ -899,9 +920,6 @@ impl CardSet {
                         }
                         | CardEffect::HarvestStartGainIfFields { amount, .. }
                         | CardEffect::OnPlayAddStoneToEmptyFields { amount, .. } => *amount,
-                        // PostPlayPassLeft is a zone move, not a gain: no
-                        // amount to bound.
-                        CardEffect::PostPlayPassLeft => 1,
                         CardEffect::OnPlayChoiceGain { options } => {
                             options.iter().map(|o| o.amount).max().unwrap_or(1)
                         }
@@ -6197,6 +6215,39 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // D007 三つ又の矛 (Trident): cost 1 wood, printed points 0. On play in
+        // round 3/6/9/12, gain 3/4/5/6 food (four exact-round table entries; the
+        // play-time condition scan resolves only the current round's row). The
+        // card then passes to the left neighbour's hand (spec
+        // post_play.destination = "left_neighbor_hand").
+        card(
+            "D007",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1)],
+            vec![
+                CardEffect::OnPlayGainIfRound {
+                    round: 3,
+                    good: Good::Food,
+                    amount: 3,
+                },
+                CardEffect::OnPlayGainIfRound {
+                    round: 6,
+                    good: Good::Food,
+                    amount: 4,
+                },
+                CardEffect::OnPlayGainIfRound {
+                    round: 9,
+                    good: Good::Food,
+                    amount: 5,
+                },
+                CardEffect::OnPlayGainIfRound {
+                    round: 12,
+                    good: Good::Food,
+                    amount: 6,
+                },
+                CardEffect::PostPlayPassLeft,
+            ],
+        ),
     ]
 }
 
@@ -7271,6 +7322,9 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
 #[cfg(test)]
 mod verified_band_d_tests {
     use super::*;
+    use crate::engine::{Action, Detail};
+    use crate::model::Config;
+    use crate::Game;
 
     fn set() -> CardSet {
         CardSet {
@@ -7734,12 +7788,395 @@ mod verified_band_d_tests {
     #[test]
     fn band_d_cards_are_absent_from_the_two_player_preset() {
         let preset = verified_basic_card_set(2).unwrap();
-        for id in ["D100", "D105", "D109", "D032", "D034", "D065", "D030"] {
+        for id in [
+            "D100", "D105", "D109", "D032", "D034", "D065", "D030", "D007",
+        ] {
             assert!(
                 preset.definition(id).is_none(),
                 "{id} must stay out of the A/B two-player preset"
             );
         }
+    }
+
+    // ---------------- D007 三つ又の矛 (Trident): round table + pass-left ----------------
+
+    #[test]
+    fn d007_definition_matches_the_bga_spec() {
+        let set = set();
+        let card = set.definition("D007").expect("D007 implemented");
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+        // The printed table is four exact-round entries plus the pass-left
+        // zone-move metadata — no other effect shapes.
+        let table: Vec<(u8, u32)> = card
+            .effects
+            .iter()
+            .filter_map(|effect| match effect {
+                CardEffect::OnPlayGainIfRound {
+                    round,
+                    good,
+                    amount,
+                } => {
+                    assert_eq!(*good, Good::Food, "D007 grants food only");
+                    Some((*round, *amount))
+                }
+                CardEffect::PostPlayPassLeft => None,
+                other => panic!("unexpected D007 effect: {other:?}"),
+            })
+            .collect();
+        assert_eq!(table, vec![(3, 3), (6, 4), (9, 5), (12, 6)]);
+        assert_eq!(
+            card.effects
+                .iter()
+                .filter(|effect| matches!(effect, CardEffect::PostPlayPassLeft))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn d007_reachable_through_the_default_registry() {
+        let registry = build_default_registry().expect("default registry");
+        assert!(
+            registry.iter().any(|c| c.external_id == "D007"),
+            "D007 must be registered from verified_band_d_cards"
+        );
+    }
+
+    /// `players` 人テーブルで D007 を `d007_seat` 席の手札に入れ、ラウンド
+    /// `round` の状態で返す（既存の 2 人用 helper を汎用化。D007 はコスト
+    /// 1 木のマイナー改良なので、対象席に木供給を 1 与えておく）。
+    fn d007_engine_game(round: u8, players: usize, d007_seat: usize) -> (Game, CardSet) {
+        assert!((2..=4).contains(&players));
+        assert!(d007_seat < players);
+        // Build a basic card set for the given player count (A/B pool + C/D/E bands + D007).
+        let mut definitions = Vec::new();
+        definitions.extend(verified_scoring_cards(players));
+        definitions.extend(verified_minor_worker_cards(players));
+        definitions.extend(
+            verified_immediate_resource_cards()
+                .into_iter()
+                .filter(|c| !c.id.starts_with('E') && !c.id.starts_with('D')),
+        );
+        definitions.extend(verified_worker_bonus_cards(players));
+        definitions.extend(
+            verified_round_and_harvest_cards()
+                .into_iter()
+                .filter(|c| c.id != "A145" && c.id != "A157"),
+        );
+        definitions.extend(verified_passive_cards());
+        definitions.extend(verified_simple_occupations(players));
+        definitions.extend(verified_extra_simple_cards());
+        // Add bands C, D, E for 3p/4p card count requirements
+        definitions.extend(verified_band_c_cards());
+        definitions.extend(verified_band_d_cards());
+        definitions.extend(verified_band_e_cards());
+        // Deduplicate by card ID (some cards may appear in multiple pools)
+        definitions.sort_by(|a, b| a.id.cmp(&b.id));
+        definitions.dedup_by(|a, b| a.id == b.id);
+        let set = CardSet { definitions };
+        set.validate(players).expect("card set validates");
+        let config = Config {
+            players,
+            seed: 7,
+            additional_action_space_enabled: false,
+        };
+        let probe = Game::with_cards(config.clone(), set.clone()).expect("probe deal");
+        let mut hands = probe.cards.hands.clone();
+        let d007_source = hands
+            .iter()
+            .position(|hand| hand.iter().any(|id| id == "D007"));
+        let seat0_minor = hands[0]
+            .iter()
+            .position(|id| {
+                set.definition(id)
+                    .is_some_and(|card| card.kind == CardKind::MinorImprovement)
+            })
+            .expect("seat 0 holds a minor improvement");
+        // Step 1: D007 を seat 0 に寄せる（1 席あたり 7 マイナー不変を保つ）。
+        match d007_source {
+            Some(0) => {} // すでに seat 0
+            Some(seat) => {
+                let displaced = hands[0].remove(seat0_minor);
+                let at = hands[seat]
+                    .iter()
+                    .position(|id| id == "D007")
+                    .expect("D007 sits in that seat");
+                hands[seat][at] = displaced;
+                hands[0].push("D007".into());
+            }
+            None => {
+                hands[0].remove(seat0_minor);
+                hands[0].push("D007".into());
+            }
+        }
+        // Step 2: D007 を seat 0 から要求席へ移し、その席のマイナーと交換する。
+        if d007_seat != 0 {
+            let at0 = hands[0]
+                .iter()
+                .position(|id| id == "D007")
+                .expect("D007 in seat 0");
+            let minor_at_target = hands[d007_seat]
+                .iter()
+                .position(|id| {
+                    set.definition(id)
+                        .is_some_and(|card| card.kind == CardKind::MinorImprovement)
+                })
+                .expect("target seat holds a minor improvement");
+            hands[0].remove(at0);
+            let target_minor = hands[d007_seat].remove(minor_at_target);
+            hands[d007_seat].push("D007".into());
+            hands[0].push(target_minor);
+        }
+        let mut game =
+            Game::with_cards_and_hands(config, set.clone(), hands).expect("explicit hands");
+        // Advance the board to `round` keeping revealed + hidden deck intact,
+        // so full validation (revealed count == round) still holds.
+        while (game.public.revealed.len() as u8) < round {
+            let card = game.hidden_round_deck.pop().expect("14 rounds only");
+            game.public.revealed.push(card);
+        }
+        game.public.round = round;
+        game.public.players[d007_seat].supply.set(Good::Wood, 1);
+        game.public.players[d007_seat].supply.set(Good::Food, 0);
+        (game, set)
+    }
+
+    fn play_d007_via_meeting_place(game: &mut Game) {
+        game.apply(Action {
+            space: Space::MeetingPlace,
+            detail: Detail::PlayMinor {
+                card_id: "D007".into(),
+            },
+        })
+        .expect("MeetingPlace + PlayMinor D007");
+    }
+
+    #[test]
+    fn d007_round_table_grants_the_printed_food() {
+        // Spec cases D007-normal (round 3) and D007-round12 (round 12) plus the
+        // 6/9 rows of the same printed table.
+        for (round, food) in [(3u8, 3u32), (6, 4), (9, 5), (12, 6)] {
+            let (mut game, _set) = d007_engine_game(round, 2, 0);
+            play_d007_via_meeting_place(&mut game);
+            assert_eq!(
+                game.public.players[0].supply.food, food,
+                "round {round} must grant the printed food amount exactly once"
+            );
+            // D007 prints 0 points and passes left, so the owner's cached
+            // card_points never move.
+            assert_eq!(game.public.players[0].card_points, 0);
+        }
+    }
+
+    #[test]
+    fn d007_grants_nothing_outside_the_table_rounds() {
+        // Spec case D007-not-triggered (round 4) plus the other off-table
+        // rounds: the exact-round match must resolve no entry at all.
+        for round in [1u8, 2, 4, 5, 7, 8, 10, 11] {
+            let (mut game, _set) = d007_engine_game(round, 2, 0);
+            play_d007_via_meeting_place(&mut game);
+            assert_eq!(
+                game.public.players[0].supply.food, 0,
+                "round {round} is outside the 3/6/9/12 table"
+            );
+        }
+    }
+
+    #[test]
+    fn d007_passes_left_once_and_leaves_no_played_trace() {
+        let (mut game, _set) = d007_engine_game(3, 2, 0);
+        play_d007_via_meeting_place(&mut game);
+        // The played card sits in the left neighbour's hand exactly once...
+        assert_eq!(
+            game.cards.hands[1]
+                .iter()
+                .filter(|id| id.as_str() == "D007")
+                .count(),
+            1,
+            "D007 must move to the left neighbour's hand"
+        );
+        // ...and neither in the owner's hand nor in the owner's played area.
+        assert!(!game.cards.hands[0].iter().any(|id| id == "D007"));
+        assert!(
+            !game.public.players[0]
+                .played_cards
+                .iter()
+                .any(|id| id == "D007"),
+            "a pass-left card must not stay in played_area"
+        );
+        // The receiving neighbour may play the received card from the new hand
+        // (MajorImprovement + PlayMinor — MeetingPlace is already used this
+        // round); the same round grants the table amount again and the card
+        // passes on (two-player wrap-around: player 1's left neighbour is
+        // player 0).
+        game.public.active_player = 1;
+        game.public.players[1].supply.set(Good::Wood, 1);
+        game.public.players[1].supply.set(Good::Food, 0);
+        game.apply(Action {
+            space: Space::MajorImprovement,
+            detail: Detail::PlayMinor {
+                card_id: "D007".into(),
+            },
+        })
+        .expect("MajorImprovement + PlayMinor D007 from the received hand");
+        assert_eq!(game.public.players[1].supply.food, 3);
+        assert!(game.cards.hands[0].iter().any(|id| id == "D007"));
+        assert!(!game.public.players[1]
+            .played_cards
+            .iter()
+            .any(|id| id == "D007"));
+    }
+
+    #[test]
+    fn d007_does_not_refire_on_subsequent_actions() {
+        let (mut game, _set) = d007_engine_game(3, 2, 0);
+        play_d007_via_meeting_place(&mut game);
+        // A later, unrelated action by the same player adds only its own grant:
+        // the on-play gain fires exactly once per play.
+        game.public.active_player = 0;
+        game.apply(Action {
+            space: Space::DayLaborer,
+            detail: Detail::None,
+        })
+        .expect("DayLaborer");
+        assert_eq!(
+            game.public.players[0].supply.food, 5,
+            "3 from D007 + 2 from DayLaborer, and nothing more"
+        );
+    }
+
+    #[test]
+    fn d007_full_game_with_pass_left_replays_identically() {
+        let mut set = verified_basic_card_set(2).expect("verified basic card set");
+        set.definitions.push(
+            verified_band_d_cards()
+                .into_iter()
+                .find(|card| card.id == "D007")
+                .expect("D007 in band D"),
+        );
+        let config = Config {
+            players: 2,
+            seed: 22,
+            additional_action_space_enabled: false,
+        };
+        let mut game = Game::with_cards(config.clone(), set.clone()).expect("game");
+        crate::policy::play_to_end(
+            &mut game,
+            &crate::evaluation::EvaluationPolicy,
+            &crate::policy::SimpleDetails,
+        )
+        .expect("play to end");
+        assert!(game.public.finished, "the pool game must finish");
+        game.validate()
+            .expect("in-game invariants hold across a pass-left");
+        let replay = Game::replay_with_cards(config, set, &game.log.events)
+            .expect("replay the recorded log");
+        assert_eq!(
+            replay.state_hash(),
+            game.state_hash(),
+            "the pass-left move and the round-table gain must replay identically"
+        );
+    }
+
+    /// D007 のパス左を 3 人テーブルの実際の Game::apply で回帰検証。
+    /// 非 wrap (seat 1 -> seat 0) と wrap (seat 0 -> seat 2) を別々の test でカバー。
+    #[test]
+    fn d007_passes_left_3p_non_wrap() {
+        let owner = 1;
+        let players = 3;
+        let (mut game, _set) = d007_engine_game(3, players, owner);
+        game.public.active_player = owner;
+        play_d007_via_meeting_place(&mut game);
+        let left = (owner + players - 1) % players; // 0
+        assert_d007_moved_once_to(&game, owner, left, players);
+        assert_eq!(
+            game.public.players[owner].supply.food, 3,
+            "3p round 3 table grant"
+        );
+    }
+
+    #[test]
+    fn d007_passes_left_3p_wrap() {
+        let owner = 0;
+        let players = 3;
+        let (mut game, _set) = d007_engine_game(3, players, owner);
+        game.public.active_player = owner;
+        play_d007_via_meeting_place(&mut game);
+        let left = (owner + players - 1) % players; // 2
+        assert_d007_moved_once_to(&game, owner, left, players);
+        assert_eq!(
+            game.public.players[owner].supply.food, 3,
+            "3p round 3 table grant"
+        );
+    }
+
+    #[test]
+    fn d007_passes_left_4p_non_wrap() {
+        let owner = 3;
+        let players = 4;
+        let (mut game, _set) = d007_engine_game(3, players, owner);
+        game.public.active_player = owner;
+        play_d007_via_meeting_place(&mut game);
+        let left = (owner + players - 1) % players; // 2
+        assert_d007_moved_once_to(&game, owner, left, players);
+        assert_eq!(
+            game.public.players[owner].supply.food, 3,
+            "4p round 3 table grant"
+        );
+    }
+
+    #[test]
+    fn d007_passes_left_4p_wrap() {
+        let owner = 0;
+        let players = 4;
+        let (mut game, _set) = d007_engine_game(3, players, owner);
+        game.public.active_player = owner;
+        play_d007_via_meeting_place(&mut game);
+        let left = (owner + players - 1) % players; // 3
+        assert_d007_moved_once_to(&game, owner, left, players);
+        assert_eq!(
+            game.public.players[owner].supply.food, 3,
+            "4p round 3 table grant"
+        );
+    }
+
+    /// D007 が owner の手札/played_area から消え、left 隣にちょうど 1 枚、
+    /// 他席には紛れ込まないことを assert する。
+    fn assert_d007_moved_once_to(game: &Game, owner: usize, left: usize, players: usize) {
+        let count_in = |seat: usize| {
+            game.cards.hands[seat]
+                .iter()
+                .filter(|id| id.as_str() == "D007")
+                .count()
+        };
+        assert_eq!(
+            count_in(left),
+            1,
+            "D007 must move to left neighbour (p+n-1)%n = {left} exactly once"
+        );
+        assert!(
+            !game.cards.hands[owner].iter().any(|id| id == "D007"),
+            "D007 must not remain in owner's hand"
+        );
+        assert!(
+            !game.public.players[owner]
+                .played_cards
+                .iter()
+                .any(|id| id == "D007"),
+            "a pass-left card must not stay in played_area"
+        );
+        for (seat, hand) in game.cards.hands.iter().enumerate().take(players) {
+            if seat != left {
+                assert!(
+                    !hand.iter().any(|id| id == "D007"),
+                    "D007 must not be misdelivered to seat {seat}"
+                );
+            }
+        }
+        game.validate()
+            .expect("in-game invariants must hold across pass-left");
     }
 
     /// D065 spec parity (data/bga-card-specs/D065.json): cost wood 1, printed

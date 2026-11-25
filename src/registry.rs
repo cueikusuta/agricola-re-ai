@@ -326,6 +326,7 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
                 | crate::cards::CardEffect::OnPlayGainPerCount { .. }
                 | crate::cards::CardEffect::OnPlayGainEachWithAtLeast { .. }
+                | crate::cards::CardEffect::OnPlayGainIfRound { .. }
                 | crate::cards::CardEffect::OnPlayChoiceGain { .. }
                 | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. }
                 | crate::cards::CardEffect::PostPlayPassLeft => EventKind::CardPlayed,
@@ -486,7 +487,8 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGain { amount, .. } => *amount,
                         crate::cards::CardEffect::EndGameBonus { .. }
                         | crate::cards::CardEffect::Prerequisite { .. }
-                        | crate::cards::CardEffect::Passive { .. } => 1,
+                        | crate::cards::CardEffect::Passive { .. }
+                        | crate::cards::CardEffect::PostPlayPassLeft => 1,
                         #[cfg(test)]
                         crate::cards::CardEffect::PendingProbe { .. } => 1,
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
@@ -566,17 +568,14 @@ impl CardRegistryBuilder {
                             amount,
                             ..
                         }
-                        | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
-                            *amount
-                        }
+| crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainIfRound { amount, .. } => *amount,
                         crate::cards::CardEffect::OnPlayAddStoneToEmptyFields {
                             amount, ..
                         } => *amount,
                         crate::cards::CardEffect::OnPlayChoiceGain { options } => {
                             options.iter().map(|o| o.amount).max().unwrap_or(1)
                         }
-                        // Zone-move metadata carries no gain amount.
-                        crate::cards::CardEffect::PostPlayPassLeft => 1,
                         // A140: the amount is read from the public
                         // accumulations at resolution time, not fixed here.
                         crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }

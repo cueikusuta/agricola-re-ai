@@ -374,6 +374,10 @@ pub fn handle_post_play_destination(
         )));
     }
     let left_neighbor = (player + num_players - 1) % num_players;
+    // One-player game: no left neighbour, card stays in played area.
+    if num_players == 1 {
+        return Ok(());
+    }
     let owner = &mut ctx.players[player];
     let Some(pos) = owner.played_cards.iter().position(|x| x == card_id) else {
         return Err(CardZoneError::CardNotInZone(
@@ -389,8 +393,8 @@ pub fn handle_post_play_destination(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cards::{CardDefinition, CardKind, CardSet};
-    use crate::model::Player;
+    use crate::cards::{CardDefinition, CardEffect, CardKind, CardSet};
+    use crate::model::{Good, Player};
 
     fn test_setup() -> (CardSet, CardState, Vec<Player>) {
         let set = CardSet {
@@ -700,6 +704,135 @@ mod tests {
         deal_initial_hands(&mut ctx, &[vec!["A001".into()]]).unwrap();
         assert!(ctx.cards.undealt.is_empty());
         assert_eq!(ctx.cards.hands[0], vec!["A001"]);
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
+    }
+
+    #[test]
+    fn handle_post_play_destination_pass_left_three_players() {
+        // C006/C007 D007: 3 players, pass-left goes to (p + n - 1) % n = (p + 2) % 3
+        // Player 0 plays -> passes to player 2 (left neighbor)
+        // Player 1 plays -> passes to player 0
+        // Player 2 plays -> passes to player 1
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                use_limit: None,
+                id: "D007".into(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::PostPlayPassLeft],
+            }],
+        };
+        let mut cards = CardState {
+            hands: vec![vec!["D007".into()], vec![], vec![]],
+            undealt: vec![],
+        };
+        let mut players = vec![Player::new(0, 0), Player::new(1, 0), Player::new(2, 0)];
+        let mut market = vec![];
+
+        // Player 0 plays D007
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        play_from_hand(&mut ctx, 0, "D007").unwrap();
+        // Dispatch play (Before phase) - in real engine this runs before pass-left
+        // Now call the canonical pass-left handler
+        crate::card_zones::handle_post_play_destination(&mut ctx, &set, 0, "D007", 3).unwrap();
+        // Card should be in player 2's hand (left of player 0 in 3p)
+        assert!(
+            ctx.cards.hands[0].is_empty(),
+            "player 0 hand should be empty"
+        );
+        assert_eq!(
+            ctx.players[0].played_cards,
+            Vec::<String>::new(),
+            "player 0 played should be empty"
+        );
+        assert!(
+            ctx.cards.hands[1].is_empty(),
+            "player 1 hand should be empty"
+        );
+        assert_eq!(
+            ctx.cards.hands[2],
+            vec!["D007"],
+            "card should be in player 2's hand"
+        );
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
+    }
+
+    #[test]
+    fn handle_post_play_destination_no_pass_left_for_non_pass_left_card() {
+        // Cards without PostPlayPassLeft should stay in played area
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                use_limit: None,
+                id: "A001".into(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::OnPlayGain {
+                    good: Good::Food,
+                    amount: 1,
+                }],
+            }],
+        };
+        let mut cards = CardState {
+            hands: vec![vec!["A001".into()], vec![]],
+            undealt: vec![],
+        };
+        let mut players = vec![Player::new(0, 0), Player::new(1, 0)];
+        let mut market = vec![];
+
+        // Player 0 plays A001
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        play_from_hand(&mut ctx, 0, "A001").unwrap();
+        // Call handler - should do nothing for non-pass-left card
+        crate::card_zones::handle_post_play_destination(&mut ctx, &set, 0, "A001", 2).unwrap();
+        // Card should stay in player 0's played area
+        assert_eq!(ctx.players[0].played_cards, vec!["A001"]);
+        assert!(ctx.cards.hands[0].is_empty());
+        assert!(ctx.cards.hands[1].is_empty());
+        validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
+    }
+
+    #[test]
+    fn handle_post_play_destination_one_player_no_move() {
+        // Single player game: no left neighbor, card stays in played
+        let set = CardSet {
+            definitions: vec![CardDefinition {
+                use_limit: None,
+                id: "D007".into(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::PostPlayPassLeft],
+            }],
+        };
+        let mut cards = CardState {
+            hands: vec![vec!["D007".into()]],
+            undealt: vec![],
+        };
+        let mut players = vec![Player::new(0, 0)];
+        let mut market = vec![];
+
+        // Player 0 plays D007
+        let mut ctx = CardMoveCtx {
+            cards: &mut cards,
+            players: &mut players,
+            improvement_market: &mut market,
+        };
+        play_from_hand(&mut ctx, 0, "D007").unwrap();
+        // Call handler - should do nothing for 1 player
+        crate::card_zones::handle_post_play_destination(&mut ctx, &set, 0, "D007", 1).unwrap();
+        // Card should stay in player 0's played area
+        assert_eq!(ctx.players[0].played_cards, vec!["D007"]);
+        assert!(ctx.cards.hands[0].is_empty());
         validate_card_partition(&set, ctx.cards, ctx.players).unwrap();
     }
 }
