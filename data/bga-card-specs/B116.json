@@ -93,7 +93,7 @@
     ],
     "checked_by": "AI source comparison vs BGA wiki",
     "checked_on": "2026-11-14",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "Verified against BGA wiki card page. On play: 1 wood. Each time empty Reed Bed cumulative space gets reed: 1 wood."
   }
 }

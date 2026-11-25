@@ -97,7 +97,7 @@
     "test_case_ids": ["B155-normal", "B155-cost-payment"],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-14",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "On play: gain wood 1 and reed 1. Occupation cost payment: may use food from cumulative space Small Theater. bga_checked is third-party BGA wiki cross-check, not official Lookout verification."
   }
 }

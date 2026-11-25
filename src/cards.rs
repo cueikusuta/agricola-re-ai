@@ -6763,6 +6763,80 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // ---- Freebuff on_play gain chapter (2026-11-25) ----
+        // Only the printed on-play gain half is wired here. Remaining printed
+        // triggers are follow-ups owned by their own chapters, so each spec
+        // implementation_status is `in_progress`.
+        // B025 パン焼き棒 (Bread Peel): cost 1 wood; on play gain 1 food.
+        // Follow-up: each occupation played grants an extra Bake Bread action.
+        CardDefinition {
+            use_limit: None,
+            id: "B025".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 1,
+            }],
+        },
+        // B103 畑の取引人 (Field Broker): no cost; on play gain 1 wood and
+        // 1 reed. Follow-up: declining a Minor/Major Improvement action gives
+        // 1 food / 1 vegetable instead.
+        CardDefinition {
+            use_limit: None,
+            id: "B103".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Wood,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Reed,
+                    amount: 1,
+                },
+            ],
+        },
+        // B116 岸辺の林業者 (Riverside Forester): no cost; on play gain
+        // 1 wood. Follow-up: each time the empty Reed Bank accumulation space
+        // receives reed, gain 1 wood.
+        CardDefinition {
+            use_limit: None,
+            id: "B116".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Wood,
+                amount: 1,
+            }],
+        },
+        // B155 美術教師 (Art Teacher): 4 players only; no cost; on play gain
+        // 1 wood and 1 reed. Follow-up: occupation costs may be paid with
+        // food from the Small Theater accumulation space.
+        CardDefinition {
+            use_limit: None,
+            id: "B155".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Wood,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Reed,
+                    amount: 1,
+                },
+            ],
+        },
     ]
 }
 
