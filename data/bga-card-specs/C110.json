@@ -39,32 +39,44 @@
   },
   "effects": [
     {
-      "trigger": "harvest",
-      "conditions": [
-        {
-          "predicate": "after_field_phase",
-          "params": {}
-        }
-      ],
+      "trigger": "harvest_feeding",
+      "conditions": [],
       "steps": [
         {
-          "operation": "exchange",
+          "operation": "other",
           "target": "owner",
           "params": {
-            "give": [
+            "kind": "choice",
+            "options": [
               {
-                "good": "grain",
-                "amount": 1
-              }
-            ],
-            "receive": [
-              {
-                "good": "food",
-                "amount": 3
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 1
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "food",
+                    "amount": 3
+                  }
+                ]
               },
               {
-                "good": "bonus_point",
-                "amount": 1
+                "kind": "exchange",
+                "give": [
+                  {
+                    "good": "grain",
+                    "amount": 1
+                  }
+                ],
+                "receive": [
+                  {
+                    "good": "points",
+                    "amount": 1
+                  }
+                ]
               }
             ]
           }
@@ -82,8 +94,10 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.trigger: 「各収穫の畑フェイズの後」を表す trigger は語彙外（doc で after_field_phase は使用禁止、C054 と同一状況）。C054 の先例に従い harvest_feeding で近似し、phase 確定まで未解決"
+    ],
     "test_case_ids": [
       "C110-normal",
       "C110-edge"

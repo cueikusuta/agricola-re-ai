@@ -42,8 +42,10 @@
       "trigger": "round_start",
       "conditions": [
         {
-          "predicate": "food_ge_round",
-          "params": {}
+          "predicate": "raw_text",
+          "params": {
+            "text": "you have food equal to or higher than the current round number (e.g., 8+ food in round 8)"
+          }
         }
       ],
       "steps": [
@@ -68,8 +70,10 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.conditions: 「食料 >= 現在のラウンド番号」を満たす既存 predicate がない（resource_greater_than の than は資源名または整数、resource_at_least の n は整数）。語彙運用規則に従い raw_text で保持し未解決"
+    ],
     "test_case_ids": [
       "C111-normal",
       "C111-edge"

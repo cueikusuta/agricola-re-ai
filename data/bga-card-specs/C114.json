@@ -39,13 +39,13 @@
   },
   "effects": [
     {
-      "trigger": "after_action",
+      "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "action_space_is",
+          "predicate": "worker_space_used",
           "params": {
             "spaces": [
-              "clay_accumulation"
+              "clay_pit"
             ]
           }
         }
@@ -71,20 +71,21 @@
         }
       ],
       "optional": true,
-      "frequency": "every_time",
+      "frequency": "every_use",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "owner"
     },
     {
-      "trigger": "after_action",
+      "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "action_space_is",
+          "predicate": "worker_space_used",
           "params": {
             "spaces": [
-              "stone_accumulation"
+              "western_quarry",
+              "eastern_quarry"
             ]
           }
         }
@@ -110,7 +111,7 @@
         }
       ],
       "optional": true,
-      "frequency": "every_time",
+      "frequency": "every_use",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 1,

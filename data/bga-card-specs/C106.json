@@ -59,7 +59,7 @@
       "decision_owner": "none"
     },
     {
-      "trigger": "harvest_field",
+      "trigger": "harvest_field_phase",
       "conditions": [
         {
           "predicate": "harvested_from",

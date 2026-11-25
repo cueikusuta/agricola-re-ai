@@ -39,60 +39,43 @@
   },
   "effects": [
     {
-      "trigger": "after_action",
+      "trigger": "after_improvement",
       "conditions": [
         {
-          "predicate": "action_is",
+          "predicate": "raw_text",
           "params": {
-            "action": "build_major_improvement"
+            "text": "the improvement built is a major improvement"
           }
         }
       ],
       "steps": [
         {
-          "operation": "gain_resource",
-          "target": "owner",
+          "operation": "other",
+          "target": "card",
           "params": {
+            "kind": "stack_goods_on_card",
             "good": "reed",
-            "amount": 1,
-            "on_card": true
+            "amount_per_use": 1,
+            "source": "general_supply"
           }
         }
       ],
       "optional": false,
-      "frequency": "every_time",
+      "frequency": "every_use",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none"
-    },
-    {
-      "trigger": "other",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "other",
-          "target": "owner",
-          "params": {
-            "kind": "reed_on_card_to_sow_or_supply"
-          }
-        }
-      ],
-      "optional": true,
-      "frequency": "any_time",
-      "duration": "permanent",
-      "snapshot": "after_event",
-      "order": 1,
-      "decision_owner": "owner"
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
+    "status": "needs_resolution",
     "unresolved_fields": [
-      "effects.1.modeling: 葦がカード上に蓄積し、いつでも供給へ移動または「種まき」アクションと交換可能。カード上在庫のモデリング未確定"
+      "effects.0.conditions: 「大進歩を建設したとき」に絞る既存 predicate がない（after_improvement は大小両進歩で発火）。raw_text で保持し未解決",
+      "effects.1 (削除): 葦がカード上に蓄積し、いつでも供給へ移動または「種まき」アクションと交換可能。カード上在庫のモデリング未確定。anytime トリガーは語彙未定義（A071/C018/C057 と同様にフリー action API 未規定）のため effect を削除し未解決"
     ],
     "test_case_ids": [
       "C115-normal",

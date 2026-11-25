@@ -39,10 +39,10 @@
   },
   "effects": [
     {
-      "trigger": "before_action",
+      "trigger": "before_worker_space",
       "conditions": [
         {
-          "predicate": "action_space_is",
+          "predicate": "worker_space_used",
           "params": {
             "spaces": [
               "grain_utilization",
@@ -54,20 +54,26 @@
       ],
       "steps": [
         {
-          "operation": "other",
+          "operation": "exchange",
           "target": "owner",
           "params": {
-            "kind": "buy_resource",
-            "resource": "grain",
-            "cost": {
-              "good": "food",
-              "amount": 1
-            }
+            "give": [
+              {
+                "good": "food",
+                "amount": 1
+              }
+            ],
+            "receive": [
+              {
+                "good": "grain",
+                "amount": 1
+              }
+            ]
           }
         }
       ],
       "optional": true,
-      "frequency": "every_time",
+      "frequency": "every_use",
       "duration": "permanent",
       "snapshot": "before_event",
       "order": 0,

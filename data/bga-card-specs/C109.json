@@ -39,7 +39,7 @@
   },
   "effects": [
     {
-      "trigger": "feeding_phase",
+      "trigger": "harvest_feeding",
       "conditions": [],
       "steps": [
         {

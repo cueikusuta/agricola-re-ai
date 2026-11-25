@@ -39,20 +39,20 @@
   },
   "effects": [
     {
-      "trigger": "harvest",
-      "conditions": [
-        {
-          "predicate": "once_per_harvest",
-          "params": {}
-        }
-      ],
+      "trigger": "harvest_start",
+      "conditions": [],
       "steps": [
         {
-          "operation": "other",
+          "operation": "exchange",
           "target": "owner",
           "params": {
-            "kind": "buy_resources",
-            "resources": [
+            "give": [
+              {
+                "good": "food",
+                "amount": 2
+              }
+            ],
+            "receive": [
               {
                 "good": "wood",
                 "amount": 1
@@ -65,11 +65,7 @@
                 "good": "grain",
                 "amount": 1
               }
-            ],
-            "cost": {
-              "good": "food",
-              "amount": 2
-            }
+            ]
           }
         }
       ],

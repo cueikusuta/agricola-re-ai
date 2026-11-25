@@ -37,34 +37,15 @@
     "prerequisites": [],
     "printed_points": 0
   },
-  "effects": [
-    {
-      "trigger": "on_play",
-      "conditions": [],
-      "steps": [
-        {
-          "operation": "other",
-          "target": "owner",
-          "params": {
-            "kind": "skip_next_harvest",
-            "also_skip_feeding": true
-          }
-        }
-      ],
-      "optional": false,
-      "frequency": "once_per_play",
-      "duration": "instant",
-      "snapshot": "after_event",
-      "order": 0,
-      "decision_owner": "none"
-    }
-  ],
+  "effects": null,
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
-    "unresolved_fields": [],
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects: 「次の収穫をスキップする（その収穫では給餌も不要）」を表す既存の trigger/operation 語彙がない。フェイズ全体のスキップはゲーム状態の大変更であり E058 と同様に formal engine definition が必要。語彙運用規則5に従い effects: null のまま未確定"
+    ],
     "test_case_ids": [
       "C108-normal",
       "C108-edge"

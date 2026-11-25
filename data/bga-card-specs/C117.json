@@ -39,11 +39,13 @@
   },
   "effects": [
     {
-      "trigger": "after_action",
+      "trigger": "after_worker_space",
       "conditions": [
         {
-          "predicate": "adjacent_to_own_worker",
-          "params": {}
+          "predicate": "raw_text",
+          "params": {
+            "text": "the used action space is orthogonally adjacent to another action space occupied by one of your people"
+          }
         }
       ],
       "steps": [
@@ -57,7 +59,7 @@
         }
       ],
       "optional": false,
-      "frequency": "every_time",
+      "frequency": "every_use",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 0,
@@ -68,7 +70,7 @@
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
+    "status": "needs_resolution",
     "unresolved_fields": [
       "effects.0.conditions: 直交隣接（orthogonally adjacent）の定義・盤面モデルへのマッピング要確認"
     ],

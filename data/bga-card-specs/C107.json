@@ -43,11 +43,10 @@
       "conditions": [],
       "steps": [
         {
-          "operation": "other",
+          "operation": "grant_action",
           "target": "owner",
           "params": {
-            "kind": "bake_bread_action",
-            "immediate": true
+            "action": "bake_bread"
           }
         }
       ],
@@ -59,27 +58,19 @@
       "decision_owner": "owner"
     },
     {
-      "trigger": "round_start",
-      "conditions": [
-        {
-          "predicate": "phase_is",
-          "params": {
-            "phase": "feeding"
-          }
-        }
-      ],
+      "trigger": "harvest_feeding",
+      "conditions": [],
       "steps": [
         {
-          "operation": "other",
+          "operation": "grant_action",
           "target": "owner",
           "params": {
-            "kind": "bake_bread_action",
-            "immediate": false
+            "action": "bake_bread"
           }
         }
       ],
       "optional": true,
-      "frequency": "every_feeding_phase",
+      "frequency": "every_harvest",
       "duration": "permanent",
       "snapshot": "after_event",
       "order": 1,

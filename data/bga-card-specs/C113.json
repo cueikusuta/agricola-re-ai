@@ -59,7 +59,7 @@
       "decision_owner": "none"
     },
     {
-      "trigger": "harvest_end",
+      "trigger": "after_harvest",
       "conditions": [],
       "steps": [
         {

@@ -44,10 +44,15 @@
       "steps": [
         {
           "operation": "other",
-          "target": "owner",
+          "target": "card",
           "params": {
-            "kind": "place_clay_on_card",
-            "amount": 8
+            "kind": "stack_goods_on_card",
+            "goods": [
+              {
+                "good": "clay",
+                "amount": 8
+              }
+            ]
           }
         }
       ],
@@ -57,44 +62,16 @@
       "snapshot": "after_event",
       "order": 0,
       "decision_owner": "none"
-    },
-    {
-      "trigger": "gain_resource",
-      "conditions": [
-        {
-          "predicate": "gained_good_is",
-          "params": {
-            "good": "grain"
-          }
-        }
-      ],
-      "steps": [
-        {
-          "operation": "gain_resource",
-          "target": "owner",
-          "params": {
-            "good": "clay",
-            "amount": 1,
-            "from_card": true
-          }
-        }
-      ],
-      "optional": false,
-      "frequency": "per_grain_gained",
-      "duration": "until_card_empty",
-      "snapshot": "after_event",
-      "order": 1,
-      "decision_owner": "none"
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "bga_checked",
+    "status": "needs_resolution",
     "unresolved_fields": [
       "effects.0.modeling: カード上に8レンガを蓄積するモデリング未確定",
-      "effects.1.conditions: 小麦獲得時のトリガー粒度（1粒ごと vs バッチ）とカード上在庫からの取り出し上限"
+      "effects.1 (削除): 小麦獲得時のトリガー粒度（1粒ごと vs バッチ）とカード上在庫からの取り出し上限。「小麦を獲得するたび」に発火する既存 trigger がなく effect を削除し未解決"
     ],
     "test_case_ids": [
       "C120-normal",
