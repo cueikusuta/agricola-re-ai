@@ -840,6 +840,15 @@ pub enum ScoreBonusRule {
     /// major improvements. Appended at the enum tail so existing serde
     /// variants and saved-game bytes are unchanged.
     MajorImprovementsBottomRowThresholds,
+    /// A134 満載畜産家 (Full Farmer): 1 bonus point per pasture filled to
+    /// capacity at the end of the game. A pasture counts as full when its
+    /// animal quantity equals `Player::pasture_capacity` — the same helper
+    /// `SparePastureCapacity` reads — and that capacity is positive, so an
+    /// empty pasture (quantity 0, capacity 0) never scores. Pets and lone
+    /// stables are not pastures and stay out of the count; like every rule
+    /// here the value is computed from the live final state and is never
+    /// added to the printed `card_points`.
+    FullPastures,
     /// B153 寮長 (Housemaster): at final scoring, sum the major-improvement
     /// scores after doubling the lowest single one (one only, even when the
     /// lowest score is tied), then take 1/2/3/4 bonus points at a doubled
@@ -2111,6 +2120,14 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         _ => 0,
                     }
                 }
+                ScoreBonusRule::FullPastures => player
+                    .pastures
+                    .iter()
+                    .filter(|pasture| {
+                        let capacity = player.pasture_capacity(pasture);
+                        capacity > 0 && pasture.quantity == capacity
+                    })
+                    .count() as i32,
                 ScoreBonusRule::MajorImprovementsLowestDoubledThresholds => {
                     // B153 寮長 (Housemaster): the lowest single score is
                     // doubled (exactly one, even when the lowest score is
@@ -6766,6 +6783,36 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 },
             ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // A134 満載畜産家 (Full Farmer): on play gain 1 wood and 1 clay; at the
+        // end of the game score 1 point per pasture filled to capacity. Only
+        // printed for 3/4 players (spec eligibility "2": "no"), so the
+        // trailing MinimumPlayers(3) prerequisite makes this a whole-card
+        // requirement that the player-count projection drops at 2 players.
+        // Printed points stay 0; the scoring bonus is read from the live final
+        // state and never cached into card_points.
+        CardDefinition {
+            use_limit: None,
+            id: "A134".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Wood,
+                    amount: 1,
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Clay,
+                    amount: 1,
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::FullPastures,
+                },
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+            ],
         },
         // A066 餌皿 (Feeding Dish): cost 1 wood, no prerequisites, 0 points.
         // After using a sheep/pig/cattle market while already keeping that

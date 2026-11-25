@@ -110,7 +110,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "tested",
     "notes": "Gain 1 wood and 1 clay on play; 1 point per pasture filled to capacity at scoring."
   }
 }

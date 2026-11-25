@@ -544,6 +544,7 @@ CARDS = {
                    freq="end_of_game", dur="permanent", snap="live_state", order=1),
         ],
         "notes": "Gain 1 wood and 1 clay on play; 1 point per pasture filled to capacity at scoring.",
+        "implementation_status": "tested",
         "tests": [
             case("A134-normal", {"wood": 0, "clay": 0}, {"play": "A134"},
                  {"wood_delta": 1, "clay_delta": 1}),
