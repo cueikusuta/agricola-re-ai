@@ -775,6 +775,10 @@ pub enum ScoreBonusRule {
     /// is added separately by `score_with_cards`. Appended at the enum tail
     /// so existing serde variants and saved-game bytes are unchanged.
     MajorImprovementsLowestDoubledThresholds,
+    /// E032 身廊 (Nave): 1 bonus point per farmyard column (of the 5) that
+    /// contains at least one room, computed from the final farm state. Several
+    /// rooms standing in the same column still score that column only once.
+    ColumnsWithRoom,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1941,6 +1945,23 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                     }
                     let total: i32 = scores.iter().sum();
                     [5, 7, 9, 11].iter().filter(|&&t| total >= t).count() as i32
+                }
+                ScoreBonusRule::ColumnsWithRoom => {
+                    // The farmyard is a 5-column x 3-row grid (see
+                    // `model::neighbors`), so column c holds the cells c, c + 5
+                    // and c + 10. A column scores once when it carries at least
+                    // one room, no matter how many rooms stand in it.
+                    const COLUMNS: usize = 5;
+                    (0..COLUMNS)
+                        .filter(|&column| {
+                            player
+                                .farm
+                                .iter()
+                                .skip(column)
+                                .step_by(COLUMNS)
+                                .any(|cell| matches!(cell.tile, Tile::Room))
+                        })
+                        .count() as i32
                 }
             },
             _ => 0,
@@ -6479,10 +6500,19 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
     ]
 }
 
-/// B-deck band 121-168 cards whose printed effects are fully expressible with
-/// the current typed effect vocabulary (BGA Agricola card wiki;
+/// B-deck band cards with typed effects (BGA Agricola card wiki;
 /// B122 p=3135, B142 p=3207, B144 p=3113). Kept out of the A/B two-player
 /// preset, same as the C/D/E band pools.
+///
+/// Chapter 1 (restack session 2026-11-23: `on_play` simple gains) adds cards
+/// whose printed on-play effect is a single constant `gain_resource` step,
+/// modelled with the existing `CardEffect::OnPlayGain` variant. Each of those
+/// cards prints further effects on OTHER triggers; only the on-play half is
+/// wired here, so their spec `implementation_status` stays `in_progress` and
+/// the remaining halves belong to their own trigger chapters (recorded per
+/// card below). Because every built-in review entry is fail-closed
+/// `unverified`, no pool gate admits these cards until official eligibility
+/// is recorded, and the experimental pool only ever grants the on-play half.
 pub fn verified_band_b_cards() -> Vec<CardDefinition> {
     let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
         space,
@@ -6758,6 +6788,85 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 CardEffect::AfterPlacementGainIfImprovementsEqualOccupations {
                     good: Good::Food,
                     amount: 2,
+                },
+            ],
+        },
+        // ---- Chapter 1 (restack 2026-11-23): on-play simple gains ----
+        // Cards below print exactly one constant gain_resource step on their
+        // on_play trigger; each is modelled with the existing OnPlayGain
+        // variant (no new variant / EventKind / saved field). Their remaining
+        // printed effects live on other triggers and stay unwired here
+        // (spec implementation_status = in_progress; follow-up noted inline).
+
+        // B054 肥料運搬車 (Tumbrel): cost 1 wood; on play gain 2 food.
+        // Eligibility 2/3/4 = yes. Still prints an after_sow "1 food per
+        // stable" step (follow-up; the harvest/sow chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B054".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 2,
+            }],
+        },
+        // B117 情報屋 (Informant): occupation, no cost; on play gain 1 wood.
+        // Eligibility 2/3/4 = yes (85-126 rule). Still prints an
+        // after_work_phase "more stone than clay => 1 wood" step (follow-up;
+        // the round/work-phase chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B117".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Wood,
+                amount: 1,
+            }],
+        },
+        // B151 小百姓 (Little Peasant): occupation, no cost; on play gain
+        // 1 stone. 4 players only (148-168 rule), so the effect is guarded by
+        // MinimumPlayers(4) and projects only at 4 players. Still prints the
+        // passive "all spaces except Meeting Place count as unoccupied while
+        // living in a 2-room wooden house" rule (follow-up; the passive
+        // chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B151".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Stone,
+                    amount: 1,
+                },
+            ],
+        },
+        // B160 飲み屋の亭主 (Pub Owner): occupation, no cost; on play gain
+        // 1 grain. 4 players only (148-168 rule) -> MinimumPlayers(4) guard.
+        // Still prints the end_of_work_phase "Forest/Clay Pit/Reed Field all
+        // occupied => 1 grain" step (follow-up; the round_end/work-phase
+        // chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B160".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Grain,
+                    amount: 1,
                 },
             ],
         },
@@ -7304,6 +7413,19 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 },
                 CardEffect::PostPlayPassLeft,
             ],
+        },
+        // E032 身廊 (Nave): cost 2 stone + 1 reed; at scoring, 1 point per
+        // farmyard column (of the 5) holding at least one room
+        // (agricola.cloudfree.jp ?p=2721).
+        CardDefinition {
+            use_limit: None,
+            id: "E032".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Stone, 2), (Good::Reed, 1)],
+            points: 0,
+            effects: vec![CardEffect::EndGameBonus {
+                rule: ScoreBonusRule::ColumnsWithRoom,
+            }],
         },
     ]
 }
@@ -8189,6 +8311,98 @@ mod verified_band_e_tests {
         assert_eq!(card.points, 0);
         let preset = verified_basic_card_set(2).unwrap();
         assert!(preset.definition("E035").is_none());
+    }
+
+    #[test]
+    fn e032_normal_three_columns_with_room_scores_three() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E032".into());
+        // Place rooms in 3 different columns (0, 1, 2).
+        // Column c uses cells c, c+5, c+10.
+        p.farm[0].tile = Tile::Room; // column 0
+        p.farm[6].tile = Tile::Room; // column 1 (1 + 5)
+        p.farm[12].tile = Tile::Room; // column 2 (2 + 10)
+                                      // Other cells empty -> no more columns with rooms.
+        assert_eq!(end_game_bonus(&set, &p), 3);
+    }
+
+    #[test]
+    fn e032_multiple_rooms_same_column_scores_once() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E032".into());
+        // Two rooms in column 0 (cells 0 and 5), one room in column 1 (cell 6).
+        p.farm[0].tile = Tile::Room; // column 0
+        p.farm[5].tile = Tile::Room; // column 0 (5 + 0)
+        p.farm[6].tile = Tile::Room; // column 1
+                                     // Column 0 has 2 rooms -> still scores 1. Column 1 scores 1. Total 2.
+        assert_eq!(end_game_bonus(&set, &p), 2);
+    }
+
+    #[test]
+    fn e032_zero_default_rooms_only_scores_one() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E032".into());
+        // Default farm has rooms at cells 0 and 5 (both column 0).
+        // No additional rooms added -> only column 0 has rooms.
+        assert_eq!(end_game_bonus(&set, &p), 1);
+    }
+
+    #[test]
+    fn e032_fields_pastures_stables_do_not_count_as_rooms() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E032".into());
+        // Clear default rooms (cells 0 and 5 are in column 0).
+        p.farm[0].tile = Tile::Empty;
+        p.farm[5].tile = Tile::Empty;
+        // Fill column 0 with a field, column 1 with a pasture, column 2 with a stable.
+        p.farm[0].tile = Tile::Field {
+            crop: Some(Crop::Grain),
+            remaining: 1,
+        }; // column 0
+        p.farm[6].tile = Tile::Pasture { id: 0 }; // column 1
+        p.farm[12].stable = true; // column 2 (cell 12), stable on empty
+        p.farm[12].tile = Tile::Empty;
+        // None are Tile::Room -> bonus 0.
+        assert_eq!(end_game_bonus(&set, &p), 0);
+    }
+
+    #[test]
+    fn e032_all_five_columns_with_room_scores_five() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("E032".into());
+        // Place a room in each of the 5 columns (cells 0, 1, 2, 3, 4).
+        for cell in p.farm.iter_mut().take(5) {
+            cell.tile = Tile::Room;
+        }
+        assert_eq!(end_game_bonus(&set, &p), 5);
+    }
+
+    #[test]
+    fn e032_cost_and_points_and_absent_from_two_player_preset() {
+        let set = CardSet {
+            definitions: verified_band_e_cards(),
+        };
+        let card = set.definition("E032").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Stone, 2), (Good::Reed, 1)]);
+        assert_eq!(card.points, 0);
+        let preset = verified_basic_card_set(2).unwrap();
+        assert!(preset.definition("E032").is_none());
     }
 }
 #[cfg(test)]
