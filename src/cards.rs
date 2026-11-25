@@ -7812,6 +7812,8 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::ColumnsWithRoom,
             }],
+            // post_play is left at PlayedArea: this card prints no pass-left
+            // effect (scoring-only card).
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
     ]

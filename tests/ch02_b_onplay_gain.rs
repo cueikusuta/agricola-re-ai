@@ -95,6 +95,7 @@ fn chapter_set() -> CardSet {
         cost: vec![],
         points: 0,
         effects: vec![],
+        // filler card stays in the played area
         post_play: PostPlayDestination::PlayedArea,
     });
     CardSet { definitions }
@@ -337,6 +338,7 @@ fn padded_raw_set(card_id: &str, players: usize) -> CardSet {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                // filler card stays in the played area
                 post_play: PostPlayDestination::PlayedArea,
             });
         }

@@ -1184,6 +1184,7 @@ CARDS = {
         "post": "left_neighbor_hand",
         "effects": [effect("on_play", [stable(1, wood_cost=0)])],
         "notes": "Build 1 stable for free (the card cost is still paid); pass left.",
+        "implementation_status": "in_progress",
         "tests": [
             case("C002-normal", {"stables": 0, "wood": 0}, {"play": "C002"},
                  {"stables_delta": 1, "wood_delta": 0,
@@ -1670,6 +1671,7 @@ CARDS = {
                    optional=True, decision="owner"),
         ],
         "notes": "Immediately build up to 3 stables for free; pass left.",
+        "implementation_status": "in_progress",
         "tests": [
             case("E001-normal", {"stables": 0, "wood": 0}, {"play": "E001", "build": 3},
                  {"stables_delta": 3, "wood_delta": 0}),
@@ -2365,6 +2367,7 @@ CARDS = {
                    optional=True, decision="owner"),
         ],
         "notes": "May build 1 free stable only on the exact cell of a fenced one-cell pasture; pass left.",
+        "implementation_status": "in_progress",
         "tests": [
             case("A001-normal", {"pastures": [{"cells": [4]}], "stables": 0},
                  {"play": "A001", "build_stable_cell": 4},

@@ -313,6 +313,48 @@ pub(crate) fn stable_site_available(p: &Player, i: usize) -> bool {
         && !p.farm[i].stable
         && matches!(p.farm[i].tile, Tile::Empty | Tile::Pasture { .. })
 }
+
+/// Build one stable for a card effect (A001 雨除け / C002 厩 / E001 簡易納屋),
+/// paying `wood_cost` wood per stable (0 for these cards: the stable itself
+/// is free while the card cost is still paid). Legality mirrors the ordinary
+/// "Build Stables" action (`stable_site_available`): the farm holds at most
+/// 4 stables, the cell must be an empty farmyard cell or a pasture cell, and
+/// no stable may already stand there. Placement (which cell) is a detail
+/// decision made by the caller, not by this rule.
+pub(crate) fn build_free_stable(p: &mut Player, cell: usize, wood_cost: u32) -> Result<()> {
+    if !stable_site_available(p, cell) {
+        return Err("stable location illegal".into());
+    }
+    p.supply.pay(Good::Wood, wood_cost)?;
+    p.farm[cell].stable = true;
+    Ok(())
+}
+
+/// Legal cells for a card-driven free stable build, in farm order: every
+/// legal stable site, narrowed to `scope` (A001 雨除け: the cell of a fenced
+/// pasture spanning exactly `pasture_size` cells — "1農場スペースだけの牧場").
+pub(crate) fn free_stable_site_candidates(
+    p: &Player,
+    scope: crate::cards::StablePlacementScope,
+) -> Vec<usize> {
+    use crate::cards::StablePlacementScope::{AnySite, OneCellPasture};
+    (0..FARM_CELLS)
+        .filter(|&i| {
+            stable_site_available(p, i)
+                && match scope {
+                    AnySite => true,
+                    OneCellPasture { pasture_size } => {
+                        matches!(p.farm[i].tile, Tile::Pasture { id }
+                        if p.pastures.iter().any(|q| {
+                            q.id == id
+                                && q.cells.len() == usize::from(pasture_size)
+                                && q.cells.contains(&i)
+                        }))
+                    }
+                }
+        })
+        .collect()
+}
 fn can_build(p: &Player) -> bool {
     (p.supply.reed >= 2
         && p.supply.get(room_material(p)) >= room_build_cost(p)
