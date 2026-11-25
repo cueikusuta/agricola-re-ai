@@ -75,7 +75,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "in_progress",
+    "implementation_status": "not_started",
     "notes": "Plow 1 field, then pass the card to the left neighbour's hand."
   }
 }

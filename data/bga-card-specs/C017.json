@@ -77,7 +77,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "in_progress",
+    "implementation_status": "not_started",
     "notes": "Immediately plow 1 field; it needs no adjacency to another field."
   }
 }
