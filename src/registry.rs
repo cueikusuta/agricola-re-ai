@@ -395,6 +395,8 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
+                // A001/C002/E001: free stable builds fire at play time.
+                crate::cards::CardEffect::OnPlayBuildStable { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerGain { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
@@ -614,6 +616,9 @@ impl CardRegistryBuilder {
                         }
                         // Zone-move metadata carries no gain amount.
                         crate::cards::CardEffect::PostPlayPassLeft => 1,
+                        // A001/C002/E001: the on-play stable build carries its
+                        // stable amount in the effect params.
+                        crate::cards::CardEffect::OnPlayBuildStable { amount, .. } => *amount,
                         // A140: the amount is read from the public
                         // accumulations at resolution time, not fixed here.
                         crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
@@ -991,6 +996,10 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
         crate::cards::verified_band_e_cards(),
         crate::cards::verified_band_a_cards(),
         crate::cards::verified_band_b_cards(),
+        // on_play build_stable chapter (A001 雨除け / C002 厩 / E001 簡易納屋);
+        // review stays Unverified, so these cards join the experimental pool
+        // only and the A/B two-player preset is untouched.
+        crate::cards::verified_build_stable_cards(),
         // B-deck chapter 1: on-play simple cards (B002/B003/B005/B008/B009).
         crate::cards::verified_b_onplay_simple_cards(),
     ];

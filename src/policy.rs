@@ -778,11 +778,20 @@ fn card_priority(
                                 | CardEffect::StartRoundGainIfAccumulationGrew { good, amount, .. }
                                 | CardEffect::StartRoundGainIfAccumulationAtLeast { good, amount, .. }
                                 | CardEffect::StartRoundGainIfNoHarvestAndAnimals {
-                                    good,
-                                    amount,
-                                    ..
-                                } => card_good_value(*good) * i64::from(*amount) * horizon,
-                            };
+                                                                                                    good,
+                                                                    amount,
+                                                                    ..
+                                                                } => card_good_value(*good) * i64::from(*amount) * horizon,
+                                                                // A001/C002/E001: a free stable carries the same
+                                                                // ongoing value as a built one (~2 wood saved +
+                                                                // 2-animal capacity); E001's 3-stable "up to"
+                                                                // counts each site.
+                                                                CardEffect::OnPlayBuildStable { amount, .. } => {
+                                                                    card_good_value(crate::model::Good::Wood)
+                                                                        * i64::from(*amount)
+                                                                        * 2
+                                                                }
+                                                            };
     }
     Some(value)
 }
