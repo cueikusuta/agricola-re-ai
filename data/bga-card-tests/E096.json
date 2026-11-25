@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "card_id": "E096",
+  "cases": [
+    {
+      "id": "E096-normal",
+      "scope": "effect_only",
+      "setup": {
+        "round": 1,
+        "phase": "work_phase_start",
+        "occupations_played": 0
+      },
+      "action": {
+        "play": "E096",
+        "without_placing_person": true
+      },
+      "expected": {
+        "occupations_played": 1,
+        "person_placed": false
+      }
+    },
+    {
+      "id": "E096-not-round1",
+      "scope": "effect_only",
+      "setup": {
+        "round": 2,
+        "phase": "work_phase_start",
+        "occupations_played": 0
+      },
+      "action": {
+        "play": "E096"
+      },
+      "expected": {
+        "occupations_played": 1,
+        "person_placed": true
+      }
+    }
+  ]
+}

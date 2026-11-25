@@ -66,6 +66,15 @@ pub enum Detail {
     PlayMinor {
         card_id: String,
     },
+    /// Play a minor improvement whose on-play effect offers a choice
+    /// (`OnPlayChoiceGain`, e.g. C007 刈り鋏): `option` is the index into the
+    /// card's option list. Kept as a separate detail so plain `PlayMinor`
+    /// keeps applying the first option for legacy callers and validation can
+    /// fail closed on out-of-range choices.
+    PlayMinorChoice {
+        card_id: String,
+        option: usize,
+    },
     GrowWithMinor {
         card_id: String,
     },
@@ -464,6 +473,7 @@ impl Game {
             self.public.round,
             &self.public.used,
             &self.public.accumulations,
+            &self.public.animal_accumulations,
             &mut self.event_budget,
             &mut self.public.card_uses,
             &self.card_use_limits,
@@ -1537,6 +1547,22 @@ impl Game {
                 match detail {
                     Detail::None => {}
                     Detail::PlayMinor { card_id } if self.card_set.enabled() => {
+                        // Fail closed (same rule as the MajorImprovement arm).
+                        if let Some(card) = self.card_set.definition(card_id) {
+                            let choice_effects = card
+                                .effects
+                                .iter()
+                                .filter(|e| {
+                                    matches!(e, crate::cards::CardEffect::OnPlayChoiceGain { .. })
+                                })
+                                .count();
+                            if choice_effects > 0 {
+                                return Err(
+                                    "card requires a choice: use PlayMinorChoice with the chosen option"
+                                        .into(),
+                                );
+                            }
+                        }
                         // Validate and pay costs
                         crate::cards::play_validate_pay(
                             &self.card_set,
@@ -1572,6 +1598,104 @@ impl Game {
                             &mut self.pending,
                             true, // is_improvement_action
                         )?;
+                        // Post-play pass (C006/C007 `PostPlayPassLeft`): pass
+                        // the card to the left neighbor's hand.
+                        {
+                            let num_players = self.public.players.len();
+                            let mut ctx = CardMoveCtx {
+                                cards: &mut self.cards,
+                                players: &mut self.public.players,
+                                improvement_market: &mut self.public.improvement_market,
+                            };
+                            crate::card_zones::handle_post_play_destination(
+                                &mut ctx,
+                                &self.card_set,
+                                id,
+                                card_id,
+                                num_players,
+                            )
+                            .map_err(|e| e.to_string())?;
+                        }
+                    }
+                    Detail::PlayMinorChoice { card_id, option } if self.card_set.enabled() => {
+                        // Same chain as the MajorImprovement arm: option
+                        // index is action data (validated against the card's
+                        // OnPlayChoiceGain option list), applied after the
+                        // dispatcher's Before scan.
+                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                        let choice_options: Vec<crate::cards::ChoiceGainOption> = card
+                            .effects
+                            .iter()
+                            .find_map(|e| match e {
+                                crate::cards::CardEffect::OnPlayChoiceGain { options } => {
+                                    Some(options.clone())
+                                }
+                                _ => None,
+                            })
+                            .unwrap_or_default();
+                        if choice_options.is_empty() {
+                            return Err("card does not offer an on-play choice".into());
+                        }
+                        if *option >= choice_options.len() {
+                            return Err("on-play choice index out of range".into());
+                        }
+                        crate::cards::play_validate_pay(
+                            &self.card_set,
+                            &mut self.cards.hands[id],
+                            &mut self.public.players[id],
+                            card_id,
+                            crate::cards::CardKind::MinorImprovement,
+                            0,
+                        )?;
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        play_from_hand(&mut ctx, id, card_id)?;
+                        dispatch_play(
+                            &self.card_set,
+                            id,
+                            card_id,
+                            0,
+                            &mut self.cards,
+                            &mut self.public.players,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            self.public.round,
+                            &self.public.used,
+                            &mut self.event_budget,
+                            &mut self.public.card_uses,
+                            &self.card_use_limits,
+                            &mut self.pending,
+                            false,
+                        )?;
+                        crate::cards::apply_choice_gain(
+                            &mut self.public.players[id],
+                            &choice_options,
+                            *option,
+                        )?;
+                        let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                        crate::cards::update_card_points_on_play(
+                            &mut self.public.players[id],
+                            card.points,
+                        )?;
+                        {
+                            let num_players = self.public.players.len();
+                            let mut ctx = CardMoveCtx {
+                                cards: &mut self.cards,
+                                players: &mut self.public.players,
+                                improvement_market: &mut self.public.improvement_market,
+                            };
+                            crate::card_zones::handle_post_play_destination(
+                                &mut ctx,
+                                &self.card_set,
+                                id,
+                                card_id,
+                                num_players,
+                            )
+                            .map_err(|e| e.to_string())?;
+                        }
                     }
                     _ => return Err("invalid starting-player details".into()),
                 }
@@ -1745,6 +1869,25 @@ impl Game {
                         &mut self.pending,
                         false, // is_improvement_action
                     )?;
+                    // Post-play pass (C006/C007 `PostPlayPassLeft`): the same
+                    // destination rule applies when the minor is played via
+                    // family growth.
+                    {
+                        let num_players = self.public.players.len();
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        crate::card_zones::handle_post_play_destination(
+                            &mut ctx,
+                            &self.card_set,
+                            id,
+                            card_id,
+                            num_players,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
                 } else if !matches!(detail, Detail::None) {
                     return Err("invalid growth details".into());
                 }
@@ -1791,6 +1934,24 @@ impl Game {
             Space::MajorImprovement => match detail {
                 // Handle card play first (before borrowing p for the rest)
                 Detail::PlayMinor { card_id } if self.card_set.enabled() => {
+                    // Fail closed: choice-requiring OnPlayChoiceGain cards
+                    // (C007 刈り鋏) must be played through PlayMinorChoice so
+                    // the chosen option is action data, never auto-resolved.
+                    if let Some(card) = self.card_set.definition(card_id) {
+                        let choice_effects = card
+                            .effects
+                            .iter()
+                            .filter(|e| {
+                                matches!(e, crate::cards::CardEffect::OnPlayChoiceGain { .. })
+                            })
+                            .count();
+                        if choice_effects > 0 {
+                            return Err(
+                                "card requires a choice: use PlayMinorChoice with the chosen option"
+                                    .into(),
+                            );
+                        }
+                    }
                     // Validate and pay costs (use internal fn; cards::play does full legacy for direct callers)
                     crate::cards::play_validate_pay(
                         &self.card_set,
@@ -1826,6 +1987,105 @@ impl Game {
                         &mut self.pending,
                         true, // is_improvement_action
                     )?;
+                    // Post-play pass (C006/C007 `PostPlayPassLeft`): pass the
+                    // card to the left neighbor's hand after the play resolves.
+                    {
+                        let num_players = self.public.players.len();
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        crate::card_zones::handle_post_play_destination(
+                            &mut ctx,
+                            &self.card_set,
+                            id,
+                            card_id,
+                            num_players,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
+                }
+                Detail::PlayMinorChoice { card_id, option } if self.card_set.enabled() => {
+                    // Choice-requiring cards (C007 刈り鋏): validate the option
+                    // index against the card's OnPlayChoiceGain options first,
+                    // then run the same play chain; the chosen option is
+                    // applied after the dispatcher's Before scan (which is a
+                    // no-op for OnPlayChoiceGain).
+                    let card = self.card_set.definition(card_id).ok_or("unknown card")?;
+                    let choice_options: Vec<crate::cards::ChoiceGainOption> = card
+                        .effects
+                        .iter()
+                        .find_map(|e| match e {
+                            crate::cards::CardEffect::OnPlayChoiceGain { options } => {
+                                Some(options.clone())
+                            }
+                            _ => None,
+                        })
+                        .unwrap_or_default();
+                    if choice_options.is_empty() {
+                        return Err("card does not offer an on-play choice".into());
+                    }
+                    if *option >= choice_options.len() {
+                        return Err("on-play choice index out of range".into());
+                    }
+                    // Validate and pay costs
+                    crate::cards::play_validate_pay(
+                        &self.card_set,
+                        &mut self.cards.hands[id],
+                        &mut self.public.players[id],
+                        card_id,
+                        crate::cards::CardKind::MinorImprovement,
+                        0,
+                    )?;
+                    // Move card from hand to played
+                    let mut ctx = CardMoveCtx {
+                        cards: &mut self.cards,
+                        players: &mut self.public.players,
+                        improvement_market: &mut self.public.improvement_market,
+                    };
+                    play_from_hand(&mut ctx, id, card_id)?;
+                    // Dispatch Replace/Before phases
+                    dispatch_play(
+                        &self.card_set,
+                        id,
+                        card_id,
+                        0,
+                        &mut self.cards,
+                        &mut self.public.players,
+                        &mut self.public.improvement_market,
+                        &mut self.delayed_well,
+                        self.public.round,
+                        &self.public.used,
+                        &mut self.event_budget,
+                        &mut self.public.card_uses,
+                        &self.card_use_limits,
+                        &mut self.pending,
+                        false,
+                    )?;
+                    // Apply the chosen on-play gain option (C007).
+                    crate::cards::apply_choice_gain(
+                        &mut self.public.players[id],
+                        &choice_options,
+                        *option,
+                    )?;
+                    // Post-play pass (C006/C007 `PostPlayPassLeft`).
+                    {
+                        let num_players = self.public.players.len();
+                        let mut ctx = CardMoveCtx {
+                            cards: &mut self.cards,
+                            players: &mut self.public.players,
+                            improvement_market: &mut self.public.improvement_market,
+                        };
+                        crate::card_zones::handle_post_play_destination(
+                            &mut ctx,
+                            &self.card_set,
+                            id,
+                            card_id,
+                            num_players,
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
                 }
                 Detail::Buy {
                     improvement,
