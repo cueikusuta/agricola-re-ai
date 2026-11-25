@@ -2,7 +2,9 @@
 use crate::cards::{CardDefinition, CardSet, CardState};
 use crate::engine::is_bake_bread_detail;
 use crate::harvest::HarvestDetailPolicy;
-use crate::pending::{PendingDecision, PendingKind, PendingResolution, Transition};
+use crate::pending::{
+    GrantedActionChoice, PendingDecision, PendingKind, PendingResolution, Transition,
+};
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -2572,30 +2574,65 @@ impl Game {
             }
             (
                 PendingKind::GrantAction {
-                    action: granted_action,
+                    action: _granted_action,
                     ..
                 },
                 PendingResolution::GrantAction { choice },
             ) => {
                 let player = &mut self.public.players[pending.player];
-                match (granted_action, choice) {
+
+                // Find and consume the matching grant from granted_actions.
+                // The grant was pushed during the Before phase; we must remove exactly one.
+                let grant_index = player
+                    .granted_actions
+                    .iter()
+                    .position(|g| {
+                        matches!(
+                            (g, &choice),
+                            (
+                                crate::model::GrantedAction::MajorImprovement { .. },
+                                GrantedActionChoice::MajorImprovement { .. }
+                            ) | (
+                                crate::model::GrantedAction::Renovation,
+                                GrantedActionChoice::Renovation { .. }
+                            ) | (
+                                crate::model::GrantedAction::Sow { .. },
+                                GrantedActionChoice::Sow { .. }
+                            )
+                        )
+                    })
+                    .ok_or("no matching grant_action found in granted_actions")?;
+
+                // Remove the grant (consumed whether accepted or declined)
+                let grant = player.granted_actions.remove(grant_index);
+
+                // Now execute based on the REAL grant's constraints
+                match (grant, choice) {
                     (
-                        crate::pending::GrantedActionChoice::MajorImprovement { .. },
-                        crate::pending::GrantedActionChoice::MajorImprovement { improvement },
+                        crate::model::GrantedAction::MajorImprovement { restriction },
+                        GrantedActionChoice::MajorImprovement { improvement },
                     ) => {
-                        // A139: only Fireplace2 or Fireplace3 allowed
-                        let Some(imp) = *improvement else {
-                            // Decline: do nothing, grant consumed
+                        let Some(imp) = improvement else {
+                            // Decline: grant already consumed, nothing else to do
                             return Ok(());
                         };
-                        // Validate restriction: only Fireplace allowed
-                        if !matches!(imp, Improvement::Fireplace2 | Improvement::Fireplace3) {
-                            return Err(
-                                "grant_action major_improvement restricted to Fireplace".into()
-                            );
+                        // Validate against the grant's restriction
+                        match restriction {
+                            crate::pending::MajorImprovementRestriction::Fireplace => {
+                                if !matches!(imp, Improvement::Fireplace2 | Improvement::Fireplace3)
+                                {
+                                    return Err(
+                                        "grant_action major_improvement restricted to Fireplace"
+                                            .into(),
+                                    );
+                                }
+                            }
+                            crate::pending::MajorImprovementRestriction::Any => {
+                                // Any major improvement allowed (market availability checked below)
+                            }
                         }
                         // Check market availability
-                        if !self.public.improvement_market.contains(&imp) {
+                        if !self.public.improvement_market.contains(imp) {
                             return Err("requested improvement not available in market".into());
                         }
                         // Pay normal cost via buy_improvement with PurchaseMode::Pay
@@ -2606,7 +2643,7 @@ impl Game {
                             &mut self.delayed_well,
                             &mut self.public.well_food_schedule,
                             self.public.round,
-                            imp,
+                            *imp,
                             crate::engine::PurchaseArgs {
                                 instant_bake: 0,
                                 allocation: None,
@@ -2617,29 +2654,29 @@ impl Game {
                         Ok(())
                     }
                     (
-                        crate::pending::GrantedActionChoice::Renovation { .. },
-                        crate::pending::GrantedActionChoice::Renovation { accept },
+                        crate::model::GrantedAction::Renovation,
+                        GrantedActionChoice::Renovation { accept },
                     ) => {
                         if *accept {
                             // Check if renovation is possible (normal cost)
                             crate::engine::renovate(player)
                         } else {
-                            // Decline: do nothing, grant consumed
+                            // Decline: grant already consumed, nothing else to do
                             Ok(())
                         }
                     }
                     (
-                        crate::pending::GrantedActionChoice::Sow { .. },
-                        crate::pending::GrantedActionChoice::Sow { plantings },
+                        crate::model::GrantedAction::Sow { fields },
+                        GrantedActionChoice::Sow { plantings },
                     ) => {
-                        // D003: at most one planting, empty = decline/no fields
+                        // D003: at most `fields` plantings, empty = decline/no fields
                         if plantings.is_empty() {
-                            // Decline or no fields available: grant consumed, nothing happens
+                            // Decline or no fields available: grant already consumed
                             Ok(())
                         } else {
-                            // Validate and execute sow
-                            if plantings.len() > 1 {
-                                return Err("grant_action sow allows at most one field".into());
+                            // Validate against grant's fields limit
+                            if plantings.len() > fields as usize {
+                                return Err("grant_action sow exceeds granted field limit".into());
                             }
                             crate::engine::sow(player, plantings)
                         }

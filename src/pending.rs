@@ -182,8 +182,10 @@ pub enum PendingKind {
     GrantAction {
         /// Source card ID that granted this action.
         source_card: String,
-        /// The type of granted action and its constraints.
-        action: GrantedActionChoice,
+        /// The actual grant with its constraints (restriction, fields).
+        /// Stored as GrantedAction (not GrantedActionChoice) so the resolution
+        /// logic can validate against the original grant's constraints.
+        action: crate::model::GrantedAction,
     },
 }
 
@@ -325,14 +327,16 @@ impl PendingDecision {
                 // Validate that the choice matches the granted action type
                 match (action, choice) {
                     (
-                        GrantedActionChoice::MajorImprovement { .. },
+                        crate::model::GrantedAction::MajorImprovement { .. },
                         GrantedActionChoice::MajorImprovement { .. },
                     ) => Ok(()),
                     (
-                        GrantedActionChoice::Renovation { .. },
+                        crate::model::GrantedAction::Renovation,
                         GrantedActionChoice::Renovation { .. },
                     ) => Ok(()),
-                    (GrantedActionChoice::Sow { .. }, GrantedActionChoice::Sow { .. }) => Ok(()),
+                    (crate::model::GrantedAction::Sow { .. }, GrantedActionChoice::Sow { .. }) => {
+                        Ok(())
+                    }
                     _ => Err("granted action choice type mismatch".into()),
                 }
             }
@@ -369,7 +373,62 @@ pub trait PendingExt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cards::{CardDefinition, CardKind, CardSet};
     use crate::model::{Config, Game, Good};
+
+    /// Shared helper: create a valid game for grant_action tests.
+    /// Returns (game, active_player_index, card_set, hands).
+    /// Setup: 14 occupations + 14 minor improvements, 7+7 cards per player.
+    #[allow(dead_code)]
+    fn grant_action_test_setup() -> (Game, usize, CardSet, Vec<Vec<String>>) {
+        let mut definitions = Vec::new();
+        // The probe card will be added by the caller (A139/D002/D003).
+        // Add 14 occupations (caller adds 1, so add 13 more)
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        // Add 14 minor improvements
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        let active = 0;
+        let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![vec![], vec![]]; // caller will push the probe card
+        hands[0].extend(occ_ids.iter().take(6).cloned());
+        hands[0].extend(minor_ids[0..7].iter().cloned());
+        hands[1].extend(occ_ids[6..13].iter().cloned());
+        hands[1].extend(minor_ids[7..14].iter().cloned());
+
+        let game = Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 100,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands.clone(),
+        )
+        .expect("game creation must succeed");
+
+        (game, active, set, hands)
+    }
 
     #[test]
     fn pending_decision_serialize_roundtrip() {
@@ -1774,12 +1833,6 @@ mod tests {
         };
         let result =
             game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
-        eprintln!("apply_with_plans result: {:?}", result);
-        eprintln!(
-            "granted_actions after play: {:?}",
-            game.public.players[active].granted_actions
-        );
-        eprintln!("pending after play: {:?}", game.pending);
         assert!(
             matches!(result, Ok(crate::pending::Transition::Paused(_))),
             "should pause for grant_action, got: {:?}",
@@ -1890,7 +1943,9 @@ mod tests {
         use crate::model::{Config, Game, Improvement, Space};
         use crate::pending::{GrantedActionChoice, PendingResolution};
 
-        let a139 = CardDefinition {
+        // Create a valid card set with 14 occupations and 14 minor improvements
+        let mut definitions = Vec::new();
+        definitions.push(CardDefinition {
             use_limit: None,
             id: "A139".to_owned(),
             kind: CardKind::Occupation,
@@ -1901,30 +1956,67 @@ mod tests {
                     restriction: crate::pending::MajorImprovementRestriction::Fireplace,
                 },
             }],
-        };
-        let set = CardSet {
-            definitions: vec![a139],
-        };
-
-        let mut game = Game::new(Config {
-            players: 2,
-            seed: 102,
-            additional_action_space_enabled: false,
         });
-        game.card_set = std::sync::Arc::new(set.clone());
-        game.card_use_limits = std::collections::BTreeMap::new();
-        game.cards = crate::cards::CardState {
-            hands: vec![vec!["A139".to_string()], vec![]],
-            undealt: vec![],
-        };
+        // Add 13 more occupations to reach 14 total
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        // Add 14 minor improvements
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        // Create a game with the custom card set and exact initial hands
+        let active = 0;
+        let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![vec!["A139".to_string()], vec![]];
+        hands[0].extend(occ_ids.iter().take(6).cloned());
+        hands[0].extend(minor_ids[0..7].iter().cloned());
+        hands[1].extend(occ_ids[6..13].iter().cloned());
+        hands[1].extend(minor_ids[7..14].iter().cloned());
+
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 102,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands.clone(),
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = active;
+        game.public.start_player = active;
+        game.card_use_limits = set
+            .definitions
+            .iter()
+            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+            .collect();
+        // Ensure market has Fireplace2, Fireplace3, ClayOven
         game.public.improvement_market = vec![
             Improvement::Fireplace2,
             Improvement::Fireplace3,
             Improvement::ClayOven,
         ];
-        let active = game.public.active_player;
         game.public.players[active].supply.clay = 10;
 
+        // Play A139 via Lessons
         let action = Action {
             space: Space::Lessons,
             detail: Detail::PlayOccupation {
@@ -2440,7 +2532,9 @@ mod tests {
         use crate::model::{Config, Game, Improvement, Space};
         use crate::pending::{GrantedActionChoice, PendingResolution};
 
-        let a139 = CardDefinition {
+        // Create a valid card set with 14 occupations and 14 minor improvements
+        let mut definitions = Vec::new();
+        definitions.push(CardDefinition {
             use_limit: None,
             id: "A139".to_owned(),
             kind: CardKind::Occupation,
@@ -2451,26 +2545,62 @@ mod tests {
                     restriction: crate::pending::MajorImprovementRestriction::Fireplace,
                 },
             }],
-        };
-        let set = CardSet {
-            definitions: vec![a139],
-        };
-
-        let mut game = Game::new(Config {
-            players: 2,
-            seed: 110,
-            additional_action_space_enabled: false,
         });
-        game.card_set = std::sync::Arc::new(set.clone());
-        game.card_use_limits = std::collections::BTreeMap::new();
-        game.cards = crate::cards::CardState {
-            hands: vec![vec!["A139".to_string()], vec![]],
-            undealt: vec![],
-        };
-        game.public.improvement_market = vec![Improvement::Fireplace2];
-        let active = game.public.active_player;
+        // Add 13 more occupations to reach 14 total
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        // Add 14 minor improvements
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        // Create a game with the custom card set and exact initial hands
+        let active = 0;
+        let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![vec!["A139".to_string()], vec![]];
+        hands[0].extend(occ_ids.iter().take(6).cloned());
+        hands[0].extend(minor_ids[0..7].iter().cloned());
+        hands[1].extend(occ_ids[6..13].iter().cloned());
+        hands[1].extend(minor_ids[7..14].iter().cloned());
+
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 110,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands.clone(),
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = active;
+        game.public.start_player = active;
+        game.card_use_limits = set
+            .definitions
+            .iter()
+            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+            .collect();
+        game.public.improvement_market = Improvement::ALL.to_vec();
         game.public.players[active].supply.clay = 10;
 
+        // Play A139 via Lessons
         let action = Action {
             space: Space::Lessons,
             detail: Detail::PlayOccupation {
@@ -2547,7 +2677,9 @@ mod tests {
         use crate::model::{Config, Game, Improvement, Space};
         use crate::pending::{GrantedActionChoice, PendingResolution};
 
-        let a139 = CardDefinition {
+        // Create a valid card set with 14 occupations and 14 minor improvements
+        let mut definitions = Vec::new();
+        definitions.push(CardDefinition {
             use_limit: None,
             id: "A139".to_owned(),
             kind: CardKind::Occupation,
@@ -2558,24 +2690,59 @@ mod tests {
                     restriction: crate::pending::MajorImprovementRestriction::Fireplace,
                 },
             }],
-        };
-        let set = CardSet {
-            definitions: vec![a139],
-        };
-
-        let mut game = Game::new(Config {
-            players: 2,
-            seed: 111,
-            additional_action_space_enabled: false,
         });
-        game.card_set = std::sync::Arc::new(set.clone());
-        game.card_use_limits = std::collections::BTreeMap::new();
-        game.cards = crate::cards::CardState {
-            hands: vec![vec!["A139".to_string()], vec![]],
-            undealt: vec![],
-        };
-        game.public.improvement_market = vec![Improvement::Fireplace2];
-        let active = game.public.active_player;
+        // Add 13 more occupations to reach 14 total
+        for i in 1..=13 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("OCC_{i}"),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![],
+            });
+        }
+        // Add 14 minor improvements
+        for i in 1..=14 {
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: format!("MINOR_{i}"),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 1,
+                effects: vec![],
+            });
+        }
+        let set = CardSet { definitions };
+
+        // Create a game with the custom card set and exact initial hands
+        let active = 0;
+        let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+        let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+        let mut hands = vec![vec!["A139".to_string()], vec![]];
+        hands[0].extend(occ_ids.iter().take(6).cloned());
+        hands[0].extend(minor_ids[0..7].iter().cloned());
+        hands[1].extend(occ_ids[6..13].iter().cloned());
+        hands[1].extend(minor_ids[7..14].iter().cloned());
+
+        let mut game = Game::with_cards_and_hands(
+            Config {
+                players: 2,
+                seed: 111,
+                additional_action_space_enabled: false,
+            },
+            set.clone(),
+            hands.clone(),
+        )
+        .expect("game creation must succeed");
+        game.public.active_player = active;
+        game.public.start_player = active;
+        game.card_use_limits = set
+            .definitions
+            .iter()
+            .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+            .collect();
+        game.public.improvement_market = Improvement::ALL.to_vec();
         game.public.players[active].supply.clay = 10;
 
         // First worker action: Lessons to play A139
@@ -2604,8 +2771,308 @@ mod tests {
             .expect("resume should succeed");
         assert_eq!(resume_result, crate::pending::Transition::Completed);
 
-        // NOW space and worker should be consumed exactly once
         assert!(game.public.used.contains(&Space::Lessons));
         assert_eq!(game.public.workers_placed[active], 1);
+        /// Regression test for one-shot apply atomicity (Defect 3): `apply` /
+        /// Regression test for one-shot apply atomicity (Defect 3): `apply` /
+        /// `apply_with_harvest_policy` (allow_pause=false) must reject a grant_action
+        /// pause with a precise Err and leave the game byte-for-byte unchanged.
+        #[allow(dead_code)]
+        fn grant_action_one_shot_apply_rejects_pause_without_state_change() {
+            use crate::cards::{CardDefinition, CardKind, CardSet};
+            use crate::engine::{Action, Detail};
+            use crate::model::{Config, Game, Improvement, Space};
+
+            // Create a valid card set with 14 occupations and 14 minor improvements
+            let mut definitions = Vec::new();
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: "A139".to_owned(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::OnPlayGrantAction {
+                    action: crate::model::GrantedAction::MajorImprovement {
+                        restriction: crate::pending::MajorImprovementRestriction::Fireplace,
+                    },
+                }],
+            });
+            for i in 1..=13 {
+                definitions.push(CardDefinition {
+                    use_limit: None,
+                    id: format!("OCC_{i}"),
+                    kind: CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                });
+            }
+            for i in 1..=14 {
+                definitions.push(CardDefinition {
+                    use_limit: None,
+                    id: format!("MINOR_{i}"),
+                    kind: CardKind::MinorImprovement,
+                    cost: vec![],
+                    points: 1,
+                    effects: vec![],
+                });
+            }
+            let set = CardSet { definitions };
+
+            let active = 0;
+            let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+            let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+            let mut hands = vec![vec!["A139".to_string()], vec![]];
+            hands[0].extend(occ_ids.iter().take(6).cloned());
+            hands[0].extend(minor_ids[0..7].iter().cloned());
+            hands[1].extend(occ_ids[6..13].iter().cloned());
+            hands[1].extend(minor_ids[7..14].iter().cloned());
+
+            let mut game = Game::with_cards_and_hands(
+                Config {
+                    players: 2,
+                    seed: 200,
+                    additional_action_space_enabled: false,
+                },
+                set.clone(),
+                hands.clone(),
+            )
+            .expect("game creation must succeed");
+            game.public.active_player = active;
+            game.public.start_player = active;
+            game.card_use_limits = set
+                .definitions
+                .iter()
+                .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+                .collect();
+            game.public.improvement_market = Improvement::ALL.to_vec();
+            game.public.players[active].supply.clay = 10;
+
+            let hash_before = game.state_hash();
+            let clay_before = game.public.players[active].supply.clay;
+            let used_before = game.public.used.clone();
+            let workers_before = game.public.workers_placed.clone();
+
+            let action = Action {
+                space: Space::Lessons,
+                detail: Detail::PlayOccupation {
+                    card_id: "A139".into(),
+                },
+            };
+            // One-shot apply (allow_pause=false) must reject the pause
+            let err = game.apply(action).unwrap_err();
+            assert!(
+                err.contains("cannot represent an interrupt"),
+                "apply must refuse with precise Err, got: {err}"
+            );
+
+            // No state change at all
+            assert!(!game.has_pending(), "no mid-action pause may be committed");
+            assert_eq!(game.state_hash(), hash_before, "state must be unchanged");
+            assert_eq!(
+                game.public.players[active].supply.clay, clay_before,
+                "clay must be unchanged"
+            );
+            assert_eq!(game.public.used, used_before, "no space may be marked used");
+            assert_eq!(
+                game.public.workers_placed, workers_before,
+                "no worker may be placed"
+            );
+            // Grant must not be consumed (not even pushed to granted_actions since play was rejected)
+            assert!(
+                game.public.players[active].granted_actions.is_empty(),
+                "grant must not be recorded"
+            );
+        }
+
+        /// Regression test for grant consumption (Defect 4): after resolving or
+        /// declining a grant_action, the grant must be removed from granted_actions.
+        #[allow(dead_code)]
+        fn grant_action_consumes_grant_on_resolve_and_decline() {
+            use crate::cards::{CardDefinition, CardKind, CardSet};
+            use crate::engine::{Action, Detail};
+            use crate::model::{Config, Game, Improvement, Space};
+            use crate::pending::{GrantedActionChoice, PendingResolution};
+
+            // Test 1: Accept consumes grant
+            let mut definitions = Vec::new();
+            definitions.push(CardDefinition {
+                use_limit: None,
+                id: "A139".to_owned(),
+                kind: CardKind::Occupation,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::OnPlayGrantAction {
+                    action: crate::model::GrantedAction::MajorImprovement {
+                        restriction: crate::pending::MajorImprovementRestriction::Fireplace,
+                    },
+                }],
+            });
+            for i in 1..=13 {
+                definitions.push(CardDefinition {
+                    use_limit: None,
+                    id: format!("OCC_{i}"),
+                    kind: CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                });
+            }
+            for i in 1..=14 {
+                definitions.push(CardDefinition {
+                    use_limit: None,
+                    id: format!("MINOR_{i}"),
+                    kind: CardKind::MinorImprovement,
+                    cost: vec![],
+                    points: 1,
+                    effects: vec![],
+                });
+            }
+            let set = CardSet { definitions };
+
+            let active = 0;
+            let occ_ids: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+            let minor_ids: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+            let mut hands = vec![vec!["A139".to_string()], vec![]];
+            hands[0].extend(occ_ids.iter().take(6).cloned());
+            hands[0].extend(minor_ids[0..7].iter().cloned());
+            hands[1].extend(occ_ids[6..13].iter().cloned());
+            hands[1].extend(minor_ids[7..14].iter().cloned());
+
+            let mut game = Game::with_cards_and_hands(
+                Config {
+                    players: 2,
+                    seed: 201,
+                    additional_action_space_enabled: false,
+                },
+                set.clone(),
+                hands.clone(),
+            )
+            .expect("game creation must succeed");
+            game.public.active_player = active;
+            game.public.start_player = active;
+            game.card_use_limits = set
+                .definitions
+                .iter()
+                .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+                .collect();
+            game.public.improvement_market = Improvement::ALL.to_vec();
+            game.public.players[active].supply.clay = 10;
+
+            let action = Action {
+                space: Space::Lessons,
+                detail: Detail::PlayOccupation {
+                    card_id: "A139".into(),
+                },
+            };
+            let result =
+                game.apply_with_plans(action, None, None, &crate::harvest::SimpleHarvestDetails);
+            assert!(matches!(result, Ok(crate::pending::Transition::Paused(_))));
+            // Grant should be in granted_actions
+            assert_eq!(game.public.players[active].granted_actions.len(), 1);
+
+            // Resolve: accept
+            let resolution = PendingResolution::GrantAction {
+                choice: GrantedActionChoice::MajorImprovement {
+                    improvement: Some(Improvement::Fireplace2),
+                },
+            };
+            game.resolve_pending_and_resume(resolution)
+                .expect("resume should succeed");
+            // Grant must be consumed
+            assert_eq!(
+                game.public.players[active].granted_actions.len(),
+                0,
+                "grant must be consumed on accept"
+            );
+
+            // Test 2: Decline consumes grant
+            let mut definitions2 = Vec::new();
+            definitions2.push(CardDefinition {
+                use_limit: None,
+                id: "D002".to_owned(),
+                kind: CardKind::MinorImprovement,
+                cost: vec![],
+                points: 0,
+                effects: vec![CardEffect::OnPlayGrantAction {
+                    action: crate::model::GrantedAction::Renovation,
+                }],
+            });
+            for i in 1..=13 {
+                definitions2.push(CardDefinition {
+                    use_limit: None,
+                    id: format!("OCC_{i}"),
+                    kind: CardKind::Occupation,
+                    cost: vec![],
+                    points: 0,
+                    effects: vec![],
+                });
+            }
+            for i in 1..=14 {
+                definitions2.push(CardDefinition {
+                    use_limit: None,
+                    id: format!("MINOR_{i}"),
+                    kind: CardKind::MinorImprovement,
+                    cost: vec![],
+                    points: 1,
+                    effects: vec![],
+                });
+            }
+            let set2 = CardSet {
+                definitions: definitions2,
+            };
+
+            let active2 = 0;
+            let occ_ids2: Vec<String> = (1..=13).map(|i| format!("OCC_{i}")).collect();
+            let minor_ids2: Vec<String> = (1..=14).map(|i| format!("MINOR_{i}")).collect();
+            let mut hands2 = vec![vec!["D002".to_string()], vec![]];
+            hands2[0].extend(occ_ids2.iter().take(6).cloned());
+            hands2[0].extend(minor_ids2[0..7].iter().cloned());
+            hands2[1].extend(occ_ids2[6..13].iter().cloned());
+            hands2[1].extend(minor_ids2[7..14].iter().cloned());
+
+            let mut game2 = Game::with_cards_and_hands(
+                Config {
+                    players: 2,
+                    seed: 202,
+                    additional_action_space_enabled: false,
+                },
+                set2.clone(),
+                hands2.clone(),
+            )
+            .expect("game creation must succeed");
+            game2.public.active_player = active2;
+            game2.public.start_player = active2;
+            game2.card_use_limits = set2
+                .definitions
+                .iter()
+                .filter_map(|c| c.use_limit.map(|l| (c.id.clone(), l)))
+                .collect();
+
+            let action2 = Action {
+                space: Space::MeetingPlace,
+                detail: Detail::PlayMinor {
+                    card_id: "D002".into(),
+                },
+            };
+            let result2 =
+                game2.apply_with_plans(action2, None, None, &crate::harvest::SimpleHarvestDetails);
+            assert!(matches!(result2, Ok(crate::pending::Transition::Paused(_))));
+            assert_eq!(game2.public.players[active2].granted_actions.len(), 1);
+
+            // Resolve: decline
+            let resolution2 = PendingResolution::GrantAction {
+                choice: GrantedActionChoice::Renovation { accept: false },
+            };
+            game2
+                .resolve_pending_and_resume(resolution2)
+                .expect("resume should succeed");
+            // Grant must be consumed even on decline
+            assert_eq!(
+                game2.public.players[active2].granted_actions.len(),
+                0,
+                "grant must be consumed on decline"
+            );
+        }
     }
 }

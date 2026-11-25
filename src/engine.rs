@@ -889,6 +889,15 @@ impl Game {
         // Check if a pending decision was created during execute_work (e.g., grant_action from on-play effect).
         // If so, handle it before proceeding to post-work card effects.
         if next.pending.is_some() {
+            if !allow_pause {
+                // One-shot apply cannot represent a pending decision.
+                // Reject BEFORE committing any state, so the game is byte-for-byte unchanged.
+                return Err(
+                    "action paused on a pending decision; apply cannot represent an \
+                             interrupt — use apply_with_plans and Game::resolve_pending_and_resume"
+                        .into(),
+                );
+            }
             let previous_player = self.public.players[player].clone();
             *self = next;
             let decision_id = self.next_decision_id;
@@ -2702,37 +2711,21 @@ pub(crate) fn create_grant_action_pending(
     source_card: &str,
     grant: &GrantedAction,
 ) -> Result<()> {
-    use crate::pending::{GrantedActionChoice, PendingDecision, PendingKind};
+    use crate::pending::{PendingDecision, PendingKind};
 
-    // Convert the GrantedAction to GrantedActionChoice for the pending
-    let choice = match grant {
-        GrantedAction::MajorImprovement { restriction } => {
-            // Only Fireplace restriction is currently used (A139)
-            let _ = restriction; // restriction is MajorImprovementRestriction
-                                 // The pending will offer the legal choices at resolution time
-            GrantedActionChoice::MajorImprovement { improvement: None }
-        }
-        GrantedAction::Renovation => {
-            GrantedActionChoice::Renovation { accept: false } // default to decline; player chooses
-        }
-        GrantedAction::Sow { fields: _ } => {
-            // For D003, fields=1. The player chooses which field to sow.
-            // Empty plantings = decline/no fields available.
-            GrantedActionChoice::Sow { plantings: vec![] }
-        }
-    };
-
+    // Store the ACTUAL grant (GrantedAction) with its constraints intact.
+    // Decision ID and state_hash_before are set to zero/empty here;
+    // the engine stamps them once at commit time (see apply_with_plans_impl).
     let pending = PendingDecision::new(
-        game.next_decision_id,
+        0, // engine will assign real decision_id
         player,
         PendingKind::GrantAction {
             source_card: source_card.to_string(),
-            action: choice,
+            action: grant.clone(),
         },
-        game.state_hash(),
+        String::new(), // engine will set real state_hash_before
         serde_json::json!({ "source_card": source_card }),
     );
-    game.next_decision_id += 1;
     game.pending = Some(pending);
     Ok(())
 }
