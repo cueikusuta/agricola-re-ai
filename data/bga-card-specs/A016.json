@@ -85,15 +85,16 @@
     "destination": "played_area"
   },
   "review": {
-      "status": "bga_checked",
-      "unresolved_fields": [],
-      "test_case_ids": [
-        "A016-normal",
-        "A016-substitute"
-      ],
-      "checked_by": "AI source comparison",
-      "checked_on": "2026-11-09",
-      "implementation_status": "implemented",
-      "notes": "Gain 1 clay on play; clay may replace wood when building fences."
-    }
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "A016-normal",
+      "A016-substitute",
+      "A016-free-fence-wood"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-09",
+    "implementation_status": "implemented",
+    "notes": "Gain 1 clay on play; clay may replace wood when building fences."
+  }
 }

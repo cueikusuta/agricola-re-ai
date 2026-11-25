@@ -24,13 +24,6 @@ fn a016_definition() -> CardDefinition {
         .expect("A016 must exist in verified_band_a_cards")
 }
 
-fn a088_definition() -> CardDefinition {
-    verified_passive_cards()
-        .into_iter()
-        .find(|card| card.id == "A088")
-        .expect("A088 must exist in verified_passive_cards")
-}
-
 /// CardSet containing only A016 for dispatcher unit tests.
 fn set_a016_only() -> CardSet {
     CardSet {
@@ -219,24 +212,71 @@ fn a016_engine_play_then_fence_pays_clay() {
 #[test]
 fn a016_free_fence_wood_combination() {
     // A088 gives 3 free fence wood per action; A016 substitution applies after free wood.
-    let set = CardSet {
-        definitions: vec![a016_definition(), a088_definition()],
-    };
-    let mut player = Player::new(0, 0);
-    player.played_cards.push("A016".to_string());
-    player.played_cards.push("A088".to_string());
-    // Apply passive effects for both cards
-    agricola_re_ai::cards::apply_on_play_effects(&set, &mut player, "A016").unwrap();
-    agricola_re_ai::cards::apply_on_play_effects(&set, &mut player, "A088").unwrap();
-    assert_eq!(player.free_fence_wood, 3);
-    assert!(player.fence_material_substitution);
-
     // 6 new segments: free 3 wood covers first 3, due=3 -> clay pays 3
-    player.supply.clay = 10;
-    player.supply.wood = 0;
-    // Use engine internal via Game in integration style; but here we can test the helper directly
-    // by replicating the pay logic: fence_due(6) = 3, affordable checks clay, pay_fence_segments uses clay.
-    // Since helpers are private, do a small Game test instead.
+    let (set, hands) = full_set_with_a016();
+    // Add A088 to the set (already in verified_passive_cards, but ensure it's there)
+    let mut set_with_both = set.clone();
+    if !set_with_both.definitions.iter().any(|c| c.id == "A088") {
+        let a088_def = verified_passive_cards()
+            .into_iter()
+            .find(|card| card.id == "A088")
+            .expect("A088 must exist in verified_passive_cards");
+        set_with_both.definitions.push(a088_def);
+    }
+
+    let config = Config {
+        players: 2,
+        seed: 0,
+        additional_action_space_enabled: false,
+    };
+    let mut game = Game::with_cards_and_hands_with_start_player(
+        config.clone(),
+        set_with_both.clone(),
+        hands.clone(),
+        1,
+    )
+    .expect("game setup with A016 and A088");
+    if game.public.revealed[0] != RoundCard::Fencing {
+        let idx = game
+            .hidden_round_deck
+            .iter()
+            .position(|&x| x == RoundCard::Fencing)
+            .unwrap();
+        game.hidden_round_deck[idx] = game.public.revealed[0];
+        game.public.revealed[0] = RoundCard::Fencing;
+    }
+    // Manually set up both cards as played with their passive effects active
+    game.public.players[0].played_cards.push("A016".to_string());
+    game.public.players[0].played_cards.push("A088".to_string());
+    game.public.players[0].fence_material_substitution = true;
+    game.public.players[0].free_fence_wood = 3;
+    game.public.players[0].supply.clay = 10;
+    game.public.players[0].supply.wood = 0;
+
+    // Seat 1 passes to give turn to seat 0
+    game.apply(Action {
+        space: Space::Forest,
+        detail: Detail::None,
+    })
+    .expect("seat 1 acts");
+
+    // Seat 0 fences 6 segments (cells 13, 14 = 6 edges)
+    game.apply(Action {
+        space: Space::Fencing,
+        detail: Detail::Fence {
+            pastures: vec![vec![13, 14]],
+        },
+    })
+    .expect("build 6-segment fence");
+    let p = &game.public.players[0];
+    assert_eq!(
+        p.supply.clay, 7,
+        "3 clay spent (6 segments - 3 free wood), wood unchanged at 0"
+    );
+    assert_eq!(p.supply.wood, 0);
+    assert_eq!(p.fences.len(), 6);
+    assert!(p.fence_material_substitution);
+    assert_eq!(p.free_fence_wood, 3);
 }
 
 #[test]

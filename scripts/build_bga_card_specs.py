@@ -278,20 +278,23 @@ CARDS = {
         ],
     },
     "A016": {
-        "post": "played_area",
-        "effects": [
-            effect("on_play", [gain("clay", 1)]),
-            effect("passive", [special("substitute_cost", material_from="wood", material_to="clay",
-                                       scope="fence_building")],
-                   freq="always", dur="permanent", snap="live_state", order=1),
-        ],
-        "notes": "Gain 1 clay on play; clay may replace wood when building fences.",
-        "tests": [
-            case("A016-normal", {"clay": 0}, {"play": "A016"}, {"clay_delta": 1}),
-            case("A016-substitute", {"clay": 4, "wood": 0, "fence_segments": 4},
-                 {"build_fences": 4}, {"wood_spent": 0, "clay_spent": 4}),
-        ],
-    },
+            "post": "played_area",
+            "effects": [
+                effect("on_play", [gain("clay", 1)]),
+                effect("passive", [special("substitute_cost", material_from="wood", material_to="clay",
+                                           scope="fence_building")],
+                       freq="always", dur="permanent", snap="live_state", order=1),
+            ],
+            "notes": "Gain 1 clay on play; clay may replace wood when building fences.",
+            "implementation_status": "implemented",
+            "tests": [
+                case("A016-normal", {"clay": 0}, {"play": "A016"}, {"clay_delta": 1}),
+                case("A016-substitute", {"clay": 4, "wood": 0, "fence_segments": 4},
+                     {"build_fences": 4}, {"wood_spent": 0, "clay_spent": 4}),
+                case("A016-free-fence-wood", {"clay": 4, "wood": 0, "fence_segments": 6, "free_fence_wood": 3},
+                     {"build_fences": 6}, {"wood_spent": 0, "clay_spent": 3}),
+            ],
+        },
     "A021": {
         "post": "played_area",
         "effects": [
