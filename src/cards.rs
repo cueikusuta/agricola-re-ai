@@ -9169,11 +9169,12 @@ mod p1_2_repro_tests {
         );
         }
 
-        // 2p プリセットのハッシュは変更不可（39 defs、content_hash 不変条件）
+        // 2p プリセットのハッシュは D054（main 側 +1 minor）と D026/E024（本 PR +2 minors）
+        // の追加により 39 -> 41 defs（content_hash 再計測済み、意図的変更）。
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
             preset.content_hash(),
-            "b6723ba1864e3e0cf08c116ffaed6431a2e7b6dcef58f00e152234defc6b2f5d",
+            "2a78347a92fd2a940a5ca7258ddc3a4971378cde3d74f730c41602b0313b26fa",
             "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067/D054 joined the preset and A157 was excluded as 4p-only)"
         );
 
