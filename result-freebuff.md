@@ -34,3 +34,9 @@
   - D117 木の専門家: wood 2。
 - `tests/onplay_gain_ch04_d.rs`: コスト・増分の 2 テスト成功。
 - 仕様 2 枚の `implementation_status` を `in_progress` に更新。
+
+## 第5章 E帯（E082）
+
+- `src/cards.rs::verified_band_e_cards()` に E082 不当利得の on_play 獲得部分（food 1）を追加。
+- `tests/onplay_gain_ch05_e.rs`: 1 テスト成功。
+- 仕様 E082 の `implementation_status` を `in_progress` に更新。

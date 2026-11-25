@@ -7427,6 +7427,20 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
                 CardEffect::PostPlayPassLeft,
             ],
         },
+        // ---- Freebuff on_play gain chapter (2026-11-25) ----
+        // E082 不当利得 (Windfall): no cost; on play gain 1 food. Follow-up:
+        // each Day Laborer use may exchange 1 building resource for another.
+        CardDefinition {
+            use_limit: None,
+            id: "E082".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 1,
+            }],
+        },
     ]
 }
 

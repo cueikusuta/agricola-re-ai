@@ -26,7 +26,7 @@
 | 第2章 | B | B025, B103, B116, B155 | 完了・commit/push 済み |
 | 第3章 | C | C026, C086 | 完了・commit/push 済み |
 | 第4章 | D | D062, D117 | 完了・commit/push 済み |
-| 第5章 | E | E082 | 未着手 |
+| 第5章 | E | E082 | 完了・commit/push 済み |
 | PR | — | 本文に実装一覧・除外理由・検証結果 | 未作成 |
 
 各章で `cargo fmt` → 対象テスト → commit → push を行う。マージはしない。
@@ -39,7 +39,7 @@
 | 第2章 B | `cargo test --test onplay_gain_ch02_b` | 4 passed |
 | 第3章 C | `cargo test --test onplay_gain_ch03_c` | 2 passed |
 | 第4章 D | `cargo test --test onplay_gain_ch04_d` | 2 passed |
-| 第5章 E | 未実施 | — |
+| 第5章 E | `cargo test --test onplay_gain_ch05_e` | 1 passed |
 | PR 前 | `cargo fmt --check` / `cargo clippy --all-targets --all-features --locked -- -D warnings` / 新規テスト5本 | 未実施 |
 
 ## 実装カード（on_play の獲得部分）
