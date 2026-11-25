@@ -269,6 +269,22 @@ pub enum CardEffect {
     OnPlayBuildPasture {
         spaces: u8,
     },
+    /// A001 雨除け (Shelter) / C002 厩 (Stable) / E001 簡易納屋 (Pole Barns):
+    /// on play, build up to `amount` stables, paying `wood_cost` wood per
+    /// stable when non-zero (all three cards print wood_cost 0 — the stable
+    /// itself is free while the card cost is still paid). Each stable must
+    /// stand on a legal site within `scope` (A001 restricts placement to the
+    /// cell of a fenced one-cell pasture). The printed effect leaves placement
+    /// to the player; the play executor cannot represent a play-time pause
+    /// (Issue #268 R2-P0-2), so sites are picked deterministically (first
+    /// legal cell in farm order) and the build stops when no legal site
+    /// remains — the play itself always succeeds. The rule itself lives in
+    /// `engine::free_stable_site_candidates` / `engine::build_free_stable`.
+    OnPlayBuildStable {
+        amount: u32,
+        wood_cost: u32,
+        scope: StablePlacementScope,
+    },
     /// B003 密造酒 (Moonshine): on play, take one occupation from the owner's
     /// hand and either play it immediately by paying `food_cost` food, or pass
     /// it to the left neighbour. Hand-dependent: resolved by the play
@@ -612,6 +628,7 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
             CardEffect::OnPlayBuildPasture { .. } => "on_play_build_pasture",
+            CardEffect::OnPlayBuildStable { .. } => "on_play_build_stable",
             CardEffect::OnPlayDrawPlayOrPassOccupation { .. } => {
                 "on_play_draw_play_or_pass_occupation"
             }
@@ -787,6 +804,10 @@ pub enum CardRequirement {
     MinimumPlayers(u8),
     MaximumPlayers(u8),
     MinimumImprovements(u8),
+    /// E001 簡易納屋 (Pole Barns): at least `fences` fence segments built on
+    /// the farm (2016 Lookout caps a farm at 15, so the printed card asks for
+    /// all 15). Read from the player's fence set.
+    MinimumFences(u8),
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -860,6 +881,22 @@ pub enum PostPlayDestination {
 /// Serde skip predicate for the default post-play destination.
 pub fn post_play_is_played_area(dest: &PostPlayDestination) -> bool {
     matches!(dest, PostPlayDestination::PlayedArea)
+}
+
+/// Where a card-driven free stable build (A001 雨除け / C002 厩 /
+/// E001 簡易納屋) may place its stables. Placement detail is a caller
+/// decision in the engine; this only records the printed restriction.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StablePlacementScope {
+    /// Any legal stable site — the ordinary "Build Stables" legality
+    /// (`engine::stable_site_available`): an empty farmyard cell or a pasture
+    /// cell without a stable, within the 4-stable farm limit. C002 厩 and
+    /// E001 簡易納屋 print no placement restriction.
+    AnySite,
+    /// Only the cell of a fenced pasture spanning exactly `pasture_size`
+    /// cells (A001 雨除け: "1農場スペースだけの牧場" — a one-cell pasture only).
+    OneCellPasture { pasture_size: u8 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1022,6 +1059,7 @@ impl CardSet {
                             *amount
                         }
                         CardEffect::OnPlayBuildPasture { .. } => 1,
+                        CardEffect::OnPlayBuildStable { amount, .. } => *amount,
                         CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost } => *food_cost,
                         CardEffect::OnPlayGainByHandOccupationCount { .. } => 1,
                         CardEffect::OnPlayExchangeGain {
@@ -1566,6 +1604,7 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
             CardRequirement::MinimumImprovements(min) => {
                 improvement_count_in_front(set, player) >= u32::from(*min)
             }
+            CardRequirement::MinimumFences(min) => player.fences.len() >= usize::from(*min),
             CardRequirement::MinimumPlayers(_) => true,
             CardRequirement::MaximumPlayers(_) => true,
             CardRequirement::PastureCount(n) => player.pastures.len() >= usize::from(*n),
@@ -1727,6 +1766,24 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                         break;
                     };
                     crate::engine::build_free_single_cell_pasture(player, cell)?;
+                }
+            }
+            // A001/C002/E001: free (or card-priced) stable builds; sites are
+            // picked deterministically from the legal candidates (A001: the
+            // cell of a fenced one-cell pasture only).
+            CardEffect::OnPlayBuildStable {
+                amount,
+                wood_cost,
+                scope,
+            } => {
+                for _ in 0..*amount {
+                    let Some(cell) = crate::engine::free_stable_site_candidates(player, *scope)
+                        .into_iter()
+                        .next()
+                    else {
+                        break;
+                    };
+                    crate::engine::build_free_stable(player, cell, *wood_cost)?;
                 }
             }
             // B008 露店 (Market Stall): conditional exchange — no payment
@@ -7819,6 +7876,78 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
     ]
 }
 
+/// A001 雨除け (Shelter) / C002 厩 (Stable) / E001 簡易納屋 (Pole Barns):
+/// on-play free stable builds. These are deliberately kept OUT of
+/// `verified_basic_card_set` (same as the band pools): the built-in A/B
+/// two-player preset must keep its pool size, distribution digest and
+/// recorded replay hashes unchanged.
+pub fn verified_build_stable_cards() -> Vec<CardDefinition> {
+    let minor = CardKind::MinorImprovement;
+    vec![
+        // A001 雨除け (Shelter): no cost; on play build 1 free stable, but
+        // only on the cell of a fenced one-cell pasture.
+        CardDefinition {
+            use_limit: None,
+            id: "A001".to_owned(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayBuildStable {
+                amount: 1,
+                wood_cost: 0,
+                scope: StablePlacementScope::OneCellPasture { pasture_size: 1 },
+            }],
+            // on_play build_stable is wired; pass-left awaits its own chapter
+            // (spec implementation_status = in_progress), so the card stays in
+            // the played area.
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // C002 厩 (Stable): cost 1 wood; on play build 1 free stable (the
+        // stable itself is free, the card cost is still paid).
+        CardDefinition {
+            use_limit: None,
+            id: "C002".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayBuildStable {
+                amount: 1,
+                wood_cost: 0,
+                scope: StablePlacementScope::AnySite,
+            }],
+            // on_play build_stable is wired; pass-left awaits its own chapter
+            // (spec implementation_status = in_progress), so the card stays in
+            // the played area.
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // E001 簡易納屋 (Pole Barns): cost 2 wood and requires 15 fence
+        // segments; on play build up to 3 free stables (the printed "up to"
+        // is the owner's choice; the deterministic engine builds as many as
+        // legal sites allow, so fewer when the farm is nearly full).
+        CardDefinition {
+            use_limit: None,
+            id: "E001".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Wood, 2)],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumFences(15),
+                },
+                CardEffect::OnPlayBuildStable {
+                    amount: 3,
+                    wood_cost: 0,
+                    scope: StablePlacementScope::AnySite,
+                },
+            ],
+            // on_play build_stable is wired; pass-left awaits its own chapter
+            // (spec implementation_status = in_progress), so the card stays in
+            // the played area.
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+    ]
+}
+
 #[cfg(test)]
 mod verified_band_d_tests {
     use super::*;
@@ -9666,7 +9795,7 @@ mod p1_2_repro_tests {
             insert_cards(players, &verified_simple_occupations(players));
             insert_cards(players, &verified_multiplayer_passive_cards(players));
         }
-        let count_independent: [Vec<CardDefinition>; 11] = [
+        let count_independent: [Vec<CardDefinition>; 12] = [
             verified_immediate_resource_cards(),
             verified_round_and_harvest_cards(),
             verified_passive_cards(),
@@ -9678,6 +9807,8 @@ mod p1_2_repro_tests {
             verified_band_c_cards(),
             verified_band_d_cards(),
             verified_band_e_cards(),
+            // on_play build_stable cards (A001/C002/E001)
+            verified_build_stable_cards(),
             // B-deck chapter 1: on-play simple cards (B002/B003/B005/B008/B009)
             verified_b_onplay_simple_cards(),
         ];
