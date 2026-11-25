@@ -7131,6 +7131,31 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
             ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
+        // B068 マメ畑 (Beanfield): minor improvement, 1 food, prerequisite
+        // 2 occupations, 1 point; on play the card becomes 1 field where only
+        // vegetables can be planted (agricola.cloudfree.jp ?p=3189). Modelled
+        // as an on-play plow field with the vegetable-only marker (spec
+        // operation plow_field, params {vegetable_only, fields: 1}); the field
+        // is recorded in Player::vegetable_only_fields and sowing rejects
+        // grain on it.
+        CardDefinition {
+            use_limit: None,
+            id: "B068".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 1)],
+            points: 1,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(2),
+                },
+                CardEffect::OnPlayPlowField {
+                    fields: 1,
+                    adjacent: true,
+                    vegetable_only: true,
+                },
+            ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
         // B105 箱造り (Case Builder): cost 0; on play, for each of
         // food/grain/vegetable/reed/wood the owner already holds at least 2
         // of, gain 1 of that good. Goods below threshold 2 grant nothing.
@@ -7358,31 +7383,6 @@ pub fn verified_b_onplay_simple_cards() -> Vec<CardDefinition> {
             ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
-        // B068 マメ畑 (Beanfield): minor improvement, 1 food, prerequisite
-        // 2 occupations, 1 point; on play the card becomes 1 field where only
-        // vegetables can be planted (agricola.cloudfree.jp ?p=3189). Modelled
-        // as an on-play plow field with the vegetable-only marker (spec
-        // operation plow_field, params {vegetable_only, fields: 1}); the field
-        // is recorded in Player::vegetable_only_fields and sowing rejects
-        // grain on it.
-        CardDefinition {
-            use_limit: None,
-            id: "B068".to_owned(),
-            kind: CardKind::MinorImprovement,
-            cost: vec![(Good::Food, 1)],
-            points: 1,
-            effects: vec![
-                CardEffect::Prerequisite {
-                    rule: CardRequirement::MinimumOccupations(2),
-                },
-                CardEffect::OnPlayPlowField {
-                    fields: 1,
-                    adjacent: true,
-                    vegetable_only: true,
-                },
-            ],
-            post_play: crate::cards::PostPlayDestination::PlayedArea,
-        },
     ]
 }
 
@@ -7390,6 +7390,15 @@ pub fn verified_b_onplay_simple_cards() -> Vec<CardDefinition> {
 #[cfg(test)]
 mod verified_band_b_tests {
     use super::*;
+
+    /// Combined CardSet for band B tests that need band A prerequisites (e.g., B068 needs 2 occupations from band A).
+    #[allow(dead_code)]
+    fn band_b_test_card_set() -> CardSet {
+        let mut definitions = Vec::new();
+        definitions.extend(verified_band_a_cards());
+        definitions.extend(verified_band_b_cards());
+        CardSet { definitions }
+    }
 
     fn applied(card_id: &str, spaces: &[Space], _players: usize) -> Player {
         let definitions = verified_band_b_cards();
