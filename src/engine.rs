@@ -462,7 +462,7 @@ impl Game {
         }
         // Worker trigger: AfterWorkerGain and AfterWorkerGainIfUsed, in the
         // active player's played_cards order.
-        let result = crate::card_events::dispatch_after_worker(
+        let result = crate::card_events::dispatch_after_worker_with_card_storage(
             &self.card_set,
             player,
             action.space,
@@ -474,6 +474,7 @@ impl Game {
             &self.public.used,
             &self.public.accumulations,
             &self.public.animal_accumulations,
+            Some(&mut self.public.card_accumulations),
             &mut self.event_budget,
             &mut self.public.card_uses,
             &self.card_use_limits,

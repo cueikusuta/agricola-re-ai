@@ -741,6 +741,13 @@ fn card_priority(
                                     amount,
                                     ..
                                 } => card_good_value(*good) * i64::from(*amount) * horizon,
+                                // A081 一時保管庫: the stored good is worth its
+                                // supply value once released; the release itself
+                                // adds no extra value.
+                                CardEffect::AfterWorkerStackOnCard { good, amount, .. } => {
+                                    card_good_value(*good) * i64::from(*amount) * horizon / 4
+                                }
+                                CardEffect::StartRoundReleaseCardGoods { .. } => 0,
                             };
     }
     Some(value)

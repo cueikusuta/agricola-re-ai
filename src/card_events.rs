@@ -11,7 +11,7 @@
 //! Source: docs/bga-card-specification.md and existing repo citations.
 
 use crate::cards::{CardEffect, CardSet};
-use crate::model::{Animal, Crop, Good, House, Player, Space, Tile};
+use crate::model::{Animal, CardGoodsLedger, Crop, Good, House, Player, Space, Tile};
 use crate::pending::{ChainPosition, PendingDecision, PendingKind, Transition};
 use crate::registry::EventKind;
 use serde::{Deserialize, Serialize};
@@ -77,6 +77,11 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::StartRoundGainIfAccumulationGrew { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => TriggerPhase::After,
         CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => TriggerPhase::After,
+        // A081 一時保管庫: the store lands after the action resolves, and the
+        // release at round start happens in the After phase like the other
+        // round-start gains.
+        CardEffect::AfterWorkerStackOnCard { .. } => TriggerPhase::After,
+        CardEffect::StartRoundReleaseCardGoods { .. } => TriggerPhase::After,
         // Fired only by the play dispatcher's dedicated after-play scan.
         CardEffect::AfterOccupationGainPerFoodCost { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
         CardEffect::AfterOccupationGain { .. } => TriggerPhase::After, // fired by the dedicated after-play scan
@@ -144,6 +149,13 @@ pub struct DispatchContext<'a> {
     /// count). `None` on every other dispatch path, and a missing entry or
     /// zero count grants nothing. Runtime-only borrow, never serialized.
     pub animal_accumulations: Option<&'a std::collections::BTreeMap<Space, u32>>,
+    /// Per-card goods ledger (`PublicState::card_accumulations`: player ->
+    /// card id -> good -> amount). Threaded mutably only by the after-worker
+    /// and round-start dispatchers, which are the paths that store goods on a
+    /// card (A081 一時保管庫) and release them. `None` on every other path and
+    /// in unit-test contexts that do not model the ledger; a missing ledger
+    /// simply stores/releases nothing.
+    pub card_accumulations: Option<&'a mut CardGoodsLedger>,
     pub event_budget: &'a mut u32,
     pub card_uses: &'a mut BTreeMap<String, u32>,
     /// Declared per-card limits. Absent card = no per-period limit.
@@ -444,6 +456,7 @@ fn resolve_phase_scan(
             used_spaces: ctx.used_spaces,
             accumulations: ctx.accumulations,
             animal_accumulations: ctx.animal_accumulations,
+            card_accumulations: ctx.card_accumulations.as_deref_mut(),
             event_budget: ctx.event_budget,
             card_uses: ctx.card_uses,
             card_use_limits: ctx.card_use_limits,
@@ -707,6 +720,32 @@ fn resolve_phase_scan(
                 } => handle_start_round_gain_if_no_harvest_and_animals(
                     ctx, player, *animal, *min, good, *amount, round_now,
                 )?,
+                // A081 一時保管庫: store a good on the card after the owner's
+                // own use of the mapped accumulation space.
+                CardEffect::AfterWorkerStackOnCard {
+                    space,
+                    good,
+                    amount,
+                } => handle_after_worker_stack_on_card(
+                    ctx,
+                    player,
+                    card_id,
+                    space,
+                    good,
+                    *amount,
+                    trigger_data,
+                )?,
+                // A081 一時保管庫: release every stored good at the listed
+                // rounds.
+                CardEffect::StartRoundReleaseCardGoods { rounds } => {
+                    handle_start_round_release_card_goods(
+                        ctx,
+                        player,
+                        card_id,
+                        rounds,
+                        trigger_data,
+                    )?
+                }
                 CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount } => {
                     handle_gain_if_no_minor_played(ctx, player, good, *amount)?
                 }
@@ -1122,6 +1161,14 @@ fn effect_condition_holds(
         CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
             trigger.site == EventKind::RoundStart
         }
+        // A081 一時保管庫: only the owner's own use of the mapped space stores
+        // a good; the release is gated by the listed rounds.
+        CardEffect::AfterWorkerStackOnCard { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
+        CardEffect::StartRoundReleaseCardGoods { rounds } => {
+            trigger.site == EventKind::RoundStart && rounds.contains(&round)
+        }
         CardEffect::HarvestFieldGainIfNoMinorPlayed { .. } => trigger.site == EventKind::Harvest,
         // D065 麦ふるい: the grain-harvested threshold needs farm state, so the
         // scan reports the effect as triggerable and the handler counts the
@@ -1486,6 +1533,31 @@ pub fn execute_chosen_triggers(
             } => handle_start_round_gain_if_no_harvest_and_animals(
                 ctx, player, *animal, *min, good, *amount, round_now,
             )?,
+            // A081 一時保管庫: store a good on the card after the owner's own
+            // use of the mapped accumulation space.
+            CardEffect::AfterWorkerStackOnCard {
+                space,
+                good,
+                amount,
+            } => handle_after_worker_stack_on_card(
+                ctx,
+                player,
+                &trigger.card_id,
+                space,
+                good,
+                *amount,
+                trigger_data,
+            )?,
+            // A081 一時保管庫: release every stored good at the listed rounds.
+            CardEffect::StartRoundReleaseCardGoods { rounds } => {
+                handle_start_round_release_card_goods(
+                    ctx,
+                    player,
+                    &trigger.card_id,
+                    rounds,
+                    trigger_data,
+                )?
+            }
             CardEffect::HarvestFieldGainIfNoMinorPlayed { good, amount } => {
                 handle_gain_if_no_minor_played(ctx, player, good, *amount)?
             }
@@ -2560,6 +2632,75 @@ fn handle_start_round_gain_if_accumulation_at_least(
 /// `round_has_no_harvest` and `animal_count_at_least` with location
 /// "pasture", so only pasture-held animals count (stable/pet animals are
 /// excluded on purpose).
+/// A081 一時保管庫 (Interim Storage): place `amount` of `good` on the resolving
+/// card whenever the owner uses `space`. Stored goods live in the existing
+/// `PublicState::card_accumulations` ledger (player -> card -> good). When the
+/// dispatcher path does not thread the ledger, the effect is a no-op; the
+/// generic condition scan already gated the space and the owner.
+fn handle_after_worker_stack_on_card(
+    ctx: &mut DispatchContext<'_>,
+    player: usize,
+    card_id: &str,
+    space: &Space,
+    good: &Good,
+    amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space != Some(*space) {
+        return Ok(EffectResult::Resolved);
+    }
+    let Some(ledger) = ctx.card_accumulations.as_deref_mut() else {
+        return Ok(EffectResult::Resolved);
+    };
+    let stored = ledger
+        .entry(player)
+        .or_default()
+        .entry(card_id.to_owned())
+        .or_default()
+        .entry(*good)
+        .or_insert(0);
+    *stored = stored.checked_add(amount).ok_or("resource overflow")?;
+    Ok(EffectResult::Resolved)
+}
+
+/// A081 一時保管庫: at the start of each listed round, move every good stored
+/// on the card to the owner's supply and clear the card's ledger entry. The
+/// ledger is the same `card_accumulations` map the stacking handler writes; the
+/// `BTreeMap` iteration keeps the transfer order deterministic for replay.
+fn handle_start_round_release_card_goods(
+    ctx: &mut DispatchContext<'_>,
+    player: usize,
+    card_id: &str,
+    rounds: &[u8],
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.site != EventKind::RoundStart || !rounds.contains(&ctx.round) {
+        return Ok(EffectResult::Resolved);
+    }
+    let Some(ledger) = ctx.card_accumulations.as_deref_mut() else {
+        return Ok(EffectResult::Resolved);
+    };
+    let Some(cards) = ledger.get_mut(&player) else {
+        return Ok(EffectResult::Resolved);
+    };
+    let Some(goods) = cards.remove(card_id) else {
+        return Ok(EffectResult::Resolved);
+    };
+    if cards.is_empty() {
+        ledger.remove(&player);
+    }
+    for (good, amount) in goods {
+        let next = ctx
+            .player
+            .supply
+            .get(good)
+            .checked_add(amount)
+            .ok_or("resource overflow")?;
+        ctx.player.supply.set(good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
 fn handle_start_round_gain_if_no_harvest_and_animals(
     ctx: &mut DispatchContext<'_>,
     _player: usize,
@@ -3136,6 +3277,7 @@ pub fn dispatch_play(
         used_spaces,
         accumulations: None,
         animal_accumulations: None,
+        card_accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3423,8 +3565,59 @@ fn dispatch_after_worker_any_player(
 /// Dispatch AfterWorker phase for a completed worker action.
 /// If `allow_choose_trigger_order_pause` is true, enables ChooseTriggerOrder pause
 /// for post-work chain integration (Issue #270).
+///
+/// Worker-completion dispatch without the per-card goods ledger. Card effects
+/// that need the ledger (A081 一時保管庫) stay dormant on this path; the engine
+/// uses [`dispatch_after_worker_with_card_storage`] so real games thread it.
 #[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_after_worker(
+    card_set: &CardSet,
+    player: usize,
+    space: Space,
+    cards: &mut crate::cards::CardState,
+    players: &mut [Player],
+    improvement_market: &mut Vec<crate::model::Improvement>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    round: u8,
+    used_spaces: &std::collections::BTreeSet<Space>,
+    accumulations: &std::collections::BTreeMap<Space, u32>,
+    animal_accumulations: &std::collections::BTreeMap<Space, u32>,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    pending: &mut Option<PendingDecision>,
+    allow_choose_trigger_order_pause: bool,
+) -> Result<Transition, String> {
+    dispatch_after_worker_with_card_storage(
+        card_set,
+        player,
+        space,
+        cards,
+        players,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        accumulations,
+        animal_accumulations,
+        None,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+        allow_choose_trigger_order_pause,
+    )
+}
+
+/// Worker-completion dispatch with the per-card goods ledger threaded through
+/// the resolution context. A081 一時保管庫 stores 1 good on the card on the
+/// owner's own use of the mapped accumulation space.
+///
+/// `needless_option_as_deref` is deliberately allowed: the ledger has to be
+/// re-borrowed for the second (Interrupt) context after the After phase.
+#[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
+#[allow(clippy::needless_option_as_deref)]
+pub fn dispatch_after_worker_with_card_storage(
     card_set: &CardSet,
     player: usize,
     space: Space,
@@ -3445,6 +3638,7 @@ pub fn dispatch_after_worker(
     // read-only for animal-accumulation conditions (A052 手投げ斧 reads the
     // pig_market count). Runtime-only borrow: never mutated or serialized.
     animal_accumulations: &std::collections::BTreeMap<Space, u32>,
+    mut card_accumulations: Option<&mut CardGoodsLedger>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
@@ -3479,6 +3673,7 @@ pub fn dispatch_after_worker(
         used_spaces,
         accumulations: Some(accumulations),
         animal_accumulations: Some(animal_accumulations),
+        card_accumulations: card_accumulations.as_deref_mut(),
         event_budget,
         card_uses,
         card_use_limits,
@@ -3531,6 +3726,7 @@ pub fn dispatch_after_worker(
         used_spaces,
         accumulations: Some(accumulations),
         animal_accumulations: Some(animal_accumulations),
+        card_accumulations: card_accumulations.as_deref_mut(),
         event_budget,
         card_uses,
         card_use_limits,
@@ -3553,7 +3749,9 @@ pub fn dispatch_after_worker(
     )
 }
 
-/// Dispatch StartRound phase for all players at round start.
+/// Dispatch StartRound phase for all players at round start, without the
+/// per-card goods ledger. A081 一時保管庫's release stays dormant on this path;
+/// the engine uses [`dispatch_start_round_with_card_storage`].
 #[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
 pub fn dispatch_start_round(
     card_set: &CardSet,
@@ -3564,6 +3762,48 @@ pub fn dispatch_start_round(
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     accumulations: &std::collections::BTreeMap<Space, u32>,
+    event_budget: &mut u32,
+    card_uses: &mut BTreeMap<String, u32>,
+    card_use_limits: &BTreeMap<String, u32>,
+    pending: &mut Option<PendingDecision>,
+    revealed_round_cards: &[crate::model::RoundCard],
+) -> Result<Transition, String> {
+    dispatch_start_round_with_card_storage(
+        card_set,
+        players,
+        cards,
+        improvement_market,
+        delayed_well,
+        round,
+        used_spaces,
+        accumulations,
+        None,
+        event_budget,
+        card_uses,
+        card_use_limits,
+        pending,
+        revealed_round_cards,
+    )
+}
+
+/// Dispatch StartRound phase for all players at round start with the per-card
+/// goods ledger threaded through the resolution context (A081 一時保管庫
+/// releases its stored goods at rounds 7/11/14).
+///
+/// `needless_option_as_deref` is deliberately allowed: the ledger has to be
+/// re-borrowed for each player's context inside the loop.
+#[allow(clippy::too_many_arguments)] // threads the same storages as the legacy cards.rs fns
+#[allow(clippy::needless_option_as_deref)]
+pub fn dispatch_start_round_with_card_storage(
+    card_set: &CardSet,
+    players: &mut [Player],
+    cards: &mut crate::cards::CardState,
+    improvement_market: &mut Vec<crate::model::Improvement>,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    round: u8,
+    used_spaces: &std::collections::BTreeSet<Space>,
+    accumulations: &std::collections::BTreeMap<Space, u32>,
+    mut card_accumulations: Option<&mut CardGoodsLedger>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
@@ -3585,6 +3825,7 @@ pub fn dispatch_start_round(
             used_spaces,
             accumulations: Some(accumulations),
             animal_accumulations: None,
+            card_accumulations: card_accumulations.as_deref_mut(),
             event_budget,
             card_uses,
             card_use_limits,
@@ -3668,6 +3909,7 @@ pub fn dispatch_after_clay_construction(
         used_spaces,
         accumulations: None,
         animal_accumulations: None,
+        card_accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3745,6 +3987,7 @@ pub fn dispatch_harvest_field(
         used_spaces,
         accumulations: None,
         animal_accumulations: None,
+        card_accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3824,6 +4067,7 @@ pub fn dispatch_after_harvest_complete(
         used_spaces,
         accumulations: None,
         animal_accumulations: None,
+        card_accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,
@@ -3894,6 +4138,7 @@ pub fn dispatch_after_harvest_bake(
         used_spaces,
         accumulations: None,
         animal_accumulations: None,
+        card_accumulations: None,
         event_budget,
         card_uses,
         card_use_limits,

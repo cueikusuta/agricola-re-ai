@@ -472,6 +472,25 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
+    /// A081 一時保管庫 (Interim Storage): each time the owner uses `space`
+    /// (one of the clay / reed / stone accumulation spaces), place `amount`
+    /// of `good` on this card. The stored goods live in the existing
+    /// `PublicState::card_accumulations` ledger (player -> card -> good); no
+    /// new persistent field is introduced. Own use only: the after-worker
+    /// dispatcher resolves the actor's own played cards.
+    AfterWorkerStackOnCard {
+        space: Space,
+        good: Good,
+        amount: u32,
+    },
+    /// A081 一時保管庫 (Interim Storage): at the start of each round listed in
+    /// `rounds`, move every good stored on this card into the owner's supply
+    /// and clear the entry. The card's stacking effect is
+    /// [`CardEffect::AfterWorkerStackOnCard`]; the round list comes from the
+    /// card spec (`7`, `11`, `14`).
+    StartRoundReleaseCardGoods {
+        rounds: Vec<u8>,
+    },
     /// A052 手投げ斧 (Throwing Axe): after the owner uses a wood accumulation
     /// space (`space` = Forest / Copse / Grove) while the boar accumulation on
     /// the `accumulation` animal market (PigMarket) holds at least `min`, gain
@@ -594,6 +613,8 @@ impl CardEffect {
             CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => {
                 "start_round_gain_if_accumulation_at_least"
             }
+            CardEffect::AfterWorkerStackOnCard { .. } => "after_worker_stack_on_card",
+            CardEffect::StartRoundReleaseCardGoods { .. } => "start_round_release_card_goods",
             CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => {
                 "after_worker_gain_if_animal_accumulation_at_least"
             }
@@ -880,7 +901,11 @@ impl CardSet {
                         | CardEffect::StartRoundGainIfAccumulationGrew { amount, .. }
                         | CardEffect::StartRoundGainIfAccumulationAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfNoHarvestAndAnimals { amount, .. }
+                        | CardEffect::AfterWorkerStackOnCard { amount, .. }
                         | CardEffect::OnPlayGainIfRoomCount { amount, .. } => *amount,
+                        // A081's release moves whatever the stacking effect
+                        // stored; the printed amount is not fixed here.
+                        CardEffect::StartRoundReleaseCardGoods { .. } => 1,
                         CardEffect::OnPlayGainEachWithAtLeast { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
@@ -6246,6 +6271,44 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
         amount,
     };
     vec![
+        // A081 一時保管庫 (Interim Storage): 2 food. Each use of the Clay Pit
+        // stores 1 wood on the card, the Reed Bank 1 clay, and either quarry
+        // 1 reed. At the start of rounds 7, 11 and 14 every stored good moves
+        // to the owner's supply and the card empties (spec A081, BGA wiki
+        // cross-check p=3344). The stored goods use the existing per-card
+        // accumulation ledger.
+        CardDefinition {
+            use_limit: None,
+            id: "A081".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Food, 2)],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterWorkerStackOnCard {
+                    space: Space::ClayPit,
+                    good: Good::Wood,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerStackOnCard {
+                    space: Space::ReedBank,
+                    good: Good::Clay,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerStackOnCard {
+                    space: Space::WesternQuarry,
+                    good: Good::Reed,
+                    amount: 1,
+                },
+                CardEffect::AfterWorkerStackOnCard {
+                    space: Space::EasternQuarry,
+                    good: Good::Reed,
+                    amount: 1,
+                },
+                CardEffect::StartRoundReleaseCardGoods {
+                    rounds: vec![7, 11, 14],
+                },
+            ],
+        },
         // A099 放牧人 (Fellow Grazer): 2 bonus points per pasture covering at
         // least 3 farm cells at scoring time.
         CardDefinition {
