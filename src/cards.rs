@@ -556,7 +556,6 @@ pub enum CardEffect {
         good: Good,
         amount: u32,
     },
-
 }
 
 /// One printed option of a harvest-feeding owner-chosen exchange.
@@ -5285,7 +5284,7 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                     },
                 ],
             }],
-        post_play: crate::cards::PostPlayDestination::PlayedArea,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // C059 シュナップス蒸留所 (Schnapps Distillery): cost 2 stone and 1
         // vegetable, 2 printed points; in each feeding phase the owner may
@@ -5307,7 +5306,7 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                     receive_animal: false,
                 }],
             }],
-        post_play: crate::cards::PostPlayDestination::PlayedArea,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // C063 クラフトビール醸造所 (Craft Brewery): cost 2 wood and 1 clay;
         // in each feeding phase the owner may brew 1 grain from supply and 1
@@ -5328,7 +5327,7 @@ pub fn verified_band_c_cards() -> Vec<CardDefinition> {
                     receive_animal: false,
                 }],
             }],
-        post_play: crate::cards::PostPlayDestination::PlayedArea,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // C006 石取り作業 (Stone Clearing): cost food1, prerequisite 1 occupation
         // played; on play place 1 stone on each empty field, harvested at next
@@ -6574,7 +6573,7 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
                 amount: 1,
                 animal: None,
             }],
-        post_play: crate::cards::PostPlayDestination::PlayedArea,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
         // D062 ビールタップ (Beer Tap): cost 1 wood; +2 food on play; in
         // each feeding phase the owner may exchange exactly 2/3/4 grain for
@@ -7354,7 +7353,6 @@ pub fn verified_b_onplay_simple_cards() -> Vec<CardDefinition> {
             }],
             post_play: PostPlayDestination::LeftNeighborHand,
         },
-
     ]
 }
 
@@ -7922,7 +7920,7 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::ColumnsWithRoom,
             }],
-        post_play: crate::cards::PostPlayDestination::PlayedArea,
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
     ]
 }
