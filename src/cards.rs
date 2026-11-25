@@ -8167,10 +8167,10 @@ mod verified_band_d_tests {
                 .any(|id| id == "D007"),
             "a pass-left card must not stay in played_area"
         );
-        for seat in 0..players {
+        for (seat, hand) in game.cards.hands.iter().enumerate().take(players) {
             if seat != left {
                 assert!(
-                    !game.cards.hands[seat].iter().any(|id| id == "D007"),
+                    !hand.iter().any(|id| id == "D007"),
                     "D007 must not be misdelivered to seat {seat}"
                 );
             }
