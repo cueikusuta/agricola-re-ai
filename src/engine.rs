@@ -473,6 +473,7 @@ impl Game {
             self.public.round,
             &self.public.used,
             &mut self.public.accumulations,
+            &self.public.animal_accumulations,
             &mut self.event_budget,
             &mut self.public.card_uses,
             &self.card_use_limits,

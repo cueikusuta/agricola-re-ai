@@ -1869,6 +1869,7 @@ impl Game {
                             used_spaces: &used_spaces,
                             well_food_schedule: Some(&mut well_food_schedule),
                             accumulations: None,
+                            animal_accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
                             card_use_limits: &card_use_limits,
@@ -2008,6 +2009,7 @@ impl Game {
                         well_food_schedule: Some(&mut well_food_schedule),
                         round,
                         accumulations: None,
+                        animal_accumulations: None,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
@@ -2125,6 +2127,7 @@ impl Game {
                         // the core action's take, so the current public map is
                         // exactly what the original dispatch saw.
                         accumulations: Some(&mut next.public.accumulations),
+                        animal_accumulations: Some(&next.public.animal_accumulations),
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -2485,6 +2488,7 @@ impl Game {
                     // the core action's take, so the current public map holds
                     // exactly the amounts the original scan saw.
                     accumulations: Some(&mut self.public.accumulations),
+                    animal_accumulations: Some(&self.public.animal_accumulations),
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,
