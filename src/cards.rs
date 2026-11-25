@@ -1403,8 +1403,8 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 give,
                 receive,
                 give_is_cost,
-                optional,
-                cap,
+                optional: _optional,
+                cap: _cap,
             } => {
                 // Simplified handler for legacy play() path: execute exchange directly.
                 // For give_is_cost=true, the cost was already paid; just grant receive.
