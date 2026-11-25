@@ -302,3 +302,18 @@
 - 語彙マッピング（`CardEffect::StartRound*`）と `round_start` トリガーの dispatch 配線は7枚分完了。`verified_round_start_cards()` から既定レジストリへ登録済み。
 - **B106** は条件充足時に無条件で獲得できる唯一のカードとして実適用。エンジンの `accumulations` はベースアクションスペースも含むため、revealed ラウンドカードのスペースのみを検査する。解釈注記（第三者のWiki記載を基にするが「開始前」の読みに替代案あり）は実装PRに記録し、人間確認を待つ。
 - **A090 / A151 / A152 / B097 / B135 / C064** は dormant（発火しない）。round start で生成する PendingDecision には解決窓がなく（`GameState::start_round` は dispatch の Transition を破棄し、次ラウンド境界で pending をエラーにする）、複数所有者が共有 pending を上書きし合う。プレイヤー決定チャネル（耕す畑の位置・手札カードの選択・与える家畜・grain 消費の可否）を導入するまで適用しない。
+
+## 2026-11-25追補：A081 一時保管庫（ラウンド開始時にカード上の品物を受け取る）
+
+仕様JSON `A081.json` の2効果を型付き語彙として実装した。効果文の解釈は仕様JSONとBGA wiki個別ページ（`?p=3344`）で確定しており、未解決点はない。
+
+### 新しい `CardEffect`
+| variant | パラメータ | 意味 |
+|---|---|---|
+| `AfterWorkerStackOnCard` | `space, good, amount` | 所有者が `space` を使った後、`good` を `amount` 個このカードの上に置く。保管先は既存の `PublicState::card_accumulations`（player → card → good）。他人の使用では置かない。 |
+| `StartRoundReleaseCardGoods` | `rounds` | 指定ラウンド（A081 は 7/11/14）の開始時に、このカード上の品物を全て所有者のストックへ移し、台帳の該当エントリを消す。 |
+
+### 実装上の区別
+- 本語彙は「カードの上に置いた品物を後で受け取る」ためのもので、**将来のラウンドスペースへの予約配置**（`place_on_round_spaces` / `round_space_has_placed_good`）とは別機構である。予約配置は PR #321 が追加する `delayed_goods` 台帳の担当で、本PRでは扱わない。
+- `DispatchContext::card_accumulations` は after-worker と round-start の dispatch だけが `Some` で受け取る。台帳を渡さない経路（既存の `dispatch_after_worker` / `dispatch_start_round` 互換ラッパー、harvest 系の再開 dispatch）では両効果は no-op で、パニックしない。
+- `state_hash` の v5 タプルは不変。`card_accumulations` は従来どおり `integrity_hash` 側で非空のときだけ検証対象になる。

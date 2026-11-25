@@ -391,6 +391,12 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => {
                     EventKind::WorkerPlaced
                 }
+                // A081 一時保管庫: store on the owner's own use, release at the
+                // listed round starts.
+                crate::cards::CardEffect::AfterWorkerStackOnCard { .. } => EventKind::WorkerPlaced,
+                crate::cards::CardEffect::StartRoundReleaseCardGoods { .. } => {
+                    EventKind::RoundStart
+                }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
                 // Chapter 1 round-start cards
                 crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. } => {
@@ -591,7 +597,11 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::StartRoundExchangeForFoodAndPoints { .. }
                         | crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
                             ..
-                        } => 1,
+                        }
+                        // A081 一時保管庫: the stacked/released amount is read
+                        // from the per-card ledger at resolution time.
+                        | crate::cards::CardEffect::AfterWorkerStackOnCard { .. }
+                        | crate::cards::CardEffect::StartRoundReleaseCardGoods { .. } => 1,
                     };
                     amount == 0 || amount > 30
                 })

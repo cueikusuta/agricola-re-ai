@@ -126,7 +126,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "implemented",
     "notes": "Clay/reed/stone space uses stack wood/clay/reed respectively on the card; the card is emptied at round 7/11/14 starts."
   }
 }

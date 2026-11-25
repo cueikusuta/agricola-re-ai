@@ -555,6 +555,11 @@ impl Space {
     }
 }
 
+/// Per-card goods ledger: player index -> card id -> good -> amount. Backs
+/// `PublicState::card_accumulations` and the `DispatchContext` borrow that
+/// card effects store into (A081 一時保管庫).
+pub type CardGoodsLedger = BTreeMap<usize, BTreeMap<String, BTreeMap<Good, u32>>>;
+
 /// Layer 0: the single canonical structure of public game state.
 ///
 /// Every path that reads or writes public state (engine, dispatcher, apply,
@@ -608,7 +613,7 @@ pub struct PublicState {
     /// `skip_serializing_if = "BTreeMap::is_empty"` keeps empty ledger out of
     /// JSON so pre-card_accumulations saves stay byte-identical (PR #327 pattern).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub card_accumulations: BTreeMap<usize, BTreeMap<String, BTreeMap<Good, u32>>>,
+    pub card_accumulations: CardGoodsLedger,
 }
 
 /// Cell as the LOG_VERSION=5 hash tuple serialized it (three fields).
@@ -1392,7 +1397,7 @@ impl Game {
         if self.card_set.enabled() {
             self.event_budget = default_event_budget();
             // dispatch_start_round already walks every player, so one call covers them all.
-            let _ = crate::card_events::dispatch_start_round(
+            let _ = crate::card_events::dispatch_start_round_with_card_storage(
                 &self.card_set,
                 &mut self.public.players,
                 &mut self.cards,
@@ -1401,6 +1406,7 @@ impl Game {
                 self.public.round,
                 &self.public.used,
                 &self.public.accumulations,
+                Some(&mut self.public.card_accumulations),
                 &mut self.event_budget,
                 &mut self.public.card_uses,
                 &self.card_use_limits,
@@ -1846,6 +1852,7 @@ impl Game {
                             used_spaces: &used_spaces,
                             accumulations: None,
                             animal_accumulations: None,
+                            card_accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
                             card_use_limits: &card_use_limits,
@@ -1983,6 +1990,7 @@ impl Game {
                         round,
                         accumulations: None,
                         animal_accumulations: None,
+                        card_accumulations: None,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
@@ -2099,6 +2107,7 @@ impl Game {
                         // exactly what the original dispatch saw.
                         accumulations: Some(&next.public.accumulations),
                         animal_accumulations: Some(&next.public.animal_accumulations),
+                        card_accumulations: None,
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -2457,6 +2466,7 @@ impl Game {
                     // exactly the amounts the original scan saw.
                     accumulations: Some(&self.public.accumulations),
                     animal_accumulations: Some(&self.public.animal_accumulations),
+                    card_accumulations: None,
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,
