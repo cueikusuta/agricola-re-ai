@@ -75,10 +75,10 @@ const CHAPTER_CARDS: [ChapterCard; 4] = [
 ];
 
 fn chapter_card(id: &str) -> CardDefinition {
-    verified_band_b_cards()
+    verified_b_onplay_simple_cards()
         .into_iter()
         .find(|card| card.id == id)
-        .unwrap_or_else(|| panic!("{id} must be defined in verified_band_b_cards"))
+        .unwrap_or_else(|| panic!("{id} must be defined in verified_b_onplay_simple_cards"))
 }
 
 /// CardSet holding every chapter card plus filler ids, so prerequisite and
