@@ -40,3 +40,12 @@
 - `src/cards.rs::verified_band_e_cards()` に E082 不当利得の on_play 獲得部分（food 1）を追加。
 - `tests/onplay_gain_ch05_e.rs`: 1 テスト成功。
 - 仕様 E082 の `implementation_status` を `in_progress` に更新。
+
+## 最終検証（PR 前）
+
+- `cargo fmt --check`: exit 0
+- `cargo clippy --all-targets --all-features --locked -- -D warnings`: exit 0
+- 新規テスト 5 本 / 11 ケース: すべて成功
+- `python scripts/validate_bga_card_specs.py`: exit 0、`errors: []`（`in_progress` 11）
+- 対象外カードと `needs_resolution` の質問一覧は `PROGRESS.md` に記録。
+- PR は作成まで。マージしない。
