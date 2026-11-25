@@ -95,6 +95,7 @@ fn chapter_set() -> CardSet {
         cost: vec![],
         points: 0,
         effects: vec![],
+    post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     });
     CardSet { definitions }
 }
@@ -336,6 +337,7 @@ fn padded_raw_set(card_id: &str, players: usize) -> CardSet {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+            post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
             });
         }
     }
