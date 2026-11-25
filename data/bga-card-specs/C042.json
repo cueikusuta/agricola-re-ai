@@ -20,13 +20,15 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=3047",
         "language": "ja",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "third-party BGA wiki card page"
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-13",
+        "checked_on": "2026-11-24",
+        "page_version": null,
         "note": "English list page cross-check"
       }
     ]
@@ -39,60 +41,62 @@
         "amount": 1
       }
     ],
-    "prerequisites": null,
+    "prerequisites": [],
     "printed_points": 0,
     "alternative_cost_notes": null
   },
   "effects": [
     {
-      "trigger": "end_scoring",
-      "conditions": [],
+      "trigger": "action_space_used",
+      "conditions": [
+        {
+          "predicate": "action_space_name",
+          "params": {
+            "name": "野菜の種"
+          },
+          "negate": false
+        }
+      ],
       "steps": [
         {
-          "operation": "gain_points",
+          "operation": "grant_action",
           "target": "owner",
           "params": {
-            "points": {
-              "op": "per",
-              "args": [
-                {
-                  "op": "count",
-                  "args": [
-                    "unknown_metric"
-                  ]
-                },
-                1
-              ]
-            }
+            "space": "野菜の種",
+            "additional_worker": true
+          }
+        },
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "resource": "accumulation_good",
+            "amount": 1
           }
         }
       ],
-      "optional": false,
-      "frequency": "end_of_game",
+      "optional": true,
+      "frequency": "per_use",
       "duration": "permanent",
-      "snapshot": "live_state",
+      "snapshot": "after_event",
       "order": 0,
-      "decision_owner": "none",
-      "notes": "Effect details pending BGA verification"
+      "decision_owner": "owner",
+      "notes": "Each time you use '野菜の種' action space, may place 1 additional person there and gain 1 additional good of the accumulating type"
     }
   ],
   "post_play": {
     "destination": "played_area"
   },
   "review": {
-    "status": "inventory_only",
-    "unresolved_fields": [
-      "effects.full",
-      "bga.eligibility",
-      "play.prerequisites.exact"
-    ],
+    "status": "bga_checked",
+    "unresolved_fields": [],
     "test_case_ids": [
-      "C042-normal",
-      "C042-edge"
+      "C042-vegetable-seeds-bonus",
+      "C042-legal-play"
     ],
-    "checked_by": "AI ledger import",
-    "checked_on": "2026-11-13",
+    "checked_by": "primary source verification (agricola.cloudfree.jp)",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "Inventory-only from base ledger; full BGA verification pending"
+    "notes": "Verified against BGA wiki page https://agricola.cloudfree.jp/?p=3047"
   }
 }

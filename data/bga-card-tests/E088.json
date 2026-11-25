@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "card_id": "E088",
+  "cases": [
+    {
+      "id": "E088-normal",
+      "scope": "effect_only",
+      "setup": {
+        "house": "stone",
+        "wood": 5,
+        "fences": 0
+      },
+      "action": {
+        "play": "E088",
+        "round_start": true,
+        "pay_2_wood_for_3_fences": true
+      },
+      "expected": {
+        "wood": 3,
+        "fences": 3
+      }
+    },
+    {
+      "id": "E088-not-stone-house",
+      "scope": "effect_only",
+      "setup": {
+        "house": "wood",
+        "wood": 5,
+        "fences": 0
+      },
+      "action": {
+        "play": "E088",
+        "round_start": true
+      },
+      "expected": {
+        "wood": 5,
+        "fences": 0
+      }
+    },
+    {
+      "id": "E088-both-options",
+      "scope": "effect_only",
+      "setup": {
+        "house": "stone",
+        "wood": 6,
+        "fences": 0
+      },
+      "action": {
+        "play": "E088",
+        "round_start": true,
+        "pay_3_wood_for_4_fences": true
+      },
+      "expected": {
+        "wood": 3,
+        "fences": 4
+      }
+    }
+  ]
+}
