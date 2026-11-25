@@ -1193,11 +1193,11 @@ mod tests {
         // Updated: StartRoundGainIf* wave — B114/A049/C067/D054 joined the
         // two-player preset (A157 stays out, 4 players only), pool size 37->41.
         // Updated: D081/B016/A037 joined verified_round_and_harvest_cards and
-                // therefore the two-player verified preset (pool size 41->44).
-                assert_eq!(
-                    digest, "152da3199c6baffe0872461354c2167d743f83123b7daa2b3339341080a4516e",
-                    "sample_game distribution changed — update this test only if intentional"
-                );
+        // therefore the two-player verified preset (pool size 41->44).
+        assert_eq!(
+            digest, "4acc66d28e2b02ac9d0a5a18031a61b2f6ed55168201b205943ab8d6f0ec96b6",
+            "sample_game distribution changed — update this test only if intentional"
+        );
     }
 
     /// Compare two observations for public-information equality (shared by the

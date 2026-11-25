@@ -22,7 +22,7 @@
 use agricola_re_ai::card_events::dispatch_play;
 use agricola_re_ai::cards::{
     apply_on_play_effects, can_play, card_set_for_game, verified_band_b_cards, CardDefinition,
-    CardEffect, CardKind, CardRequirement, CardSet,
+    CardEffect, CardKind, CardRequirement, CardSet, PostPlayDestination,
 };
 use agricola_re_ai::model::{Good, Player};
 use agricola_re_ai::registry::{build_default_registry, CardPool};
@@ -95,6 +95,7 @@ fn chapter_set() -> CardSet {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play: PostPlayDestination::PlayedArea,
     });
     CardSet { definitions }
 }
@@ -336,6 +337,7 @@ fn padded_raw_set(card_id: &str, players: usize) -> CardSet {
                 cost: vec![],
                 points: 0,
                 effects: vec![],
+                post_play: PostPlayDestination::PlayedArea,
             });
         }
     }
