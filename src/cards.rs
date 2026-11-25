@@ -6459,10 +6459,19 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
     ]
 }
 
-/// B-deck band 121-168 cards whose printed effects are fully expressible with
-/// the current typed effect vocabulary (BGA Agricola card wiki;
+/// B-deck band cards with typed effects (BGA Agricola card wiki;
 /// B122 p=3135, B142 p=3207, B144 p=3113). Kept out of the A/B two-player
 /// preset, same as the C/D/E band pools.
+///
+/// Chapter 1 (restack session 2026-11-23: `on_play` simple gains) adds cards
+/// whose printed on-play effect is a single constant `gain_resource` step,
+/// modelled with the existing `CardEffect::OnPlayGain` variant. Each of those
+/// cards prints further effects on OTHER triggers; only the on-play half is
+/// wired here, so their spec `implementation_status` stays `in_progress` and
+/// the remaining halves belong to their own trigger chapters (recorded per
+/// card below). Because every built-in review entry is fail-closed
+/// `unverified`, no pool gate admits these cards until official eligibility
+/// is recorded, and the experimental pool only ever grants the on-play half.
 pub fn verified_band_b_cards() -> Vec<CardDefinition> {
     let gain = |space: Space, good: Good, amount: u32| CardEffect::AfterWorkerGain {
         space,
@@ -6718,6 +6727,85 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
                 CardEffect::EndGameBonus {
                     rule: ScoreBonusRule::MajorImprovementsLowestDoubledThresholds,
+                },
+            ],
+        },
+        // ---- Chapter 1 (restack 2026-11-23): on-play simple gains ----
+        // Cards below print exactly one constant gain_resource step on their
+        // on_play trigger; each is modelled with the existing OnPlayGain
+        // variant (no new variant / EventKind / saved field). Their remaining
+        // printed effects live on other triggers and stay unwired here
+        // (spec implementation_status = in_progress; follow-up noted inline).
+
+        // B054 肥料運搬車 (Tumbrel): cost 1 wood; on play gain 2 food.
+        // Eligibility 2/3/4 = yes. Still prints an after_sow "1 food per
+        // stable" step (follow-up; the harvest/sow chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B054".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Food,
+                amount: 2,
+            }],
+        },
+        // B117 情報屋 (Informant): occupation, no cost; on play gain 1 wood.
+        // Eligibility 2/3/4 = yes (85-126 rule). Still prints an
+        // after_work_phase "more stone than clay => 1 wood" step (follow-up;
+        // the round/work-phase chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B117".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::OnPlayGain {
+                good: Good::Wood,
+                amount: 1,
+            }],
+        },
+        // B151 小百姓 (Little Peasant): occupation, no cost; on play gain
+        // 1 stone. 4 players only (148-168 rule), so the effect is guarded by
+        // MinimumPlayers(4) and projects only at 4 players. Still prints the
+        // passive "all spaces except Meeting Place count as unoccupied while
+        // living in a 2-room wooden house" rule (follow-up; the passive
+        // chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B151".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Stone,
+                    amount: 1,
+                },
+            ],
+        },
+        // B160 飲み屋の亭主 (Pub Owner): occupation, no cost; on play gain
+        // 1 grain. 4 players only (148-168 rule) -> MinimumPlayers(4) guard.
+        // Still prints the end_of_work_phase "Forest/Clay Pit/Reed Field all
+        // occupied => 1 grain" step (follow-up; the round_end/work-phase
+        // chapter owns that trigger).
+        CardDefinition {
+            use_limit: None,
+            id: "B160".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Grain,
+                    amount: 1,
                 },
             ],
         },
