@@ -1,7 +1,7 @@
 //! Card-set metadata is supplied by callers; copyrighted card text is never bundled.
 //! This is a deliberately small deterministic effect vocabulary, not a claim that
 //! the full Agricola Revised deck has been implemented.
-use crate::model::{Animal, Crop, Good, House, Improvement, Player, Space, Tile};
+use crate::model::{neighbors, Animal, Crop, Good, House, Improvement, Player, Space, Tile};
 use crate::registry::{
     build_default_registry, card_set_from_pool, card_set_from_registry, CardId, CardPool,
     CardRegistry,
@@ -708,6 +708,10 @@ pub enum CardRequirement {
     MinimumPlayers(u8),
     MaximumPlayers(u8),
     MinimumImprovements(u8),
+    /// B031 製陶所の敷地 (Pottery Yard): the player owns this major improvement
+    /// in front of them. Appended at the enum tail so existing serde variants
+    /// and saved-game bytes are unchanged.
+    OwnsMajorImprovement(Improvement),
 }
 
 /// Named formulas keep card descriptions outside source and replay data.
@@ -763,6 +767,13 @@ pub enum ScoreBonusRule {
     /// contains at least one room, computed from the final farm state. Several
     /// rooms standing in the same column still score that column only once.
     ColumnsWithRoom,
+    /// E124 市長候補者 (Mayor Candidate): at final scoring, -1 point per wood
+    /// and per stone in the supply. Appended at the enum tail.
+    WoodStoneSupplyPenalty,
+    /// B031 製陶所の敷地 (Pottery Yard): at final scoring, +2 when at least two
+    /// orthogonally adjacent farmyard spaces are unused (empty and without a
+    /// stable). Appended at the enum tail.
+    UnusedFarmAdjacentPair,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1440,6 +1451,9 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
             CardRequirement::MinimumImprovements(min) => {
                 improvement_count_in_front(set, player) >= u32::from(*min)
             }
+            CardRequirement::OwnsMajorImprovement(improvement) => {
+                player.improvements.contains(improvement)
+            }
             CardRequirement::MinimumPlayers(_) => true,
             CardRequirement::MaximumPlayers(_) => true,
             CardRequirement::PastureCount(n) => player.pastures.len() >= usize::from(*n),
@@ -1942,6 +1956,26 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                                 .any(|cell| matches!(cell.tile, Tile::Room))
                         })
                         .count() as i32
+                }
+                ScoreBonusRule::WoodStoneSupplyPenalty => {
+                    -((player.supply.wood + player.supply.stone) as i32)
+                }
+                ScoreBonusRule::UnusedFarmAdjacentPair => {
+                    // Unused = Tile::Empty with no stable built on it. Pottery
+                    // Yard needs one orthogonally adjacent unused pair.
+                    let unused = |index: usize| {
+                        player
+                            .farm
+                            .get(index)
+                            .is_some_and(|cell| matches!(cell.tile, Tile::Empty) && !cell.stable)
+                    };
+                    let has_pair = (0..player.farm.len())
+                        .any(|index| unused(index) && neighbors(index).into_iter().any(unused));
+                    if has_pair {
+                        2
+                    } else {
+                        0
+                    }
                 }
             },
             _ => 0,
@@ -6751,6 +6785,26 @@ pub fn verified_band_b_cards() -> Vec<CardDefinition> {
                 },
             ],
         },
+        // B031 製陶所の敷地 (Pottery Yard): minor, no cost, 1 printed point.
+        // Prerequisite: the major Pottery (製陶所) in front. The upgrade
+        // (大製陶所 D060) is not implemented on main, so only Pottery counts
+        // for now. At final scoring, +2 when 2+ adjacent unused farm spaces
+        // exist (BGA wiki ?p=3226; spec data/bga-card-specs/B031.json).
+        CardDefinition {
+            use_limit: None,
+            id: "B031".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 1,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::OwnsMajorImprovement(Improvement::Pottery),
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::UnusedFarmAdjacentPair,
+                },
+            ],
+        },
         // ---- Chapter 1 (restack 2026-11-23): on-play simple gains ----
         // Cards below print exactly one constant gain_resource step on their
         // on_play trigger; each is modelled with the existing OnPlayGain
@@ -7386,6 +7440,30 @@ pub fn verified_band_e_cards() -> Vec<CardDefinition> {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::ColumnsWithRoom,
             }],
+        },
+        // E124 市長候補者 (Mayor Candidate): occupation, no cost. On play gain
+        // 2 wood and 2 stone (two constant on-play grants). At final scoring,
+        // -1 point per wood and per stone in stock (spec
+        // data/bga-card-specs/E124.json; BGA wiki ?p=2629).
+        CardDefinition {
+            use_limit: None,
+            id: "E124".to_owned(),
+            kind: CardKind::Occupation,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Wood,
+                    amount: 2,
+                },
+                CardEffect::OnPlayGain {
+                    good: Good::Stone,
+                    amount: 2,
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::WoodStoneSupplyPenalty,
+                },
+            ],
         },
     ]
 }
