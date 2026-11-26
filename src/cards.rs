@@ -876,6 +876,14 @@ pub enum ScoreBonusRule {
     /// major improvements. Appended at the enum tail so existing serde
     /// variants and saved-game bytes are unchanged.
     MajorImprovementsBottomRowThresholds,
+    /// D035 飼料部屋 (Fodder Chamber): 1 bonus point per `threshold` own
+    /// livestock (sheep + boar + cattle) at end-game scoring. The
+    /// per-player-count threshold (2p: 7, 3p: 5, 4p: 4 animals per point)
+    /// is selected by player-count guard prerequisites on the card
+    /// definition and projected at game entry, so exactly one threshold is
+    /// active per game. Appended at the enum tail so existing serde
+    /// variants and saved-game bytes are unchanged.
+    LivestockThresholds(u32),
     /// B153 寮長 (Housemaster): at final scoring, sum the major-improvement
     /// scores after doubling the lowest single one (one only, even when the
     /// lowest score is tied), then take 1/2/3/4 bonus points at a doubled
@@ -2154,6 +2162,15 @@ pub fn end_game_bonus_for_definitions(definitions: &[CardDefinition], player: &P
                         n if n >= 5 => 8,
                         _ => 0,
                     }
+                }
+                ScoreBonusRule::LivestockThresholds(threshold) => {
+                    // D035: 1 point per `threshold` own livestock of any
+                    // species (sheep, boar, cattle).
+                    let livestock = player
+                        .animal_count(Animal::Sheep)
+                        .saturating_add(player.animal_count(Animal::Boar))
+                        .saturating_add(player.animal_count(Animal::Cattle));
+                    livestock.saturating_div(*threshold) as i32
                 }
                 ScoreBonusRule::MajorImprovementsLowestDoubledThresholds => {
                     // B153 寮長 (Housemaster): the lowest single score is
@@ -6691,6 +6708,42 @@ pub fn verified_band_d_cards() -> Vec<CardDefinition> {
             ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
+        // D035 飼料部屋 (Fodder Chamber): cost 3 stone + 3 grain, printed
+        // 2 points; at scoring, 1 bonus point per threshold number of own
+        // livestock (2p: 7 animals/point, 3p: 5, 4p: 4). Each player-count
+        // run is guarded by Minimum/MaximumPlayers so the game-entry
+        // projection keeps exactly one end-game bonus per player count.
+        CardDefinition {
+            use_limit: None,
+            id: "D035".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Stone, 3), (Good::Grain, 3)],
+            points: 2,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MaximumPlayers(2),
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::LivestockThresholds(7),
+                },
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(3),
+                },
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MaximumPlayers(3),
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::LivestockThresholds(5),
+                },
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumPlayers(4),
+                },
+                CardEffect::EndGameBonus {
+                    rule: ScoreBonusRule::LivestockThresholds(4),
+                },
+            ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
         // D012 搾乳所 (Milking Place): cost 1 grain, 1 printed point;
         // +1 food in the feeding phase of each harvest (BGA spec D012,
         // harvest_feeding gain). The printed passive "no animals in the
@@ -10015,6 +10068,36 @@ mod p1_2_repro_tests {
                 }
                 effects
             }),
+            "D035" => match players {
+                2 => Some(vec![
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MaximumPlayers(2),
+                    },
+                    CardEffect::EndGameBonus {
+                        rule: ScoreBonusRule::LivestockThresholds(7),
+                    },
+                ]),
+                3 => Some(vec![
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MinimumPlayers(3),
+                    },
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MaximumPlayers(3),
+                    },
+                    CardEffect::EndGameBonus {
+                        rule: ScoreBonusRule::LivestockThresholds(5),
+                    },
+                ]),
+                4 => Some(vec![
+                    CardEffect::Prerequisite {
+                        rule: CardRequirement::MinimumPlayers(4),
+                    },
+                    CardEffect::EndGameBonus {
+                        rule: ScoreBonusRule::LivestockThresholds(4),
+                    },
+                ]),
+                _ => None,
+            },
             _ => None,
         }
     }
