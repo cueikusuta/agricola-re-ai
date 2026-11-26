@@ -2049,6 +2049,16 @@ pub fn verified_passive_cards() -> Vec<CardDefinition> {
             vec![],
             PassiveRule::RoomCost(3),
         ),
+        card(
+            "C013",
+            CardKind::MinorImprovement,
+            vec![(Good::Wood, 1)],
+            PassiveRule::FirstRenovationStoneDiscount {
+                min_wooden_rooms: 5,
+                discount: 2,
+                direct_to_stone: true,
+            },
+        ),
     ]
 }
 #[cfg(test)]
@@ -2426,9 +2436,11 @@ mod simple_occupation_tests {
         // minor: 44 -> 45 total (occupations unchanged, minors 25 -> 26).
         // D026 大工の敷地 / E024 野心 add 2 more minors: 45 + 2 = 47 total
         // (occupations 19, minors 26 -> 28).
-        assert_eq!(total, 47);
+        // C013 Wood Slide Hammer (PR #487 merge) joins as a 2p-eligible minor:
+        // 47 -> 48 total (occupations 19, minors 28 -> 29).
+        assert_eq!(total, 48);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 28);
+        assert_eq!(minor, 29);
         assert!(verified_basic_card_set(3).is_err());
     }
 }

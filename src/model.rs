@@ -191,6 +191,20 @@ pub struct Pasture {
     pub animal: Option<Animal>,
     pub quantity: u32,
 }
+
+/// C013 木製スライドハンマー (Wood Slide Hammer): on the owner's first
+/// renovation from a wooden house with at least `min_wooden_rooms` rooms,
+/// renovate directly to a stone house paying `discount` less stone.
+/// The condition (`house == Wood && rooms >= min_wooden_rooms`) is evaluated
+/// at renovation time and no longer holds after the renovation, so the rule
+/// fires at most once without a use-count ledger.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FirstRenovationStoneDiscount {
+    pub min_wooden_rooms: u32,
+    pub discount: u32,
+    pub direct_to_stone: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Player {
     pub id: usize,
@@ -223,6 +237,12 @@ pub struct Player {
     pub stone_cost_discount: u32,
     #[serde(default)]
     pub extra_housing: u8,
+    /// C013: first wooden-house renovation may skip clay and go straight to
+    /// stone at a stone discount. `#[serde(default)]` keeps pre-C013 saves
+    /// loadable; the field is deliberately excluded from `PlayerHashMaterialV5`
+    /// so `state_hash` values stay byte-identical to v5.
+    #[serde(default)]
+    pub first_renovation_stone: Option<FirstRenovationStoneDiscount>,
     pub begging: u32,
     /// Snapshot of total crop goods in fields at the end of the final harvest
     /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
@@ -260,6 +280,7 @@ impl Player {
             major_stone_discount_by_rooms: false,
             stone_cost_discount: 0,
             extra_housing: 0,
+            first_renovation_stone: None,
             begging: 0,
             field_goods_before_final_harvest: None,
         }

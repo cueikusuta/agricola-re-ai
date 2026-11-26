@@ -1,7 +1,9 @@
 //! Card-set metadata is supplied by callers; copyrighted card text is never bundled.
 //! This is a deliberately small deterministic effect vocabulary, not a claim that
 //! the full Agricola Revised deck has been implemented.
-use crate::model::{Animal, Crop, Good, House, Improvement, Player, Space, Tile};
+use crate::model::{
+    Animal, Crop, FirstRenovationStoneDiscount, Good, House, Improvement, Player, Space, Tile,
+};
 use crate::registry::{
     build_default_registry, card_set_from_pool, card_set_from_registry, CardId, CardPool,
     CardRegistry,
@@ -804,6 +806,14 @@ pub enum PassiveRule {
     /// If false (E024), any major improvement may be built.
     AllowMajorViaMinor {
         joinery_and_well_only: bool,
+    },
+    /// C013 木製スライドハンマー (Wood Slide Hammer): first renovation from
+    /// a wooden house with at least `min_wooden_rooms` rooms may go directly
+    /// to stone paying `discount` less stone. Separate from `StoneDiscount`.
+    FirstRenovationStoneDiscount {
+        min_wooden_rooms: u32,
+        discount: u32,
+        direct_to_stone: bool,
     },
 }
 
@@ -1917,6 +1927,27 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
                 PassiveRule::AllowMajorViaMinor { .. } => {}
+                PassiveRule::FirstRenovationStoneDiscount {
+                    min_wooden_rooms,
+                    discount,
+                    direct_to_stone,
+                } => {
+                    let params = FirstRenovationStoneDiscount {
+                        min_wooden_rooms: *min_wooden_rooms,
+                        discount: *discount,
+                        direct_to_stone: *direct_to_stone,
+                    };
+                    player.first_renovation_stone = match player.first_renovation_stone {
+                        None => Some(params),
+                        Some(existing) => Some(FirstRenovationStoneDiscount {
+                            min_wooden_rooms: existing
+                                .min_wooden_rooms
+                                .min(params.min_wooden_rooms),
+                            discount: existing.discount.saturating_add(params.discount),
+                            direct_to_stone: existing.direct_to_stone || params.direct_to_stone,
+                        }),
+                    };
+                }
             },
             CardEffect::OnPlayAddStoneToEmptyFields { good: _, amount } => {
                 for cell in &mut player.farm {
@@ -3369,12 +3400,13 @@ mod p1_2_repro_tests {
 
         // 2p プリセットのハッシュは D054（main 側 +1 minor）と D026/E024（本 PR +2 minors）
         // の追加により 39 -> 41 defs（content_hash 再計測済み、意図的変更）。
+        // 加えて C013 木製スライドハンマー（PR #487 merge、+1 minor）後に再々計測。
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
-            preset.content_hash(),
-            "2a78347a92fd2a940a5ca7258ddc3a4971378cde3d74f730c41602b0313b26fa",
-            "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067/D054 joined the preset and A157 was excluded as 4p-only)"
-        );
+                    preset.content_hash(),
+                    "e0de7e8ebc9c09fe33fdc3095c4f40271bc6d1f08ceb83e6ea3724c41b360c04",
+                    "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067/D054 joined the preset and A157 was excluded as 4p-only; re-measured again after C013 joined via the PR #487 merge)"
+                );
 
         // 実測の pool 不適格セット @ b10a61a（main 追加で変動可）。
         // 2p: [A133, A143, A155, B142, B144]（A133/A143 は 3人+、A155 は 4人のみ、B142/B144 は 3人+ のみ；
