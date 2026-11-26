@@ -62,7 +62,8 @@ fn dispatch(
     let limits = BTreeMap::new();
     let mut pending = None;
     let used = BTreeSet::new();
-    let accumulations = BTreeMap::new();
+    let mut accumulations = BTreeMap::new();
+    let mut well_mirror = BTreeMap::new();
     let animal_accumulations = BTreeMap::new();
     dispatch_after_worker_with_previous(
         set,
@@ -74,13 +75,14 @@ fn dispatch(
         &mut well,
         round,
         &used,
-        &accumulations,
+        &mut accumulations,
         &animal_accumulations,
         &mut budget,
         &mut uses,
         &limits,
         &mut pending,
         false,
+        &mut well_mirror,
         previous,
     )
     .expect("dispatch_after_worker_with_previous must succeed");
@@ -247,7 +249,7 @@ fn a068_play_precondition_requires_truly_empty_fields() {
     // No field: cannot play.
     let bare = Player::new(0, 0);
     assert!(
-        !can_play(&set, &card, &bare, 0),
+        !can_play(&set, &card, &bare, 1, 0),
         "no empty field must block play"
     );
 
@@ -257,7 +259,7 @@ fn a068_play_precondition_requires_truly_empty_fields() {
         remaining: 0,
     });
     assert!(
-        can_play(&set, &card, &empty, 0),
+        can_play(&set, &card, &empty, 1, 0),
         "one empty field is the printed precondition"
     );
 
@@ -269,7 +271,7 @@ fn a068_play_precondition_requires_truly_empty_fields() {
     let mut stone = stone;
     stone.farm[1].field_stones = 1;
     assert!(
-        !can_play(&set, &card, &stone, 0),
+        !can_play(&set, &card, &stone, 1, 0),
         "a stone field is not an empty field"
     );
 
@@ -279,7 +281,7 @@ fn a068_play_precondition_requires_truly_empty_fields() {
         remaining: 1,
     });
     assert!(
-        !can_play(&set, &card, &sown, 0),
+        !can_play(&set, &card, &sown, 1, 0),
         "a sown field is not an empty field"
     );
 }

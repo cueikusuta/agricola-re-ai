@@ -59,7 +59,7 @@ fn stable_cells(p: &Player) -> Vec<usize> {
 fn play_card(set: &CardSet, p: &mut Player, id: &str, wood: u32) {
     p.supply.set(Good::Wood, wood);
     let mut hand = vec![id.to_owned()];
-    agricola_re_ai::cards::play(set, &mut hand, p, id, CardKind::MinorImprovement, 0)
+    agricola_re_ai::cards::play(set, &mut hand, p, id, CardKind::MinorImprovement, 1, 0)
         .unwrap_or_else(|e| panic!("play {id} failed: {e}"));
 }
 
@@ -137,6 +137,7 @@ fn e001_requires_fifteen_fences() {
             &mut p,
             "E001",
             CardKind::MinorImprovement,
+            1,
             0,
         )
     };

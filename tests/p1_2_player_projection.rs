@@ -186,6 +186,7 @@ fn raw_b102_both_series_fire_in_two_player_game() {
         &mut game.public.players[owner],
         "B102",
         CardKind::Occupation,
+        1,
         0,
     )
     .expect("raw B102 is playable today");
@@ -285,6 +286,7 @@ fn normal_entry_b102_grants_only_two_player_series() {
         &mut game.public.players[owner],
         "B102",
         CardKind::Occupation,
+        1,
         0,
     )
     .expect("B102 is playable");

@@ -298,7 +298,7 @@ mod verified_band_d_tests {
         let set = set();
         let mut hand = vec!["D109".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "D109", CardKind::Occupation, 0).unwrap();
+        play(&set, &mut hand, &mut p, "D109", CardKind::Occupation, 1, 0).unwrap();
         assert_eq!(p.supply.wood, 1);
         for space in [
             Space::GrainSeeds,
@@ -666,13 +666,13 @@ mod verified_band_d_tests {
         // Two played occupations (D100/D105) cannot satisfy the 3-occupation
         // prerequisite even though the stone cost is affordable.
         p.played_cards.extend(["D100".into(), "D105".into()]);
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         // A third occupation (D109) opens the play.
         p.played_cards.push("D109".into());
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         // Without the stone the cost alone blocks the play.
         p.supply.stone = 0;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
     }
 
     #[test]
@@ -689,7 +689,8 @@ mod verified_band_d_tests {
             &mut p,
             "D030",
             CardKind::MinorImprovement,
-            0
+            1,
+            0,
         )
         .is_err());
         // With the third occupation the play succeeds and adds the printed
@@ -701,6 +702,7 @@ mod verified_band_d_tests {
             &mut p,
             "D030",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();

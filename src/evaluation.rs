@@ -425,7 +425,7 @@ fn project_play_card(
         definitions: obs.card_definitions.clone(),
     };
     let mut hand = obs.hand.clone();
-    crate::cards::play(&set, &mut hand, player, id, kind, fee).ok()?;
+    crate::cards::play(&set, &mut hand, player, id, kind, obs.public.round, fee).ok()?;
     Some(())
 }
 

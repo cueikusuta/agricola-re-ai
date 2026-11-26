@@ -559,6 +559,112 @@ pub fn verified_b_onplay_simple_cards_extended() -> Vec<CardDefinition> {
 }
 
 /// Test module for verified_band_b_cards.
+/// B-deck chapter 1: after_worker_space simple gain cards (B017, B047, B051, B060, B063).
+/// These are minor improvements with bga_checked after_worker_space triggers.
+/// Kept out of the A/B two-player preset, same as the band pools.
+pub fn verified_b_afterworker_simple_cards() -> Vec<CardDefinition> {
+    let minor = CardKind::MinorImprovement;
+    vec![
+        // B017 森林鋤 (Forest Plow): cost 1 wood; after using Forest/Copse/Grove,
+        // may pay 2 wood to plow 1 field. The wood stays on the accumulation space.
+        CardDefinition {
+            use_limit: None,
+            id: "B017".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::AfterWorkerSpendPlowField {
+                    space: Space::Forest,
+                    good: Good::Wood,
+                    amount: 2,
+                    plow: 1,
+                },
+                CardEffect::AfterWorkerSpendPlowField {
+                    space: Space::Copse,
+                    good: Good::Wood,
+                    amount: 2,
+                    plow: 1,
+                },
+                CardEffect::AfterWorkerSpendPlowField {
+                    space: Space::Grove,
+                    good: Good::Wood,
+                    amount: 2,
+                    plow: 1,
+                },
+            ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // B047 ニシン鍋 (Herring Pot): cost 1 clay; after using Fishing,
+        // place 1 food on each of the next 3 round spaces.
+        CardDefinition {
+            use_limit: None,
+            id: "B047".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Clay, 1)],
+            points: 0,
+            effects: vec![CardEffect::AfterWorkerScheduleFood {
+                space: Space::Fishing,
+                rounds: 3,
+            }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // B051 採掘シャベル (Digging Spade): cost 1 wood; playable from round 7;
+        // after using Clay Pit, gain food equal to the number of wild boars.
+        CardDefinition {
+            use_limit: None,
+            id: "B051".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Wood, 1)],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumRound(7),
+                },
+                CardEffect::AfterWorkerGainPerAnimal {
+                    space: Space::ClayPit,
+                    good: Good::Food,
+                    per: 1,
+                },
+            ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // B060 仕込み水 (Brewing Water): free cost; after using Fishing,
+        // may pay 1 grain to place 1 food on each of the next 6 round spaces.
+        CardDefinition {
+            use_limit: None,
+            id: "B060".to_owned(),
+            kind: minor,
+            cost: vec![],
+            points: 0,
+            effects: vec![CardEffect::AfterWorkerPayToScheduleFood {
+                space: Space::Fishing,
+                pay_good: Good::Grain,
+                pay_amount: 1,
+                rounds: 6,
+            }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // B063 味見 (Tasting): cost 2 wood; 1 point; after using Lessons,
+        // optionally exchange 1 grain for 4 food.
+        CardDefinition {
+            use_limit: None,
+            id: "B063".to_owned(),
+            kind: minor,
+            cost: vec![(Good::Wood, 2)],
+            points: 1,
+            effects: vec![CardEffect::AfterWorkerOptionalExchange {
+                space: Space::Lessons,
+                give: Good::Grain,
+                give_amount: 1,
+                receive: Good::Food,
+                receive_amount: 4,
+            }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+    ]
+}
+
 #[cfg(test)]
 mod verified_band_b_tests {
     use super::super::*;
@@ -619,7 +725,7 @@ mod verified_band_b_tests {
         for players in [2, 3, 4] {
             let p = Player::new(0, 0);
             assert!(
-                can_play(&set, card, &p, 0),
+                can_play(&set, card, &p, 1, 0),
                 "B122 should be playable at {players} players"
             );
         }
@@ -672,7 +778,7 @@ mod verified_band_b_tests {
         );
         let p = Player::new(0, 0);
         assert!(
-            can_play(&set, card, &p, 0),
+            can_play(&set, card, &p, 1, 0),
             "B142 should be playable via can_play"
         );
     }
@@ -723,7 +829,7 @@ mod verified_band_b_tests {
         );
         let p = Player::new(0, 0);
         assert!(
-            can_play(&set, card, &p, 0),
+            can_play(&set, card, &p, 1, 0),
             "B144 should be playable via can_play"
         );
     }
@@ -791,6 +897,7 @@ mod verified_band_b_tests {
             &mut p,
             "B058",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -958,5 +1065,817 @@ mod verified_band_b_tests {
         r.improvements
             .extend([Improvement::Well, Improvement::Fireplace2]);
         assert_eq!(end_game_bonus(&set, &r), 1, "4+2 = 6 -> +1");
+    }
+}
+
+/// Test module for verified_b_afterworker_simple_cards (B017, B047, B051, B060, B063).
+#[cfg(test)]
+mod verified_b_afterworker_simple_tests {
+    use super::super::*;
+    use crate::card_events::dispatch_after_worker;
+    use crate::cards::CardState;
+    use std::collections::BTreeMap;
+
+    fn set() -> CardSet {
+        CardSet {
+            definitions: verified_b_afterworker_simple_cards(),
+        }
+    }
+
+    /// Drive the after-worker dispatch and resolve the optional decision
+    /// (B017/B060/B063) with the caller's choice. The contract's
+    /// "use the card" cases accept; the declined cases pass `false`.
+    /// Returns the public accumulation map so the B017 accumulation-return
+    /// contract (space_wood_delta +2) can be asserted.
+    fn after_worker_simple_choice(
+        set: &CardSet,
+        player: &mut Player,
+        space: Space,
+        confirmed: bool,
+    ) -> BTreeMap<Space, u32> {
+        let mut cards = CardState::default();
+        let mut players = vec![player.clone()];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        let mut well = BTreeMap::new();
+        let mut mirror = BTreeMap::new();
+        let mut accumulations = BTreeMap::new();
+        dispatch_after_worker(
+            set,
+            0,
+            space,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            1,
+            &used_spaces,
+            &mut accumulations,
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut mirror,
+        )
+        .unwrap();
+        if let Some(decision) = pending {
+            crate::card_events::apply_after_worker_optional_decision(
+                &decision,
+                &mut players[0],
+                &mut well,
+                &mut mirror,
+                Some(&mut accumulations),
+                1,
+                confirmed,
+            )
+            .expect("optional decision resolution applies");
+        }
+        *player = players[0].clone();
+        accumulations
+    }
+
+    fn after_worker_simple(set: &CardSet, player: &mut Player, space: Space) {
+        // The accepted case: the owner chooses to use the optional effect.
+        after_worker_simple_choice(set, player, space, true);
+    }
+
+    // B017 森林鋤 (Forest Plow): cost 1 wood; after using Forest/Copse/Grove,
+    // may pay 2 wood to plow 1 field. The wood stays on the accumulation space.
+    #[test]
+    fn b017_plows_field_on_forest_when_paying_wood() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 3; // 2 for effect + 1 to have some
+        let accums = after_worker_simple_choice(&s, &mut p, Space::Forest, true);
+        assert_eq!(p.supply.wood, 1); // 3 - 2 paid
+                                      // Field should be plowed
+        assert!(p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+        // The paid wood stays on the used accumulation space (spec
+        // `return_to: accumulation_space`; contract B017-normal
+        // space_wood_delta +2). Only the 2 paid wood returns.
+        assert_eq!(accums.get(&Space::Forest).copied(), Some(2));
+    }
+
+    // Contract data/bga-card-tests/B017.json B017-normal: setup wood 2 ->
+    // wood_delta -2, fields_delta +1, space_wood_delta +2.
+    #[test]
+    fn b017_paying_wood_returns_it_to_the_accumulation_space() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 2;
+        let accums = after_worker_simple_choice(&s, &mut p, Space::Forest, true);
+        assert_eq!(p.supply.wood, 0, "wood_delta -2");
+        let fields = p
+            .farm
+            .iter()
+            .filter(|c| matches!(c.tile, Tile::Field { .. }))
+            .count();
+        assert_eq!(fields, 1, "fields_delta +1");
+        assert_eq!(
+            accums.get(&Space::Forest).copied(),
+            Some(2),
+            "space_wood_delta +2"
+        );
+    }
+
+    // Contract B017-declined: setup wood 2, use_card false -> wood_delta 0.
+    // The owner can pay but declines: nothing is paid, plowed or accumulated.
+    #[test]
+    fn b017_declined_when_paying_is_possible() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 2;
+        let accums = after_worker_simple_choice(&s, &mut p, Space::Forest, false);
+        assert_eq!(p.supply.wood, 2, "a decline pays nothing");
+        assert!(
+            !p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })),
+            "a decline plows nothing"
+        );
+        assert!(
+            accums.get(&Space::Forest).copied().unwrap_or(0) == 0,
+            "a decline accumulates nothing"
+        );
+    }
+
+    #[test]
+    fn b017_plows_field_on_copse_when_paying_wood() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 3;
+        after_worker_simple(&s, &mut p, Space::Copse);
+        assert_eq!(p.supply.wood, 1);
+        assert!(p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+    }
+
+    #[test]
+    fn b017_plows_field_on_grove_when_paying_wood() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 3;
+        after_worker_simple(&s, &mut p, Space::Grove);
+        assert_eq!(p.supply.wood, 1);
+        assert!(p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+    }
+
+    #[test]
+    fn b017_declined_when_insufficient_wood() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 1; // Not enough to pay 2
+        after_worker_simple(&s, &mut p, Space::Forest);
+        assert_eq!(p.supply.wood, 1); // No wood spent
+                                      // No field plowed
+        assert!(!p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+    }
+
+    #[test]
+    fn b017_not_triggered_by_other_spaces() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B017".into());
+        p.supply.wood = 5;
+        after_worker_simple(&s, &mut p, Space::ClayPit);
+        after_worker_simple(&s, &mut p, Space::Fishing);
+        after_worker_simple(&s, &mut p, Space::DayLaborer);
+        assert_eq!(p.supply.wood, 5); // No wood spent
+        assert!(!p.farm.iter().any(|c| matches!(c.tile, Tile::Field { .. })));
+    }
+
+    #[test]
+    fn b017_cost_and_points() {
+        let s = set();
+        let card = s.definition("B017").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+    }
+
+    // B047 ニシン鍋 (Herring Pot): cost 1 clay; after using Fishing,
+    // place 1 food on each of the next 3 round spaces.
+    #[test]
+    fn b047_schedules_food_on_next_three_rounds() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B047".into());
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![p];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5, // round 5
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut std::collections::BTreeMap::new(),
+        )
+        .unwrap();
+        // Food scheduled on rounds 6, 7, 8
+        assert_eq!(well.get(&6), Some(&vec![0]));
+        assert_eq!(well.get(&7), Some(&vec![0]));
+        assert_eq!(well.get(&8), Some(&vec![0]));
+        assert_eq!(well.get(&9), None);
+    }
+
+    #[test]
+    fn b047_twice_accumulates() {
+        let s = set();
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("B047".into());
+        let mut used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        // First Fishing at round 5
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut std::collections::BTreeMap::new(),
+        )
+        .unwrap();
+        used_spaces.clear();
+        // Second Fishing at round 5 (same round)
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut std::collections::BTreeMap::new(),
+        )
+        .unwrap();
+        // Each use schedules 3 food, so 2 uses = 6 food on each of rounds 6,7,8
+        assert_eq!(well.get(&6), Some(&vec![0, 0]));
+        assert_eq!(well.get(&7), Some(&vec![0, 0]));
+        assert_eq!(well.get(&8), Some(&vec![0, 0]));
+    }
+
+    // P1-2 (PR #425 Round 1 review): a card-scheduled well reservation must
+    // land in BOTH `delayed_well` (the source of truth) and the public mirror
+    // `well_food_schedule` (PR #265 Finding A — buy_improvement writes both),
+    // and `start_round` must grant the real food from the source of truth.
+    #[test]
+    fn b047_schedule_writes_both_well_maps_and_grants_food() {
+        use crate::model::{Config, Game};
+
+        let s = set();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("B047".into());
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        let mut well = BTreeMap::new();
+        let mut mirror = BTreeMap::new();
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5, // round 5 -> reserves rounds 6, 7, 8
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut mirror,
+        )
+        .unwrap();
+
+        // Both maps carry the identical reservation (no public-only divergence).
+        for round in [6u8, 7, 8] {
+            assert_eq!(
+                well.get(&round),
+                Some(&vec![0]),
+                "delayed_well must hold round {round}"
+            );
+            assert_eq!(
+                mirror.get(&round),
+                Some(&vec![0]),
+                "public mirror must hold round {round}"
+            );
+        }
+        assert_eq!(well, mirror, "mirror must equal the source of truth");
+
+        // start_round grants the real food from the source of truth and consumes
+        // both entries (same pattern as
+        // mcts::tests::start_round_preserves_well_and_card_limits).
+        let mut game = Game::with_cards(
+            Config {
+                seed: 7,
+                ..Config::default()
+            },
+            verified_basic_card_set(2).unwrap(),
+        )
+        .unwrap();
+        game.public.round = 5;
+        game.delayed_well = well;
+        game.public.well_food_schedule = mirror;
+        let food_before = game.public.players[0].supply.food;
+        game.start_round().expect("start_round must succeed");
+        assert_eq!(game.public.round, 6);
+        assert_eq!(
+            game.public.players[0].supply.food,
+            food_before + 1,
+            "the reserved well food must be granted when round 6 starts"
+        );
+        assert!(!game.delayed_well.contains_key(&6));
+        assert!(!game.public.well_food_schedule.contains_key(&6));
+    }
+    #[test]
+    fn b047_not_triggered_by_other_spaces() {
+        let s = set();
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("B047".into());
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Forest,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut std::collections::BTreeMap::new(),
+        )
+        .unwrap();
+        assert!(well.is_empty());
+    }
+
+    #[test]
+    fn b047_cost_and_points() {
+        let s = set();
+        let card = s.definition("B047").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Clay, 1)]);
+        assert_eq!(card.points, 0);
+    }
+
+    // B051 採掘シャベル (Digging Spade): cost 1 wood; playable from round 7;
+    // after using Clay Pit, gain food equal to the number of wild boars.
+    #[test]
+    fn b051_gains_food_per_boar_on_clay_pit() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B051".into());
+        // Add 3 wild boars
+        p.pastures.push(crate::model::Pasture {
+            id: 0,
+            cells: vec![2, 3, 4],
+            animal: Some(Animal::Boar),
+            quantity: 3,
+        });
+        after_worker_simple(&s, &mut p, Space::ClayPit);
+        assert_eq!(p.supply.food, 3); // 3 boars * 1
+    }
+
+    #[test]
+    fn b051_zero_when_no_boars() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B051".into());
+        after_worker_simple(&s, &mut p, Space::ClayPit);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn b051_round_prerequisite_enforced() {
+        let s = set();
+        let card = s.definition("B051").unwrap();
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        // Round 6 -> cannot play (minimum round 7)
+        assert!(!can_play(&s, card, &p, 6, 0));
+        // Round 7 -> can play
+        assert!(can_play(&s, card, &p, 7, 0));
+    }
+
+    #[test]
+    fn b051_too_early_cannot_play() {
+        let s = set();
+        let card = s.definition("B051").unwrap();
+        let mut p = Player::new(0, 0);
+        p.supply.wood = 1;
+        // Round 1 -> cannot play
+        assert!(!can_play(&s, card, &p, 1, 0));
+    }
+
+    #[test]
+    fn b051_not_triggered_by_other_spaces() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B051".into());
+        p.pastures.push(crate::model::Pasture {
+            id: 0,
+            cells: vec![2, 3, 4],
+            animal: Some(Animal::Boar),
+            quantity: 2,
+        });
+        after_worker_simple(&s, &mut p, Space::Forest);
+        after_worker_simple(&s, &mut p, Space::Fishing);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn b051_cost_and_points() {
+        let s = set();
+        let card = s.definition("B051").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 1)]);
+        assert_eq!(card.points, 0);
+    }
+
+    // B060 仕込み水 (Brewing Water): free cost; after using Fishing,
+    // may pay 1 grain to place 1 food on each of the next 6 round spaces.
+    #[test]
+    fn b060_schedules_food_on_next_six_rounds_when_paying_grain() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B060".into());
+        p.supply.grain = 1;
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![p];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5, // round 5
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut std::collections::BTreeMap::new(),
+        )
+        .unwrap();
+        if let Some(decision) = pending {
+            // B060 is optional: the accepted contract cases confirm the pay.
+            crate::card_events::apply_after_worker_optional_decision(
+                &decision,
+                &mut players[0],
+                &mut well,
+                &mut std::collections::BTreeMap::new(),
+                None,
+                5,
+                true,
+            )
+            .expect("optional decision resolution applies");
+        }
+        // Food scheduled on rounds 6, 7, 8, 9, 10, 11
+        for r in 6..=11 {
+            assert_eq!(well.get(&r), Some(&vec![0]), "round {r} should have food");
+        }
+        assert_eq!(well.get(&12), None);
+        // Grain should be spent
+        assert_eq!(players[0].supply.grain, 0);
+    }
+
+    // Contract data/bga-card-tests/B060.json B060-decline: setup grain 1,
+    // pay_grain false -> rounds_with_food 0. The owner can pay but declines:
+    // nothing is paid and nothing is scheduled.
+    #[test]
+    fn b060_declined_when_paying_is_possible() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B060".into());
+        p.supply.grain = 1;
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![p];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut std::collections::BTreeMap::new(),
+        )
+        .unwrap();
+        let decision = pending.expect("an affordable owner gets the choice");
+        crate::card_events::apply_after_worker_optional_decision(
+            &decision,
+            &mut players[0],
+            &mut well,
+            &mut std::collections::BTreeMap::new(),
+            None,
+            5,
+            false, // declined
+        )
+        .expect("optional decision resolution applies");
+        assert!(well.is_empty(), "rounds_with_food 0");
+        assert_eq!(players[0].supply.grain, 1, "a decline pays nothing");
+    }
+
+    #[test]
+    fn b060_declined_when_insufficient_grain() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B060".into());
+        p.supply.grain = 0; // Cannot pay
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![p];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut std::collections::BTreeMap::new(),
+        )
+        .unwrap();
+        assert!(well.is_empty(), "no food scheduled when grain not paid");
+    }
+
+    #[test]
+    fn b060_late_round_schedules_only_up_to_14() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B060".into());
+        p.supply.grain = 1;
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![p];
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        // Round 12 -> schedules on 13, 14 only (15+ don't exist)
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Fishing,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            12,
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut std::collections::BTreeMap::new(),
+        )
+        .unwrap();
+        if let Some(decision) = pending {
+            // B060 is optional: the accepted contract cases confirm the pay.
+            crate::card_events::apply_after_worker_optional_decision(
+                &decision,
+                &mut players[0],
+                &mut well,
+                &mut std::collections::BTreeMap::new(),
+                None,
+                12,
+                true,
+            )
+            .expect("optional decision resolution applies");
+        }
+        assert_eq!(well.get(&13), Some(&vec![0]));
+        assert_eq!(well.get(&14), Some(&vec![0]));
+        assert_eq!(well.get(&15), None);
+        assert_eq!(well.get(&16), None);
+    }
+
+    #[test]
+    fn b060_not_triggered_by_other_spaces() {
+        let s = set();
+        let mut well = BTreeMap::new();
+        let mut cards = CardState::default();
+        let mut players = vec![Player::new(0, 0)];
+        players[0].played_cards.push("B060".into());
+        players[0].supply.grain = 1;
+        let used_spaces = std::collections::BTreeSet::new();
+        let mut event_budget = 100;
+        let mut card_uses = BTreeMap::new();
+        let card_use_limits = BTreeMap::new();
+        let mut pending = None;
+        dispatch_after_worker(
+            &s,
+            0,
+            Space::Forest,
+            &mut cards,
+            &mut players,
+            &mut vec![],
+            &mut well,
+            5,
+            &used_spaces,
+            &mut BTreeMap::new(),
+            &BTreeMap::new(),
+            &mut event_budget,
+            &mut card_uses,
+            &card_use_limits,
+            &mut pending,
+            true,
+            &mut std::collections::BTreeMap::new(),
+        )
+        .unwrap();
+        assert!(well.is_empty());
+    }
+
+    #[test]
+    fn b060_cost_and_points() {
+        let s = set();
+        let card = s.definition("B060").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert!(card.cost.is_empty());
+        assert_eq!(card.points, 0);
+    }
+
+    // B063 味見 (Tasting): cost 2 wood; 1 point; after using Lessons,
+    // optionally exchange 1 grain for 4 food.
+    #[test]
+    fn b063_exchanges_grain_for_food_on_lessons() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B063".into());
+        p.supply.grain = 1;
+        after_worker_simple(&s, &mut p, Space::Lessons);
+        assert_eq!(p.supply.grain, 0);
+        assert_eq!(p.supply.food, 4);
+    }
+
+    // Contract data/bga-card-tests/B063.json B063-decline: setup grain 1,
+    // exchange false -> grain/food delta 0. The owner can exchange but
+    // declines: both goods stay put.
+    #[test]
+    fn b063_declined_when_exchange_is_possible() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B063".into());
+        p.supply.grain = 1;
+        after_worker_simple_choice(&s, &mut p, Space::Lessons, false);
+        assert_eq!(p.supply.grain, 1, "a decline gives no grain");
+        assert_eq!(p.supply.food, 0, "a decline receives no food");
+    }
+
+    #[test]
+    fn b063_declined_when_no_grain() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B063".into());
+        p.supply.grain = 0;
+        after_worker_simple(&s, &mut p, Space::Lessons);
+        assert_eq!(p.supply.grain, 0);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn b063_not_triggered_by_other_spaces() {
+        let s = set();
+        let mut p = Player::new(0, 0);
+        p.played_cards.push("B063".into());
+        p.supply.grain = 5;
+        after_worker_simple(&s, &mut p, Space::Forest);
+        after_worker_simple(&s, &mut p, Space::ClayPit);
+        after_worker_simple(&s, &mut p, Space::Fishing);
+        assert_eq!(p.supply.grain, 5);
+        assert_eq!(p.supply.food, 0);
+    }
+
+    #[test]
+    fn b063_cost_and_points() {
+        let s = set();
+        let card = s.definition("B063").unwrap();
+        assert_eq!(card.kind, CardKind::MinorImprovement);
+        assert_eq!(card.cost, vec![(Good::Wood, 2)]);
+        assert_eq!(card.points, 1);
+    }
+
+    #[test]
+    fn afterworker_simple_cards_absent_from_two_player_preset() {
+        let preset = verified_basic_card_set(2).unwrap();
+        for id in ["B017", "B047", "B051", "B060", "B063"] {
+            assert!(
+                preset.definition(id).is_none(),
+                "{id} must stay out of the A/B two-player preset"
+            );
+        }
     }
 }

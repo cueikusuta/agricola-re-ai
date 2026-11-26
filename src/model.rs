@@ -297,6 +297,28 @@ impl Player {
             .filter(|c| matches!(c.tile, Tile::Field { .. }))
             .count()
     }
+    /// Plow one field on the first valid empty tile.
+    /// Returns Ok(()) on success, Err if no valid spot.
+    pub fn plow_field(&mut self) -> Result<(), String> {
+        // Find first empty tile that can be a field (adjacent to existing field or any if no fields)
+        let has_fields = self.fields() > 0;
+        for i in 0..FARM_CELLS {
+            if matches!(self.farm[i].tile, Tile::Empty)
+                && !self.farm[i].stable
+                && (!has_fields
+                    || neighbors(i)
+                        .iter()
+                        .any(|&j| matches!(self.farm[j].tile, Tile::Field { .. })))
+            {
+                self.farm[i].tile = Tile::Field {
+                    crop: None,
+                    remaining: 0,
+                };
+                return Ok(());
+            }
+        }
+        Err("no valid field spot".into())
+    }
     pub fn occupied_stables(&self) -> usize {
         self.farm.iter().filter(|c| c.stable).count()
     }
@@ -1423,7 +1445,7 @@ impl Game {
                 &mut self.delayed_well,
                 self.public.round,
                 &self.public.used,
-                &self.public.accumulations,
+                &mut self.public.accumulations,
                 &mut self.event_budget,
                 &mut self.public.card_uses,
                 &self.card_use_limits,
@@ -1827,6 +1849,7 @@ impl Game {
         let mut players = next.public.players.clone();
         let mut improvement_market = next.public.improvement_market.clone();
         let mut delayed_well = next.delayed_well.clone();
+        let mut well_food_schedule = next.public.well_food_schedule.clone();
         let round = next.public.round;
         let used_spaces = next.public.used.clone();
         let mut event_budget = next.event_budget;
@@ -1867,6 +1890,7 @@ impl Game {
                             delayed_well: &mut delayed_well,
                             round,
                             used_spaces: &used_spaces,
+                            well_food_schedule: Some(&mut well_food_schedule),
                             accumulations: None,
                             animal_accumulations: None,
                             event_budget: &mut event_budget,
@@ -1927,6 +1951,7 @@ impl Game {
                             next.cards = cards;
                             next.public.improvement_market = improvement_market;
                             next.delayed_well = delayed_well;
+                            next.public.well_food_schedule = well_food_schedule;
                             next.event_budget = event_budget;
                             next.public.card_uses = card_uses;
                             return self.commit_second_pause(
@@ -1977,6 +2002,7 @@ impl Game {
                             next.cards = cards;
                             next.public.improvement_market = improvement_market;
                             next.delayed_well = delayed_well;
+                            next.public.well_food_schedule = well_food_schedule;
                             next.event_budget = event_budget;
                             next.public.card_uses = card_uses;
                             return self.commit_second_pause(
@@ -2003,6 +2029,7 @@ impl Game {
                         cards: &mut cards,
                         improvement_market: &mut improvement_market,
                         delayed_well: &mut delayed_well,
+                        well_food_schedule: Some(&mut well_food_schedule),
                         round,
                         accumulations: None,
                         animal_accumulations: None,
@@ -2062,6 +2089,7 @@ impl Game {
                         next.cards = cards;
                         next.public.improvement_market = improvement_market;
                         next.delayed_well = delayed_well;
+                        next.public.well_food_schedule = well_food_schedule;
                         next.event_budget = event_budget;
                         next.public.card_uses = card_uses;
                         return self.commit_second_pause(
@@ -2118,9 +2146,10 @@ impl Game {
                         delayed_well: &mut delayed_well,
                         // A140 ショベル運搬人 reads the OTHER clay accumulation
                         // at resolution time; the paused state already reflects
+                        well_food_schedule: Some(&mut well_food_schedule),
                         // the core action's take, so the current public map is
                         // exactly what the original dispatch saw.
-                        accumulations: Some(&next.public.accumulations),
+                        accumulations: Some(&mut next.public.accumulations),
                         animal_accumulations: Some(&next.public.animal_accumulations),
                         round,
                         used_spaces: &used_spaces,
@@ -2182,6 +2211,7 @@ impl Game {
                         next.cards = cards;
                         next.public.improvement_market = improvement_market;
                         next.delayed_well = delayed_well;
+                        next.public.well_food_schedule = well_food_schedule;
                         next.event_budget = event_budget;
                         next.public.card_uses = card_uses;
                         return self.commit_second_pause(
@@ -2237,6 +2267,7 @@ impl Game {
         next.cards = cards;
         next.public.improvement_market = improvement_market;
         next.delayed_well = delayed_well;
+        next.public.well_food_schedule = well_food_schedule;
         next.event_budget = event_budget;
         next.public.card_uses = card_uses;
         next.pending = pending; // Should remain None
@@ -2478,10 +2509,11 @@ impl Game {
                     round: self.public.round,
                     used_spaces: &self.public.used,
                     // A140 ショベル運搬人 reads the OTHER clay accumulation
+                    well_food_schedule: Some(&mut self.public.well_food_schedule),
                     // at resolution time; the paused state was committed after
                     // the core action's take, so the current public map holds
                     // exactly the amounts the original scan saw.
-                    accumulations: Some(&self.public.accumulations),
+                    accumulations: Some(&mut self.public.accumulations),
                     animal_accumulations: Some(&self.public.animal_accumulations),
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
@@ -2549,6 +2581,32 @@ impl Game {
                         }
                     }
                     Ok(())
+                } else if matches!(
+                    &pending.kind,
+                    crate::pending::PendingKind::Custom { payload, .. }
+                        if payload.get("type").and_then(|v| v.as_str())
+                            == Some("after_worker_optional")
+                ) {
+                    // B017/B060/B063 optional after-worker effects: the
+                    // resolution payload confirms or declines the owner's
+                    // choice (data/bga-card-tests B017-declined,
+                    // B060-decline, B063-decline). The shared resolver in
+                    // card_events applies payment + effect on confirmation;
+                    // a decline changes nothing.
+                    let confirmed = payload
+                        .get("confirmed")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    let beneficiary = pending.player;
+                    crate::card_events::apply_after_worker_optional_decision(
+                        pending,
+                        &mut self.public.players[beneficiary],
+                        &mut self.delayed_well,
+                        &mut self.public.well_food_schedule,
+                        Some(&mut self.public.accumulations),
+                        self.public.round,
+                        confirmed,
+                    )
                 } else {
                     // Extensible: other custom effects handle their own payload
                     Ok(())

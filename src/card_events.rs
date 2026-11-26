@@ -79,6 +79,11 @@ fn effect_phase(effect: &CardEffect) -> TriggerPhase {
         CardEffect::AfterWorkerGain { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainIfUsed { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainAnimal { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerSpendPlowField { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerScheduleFood { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerGainPerAnimal { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerPayToScheduleFood { .. } => TriggerPhase::After,
+        CardEffect::AfterWorkerOptionalExchange { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => TriggerPhase::After,
         CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => TriggerPhase::After,
         // A068 アスパラガスの贈り物: after-worker conditional gain — After phase.
@@ -155,9 +160,19 @@ pub struct DispatchContext<'a> {
     /// round-start dispatcher for accumulation-grew conditions (A049 営巣地)
     /// and by the after-worker dispatcher for dynamic-count effects
     /// (A140 ショベル運搬人 reads the OTHER clay accumulation). `None` on
-    /// every other dispatch path. This is a runtime-only borrow: the struct
-    /// is never serialized, so save/observation formats are untouched.
-    pub accumulations: Option<&'a std::collections::BTreeMap<Space, u32>>,
+    /// every other dispatch path. Writable because B017 森林鋤 returns the
+    /// paid wood to the used accumulation space (spec `return_to:
+    /// accumulation_space`); read-only consumers just borrow through it.
+    /// Runtime-only borrow: the struct is never serialized, so
+    /// save/observation formats are untouched.
+    pub accumulations: Option<&'a mut std::collections::BTreeMap<Space, u32>>,
+    /// Public mirror of `delayed_well` (PR #265 Finding A: `delayed_well` is the
+    /// private source of truth, `PublicState::well_food_schedule` its public
+    /// mirror). Provided by the after-worker dispatcher, whose handlers can
+    /// schedule well food (B047/B060); `None` on dispatch paths that cannot
+    /// fire those effects. Handlers that reserve well food write BOTH maps so
+    /// observations (MCTS, save/restore) stay in sync with the source of truth.
+    pub well_food_schedule: Option<&'a mut BTreeMap<u8, Vec<usize>>>,
     /// Public animal-market accumulations (space -> standing animals), the
     /// pig/sheep/cattle ledger kept separately from `accumulations` because
     /// animals are not goods. Provided by the after-worker dispatcher for
@@ -468,7 +483,8 @@ fn resolve_phase_scan(
             delayed_well: ctx.delayed_well,
             round: ctx.round,
             used_spaces: ctx.used_spaces,
-            accumulations: ctx.accumulations,
+            accumulations: ctx.accumulations.as_deref_mut(),
+            well_food_schedule: ctx.well_food_schedule.as_deref_mut(),
             animal_accumulations: ctx.animal_accumulations,
             event_budget: ctx.event_budget,
             card_uses: ctx.card_uses,
@@ -691,6 +707,53 @@ fn resolve_phase_scan(
                     animal,
                     amount,
                 } => handle_after_worker_gain_animal(ctx, space, animal, *amount, trigger_data)?,
+                CardEffect::AfterWorkerSpendPlowField {
+                    space,
+                    good,
+                    amount,
+                    plow,
+                } => handle_after_worker_spend_plow_field(
+                    ctx,
+                    space,
+                    good,
+                    *amount,
+                    *plow,
+                    trigger_data,
+                )?,
+                CardEffect::AfterWorkerScheduleFood { space, rounds } => {
+                    handle_after_worker_schedule_food(ctx, space, *rounds, trigger_data)?
+                }
+                CardEffect::AfterWorkerGainPerAnimal { space, good, per } => {
+                    handle_after_worker_gain_per_animal(ctx, space, good, *per, trigger_data)?
+                }
+                CardEffect::AfterWorkerPayToScheduleFood {
+                    space,
+                    pay_good,
+                    pay_amount,
+                    rounds,
+                } => handle_after_worker_pay_to_schedule_food(
+                    ctx,
+                    space,
+                    pay_good,
+                    *pay_amount,
+                    *rounds,
+                    trigger_data,
+                )?,
+                CardEffect::AfterWorkerOptionalExchange {
+                    space,
+                    give,
+                    give_amount,
+                    receive,
+                    receive_amount,
+                } => handle_after_worker_optional_exchange(
+                    ctx,
+                    space,
+                    give,
+                    *give_amount,
+                    receive,
+                    *receive_amount,
+                    trigger_data,
+                )?,
                 CardEffect::AfterWorkerGainIfOwnsAnimal {
                     space,
                     animal,
@@ -1308,6 +1371,21 @@ fn effect_condition_holds(
         CardEffect::AfterWorkerGainAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
+        CardEffect::AfterWorkerSpendPlowField { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
+        CardEffect::AfterWorkerScheduleFood { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
+        CardEffect::AfterWorkerGainPerAnimal { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
+        CardEffect::AfterWorkerPayToScheduleFood { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
+        CardEffect::AfterWorkerOptionalExchange { space, .. } => {
+            trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
+        }
         CardEffect::AfterWorkerGainIfOwnsAnimal { space, .. } => {
             trigger.site == EventKind::WorkerPlaced && trigger.space == Some(*space)
         }
@@ -1582,6 +1660,53 @@ pub fn execute_chosen_triggers(
                 animal,
                 amount,
             } => handle_after_worker_gain_animal(ctx, space, animal, *amount, trigger_data)?,
+            CardEffect::AfterWorkerSpendPlowField {
+                space,
+                good,
+                amount,
+                plow,
+            } => handle_after_worker_spend_plow_field(
+                ctx,
+                space,
+                good,
+                *amount,
+                *plow,
+                trigger_data,
+            )?,
+            CardEffect::AfterWorkerScheduleFood { space, rounds } => {
+                handle_after_worker_schedule_food(ctx, space, *rounds, trigger_data)?
+            }
+            CardEffect::AfterWorkerGainPerAnimal { space, good, per } => {
+                handle_after_worker_gain_per_animal(ctx, space, good, *per, trigger_data)?
+            }
+            CardEffect::AfterWorkerPayToScheduleFood {
+                space,
+                pay_good,
+                pay_amount,
+                rounds,
+            } => handle_after_worker_pay_to_schedule_food(
+                ctx,
+                space,
+                pay_good,
+                *pay_amount,
+                *rounds,
+                trigger_data,
+            )?,
+            CardEffect::AfterWorkerOptionalExchange {
+                space,
+                give,
+                give_amount,
+                receive,
+                receive_amount,
+            } => handle_after_worker_optional_exchange(
+                ctx,
+                space,
+                give,
+                *give_amount,
+                receive,
+                *receive_amount,
+                trigger_data,
+            )?,
             CardEffect::AfterWorkerGainIfOwnsAnimal {
                 space,
                 animal,
@@ -1981,6 +2106,7 @@ fn handle_prerequisite(
         crate::cards::CardRequirement::MinimumImprovements(min) => {
             crate::cards::improvement_count_in_front(ctx.card_set, p) >= u32::from(*min)
         }
+        crate::cards::CardRequirement::MinimumRound(min) => ctx.round >= *min,
         crate::cards::CardRequirement::MinimumPlayers(_) => true, // Validated at card set level
         crate::cards::CardRequirement::PastureCount(n) => p.pastures.len() >= usize::from(*n),
         // A068 アスパラガスの贈り物: empty fields are plowed fields with no crop
@@ -2270,6 +2396,7 @@ fn handle_after_worker_gain_other_accumulation_food(
     };
     let amount = ctx
         .accumulations
+        .as_deref()
         .and_then(|map| map.get(&other).copied())
         .unwrap_or(0);
     if amount == 0 {
@@ -2738,6 +2865,348 @@ fn handle_after_worker_gain_animal(
     Ok(EffectResult::Resolved)
 }
 
+/// B017 森林鋤: after using the trigger space (Forest/Copse/Grove), the owner
+/// MAY pay `amount` of `good` (2 wood) to plow `plow` field(s); the paid wood
+/// stays on the used accumulation space (spec `return_to:
+/// accumulation_space`, data/bga-card-specs/B017.json).
+///
+/// Spec `optional: true, decision_owner: owner`: paying is the owner's choice,
+/// so an affordable owner pauses the chain on a Custom PendingDecision instead
+/// of firing unconditionally. The payment, the plow and the accumulation
+/// return all happen at resolution
+/// ([`apply_after_worker_optional_decision`]); a decline changes nothing.
+fn handle_after_worker_spend_plow_field(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    good: &Good,
+    amount: u32,
+    plow: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        // Offer the choice only when the cost is payable; an owner who cannot
+        // pay simply gets nothing (same as a decline).
+        if ctx.player.supply.get(*good) >= amount {
+            let decision = PendingDecision::new(
+                0, // stamped by the engine
+                ctx.card_owner,
+                crate::pending::PendingKind::Custom {
+                    source_card: "B017".to_string(),
+                    // The parameters ride in the kind payload: the
+                    // phase scan overwrites `context` with its resume
+                    // bookkeeping (C147 keeps its parameters in the
+                    // kind for the same reason).
+                    payload: serde_json::json!({
+                    "type": "after_worker_optional",
+                    "card": "B017",
+                    "space": space,
+                    "action": "spend_plow_field",
+                    "cost_good": good,
+                    "cost_amount": amount,
+                    "plow": plow,
+                    // The paid wood returns to the used accumulation space.
+                    "space_return_amount": amount,
+                    }),
+                },
+                String::new(),
+                serde_json::json!({}),
+            );
+            return Ok(EffectResult::Pending(decision));
+        }
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B047 ニシン鍋: after using the trigger space, schedule food on the next N round spaces.
+fn handle_after_worker_schedule_food(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    rounds: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        let current_round = ctx.round;
+        let beneficiary = ctx.beneficiary;
+        // PR #265 Finding A: delayed_well is the source of truth, but the
+        // public mirror must carry the same reservation (buy_improvement
+        // writes both; a card-scheduled reservation is no different).
+        let mirror = ctx
+            .well_food_schedule
+            .as_mut()
+            .ok_or("after-worker well schedule requires the public mirror")?;
+        for i in 1..=rounds {
+            let target_round = current_round + i as u8;
+            if target_round <= 14 {
+                ctx.delayed_well
+                    .entry(target_round)
+                    .or_default()
+                    .push(beneficiary);
+                mirror.entry(target_round).or_default().push(beneficiary);
+            }
+        }
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B051 採掘シャベル: after using the trigger space, gain food equal to the
+/// number of wild boars on your farm.
+fn handle_after_worker_gain_per_animal(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    good: &Good,
+    per: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        let p = &mut ctx.player;
+        let animal_count = p.animal_count(Animal::Boar);
+        let gain = animal_count.checked_mul(per).ok_or("gain overflow")?;
+        let next = p
+            .supply
+            .get(*good)
+            .checked_add(gain)
+            .ok_or("resource overflow")?;
+        p.supply.set(*good, next);
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B060 仕込み水: after using the trigger space (Fishing), the owner MAY pay
+/// `pay_amount` of `pay_good` (1 grain) to place 1 food on each of the next
+/// `rounds` round spaces (capped at round 14).
+///
+/// Spec `optional: true, decision_owner: owner`: an affordable owner pauses on
+/// a Custom PendingDecision; the payment and the well reservation (source of
+/// truth AND public mirror, PR #265 Finding A) happen at resolution
+/// ([`apply_after_worker_optional_decision`]). A decline changes nothing.
+fn handle_after_worker_pay_to_schedule_food(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    pay_good: &Good,
+    pay_amount: u32,
+    rounds: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        // Offer the choice only when the grain is payable; a decline and an
+        // unpayable cost are indistinguishable on the board (nothing happens).
+        if ctx.player.supply.get(*pay_good) >= pay_amount {
+            let decision = PendingDecision::new(
+                0, // stamped by the engine
+                ctx.card_owner,
+                crate::pending::PendingKind::Custom {
+                    source_card: "B060".to_string(),
+                    // The parameters ride in the kind payload: the
+                    // phase scan overwrites `context` with its resume
+                    // bookkeeping (C147 keeps its parameters in the
+                    // kind for the same reason).
+                    payload: serde_json::json!({
+                    "type": "after_worker_optional",
+                    "card": "B060",
+                    "space": space,
+                    "action": "pay_to_schedule_food",
+                    "cost_good": pay_good,
+                    "cost_amount": pay_amount,
+                    "rounds": rounds,
+                    }),
+                },
+                String::new(),
+                serde_json::json!({}),
+            );
+            return Ok(EffectResult::Pending(decision));
+        }
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// B063 味見: after using the trigger space (Lessons), the owner MAY exchange
+/// `give_amount` of `give` (1 grain) for `receive_amount` of `receive`
+/// (4 food).
+///
+/// Spec `optional: true, decision_owner: owner`: an affordable owner pauses on
+/// a Custom PendingDecision; the exchange happens at resolution
+/// ([`apply_after_worker_optional_decision`]). A decline changes nothing.
+///
+/// Timing note (spec notes: "before paying the occupation cost"): the engine
+/// dispatches card effects only AFTER the core action resolves, so the
+/// exchange necessarily follows the Lessons occupation play/cost payment in
+/// this implementation. The pre-cost ordering — exchanged food paying the
+/// occupation cost — is recorded as an explicit unresolved item under
+/// AGENTS.md §3 (issue cueikusuta/agricola-re-ai#525: the engine's pause
+/// machinery is post-work-chain only, so a pre-cost pause inside the Lessons
+/// arm would break the one-shot apply/replay paths), not silently dropped.
+fn handle_after_worker_optional_exchange(
+    ctx: &mut DispatchContext<'_>,
+    space: &Space,
+    give: &Good,
+    give_amount: u32,
+    receive: &Good,
+    receive_amount: u32,
+    trigger: &PhaseTriggerData,
+) -> Result<EffectResult, String> {
+    if trigger.space == Some(*space) {
+        // Offer the choice only when the grain is payable; a decline and an
+        // unpayable cost are indistinguishable on the board (nothing happens).
+        if ctx.player.supply.get(*give) >= give_amount {
+            let decision = PendingDecision::new(
+                0, // stamped by the engine
+                ctx.card_owner,
+                crate::pending::PendingKind::Custom {
+                    source_card: "B063".to_string(),
+                    // The parameters ride in the kind payload: the
+                    // phase scan overwrites `context` with its resume
+                    // bookkeeping (C147 keeps its parameters in the
+                    // kind for the same reason).
+                    payload: serde_json::json!({
+                    "type": "after_worker_optional",
+                    "card": "B063",
+                    "space": space,
+                    "action": "optional_exchange",
+                    "cost_good": give,
+                    "cost_amount": give_amount,
+                    "receive_good": receive,
+                    "receive_amount": receive_amount,
+                    }),
+                },
+                String::new(),
+                serde_json::json!({}),
+            );
+            return Ok(EffectResult::Pending(decision));
+        }
+    }
+    Ok(EffectResult::Resolved)
+}
+
+/// Resolve an optional after-worker decision created by the B017/B060/B063
+/// handlers ([`handle_after_worker_spend_plow_field`],
+/// [`handle_after_worker_pay_to_schedule_food`],
+/// [`handle_after_worker_optional_exchange`]).
+///
+/// `confirmed == false` declines the optional effect: nothing is paid and
+/// nothing is gained. On confirmation the effect parameters are read from the
+/// decision context (engine-written, so a missing or unknown field is a hard
+/// error rather than a silent drop) and applied to `player`:
+/// - B017: pay the wood, plow the field(s), and return the paid wood to the
+///   used accumulation space (spec `return_to: accumulation_space`).
+/// - B060: pay the grain and reserve well food on the next N round spaces in
+///   BOTH the source of truth (`delayed_well`) and its public mirror
+///   (PR #265 Finding A), capped at round 14.
+/// - B063: exchange the goods.
+///
+/// Shared by the engine's resolution arm (`Game::apply_pending_resolution`)
+/// and the synthetic dispatch harness, so both paths apply identical behavior.
+pub fn apply_after_worker_optional_decision(
+    pending: &PendingDecision,
+    player: &mut Player,
+    delayed_well: &mut BTreeMap<u8, Vec<usize>>,
+    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
+    accumulations: Option<&mut BTreeMap<Space, u32>>,
+    round: u8,
+    confirmed: bool,
+) -> Result<(), String> {
+    // Parameters live in the Custom kind payload (the phase scan overwrites
+    // `context` with resume bookkeeping).
+    let crate::pending::PendingKind::Custom { payload, .. } = &pending.kind else {
+        return Err("decision is not an after-worker optional effect".into());
+    };
+    if payload.get("type").and_then(|v| v.as_str()) != Some("after_worker_optional") {
+        return Err("decision is not an after-worker optional effect".into());
+    }
+    if !confirmed {
+        // Declined: the optional effect does not fire at all.
+        return Ok(());
+    }
+    let card = payload
+        .get("card")
+        .and_then(|v| v.as_str())
+        .ok_or("after-worker optional decision missing card")?;
+    let action = payload
+        .get("action")
+        .and_then(|v| v.as_str())
+        .ok_or("after-worker optional decision missing action")?;
+    let cost_good: Good = payload
+        .get("cost_good")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .ok_or("after-worker optional decision missing cost_good")?;
+    let cost_amount = payload
+        .get("cost_amount")
+        .and_then(|v| v.as_u64())
+        .ok_or("after-worker optional decision missing cost_amount")? as u32;
+    let beneficiary = pending.player;
+    match (card, action) {
+        ("B017", "spend_plow_field") => {
+            let plow = payload.get("plow").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
+            let space_return = payload
+                .get("space_return_amount")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(u64::from(cost_amount)) as u32;
+            let space: Space = payload
+                .get("space")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .ok_or("after-worker optional decision missing space")?;
+            player.supply.pay(cost_good, cost_amount)?;
+            for _ in 0..plow {
+                player
+                    .plow_field()
+                    .map_err(|e| format!("plow failed: {e}"))?;
+            }
+            // The paid wood stays on the used accumulation space (spec
+            // `return_to: accumulation_space`); contract B017-normal asserts
+            // space_wood_delta +2.
+            if space_return > 0 {
+                let accums =
+                    accumulations.ok_or("B017 accumulation return requires the public map")?;
+                *accums.entry(space).or_insert(0) += space_return;
+            }
+            Ok(())
+        }
+        ("B060", "pay_to_schedule_food") => {
+            let rounds = payload
+                .get("rounds")
+                .and_then(|v| v.as_u64())
+                .ok_or("after-worker optional decision missing rounds")?
+                as u32;
+            player.supply.pay(cost_good, cost_amount)?;
+            for i in 1..=rounds {
+                let target_round = round + i as u8;
+                if target_round <= 14 {
+                    delayed_well
+                        .entry(target_round)
+                        .or_default()
+                        .push(beneficiary);
+                    well_food_schedule
+                        .entry(target_round)
+                        .or_default()
+                        .push(beneficiary);
+                }
+            }
+            Ok(())
+        }
+        ("B063", "optional_exchange") => {
+            let receive_good: Good = payload
+                .get("receive_good")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .ok_or("after-worker optional decision missing receive_good")?;
+            let receive_amount = payload
+                .get("receive_amount")
+                .and_then(|v| v.as_u64())
+                .ok_or("after-worker optional decision missing receive_amount")?
+                as u32;
+            player.supply.pay(cost_good, cost_amount)?;
+            let next = player
+                .supply
+                .get(receive_good)
+                .checked_add(receive_amount)
+                .ok_or("resource overflow")?;
+            player.supply.set(receive_good, next);
+            Ok(())
+        }
+        _ => Err(format!(
+            "unknown after-worker optional effect: card {card} action {action}"
+        )),
+    }
+}
+
 /// A050 (others half): each time ANY player uses the specified space,
 /// all players EXCEPT the card owner gain `amount` of `good`.
 fn handle_after_any_worker_others_gain(
@@ -3007,6 +3476,7 @@ fn handle_start_round_gain_if_accumulation_grew(
 ) -> Result<EffectResult, String> {
     let current = ctx
         .accumulations
+        .as_deref()
         .and_then(|map| map.get(&space).copied())
         .unwrap_or(0);
     let per_round = space.accumulation().map(|(_, n)| n).unwrap_or(0);
@@ -3038,6 +3508,7 @@ fn handle_start_round_gain_if_accumulation_at_least(
 ) -> Result<EffectResult, String> {
     let current = ctx
         .accumulations
+        .as_deref()
         .and_then(|map| map.get(&space).copied())
         .unwrap_or(0);
     if current >= min {
@@ -3529,6 +4000,7 @@ fn handle_start_round_gain_if_goods_on_round_spaces(
     // in (`None` elsewhere), so the Option gates the check naturally.
     let has_round_space_goods = trigger_data.revealed_round_cards.iter().any(|card| {
         ctx.accumulations
+            .as_deref()
             .is_some_and(|map| map.get(&Space::from(*card)).is_some_and(|&n| n > 0))
     });
     if has_round_space_goods {
@@ -3633,6 +4105,7 @@ pub fn dispatch_play(
         round,
         used_spaces,
         accumulations: None,
+        well_food_schedule: None,
         animal_accumulations: None,
         event_budget,
         card_uses,
@@ -3972,10 +4445,10 @@ pub fn dispatch_after_worker(
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
     // Public space accumulations (space -> amount) as they stand after the
-    // core action resolved, threaded read-only for dynamic-count effects
-    // (A140 ショベル運搬人 reads the OTHER clay accumulation). Runtime-only
-    // borrow: the dispatcher never mutates or serializes it.
-    accumulations: &std::collections::BTreeMap<Space, u32>,
+    // core action resolved, threaded read-write: A140 ショベル運搬人 reads the
+    // OTHER clay accumulation and B017 森林鋤 returns the paid wood to the used
+    // space. Runtime-only borrow: the dispatcher never serializes it.
+    accumulations: &mut std::collections::BTreeMap<Space, u32>,
     // Public animal-market accumulations (space -> standing animals) as they
     // stand after the core action resolved; the pig/sheep/cattle ledger kept
     // separately from `accumulations` because animals are not goods. Threaded
@@ -3987,6 +4460,11 @@ pub fn dispatch_after_worker(
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
     allow_choose_trigger_order_pause: bool,
+    // Public mirror of `delayed_well` (PR #265 Finding A: `delayed_well` is
+    // the private source of truth, `PublicState::well_food_schedule` its
+    // public mirror). Handlers that schedule well food (B047/B060) write BOTH
+    // maps; the dispatcher forwards this into `DispatchContext`.
+    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
 ) -> Result<Transition, String> {
     dispatch_after_worker_with_previous(
         card_set,
@@ -4005,6 +4483,7 @@ pub fn dispatch_after_worker(
         card_use_limits,
         pending,
         allow_choose_trigger_order_pause,
+        well_food_schedule,
         None,
     )
 }
@@ -4024,13 +4503,14 @@ pub fn dispatch_after_worker_with_previous(
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
-    accumulations: &std::collections::BTreeMap<Space, u32>,
+    accumulations: &mut std::collections::BTreeMap<Space, u32>,
     animal_accumulations: &std::collections::BTreeMap<Space, u32>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
     pending: &mut Option<PendingDecision>,
     allow_choose_trigger_order_pause: bool,
+    well_food_schedule: &mut BTreeMap<u8, Vec<usize>>,
     previous_player: Option<Player>,
 ) -> Result<Transition, String> {
     // Clone players for all_players parameter to avoid borrow checker issues
@@ -4060,6 +4540,7 @@ pub fn dispatch_after_worker_with_previous(
         round,
         used_spaces,
         accumulations: Some(accumulations),
+        well_food_schedule: Some(well_food_schedule),
         animal_accumulations: Some(animal_accumulations),
         event_budget,
         card_uses,
@@ -4112,6 +4593,7 @@ pub fn dispatch_after_worker_with_previous(
         round,
         used_spaces,
         accumulations: Some(accumulations),
+        well_food_schedule: Some(well_food_schedule),
         animal_accumulations: Some(animal_accumulations),
         event_budget,
         card_uses,
@@ -4145,7 +4627,7 @@ pub fn dispatch_start_round(
     delayed_well: &mut BTreeMap<u8, Vec<usize>>,
     round: u8,
     used_spaces: &std::collections::BTreeSet<Space>,
-    accumulations: &std::collections::BTreeMap<Space, u32>,
+    accumulations: &mut std::collections::BTreeMap<Space, u32>,
     event_budget: &mut u32,
     card_uses: &mut BTreeMap<String, u32>,
     card_use_limits: &BTreeMap<String, u32>,
@@ -4166,6 +4648,7 @@ pub fn dispatch_start_round(
             round,
             used_spaces,
             accumulations: Some(accumulations),
+            well_food_schedule: None,
             animal_accumulations: None,
             event_budget,
             card_uses,
@@ -4249,6 +4732,7 @@ pub fn dispatch_after_clay_construction(
         round,
         used_spaces,
         accumulations: None,
+        well_food_schedule: None,
         animal_accumulations: None,
         event_budget,
         card_uses,
@@ -4326,6 +4810,7 @@ pub fn dispatch_harvest_field(
         round,
         used_spaces,
         accumulations: None,
+        well_food_schedule: None,
         animal_accumulations: None,
         event_budget,
         card_uses,
@@ -4405,6 +4890,7 @@ pub fn dispatch_after_harvest_complete(
         round,
         used_spaces,
         accumulations: None,
+        well_food_schedule: None,
         animal_accumulations: None,
         event_budget,
         card_uses,
@@ -4475,6 +4961,7 @@ pub fn dispatch_after_harvest_bake(
         round,
         used_spaces,
         accumulations: None,
+        well_food_schedule: None,
         animal_accumulations: None,
         event_budget,
         card_uses,
@@ -4983,13 +5470,14 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -5032,7 +5520,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -5086,7 +5574,7 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -5236,13 +5724,14 @@ mod tests {
                 &mut well,
                 1,
                 &used,
-                &std::collections::BTreeMap::new(),
+                &mut std::collections::BTreeMap::new(),
                 &std::collections::BTreeMap::new(),
                 &mut c.budget,
                 &mut c.uses,
                 &c.limits,
                 &mut pending,
                 false, // test: not post-work chain
+                &mut std::collections::BTreeMap::new(),
             )
             .unwrap();
             assert_eq!(
@@ -5280,7 +5769,7 @@ mod tests {
             &mut well,
             2,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -5490,13 +5979,14 @@ mod tests {
                     &mut well,
                     1,
                     &used,
-                    &std::collections::BTreeMap::new(),
+                    &mut std::collections::BTreeMap::new(),
                     &std::collections::BTreeMap::new(),
                     &mut c.budget,
                     &mut c.uses,
                     &c.limits,
                     &mut pending,
                     false, // test: not post-work chain
+                    &mut std::collections::BTreeMap::new(),
                 )
                 .unwrap();
 
@@ -5535,7 +6025,7 @@ mod tests {
                 &mut well,
                 round,
                 &std::collections::BTreeSet::new(),
-                &std::collections::BTreeMap::new(),
+                &mut std::collections::BTreeMap::new(),
                 &mut c.budget,
                 &mut c.uses,
                 &c.limits,
@@ -5692,6 +6182,7 @@ mod tests {
             &mut legacy[0],
             "M1",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -5720,6 +6211,7 @@ mod tests {
                 &mut ctx.players[0],
                 "M1",
                 CardKind::MinorImprovement,
+                1,
                 0,
             )
             .unwrap();
@@ -5788,7 +6280,7 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -5853,7 +6345,7 @@ mod tests {
             &mut BTreeMap::new(),
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -5915,13 +6407,14 @@ mod tests {
             &mut well,
             1,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         );
 
         // The chain should pause with a pending decision
@@ -6007,13 +6500,14 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -6045,13 +6539,14 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -6113,13 +6608,14 @@ mod tests {
             &mut well,
             1,
             &used_spaces,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -6149,13 +6645,14 @@ mod tests {
             &mut well,
             1,
             &used_spaces,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -6210,7 +6707,7 @@ mod tests {
             &mut well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -6240,7 +6737,7 @@ mod tests {
             &mut well,
             2,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut budget,
             &mut uses,
             &limits,
@@ -6316,13 +6813,14 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -6359,13 +6857,14 @@ mod tests {
             &mut delayed_well,
             1,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             false, // test: not post-work chain
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
 
@@ -6607,6 +7106,279 @@ mod tests {
             "each effect must fire exactly once"
         );
         assert_eq!(game.event_budget, 62, "two effects consume two budget");
+    }
+
+    /// B017 森林鋤 optional decision on the real engine path (Round 2 review
+    /// finding 3): the after-worker dispatch pauses on a Custom
+    /// PendingDecision, `resolve_pending_and_resume` applies the pay + plow +
+    /// accumulation return when confirmed, and applies nothing when declined.
+    /// The declined case is contract data/bga-card-tests/B017.json
+    /// B017-declined (wood 2 available, use_card false -> wood_delta 0).
+    ///
+    /// The game is driven through the real engine from explicit hands (the
+    /// `hands_with_*_in_seat0` pattern of tests/ch_b102_four_player_animal.rs):
+    /// round 1 gathers wood at Forest and plays B017 from hand at
+    /// MeetingPlace, round 2 uses Forest again and pauses on the optional
+    /// decision. Every state change is a logged legal action, so the
+    /// paused+resolved game also replays byte-identically.
+    #[test]
+    fn b017_optional_decision_e2e_engine_path_pause_resume() {
+        use crate::cards::card_set_for_game;
+        use crate::engine::{Action, Detail};
+        use crate::model::{Config, Game};
+
+        /// Explicit 7+7 hands with B017 seeded into seat 0's minor hand
+        /// (drawn from the experimental pool, which doubles as the registry /
+        /// pool acceptance check for B017 at this player count).
+        fn hands_with_b017_in_seat0() -> Vec<Vec<String>> {
+            let set = card_set_for_game(2, true);
+            assert!(set.definition("B017").is_some(), "B017 in the 2p pool");
+            let mut minors: Vec<String> = set
+                .definitions
+                .iter()
+                .filter(|c| c.kind == crate::cards::CardKind::MinorImprovement)
+                .map(|c| c.id.clone())
+                .collect();
+            let occupations: Vec<String> = set
+                .definitions
+                .iter()
+                .filter(|c| c.kind == crate::cards::CardKind::Occupation)
+                .map(|c| c.id.clone())
+                .collect();
+            assert!(
+                minors.len() >= 14,
+                "pool needs 14 minors, has {}",
+                minors.len()
+            );
+            assert!(
+                occupations.len() >= 14,
+                "pool needs 14 occupations, has {}",
+                occupations.len()
+            );
+            // B017 first in the minor pool so seat 0's first minor is B017.
+            minors.retain(|id| id != "B017");
+            let mut minor_pool = vec!["B017".to_string()];
+            minor_pool.extend(minors);
+            let mut hands: Vec<Vec<String>> = vec![Vec::new(); 2];
+            let mut cursor = 0usize;
+            for hand in hands.iter_mut() {
+                for _ in 0..7 {
+                    hand.push(minor_pool[cursor].clone());
+                    cursor += 1;
+                }
+            }
+            let mut cursor = 0usize;
+            for hand in hands.iter_mut() {
+                for _ in 0..7 {
+                    hand.push(occupations[cursor].clone());
+                    cursor += 1;
+                }
+            }
+            hands
+        }
+
+        fn fresh_game() -> Game {
+            Game::with_cards_and_hands_with_start_player(
+                Config {
+                    players: 2,
+                    seed: 0xB017,
+                    additional_action_space_enabled: false,
+                },
+                card_set_for_game(2, true),
+                hands_with_b017_in_seat0(),
+                0,
+            )
+            .expect("game setup with B017 in seat 0's hand")
+        }
+
+        /// Round 1: seat 0 gathers the Forest wood, then plays B017 from hand
+        /// at MeetingPlace (paying its printed 1 wood). Seat 1 fills its quota,
+        /// round 2 opens with Forest refilled. Round 1-3 carry no harvest, so
+        /// no feeding/breeding plans are involved.
+        fn drive_to_round_two_with_b017_played(game: &mut Game) {
+            assert_eq!(game.public.active_player, 0, "seat 0 starts");
+            game.apply(Action {
+                space: Space::Forest,
+                detail: Detail::None,
+            })
+            .expect("round 1 Forest gathers wood");
+            assert!(
+                game.public.players[0].supply.wood >= 1,
+                "at least 1 wood pays the B017 cost"
+            );
+            game.apply(Action {
+                space: Space::DayLaborer,
+                detail: Detail::None,
+            })
+            .expect("seat 1 first worker");
+            game.apply(Action {
+                space: Space::MeetingPlace,
+                detail: Detail::PlayMinor {
+                    card_id: "B017".to_string(),
+                },
+            })
+            .expect("B017 played from hand through the engine route");
+            assert!(
+                game.public.players[0]
+                    .played_cards
+                    .iter()
+                    .any(|id| id == "B017"),
+                "B017 must reach the played area"
+            );
+            game.apply(Action {
+                space: Space::GrainSeeds,
+                detail: Detail::None,
+            })
+            .expect("seat 1 second worker closes round 1");
+            assert_eq!(game.public.round, 2, "round 2 opened");
+            assert_eq!(game.public.active_player, 0, "seat 0 starts round 2");
+        }
+
+        let confirm = serde_json::json!({ "confirmed": true });
+        let decline = serde_json::json!({ "confirmed": false });
+
+        // --- confirmed: wood paid, field plowed, wood returns to the space ---
+        let mut game = fresh_game();
+        drive_to_round_two_with_b017_played(&mut game);
+        let transition = game.apply_with_plans(
+            Action {
+                space: Space::Forest,
+                detail: Detail::None,
+            },
+            None,
+            None,
+            &crate::harvest::SimpleHarvestDetails,
+        );
+        assert!(
+            matches!(transition, Ok(Transition::Paused(_))),
+            "an affordable B017 owner must get the choice, got: {transition:?}"
+        );
+        let decision = game.pending().expect("the pause is recorded");
+        match &decision.kind {
+            crate::pending::PendingKind::Custom { source_card, .. } => {
+                assert_eq!(source_card, "B017");
+            }
+            other => panic!("unexpected pending kind: {other:?}"),
+        }
+        // The core action already ran (Forest takes the accumulated wood), so
+        // compare against the committed mid-action state, not the setup.
+        let wood_at_pause = game.public.players[0].supply.wood;
+        assert!(
+            wood_at_pause >= 2,
+            "the effect was offered: wood is payable"
+        );
+        let fields_at_pause = game.public.players[0]
+            .farm
+            .iter()
+            .filter(|c| matches!(c.tile, crate::model::Tile::Field { .. }))
+            .count();
+        let forest_acc_at_pause = game
+            .public
+            .accumulations
+            .get(&Space::Forest)
+            .copied()
+            .unwrap_or(0);
+        let outcome = game
+            .resolve_pending_and_resume(crate::pending::PendingResolution::Custom {
+                payload: confirm,
+            })
+            .expect("resolution must succeed");
+        assert_eq!(outcome, Transition::Completed, "resume must complete");
+        assert!(!game.has_pending(), "no pending after resume");
+        assert_eq!(
+            game.public.players[0].supply.wood,
+            wood_at_pause - 2,
+            "wood paid"
+        );
+        let fields_after = game.public.players[0]
+            .farm
+            .iter()
+            .filter(|c| matches!(c.tile, crate::model::Tile::Field { .. }))
+            .count();
+        assert_eq!(fields_after, fields_at_pause + 1, "one field plowed");
+        assert_eq!(
+            game.public.accumulations.get(&Space::Forest).copied(),
+            Some(forest_acc_at_pause + 2),
+            "the paid wood stays on the accumulation space"
+        );
+        assert!(game.public.used.contains(&Space::Forest), "space used");
+
+        // --- the paused+resolved game replays byte-identically ---
+        let replay = Game::replay_with_setup_and_start_player(
+            game.config.clone(),
+            (*game.card_set).clone(),
+            game.log.initial_hands.clone(),
+            game.log.initial_start_player_override,
+            &game.log.events,
+        )
+        .expect("logged actions replay");
+        assert_eq!(replay.state_hash(), game.state_hash());
+        assert_eq!(replay.integrity_hash(), game.integrity_hash());
+
+        // --- declined: nothing is paid, plowed or accumulated ---
+        let mut game = fresh_game();
+        drive_to_round_two_with_b017_played(&mut game);
+        let transition = game.apply_with_plans(
+            Action {
+                space: Space::Forest,
+                detail: Detail::None,
+            },
+            None,
+            None,
+            &crate::harvest::SimpleHarvestDetails,
+        );
+        assert!(
+            matches!(transition, Ok(Transition::Paused(_))),
+            "an affordable B017 owner must get the choice, got: {transition:?}"
+        );
+        let wood_at_pause = game.public.players[0].supply.wood;
+        assert!(
+            wood_at_pause >= 2,
+            "the effect was offered: wood is payable"
+        );
+        let forest_acc_at_pause = game
+            .public
+            .accumulations
+            .get(&Space::Forest)
+            .copied()
+            .unwrap_or(0);
+        let outcome = game
+            .resolve_pending_and_resume(crate::pending::PendingResolution::Custom {
+                payload: decline,
+            })
+            .expect("resolution must succeed");
+        assert_eq!(outcome, Transition::Completed, "resume must complete");
+        assert_eq!(
+            game.public.players[0].supply.wood, wood_at_pause,
+            "a decline pays nothing"
+        );
+        assert!(
+            !game.public.players[0]
+                .farm
+                .iter()
+                .any(|c| matches!(c.tile, crate::model::Tile::Field { .. })),
+            "a decline plows nothing"
+        );
+        assert_eq!(
+            game.public
+                .accumulations
+                .get(&Space::Forest)
+                .copied()
+                .unwrap_or(0),
+            forest_acc_at_pause,
+            "a decline accumulates nothing"
+        );
+        assert!(game.public.used.contains(&Space::Forest), "space used");
+        let replay = Game::replay_with_setup_and_start_player(
+            game.config.clone(),
+            (*game.card_set).clone(),
+            game.log.initial_hands.clone(),
+            game.log.initial_start_player_override,
+            &game.log.events,
+        )
+        .expect("logged actions replay");
+        assert_eq!(replay.state_hash(), game.state_hash());
+        assert_eq!(replay.integrity_hash(), game.integrity_hash());
     }
 
     /// P0-3 reproduction: save/load/replay after ChooseTriggerOrder pause/resume
@@ -7241,7 +8013,7 @@ mod tests {
                 &mut well,
                 round,
                 &BTreeSet::new(),
-                &std::collections::BTreeMap::new(),
+                &mut std::collections::BTreeMap::new(),
                 &mut c.budget,
                 &mut c.uses,
                 &c.limits,
@@ -7420,7 +8192,7 @@ mod tests {
         let mut market = vec![];
         let mut well = BTreeMap::new();
         let mut used = std::collections::BTreeSet::new();
-        let accumulations = BTreeMap::new();
+        let mut accumulations = BTreeMap::new();
         let animal_accumulations = BTreeMap::new();
         used.insert(Space::DayLaborer);
         let mut pending = None;
@@ -7434,13 +8206,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &accumulations,
+            &mut accumulations,
             &animal_accumulations,
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -7970,6 +8743,7 @@ mod tests {
             &mut legacy,
             "A117",
             CardKind::Occupation,
+            1,
             0,
         )
         .unwrap();
@@ -7999,6 +8773,7 @@ mod tests {
                 &mut ctx.players[0],
                 "A117",
                 CardKind::Occupation,
+                1,
                 0,
             )
             .unwrap();
@@ -8086,13 +8861,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // C106 has HarvestFieldGain (VegetablesHarvested) which should ONLY fire
@@ -8129,13 +8905,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // B057 has StartRoundGain which should ONLY fire on round start, NOT on
@@ -8171,13 +8948,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // C111 has StartRoundGainIfFoodAtLeastRound which should ONLY fire on
@@ -8215,13 +8993,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // B118 has 2 rooms by default; the event_kind check prevents firing.
@@ -8256,13 +9035,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -8307,13 +9087,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         // B050 has HarvestFieldGain (Animals) which should ONLY fire on harvest
@@ -8361,13 +9142,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -8409,13 +9191,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -8457,13 +9240,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -8499,13 +9283,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -8547,13 +9332,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(
@@ -8624,7 +9410,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -8749,7 +9535,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -8783,7 +9569,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -8866,7 +9652,7 @@ mod tests {
             &mut well,
             4,
             &std::collections::BTreeSet::new(),
-            &std::collections::BTreeMap::new(),
+            &mut std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -9753,6 +10539,8 @@ mod tests {
         c.players[0].played_cards = vec!["A099".into(), "A101".into()];
         let mut market = vec![];
         let mut well = BTreeMap::new();
+        let mut well_mirror = BTreeMap::new();
+        let mut accumulations = BTreeMap::new();
         let mut used = std::collections::BTreeSet::new();
         used.insert(Space::DayLaborer);
         let mut pending = None;
@@ -9767,13 +10555,14 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut accumulations,
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             true, // allow_pause=true: post-work chain
+            &mut well_mirror,
         );
         // Should complete without ChooseTriggerOrder pause
         assert!(
@@ -9802,6 +10591,7 @@ mod tests {
         let mut well = BTreeMap::new();
         let used = std::collections::BTreeSet::new();
         let mut pending = None;
+        let mut accumulations = BTreeMap::new();
 
         // First: RoundStart dispatch (food gain)
         let result1 = dispatch_start_round(
@@ -9812,7 +10602,7 @@ mod tests {
             &mut well,
             4,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut accumulations,
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -9963,6 +10753,8 @@ mod tests {
 
         // 3) Worker dispatcher on Forest: grants C076's Forest effect once (+2 wood).
         //    A063's bake-kind effect must NOT fire here.
+        let mut well_mirror = BTreeMap::new();
+        let mut accumulations = BTreeMap::new();
         dispatch_after_worker(
             &set,
             0,
@@ -9973,13 +10765,14 @@ mod tests {
             &mut well,
             5,
             &used,
-            &std::collections::BTreeMap::new(),
+            &mut accumulations,
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
             &mut pending,
             false,
+            &mut well_mirror,
         )
         .unwrap();
         assert_eq!(
@@ -10434,7 +11227,7 @@ mod a052_throwing_axe_tests {
         let limits = BTreeMap::new();
         let mut pending = None;
         let used = BTreeSet::new();
-        let accumulations = BTreeMap::new();
+        let mut accumulations = BTreeMap::new();
         let mut animal_accumulations = BTreeMap::new();
         if boars > 0 {
             animal_accumulations.insert(Space::PigMarket, boars);
@@ -10449,13 +11242,14 @@ mod a052_throwing_axe_tests {
             &mut well,
             1,
             &used,
-            &accumulations,
+            &mut accumulations,
             &animal_accumulations,
             &mut budget,
             &mut uses,
             &limits,
             &mut pending,
             false,
+            &mut std::collections::BTreeMap::new(),
         )
         .expect("dispatch_after_worker must succeed");
         players

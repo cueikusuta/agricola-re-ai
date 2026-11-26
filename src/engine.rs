@@ -535,13 +535,14 @@ impl Game {
             &mut self.delayed_well,
             self.public.round,
             &self.public.used,
-            &self.public.accumulations,
+            &mut self.public.accumulations,
             &self.public.animal_accumulations,
             &mut self.event_budget,
             &mut self.public.card_uses,
             &self.card_use_limits,
             &mut self.pending,
             allow_pause, // post-work chain: allow ChooseTriggerOrder pause only when allow_pause=true
+            &mut self.public.well_food_schedule,
             Some(previous.clone()),
         )?;
         if let Transition::Paused(_) = result {
@@ -623,7 +624,7 @@ impl Game {
             .count();
         let can_minor = own_cards.iter().any(|c| {
             c.kind == crate::cards::CardKind::MinorImprovement
-                && crate::cards::can_play(&self.card_set, c, me, 0)
+                && crate::cards::can_play(&self.card_set, c, me, self.public.round, 0)
         });
         list.retain(|&s| {
             if self.public.used.contains(&s)
@@ -641,7 +642,13 @@ impl Game {
                 }
                 Space::Lessons => own_cards.iter().any(|c| {
                     c.kind == crate::cards::CardKind::Occupation
-                        && crate::cards::can_play(&self.card_set, c, me, u32::from(occupations > 0))
+                        && crate::cards::can_play(
+                            &self.card_set,
+                            c,
+                            me,
+                            self.public.round,
+                            u32::from(occupations > 0),
+                        )
                 }),
                 Space::ExtraLessons => {
                     let fee = if players == 3 || occupations >= 2 {
@@ -651,7 +658,7 @@ impl Game {
                     };
                     own_cards.iter().any(|c| {
                         c.kind == crate::cards::CardKind::Occupation
-                            && crate::cards::can_play(&self.card_set, c, me, fee)
+                            && crate::cards::can_play(&self.card_set, c, me, self.public.round, fee)
                     })
                 }
                 Space::FamilyGrowthWithRoom => {
@@ -764,7 +771,14 @@ impl Game {
             hand.iter()
                 .filter(|id| {
                     self.card_set.definition(id).is_some_and(|card| {
-                        card.kind == kind && crate::cards::can_play(&self.card_set, card, me, fee)
+                        card.kind == kind
+                            && crate::cards::can_play(
+                                &self.card_set,
+                                card,
+                                me,
+                                self.public.round,
+                                fee,
+                            )
                     })
                 })
                 .cloned()
@@ -1634,6 +1648,7 @@ impl Game {
                             &mut self.public.players[id],
                             card_id,
                             crate::cards::CardKind::MinorImprovement,
+                            self.public.round,
                             0,
                         )?;
                         // Canonical zone move: hand -> played (2016 Lookout p.6)
@@ -1709,6 +1724,7 @@ impl Game {
                             &mut self.public.players[id],
                             card_id,
                             crate::cards::CardKind::MinorImprovement,
+                            self.public.round,
                             0,
                         )?;
                         let mut ctx = CardMoveCtx {
@@ -1830,6 +1846,7 @@ impl Game {
                     &mut self.public.players[id],
                     card_id,
                     crate::cards::CardKind::Occupation,
+                    self.public.round,
                     fee,
                 )?;
                 // Canonical zone move: hand -> played (2016 Lookout p.6)
@@ -1938,6 +1955,7 @@ impl Game {
                         &mut self.public.players[id],
                         card_id,
                         crate::cards::CardKind::MinorImprovement,
+                        self.public.round,
                         0,
                     )?;
                     // Move card from hand to played
@@ -2056,6 +2074,7 @@ impl Game {
                         &mut self.public.players[id],
                         card_id,
                         crate::cards::CardKind::MinorImprovement,
+                        self.public.round,
                         0,
                     )?;
                     // Move card from hand to played
@@ -2133,6 +2152,7 @@ impl Game {
                         &mut self.public.players[id],
                         card_id,
                         crate::cards::CardKind::MinorImprovement,
+                        self.public.round,
                         0,
                     )?;
                     // Move card from hand to played
@@ -3696,7 +3716,16 @@ mod m6_passive_engine_tests {
             definitions: verified_passive_cards(),
         };
         let mut hand = vec![id.into()];
-        play(&set, &mut hand, p, id, set.definition(id).unwrap().kind, 0).unwrap();
+        play(
+            &set,
+            &mut hand,
+            p,
+            id,
+            set.definition(id).unwrap().kind,
+            1,
+            0,
+        )
+        .unwrap();
     }
     #[test]
     fn a012_capacity_with_stable() {
@@ -3784,6 +3813,7 @@ mod m6_extra_passive_engine_tests {
             &mut p,
             "B010",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -3803,6 +3833,7 @@ mod m6_extra_passive_engine_tests {
             &mut p,
             "A143",
             CardKind::Occupation,
+            1,
             0,
         )
         .unwrap();
@@ -4107,6 +4138,7 @@ mod grow_with_minor_regression_tests {
             &mut game.public.players[0],
             "B010",
             CardKind::MinorImprovement,
+            0,
             0,
         )
         .unwrap();

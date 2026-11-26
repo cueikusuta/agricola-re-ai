@@ -278,6 +278,47 @@ pub enum CardEffect {
         animal: Animal,
         amount: u32,
     },
+
+    /// B017 森林鋤 / B060 仕込み水: after using the trigger space, may pay cost
+    /// to gain a resource or perform an action.
+    AfterWorkerSpendPlowField {
+        space: Space,
+        good: Good,
+        amount: u32,
+        plow: u32,
+    },
+
+    /// B047 ニシン鍋: after using the trigger space, schedule food on the next N round spaces.
+    AfterWorkerScheduleFood {
+        space: Space,
+        rounds: u32,
+    },
+
+    /// B051 採掘シャベル: after using the trigger space, gain food equal to the
+    /// number of wild boars on your farm.
+    AfterWorkerGainPerAnimal {
+        space: Space,
+        good: Good,
+        per: u32,
+    },
+
+    /// B060 仕込み水: after using the trigger space, may pay grain to schedule food
+    /// on the next N round spaces.
+    AfterWorkerPayToScheduleFood {
+        space: Space,
+        pay_good: Good,
+        pay_amount: u32,
+        rounds: u32,
+    },
+
+    /// B063 味見: after using the trigger space, optionally exchange 1 grain for 4 food.
+    AfterWorkerOptionalExchange {
+        space: Space,
+        give: Good,
+        give_amount: u32,
+        receive: Good,
+        receive_amount: u32,
+    },
     /// B002 小牧場 (Mini Pasture): on play, fence `spaces` empty farmyard
     /// cell(s) into a pasture at no wood cost. The engine picks the cell
     /// deterministically (adjacent to an existing pasture when one exists);
@@ -676,6 +717,11 @@ impl CardEffect {
             CardEffect::OnPlayGainAnimal { .. } => "on_play_gain_animal",
             CardEffect::OnPlayGainEachWithAtLeast { .. } => "on_play_gain_each_with_at_least",
             CardEffect::AfterWorkerGainAnimal { .. } => "after_worker_gain_animal",
+            CardEffect::AfterWorkerSpendPlowField { .. } => "after_worker_spend_plow_field",
+            CardEffect::AfterWorkerScheduleFood { .. } => "after_worker_schedule_food",
+            CardEffect::AfterWorkerGainPerAnimal { .. } => "after_worker_gain_per_animal",
+            CardEffect::AfterWorkerPayToScheduleFood { .. } => "after_worker_pay_to_schedule_food",
+            CardEffect::AfterWorkerOptionalExchange { .. } => "after_worker_optional_exchange",
             CardEffect::AfterAnyWorkerOthersGain { .. } => "after_any_worker_others_gain",
             CardEffect::HarvestStartGainIfFields { .. } => "harvest_start_gain_if_fields",
             CardEffect::OnPlayBuildPasture { .. } => "on_play_build_pasture",
@@ -882,6 +928,7 @@ pub enum CardRequirement {
     MinimumPlayers(u8),
     MaximumPlayers(u8),
     MinimumImprovements(u8),
+    MinimumRound(u8),
     /// A068 アスパラガスの贈り物 (Asparagus Gift): the player must have at
     /// least `n` EMPTY fields — plowed `Tile::Field { crop: None }` cells with
     /// no C006 stone planted on them (`field_stones == 0`; a stone field
@@ -1065,10 +1112,22 @@ impl CardSet {
                 || card.effects.iter().any(|effect| {
                     let amount = match effect {
                         CardEffect::OnPlayGain { amount, .. }
-                        | CardEffect::AfterWorkerGain { amount, .. } => *amount,
+                        | CardEffect::AfterWorkerGain { amount, .. }
+                        | CardEffect::OnPlayGainAnimal { amount, .. }
+                        | CardEffect::AfterWorkerGainAnimal { amount, .. }
+                        | CardEffect::AfterWorkerSpendPlowField { amount, .. }
+                        | CardEffect::AfterWorkerGainPerAnimal { per: amount, .. }
+                        | CardEffect::AfterWorkerPayToScheduleFood {
+                            pay_amount: amount, ..
+                        }
+                        | CardEffect::AfterWorkerOptionalExchange {
+                            give_amount: amount,
+                            ..
+                        } => *amount,
                         CardEffect::EndGameBonus { .. }
                         | CardEffect::Prerequisite { .. }
-                        | CardEffect::Passive { .. } => 1,
+                        | CardEffect::Passive { .. }
+                        | CardEffect::AfterWorkerScheduleFood { .. } => 1,
                         #[cfg(test)]
                         CardEffect::PendingProbe { .. } => 1,
                         CardEffect::OnPlayGainPerStored { amount, .. }
@@ -1085,9 +1144,7 @@ impl CardSet {
                         | CardEffect::AfterClayConstructionGain { amount, .. }
                         | CardEffect::AfterHarvestBakeGain { amount }
                         | CardEffect::OnPlayGainPerCount { amount, .. }
-                        | CardEffect::AfterImprovementPlayedGain { amount, .. }
-                        | CardEffect::OnPlayGainAnimal { amount, .. }
-                        | CardEffect::AfterWorkerGainAnimal { amount, .. } => *amount,
+                        | CardEffect::AfterImprovementPlayedGain { amount, .. } => *amount,
                         CardEffect::AfterHarvestGain { amount, .. }
                         | CardEffect::AfterHarvestGainIfAtLeast { amount, .. }
                         | CardEffect::StartRoundGainIfFamilyAndRooms { amount, .. }
@@ -1166,6 +1223,13 @@ impl CardSet {
                 })
                 || card.effects.iter().any(|effect| {
                     matches!(effect, CardEffect::OnPlayGainPerStored { divisor: 0, .. })
+                        || matches!(
+                            effect,
+                            CardEffect::AfterWorkerOptionalExchange {
+                                receive_amount: 0,
+                                ..
+                            }
+                        )
                         || matches!(
                             effect,
                             CardEffect::HarvestFieldGain {
@@ -1653,7 +1717,14 @@ pub(crate) fn sown_field_count(player: &Player) -> usize {
         .count()
 }
 
-pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_food: u32) -> bool {
+/// Check if a player can play a card (costs and prerequisites).
+pub fn can_play(
+    set: &CardSet,
+    card: &CardDefinition,
+    player: &Player,
+    round: u8,
+    extra_food: u32,
+) -> bool {
     if !affordable(card, player, extra_food) {
         return false;
     }
@@ -1682,6 +1753,7 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
             CardRequirement::MinimumImprovements(min) => {
                 improvement_count_in_front(set, player) >= u32::from(*min)
             }
+            CardRequirement::MinimumRound(min) => round >= *min,
             CardRequirement::MinimumFences(min) => player.fences.len() >= usize::from(*min),
             CardRequirement::MinimumPlayers(_) => true,
             CardRequirement::MaximumPlayers(_) => true,
@@ -1723,13 +1795,14 @@ pub fn play(
     player: &mut Player,
     id: &str,
     kind: CardKind,
+    round: u8,
     extra_food: u32,
 ) -> Result<(), String> {
     let card = set.definition(id).ok_or("unknown card")?;
     if card.kind != kind || !hand.iter().any(|x| x == id) {
         return Err("card is not in the player's hand or is the wrong kind".into());
     }
-    if !can_play(set, card, player, extra_food) {
+    if !can_play(set, card, player, round, extra_food) {
         return Err("cannot pay card costs or prerequisites are unmet".into());
     }
     for (good, amount) in card_costs(card, player, extra_food) {
@@ -1756,13 +1829,14 @@ pub(crate) fn play_validate_pay(
     player: &mut Player,
     id: &str,
     kind: CardKind,
+    round: u8,
     extra_food: u32,
 ) -> Result<(), String> {
     let card = set.definition(id).ok_or("unknown card")?;
     if card.kind != kind || !hand.iter().any(|x| x == id) {
         return Err("card is not in the player's hand or is the wrong kind".into());
     }
-    if !can_play(set, card, player, extra_food) {
+    if !can_play(set, card, player, round, extra_food) {
         return Err("cannot pay card costs or prerequisites are unmet".into());
     }
     for (good, amount) in card_costs(card, player, extra_food) {
@@ -2272,11 +2346,11 @@ mod card_prerequisite_tests {
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
         p.played_cards.push("one".into());
-        assert!(!can_play(&set, &card, &p, 0));
+        assert!(!can_play(&set, &card, &p, 1, 0));
         p.played_cards.push("two".into());
-        assert!(can_play(&set, &card, &p, 0));
+        assert!(can_play(&set, &card, &p, 1, 0));
         let (_, too_many) = prerequisite_card(CardRequirement::MaximumOccupations(1));
-        assert!(!can_play(&set, &too_many, &p, 0));
+        assert!(!can_play(&set, &too_many, &p, 1, 0));
     }
 
     #[test]
@@ -2287,14 +2361,14 @@ mod card_prerequisite_tests {
         let card = set.definition("A038").unwrap();
         let mut p = Player::new(0, 0);
         p.pet = Some(Animal::Sheep);
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         p.pastures.push(crate::model::Pasture {
             id: 0,
             cells: vec![2, 3, 4],
             animal: Some(Animal::Sheep),
             quantity: 4,
         });
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
     }
 
     #[test]
@@ -2313,12 +2387,12 @@ mod card_prerequisite_tests {
             crop: Some(Crop::Vegetable),
             remaining: 1,
         };
-        assert!(!can_play(&set, &card, &p, 0));
+        assert!(!can_play(&set, &card, &p, 1, 0));
         p.farm[3].tile = Tile::Field {
             crop: Some(Crop::Grain),
             remaining: 1,
         };
-        assert!(can_play(&set, &card, &p, 0));
+        assert!(can_play(&set, &card, &p, 1, 0));
     }
 
     #[test]
@@ -2360,6 +2434,7 @@ mod card_prerequisite_tests {
             &mut p,
             "C006",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -2387,14 +2462,14 @@ mod card_prerequisite_tests {
             remaining: 2,
         };
         // 1 枚だけでは足りない
-        assert!(!can_play(&set, &card, &p, 0));
+        assert!(!can_play(&set, &card, &p, 1, 0));
         // 石を置かれた空き畑も栽培中とみなされ、要件を満たす
         p.farm[1].tile = Tile::Field {
             crop: None,
             remaining: 0,
         };
         p.farm[1].field_stones = 1;
-        assert!(can_play(&set, &card, &p, 0));
+        assert!(can_play(&set, &card, &p, 1, 0));
     }
 
     #[test]
@@ -2809,6 +2884,7 @@ mod a063_baking_tests {
             &mut player,
             "A063",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -3285,7 +3361,7 @@ mod p1_2_repro_tests {
             insert_cards(players, &verified_simple_occupations(players));
             insert_cards(players, &verified_multiplayer_passive_cards(players));
         }
-        let count_independent: [Vec<CardDefinition>; 12] = [
+        let count_independent: [Vec<CardDefinition>; 13] = [
             verified_immediate_resource_cards(),
             verified_round_and_harvest_cards(),
             verified_passive_cards(),
@@ -3297,6 +3373,10 @@ mod p1_2_repro_tests {
             verified_band_c_cards(),
             verified_band_d_cards(),
             verified_band_e_cards(),
+            // B-deck chapter 1: after_worker_space simple gain cards
+            // (B017/B047/B051/B060/B063) — mirrors build_default_registry's
+            // independent_cards collection (not in the verified 2p preset).
+            verified_b_afterworker_simple_cards(),
             // on_play build_stable cards (A001/C002/E001)
             verified_build_stable_cards(),
             // B-deck chapter 1: on-play simple cards (B002/B003/B005/B008/B009)

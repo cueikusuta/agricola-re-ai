@@ -361,13 +361,13 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut p = Player::new(0, 0);
         p.supply.wood = 3;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         p.played_cards
             .extend(["occ1".to_string(), "occ2".to_string(), "occ3".to_string()]);
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         // 支払えなければ出せない。
         p.supply.wood = 2;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
     }
 
     #[test]
@@ -397,7 +397,7 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut hand = vec!["C106".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "C106", CardKind::Occupation, 0).unwrap();
+        play(&set, &mut hand, &mut p, "C106", CardKind::Occupation, 1, 0).unwrap();
         assert_eq!(p.supply.food, 3);
         assert_eq!(p.played_cards, vec!["C106"]);
     }
@@ -431,7 +431,7 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut hand = vec!["C111".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "C111", CardKind::Occupation, 0).unwrap();
+        play(&set, &mut hand, &mut p, "C111", CardKind::Occupation, 1, 0).unwrap();
         assert_eq!(p.played_cards, vec!["C111"]);
     }
 
@@ -444,7 +444,7 @@ mod verified_band_c_tests {
         assert_eq!(card.points, 0);
         let mut hand = vec!["C116".to_string()];
         let mut p = Player::new(0, 0);
-        play(&set, &mut hand, &mut p, "C116", CardKind::Occupation, 0).unwrap();
+        play(&set, &mut hand, &mut p, "C116", CardKind::Occupation, 1, 0).unwrap();
         assert_eq!(p.supply.wood, 1);
         assert_eq!(p.played_cards, vec!["C116"]);
     }
@@ -477,7 +477,7 @@ mod verified_band_c_tests {
         let mut p = Player::new(0, 0);
         p.supply.food = 1;
         let card = set.definition(&card_id).unwrap();
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         // One occupation played → can play
         p.played_cards.push("occ1".into());
         set.definitions.extend([CardDefinition {
@@ -490,7 +490,7 @@ mod verified_band_c_tests {
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         }]);
         let card = set.definition(&card_id).unwrap();
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
     }
 
     #[test]
@@ -529,6 +529,7 @@ mod verified_band_c_tests {
             &mut p,
             &card_id,
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -576,6 +577,7 @@ mod verified_band_c_tests {
             &mut p,
             &card_id,
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -625,7 +627,7 @@ mod verified_band_c_tests {
         // No pastures → cannot play
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         // One pasture → can play
         p.pastures.push(Pasture {
             id: 0,
@@ -633,7 +635,7 @@ mod verified_band_c_tests {
             animal: None,
             quantity: 0,
         });
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
     }
 
     #[test]
@@ -660,6 +662,7 @@ mod verified_band_c_tests {
             &mut p,
             "C007",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -722,6 +725,7 @@ mod verified_band_c_tests {
             &mut p,
             "C007",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -778,6 +782,7 @@ mod verified_band_c_tests {
             &mut p,
             "C007",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();

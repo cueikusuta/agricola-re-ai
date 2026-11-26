@@ -409,13 +409,14 @@ fn dispatch_after_worker_b122_owner_triggers() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));
@@ -445,13 +446,14 @@ fn dispatch_after_worker_b122_non_owner_no_trigger() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));
@@ -478,13 +480,14 @@ fn dispatch_after_worker_b122_unrelated_space_no_trigger() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));
@@ -510,13 +513,14 @@ fn dispatch_after_worker_b142_owner_grain_seeds() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));
@@ -543,13 +547,14 @@ fn dispatch_after_worker_b142_owner_farmland_no_trigger() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));
@@ -577,13 +582,14 @@ fn dispatch_after_worker_b144_owner_triggers() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));
@@ -602,13 +608,14 @@ fn dispatch_after_worker_b144_owner_triggers() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));
@@ -632,13 +639,14 @@ fn dispatch_after_worker_b144_non_owner_no_trigger() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));
@@ -665,13 +673,14 @@ fn dispatch_after_worker_a155_owner_triggers() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));
@@ -697,13 +706,14 @@ fn dispatch_after_worker_a155_non_owner_no_trigger() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));
@@ -728,13 +738,14 @@ fn dispatch_after_worker_a155_unrelated_space_no_trigger() {
         &mut game.delayed_well,
         game.public.round,
         &game.public.used,
-        &game.public.accumulations,
+        &mut game.public.accumulations,
         &game.public.animal_accumulations,
         &mut game.event_budget,
         &mut game.public.card_uses,
         &game.card_use_limits,
         &mut game.pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .unwrap();
     assert!(matches!(transition, Transition::Completed));

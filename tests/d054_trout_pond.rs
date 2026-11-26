@@ -24,6 +24,7 @@ fn set_with_d054() -> CardSet {
 
 fn d054_round_start_food(owner: usize, accumulations: &BTreeMap<Space, u32>) -> (u32, u32) {
     // owner = seat 0 (D054 holder), seat 1 = other player (no D054).
+    let mut accumulations = accumulations.clone();
     let set = set_with_d054();
     let mut cards = CardState::default();
     let mut players = vec![Player::new(0, 0), Player::new(1, 0)];
@@ -41,7 +42,7 @@ fn d054_round_start_food(owner: usize, accumulations: &BTreeMap<Space, u32>) -> 
         &mut BTreeMap::new(),
         2,
         &used,
-        accumulations,
+        &mut accumulations,
         &mut event_budget,
         &mut card_uses,
         &card_use_limits,

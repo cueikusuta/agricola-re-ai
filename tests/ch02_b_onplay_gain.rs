@@ -305,12 +305,12 @@ fn b054_cost_boundary_requires_the_printed_wood() {
     let card = chapter_card("B054");
     let mut player = player_with(Good::Wood, 1);
     assert!(
-        can_play(&set, &card, &player, 0),
+        can_play(&set, &card, &player, 1, 0),
         "exactly 1 wood must make B054 playable"
     );
     player.supply.wood = 0;
     assert!(
-        !can_play(&set, &card, &player, 0),
+        !can_play(&set, &card, &player, 1, 0),
         "the printed 1-wood cost is still required"
     );
 }
@@ -321,7 +321,7 @@ fn b117_occupation_is_free_to_play() {
     let card = chapter_card("B117");
     let player = Player::new(0, 0);
     assert!(
-        can_play(&set, &card, &player, 0),
+        can_play(&set, &card, &player, 1, 0),
         "occupations carry no printed cost, so B117 must be playable with empty supply"
     );
 }

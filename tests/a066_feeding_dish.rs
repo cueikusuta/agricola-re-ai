@@ -51,7 +51,7 @@ fn dispatch(
     let limits = BTreeMap::new();
     let mut pending = None;
     let used = BTreeSet::new();
-    let accumulations = BTreeMap::new();
+    let mut accumulations = BTreeMap::new();
     let animal_accumulations = BTreeMap::new();
     dispatch_after_worker(
         set,
@@ -63,13 +63,14 @@ fn dispatch(
         &mut well,
         1,
         &used,
-        &accumulations,
+        &mut accumulations,
         &animal_accumulations,
         &mut budget,
         &mut uses,
         &limits,
         &mut pending,
         false,
+        &mut std::collections::BTreeMap::new(),
     )
     .expect("dispatch_after_worker must succeed");
     players

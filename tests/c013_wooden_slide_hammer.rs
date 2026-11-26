@@ -58,6 +58,7 @@ fn play_c013(game: &mut Game) {
         p,
         C013,
         CardKind::MinorImprovement,
+        1,
         0,
     )
     .unwrap();

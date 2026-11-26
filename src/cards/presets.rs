@@ -393,9 +393,9 @@ mod verified_minor_worker_tests {
         let card = set.definition("A078").unwrap();
         let mut p = Player::new(0, 0);
         p.supply.wood = 2;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         p.played_cards.push("test_occ".into());
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         assert_eq!(card.points, 1);
     }
     #[test]
@@ -432,9 +432,9 @@ mod verified_minor_worker_tests {
         let card = set.definition("B077").unwrap();
         let mut p = Player::new(0, 1);
         p.played_cards.extend(["occ1".into(), "occ2".into()]);
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         p.played_cards.push("occ3".into());
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         assert_eq!(card.points, 1);
     }
     #[test]
@@ -467,9 +467,9 @@ mod verified_minor_worker_tests {
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
         p.supply.reed = 0;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         p.supply.reed = 1;
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         assert_eq!(card.points, 1);
     }
     #[test]
@@ -500,12 +500,12 @@ mod verified_minor_worker_tests {
         let card = set.definition("A042").unwrap();
         let mut p = Player::new(0, 0);
         p.supply.clay = 1;
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         let old = p.clone();
-        assert!(!can_play(&set, card, &p, 0));
+        assert!(!can_play(&set, card, &p, 1, 0));
         assert_eq!(p, old);
         p.supply.clay = 2;
-        assert!(can_play(&set, card, &p, 0));
+        assert!(can_play(&set, card, &p, 1, 0));
         assert_eq!(card.points, 1);
     }
     #[test]
@@ -519,7 +519,7 @@ mod verified_minor_worker_tests {
         assert_eq!(card.points, 0);
         let mut p = Player::new(0, 0);
         let mut hand = vec!["A121".to_string()];
-        play(&set, &mut hand, &mut p, "A121", CardKind::Occupation, 0).unwrap();
+        play(&set, &mut hand, &mut p, "A121", CardKind::Occupation, 1, 0).unwrap();
         assert_eq!(p.supply.clay, 1);
         assert_eq!(p.played_cards, vec!["A121"]);
     }
@@ -667,7 +667,7 @@ mod verified_immediate_resource_tests {
         };
         let mut hand = vec![id.to_string()];
         let kind = set.definition(id).unwrap().kind;
-        play(&set, &mut hand, player, id, kind, 0)
+        play(&set, &mut hand, player, id, kind, 1, 0)
     }
 
     #[test]
@@ -949,7 +949,7 @@ mod verified_worker_bonus_tests {
         assert_eq!(card.points, 0);
         let set = CardSet { definitions };
         let player = Player::new(0, 0);
-        assert!(can_play(&set, &card, &player, 0));
+        assert!(can_play(&set, &card, &player, 1, 0));
     }
 
     // B064 水車の輪: AfterWorkerGainIfUsed grain_utilization if fishing used -> food 2
@@ -993,9 +993,9 @@ mod verified_worker_bonus_tests {
         assert_eq!(card.points, 1);
         let set = CardSet { definitions };
         let mut player = Player::new(0, 0);
-        assert!(!can_play(&set, &card, &player, 0));
+        assert!(!can_play(&set, &card, &player, 1, 0));
         player.supply.wood = 2;
-        assert!(can_play(&set, &card, &player, 0));
+        assert!(can_play(&set, &card, &player, 1, 0));
     }
 }
 
@@ -1403,13 +1403,14 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.grain, 1);
@@ -1426,13 +1427,14 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.grain, 2);
@@ -1449,13 +1451,14 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.grain, 2);
@@ -1490,13 +1493,14 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.food, 3); // self: 3
@@ -1515,13 +1519,14 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.food, 6); // 3 + 3
@@ -1540,13 +1545,14 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             1,
             &used_spaces,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
             &mut pending,
             true,
+            &mut BTreeMap::new(),
         )
         .unwrap();
         assert_eq!(players[0].supply.food, 6);
@@ -1717,7 +1723,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             2,
             &used,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -1764,7 +1770,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             2,
             used,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -1790,7 +1796,7 @@ mod round_and_harvest_card_tests {
     }
 
     // --- A049 営巣地 (Nest Site): ReedBank >= 1 and grew -> 1 food ---
-    fn a049_round_start_food(accumulations: &std::collections::BTreeMap<Space, u32>) -> u32 {
+    fn a049_round_start_food(mut accumulations: std::collections::BTreeMap<Space, u32>) -> u32 {
         use crate::card_events::dispatch_start_round;
         use crate::cards::CardState;
         use std::collections::BTreeMap;
@@ -1814,7 +1820,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             2,
             &used,
-            accumulations,
+            &mut accumulations,
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -1829,16 +1835,16 @@ mod round_and_harvest_card_tests {
     fn a049_gains_food_when_the_reed_bank_refill_lands_on_a_non_empty_bank() {
         // Positive: 2 reeds = this round's refill landed on a non-empty bank.
         let grew = std::collections::BTreeMap::from([(Space::ReedBank, 2)]);
-        assert_eq!(a049_round_start_food(&grew), 1);
+        assert_eq!(a049_round_start_food(grew.clone()), 1);
         // Boundary/positive: multi-round untouched growth also fires.
         let grew_more = std::collections::BTreeMap::from([(Space::ReedBank, 4)]);
-        assert_eq!(a049_round_start_food(&grew_more), 1);
+        assert_eq!(a049_round_start_food(grew_more.clone()), 1);
         // Negative: 1 reed means the refill landed on an empty bank.
         let fresh = std::collections::BTreeMap::from([(Space::ReedBank, 1)]);
-        assert_eq!(a049_round_start_food(&fresh), 0);
+        assert_eq!(a049_round_start_food(fresh.clone()), 0);
         // Negative: empty bank (accumulation_at_least unmet).
-        let empty = std::collections::BTreeMap::new();
-        assert_eq!(a049_round_start_food(&empty), 0);
+        let empty = BTreeMap::new();
+        assert_eq!(a049_round_start_food(empty.clone()), 0);
     }
 
     // --- C067 ミネラルフィーダー (Mineral Feeder): non-harvest round +
@@ -1875,7 +1881,7 @@ mod round_and_harvest_card_tests {
             &mut BTreeMap::new(),
             round,
             &used,
-            &BTreeMap::new(),
+            &mut BTreeMap::new(),
             &mut event_budget,
             &mut card_uses,
             &card_use_limits,
@@ -2070,7 +2076,7 @@ mod passive_cards_tests {
         };
         let mut hand = vec![id.into()];
         let kind = set.definition(id).unwrap().kind;
-        play(&set, &mut hand, p, id, kind, 0).unwrap();
+        play(&set, &mut hand, p, id, kind, 1, 0).unwrap();
     }
     #[test]
     fn a012_pasture_extra_two_including_stable() {
@@ -2111,6 +2117,7 @@ mod passive_cards_tests {
             &mut p,
             "sample",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -2160,9 +2167,9 @@ mod passive_cards_tests {
         }
         let mut p = Player::new(0, 0);
         p.supply.wood = 1;
-        assert!(can_play(&set, set.definition("B050").unwrap(), &p, 0));
+        assert!(can_play(&set, set.definition("B050").unwrap(), &p, 1, 0));
         p.played_cards.extend((0..4).map(|i| format!("occ{i}")));
-        assert!(!can_play(&set, set.definition("B050").unwrap(), &p, 0));
+        assert!(!can_play(&set, set.definition("B050").unwrap(), &p, 1, 0));
     }
 }
 
@@ -2376,6 +2383,7 @@ mod simple_occupation_tests {
             &mut p,
             "B102",
             CardKind::Occupation,
+            1,
             0,
         )
         .unwrap();
@@ -2671,6 +2679,7 @@ mod m6_extra_passive_tests {
             &mut p,
             "B010",
             CardKind::MinorImprovement,
+            1,
             0,
         )
         .unwrap();
@@ -2690,6 +2699,7 @@ mod m6_extra_passive_tests {
             &mut p,
             "A143",
             CardKind::Occupation,
+            1,
             0,
         )
         .unwrap();

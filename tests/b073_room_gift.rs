@@ -241,19 +241,19 @@ fn b073_requires_three_occupations_and_reed() {
     player.supply.reed = 1;
     player.played_cards = vec!["occ1".to_owned(), "occ2".to_owned()];
     assert!(
-        !can_play(&set, card, &player, 0),
+        !can_play(&set, card, &player, 1, 0),
         "2 occupations must not satisfy MinimumOccupations(3)"
     );
 
     player.played_cards.push("occ3".to_owned());
     assert!(
-        can_play(&set, card, &player, 0),
+        can_play(&set, card, &player, 1, 0),
         "3 occupations and 1 reed make B073 playable"
     );
 
     player.supply.reed = 0;
     assert!(
-        !can_play(&set, card, &player, 0),
+        !can_play(&set, card, &player, 1, 0),
         "the printed 1-reed cost is still required"
     );
 }

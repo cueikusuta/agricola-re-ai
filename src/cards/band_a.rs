@@ -440,6 +440,7 @@ mod verified_band_a_tests {
             &mut p,
             "A117",
             CardKind::Occupation,
+            1,
             0,
         )
         .unwrap();
@@ -513,7 +514,7 @@ mod verified_band_a_tests {
         );
         let p = Player::new(0, 0);
         assert!(
-            can_play(&set, card, &p, 0),
+            can_play(&set, card, &p, 1, 0),
             "A155 should be playable via can_play"
         );
     }
@@ -544,6 +545,7 @@ mod verified_band_a_tests {
             "A008",
             CardKind::MinorImprovement,
             1, // reed cost
+            1,
         );
         assert!(result.is_err(), "Should fail with 0 occupations");
 
@@ -558,6 +560,7 @@ mod verified_band_a_tests {
             &mut p,
             "A008",
             CardKind::MinorImprovement,
+            1,
             1,
         );
         assert!(result.is_err(), "Should fail with 1 occupation");
@@ -575,6 +578,7 @@ mod verified_band_a_tests {
             &mut p,
             "A008",
             CardKind::MinorImprovement,
+            1,
             1,
         );
         assert!(
@@ -597,6 +601,7 @@ mod verified_band_a_tests {
             "A008",
             CardKind::MinorImprovement,
             1,
+            1,
         )
         .unwrap();
         // Fixed 1 grain + 1 vegetable regardless of improvement count
@@ -618,6 +623,7 @@ mod verified_band_a_tests {
             &mut p,
             "A008",
             CardKind::MinorImprovement,
+            1,
             1,
         )
         .unwrap();

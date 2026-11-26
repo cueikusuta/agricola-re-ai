@@ -338,7 +338,7 @@ impl DetailPolicy for SimpleDetails {
                         obs.card_definitions.iter().any(|card| {
                             card.id == **id
                                 && card.kind == crate::cards::CardKind::Occupation
-                                && crate::cards::can_play(&card_set, card, p, fee)
+                                && crate::cards::can_play(&card_set, card, p, obs.public.round, fee)
                         })
                     })?
                     .clone();
@@ -490,7 +490,13 @@ impl DetailPolicy for SimpleDetails {
                             obs.card_definitions.iter().any(|card| {
                                 card.id == **id
                                     && card.kind == crate::cards::CardKind::MinorImprovement
-                                    && crate::cards::can_play(&card_set, card, p, 0)
+                                    && crate::cards::can_play(
+                                        &card_set,
+                                        card,
+                                        p,
+                                        obs.public.round,
+                                        0,
+                                    )
                             })
                         })?
                         .clone();
@@ -572,7 +578,7 @@ fn card_priority(
     use crate::cards::CardEffect;
     let mut after = player.clone();
     let mut hand = vec![card.id.clone()];
-    crate::cards::play(set, &mut hand, &mut after, &card.id, card.kind, fee).ok()?;
+    crate::cards::play(set, &mut hand, &mut after, &card.id, card.kind, round, fee).ok()?;
     let mut value = i64::from(after.card_points - player.card_points) * 6;
     for good in [
         Good::Food,
@@ -670,7 +676,7 @@ fn card_priority(
                 CardEffect::Passive { .. } => horizon * 5,
                                 CardEffect::EndGameBonus { .. } => 12,
                                 CardEffect::AfterHarvestBakeGain { amount } => i64::from(*amount) * horizon,
-                                CardEffect::AfterHarvestGain { good, amount, .. }
+                                                                CardEffect::AfterHarvestGain { good, amount, .. }
                                 | CardEffect::AfterHarvestGainIfAtLeast { good, amount, .. } => {
                                     card_good_value(*good) * i64::from(*amount) * horizon
                                 }
@@ -708,6 +714,29 @@ fn card_priority(
                                                                     (card_good_value(Good::Food) * i64::from(max_food) + animal_val + i64::from(max_points)) * horizon / 2
                                                                 }
                                                                 // New variants for market followup cards (PR #393)
+                                // New variants for market followup cards (PR #393)
+                                // New variants for after_worker_space simple gain cards (B017, B047, B051, B060, B063)
+                                CardEffect::AfterWorkerSpendPlowField { .. } => horizon * 4, // plowing is valuable
+                                CardEffect::AfterWorkerScheduleFood { rounds, .. } => {
+                                    // Each use places 1 food on each of N future rounds
+                                    card_good_value(Good::Food) * i64::from(*rounds) * horizon / 4
+                                }
+                                CardEffect::AfterWorkerGainPerAnimal { good, per, .. } => {
+                                    // Approximate with 2 animals mid-game
+                                    card_good_value(*good) * i64::from(*per) * 2 * horizon / 4
+                                }
+                                CardEffect::AfterWorkerPayToScheduleFood { pay_good, pay_amount, rounds, .. } => {
+                                    // Net value: food gained minus grain paid
+                                    let food_value = card_good_value(Good::Food) * i64::from(*rounds);
+                                    let pay_cost = card_good_value(*pay_good) * i64::from(*pay_amount);
+                                    (food_value - pay_cost) * horizon / 4
+                                }
+                                CardEffect::AfterWorkerOptionalExchange { give, give_amount, receive, receive_amount, .. } => {
+                                    // Net value per use
+                                    let gain = card_good_value(*receive) * i64::from(*receive_amount);
+                                    let cost = card_good_value(*give) * i64::from(*give_amount);
+                                    (gain - cost) * horizon / 4
+                                }
                                 CardEffect::AfterAnyWorkerGain { good, amount, .. }
                                 | CardEffect::AfterAnyWorkerOthersGain { good, amount, .. } => {
                                     // Fires on any player's use of the space; approximate with per-round expectation
@@ -836,7 +865,9 @@ fn preferred_card(
         .iter()
         .filter_map(|id| {
             let card = set.definition(id)?;
-            if card.kind != kind || !crate::cards::can_play(&set, card, player, fee) {
+            if card.kind != kind
+                || !crate::cards::can_play(&set, card, player, obs.public.round, fee)
+            {
                 return None;
             }
             Some((
