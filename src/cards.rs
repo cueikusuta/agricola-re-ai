@@ -784,6 +784,13 @@ pub enum PassiveRule {
     MajorStoneDiscountByRooms,
     StoneDiscount(u32),
     HousingSpace(u8),
+    /// D026 大工の敷地 / E024 野心: allows building major improvements
+    /// when taking a Minor Improvement action (MeetingPlace).
+    /// If `joinery_and_well_only` is true (D026), only Joinery and Well are allowed.
+    /// If false (E024), any major improvement may be built.
+    AllowMajorViaMinor {
+        joinery_and_well_only: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1895,6 +1902,7 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 }
                 PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                PassiveRule::AllowMajorViaMinor { .. } => {}
             },
             CardEffect::OnPlayAddStoneToEmptyFields { good: _, amount } => {
                 for cell in &mut player.farm {
@@ -5105,9 +5113,11 @@ mod simple_occupation_tests {
         // (occupations 18 + 1, minors 23 + 2).
         // D054 マスの池 (spec eligibility "2": "yes") joins the preset as a
         // minor: 44 -> 45 total (occupations unchanged, minors 25 -> 26).
-        assert_eq!(total, 45);
+        // D026 大工の敷地 / E024 野心 add 2 more minors: 45 + 2 = 47 total
+        // (occupations 19, minors 26 -> 28).
+        assert_eq!(total, 47);
         assert_eq!(occ, 19);
-        assert_eq!(minor, 26);
+        assert_eq!(minor, 28);
         assert!(verified_basic_card_set(3).is_err());
     }
 }
@@ -5132,6 +5142,41 @@ pub fn verified_extra_simple_cards() -> Vec<CardDefinition> {
             cost: vec![(Good::Wood, 2), (Good::Stone, 2)],
             points: 2,
             effects: vec![CardEffect::AfterHarvestBakeGain { amount: 3 }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // D026 大工の敷地 (Carpenter's Yard): cost 1 wood + 1 reed, 1 VP.
+        // Passive: when taking a Minor Improvement action (MeetingPlace), may build Joinery or Well.
+        CardDefinition {
+            use_limit: None,
+            id: "D026".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![(Good::Wood, 1), (Good::Reed, 1)],
+            points: 1,
+            effects: vec![CardEffect::Passive {
+                rule: PassiveRule::AllowMajorViaMinor {
+                    joinery_and_well_only: true,
+                },
+            }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // E024 野心 (Ambition): prerequisite 2 occupations, 0 VP.
+        // Passive: when taking a Minor Improvement action (MeetingPlace), may build any major improvement.
+        CardDefinition {
+            use_limit: None,
+            id: "E024".into(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumOccupations(2),
+                },
+                CardEffect::Passive {
+                    rule: PassiveRule::AllowMajorViaMinor {
+                        joinery_and_well_only: false,
+                    },
+                },
+            ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
     ]
@@ -10313,11 +10358,12 @@ mod p1_2_repro_tests {
         );
         }
 
-        // 2p プリセットのハッシュは変更不可（39 defs、content_hash 不変条件）
+        // 2p プリセットのハッシュは D054（main 側 +1 minor）と D026/E024（本 PR +2 minors）
+        // の追加により 39 -> 41 defs（content_hash 再計測済み、意図的変更）。
         let preset = verified_basic_card_set(2).unwrap();
         assert_eq!(
             preset.content_hash(),
-            "b6723ba1864e3e0cf08c116ffaed6431a2e7b6dcef58f00e152234defc6b2f5d",
+            "2a78347a92fd2a940a5ca7258ddc3a4971378cde3d74f730c41602b0313b26fa",
             "2-player preset content hash (StartRoundGainIf* wave: re-measured after B114/A049/C067/D054 joined the preset and A157 was excluded as 4p-only)"
         );
 

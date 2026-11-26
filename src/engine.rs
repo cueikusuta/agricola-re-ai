@@ -1740,6 +1740,39 @@ impl Game {
                             .map_err(|e| e.to_string())?;
                         }
                     }
+                    Detail::Buy {
+                        improvement,
+                        instant_bake,
+                    } => {
+                        // D026 / E024 passive: a played AllowMajorViaMinor card
+                        // lets the owner build a major improvement with a Minor
+                        // Improvement (MeetingPlace) action. Queried from played
+                        // card definitions — no new Player state, and
+                        // buy_improvement's normal cost/market/exchange rules
+                        // are unchanged.
+                        if !major_improvement_allowed_via_minor(
+                            &self.card_set,
+                            &p.played_cards,
+                            *improvement,
+                        ) {
+                            return Err(format!(
+                                "{improvement:?} is not allowed on MeetingPlace without a matching played passive"
+                            ));
+                        }
+                        buy_improvement(
+                            p,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            &mut self.public.well_food_schedule,
+                            self.public.round,
+                            *improvement,
+                            PurchaseArgs {
+                                instant_bake: *instant_bake,
+                                allocation: None,
+                                mode: PurchaseMode::Auto,
+                            },
+                        )?;
+                    }
                     _ => return Err("invalid starting-player details".into()),
                 }
                 // Now handle the rest of the action
@@ -2558,6 +2591,39 @@ struct PurchaseArgs<'a> {
     allocation: Option<&'a [BakeAllocation]>,
     mode: PurchaseMode,
 }
+/// D026 / E024 passive: may a played card let the owner build `improvement`
+/// with a Minor Improvement (MeetingPlace) action? Queried from played card
+/// definitions only — no persistent Player state.
+/// D026 (`joinery_and_well_only = true`): Joinery and Well only.
+/// E024 (`joinery_and_well_only = false`): any major improvement.
+fn major_improvement_allowed_via_minor(
+    card_set: &crate::cards::CardSet,
+    played_cards: &[String],
+    improvement: Improvement,
+) -> bool {
+    played_cards.iter().any(|card_id| {
+        card_set.definition(card_id).is_some_and(|card| {
+            card.effects.iter().any(|e| {
+                if let crate::cards::CardEffect::Passive {
+                    rule:
+                        crate::cards::PassiveRule::AllowMajorViaMinor {
+                            joinery_and_well_only,
+                        },
+                } = e
+                {
+                    if *joinery_and_well_only {
+                        matches!(improvement, Improvement::Joinery | Improvement::Well)
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                }
+            })
+        })
+    })
+}
+
 fn buy_improvement(
     p: &mut Player,
     market: &mut Vec<Improvement>,

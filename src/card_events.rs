@@ -2177,6 +2177,7 @@ fn handle_passive(
         }
         crate::cards::PassiveRule::StoneDiscount(n) => p.stone_cost_discount += n,
         crate::cards::PassiveRule::HousingSpace(n) => p.extra_housing += n,
+        crate::cards::PassiveRule::AllowMajorViaMinor { .. } => {}
     }
     Ok(EffectResult::Resolved)
 }
@@ -4610,6 +4611,7 @@ pub mod legacy {
                     }
                     crate::cards::PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                     crate::cards::PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                    crate::cards::PassiveRule::AllowMajorViaMinor { .. } => {}
                 },
                 _ => {}
             }
@@ -9726,6 +9728,7 @@ mod tests {
             4,
             &used,
             &std::collections::BTreeMap::new(),
+            &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
             &c.limits,
@@ -9930,6 +9933,7 @@ mod tests {
             &mut well,
             5,
             &used,
+            &std::collections::BTreeMap::new(),
             &std::collections::BTreeMap::new(),
             &mut c.budget,
             &mut c.uses,
