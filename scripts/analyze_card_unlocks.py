@@ -4,7 +4,7 @@
 Stdlib-only helper for card implementation planning.
 
 It mechanically extracts implemented card IDs (``[A-E]\\d{3}``) from production
-code in ``src/cards.rs`` (excluding all ``#[cfg(test)]`` items/blocks and
+code in ``src/cards/**/*.rs`` (excluding all ``#[cfg(test)]`` items/blocks and
 comments), cross-references them against ``data/bga-card-specs/*.json``, and
 reports:
 
@@ -31,7 +31,7 @@ import sys
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CARDS_RS = ROOT / "src" / "cards.rs"
+DEFAULT_CARDS_RS = ROOT / "src" / "cards"
 DEFAULT_SPECS_DIR = ROOT / "data" / "bga-card-specs"
 
 CARD_ID_LITERAL_RE = re.compile(r'"([A-E]\d{3})"')
@@ -305,9 +305,13 @@ def strip_cfg_test_and_comments(code: str) -> str:
 
 def extract_implemented_card_ids(cards_rs: Path) -> list[str]:
     """Mechanically extract implemented ``[A-E]\\d{3}`` IDs from production code."""
-    source = cards_rs.read_text(encoding="utf-8")
-    prod_code = strip_cfg_test_and_comments(source)
-    return sorted(set(CARD_ID_LITERAL_RE.findall(prod_code)))
+    paths = sorted(cards_rs.rglob("*.rs")) if cards_rs.is_dir() else [cards_rs]
+    found: set[str] = set()
+    for path in paths:
+        source = path.read_text(encoding="utf-8")
+        prod_code = strip_cfg_test_and_comments(source)
+        found.update(CARD_ID_LITERAL_RE.findall(prod_code))
+    return sorted(found)
 
 
 def normalize_trigger(trigger: str) -> str:
@@ -467,7 +471,7 @@ def analyze(
 def format_text_report(report: dict[str, Any], top: int) -> str:
     lines: list[str] = []
     lines.append("=== Card Unlock Analysis ===")
-    lines.append(f"Implemented cards (src/cards.rs prod): {report['implemented_count']}")
+    lines.append(f"Implemented cards (src/cards prod): {report['implemented_count']}")
     lines.append(f"Total BGA card specs:                  {report['total_specs']}")
     lines.append(f"  bga_checked total:                   {report['bga_checked_count']}")
     lines.append(
@@ -518,7 +522,7 @@ def main(argv: list[str] | None = None) -> int:
         "--cards-rs",
         type=Path,
         default=DEFAULT_CARDS_RS,
-        help="Path to src/cards.rs (default: repo src/cards.rs)",
+        help="Path to src/cards directory or cards .rs file (default: repo src/cards)",
     )
     parser.add_argument(
         "--specs-dir",
@@ -547,8 +551,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.top < 1:
         print("error: --top must be >= 1", file=sys.stderr)
         return 2
-    if not args.cards_rs.is_file():
-        print(f"error: cards.rs not found: {args.cards_rs}", file=sys.stderr)
+    if not (args.cards_rs.is_file() or args.cards_rs.is_dir()):
+        print(f"error: cards source not found: {args.cards_rs}", file=sys.stderr)
         return 2
     if not args.specs_dir.is_dir():
         print(f"error: specs directory not found: {args.specs_dir}", file=sys.stderr)
