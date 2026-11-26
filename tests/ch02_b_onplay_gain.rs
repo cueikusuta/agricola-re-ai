@@ -78,7 +78,9 @@ fn chapter_card(id: &str) -> CardDefinition {
     verified_b_onplay_simple_cards_extended()
         .into_iter()
         .find(|card| card.id == id)
-        .unwrap_or_else(|| panic!("{id} must be defined in verified_b_onplay_simple_cards_extended"))
+        .unwrap_or_else(|| {
+            panic!("{id} must be defined in verified_b_onplay_simple_cards_extended")
+        })
 }
 
 /// CardSet holding every chapter card plus filler ids, so prerequisite and

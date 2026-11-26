@@ -7541,7 +7541,7 @@ pub fn verified_b_onplay_simple_cards() -> Vec<CardDefinition> {
 /// variant (no new variant / EventKind / saved field). Their remaining
 /// printed effects live on other triggers and stay unwired here
 /// (spec implementation_status = in_progress; follow-up noted inline).
-
+///
 /// B054 肥料運搬車 (Tumbrel): cost 1 wood; on play gain 2 food.
 /// Eligibility 2/3/4 = yes. Still prints an after_sow "1 food per
 /// stable" step (follow-up; the harvest/sow chapter owns that trigger).
