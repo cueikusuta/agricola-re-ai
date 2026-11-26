@@ -459,7 +459,7 @@ CARDS = {
                    cond=[cond("fence_count_at_least_round")],
                    freq="every_use", dur="permanent"),
         ],
-        "notes": "Each fence build with fences >= current round: gain 1 vegetable.",
+        "notes": "Each fence-building action where the number of fences built by that action is equal to or greater than the current round: gain 1 vegetable. The printed number is the count built by the triggering action, not the standing fence total; the trigger is the fence build itself, so Fencing and FarmRedevelopment fence building both fire.",
         "tests": [
             case("A068-normal", {"round": 4, "fences_built": 4}, {"build_fences": 4},
                  {"vegetable_delta": 1}),

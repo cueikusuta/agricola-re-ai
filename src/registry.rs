@@ -412,6 +412,9 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => {
                     EventKind::WorkerPlaced
                 }
+                crate::cards::CardEffect::AfterWorkerGainIfFencesAtLeastRound { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 crate::cards::CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => {
                     EventKind::WorkerPlaced
                 }
@@ -545,6 +548,7 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainIfFencesAtLeastRound { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
                             amount,
                             ..

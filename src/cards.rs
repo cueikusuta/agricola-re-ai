@@ -521,6 +521,24 @@ pub enum CardEffect {
         extra_4p_good: Good,
         extra_4p_amount: u32,
     },
+    /// A068 アスパラガスの贈り物 (Asparagus Gift): each time the owner builds a
+    /// number of fences equal to or greater than the current round number,
+    /// gain `amount` of `good` (printed: 1 vegetable). "A number of fences"
+    /// is the number built by THAT fence-building action (official card text),
+    /// not the standing fence total, and it is not limited to the Fencing
+    /// action space: worker actions that build fences (Fencing,
+    /// FarmRedevelopment) fire it. `built == 0` or `built < round` does not
+    /// fire. The `space` field records the original space binding for
+    /// serialization compatibility and is no longer used as the gate; the
+    /// gate is the pre-action fence snapshot carried by the dispatcher. The
+    /// owner-side play-time precondition ("at least one empty field") is a
+    /// separate `Prerequisite { MinimumEmptyFields(1) }` effect, so this
+    /// variant needs no new persistent field or PendingDecision.
+    AfterWorkerGainIfFencesAtLeastRound {
+        space: Space,
+        good: Good,
+        amount: u32,
+    },
     /// On-play per-good threshold gain: for each good in `goods`, if the
     /// owner already holds at least `threshold` of it, gain `amount` of
     /// that good. Judged per good against the owner's own supply (not
@@ -697,6 +715,9 @@ impl CardEffect {
             CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
                 "after_any_worker_gain_by_count_if_not_actor"
             }
+            CardEffect::AfterWorkerGainIfFencesAtLeastRound { .. } => {
+                "after_worker_gain_if_fences_at_least_round"
+            }
             CardEffect::StartRoundGainIfAccumulationAtLeast { .. } => {
                 "start_round_gain_if_accumulation_at_least"
             }
@@ -830,6 +851,11 @@ pub enum CardRequirement {
     MinimumPlayers(u8),
     MaximumPlayers(u8),
     MinimumImprovements(u8),
+    /// A068 アスパラガスの贈り物 (Asparagus Gift): the player must have at
+    /// least `n` EMPTY fields — plowed `Tile::Field { crop: None }` cells with
+    /// no C006 stone planted on them (`field_stones == 0`; a stone field
+    /// counts as sown, not empty, per spec `empty_field_count`).
+    MinimumEmptyFields(u8),
     /// E001 簡易納屋 (Pole Barns): at least `fences` fence segments built on
     /// the farm (2016 Lookout caps a farm at 15, so the printed card asks for
     /// all 15). Read from the player's fence set.
@@ -1042,6 +1068,7 @@ impl CardSet {
                         CardEffect::OnPlayBuildStable { amount, .. } => *amount,
                         CardEffect::OnPlayGainEachWithAtLeast { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. } => *amount,
+                        CardEffect::AfterWorkerGainIfFencesAtLeastRound { amount, .. } => *amount,
                         CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
                             amount, ..
                         } => *amount,
@@ -1628,6 +1655,19 @@ pub fn can_play(set: &CardSet, card: &CardDefinition, player: &Player, extra_foo
             CardRequirement::MinimumPlayers(_) => true,
             CardRequirement::MaximumPlayers(_) => true,
             CardRequirement::PastureCount(n) => player.pastures.len() >= usize::from(*n),
+            // A068 アスパラガスの贈り物: empty fields are plowed fields with no
+            // crop and no C006 stone (a stone field counts as sown).
+            CardRequirement::MinimumEmptyFields(min) => {
+                player
+                    .farm
+                    .iter()
+                    .filter(|cell| {
+                        matches!(cell.tile, Tile::Field { crop: None, .. })
+                            && cell.field_stones == 0
+                    })
+                    .count()
+                    >= usize::from(*min)
+            }
         }
     })
 }
@@ -7090,6 +7130,32 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                     min: 1,
                     good: Good::Food,
                     amount: 2,
+                },
+            ],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // A068 アスパラガスの贈り物 (Asparagus Gift): no cost, no bonus points.
+        // Play precondition: at least one empty (plowed, unplanted, stoneless)
+        // field. Each time the owner builds a number of fences equal to or
+        // greater than the current round, gain 1 vegetable. The printed
+        // number is the count built by that fence-building action (not the
+        // standing fence total), and the trigger is the fence build itself:
+        // Fencing and FarmRedevelopment fence building both fire
+        // (spec data/bga-card-specs/A068.json).
+        CardDefinition {
+            use_limit: None,
+            id: "A068".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::Prerequisite {
+                    rule: CardRequirement::MinimumEmptyFields(1),
+                },
+                CardEffect::AfterWorkerGainIfFencesAtLeastRound {
+                    space: Space::Fencing,
+                    good: Good::Vegetable,
+                    amount: 1,
                 },
             ],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
