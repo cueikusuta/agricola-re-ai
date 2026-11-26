@@ -5,24 +5,37 @@
     {
       "id": "C112-normal",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "food": 2,
+        "grain": 0
+      },
       "action": {
-        "play": "C112"
+        "use_space": "grain_utilization"
       },
       "expected": {
-        "note": "basic effect verification"
-      }
+        "food_delta": -1,
+        "grain_delta": 1
+      },
+      "notes": "Before using grain utilization/farmland/cultivation, pay 1 food to gain 1 grain."
     },
     {
       "id": "C112-edge",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "food": 2,
+        "grain": 0
+      },
       "action": {
-        "play": "C112"
+        "use_space": "forest"
       },
       "expected": {
-        "note": "boundary/conditional effect verification"
-      }
+        "food_delta": 0,
+        "grain_delta": 0,
+        "effect_allowed": false
+      },
+      "notes": "The exchange is not offered for other action spaces."
     }
   ]
 }

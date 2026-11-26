@@ -5,24 +5,39 @@
     {
       "id": "C106-normal",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "food": 0
+      },
       "action": {
         "play": "C106"
       },
       "expected": {
-        "note": "basic effect verification"
-      }
+        "food_delta": 3
+      },
+      "notes": "On play, gain 3 food."
     },
     {
       "id": "C106-edge",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "food": 0,
+        "fields": [
+          {
+            "crop": "grain",
+            "amount": 2
+          }
+        ]
+      },
       "action": {
-        "play": "C106"
+        "run_harvest": true,
+        "harvest_source": "field"
       },
       "expected": {
-        "note": "boundary/conditional effect verification"
-      }
+        "food_delta": 1
+      },
+      "notes": "Harvesting from a field during the field phase gains 1 additional food."
     }
   ]
 }

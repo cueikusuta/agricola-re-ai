@@ -5,24 +5,37 @@
     {
       "id": "C111-normal",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "round": 4,
+        "food": 5
+      },
       "action": {
-        "play": "C111"
+        "run_round_start": true,
+        "use_card": true
       },
       "expected": {
-        "note": "basic effect verification"
-      }
+        "food_delta": 1
+      },
+      "notes": "Round start with food (5) >= round number (4): gain 1 food."
     },
     {
       "id": "C111-edge",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "round": 4,
+        "food": 3
+      },
       "action": {
-        "play": "C111"
+        "run_round_start": true,
+        "use_card": true
       },
       "expected": {
-        "note": "boundary/conditional effect verification"
-      }
+        "food_delta": 0,
+        "effect_allowed": false
+      },
+      "notes": "With food (3) < round number (4) the condition fails and nothing is gained."
     }
   ]
 }

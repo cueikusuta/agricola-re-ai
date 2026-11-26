@@ -5,24 +5,45 @@
     {
       "id": "C118-normal",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "round": 4
+      },
       "action": {
         "play": "C118"
       },
       "expected": {
-        "note": "basic effect verification"
-      }
+        "wood_on_round_spaces": {
+          "5": 1,
+          "6": 1,
+          "7": 1,
+          "8": 1,
+          "9": 1
+        }
+      },
+      "notes": "On play, 1 wood is placed on each of the next five round spaces (A074 pattern)."
     },
     {
       "id": "C118-edge",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "round": 5,
+        "wood_on_round_spaces": {
+          "5": 1,
+          "6": 1,
+          "7": 1,
+          "8": 1,
+          "9": 1
+        }
+      },
       "action": {
-        "play": "C118"
+        "run_round_start": true
       },
       "expected": {
-        "note": "boundary/conditional effect verification"
-      }
+        "wood_delta": 1
+      },
+      "notes": "At the round start the wood placed for that round is collected."
     }
   ]
 }

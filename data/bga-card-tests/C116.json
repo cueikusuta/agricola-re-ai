@@ -5,24 +5,33 @@
     {
       "id": "C116-normal",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "wood": 0
+      },
       "action": {
         "play": "C116"
       },
       "expected": {
-        "note": "basic effect verification"
-      }
+        "wood_delta": 1
+      },
+      "notes": "On play, gain 1 wood."
     },
     {
       "id": "C116-edge",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "wood": 0,
+        "occupation_cost_food_paid": 2
+      },
       "action": {
-        "play": "C116"
+        "play_occupation_after_this": true
       },
       "expected": {
-        "note": "boundary/conditional effect verification"
-      }
+        "wood_delta": 2
+      },
+      "notes": "Playing another occupation afterwards gains 1 wood per food paid as its cost."
     }
   ]
 }

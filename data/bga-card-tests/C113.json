@@ -5,24 +5,37 @@
     {
       "id": "C113-normal",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "grain": 0,
+        "food": 3,
+        "vegetable": 0
+      },
       "action": {
         "play": "C113"
       },
       "expected": {
-        "note": "basic effect verification"
-      }
+        "grain_delta": 1
+      },
+      "notes": "On play, gain 1 grain."
     },
     {
       "id": "C113-edge",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "food": 3,
+        "vegetable": 0
+      },
       "action": {
-        "play": "C113"
+        "run_harvest": true,
+        "use_card": true
       },
       "expected": {
-        "note": "boundary/conditional effect verification"
-      }
+        "food_delta": -2,
+        "vegetable_delta": 1
+      },
+      "notes": "After the harvest, pay 2 food to gain 1 vegetable (optional)."
     }
   ]
 }

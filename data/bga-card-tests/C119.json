@@ -5,24 +5,35 @@
     {
       "id": "C119-normal",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "wood": 0,
+        "clay": 0
+      },
       "action": {
         "play": "C119"
       },
       "expected": {
-        "note": "basic effect verification"
-      }
+        "wood_delta": 1,
+        "clay_delta": 1
+      },
+      "notes": "On play, gain 1 wood and 1 clay."
     },
     {
       "id": "C119-edge",
       "scope": "effect_only",
-      "setup": {},
+      "setup": {
+        "card_played": true,
+        "wood": 0,
+        "workers_placed_this_round": 2
+      },
       "action": {
-        "play": "C119"
+        "renovate": true
       },
       "expected": {
-        "note": "boundary/conditional effect verification"
-      }
+        "wood_delta": 2
+      },
+      "notes": "After renovating, gain 1 wood per person placed this round."
     }
   ]
 }
