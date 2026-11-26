@@ -21,7 +21,7 @@
 
 use agricola_re_ai::card_events::dispatch_play;
 use agricola_re_ai::cards::{
-    apply_on_play_effects, can_play, card_set_for_game, verified_b_onplay_simple_cards,
+    apply_on_play_effects, can_play, card_set_for_game, verified_b_onplay_simple_cards_extended,
     CardDefinition, CardEffect, CardKind, CardRequirement, CardSet,
 };
 use agricola_re_ai::model::{Good, Player};
@@ -75,10 +75,12 @@ const CHAPTER_CARDS: [ChapterCard; 4] = [
 ];
 
 fn chapter_card(id: &str) -> CardDefinition {
-    verified_b_onplay_simple_cards()
+    verified_b_onplay_simple_cards_extended()
         .into_iter()
         .find(|card| card.id == id)
-        .unwrap_or_else(|| panic!("{id} must be defined in verified_b_onplay_simple_cards"))
+        .unwrap_or_else(|| {
+            panic!("{id} must be defined in verified_b_onplay_simple_cards_extended")
+        })
 }
 
 /// CardSet holding every chapter card plus filler ids, so prerequisite and
