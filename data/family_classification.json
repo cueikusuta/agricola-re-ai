@@ -1,0 +1,3691 @@
+{
+  "summary": {
+    "total_unimplemented": 806,
+    "fully_covered": 193,
+    "needs_new_mechanism": 555,
+    "family_count": 258,
+    "foundation_cards": {
+      "pasture_predicates": "A001",
+      "build_stable_op": "A001",
+      "plow_field_op": "A002",
+      "new_operation_other": "A003",
+      "building_predicates": "A004",
+      "new_passive_modify_capacity": "A010",
+      "new_passive_other": "A010",
+      "new_operation_renovate": "A013",
+      "new_trigger_after_room_construction": "A014",
+      "new_predicate_rooms_built_at_once_at_least": "A014",
+      "new_predicate_all_accumulated_animals_accommodated": "A017",
+      "new_trigger_after_animal_accommodation": "A017",
+      "new_predicate_first_person_of_round": "A018",
+      "round_space_predicates": "A019",
+      "grant_action_op": "A021",
+      "round_end_triggers": "A029",
+      "new_trigger_after_fence_build": "A034",
+      "new_predicate_person_returned_from_fishing": "A035",
+      "building_triggers": "A037",
+      "new_trigger_after_farmyard_space_used": "A040",
+      "new_trigger_after_upgrade_fireplace": "A041",
+      "new_trigger_after_stable_construction": "A043",
+      "new_trigger_after_wood_gain": "A048",
+      "new_predicate_accumulation_grew_this_round": "A049",
+      "new_predicate_resources_gained_in_work_phase_at_least": "A053",
+      "new_trigger_after_improvement": "A055",
+      "new_trigger_after_harvest_vegetable_gain": "A059",
+      "harvest_feeding_trigger": "A062",
+      "new_trigger_before_sow": "A065",
+      "new_predicate_already_owns_animal_type": "A066",
+      "new_predicate_farmyard_unused_became_used": "A073",
+      "new_trigger_after_stables_built": "A074",
+      "new_predicate_round_space_has_placed_good": "A074",
+      "new_predicate_stables_built_on_own_turn": "A074",
+      "new_trigger_work_phase_start": "A076",
+      "sowing_triggers": "A079",
+      "new_predicate_vegetables_planted": "A079",
+      "new_predicate_new_pasture_created": "A083",
+      "new_trigger_returning_home_phase": "A084",
+      "new_trigger_sow_action_declined": "A094",
+      "new_predicate_accumulation_at_most": "A095",
+      "new_trigger_stone_accumulation_space_revealed": "A096",
+      "new_trigger_before_bake_bread": "A097",
+      "new_predicate_persons_returned_from_accumulation_at_least": "A100",
+      "new_passive_spend_resource": "A102",
+      "new_trigger_after_field_gained": "A105",
+      "new_predicate_own_placement_index_this_round": "A107",
+      "new_predicate_accumulation_exactly": "A107",
+      "new_predicate_improvement_played_from_hand": "A109",
+      "new_predicate_round_space_in": "A124",
+      "new_trigger_before_worker_space": "A124",
+      "new_predicate_space_occupied": "A141",
+      "new_predicate_reed_taken_at_least": "A142",
+      "new_predicate_food_taken_in": "A146",
+      "new_predicate_round_space_unused": "A151",
+      "new_predicate_lessons_used_by_fewer_players": "A152",
+      "new_trigger_after_animal_acquisition": "A153",
+      "new_predicate_other_player_uses": "A156",
+      "new_predicate_lessons_occupants_at_least": "A157",
+      "new_predicate_same_good_already_taken_this_work_phase": "A161",
+      "new_passive_exchange": "A164",
+      "new_trigger_harvest_end": "A166",
+      "new_predicate_stables_at_least": "A167",
+      "new_trigger_on_use_wood_accumulation": "B015",
+      "new_predicate_card_food_empty": "B021",
+      "new_trigger_after_occupation": "B025",
+      "new_trigger_on_use_grain_utilization": "B026",
+      "new_trigger_on_build_room_stable_fence": "B027",
+      "new_trigger_on_use_forest_accumulation": "B028",
+      "new_trigger_on_use_lesson_and_major_improvement": "B029",
+      "new_trigger_on_build_fence": "B030",
+      "new_trigger_scoring": "B031",
+      "new_trigger_any_time": "B032",
+      "new_trigger_first_time_all_livestock_fed_from_accumulation": "B034",
+      "new_trigger_each_field_phase": "B039",
+      "new_trigger_on_use_fishing_or_reed_accumulation": "B040",
+      "new_predicate_space_is": "B042",
+      "new_predicate_improvements_equal_occupations": "B049",
+      "new_predicate_custom": "B056",
+      "new_trigger_harvest_start": "B070",
+      "harvest_occupation_predicates": "B071",
+      "new_predicate_room_count_in": "B073",
+      "new_trigger_before_play_improvement": "B075",
+      "new_trigger_on_any_player_take_accumulation": "B079",
+      "new_trigger_on_build_stable": "B085",
+      "new_trigger_on_use_day_laborer": "B087",
+      "new_trigger_on_use_cultivation": "B090",
+      "new_predicate_round_at_least": "B092",
+      "new_predicate_is_cumulative_space": "B092",
+      "new_trigger_on_action_space_use": "B092",
+      "new_predicate_is_action_space": "B094",
+      "new_predicate_wood_on_this_round_space": "B096",
+      "new_predicate_round_is_odd": "B096",
+      "new_predicate_has_stone_house": "B097",
+      "new_trigger_game_end_scoring": "B100",
+      "new_trigger_harvest": "B101",
+      "new_predicate_any_player_has_card": "B101",
+      "new_trigger_after_improvement_declined": "B103",
+      "new_predicate_has_sheep_on_farm": "B104",
+      "new_predicate_goods_on_upcoming_round_spaces": "B106",
+      "new_predicate_pay_wood": "B109",
+      "new_trigger_on_play_occupation": "B109",
+      "new_predicate_round_is": "B110",
+      "new_trigger_setup_phase_end": "B110",
+      "new_predicate_has_stone_in_stock": "B110",
+      "new_predicate_room_type_is": "B111",
+      "new_predicate_not_stone_room": "B111",
+      "build_room_op": "B111",
+      "new_predicate_not_renovation_from_wood": "B111",
+      "new_predicate_is_most_recently_revealed_action_space": "B112",
+      "new_predicate_rooms_at_least": "B114",
+      "new_predicate_family_exactly": "B114",
+      "sow_op": "B115",
+      "new_trigger_continuous": "B115",
+      "new_trigger_reed_bed_cumulative_space_receives_reed": "B116",
+      "new_trigger_after_work_phase": "B117",
+      "new_predicate_is_action_space_above_most_recent_round_space_card": "B120",
+      "new_predicate_farmyard_all_used": "B132",
+      "new_predicate_board_wood_empty": "B139",
+      "new_predicate_farmyard_goods_placed": "B140",
+      "new_trigger_after_event": "B145",
+      "new_predicate_build_room_or_renovate": "B145",
+      "new_trigger_final_scoring": "B153",
+      "new_trigger_pay_occupation_cost": "B155",
+      "new_trigger_anytime": "B157",
+      "new_trigger_end_of_work_phase": "B158",
+      "new_predicate_both_cumulative_spaces_used": "B158",
+      "new_predicate_player_places_adjacent_field": "B159",
+      "new_trigger_other_player_action": "B159",
+      "new_predicate_all_cumulative_spaces_occupied": "B160",
+      "new_predicate_unused_cumulative_space_goods_ge_5": "B161",
+      "new_trigger_your_turn_in_work_phase": "B161",
+      "new_predicate_stored_exact_wood": "B162",
+      "new_trigger_store_from_cumulative_space": "B162",
+      "new_predicate_only_owner_with_two_room_house": "B163",
+      "new_trigger_before_harvest": "B165",
+      "new_trigger_renovate": "B168",
+      "new_passive_discount_cost": "C013",
+      "new_predicate_cultivated_fields_at_least": "C018",
+      "new_predicate_has_empty_room": "C021",
+      "when_buying_discount": "C027",
+      "new_trigger_after_brick_accumulation_used": "C036",
+      "new_trigger_field_placed": "C037",
+      "new_predicate_accumulation_space_name": "C039",
+      "new_trigger_accumulation_space_used": "C039",
+      "new_predicate_cost_paid_with": "C040",
+      "new_trigger_after_harvest_feeding": "C041",
+      "new_predicate_action_space_name": "C042",
+      "new_trigger_action_space_used": "C042",
+      "new_trigger_major_improvement_built": "C043",
+      "new_trigger_unused_farm_space_used": "C048",
+      "new_trigger_harvest_feeding_phase": "C049",
+      "new_trigger_after_cooking_conversion": "C053",
+      "new_predicate_cooking_conversion_goods": "C053",
+      "new_trigger_after_stable_built": "C056",
+      "new_predicate_field_vegetable_stacked": "C057",
+      "new_trigger_harvest_field": "C070",
+      "new_predicate_harvested_from": "C070",
+      "new_predicate_action_space_used": "C121",
+      "new_passive_gain_resource": "C121",
+      "new_predicate_house_type": "C123",
+      "new_predicate_harvest_number": "C124",
+      "new_predicate_action_space_occupied": "C131",
+      "new_passive_gain_points": "C132",
+      "new_predicate_renovation_to_stone_house": "C132",
+      "new_predicate_rounds_remaining": "C135",
+      "new_predicate_improvement_is_baking": "C137",
+      "new_trigger_on_use_minor_improvement_space": "C140",
+      "new_predicate_other_of_pair_occupied": "C145",
+      "new_predicate_card_clay_at_least": "C148",
+      "new_trigger_card_clay_reaches": "C148",
+      "new_predicate_right_neighbor_last_used": "C150",
+      "new_predicate_goods_in_fields_before_final_harvest_at_least": "D032",
+      "new_predicate_stone_rooms_exceed_people": "D034",
+      "new_predicate_grain_harvested_at_least": "D065",
+      "new_predicate_raw_text": "D071",
+      "new_predicate_resource_count": "D076",
+      "occupation_predicates": "D085",
+      "new_predicate_round_number": "D092",
+      "new_predicate_worker_on_space": "D094",
+      "new_trigger_before_final_harvest": "D098",
+      "new_trigger_after_final_harvest": "D099",
+      "new_trigger_ongoing": "D121",
+      "new_trigger_on_action_use": "D137",
+      "new_predicate_accumulation_space_has_exactly_one": "D138",
+      "new_trigger_on_other_player_action": "D139",
+      "new_trigger_on_take_from_accumulation": "D140",
+      "new_predicate_accumulation_resource_count_at_least": "D140",
+      "new_predicate_accumulation_space_unoccupied": "D142",
+      "new_predicate_occupies_accumulation_space": "D142",
+      "new_predicate_accumulation_has_at_least_3_of_non_wood_resource": "D143",
+      "new_predicate_action_space_name_in": "D144",
+      "new_predicate_person_is_second_placed_this_round": "D150",
+      "new_predicate_action_type": "D150",
+      "new_predicate_occupation_played_after_this": "D152",
+      "new_predicate_pasture_adjacent_to_house": "E011",
+      "new_predicate_all_other_players_more_family": "E014",
+      "new_predicate_card_food_at_least": "E027",
+      "new_predicate_animal_count_at_most": "E037",
+      "new_predicate_wood_rooms_built_at_least": "E049",
+      "new_predicate_animal_is": "E053",
+      "new_predicate_not_harvest_breeding": "E053",
+      "new_predicate_grain_converted_at_least": "E057",
+      "new_predicate_all_other_players_have_unplaced_people": "E062",
+      "new_predicate_action_space_is": "E066",
+      "new_predicate_harvested_last_wood": "E068",
+      "new_predicate_field_is": "E068",
+      "new_predicate_harvested_last_vegetable": "E069",
+      "new_trigger_when_last_crop_removed_from_card": "E070",
+      "new_predicate_field_adjacent_to_pasture": "E071",
+      "new_predicate_harvested_this_card_at_least": "E072",
+      "new_predicate_takes_reed_or_stone_from_space": "E077",
+      "new_predicate_sown_at_least_one_field": "E079",
+      "new_predicate_user_is_not_owner": "E081",
+      "new_trigger_on_use_this_card": "E081",
+      "new_trigger_breeding_phase_start": "E083",
+      "new_predicate_unfenced_stable_without_animal": "E083",
+      "new_trigger_harvest_breeding": "E084",
+      "new_trigger_convert_animal_to_food": "E085",
+      "new_trigger_check_card_becomes_room": "E085",
+      "new_trigger_after_play_occupation": "E089",
+      "new_predicate_occupation_count_is": "E089",
+      "new_trigger_breeding": "E090",
+      "new_predicate_offspring_at_least": "E090",
+      "new_predicate_improvement_is": "E091",
+      "new_trigger_play_minor_improvement": "E091",
+      "new_trigger_harvest_use_joinery": "E091",
+      "new_predicate_house_surrounded_by_4_fields": "E092",
+      "new_trigger_use_family_growth": "E092",
+      "new_predicate_house_has_exactly_2_rooms": "E092",
+      "new_predicate_no_unused_farm_spaces": "E093",
+      "new_trigger_first_turn_of_round": "E093",
+      "new_trigger_other_player_uses_grain_seeds": "E095",
+      "new_trigger_round_1_work_phase_start": "E096",
+      "new_predicate_is_first_occupation": "E098",
+      "new_trigger_feeding_phase": "E110",
+      "new_predicate_minor_improvement_count": "E111",
+      "new_trigger_after_family_growth": "E113",
+      "new_predicate_stable_count_in": "E114",
+      "new_predicate_gained_food_from_this_space": "E118",
+      "new_trigger_on_action_space_used": "E121",
+      "new_trigger_on_card_played_or_built": "E122",
+      "new_trigger_on_build_room_or_play_improvement_or_renovate": "E123",
+      "new_trigger_end_game_scoring": "E124",
+      "new_predicate_all_persons_placed": "E125",
+      "new_predicate_max_score_categories_at_4": "E127",
+      "new_trigger_on_build_major_improvement": "E128",
+      "new_predicate_action_space_not_accumulating": "E129",
+      "new_predicate_round_in_range": "E129",
+      "new_predicate_last_person_of_round": "E131",
+      "new_operation_move_card": "E131",
+      "new_predicate_animal_type_at_least_2_3_bred": "E133",
+      "new_predicate_pre_rounds_at_least": "E135",
+      "new_predicate_most_vegetables": "E135",
+      "new_trigger_game_start": "E135",
+      "new_predicate_most_pastures": "E136",
+      "new_predicate_improvement_cost_includes": "E156",
+      "new_predicate_occupation_played_from_hand": "E163"
+    }
+  },
+  "families": {
+    "pasture_predicates": {
+      "count": 1,
+      "cards": [
+        "A001"
+      ],
+      "foundation": "A001"
+    },
+    "build_stable_op": {
+      "count": 12,
+      "cards": [
+        "A001",
+        "A015",
+        "A089",
+        "B016",
+        "B085",
+        "B149",
+        "C002",
+        "D016",
+        "D089",
+        "D149",
+        "E001",
+        "E089"
+      ],
+      "foundation": "A001"
+    },
+    "plow_field_op": {
+      "count": 24,
+      "cards": [
+        "A002",
+        "A017",
+        "A018",
+        "A020",
+        "A090",
+        "A091",
+        "B017",
+        "B018",
+        "B020",
+        "B068",
+        "B090",
+        "B091",
+        "C017",
+        "C019",
+        "C020",
+        "D001",
+        "D017",
+        "D019",
+        "E017",
+        "E018",
+        "E019",
+        "E020",
+        "E069",
+        "E128"
+      ],
+      "foundation": "A002"
+    },
+    "new_operation_other": {
+      "count": 279,
+      "cards": [
+        "A003",
+        "A006",
+        "A010",
+        "A016",
+        "A019",
+        "A022",
+        "A025",
+        "A026",
+        "A027",
+        "A028",
+        "A040",
+        "A043",
+        "A044",
+        "A045",
+        "A046",
+        "A047",
+        "A058",
+        "A061",
+        "A069",
+        "A070",
+        "A072",
+        "A074",
+        "A081",
+        "A082",
+        "A083",
+        "A084",
+        "A086",
+        "A087",
+        "A089",
+        "A094",
+        "A097",
+        "A102",
+        "A111",
+        "A113",
+        "A114",
+        "A120",
+        "A127",
+        "A128",
+        "A129",
+        "A130",
+        "A137",
+        "A142",
+        "A144",
+        "A148",
+        "A150",
+        "A151",
+        "A156",
+        "A162",
+        "A165",
+        "B002",
+        "B003",
+        "B009",
+        "B011",
+        "B012",
+        "B014",
+        "B015",
+        "B018",
+        "B019",
+        "B020",
+        "B021",
+        "B023",
+        "B024",
+        "B026",
+        "B027",
+        "B028",
+        "B030",
+        "B033",
+        "B036",
+        "B041",
+        "B042",
+        "B043",
+        "B044",
+        "B045",
+        "B046",
+        "B047",
+        "B048",
+        "B053",
+        "B055",
+        "B060",
+        "B065",
+        "B066",
+        "B069",
+        "B072",
+        "B076",
+        "B083",
+        "B086",
+        "B089",
+        "B093",
+        "B096",
+        "B105",
+        "B113",
+        "B114",
+        "B119",
+        "B125",
+        "B129",
+        "B130",
+        "B136",
+        "B137",
+        "B141",
+        "B145",
+        "B146",
+        "B147",
+        "B149",
+        "B150",
+        "B151",
+        "B152",
+        "B153",
+        "B155",
+        "B156",
+        "B157",
+        "B159",
+        "B162",
+        "B164",
+        "B165",
+        "B166",
+        "B167",
+        "B168",
+        "C001",
+        "C003",
+        "C006",
+        "C007",
+        "C008",
+        "C009",
+        "C014",
+        "C016",
+        "C018",
+        "C019",
+        "C022",
+        "C023",
+        "C027",
+        "C046",
+        "C051",
+        "C056",
+        "C058",
+        "C060",
+        "C062",
+        "C064",
+        "C065",
+        "C069",
+        "C070",
+        "C095",
+        "C124",
+        "C125",
+        "C126",
+        "C127",
+        "C129",
+        "C131",
+        "C132",
+        "C138",
+        "C140",
+        "C143",
+        "C146",
+        "C148",
+        "C149",
+        "C150",
+        "D006",
+        "D012",
+        "D026",
+        "D043",
+        "D047",
+        "D057",
+        "D062",
+        "D070",
+        "D071",
+        "D073",
+        "D074",
+        "D075",
+        "D078",
+        "D082",
+        "D085",
+        "D086",
+        "D087",
+        "D088",
+        "D090",
+        "D091",
+        "D092",
+        "D093",
+        "D094",
+        "D095",
+        "D097",
+        "D098",
+        "D099",
+        "D100",
+        "D101",
+        "D102",
+        "D103",
+        "D107",
+        "D111",
+        "D113",
+        "D115",
+        "D116",
+        "D117",
+        "D118",
+        "D119",
+        "D120",
+        "D121",
+        "D122",
+        "D123",
+        "D124",
+        "D125",
+        "D126",
+        "D127",
+        "D128",
+        "D129",
+        "D130",
+        "D131",
+        "D132",
+        "D133",
+        "D134",
+        "D135",
+        "D136",
+        "D147",
+        "D150",
+        "D151",
+        "E003",
+        "E004",
+        "E005",
+        "E006",
+        "E009",
+        "E010",
+        "E016",
+        "E017",
+        "E021",
+        "E022",
+        "E024",
+        "E025",
+        "E027",
+        "E028",
+        "E030",
+        "E031",
+        "E033",
+        "E036",
+        "E038",
+        "E039",
+        "E040",
+        "E041",
+        "E042",
+        "E043",
+        "E044",
+        "E045",
+        "E046",
+        "E047",
+        "E051",
+        "E058",
+        "E070",
+        "E072",
+        "E073",
+        "E074",
+        "E075",
+        "E076",
+        "E078",
+        "E080",
+        "E081",
+        "E084",
+        "E085",
+        "E086",
+        "E088",
+        "E090",
+        "E091",
+        "E092",
+        "E093",
+        "E094",
+        "E095",
+        "E096",
+        "E097",
+        "E110",
+        "E112",
+        "E119",
+        "E120",
+        "E123",
+        "E129",
+        "E130",
+        "E134",
+        "E155",
+        "E159",
+        "E161",
+        "E162",
+        "E163",
+        "E167"
+      ],
+      "foundation": "A003"
+    },
+    "building_predicates": {
+      "count": 3,
+      "cards": [
+        "A004",
+        "A021",
+        "D010"
+      ],
+      "foundation": "A004"
+    },
+    "new_passive_modify_capacity": {
+      "count": 16,
+      "cards": [
+        "A010",
+        "A011",
+        "A085",
+        "A086",
+        "A127",
+        "A148",
+        "B148",
+        "C010",
+        "C011",
+        "C012",
+        "C086",
+        "C128",
+        "D011",
+        "D148",
+        "E011",
+        "E012"
+      ],
+      "foundation": "A010"
+    },
+    "new_passive_other": {
+      "count": 45,
+      "cards": [
+        "A010",
+        "A016",
+        "A025",
+        "A026",
+        "A028",
+        "A087",
+        "A102",
+        "A130",
+        "A162",
+        "B033",
+        "B042",
+        "B086",
+        "B129",
+        "B141",
+        "B151",
+        "C009",
+        "C014",
+        "C018",
+        "C023",
+        "C027",
+        "C056",
+        "C124",
+        "C125",
+        "C126",
+        "C129",
+        "C131",
+        "C132",
+        "C143",
+        "D012",
+        "D026",
+        "D074",
+        "D075",
+        "D082",
+        "D085",
+        "D086",
+        "D087",
+        "D088",
+        "E016",
+        "E021",
+        "E024",
+        "E033",
+        "E036",
+        "E074",
+        "E155",
+        "E161"
+      ],
+      "foundation": "A010"
+    },
+    "new_operation_renovate": {
+      "count": 5,
+      "cards": [
+        "A013",
+        "B088",
+        "E002",
+        "E087",
+        "E094"
+      ],
+      "foundation": "A013"
+    },
+    "new_trigger_after_room_construction": {
+      "count": 9,
+      "cards": [
+        "A014",
+        "A093",
+        "A111",
+        "A123",
+        "D015",
+        "D094",
+        "D096",
+        "E049",
+        "E052"
+      ],
+      "foundation": "A014"
+    },
+    "new_predicate_rooms_built_at_once_at_least": {
+      "count": 2,
+      "cards": [
+        "A014",
+        "E052"
+      ],
+      "foundation": "A014"
+    },
+    "new_predicate_all_accumulated_animals_accommodated": {
+      "count": 1,
+      "cards": [
+        "A017"
+      ],
+      "foundation": "A017"
+    },
+    "new_trigger_after_animal_accommodation": {
+      "count": 1,
+      "cards": [
+        "A017"
+      ],
+      "foundation": "A017"
+    },
+    "new_predicate_first_person_of_round": {
+      "count": 1,
+      "cards": [
+        "A018"
+      ],
+      "foundation": "A018"
+    },
+    "round_space_predicates": {
+      "count": 7,
+      "cards": [
+        "A019",
+        "A022",
+        "A089",
+        "B018",
+        "B020",
+        "D091",
+        "E028"
+      ],
+      "foundation": "A019"
+    },
+    "grant_action_op": {
+      "count": 56,
+      "cards": [
+        "A021",
+        "A023",
+        "A024",
+        "A073",
+        "A093",
+        "A095",
+        "A096",
+        "A115",
+        "A131",
+        "A139",
+        "A149",
+        "A152",
+        "B001",
+        "B021",
+        "B025",
+        "B087",
+        "B088",
+        "B092",
+        "B093",
+        "B094",
+        "B096",
+        "B097",
+        "B108",
+        "B127",
+        "B128",
+        "B131",
+        "C015",
+        "C021",
+        "C024",
+        "C025",
+        "C026",
+        "C028",
+        "C042",
+        "C151",
+        "C152",
+        "D002",
+        "D003",
+        "D010",
+        "D021",
+        "D028",
+        "D112",
+        "E013",
+        "E014",
+        "E015",
+        "E022",
+        "E023",
+        "E026",
+        "E027",
+        "E028",
+        "E062",
+        "E063",
+        "E064",
+        "E095",
+        "E115",
+        "E125",
+        "E136"
+      ],
+      "foundation": "A021"
+    },
+    "round_end_triggers": {
+      "count": 15,
+      "cards": [
+        "A029",
+        "A035",
+        "A053",
+        "A054",
+        "A058",
+        "A070",
+        "A127",
+        "A141",
+        "A165",
+        "B053",
+        "D010",
+        "D052",
+        "D079",
+        "E022",
+        "E125"
+      ],
+      "foundation": "A029"
+    },
+    "new_trigger_after_fence_build": {
+      "count": 5,
+      "cards": [
+        "A034",
+        "A068",
+        "A083",
+        "B124",
+        "D089"
+      ],
+      "foundation": "A034"
+    },
+    "new_predicate_person_returned_from_fishing": {
+      "count": 1,
+      "cards": [
+        "A035"
+      ],
+      "foundation": "A035"
+    },
+    "building_triggers": {
+      "count": 13,
+      "cards": [
+        "A037",
+        "A045",
+        "A120",
+        "B016",
+        "B055",
+        "B134",
+        "C144",
+        "C146",
+        "C149",
+        "D077",
+        "D081",
+        "D111",
+        "E154"
+      ],
+      "foundation": "A037"
+    },
+    "new_trigger_after_farmyard_space_used": {
+      "count": 1,
+      "cards": [
+        "A040"
+      ],
+      "foundation": "A040"
+    },
+    "new_trigger_after_upgrade_fireplace": {
+      "count": 1,
+      "cards": [
+        "A041"
+      ],
+      "foundation": "A041"
+    },
+    "new_trigger_after_stable_construction": {
+      "count": 2,
+      "cards": [
+        "A043",
+        "A167"
+      ],
+      "foundation": "A043"
+    },
+    "new_trigger_after_wood_gain": {
+      "count": 3,
+      "cards": [
+        "A048",
+        "B021",
+        "E047"
+      ],
+      "foundation": "A048"
+    },
+    "new_predicate_accumulation_grew_this_round": {
+      "count": 1,
+      "cards": [
+        "A049"
+      ],
+      "foundation": "A049"
+    },
+    "new_predicate_resources_gained_in_work_phase_at_least": {
+      "count": 1,
+      "cards": [
+        "A053"
+      ],
+      "foundation": "A053"
+    },
+    "new_trigger_after_improvement": {
+      "count": 12,
+      "cards": [
+        "A055",
+        "A109",
+        "A131",
+        "B049",
+        "C137",
+        "D080",
+        "D118",
+        "E018",
+        "E031",
+        "E054",
+        "E156",
+        "E165"
+      ],
+      "foundation": "A055"
+    },
+    "new_trigger_after_harvest_vegetable_gain": {
+      "count": 1,
+      "cards": [
+        "A059"
+      ],
+      "foundation": "A059"
+    },
+    "harvest_feeding_trigger": {
+      "count": 13,
+      "cards": [
+        "A062",
+        "A148",
+        "C054",
+        "C055",
+        "C059",
+        "C062",
+        "C063",
+        "D012",
+        "D062",
+        "D084",
+        "E030",
+        "E048",
+        "E159"
+      ],
+      "foundation": "A062"
+    },
+    "new_trigger_before_sow": {
+      "count": 5,
+      "cards": [
+        "A065",
+        "A132",
+        "A154",
+        "D017",
+        "E017"
+      ],
+      "foundation": "A065"
+    },
+    "new_predicate_already_owns_animal_type": {
+      "count": 1,
+      "cards": [
+        "A066"
+      ],
+      "foundation": "A066"
+    },
+    "new_predicate_farmyard_unused_became_used": {
+      "count": 1,
+      "cards": [
+        "A073"
+      ],
+      "foundation": "A073"
+    },
+    "new_trigger_after_stables_built": {
+      "count": 1,
+      "cards": [
+        "A074"
+      ],
+      "foundation": "A074"
+    },
+    "new_predicate_round_space_has_placed_good": {
+      "count": 5,
+      "cards": [
+        "A074",
+        "A111",
+        "A120",
+        "B125",
+        "E047"
+      ],
+      "foundation": "A074"
+    },
+    "new_predicate_stables_built_on_own_turn": {
+      "count": 1,
+      "cards": [
+        "A074"
+      ],
+      "foundation": "A074"
+    },
+    "new_trigger_work_phase_start": {
+      "count": 3,
+      "cards": [
+        "A076",
+        "B081",
+        "D054"
+      ],
+      "foundation": "A076"
+    },
+    "sowing_triggers": {
+      "count": 5,
+      "cards": [
+        "A079",
+        "B054",
+        "E050",
+        "E071",
+        "E079"
+      ],
+      "foundation": "A079"
+    },
+    "new_predicate_vegetables_planted": {
+      "count": 1,
+      "cards": [
+        "A079"
+      ],
+      "foundation": "A079"
+    },
+    "new_predicate_new_pasture_created": {
+      "count": 2,
+      "cards": [
+        "A083",
+        "B124"
+      ],
+      "foundation": "A083"
+    },
+    "new_trigger_returning_home_phase": {
+      "count": 5,
+      "cards": [
+        "A084",
+        "A100",
+        "B139",
+        "D102",
+        "D107"
+      ],
+      "foundation": "A084"
+    },
+    "new_trigger_sow_action_declined": {
+      "count": 1,
+      "cards": [
+        "A094"
+      ],
+      "foundation": "A094"
+    },
+    "new_predicate_accumulation_at_most": {
+      "count": 1,
+      "cards": [
+        "A095"
+      ],
+      "foundation": "A095"
+    },
+    "new_trigger_stone_accumulation_space_revealed": {
+      "count": 3,
+      "cards": [
+        "A096",
+        "C021",
+        "D116"
+      ],
+      "foundation": "A096"
+    },
+    "new_trigger_before_bake_bread": {
+      "count": 5,
+      "cards": [
+        "A097",
+        "B067",
+        "D066",
+        "E063",
+        "E064"
+      ],
+      "foundation": "A097"
+    },
+    "new_predicate_persons_returned_from_accumulation_at_least": {
+      "count": 1,
+      "cards": [
+        "A100"
+      ],
+      "foundation": "A100"
+    },
+    "new_passive_spend_resource": {
+      "count": 1,
+      "cards": [
+        "A102"
+      ],
+      "foundation": "A102"
+    },
+    "new_trigger_after_field_gained": {
+      "count": 3,
+      "cards": [
+        "A105",
+        "D104",
+        "E164"
+      ],
+      "foundation": "A105"
+    },
+    "new_predicate_own_placement_index_this_round": {
+      "count": 2,
+      "cards": [
+        "A107",
+        "E056"
+      ],
+      "foundation": "A107"
+    },
+    "new_predicate_accumulation_exactly": {
+      "count": 1,
+      "cards": [
+        "A107"
+      ],
+      "foundation": "A107"
+    },
+    "new_predicate_improvement_played_from_hand": {
+      "count": 7,
+      "cards": [
+        "A109",
+        "C137",
+        "D117",
+        "D118",
+        "E018",
+        "E054",
+        "E165"
+      ],
+      "foundation": "A109"
+    },
+    "new_predicate_round_space_in": {
+      "count": 3,
+      "cards": [
+        "A124",
+        "A151",
+        "B137"
+      ],
+      "foundation": "A124"
+    },
+    "new_trigger_before_worker_space": {
+      "count": 6,
+      "cards": [
+        "A124",
+        "A126",
+        "B138",
+        "C015",
+        "D016",
+        "D119"
+      ],
+      "foundation": "A124"
+    },
+    "new_predicate_space_occupied": {
+      "count": 2,
+      "cards": [
+        "A141",
+        "B064"
+      ],
+      "foundation": "A141"
+    },
+    "new_predicate_reed_taken_at_least": {
+      "count": 1,
+      "cards": [
+        "A142"
+      ],
+      "foundation": "A142"
+    },
+    "new_predicate_food_taken_in": {
+      "count": 1,
+      "cards": [
+        "A146"
+      ],
+      "foundation": "A146"
+    },
+    "new_predicate_round_space_unused": {
+      "count": 1,
+      "cards": [
+        "A151"
+      ],
+      "foundation": "A151"
+    },
+    "new_predicate_lessons_used_by_fewer_players": {
+      "count": 1,
+      "cards": [
+        "A152"
+      ],
+      "foundation": "A152"
+    },
+    "new_trigger_after_animal_acquisition": {
+      "count": 3,
+      "cards": [
+        "A153",
+        "B154",
+        "E053"
+      ],
+      "foundation": "A153"
+    },
+    "new_predicate_other_player_uses": {
+      "count": 5,
+      "cards": [
+        "A156",
+        "A158",
+        "A159",
+        "B138",
+        "B143"
+      ],
+      "foundation": "A156"
+    },
+    "new_predicate_lessons_occupants_at_least": {
+      "count": 1,
+      "cards": [
+        "A157"
+      ],
+      "foundation": "A157"
+    },
+    "new_predicate_same_good_already_taken_this_work_phase": {
+      "count": 1,
+      "cards": [
+        "A161"
+      ],
+      "foundation": "A161"
+    },
+    "new_passive_exchange": {
+      "count": 2,
+      "cards": [
+        "A164",
+        "C057"
+      ],
+      "foundation": "A164"
+    },
+    "new_trigger_harvest_end": {
+      "count": 2,
+      "cards": [
+        "A166",
+        "B082"
+      ],
+      "foundation": "A166"
+    },
+    "new_predicate_stables_at_least": {
+      "count": 1,
+      "cards": [
+        "A167"
+      ],
+      "foundation": "A167"
+    },
+    "new_trigger_on_use_wood_accumulation": {
+      "count": 2,
+      "cards": [
+        "B015",
+        "E015"
+      ],
+      "foundation": "B015"
+    },
+    "new_predicate_card_food_empty": {
+      "count": 1,
+      "cards": [
+        "B021"
+      ],
+      "foundation": "B021"
+    },
+    "new_trigger_after_occupation": {
+      "count": 4,
+      "cards": [
+        "B025",
+        "B049",
+        "C068",
+        "E163"
+      ],
+      "foundation": "B025"
+    },
+    "new_trigger_on_use_grain_utilization": {
+      "count": 2,
+      "cards": [
+        "B026",
+        "E067"
+      ],
+      "foundation": "B026"
+    },
+    "new_trigger_on_build_room_stable_fence": {
+      "count": 1,
+      "cards": [
+        "B027"
+      ],
+      "foundation": "B027"
+    },
+    "new_trigger_on_use_forest_accumulation": {
+      "count": 1,
+      "cards": [
+        "B028"
+      ],
+      "foundation": "B028"
+    },
+    "new_trigger_on_use_lesson_and_major_improvement": {
+      "count": 1,
+      "cards": [
+        "B029"
+      ],
+      "foundation": "B029"
+    },
+    "new_trigger_on_build_fence": {
+      "count": 1,
+      "cards": [
+        "B030"
+      ],
+      "foundation": "B030"
+    },
+    "new_trigger_scoring": {
+      "count": 4,
+      "cards": [
+        "B031",
+        "B035",
+        "B038",
+        "B039"
+      ],
+      "foundation": "B031"
+    },
+    "new_trigger_any_time": {
+      "count": 8,
+      "cards": [
+        "B032",
+        "B080",
+        "B104",
+        "C050",
+        "C139",
+        "E014",
+        "E027",
+        "E086"
+      ],
+      "foundation": "B032"
+    },
+    "new_trigger_first_time_all_livestock_fed_from_accumulation": {
+      "count": 1,
+      "cards": [
+        "B034"
+      ],
+      "foundation": "B034"
+    },
+    "new_trigger_each_field_phase": {
+      "count": 1,
+      "cards": [
+        "B039"
+      ],
+      "foundation": "B039"
+    },
+    "new_trigger_on_use_fishing_or_reed_accumulation": {
+      "count": 2,
+      "cards": [
+        "B040",
+        "E055"
+      ],
+      "foundation": "B040"
+    },
+    "new_predicate_space_is": {
+      "count": 3,
+      "cards": [
+        "B042",
+        "E055",
+        "E067"
+      ],
+      "foundation": "B042"
+    },
+    "new_predicate_improvements_equal_occupations": {
+      "count": 1,
+      "cards": [
+        "B049"
+      ],
+      "foundation": "B049"
+    },
+    "new_predicate_custom": {
+      "count": 2,
+      "cards": [
+        "B056",
+        "B065"
+      ],
+      "foundation": "B056"
+    },
+    "new_trigger_harvest_start": {
+      "count": 11,
+      "cards": [
+        "B070",
+        "C024",
+        "D061",
+        "D097",
+        "D115",
+        "E039",
+        "E058",
+        "E061",
+        "E110",
+        "E111",
+        "E117"
+      ],
+      "foundation": "B070"
+    },
+    "harvest_occupation_predicates": {
+      "count": 1,
+      "cards": [
+        "B071"
+      ],
+      "foundation": "B071"
+    },
+    "new_predicate_room_count_in": {
+      "count": 2,
+      "cards": [
+        "B073",
+        "D087"
+      ],
+      "foundation": "B073"
+    },
+    "new_trigger_before_play_improvement": {
+      "count": 1,
+      "cards": [
+        "B075"
+      ],
+      "foundation": "B075"
+    },
+    "new_trigger_on_any_player_take_accumulation": {
+      "count": 1,
+      "cards": [
+        "B079"
+      ],
+      "foundation": "B079"
+    },
+    "new_trigger_on_build_stable": {
+      "count": 1,
+      "cards": [
+        "B085"
+      ],
+      "foundation": "B085"
+    },
+    "new_trigger_on_use_day_laborer": {
+      "count": 4,
+      "cards": [
+        "B087",
+        "B091",
+        "C138",
+        "E059"
+      ],
+      "foundation": "B087"
+    },
+    "new_trigger_on_use_cultivation": {
+      "count": 1,
+      "cards": [
+        "B090"
+      ],
+      "foundation": "B090"
+    },
+    "new_predicate_round_at_least": {
+      "count": 1,
+      "cards": [
+        "B092"
+      ],
+      "foundation": "B092"
+    },
+    "new_predicate_is_cumulative_space": {
+      "count": 4,
+      "cards": [
+        "B092",
+        "B108",
+        "C148",
+        "E066"
+      ],
+      "foundation": "B092"
+    },
+    "new_trigger_on_action_space_use": {
+      "count": 5,
+      "cards": [
+        "B092",
+        "B094",
+        "B108",
+        "B112",
+        "B120"
+      ],
+      "foundation": "B092"
+    },
+    "new_predicate_is_action_space": {
+      "count": 1,
+      "cards": [
+        "B094"
+      ],
+      "foundation": "B094"
+    },
+    "new_predicate_wood_on_this_round_space": {
+      "count": 2,
+      "cards": [
+        "B096",
+        "B119"
+      ],
+      "foundation": "B096"
+    },
+    "new_predicate_round_is_odd": {
+      "count": 1,
+      "cards": [
+        "B096"
+      ],
+      "foundation": "B096"
+    },
+    "new_predicate_has_stone_house": {
+      "count": 1,
+      "cards": [
+        "B097"
+      ],
+      "foundation": "B097"
+    },
+    "new_trigger_game_end_scoring": {
+      "count": 1,
+      "cards": [
+        "B100"
+      ],
+      "foundation": "B100"
+    },
+    "new_trigger_harvest": {
+      "count": 4,
+      "cards": [
+        "B101",
+        "E132",
+        "E134",
+        "E153"
+      ],
+      "foundation": "B101"
+    },
+    "new_predicate_any_player_has_card": {
+      "count": 1,
+      "cards": [
+        "B101"
+      ],
+      "foundation": "B101"
+    },
+    "new_trigger_after_improvement_declined": {
+      "count": 2,
+      "cards": [
+        "B103",
+        "D021"
+      ],
+      "foundation": "B103"
+    },
+    "new_predicate_has_sheep_on_farm": {
+      "count": 1,
+      "cards": [
+        "B104"
+      ],
+      "foundation": "B104"
+    },
+    "new_predicate_goods_on_upcoming_round_spaces": {
+      "count": 1,
+      "cards": [
+        "B106"
+      ],
+      "foundation": "B106"
+    },
+    "new_predicate_pay_wood": {
+      "count": 1,
+      "cards": [
+        "B109"
+      ],
+      "foundation": "B109"
+    },
+    "new_trigger_on_play_occupation": {
+      "count": 3,
+      "cards": [
+        "B109",
+        "D152",
+        "E051"
+      ],
+      "foundation": "B109"
+    },
+    "new_predicate_round_is": {
+      "count": 2,
+      "cards": [
+        "B110",
+        "E087"
+      ],
+      "foundation": "B110"
+    },
+    "new_trigger_setup_phase_end": {
+      "count": 1,
+      "cards": [
+        "B110"
+      ],
+      "foundation": "B110"
+    },
+    "new_predicate_has_stone_in_stock": {
+      "count": 1,
+      "cards": [
+        "B110"
+      ],
+      "foundation": "B110"
+    },
+    "new_predicate_room_type_is": {
+      "count": 2,
+      "cards": [
+        "B111",
+        "C149"
+      ],
+      "foundation": "B111"
+    },
+    "new_predicate_not_stone_room": {
+      "count": 1,
+      "cards": [
+        "B111"
+      ],
+      "foundation": "B111"
+    },
+    "build_room_op": {
+      "count": 2,
+      "cards": [
+        "B111",
+        "E127"
+      ],
+      "foundation": "B111"
+    },
+    "new_predicate_not_renovation_from_wood": {
+      "count": 1,
+      "cards": [
+        "B111"
+      ],
+      "foundation": "B111"
+    },
+    "new_predicate_is_most_recently_revealed_action_space": {
+      "count": 1,
+      "cards": [
+        "B112"
+      ],
+      "foundation": "B112"
+    },
+    "new_predicate_rooms_at_least": {
+      "count": 1,
+      "cards": [
+        "B114"
+      ],
+      "foundation": "B114"
+    },
+    "new_predicate_family_exactly": {
+      "count": 1,
+      "cards": [
+        "B114"
+      ],
+      "foundation": "B114"
+    },
+    "sow_op": {
+      "count": 1,
+      "cards": [
+        "B115"
+      ],
+      "foundation": "B115"
+    },
+    "new_trigger_continuous": {
+      "count": 1,
+      "cards": [
+        "B115"
+      ],
+      "foundation": "B115"
+    },
+    "new_trigger_reed_bed_cumulative_space_receives_reed": {
+      "count": 1,
+      "cards": [
+        "B116"
+      ],
+      "foundation": "B116"
+    },
+    "new_trigger_after_work_phase": {
+      "count": 9,
+      "cards": [
+        "B117",
+        "B140",
+        "D093",
+        "E010",
+        "E020",
+        "E023",
+        "E026",
+        "E027",
+        "E158"
+      ],
+      "foundation": "B117"
+    },
+    "new_predicate_is_action_space_above_most_recent_round_space_card": {
+      "count": 1,
+      "cards": [
+        "B120"
+      ],
+      "foundation": "B120"
+    },
+    "new_predicate_farmyard_all_used": {
+      "count": 2,
+      "cards": [
+        "B132",
+        "E034"
+      ],
+      "foundation": "B132"
+    },
+    "new_predicate_board_wood_empty": {
+      "count": 1,
+      "cards": [
+        "B139"
+      ],
+      "foundation": "B139"
+    },
+    "new_predicate_farmyard_goods_placed": {
+      "count": 1,
+      "cards": [
+        "B140"
+      ],
+      "foundation": "B140"
+    },
+    "new_trigger_after_event": {
+      "count": 1,
+      "cards": [
+        "B145"
+      ],
+      "foundation": "B145"
+    },
+    "new_predicate_build_room_or_renovate": {
+      "count": 1,
+      "cards": [
+        "B145"
+      ],
+      "foundation": "B145"
+    },
+    "new_trigger_final_scoring": {
+      "count": 1,
+      "cards": [
+        "B153"
+      ],
+      "foundation": "B153"
+    },
+    "new_trigger_pay_occupation_cost": {
+      "count": 2,
+      "cards": [
+        "B155",
+        "E060"
+      ],
+      "foundation": "B155"
+    },
+    "new_trigger_anytime": {
+      "count": 2,
+      "cards": [
+        "B157",
+        "C069"
+      ],
+      "foundation": "B157"
+    },
+    "new_trigger_end_of_work_phase": {
+      "count": 4,
+      "cards": [
+        "B158",
+        "B160",
+        "D142",
+        "E087"
+      ],
+      "foundation": "B158"
+    },
+    "new_predicate_both_cumulative_spaces_used": {
+      "count": 1,
+      "cards": [
+        "B158"
+      ],
+      "foundation": "B158"
+    },
+    "new_predicate_player_places_adjacent_field": {
+      "count": 1,
+      "cards": [
+        "B159"
+      ],
+      "foundation": "B159"
+    },
+    "new_trigger_other_player_action": {
+      "count": 2,
+      "cards": [
+        "B159",
+        "E066"
+      ],
+      "foundation": "B159"
+    },
+    "new_predicate_all_cumulative_spaces_occupied": {
+      "count": 1,
+      "cards": [
+        "B160"
+      ],
+      "foundation": "B160"
+    },
+    "new_predicate_unused_cumulative_space_goods_ge_5": {
+      "count": 1,
+      "cards": [
+        "B161"
+      ],
+      "foundation": "B161"
+    },
+    "new_trigger_your_turn_in_work_phase": {
+      "count": 3,
+      "cards": [
+        "B161",
+        "C150",
+        "E062"
+      ],
+      "foundation": "B161"
+    },
+    "new_predicate_stored_exact_wood": {
+      "count": 1,
+      "cards": [
+        "B162"
+      ],
+      "foundation": "B162"
+    },
+    "new_trigger_store_from_cumulative_space": {
+      "count": 1,
+      "cards": [
+        "B162"
+      ],
+      "foundation": "B162"
+    },
+    "new_predicate_only_owner_with_two_room_house": {
+      "count": 1,
+      "cards": [
+        "B163"
+      ],
+      "foundation": "B163"
+    },
+    "new_trigger_before_harvest": {
+      "count": 1,
+      "cards": [
+        "B165"
+      ],
+      "foundation": "B165"
+    },
+    "new_trigger_renovate": {
+      "count": 1,
+      "cards": [
+        "B168"
+      ],
+      "foundation": "B168"
+    },
+    "new_passive_discount_cost": {
+      "count": 2,
+      "cards": [
+        "C013",
+        "C122"
+      ],
+      "foundation": "C013"
+    },
+    "new_predicate_cultivated_fields_at_least": {
+      "count": 1,
+      "cards": [
+        "C018"
+      ],
+      "foundation": "C018"
+    },
+    "new_predicate_has_empty_room": {
+      "count": 3,
+      "cards": [
+        "C021",
+        "D021",
+        "D092"
+      ],
+      "foundation": "C021"
+    },
+    "when_buying_discount": {
+      "count": 2,
+      "cards": [
+        "C027",
+        "D117"
+      ],
+      "foundation": "C027"
+    },
+    "new_trigger_after_brick_accumulation_used": {
+      "count": 1,
+      "cards": [
+        "C036"
+      ],
+      "foundation": "C036"
+    },
+    "new_trigger_field_placed": {
+      "count": 1,
+      "cards": [
+        "C037"
+      ],
+      "foundation": "C037"
+    },
+    "new_predicate_accumulation_space_name": {
+      "count": 1,
+      "cards": [
+        "C039"
+      ],
+      "foundation": "C039"
+    },
+    "new_trigger_accumulation_space_used": {
+      "count": 1,
+      "cards": [
+        "C039"
+      ],
+      "foundation": "C039"
+    },
+    "new_predicate_cost_paid_with": {
+      "count": 1,
+      "cards": [
+        "C040"
+      ],
+      "foundation": "C040"
+    },
+    "new_trigger_after_harvest_feeding": {
+      "count": 1,
+      "cards": [
+        "C041"
+      ],
+      "foundation": "C041"
+    },
+    "new_predicate_action_space_name": {
+      "count": 12,
+      "cards": [
+        "C042",
+        "C045",
+        "D137",
+        "D138",
+        "D139",
+        "D141",
+        "D147",
+        "D149",
+        "D151",
+        "E121",
+        "E130",
+        "E131"
+      ],
+      "foundation": "C042"
+    },
+    "new_trigger_action_space_used": {
+      "count": 2,
+      "cards": [
+        "C042",
+        "C045"
+      ],
+      "foundation": "C042"
+    },
+    "new_trigger_major_improvement_built": {
+      "count": 1,
+      "cards": [
+        "C043"
+      ],
+      "foundation": "C043"
+    },
+    "new_trigger_unused_farm_space_used": {
+      "count": 1,
+      "cards": [
+        "C048"
+      ],
+      "foundation": "C048"
+    },
+    "new_trigger_harvest_feeding_phase": {
+      "count": 1,
+      "cards": [
+        "C049"
+      ],
+      "foundation": "C049"
+    },
+    "new_trigger_after_cooking_conversion": {
+      "count": 1,
+      "cards": [
+        "C053"
+      ],
+      "foundation": "C053"
+    },
+    "new_predicate_cooking_conversion_goods": {
+      "count": 1,
+      "cards": [
+        "C053"
+      ],
+      "foundation": "C053"
+    },
+    "new_trigger_after_stable_built": {
+      "count": 2,
+      "cards": [
+        "C056",
+        "E114"
+      ],
+      "foundation": "C056"
+    },
+    "new_predicate_field_vegetable_stacked": {
+      "count": 1,
+      "cards": [
+        "C057"
+      ],
+      "foundation": "C057"
+    },
+    "new_trigger_harvest_field": {
+      "count": 1,
+      "cards": [
+        "C070"
+      ],
+      "foundation": "C070"
+    },
+    "new_predicate_harvested_from": {
+      "count": 1,
+      "cards": [
+        "C070"
+      ],
+      "foundation": "C070"
+    },
+    "new_predicate_action_space_used": {
+      "count": 4,
+      "cards": [
+        "C121",
+        "C126",
+        "C130",
+        "C131"
+      ],
+      "foundation": "C121"
+    },
+    "new_passive_gain_resource": {
+      "count": 4,
+      "cards": [
+        "C121",
+        "C123",
+        "C126",
+        "C130"
+      ],
+      "foundation": "C121"
+    },
+    "new_predicate_house_type": {
+      "count": 1,
+      "cards": [
+        "C123"
+      ],
+      "foundation": "C123"
+    },
+    "new_predicate_harvest_number": {
+      "count": 1,
+      "cards": [
+        "C124"
+      ],
+      "foundation": "C124"
+    },
+    "new_predicate_action_space_occupied": {
+      "count": 1,
+      "cards": [
+        "C131"
+      ],
+      "foundation": "C131"
+    },
+    "new_passive_gain_points": {
+      "count": 5,
+      "cards": [
+        "C132",
+        "C133",
+        "C134",
+        "C135",
+        "C136"
+      ],
+      "foundation": "C132"
+    },
+    "new_predicate_renovation_to_stone_house": {
+      "count": 1,
+      "cards": [
+        "C132"
+      ],
+      "foundation": "C132"
+    },
+    "new_predicate_rounds_remaining": {
+      "count": 2,
+      "cards": [
+        "C135",
+        "C136"
+      ],
+      "foundation": "C135"
+    },
+    "new_predicate_improvement_is_baking": {
+      "count": 1,
+      "cards": [
+        "C137"
+      ],
+      "foundation": "C137"
+    },
+    "new_trigger_on_use_minor_improvement_space": {
+      "count": 1,
+      "cards": [
+        "C140"
+      ],
+      "foundation": "C140"
+    },
+    "new_predicate_other_of_pair_occupied": {
+      "count": 1,
+      "cards": [
+        "C145"
+      ],
+      "foundation": "C145"
+    },
+    "new_predicate_card_clay_at_least": {
+      "count": 1,
+      "cards": [
+        "C148"
+      ],
+      "foundation": "C148"
+    },
+    "new_trigger_card_clay_reaches": {
+      "count": 1,
+      "cards": [
+        "C148"
+      ],
+      "foundation": "C148"
+    },
+    "new_predicate_right_neighbor_last_used": {
+      "count": 1,
+      "cards": [
+        "C150"
+      ],
+      "foundation": "C150"
+    },
+    "new_predicate_goods_in_fields_before_final_harvest_at_least": {
+      "count": 1,
+      "cards": [
+        "D032"
+      ],
+      "foundation": "D032"
+    },
+    "new_predicate_stone_rooms_exceed_people": {
+      "count": 1,
+      "cards": [
+        "D034"
+      ],
+      "foundation": "D034"
+    },
+    "new_predicate_grain_harvested_at_least": {
+      "count": 2,
+      "cards": [
+        "D065",
+        "D113"
+      ],
+      "foundation": "D065"
+    },
+    "new_predicate_raw_text": {
+      "count": 2,
+      "cards": [
+        "D071",
+        "D080"
+      ],
+      "foundation": "D071"
+    },
+    "new_predicate_resource_count": {
+      "count": 1,
+      "cards": [
+        "D076"
+      ],
+      "foundation": "D076"
+    },
+    "occupation_predicates": {
+      "count": 2,
+      "cards": [
+        "D085",
+        "E157"
+      ],
+      "foundation": "D085"
+    },
+    "new_predicate_round_number": {
+      "count": 4,
+      "cards": [
+        "D092",
+        "D099",
+        "D144",
+        "E119"
+      ],
+      "foundation": "D092"
+    },
+    "new_predicate_worker_on_space": {
+      "count": 3,
+      "cards": [
+        "D094",
+        "E010",
+        "E020"
+      ],
+      "foundation": "D094"
+    },
+    "new_trigger_before_final_harvest": {
+      "count": 1,
+      "cards": [
+        "D098"
+      ],
+      "foundation": "D098"
+    },
+    "new_trigger_after_final_harvest": {
+      "count": 1,
+      "cards": [
+        "D099"
+      ],
+      "foundation": "D099"
+    },
+    "new_trigger_ongoing": {
+      "count": 16,
+      "cards": [
+        "D121",
+        "D122",
+        "D123",
+        "D124",
+        "D125",
+        "D126",
+        "D127",
+        "D128",
+        "D129",
+        "D130",
+        "D131",
+        "D132",
+        "D133",
+        "D134",
+        "D135",
+        "D136"
+      ],
+      "foundation": "D121"
+    },
+    "new_trigger_on_action_use": {
+      "count": 7,
+      "cards": [
+        "D137",
+        "D138",
+        "D141",
+        "D144",
+        "D147",
+        "D150",
+        "D151"
+      ],
+      "foundation": "D137"
+    },
+    "new_predicate_accumulation_space_has_exactly_one": {
+      "count": 1,
+      "cards": [
+        "D138"
+      ],
+      "foundation": "D138"
+    },
+    "new_trigger_on_other_player_action": {
+      "count": 2,
+      "cards": [
+        "D139",
+        "D149"
+      ],
+      "foundation": "D139"
+    },
+    "new_trigger_on_take_from_accumulation": {
+      "count": 3,
+      "cards": [
+        "D140",
+        "D143",
+        "D146"
+      ],
+      "foundation": "D140"
+    },
+    "new_predicate_accumulation_resource_count_at_least": {
+      "count": 2,
+      "cards": [
+        "D140",
+        "D146"
+      ],
+      "foundation": "D140"
+    },
+    "new_predicate_accumulation_space_unoccupied": {
+      "count": 1,
+      "cards": [
+        "D142"
+      ],
+      "foundation": "D142"
+    },
+    "new_predicate_occupies_accumulation_space": {
+      "count": 1,
+      "cards": [
+        "D142"
+      ],
+      "foundation": "D142"
+    },
+    "new_predicate_accumulation_has_at_least_3_of_non_wood_resource": {
+      "count": 1,
+      "cards": [
+        "D143"
+      ],
+      "foundation": "D143"
+    },
+    "new_predicate_action_space_name_in": {
+      "count": 1,
+      "cards": [
+        "D144"
+      ],
+      "foundation": "D144"
+    },
+    "new_predicate_person_is_second_placed_this_round": {
+      "count": 1,
+      "cards": [
+        "D150"
+      ],
+      "foundation": "D150"
+    },
+    "new_predicate_action_type": {
+      "count": 1,
+      "cards": [
+        "D150"
+      ],
+      "foundation": "D150"
+    },
+    "new_predicate_occupation_played_after_this": {
+      "count": 1,
+      "cards": [
+        "D152"
+      ],
+      "foundation": "D152"
+    },
+    "new_predicate_pasture_adjacent_to_house": {
+      "count": 1,
+      "cards": [
+        "E011"
+      ],
+      "foundation": "E011"
+    },
+    "new_predicate_all_other_players_more_family": {
+      "count": 1,
+      "cards": [
+        "E014"
+      ],
+      "foundation": "E014"
+    },
+    "new_predicate_card_food_at_least": {
+      "count": 1,
+      "cards": [
+        "E027"
+      ],
+      "foundation": "E027"
+    },
+    "new_predicate_animal_count_at_most": {
+      "count": 1,
+      "cards": [
+        "E037"
+      ],
+      "foundation": "E037"
+    },
+    "new_predicate_wood_rooms_built_at_least": {
+      "count": 1,
+      "cards": [
+        "E049"
+      ],
+      "foundation": "E049"
+    },
+    "new_predicate_animal_is": {
+      "count": 2,
+      "cards": [
+        "E053",
+        "E085"
+      ],
+      "foundation": "E053"
+    },
+    "new_predicate_not_harvest_breeding": {
+      "count": 1,
+      "cards": [
+        "E053"
+      ],
+      "foundation": "E053"
+    },
+    "new_predicate_grain_converted_at_least": {
+      "count": 1,
+      "cards": [
+        "E057"
+      ],
+      "foundation": "E057"
+    },
+    "new_predicate_all_other_players_have_unplaced_people": {
+      "count": 1,
+      "cards": [
+        "E062"
+      ],
+      "foundation": "E062"
+    },
+    "new_predicate_action_space_is": {
+      "count": 1,
+      "cards": [
+        "E066"
+      ],
+      "foundation": "E066"
+    },
+    "new_predicate_harvested_last_wood": {
+      "count": 1,
+      "cards": [
+        "E068"
+      ],
+      "foundation": "E068"
+    },
+    "new_predicate_field_is": {
+      "count": 2,
+      "cards": [
+        "E068",
+        "E069"
+      ],
+      "foundation": "E068"
+    },
+    "new_predicate_harvested_last_vegetable": {
+      "count": 1,
+      "cards": [
+        "E069"
+      ],
+      "foundation": "E069"
+    },
+    "new_trigger_when_last_crop_removed_from_card": {
+      "count": 1,
+      "cards": [
+        "E070"
+      ],
+      "foundation": "E070"
+    },
+    "new_predicate_field_adjacent_to_pasture": {
+      "count": 1,
+      "cards": [
+        "E071"
+      ],
+      "foundation": "E071"
+    },
+    "new_predicate_harvested_this_card_at_least": {
+      "count": 1,
+      "cards": [
+        "E072"
+      ],
+      "foundation": "E072"
+    },
+    "new_predicate_takes_reed_or_stone_from_space": {
+      "count": 1,
+      "cards": [
+        "E077"
+      ],
+      "foundation": "E077"
+    },
+    "new_predicate_sown_at_least_one_field": {
+      "count": 1,
+      "cards": [
+        "E079"
+      ],
+      "foundation": "E079"
+    },
+    "new_predicate_user_is_not_owner": {
+      "count": 1,
+      "cards": [
+        "E081"
+      ],
+      "foundation": "E081"
+    },
+    "new_trigger_on_use_this_card": {
+      "count": 1,
+      "cards": [
+        "E081"
+      ],
+      "foundation": "E081"
+    },
+    "new_trigger_breeding_phase_start": {
+      "count": 1,
+      "cards": [
+        "E083"
+      ],
+      "foundation": "E083"
+    },
+    "new_predicate_unfenced_stable_without_animal": {
+      "count": 1,
+      "cards": [
+        "E083"
+      ],
+      "foundation": "E083"
+    },
+    "new_trigger_harvest_breeding": {
+      "count": 2,
+      "cards": [
+        "E084",
+        "E133"
+      ],
+      "foundation": "E084"
+    },
+    "new_trigger_convert_animal_to_food": {
+      "count": 1,
+      "cards": [
+        "E085"
+      ],
+      "foundation": "E085"
+    },
+    "new_trigger_check_card_becomes_room": {
+      "count": 1,
+      "cards": [
+        "E085"
+      ],
+      "foundation": "E085"
+    },
+    "new_trigger_after_play_occupation": {
+      "count": 1,
+      "cards": [
+        "E089"
+      ],
+      "foundation": "E089"
+    },
+    "new_predicate_occupation_count_is": {
+      "count": 2,
+      "cards": [
+        "E089",
+        "E097"
+      ],
+      "foundation": "E089"
+    },
+    "new_trigger_breeding": {
+      "count": 1,
+      "cards": [
+        "E090"
+      ],
+      "foundation": "E090"
+    },
+    "new_predicate_offspring_at_least": {
+      "count": 1,
+      "cards": [
+        "E090"
+      ],
+      "foundation": "E090"
+    },
+    "new_predicate_improvement_is": {
+      "count": 1,
+      "cards": [
+        "E091"
+      ],
+      "foundation": "E091"
+    },
+    "new_trigger_play_minor_improvement": {
+      "count": 1,
+      "cards": [
+        "E091"
+      ],
+      "foundation": "E091"
+    },
+    "new_trigger_harvest_use_joinery": {
+      "count": 1,
+      "cards": [
+        "E091"
+      ],
+      "foundation": "E091"
+    },
+    "new_predicate_house_surrounded_by_4_fields": {
+      "count": 1,
+      "cards": [
+        "E092"
+      ],
+      "foundation": "E092"
+    },
+    "new_trigger_use_family_growth": {
+      "count": 1,
+      "cards": [
+        "E092"
+      ],
+      "foundation": "E092"
+    },
+    "new_predicate_house_has_exactly_2_rooms": {
+      "count": 1,
+      "cards": [
+        "E092"
+      ],
+      "foundation": "E092"
+    },
+    "new_predicate_no_unused_farm_spaces": {
+      "count": 1,
+      "cards": [
+        "E093"
+      ],
+      "foundation": "E093"
+    },
+    "new_trigger_first_turn_of_round": {
+      "count": 1,
+      "cards": [
+        "E093"
+      ],
+      "foundation": "E093"
+    },
+    "new_trigger_other_player_uses_grain_seeds": {
+      "count": 1,
+      "cards": [
+        "E095"
+      ],
+      "foundation": "E095"
+    },
+    "new_trigger_round_1_work_phase_start": {
+      "count": 1,
+      "cards": [
+        "E096"
+      ],
+      "foundation": "E096"
+    },
+    "new_predicate_is_first_occupation": {
+      "count": 1,
+      "cards": [
+        "E098"
+      ],
+      "foundation": "E098"
+    },
+    "new_trigger_feeding_phase": {
+      "count": 1,
+      "cards": [
+        "E110"
+      ],
+      "foundation": "E110"
+    },
+    "new_predicate_minor_improvement_count": {
+      "count": 1,
+      "cards": [
+        "E111"
+      ],
+      "foundation": "E111"
+    },
+    "new_trigger_after_family_growth": {
+      "count": 1,
+      "cards": [
+        "E113"
+      ],
+      "foundation": "E113"
+    },
+    "new_predicate_stable_count_in": {
+      "count": 1,
+      "cards": [
+        "E114"
+      ],
+      "foundation": "E114"
+    },
+    "new_predicate_gained_food_from_this_space": {
+      "count": 1,
+      "cards": [
+        "E118"
+      ],
+      "foundation": "E118"
+    },
+    "new_trigger_on_action_space_used": {
+      "count": 4,
+      "cards": [
+        "E121",
+        "E129",
+        "E130",
+        "E131"
+      ],
+      "foundation": "E121"
+    },
+    "new_trigger_on_card_played_or_built": {
+      "count": 1,
+      "cards": [
+        "E122"
+      ],
+      "foundation": "E122"
+    },
+    "new_trigger_on_build_room_or_play_improvement_or_renovate": {
+      "count": 1,
+      "cards": [
+        "E123"
+      ],
+      "foundation": "E123"
+    },
+    "new_trigger_end_game_scoring": {
+      "count": 5,
+      "cards": [
+        "E124",
+        "E132",
+        "E134",
+        "E135",
+        "E136"
+      ],
+      "foundation": "E124"
+    },
+    "new_predicate_all_persons_placed": {
+      "count": 1,
+      "cards": [
+        "E125"
+      ],
+      "foundation": "E125"
+    },
+    "new_predicate_max_score_categories_at_4": {
+      "count": 1,
+      "cards": [
+        "E127"
+      ],
+      "foundation": "E127"
+    },
+    "new_trigger_on_build_major_improvement": {
+      "count": 1,
+      "cards": [
+        "E128"
+      ],
+      "foundation": "E128"
+    },
+    "new_predicate_action_space_not_accumulating": {
+      "count": 1,
+      "cards": [
+        "E129"
+      ],
+      "foundation": "E129"
+    },
+    "new_predicate_round_in_range": {
+      "count": 1,
+      "cards": [
+        "E129"
+      ],
+      "foundation": "E129"
+    },
+    "new_predicate_last_person_of_round": {
+      "count": 1,
+      "cards": [
+        "E131"
+      ],
+      "foundation": "E131"
+    },
+    "new_operation_move_card": {
+      "count": 1,
+      "cards": [
+        "E131"
+      ],
+      "foundation": "E131"
+    },
+    "new_predicate_animal_type_at_least_2_3_bred": {
+      "count": 1,
+      "cards": [
+        "E133"
+      ],
+      "foundation": "E133"
+    },
+    "new_predicate_pre_rounds_at_least": {
+      "count": 2,
+      "cards": [
+        "E135",
+        "E136"
+      ],
+      "foundation": "E135"
+    },
+    "new_predicate_most_vegetables": {
+      "count": 1,
+      "cards": [
+        "E135"
+      ],
+      "foundation": "E135"
+    },
+    "new_trigger_game_start": {
+      "count": 2,
+      "cards": [
+        "E135",
+        "E136"
+      ],
+      "foundation": "E135"
+    },
+    "new_predicate_most_pastures": {
+      "count": 1,
+      "cards": [
+        "E136"
+      ],
+      "foundation": "E136"
+    },
+    "new_predicate_improvement_cost_includes": {
+      "count": 1,
+      "cards": [
+        "E156"
+      ],
+      "foundation": "E156"
+    },
+    "new_predicate_occupation_played_from_hand": {
+      "count": 1,
+      "cards": [
+        "E163"
+      ],
+      "foundation": "E163"
+    }
+  },
+  "fully_covered_cards": [
+    "A007",
+    "A008",
+    "A009",
+    "A030",
+    "A031",
+    "A033",
+    "A036",
+    "A039",
+    "A042",
+    "A050",
+    "A051",
+    "A052",
+    "A056",
+    "A057",
+    "A060",
+    "A064",
+    "A071",
+    "A077",
+    "A092",
+    "A099",
+    "A101",
+    "A103",
+    "A104",
+    "A106",
+    "A108",
+    "A112",
+    "A117",
+    "A118",
+    "A121",
+    "A122",
+    "A134",
+    "A135",
+    "A136",
+    "A138",
+    "A140",
+    "A145",
+    "A147",
+    "A160",
+    "A163",
+    "A168",
+    "B004",
+    "B005",
+    "B006",
+    "B007",
+    "B008",
+    "B022",
+    "B037",
+    "B051",
+    "B052",
+    "B058",
+    "B059",
+    "B063",
+    "B074",
+    "B078",
+    "B084",
+    "B122",
+    "B123",
+    "B133",
+    "B135",
+    "B144",
+    "C004",
+    "C005",
+    "C029",
+    "C030",
+    "C031",
+    "C032",
+    "C033",
+    "C034",
+    "C035",
+    "C038",
+    "C044",
+    "C047",
+    "C052",
+    "C061",
+    "C066",
+    "C067",
+    "C083",
+    "C141",
+    "C142",
+    "C147",
+    "C153",
+    "C154",
+    "C155",
+    "C156",
+    "C157",
+    "C158",
+    "C159",
+    "C160",
+    "C161",
+    "C162",
+    "C163",
+    "C164",
+    "C165",
+    "C166",
+    "C167",
+    "C168",
+    "D004",
+    "D005",
+    "D007",
+    "D008",
+    "D009",
+    "D013",
+    "D014",
+    "D018",
+    "D020",
+    "D022",
+    "D023",
+    "D024",
+    "D025",
+    "D027",
+    "D029",
+    "D030",
+    "D031",
+    "D033",
+    "D035",
+    "D036",
+    "D037",
+    "D038",
+    "D039",
+    "D040",
+    "D041",
+    "D042",
+    "D044",
+    "D045",
+    "D046",
+    "D048",
+    "D049",
+    "D050",
+    "D051",
+    "D053",
+    "D055",
+    "D056",
+    "D058",
+    "D059",
+    "D060",
+    "D063",
+    "D064",
+    "D067",
+    "D068",
+    "D069",
+    "D072",
+    "D083",
+    "D105",
+    "D106",
+    "D108",
+    "D109",
+    "D110",
+    "D114",
+    "D145",
+    "D153",
+    "D154",
+    "D155",
+    "D156",
+    "D157",
+    "D158",
+    "D159",
+    "D160",
+    "D161",
+    "D162",
+    "D163",
+    "D164",
+    "D165",
+    "D166",
+    "D167",
+    "D168",
+    "E007",
+    "E008",
+    "E029",
+    "E032",
+    "E035",
+    "E065",
+    "E082",
+    "E116",
+    "E126",
+    "E137",
+    "E138",
+    "E139",
+    "E140",
+    "E141",
+    "E142",
+    "E143",
+    "E144",
+    "E145",
+    "E146",
+    "E147",
+    "E148",
+    "E149",
+    "E150",
+    "E151",
+    "E152",
+    "E160",
+    "E166",
+    "E168"
+  ],
+  "complex_cards": [
+    {
+      "card_id": "A010",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_modify_capacity",
+        "new_passive_other"
+      ]
+    },
+    {
+      "card_id": "A017",
+      "missing_families": [
+        "new_predicate_all_accumulated_animals_accommodated",
+        "new_trigger_after_animal_accommodation",
+        "plow_field_op"
+      ]
+    },
+    {
+      "card_id": "A074",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_round_space_has_placed_good",
+        "new_predicate_stables_built_on_own_turn",
+        "new_trigger_after_stables_built"
+      ]
+    },
+    {
+      "card_id": "A083",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_new_pasture_created",
+        "new_trigger_after_fence_build"
+      ]
+    },
+    {
+      "card_id": "A089",
+      "missing_families": [
+        "build_stable_op",
+        "new_operation_other",
+        "round_space_predicates"
+      ]
+    },
+    {
+      "card_id": "A102",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_other",
+        "new_passive_spend_resource"
+      ]
+    },
+    {
+      "card_id": "A111",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_round_space_has_placed_good",
+        "new_trigger_after_room_construction"
+      ]
+    },
+    {
+      "card_id": "A120",
+      "missing_families": [
+        "building_triggers",
+        "new_operation_other",
+        "new_predicate_round_space_has_placed_good"
+      ]
+    },
+    {
+      "card_id": "A127",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_modify_capacity",
+        "round_end_triggers"
+      ]
+    },
+    {
+      "card_id": "A148",
+      "missing_families": [
+        "harvest_feeding_trigger",
+        "new_operation_other",
+        "new_passive_modify_capacity"
+      ]
+    },
+    {
+      "card_id": "A151",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_round_space_in",
+        "new_predicate_round_space_unused"
+      ]
+    },
+    {
+      "card_id": "B018",
+      "missing_families": [
+        "new_operation_other",
+        "plow_field_op",
+        "round_space_predicates"
+      ]
+    },
+    {
+      "card_id": "B020",
+      "missing_families": [
+        "new_operation_other",
+        "plow_field_op",
+        "round_space_predicates"
+      ]
+    },
+    {
+      "card_id": "B021",
+      "missing_families": [
+        "grant_action_op",
+        "new_operation_other",
+        "new_predicate_card_food_empty",
+        "new_trigger_after_wood_gain"
+      ]
+    },
+    {
+      "card_id": "B042",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_other",
+        "new_predicate_space_is"
+      ]
+    },
+    {
+      "card_id": "B049",
+      "missing_families": [
+        "new_predicate_improvements_equal_occupations",
+        "new_trigger_after_improvement",
+        "new_trigger_after_occupation"
+      ]
+    },
+    {
+      "card_id": "B092",
+      "missing_families": [
+        "grant_action_op",
+        "new_predicate_is_cumulative_space",
+        "new_predicate_round_at_least",
+        "new_trigger_on_action_space_use"
+      ]
+    },
+    {
+      "card_id": "B094",
+      "missing_families": [
+        "grant_action_op",
+        "new_predicate_is_action_space",
+        "new_trigger_on_action_space_use"
+      ]
+    },
+    {
+      "card_id": "B096",
+      "missing_families": [
+        "grant_action_op",
+        "new_operation_other",
+        "new_predicate_round_is_odd",
+        "new_predicate_wood_on_this_round_space"
+      ]
+    },
+    {
+      "card_id": "B108",
+      "missing_families": [
+        "grant_action_op",
+        "new_predicate_is_cumulative_space",
+        "new_trigger_on_action_space_use"
+      ]
+    },
+    {
+      "card_id": "B110",
+      "missing_families": [
+        "new_predicate_has_stone_in_stock",
+        "new_predicate_round_is",
+        "new_trigger_setup_phase_end"
+      ]
+    },
+    {
+      "card_id": "B111",
+      "missing_families": [
+        "build_room_op",
+        "new_predicate_not_renovation_from_wood",
+        "new_predicate_not_stone_room",
+        "new_predicate_room_type_is"
+      ]
+    },
+    {
+      "card_id": "B114",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_family_exactly",
+        "new_predicate_rooms_at_least"
+      ]
+    },
+    {
+      "card_id": "B145",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_build_room_or_renovate",
+        "new_trigger_after_event"
+      ]
+    },
+    {
+      "card_id": "B159",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_player_places_adjacent_field",
+        "new_trigger_other_player_action"
+      ]
+    },
+    {
+      "card_id": "B162",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_stored_exact_wood",
+        "new_trigger_store_from_cumulative_space"
+      ]
+    },
+    {
+      "card_id": "C018",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_other",
+        "new_predicate_cultivated_fields_at_least"
+      ]
+    },
+    {
+      "card_id": "C021",
+      "missing_families": [
+        "grant_action_op",
+        "new_predicate_has_empty_room",
+        "new_trigger_stone_accumulation_space_revealed"
+      ]
+    },
+    {
+      "card_id": "C027",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_other",
+        "when_buying_discount"
+      ]
+    },
+    {
+      "card_id": "C042",
+      "missing_families": [
+        "grant_action_op",
+        "new_predicate_action_space_name",
+        "new_trigger_action_space_used"
+      ]
+    },
+    {
+      "card_id": "C056",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_other",
+        "new_trigger_after_stable_built"
+      ]
+    },
+    {
+      "card_id": "C070",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_harvested_from",
+        "new_trigger_harvest_field"
+      ]
+    },
+    {
+      "card_id": "C124",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_other",
+        "new_predicate_harvest_number"
+      ]
+    },
+    {
+      "card_id": "C126",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_gain_resource",
+        "new_passive_other",
+        "new_predicate_action_space_used"
+      ]
+    },
+    {
+      "card_id": "C131",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_other",
+        "new_predicate_action_space_occupied",
+        "new_predicate_action_space_used"
+      ]
+    },
+    {
+      "card_id": "C132",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_gain_points",
+        "new_passive_other",
+        "new_predicate_renovation_to_stone_house"
+      ]
+    },
+    {
+      "card_id": "C137",
+      "missing_families": [
+        "new_predicate_improvement_is_baking",
+        "new_predicate_improvement_played_from_hand",
+        "new_trigger_after_improvement"
+      ]
+    },
+    {
+      "card_id": "C148",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_card_clay_at_least",
+        "new_predicate_is_cumulative_space",
+        "new_trigger_card_clay_reaches"
+      ]
+    },
+    {
+      "card_id": "C149",
+      "missing_families": [
+        "building_triggers",
+        "new_operation_other",
+        "new_predicate_room_type_is"
+      ]
+    },
+    {
+      "card_id": "C150",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_right_neighbor_last_used",
+        "new_trigger_your_turn_in_work_phase"
+      ]
+    },
+    {
+      "card_id": "D010",
+      "missing_families": [
+        "building_predicates",
+        "grant_action_op",
+        "round_end_triggers"
+      ]
+    },
+    {
+      "card_id": "D012",
+      "missing_families": [
+        "harvest_feeding_trigger",
+        "new_operation_other",
+        "new_passive_other"
+      ]
+    },
+    {
+      "card_id": "D021",
+      "missing_families": [
+        "grant_action_op",
+        "new_predicate_has_empty_room",
+        "new_trigger_after_improvement_declined"
+      ]
+    },
+    {
+      "card_id": "D085",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_other",
+        "occupation_predicates"
+      ]
+    },
+    {
+      "card_id": "D087",
+      "missing_families": [
+        "new_operation_other",
+        "new_passive_other",
+        "new_predicate_room_count_in"
+      ]
+    },
+    {
+      "card_id": "D092",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_has_empty_room",
+        "new_predicate_round_number"
+      ]
+    },
+    {
+      "card_id": "D094",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_worker_on_space",
+        "new_trigger_after_room_construction"
+      ]
+    },
+    {
+      "card_id": "D099",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_round_number",
+        "new_trigger_after_final_harvest"
+      ]
+    },
+    {
+      "card_id": "D117",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_improvement_played_from_hand",
+        "when_buying_discount"
+      ]
+    },
+    {
+      "card_id": "D118",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_improvement_played_from_hand",
+        "new_trigger_after_improvement"
+      ]
+    },
+    {
+      "card_id": "D138",
+      "missing_families": [
+        "new_predicate_accumulation_space_has_exactly_one",
+        "new_predicate_action_space_name",
+        "new_trigger_on_action_use"
+      ]
+    },
+    {
+      "card_id": "D142",
+      "missing_families": [
+        "new_predicate_accumulation_space_unoccupied",
+        "new_predicate_occupies_accumulation_space",
+        "new_trigger_end_of_work_phase"
+      ]
+    },
+    {
+      "card_id": "D144",
+      "missing_families": [
+        "new_predicate_action_space_name_in",
+        "new_predicate_round_number",
+        "new_trigger_on_action_use"
+      ]
+    },
+    {
+      "card_id": "D147",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_action_space_name",
+        "new_trigger_on_action_use"
+      ]
+    },
+    {
+      "card_id": "D149",
+      "missing_families": [
+        "build_stable_op",
+        "new_predicate_action_space_name",
+        "new_trigger_on_other_player_action"
+      ]
+    },
+    {
+      "card_id": "D150",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_action_type",
+        "new_predicate_person_is_second_placed_this_round",
+        "new_trigger_on_action_use"
+      ]
+    },
+    {
+      "card_id": "D151",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_action_space_name",
+        "new_trigger_on_action_use"
+      ]
+    },
+    {
+      "card_id": "E010",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_worker_on_space",
+        "new_trigger_after_work_phase"
+      ]
+    },
+    {
+      "card_id": "E014",
+      "missing_families": [
+        "grant_action_op",
+        "new_predicate_all_other_players_more_family",
+        "new_trigger_any_time"
+      ]
+    },
+    {
+      "card_id": "E017",
+      "missing_families": [
+        "new_operation_other",
+        "new_trigger_before_sow",
+        "plow_field_op"
+      ]
+    },
+    {
+      "card_id": "E018",
+      "missing_families": [
+        "new_predicate_improvement_played_from_hand",
+        "new_trigger_after_improvement",
+        "plow_field_op"
+      ]
+    },
+    {
+      "card_id": "E020",
+      "missing_families": [
+        "new_predicate_worker_on_space",
+        "new_trigger_after_work_phase",
+        "plow_field_op"
+      ]
+    },
+    {
+      "card_id": "E022",
+      "missing_families": [
+        "grant_action_op",
+        "new_operation_other",
+        "round_end_triggers"
+      ]
+    },
+    {
+      "card_id": "E027",
+      "missing_families": [
+        "grant_action_op",
+        "new_operation_other",
+        "new_predicate_card_food_at_least",
+        "new_trigger_after_work_phase",
+        "new_trigger_any_time"
+      ]
+    },
+    {
+      "card_id": "E028",
+      "missing_families": [
+        "grant_action_op",
+        "new_operation_other",
+        "round_space_predicates"
+      ]
+    },
+    {
+      "card_id": "E047",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_round_space_has_placed_good",
+        "new_trigger_after_wood_gain"
+      ]
+    },
+    {
+      "card_id": "E053",
+      "missing_families": [
+        "new_predicate_animal_is",
+        "new_predicate_not_harvest_breeding",
+        "new_trigger_after_animal_acquisition"
+      ]
+    },
+    {
+      "card_id": "E062",
+      "missing_families": [
+        "grant_action_op",
+        "new_predicate_all_other_players_have_unplaced_people",
+        "new_trigger_your_turn_in_work_phase"
+      ]
+    },
+    {
+      "card_id": "E066",
+      "missing_families": [
+        "new_predicate_action_space_is",
+        "new_predicate_is_cumulative_space",
+        "new_trigger_other_player_action"
+      ]
+    },
+    {
+      "card_id": "E069",
+      "missing_families": [
+        "new_predicate_field_is",
+        "new_predicate_harvested_last_vegetable",
+        "plow_field_op"
+      ]
+    },
+    {
+      "card_id": "E081",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_user_is_not_owner",
+        "new_trigger_on_use_this_card"
+      ]
+    },
+    {
+      "card_id": "E085",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_animal_is",
+        "new_trigger_check_card_becomes_room",
+        "new_trigger_convert_animal_to_food"
+      ]
+    },
+    {
+      "card_id": "E087",
+      "missing_families": [
+        "new_operation_renovate",
+        "new_predicate_round_is",
+        "new_trigger_end_of_work_phase"
+      ]
+    },
+    {
+      "card_id": "E089",
+      "missing_families": [
+        "build_stable_op",
+        "new_predicate_occupation_count_is",
+        "new_trigger_after_play_occupation"
+      ]
+    },
+    {
+      "card_id": "E090",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_offspring_at_least",
+        "new_trigger_breeding"
+      ]
+    },
+    {
+      "card_id": "E091",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_improvement_is",
+        "new_trigger_harvest_use_joinery",
+        "new_trigger_play_minor_improvement"
+      ]
+    },
+    {
+      "card_id": "E092",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_house_has_exactly_2_rooms",
+        "new_predicate_house_surrounded_by_4_fields",
+        "new_trigger_use_family_growth"
+      ]
+    },
+    {
+      "card_id": "E093",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_no_unused_farm_spaces",
+        "new_trigger_first_turn_of_round"
+      ]
+    },
+    {
+      "card_id": "E095",
+      "missing_families": [
+        "grant_action_op",
+        "new_operation_other",
+        "new_trigger_other_player_uses_grain_seeds"
+      ]
+    },
+    {
+      "card_id": "E110",
+      "missing_families": [
+        "new_operation_other",
+        "new_trigger_feeding_phase",
+        "new_trigger_harvest_start"
+      ]
+    },
+    {
+      "card_id": "E125",
+      "missing_families": [
+        "grant_action_op",
+        "new_predicate_all_persons_placed",
+        "round_end_triggers"
+      ]
+    },
+    {
+      "card_id": "E129",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_action_space_not_accumulating",
+        "new_predicate_round_in_range",
+        "new_trigger_on_action_space_used"
+      ]
+    },
+    {
+      "card_id": "E130",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_action_space_name",
+        "new_trigger_on_action_space_used"
+      ]
+    },
+    {
+      "card_id": "E131",
+      "missing_families": [
+        "new_operation_move_card",
+        "new_predicate_action_space_name",
+        "new_predicate_last_person_of_round",
+        "new_trigger_on_action_space_used"
+      ]
+    },
+    {
+      "card_id": "E134",
+      "missing_families": [
+        "new_operation_other",
+        "new_trigger_end_game_scoring",
+        "new_trigger_harvest"
+      ]
+    },
+    {
+      "card_id": "E135",
+      "missing_families": [
+        "new_predicate_most_vegetables",
+        "new_predicate_pre_rounds_at_least",
+        "new_trigger_end_game_scoring",
+        "new_trigger_game_start"
+      ]
+    },
+    {
+      "card_id": "E136",
+      "missing_families": [
+        "grant_action_op",
+        "new_predicate_most_pastures",
+        "new_predicate_pre_rounds_at_least",
+        "new_trigger_end_game_scoring",
+        "new_trigger_game_start"
+      ]
+    },
+    {
+      "card_id": "E163",
+      "missing_families": [
+        "new_operation_other",
+        "new_predicate_occupation_played_from_hand",
+        "new_trigger_after_occupation"
+      ]
+    }
+  ]
+}

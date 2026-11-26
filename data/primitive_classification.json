@@ -1,0 +1,6866 @@
+{
+  "summary": {
+    "total_cards_analyzed": 279,
+    "primitive_count": 153,
+    "cards_by_primitive_count": {
+      "2": 109,
+      "3": 58,
+      "1": 88,
+      "5": 5,
+      "4": 18,
+      "6": 1
+    },
+    "coverage": {
+      "fully_covered": 0,
+      "partially_covered": 72,
+      "not_covered": 207,
+      "no_spec": 0
+    }
+  },
+  "primitives": {
+    "pass_to_left": {
+      "count": 28,
+      "cards": [
+        "A003",
+        "A006",
+        "B002",
+        "B003",
+        "B009",
+        "B024",
+        "B036",
+        "B069",
+        "B072",
+        "B076",
+        "B083",
+        "C001",
+        "C003",
+        "C006",
+        "C007",
+        "C008",
+        "C009",
+        "D006",
+        "D070",
+        "D071",
+        "D073",
+        "E003",
+        "E004",
+        "E005",
+        "E006",
+        "E009",
+        "E076",
+        "E078"
+      ]
+    },
+    "random_selection": {
+      "count": 2,
+      "cards": [
+        "A003",
+        "B003"
+      ]
+    },
+    "conditional_gain": {
+      "count": 8,
+      "cards": [
+        "A006",
+        "A156",
+        "B105",
+        "B159",
+        "B162",
+        "B168",
+        "C058",
+        "E006"
+      ]
+    },
+    "card_play": {
+      "count": 13,
+      "cards": [
+        "A010",
+        "A026",
+        "A028",
+        "A097",
+        "B129",
+        "B151",
+        "C027",
+        "C131",
+        "D026",
+        "E021",
+        "E024",
+        "E130",
+        "E161"
+      ]
+    },
+    "existing:modify_capacity": {
+      "count": 4,
+      "cards": [
+        "A010",
+        "A086",
+        "A127",
+        "A148"
+      ]
+    },
+    "forbid_renovation": {
+      "count": 2,
+      "cards": [
+        "A010",
+        "B033"
+      ]
+    },
+    "exchange": {
+      "count": 16,
+      "cards": [
+        "A016",
+        "A028",
+        "A070",
+        "B145",
+        "B157",
+        "C009",
+        "C014",
+        "C069",
+        "C124",
+        "C126",
+        "C143",
+        "C146",
+        "D082",
+        "D088",
+        "D095",
+        "D117"
+      ]
+    },
+    "existing:gain_resource": {
+      "count": 35,
+      "cards": [
+        "A016",
+        "A027",
+        "A074",
+        "A120",
+        "A162",
+        "A165",
+        "B021",
+        "B048",
+        "B055",
+        "B093",
+        "B096",
+        "B114",
+        "B119",
+        "B125",
+        "B136",
+        "B137",
+        "B151",
+        "B155",
+        "B168",
+        "C056",
+        "C060",
+        "C126",
+        "C140",
+        "D012",
+        "D062",
+        "D088",
+        "D097",
+        "D117",
+        "E047",
+        "E051",
+        "E072",
+        "E110",
+        "E155",
+        "E161",
+        "E167"
+      ]
+    },
+    "field_mod": {
+      "count": 11,
+      "cards": [
+        "A019",
+        "A058",
+        "A072",
+        "A113",
+        "C006",
+        "C008",
+        "C018",
+        "C070",
+        "E004",
+        "E017",
+        "E112"
+      ]
+    },
+    "marker_placement": {
+      "count": 45,
+      "cards": [
+        "A019",
+        "A022",
+        "A043",
+        "A044",
+        "A045",
+        "A046",
+        "A047",
+        "A069",
+        "A074",
+        "A089",
+        "A111",
+        "A120",
+        "B018",
+        "B020",
+        "B041",
+        "B043",
+        "B044",
+        "B045",
+        "B046",
+        "B047",
+        "B060",
+        "B065",
+        "B066",
+        "B125",
+        "B157",
+        "B164",
+        "C064",
+        "C065",
+        "D043",
+        "D047",
+        "D057",
+        "D078",
+        "D091",
+        "D111",
+        "D120",
+        "E028",
+        "E041",
+        "E042",
+        "E043",
+        "E044",
+        "E045",
+        "E046",
+        "E047",
+        "E119",
+        "E120"
+      ]
+    },
+    "predicate:round_space_has_marker": {
+      "count": 7,
+      "cards": [
+        "A019",
+        "A022",
+        "A089",
+        "B018",
+        "B020",
+        "D091",
+        "E028"
+      ]
+    },
+    "grant_action": {
+      "count": 6,
+      "cards": [
+        "A022",
+        "A137",
+        "B042",
+        "C051",
+        "D087",
+        "E161"
+      ]
+    },
+    "copy_move": {
+      "count": 17,
+      "cards": [
+        "A025",
+        "A081",
+        "A094",
+        "A148",
+        "A151",
+        "C003",
+        "C022",
+        "C023",
+        "C129",
+        "C140",
+        "D091",
+        "D094",
+        "D116",
+        "E003",
+        "E010",
+        "E123",
+        "E129"
+      ]
+    },
+    "build": {
+      "count": 12,
+      "cards": [
+        "A027",
+        "A128",
+        "B002",
+        "B019",
+        "C001",
+        "C016",
+        "C056",
+        "C060",
+        "C095",
+        "C149",
+        "D095",
+        "E016"
+      ]
+    },
+    "accumulate": {
+      "count": 24,
+      "cards": [
+        "A040",
+        "A081",
+        "A082",
+        "A102",
+        "A111",
+        "A144",
+        "B021",
+        "B048",
+        "B055",
+        "B137",
+        "C019",
+        "C132",
+        "C148",
+        "D098",
+        "D099",
+        "D118",
+        "E005",
+        "E022",
+        "E027",
+        "E040",
+        "E051",
+        "E110",
+        "E119",
+        "E120"
+      ]
+    },
+    "existing:exchange": {
+      "count": 6,
+      "cards": [
+        "A040",
+        "A058",
+        "B042",
+        "C070",
+        "C143",
+        "C148"
+      ]
+    },
+    "new_trigger:after_farmyard_space_used": {
+      "count": 1,
+      "cards": [
+        "A040"
+      ]
+    },
+    "new_trigger:after_stable_construction": {
+      "count": 1,
+      "cards": [
+        "A043"
+      ]
+    },
+    "new_trigger:after_renovation": {
+      "count": 6,
+      "cards": [
+        "A045",
+        "A120",
+        "B055",
+        "C146",
+        "C149",
+        "D111"
+      ]
+    },
+    "new_trigger:round_end": {
+      "count": 6,
+      "cards": [
+        "A058",
+        "A070",
+        "A127",
+        "A165",
+        "B053",
+        "E022"
+      ]
+    },
+    "cook_bake": {
+      "count": 4,
+      "cards": [
+        "A061",
+        "C062",
+        "E025",
+        "E058"
+      ]
+    },
+    "new_trigger:after_stables_built": {
+      "count": 1,
+      "cards": [
+        "A074"
+      ]
+    },
+    "predicate:round_space_has_placed_good": {
+      "count": 5,
+      "cards": [
+        "A074",
+        "A111",
+        "A120",
+        "B125",
+        "E047"
+      ]
+    },
+    "predicate:stables_built_on_own_turn": {
+      "count": 1,
+      "cards": [
+        "A074"
+      ]
+    },
+    "animal_housing": {
+      "count": 12,
+      "cards": [
+        "A083",
+        "A084",
+        "A127",
+        "A165",
+        "B149",
+        "C127",
+        "C129",
+        "D012",
+        "D085",
+        "E030",
+        "E033",
+        "E036"
+      ]
+    },
+    "new_trigger:after_fence_build": {
+      "count": 1,
+      "cards": [
+        "A083"
+      ]
+    },
+    "predicate:new_pasture_created": {
+      "count": 1,
+      "cards": [
+        "A083"
+      ]
+    },
+    "existing:spend_resource": {
+      "count": 10,
+      "cards": [
+        "A084",
+        "A102",
+        "A156",
+        "B060",
+        "B130",
+        "B149",
+        "C149",
+        "C150",
+        "D099",
+        "E022"
+      ]
+    },
+    "new_trigger:returning_home_phase": {
+      "count": 3,
+      "cards": [
+        "A084",
+        "D102",
+        "D107"
+      ]
+    },
+    "choice": {
+      "count": 38,
+      "cards": [
+        "A086",
+        "A114",
+        "A142",
+        "A150",
+        "B009",
+        "B053",
+        "B141",
+        "B146",
+        "B147",
+        "B150",
+        "B152",
+        "B156",
+        "B165",
+        "B166",
+        "B167",
+        "C007",
+        "C138",
+        "D006",
+        "D062",
+        "D070",
+        "D071",
+        "D073",
+        "D090",
+        "D091",
+        "D093",
+        "D097",
+        "D101",
+        "D102",
+        "D103",
+        "D107",
+        "D113",
+        "D115",
+        "D119",
+        "E009",
+        "E039",
+        "E162",
+        "E163",
+        "E167"
+      ]
+    },
+    "conditional_discount": {
+      "count": 2,
+      "cards": [
+        "A087",
+        "D074"
+      ]
+    },
+    "known:build_stable": {
+      "count": 2,
+      "cards": [
+        "A089",
+        "B149"
+      ]
+    },
+    "new_trigger:sow_action_declined": {
+      "count": 1,
+      "cards": [
+        "A094"
+      ]
+    },
+    "new_trigger:before_bake_bread": {
+      "count": 1,
+      "cards": [
+        "A097"
+      ]
+    },
+    "new_trigger:after_room_construction": {
+      "count": 2,
+      "cards": [
+        "A111",
+        "D094"
+      ]
+    },
+    "action_order": {
+      "count": 6,
+      "cards": [
+        "A129",
+        "A130",
+        "B130",
+        "B155",
+        "C150",
+        "D092"
+      ]
+    },
+    "predicate:reed_taken_at_least": {
+      "count": 1,
+      "cards": [
+        "A142"
+      ]
+    },
+    "new_trigger:harvest_feeding": {
+      "count": 6,
+      "cards": [
+        "A148",
+        "C062",
+        "D012",
+        "D062",
+        "E030",
+        "E159"
+      ]
+    },
+    "predicate:round_space_in": {
+      "count": 2,
+      "cards": [
+        "A151",
+        "B137"
+      ]
+    },
+    "predicate:round_space_unused": {
+      "count": 1,
+      "cards": [
+        "A151"
+      ]
+    },
+    "predicate:other_player_uses": {
+      "count": 1,
+      "cards": [
+        "A156"
+      ]
+    },
+    "special_combine": {
+      "count": 1,
+      "cards": [
+        "A162"
+      ]
+    },
+    "other:unknown": {
+      "count": 63,
+      "cards": [
+        "B011",
+        "B012",
+        "B014",
+        "B015",
+        "B023",
+        "B024",
+        "B026",
+        "B027",
+        "B028",
+        "B030",
+        "B036",
+        "B069",
+        "B072",
+        "B076",
+        "B083",
+        "B086",
+        "B089",
+        "B093",
+        "B096",
+        "B113",
+        "B114",
+        "B119",
+        "C046",
+        "D121",
+        "D122",
+        "D123",
+        "D124",
+        "D125",
+        "D126",
+        "D127",
+        "D128",
+        "D129",
+        "D130",
+        "D131",
+        "D132",
+        "D133",
+        "D134",
+        "D135",
+        "D136",
+        "D147",
+        "D150",
+        "D151",
+        "E070",
+        "E072",
+        "E073",
+        "E074",
+        "E075",
+        "E076",
+        "E078",
+        "E080",
+        "E081",
+        "E084",
+        "E085",
+        "E086",
+        "E088",
+        "E090",
+        "E091",
+        "E092",
+        "E093",
+        "E094",
+        "E095",
+        "E096",
+        "E097"
+      ]
+    },
+    "existing:discount_cost": {
+      "count": 2,
+      "cards": [
+        "B015",
+        "C027"
+      ]
+    },
+    "new_trigger:on_use_wood_accumulation": {
+      "count": 1,
+      "cards": [
+        "B015"
+      ]
+    },
+    "known:plow_field": {
+      "count": 4,
+      "cards": [
+        "B018",
+        "B020",
+        "C019",
+        "E017"
+      ]
+    },
+    "known:grant_action": {
+      "count": 7,
+      "cards": [
+        "B021",
+        "B093",
+        "B096",
+        "E022",
+        "E027",
+        "E028",
+        "E095"
+      ]
+    },
+    "new_trigger:after_wood_gain": {
+      "count": 2,
+      "cards": [
+        "B021",
+        "E047"
+      ]
+    },
+    "predicate:card_food_empty": {
+      "count": 1,
+      "cards": [
+        "B021"
+      ]
+    },
+    "new_trigger:on_use_grain_utilization": {
+      "count": 1,
+      "cards": [
+        "B026"
+      ]
+    },
+    "new_trigger:on_build_room_stable_fence": {
+      "count": 1,
+      "cards": [
+        "B027"
+      ]
+    },
+    "new_trigger:on_use_forest_accumulation": {
+      "count": 1,
+      "cards": [
+        "B028"
+      ]
+    },
+    "new_trigger:on_build_fence": {
+      "count": 1,
+      "cards": [
+        "B030"
+      ]
+    },
+    "existing:gain_points": {
+      "count": 7,
+      "cards": [
+        "B033",
+        "C132",
+        "D092",
+        "D099",
+        "E033",
+        "E038",
+        "E134"
+      ]
+    },
+    "predicate:space_is": {
+      "count": 1,
+      "cards": [
+        "B042"
+      ]
+    },
+    "predicate:custom": {
+      "count": 1,
+      "cards": [
+        "B065"
+      ]
+    },
+    "predicate:round_is_odd": {
+      "count": 1,
+      "cards": [
+        "B096"
+      ]
+    },
+    "predicate:wood_on_this_round_space": {
+      "count": 2,
+      "cards": [
+        "B096",
+        "B119"
+      ]
+    },
+    "predicate:family_exactly": {
+      "count": 1,
+      "cards": [
+        "B114"
+      ]
+    },
+    "predicate:rooms_at_least": {
+      "count": 1,
+      "cards": [
+        "B114"
+      ]
+    },
+    "scoring": {
+      "count": 5,
+      "cards": [
+        "B136",
+        "B153",
+        "D100",
+        "E031",
+        "E159"
+      ]
+    },
+    "other:count_as_field": {
+      "count": 2,
+      "cards": [
+        "B141",
+        "D075"
+      ]
+    },
+    "new_trigger:after_event": {
+      "count": 1,
+      "cards": [
+        "B145"
+      ]
+    },
+    "predicate:build_room_or_renovate": {
+      "count": 1,
+      "cards": [
+        "B145"
+      ]
+    },
+    "new_trigger:final_scoring": {
+      "count": 1,
+      "cards": [
+        "B153"
+      ]
+    },
+    "new_trigger:pay_occupation_cost": {
+      "count": 1,
+      "cards": [
+        "B155"
+      ]
+    },
+    "new_trigger:anytime": {
+      "count": 2,
+      "cards": [
+        "B157",
+        "C069"
+      ]
+    },
+    "new_trigger:other_player_action": {
+      "count": 1,
+      "cards": [
+        "B159"
+      ]
+    },
+    "predicate:player_places_adjacent_field": {
+      "count": 1,
+      "cards": [
+        "B159"
+      ]
+    },
+    "new_trigger:store_from_cumulative_space": {
+      "count": 1,
+      "cards": [
+        "B162"
+      ]
+    },
+    "predicate:stored_exact_wood": {
+      "count": 1,
+      "cards": [
+        "B162"
+      ]
+    },
+    "new_trigger:before_harvest": {
+      "count": 1,
+      "cards": [
+        "B165"
+      ]
+    },
+    "new_trigger:renovate": {
+      "count": 1,
+      "cards": [
+        "B168"
+      ]
+    },
+    "predicate:cultivated_fields_at_least": {
+      "count": 1,
+      "cards": [
+        "C018"
+      ]
+    },
+    "new_trigger:when_buying": {
+      "count": 2,
+      "cards": [
+        "C027",
+        "D117"
+      ]
+    },
+    "new_trigger:after_stable_built": {
+      "count": 1,
+      "cards": [
+        "C056"
+      ]
+    },
+    "new_trigger:harvest_field": {
+      "count": 1,
+      "cards": [
+        "C070"
+      ]
+    },
+    "predicate:harvested_from": {
+      "count": 1,
+      "cards": [
+        "C070"
+      ]
+    },
+    "predicate:harvest_number": {
+      "count": 1,
+      "cards": [
+        "C124"
+      ]
+    },
+    "other:place_worker_on_accumulation_space": {
+      "count": 1,
+      "cards": [
+        "C125"
+      ]
+    },
+    "predicate:action_space_used": {
+      "count": 2,
+      "cards": [
+        "C126",
+        "C131"
+      ]
+    },
+    "predicate:action_space_occupied": {
+      "count": 1,
+      "cards": [
+        "C131"
+      ]
+    },
+    "predicate:renovation_to_stone_house": {
+      "count": 1,
+      "cards": [
+        "C132"
+      ]
+    },
+    "new_trigger:on_use_day_laborer": {
+      "count": 1,
+      "cards": [
+        "C138"
+      ]
+    },
+    "new_trigger:on_use_minor_improvement_space": {
+      "count": 1,
+      "cards": [
+        "C140"
+      ]
+    },
+    "other:place_resource_pairs_on_improvements": {
+      "count": 1,
+      "cards": [
+        "C146"
+      ]
+    },
+    "new_trigger:card_clay_reaches": {
+      "count": 1,
+      "cards": [
+        "C148"
+      ]
+    },
+    "predicate:card_clay_at_least": {
+      "count": 1,
+      "cards": [
+        "C148"
+      ]
+    },
+    "predicate:is_cumulative_space": {
+      "count": 1,
+      "cards": [
+        "C148"
+      ]
+    },
+    "predicate:room_type_is": {
+      "count": 1,
+      "cards": [
+        "C149"
+      ]
+    },
+    "new_trigger:your_turn_in_work_phase": {
+      "count": 1,
+      "cards": [
+        "C150"
+      ]
+    },
+    "predicate:right_neighbor_last_used": {
+      "count": 1,
+      "cards": [
+        "C150"
+      ]
+    },
+    "predicate:raw_text": {
+      "count": 1,
+      "cards": [
+        "D071"
+      ]
+    },
+    "predicate:occupation_count": {
+      "count": 1,
+      "cards": [
+        "D085"
+      ]
+    },
+    "modify_capacity": {
+      "count": 1,
+      "cards": [
+        "D086"
+      ]
+    },
+    "predicate:room_count_in": {
+      "count": 1,
+      "cards": [
+        "D087"
+      ]
+    },
+    "predicate:has_empty_room": {
+      "count": 1,
+      "cards": [
+        "D092"
+      ]
+    },
+    "predicate:round_number": {
+      "count": 3,
+      "cards": [
+        "D092",
+        "D099",
+        "E119"
+      ]
+    },
+    "new_trigger:after_work_phase": {
+      "count": 3,
+      "cards": [
+        "D093",
+        "E010",
+        "E027"
+      ]
+    },
+    "predicate:worker_on_space": {
+      "count": 2,
+      "cards": [
+        "D094",
+        "E010"
+      ]
+    },
+    "new_trigger:harvest_start": {
+      "count": 5,
+      "cards": [
+        "D097",
+        "D115",
+        "E039",
+        "E058",
+        "E110"
+      ]
+    },
+    "new_trigger:before_final_harvest": {
+      "count": 1,
+      "cards": [
+        "D098"
+      ]
+    },
+    "new_trigger:after_final_harvest": {
+      "count": 1,
+      "cards": [
+        "D099"
+      ]
+    },
+    "predicate:grain_harvested_at_least": {
+      "count": 1,
+      "cards": [
+        "D113"
+      ]
+    },
+    "new_trigger:stone_accumulation_space_revealed": {
+      "count": 1,
+      "cards": [
+        "D116"
+      ]
+    },
+    "predicate:improvement_played_from_hand": {
+      "count": 2,
+      "cards": [
+        "D117",
+        "D118"
+      ]
+    },
+    "new_trigger:after_improvement": {
+      "count": 2,
+      "cards": [
+        "D118",
+        "E031"
+      ]
+    },
+    "new_trigger:before_worker_space": {
+      "count": 1,
+      "cards": [
+        "D119"
+      ]
+    },
+    "new_trigger:ongoing": {
+      "count": 16,
+      "cards": [
+        "D121",
+        "D122",
+        "D123",
+        "D124",
+        "D125",
+        "D126",
+        "D127",
+        "D128",
+        "D129",
+        "D130",
+        "D131",
+        "D132",
+        "D133",
+        "D134",
+        "D135",
+        "D136"
+      ]
+    },
+    "new_trigger:on_action_use": {
+      "count": 3,
+      "cards": [
+        "D147",
+        "D150",
+        "D151"
+      ]
+    },
+    "predicate:action_space_name": {
+      "count": 3,
+      "cards": [
+        "D147",
+        "D151",
+        "E130"
+      ]
+    },
+    "predicate:action_type": {
+      "count": 1,
+      "cards": [
+        "D150"
+      ]
+    },
+    "predicate:person_is_second_placed_this_round": {
+      "count": 1,
+      "cards": [
+        "D150"
+      ]
+    },
+    "new_trigger:before_sow": {
+      "count": 1,
+      "cards": [
+        "E017"
+      ]
+    },
+    "new_trigger:any_time": {
+      "count": 2,
+      "cards": [
+        "E027",
+        "E086"
+      ]
+    },
+    "other:discard_food_from_card": {
+      "count": 1,
+      "cards": [
+        "E027"
+      ]
+    },
+    "predicate:card_food_at_least": {
+      "count": 1,
+      "cards": [
+        "E027"
+      ]
+    },
+    "other:place_up_to_two_wood_on_card": {
+      "count": 1,
+      "cards": [
+        "E038"
+      ]
+    },
+    "new_trigger:on_play_occupation": {
+      "count": 1,
+      "cards": [
+        "E051"
+      ]
+    },
+    "new_trigger:when_last_crop_removed_from_card": {
+      "count": 1,
+      "cards": [
+        "E070"
+      ]
+    },
+    "predicate:harvested_this_card_at_least": {
+      "count": 1,
+      "cards": [
+        "E072"
+      ]
+    },
+    "new_trigger:on_use_this_card": {
+      "count": 1,
+      "cards": [
+        "E081"
+      ]
+    },
+    "predicate:user_is_not_owner": {
+      "count": 1,
+      "cards": [
+        "E081"
+      ]
+    },
+    "new_trigger:harvest_breeding": {
+      "count": 1,
+      "cards": [
+        "E084"
+      ]
+    },
+    "new_trigger:check_card_becomes_room": {
+      "count": 1,
+      "cards": [
+        "E085"
+      ]
+    },
+    "new_trigger:convert_animal_to_food": {
+      "count": 1,
+      "cards": [
+        "E085"
+      ]
+    },
+    "predicate:animal_is": {
+      "count": 1,
+      "cards": [
+        "E085"
+      ]
+    },
+    "new_trigger:breeding": {
+      "count": 1,
+      "cards": [
+        "E090"
+      ]
+    },
+    "predicate:offspring_at_least": {
+      "count": 1,
+      "cards": [
+        "E090"
+      ]
+    },
+    "new_trigger:harvest_use_joinery": {
+      "count": 1,
+      "cards": [
+        "E091"
+      ]
+    },
+    "new_trigger:play_minor_improvement": {
+      "count": 1,
+      "cards": [
+        "E091"
+      ]
+    },
+    "predicate:improvement_is": {
+      "count": 1,
+      "cards": [
+        "E091"
+      ]
+    },
+    "new_trigger:use_family_growth": {
+      "count": 1,
+      "cards": [
+        "E092"
+      ]
+    },
+    "predicate:house_has_exactly_2_rooms": {
+      "count": 1,
+      "cards": [
+        "E092"
+      ]
+    },
+    "predicate:house_surrounded_by_4_fields": {
+      "count": 1,
+      "cards": [
+        "E092"
+      ]
+    },
+    "new_trigger:first_turn_of_round": {
+      "count": 1,
+      "cards": [
+        "E093"
+      ]
+    },
+    "predicate:no_unused_farm_spaces": {
+      "count": 1,
+      "cards": [
+        "E093"
+      ]
+    },
+    "known:renovate": {
+      "count": 1,
+      "cards": [
+        "E094"
+      ]
+    },
+    "new_trigger:other_player_uses_grain_seeds": {
+      "count": 1,
+      "cards": [
+        "E095"
+      ]
+    },
+    "new_trigger:round_1_work_phase_start": {
+      "count": 1,
+      "cards": [
+        "E096"
+      ]
+    },
+    "predicate:occupation_count_is": {
+      "count": 1,
+      "cards": [
+        "E097"
+      ]
+    },
+    "new_trigger:feeding_phase": {
+      "count": 1,
+      "cards": [
+        "E110"
+      ]
+    },
+    "new_trigger:on_build_room_or_play_improvement_or_renovate": {
+      "count": 1,
+      "cards": [
+        "E123"
+      ]
+    },
+    "new_trigger:on_action_space_used": {
+      "count": 2,
+      "cards": [
+        "E129",
+        "E130"
+      ]
+    },
+    "predicate:action_space_not_accumulating": {
+      "count": 1,
+      "cards": [
+        "E129"
+      ]
+    },
+    "predicate:round_in_range": {
+      "count": 1,
+      "cards": [
+        "E129"
+      ]
+    },
+    "new_trigger:end_game_scoring": {
+      "count": 1,
+      "cards": [
+        "E134"
+      ]
+    },
+    "new_trigger:harvest": {
+      "count": 1,
+      "cards": [
+        "E134"
+      ]
+    },
+    "other:place_harvested_on_card": {
+      "count": 1,
+      "cards": [
+        "E134"
+      ]
+    },
+    "forbid_family_growth": {
+      "count": 1,
+      "cards": [
+        "E155"
+      ]
+    },
+    "feeding_mod": {
+      "count": 1,
+      "cards": [
+        "E159"
+      ]
+    },
+    "new_trigger:after_occupation": {
+      "count": 1,
+      "cards": [
+        "E163"
+      ]
+    },
+    "predicate:occupation_played_from_hand": {
+      "count": 1,
+      "cards": [
+        "E163"
+      ]
+    }
+  },
+  "card_details": [
+    {
+      "card_id": "A003",
+      "primitives": [
+        "pass_to_left",
+        "random_selection"
+      ],
+      "details": "other(pick_random_from_hand) -> random_selection; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "random_selection",
+          "pass_to_left"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A006",
+      "primitives": [
+        "conditional_gain",
+        "pass_to_left"
+      ],
+      "details": "other(gain_matching_improvement) -> conditional_gain; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "conditional_gain",
+          "pass_to_left"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A010",
+      "primitives": [
+        "card_play",
+        "existing:modify_capacity",
+        "forbid_renovation"
+      ],
+      "details": "existing op: modify_capacity params={'scope': 'card', 'person_capacity': 1}; other(forbid_renovation) -> forbid_renovation; other(play_via_major_improvement_only) -> card_play",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:modify_capacity"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "forbid_renovation",
+          "card_play"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A016",
+      "primitives": [
+        "exchange",
+        "existing:gain_resource"
+      ],
+      "details": "existing op: gain_resource params={'good': 'clay', 'amount': 1}; other(substitute_cost) -> exchange",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "exchange"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A019",
+      "primitives": [
+        "field_mod",
+        "marker_placement",
+        "predicate:round_space_has_marker"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement; other(take_field_from_round_space) -> field_mod; predicate:round_space_has_marker params={'kind': 'field_tile'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement",
+          "field_mod",
+          "predicate:round_space_has_marker"
+        ],
+        "predicates": [
+          "predicate:round_space_has_marker"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A022",
+      "primitives": [
+        "grant_action",
+        "marker_placement",
+        "predicate:round_space_has_marker"
+      ],
+      "details": "other(mark_round_space) -> marker_placement; other(grant_extra_person) -> grant_action; predicate:round_space_has_marker params={'kind': 'person_marker'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement",
+          "grant_action",
+          "predicate:round_space_has_marker"
+        ],
+        "predicates": [
+          "predicate:round_space_has_marker"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A025",
+      "primitives": [
+        "copy_move"
+      ],
+      "details": "other(use_first_space_of_work_phase) -> copy_move",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "copy_move"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A026",
+      "primitives": [
+        "card_play"
+      ],
+      "details": "other(ignore_occupation) -> card_play",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "card_play"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A027",
+      "primitives": [
+        "build",
+        "existing:gain_resource"
+      ],
+      "details": "existing op: gain_resource params={'good': 'wood', 'amount': 2}; other(build_improvement) -> build",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "build"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A028",
+      "primitives": [
+        "card_play",
+        "exchange"
+      ],
+      "details": "other(ignore_occupation) -> card_play; other(substitute_cost) -> exchange",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "card_play",
+          "exchange"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A040",
+      "primitives": [
+        "accumulate",
+        "existing:exchange",
+        "new_trigger:after_farmyard_space_used"
+      ],
+      "details": "other(place_clay_on_unused_farmyard) -> accumulate; new trigger: after_farmyard_space_used; other(take_clay_from_space) -> accumulate; existing op: exchange params={'give': [{'good': 'clay', 'amount': 1}], 'receive': [{'good': 'food', 'amount': 2}]}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:exchange"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "new_trigger:after_farmyard_space_used"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:after_farmyard_space_used"
+        ]
+      }
+    },
+    {
+      "card_id": "A043",
+      "primitives": [
+        "marker_placement",
+        "new_trigger:after_stable_construction"
+      ],
+      "details": "new trigger: after_stable_construction; other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:after_stable_construction",
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:after_stable_construction"
+        ]
+      }
+    },
+    {
+      "card_id": "A044",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A045",
+      "primitives": [
+        "marker_placement",
+        "new_trigger:after_renovation"
+      ],
+      "details": "new trigger: after_renovation; other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement",
+          "new_trigger:after_renovation"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:after_renovation"
+        ]
+      }
+    },
+    {
+      "card_id": "A046",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A047",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A058",
+      "primitives": [
+        "existing:exchange",
+        "field_mod",
+        "new_trigger:round_end"
+      ],
+      "details": "new trigger: round_end; other(take_vegetable_from_one_field) -> field_mod; existing op: exchange params={'give': [{'good': 'vegetable', 'amount': 1}], 'receive': [{'good': 'food', 'amount': 3}, {'good': 'points', 'amount': 1}]}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:exchange"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "field_mod",
+          "new_trigger:round_end"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:round_end"
+        ]
+      }
+    },
+    {
+      "card_id": "A061",
+      "primitives": [
+        "cook_bake"
+      ],
+      "details": "other(bake_single_grain) -> cook_bake",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "cook_bake"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A069",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A070",
+      "primitives": [
+        "exchange",
+        "new_trigger:round_end"
+      ],
+      "details": "new trigger: round_end; other(move_field_good_to_supply) -> exchange",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "exchange",
+          "new_trigger:round_end"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:round_end"
+        ]
+      }
+    },
+    {
+      "card_id": "A072",
+      "primitives": [
+        "field_mod"
+      ],
+      "details": "other(add_good_to_single_crop_type_fields) -> field_mod",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "field_mod"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A074",
+      "primitives": [
+        "existing:gain_resource",
+        "marker_placement",
+        "new_trigger:after_stables_built",
+        "predicate:round_space_has_placed_good",
+        "predicate:stables_built_on_own_turn"
+      ],
+      "details": "new trigger: after_stables_built; other(place_on_round_spaces) -> marker_placement; predicate:stables_built_on_own_turn params={'min': 1}; existing op: gain_resource params={'good': 'wood', 'amount': 1}; predicate:round_space_has_placed_good params={'good': 'wood'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement",
+          "new_trigger:after_stables_built",
+          "predicate:round_space_has_placed_good",
+          "predicate:stables_built_on_own_turn"
+        ],
+        "predicates": [
+          "predicate:round_space_has_placed_good",
+          "predicate:stables_built_on_own_turn"
+        ],
+        "triggers": [
+          "new_trigger:after_stables_built"
+        ]
+      }
+    },
+    {
+      "card_id": "A081",
+      "primitives": [
+        "accumulate",
+        "copy_move"
+      ],
+      "details": "other(stack_goods_on_card) -> accumulate; other(move_all_goods_on_card_to_supply) -> copy_move",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "copy_move"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A082",
+      "primitives": [
+        "accumulate"
+      ],
+      "details": "other(take_good_from_accumulation) -> accumulate",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A083",
+      "primitives": [
+        "animal_housing",
+        "new_trigger:after_fence_build",
+        "predicate:new_pasture_created"
+      ],
+      "details": "new trigger: after_fence_build; other(place_animals_on_fenced_pasture) -> animal_housing; predicate:new_pasture_created params={'min_spaces': 4}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:after_fence_build",
+          "animal_housing",
+          "predicate:new_pasture_created"
+        ],
+        "predicates": [
+          "predicate:new_pasture_created"
+        ],
+        "triggers": [
+          "new_trigger:after_fence_build"
+        ]
+      }
+    },
+    {
+      "card_id": "A084",
+      "primitives": [
+        "animal_housing",
+        "existing:spend_resource",
+        "new_trigger:returning_home_phase"
+      ],
+      "details": "new trigger: returning_home_phase; existing op: spend_resource params={'good': 'grain', 'amount': 1, 'allow_from_field': True}; other(breed_animal) -> animal_housing",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:spend_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "animal_housing",
+          "new_trigger:returning_home_phase"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:returning_home_phase"
+        ]
+      }
+    },
+    {
+      "card_id": "A086",
+      "primitives": [
+        "choice",
+        "existing:modify_capacity"
+      ],
+      "details": "other(choice) -> choice; existing op: modify_capacity params={'scope': 'room', 'animal_capacity': 1, 'any_type': True}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:modify_capacity"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A087",
+      "primitives": [
+        "conditional_discount"
+      ],
+      "details": "other(allow_wood_to_stone_renovation) -> conditional_discount",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "conditional_discount"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A089",
+      "primitives": [
+        "known:build_stable",
+        "marker_placement",
+        "predicate:round_space_has_marker"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement; known op: build_stable params={'amount': 1, 'wood_cost': 0, 'consume_marker': True}; predicate:round_space_has_marker params={'kind': 'stable_marker'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [
+          "known:build_stable"
+        ],
+        "new_primitives": [
+          "marker_placement",
+          "predicate:round_space_has_marker"
+        ],
+        "predicates": [
+          "predicate:round_space_has_marker"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A094",
+      "primitives": [
+        "copy_move",
+        "new_trigger:sow_action_declined"
+      ],
+      "details": "new trigger: sow_action_declined; other(place_unplaced_person) -> copy_move",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "copy_move",
+          "new_trigger:sow_action_declined"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:sow_action_declined"
+        ]
+      }
+    },
+    {
+      "card_id": "A097",
+      "primitives": [
+        "card_play",
+        "new_trigger:before_bake_bread"
+      ],
+      "details": "new trigger: before_bake_bread; other(play_occupation_without_cost) -> card_play",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:before_bake_bread",
+          "card_play"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:before_bake_bread"
+        ]
+      }
+    },
+    {
+      "card_id": "A102",
+      "primitives": [
+        "accumulate",
+        "existing:spend_resource"
+      ],
+      "details": "other(stack_goods_on_card) -> accumulate; existing op: spend_resource params={'good': 'food', 'amount': 1}; other(take_top_good_from_card) -> accumulate",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:spend_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A111",
+      "primitives": [
+        "accumulate",
+        "marker_placement",
+        "new_trigger:after_room_construction",
+        "predicate:round_space_has_placed_good"
+      ],
+      "details": "new trigger: after_room_construction; other(place_on_round_spaces) -> marker_placement; other(take_all_goods_from_round_space) -> accumulate; predicate:round_space_has_placed_good params={'good': 'food'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "marker_placement",
+          "new_trigger:after_room_construction",
+          "predicate:round_space_has_placed_good"
+        ],
+        "predicates": [
+          "predicate:round_space_has_placed_good"
+        ],
+        "triggers": [
+          "new_trigger:after_room_construction"
+        ]
+      }
+    },
+    {
+      "card_id": "A113",
+      "primitives": [
+        "field_mod"
+      ],
+      "details": "other(add_good_to_matching_fields) -> field_mod",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "field_mod"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A114",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A120",
+      "primitives": [
+        "existing:gain_resource",
+        "marker_placement",
+        "new_trigger:after_renovation",
+        "predicate:round_space_has_placed_good"
+      ],
+      "details": "new trigger: after_renovation; other(place_on_round_spaces) -> marker_placement; existing op: gain_resource params={'good': 'clay', 'amount': 2}; predicate:round_space_has_placed_good params={'good': 'clay'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement",
+          "predicate:round_space_has_placed_good",
+          "new_trigger:after_renovation"
+        ],
+        "predicates": [
+          "predicate:round_space_has_placed_good"
+        ],
+        "triggers": [
+          "new_trigger:after_renovation"
+        ]
+      }
+    },
+    {
+      "card_id": "A127",
+      "primitives": [
+        "animal_housing",
+        "existing:modify_capacity",
+        "new_trigger:round_end"
+      ],
+      "details": "existing op: modify_capacity params={'scope': 'card', 'person_capacity': 1, 'until_round': 9}; new trigger: round_end; other(remove_person_if_no_housing) -> animal_housing",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:modify_capacity"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "animal_housing",
+          "new_trigger:round_end"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:round_end"
+        ]
+      }
+    },
+    {
+      "card_id": "A128",
+      "primitives": [
+        "build"
+      ],
+      "details": "other(build_room_with_discount) -> build",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "build"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A129",
+      "primitives": [
+        "action_order"
+      ],
+      "details": "other(use_other_space_with_same_person) -> action_order",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "action_order"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A130",
+      "primitives": [
+        "action_order"
+      ],
+      "details": "other(reuse_second_person_space) -> action_order",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "action_order"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A137",
+      "primitives": [
+        "grant_action"
+      ],
+      "details": "other(take_from_other_accumulation) -> grant_action",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "grant_action"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A142",
+      "primitives": [
+        "choice",
+        "predicate:reed_taken_at_least"
+      ],
+      "details": "other(choice) -> choice; predicate:reed_taken_at_least params={'n': 2}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "predicate:reed_taken_at_least"
+        ],
+        "predicates": [
+          "predicate:reed_taken_at_least"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A144",
+      "primitives": [
+        "accumulate"
+      ],
+      "details": "other(place_rewards_on_card) -> accumulate",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A148",
+      "primitives": [
+        "copy_move",
+        "existing:modify_capacity",
+        "new_trigger:harvest_feeding"
+      ],
+      "details": "existing op: modify_capacity params={'scope': 'card', 'animal_capacity': 'unlimited', 'until': 'feeding_phase_of_harvest'}; new trigger: harvest_feeding; other(move_card_animals_to_fields) -> copy_move",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:modify_capacity"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "copy_move",
+          "new_trigger:harvest_feeding"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_feeding"
+        ]
+      }
+    },
+    {
+      "card_id": "A150",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A151",
+      "primitives": [
+        "copy_move",
+        "predicate:round_space_in",
+        "predicate:round_space_unused"
+      ],
+      "details": "other(copy_unused_round_card_effect) -> copy_move; predicate:round_space_in params={'values': [1, 2, 3, 4]}; predicate:round_space_unused params={}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:round_space_unused",
+          "copy_move",
+          "predicate:round_space_in"
+        ],
+        "predicates": [
+          "predicate:round_space_unused",
+          "predicate:round_space_in"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A156",
+      "primitives": [
+        "conditional_gain",
+        "existing:spend_resource",
+        "predicate:other_player_uses"
+      ],
+      "details": "existing op: spend_resource params={'good': 'food', 'amount': 1, 'source': 'owner_supply', 'target': 'other_player'}; other(gain_from_other_supply) -> conditional_gain; predicate:other_player_uses params={'spaces': ['forest', 'clay_pit', 'reed_bank', 'western_quarry', 'eastern_quarry']}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:spend_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "conditional_gain",
+          "predicate:other_player_uses"
+        ],
+        "predicates": [
+          "predicate:other_player_uses"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A162",
+      "primitives": [
+        "existing:gain_resource",
+        "special_combine"
+      ],
+      "details": "other(combine_reed_bank_and_clay_pit) -> special_combine; existing op: gain_resource params={'good': 'clay', 'amount': 2}; existing op: gain_resource params={'good': 'wood', 'amount': 3}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "special_combine"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "A165",
+      "primitives": [
+        "animal_housing",
+        "existing:gain_resource",
+        "new_trigger:round_end"
+      ],
+      "details": "existing op: gain_resource params={'good': 'food', 'amount': 1}; new trigger: round_end; other(free_breeding_if_room) -> animal_housing",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "animal_housing",
+          "new_trigger:round_end"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:round_end"
+        ]
+      }
+    },
+    {
+      "card_id": "B002",
+      "primitives": [
+        "build",
+        "pass_to_left"
+      ],
+      "details": "other(fence_pasture) -> build; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "build"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B003",
+      "primitives": [
+        "pass_to_left",
+        "random_selection"
+      ],
+      "details": "other(pick_random_from_hand) -> random_selection; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "random_selection",
+          "pass_to_left"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B009",
+      "primitives": [
+        "choice",
+        "pass_to_left"
+      ],
+      "details": "other(choice) -> choice; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B011",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B012",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B014",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B015",
+      "primitives": [
+        "existing:discount_cost",
+        "new_trigger:on_use_wood_accumulation",
+        "other:unknown"
+      ],
+      "details": "existing op: discount_cost params={'cost_type': 'wooden_room', 'amount': 2}; new trigger: on_use_wood_accumulation; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:discount_cost"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:on_use_wood_accumulation"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:on_use_wood_accumulation"
+        ]
+      }
+    },
+    {
+      "card_id": "B018",
+      "primitives": [
+        "known:plow_field",
+        "marker_placement",
+        "predicate:round_space_has_marker"
+      ],
+      "details": "other(place_field_on_round_space) -> marker_placement; known op: plow_field params={'amount': 1}; predicate:round_space_has_marker params={'kind': 'field_tile'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [
+          "known:plow_field"
+        ],
+        "new_primitives": [
+          "marker_placement",
+          "predicate:round_space_has_marker"
+        ],
+        "predicates": [
+          "predicate:round_space_has_marker"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B019",
+      "primitives": [
+        "build"
+      ],
+      "details": "other(place_field_tiles_on_card) -> build; other(plow_extra_from_card) -> build",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "build"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B020",
+      "primitives": [
+        "known:plow_field",
+        "marker_placement",
+        "predicate:round_space_has_marker"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement; known op: plow_field params={'amount': 1}; predicate:round_space_has_marker params={'kind': 'field_tile'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [
+          "known:plow_field"
+        ],
+        "new_primitives": [
+          "marker_placement",
+          "predicate:round_space_has_marker"
+        ],
+        "predicates": [
+          "predicate:round_space_has_marker"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B021",
+      "primitives": [
+        "accumulate",
+        "existing:gain_resource",
+        "known:grant_action",
+        "new_trigger:after_wood_gain",
+        "predicate:card_food_empty"
+      ],
+      "details": "other(place_food_on_card) -> accumulate; new trigger: after_wood_gain; existing op: gain_resource params={'good': 'food', 'amount': 1, 'source': 'card'}; new trigger: after_wood_gain; known op: grant_action params={'action': 'family_growth', 'without_room': True}; predicate:card_food_empty params={}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [
+          "known:grant_action"
+        ],
+        "new_primitives": [
+          "accumulate",
+          "new_trigger:after_wood_gain",
+          "predicate:card_food_empty"
+        ],
+        "predicates": [
+          "predicate:card_food_empty"
+        ],
+        "triggers": [
+          "new_trigger:after_wood_gain"
+        ]
+      }
+    },
+    {
+      "card_id": "B023",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B024",
+      "primitives": [
+        "other:unknown",
+        "pass_to_left"
+      ],
+      "details": "other: unknown kind; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B026",
+      "primitives": [
+        "new_trigger:on_use_grain_utilization",
+        "other:unknown"
+      ],
+      "details": "new trigger: on_use_grain_utilization; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:on_use_grain_utilization",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:on_use_grain_utilization"
+        ]
+      }
+    },
+    {
+      "card_id": "B027",
+      "primitives": [
+        "new_trigger:on_build_room_stable_fence",
+        "other:unknown"
+      ],
+      "details": "new trigger: on_build_room_stable_fence; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:on_build_room_stable_fence",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:on_build_room_stable_fence"
+        ]
+      }
+    },
+    {
+      "card_id": "B028",
+      "primitives": [
+        "new_trigger:on_use_forest_accumulation",
+        "other:unknown"
+      ],
+      "details": "new trigger: on_use_forest_accumulation; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:on_use_forest_accumulation"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:on_use_forest_accumulation"
+        ]
+      }
+    },
+    {
+      "card_id": "B030",
+      "primitives": [
+        "new_trigger:on_build_fence",
+        "other:unknown"
+      ],
+      "details": "new trigger: on_build_fence; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:on_build_fence"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:on_build_fence"
+        ]
+      }
+    },
+    {
+      "card_id": "B033",
+      "primitives": [
+        "existing:gain_points",
+        "forbid_renovation"
+      ],
+      "details": "existing op: gain_points params={'points': {'op': 'per', 'args': [{'op': 'count', 'args': ['remaining_rounds']}, 1]}}; other(forbid_renovation) -> forbid_renovation",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_points"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "forbid_renovation"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B036",
+      "primitives": [
+        "other:unknown",
+        "pass_to_left"
+      ],
+      "details": "other: unknown kind; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B041",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B042",
+      "primitives": [
+        "existing:exchange",
+        "grant_action",
+        "predicate:space_is"
+      ],
+      "details": "other(grant_public_action_space) -> grant_action; predicate:space_is params={'space': 'forest_inn'}; existing op: exchange params={'give': [{'good': 'wood', 'amount': {'op': 'table', 'args': ['player_count', {'2': 5, '3': 7, '4': 9}]}}], 'receive': [{'good': 'wood', 'amount': 8}, {'good': 'food', 'amount': {'op': 'table', 'args': ['player_count', {'2': 2, '3': 4, '4': 7}]}}]}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:exchange"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:space_is",
+          "grant_action"
+        ],
+        "predicates": [
+          "predicate:space_is"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B043",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B044",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B045",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B046",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B047",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B048",
+      "primitives": [
+        "accumulate",
+        "existing:gain_resource"
+      ],
+      "details": "other(place_food_on_card) -> accumulate; existing op: gain_resource params={'good': 'food', 'amount': 1, 'source': 'card'}; other(place_food_on_card) -> accumulate",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B053",
+      "primitives": [
+        "choice",
+        "new_trigger:round_end"
+      ],
+      "details": "new trigger: round_end; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "new_trigger:round_end"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:round_end"
+        ]
+      }
+    },
+    {
+      "card_id": "B055",
+      "primitives": [
+        "accumulate",
+        "existing:gain_resource",
+        "new_trigger:after_renovation"
+      ],
+      "details": "other(place_food_on_card) -> accumulate; existing op: gain_resource params={'good': 'food', 'amount': 1, 'source': 'card'}; new trigger: after_renovation; other(restock_food_on_card) -> accumulate",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "new_trigger:after_renovation"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:after_renovation"
+        ]
+      }
+    },
+    {
+      "card_id": "B060",
+      "primitives": [
+        "existing:spend_resource",
+        "marker_placement"
+      ],
+      "details": "existing op: spend_resource params={'good': 'grain', 'amount': 1}; other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:spend_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B065",
+      "primitives": [
+        "marker_placement",
+        "predicate:custom"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement; predicate:custom params={'kind': 'paid_good_in', 'goods': ['wood', 'clay', 'stone']}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:custom",
+          "marker_placement"
+        ],
+        "predicates": [
+          "predicate:custom"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B066",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B069",
+      "primitives": [
+        "other:unknown",
+        "pass_to_left"
+      ],
+      "details": "other: unknown kind; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B072",
+      "primitives": [
+        "other:unknown",
+        "pass_to_left"
+      ],
+      "details": "other: unknown kind; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B076",
+      "primitives": [
+        "other:unknown",
+        "pass_to_left"
+      ],
+      "details": "other: unknown kind; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B083",
+      "primitives": [
+        "other:unknown",
+        "pass_to_left"
+      ],
+      "details": "other: unknown kind; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B086",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B089",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B093",
+      "primitives": [
+        "existing:gain_resource",
+        "known:grant_action",
+        "other:unknown"
+      ],
+      "details": "other: unknown kind; existing op: gain_resource params={'good': 'food', 'amount': 1, 'description': 'retrieve_resource_from_space'}; known op: grant_action params={'action': 'sow_or_build_fences', 'description': 'grant_action_choice_sow_build_fences'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [
+          "known:grant_action"
+        ],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B096",
+      "primitives": [
+        "existing:gain_resource",
+        "known:grant_action",
+        "other:unknown",
+        "predicate:round_is_odd",
+        "predicate:wood_on_this_round_space"
+      ],
+      "details": "other: unknown kind; existing op: gain_resource params={'good': 'wood', 'amount': 1}; known op: grant_action params={'action': 'minor_improvement'}; predicate:round_is_odd params={}; predicate:wood_on_this_round_space params={}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [
+          "known:grant_action"
+        ],
+        "new_primitives": [
+          "other:unknown",
+          "predicate:wood_on_this_round_space",
+          "predicate:round_is_odd"
+        ],
+        "predicates": [
+          "predicate:wood_on_this_round_space",
+          "predicate:round_is_odd"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B105",
+      "primitives": [
+        "conditional_gain"
+      ],
+      "details": "other(gain_each_with_at_least) -> conditional_gain",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "conditional_gain"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B113",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B114",
+      "primitives": [
+        "existing:gain_resource",
+        "other:unknown",
+        "predicate:family_exactly",
+        "predicate:rooms_at_least"
+      ],
+      "details": "existing op: gain_resource params={'good': 'food', 'amount': 1}; other: unknown kind; predicate:rooms_at_least params={'count': 3}; predicate:family_exactly params={'count': 2}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "predicate:family_exactly",
+          "predicate:rooms_at_least"
+        ],
+        "predicates": [
+          "predicate:family_exactly",
+          "predicate:rooms_at_least"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B119",
+      "primitives": [
+        "existing:gain_resource",
+        "other:unknown",
+        "predicate:wood_on_this_round_space"
+      ],
+      "details": "existing op: gain_resource params={'good': 'wood', 'amount': 1}; other: unknown kind; existing op: gain_resource params={'good': 'wood', 'amount': 1}; predicate:wood_on_this_round_space params={}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "predicate:wood_on_this_round_space"
+        ],
+        "predicates": [
+          "predicate:wood_on_this_round_space"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B125",
+      "primitives": [
+        "existing:gain_resource",
+        "marker_placement",
+        "predicate:round_space_has_placed_good"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement; other(place_on_round_spaces) -> marker_placement; other(place_on_round_spaces) -> marker_placement; other(place_on_round_spaces) -> marker_placement; existing op: gain_resource params={'good': 'wood', 'amount': 1, 'source': 'card'}; predicate:round_space_has_placed_good params={'good': 'wood'}; existing op: gain_resource params={'good': 'clay', 'amount': 1, 'source': 'card'}; predicate:round_space_has_placed_good params={'good': 'clay'}; existing op: gain_resource params={'good': 'reed', 'amount': 1, 'source': 'card'}; predicate:round_space_has_placed_good params={'good': 'reed'}; existing op: gain_resource params={'good': 'stone', 'amount': 1, 'source': 'card'}; predicate:round_space_has_placed_good params={'good': 'stone'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement",
+          "predicate:round_space_has_placed_good"
+        ],
+        "predicates": [
+          "predicate:round_space_has_placed_good"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B129",
+      "primitives": [
+        "card_play"
+      ],
+      "details": "other(ignore_occupation) -> card_play",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "card_play"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B130",
+      "primitives": [
+        "action_order",
+        "existing:spend_resource"
+      ],
+      "details": "existing op: spend_resource params={'good': 'food', 'amount': 1}; other(use_other_space_with_same_person) -> action_order",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:spend_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "action_order"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B136",
+      "primitives": [
+        "existing:gain_resource",
+        "scoring"
+      ],
+      "details": "existing op: gain_resource params={'good': 'wood', 'amount': {'op': 'table', 'args': ['remaining_rounds', {'1': 1, '3': 2, '6': 3, '9': 4}]}}; other(award_most_rooms_bonus) -> scoring",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "scoring"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B137",
+      "primitives": [
+        "accumulate",
+        "existing:gain_resource",
+        "predicate:round_space_in"
+      ],
+      "details": "other(stack_goods_on_card) -> accumulate; existing op: gain_resource params={'good': 'vegetable', 'amount': 1, 'source': 'card'}; predicate:round_space_in params={'values': [8]}; existing op: gain_resource params={'good': 'wild_boar', 'amount': 1, 'source': 'card'}; predicate:round_space_in params={'values': [9]}; existing op: gain_resource params={'good': 'stone', 'amount': 1, 'source': 'card'}; predicate:round_space_in params={'values': [10]}; existing op: gain_resource params={'good': 'cattle', 'amount': 1, 'source': 'card'}; predicate:round_space_in params={'values': [11]}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "predicate:round_space_in"
+        ],
+        "predicates": [
+          "predicate:round_space_in"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B141",
+      "primitives": [
+        "choice",
+        "other:count_as_field"
+      ],
+      "details": "other(choice) -> choice; other(count_as_field) -> other:count_as_field",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:count_as_field",
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B145",
+      "primitives": [
+        "exchange",
+        "new_trigger:after_event",
+        "predicate:build_room_or_renovate"
+      ],
+      "details": "new trigger: after_event; other(substitute_reed_with_wood) -> exchange; predicate:build_room_or_renovate params={}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:build_room_or_renovate",
+          "new_trigger:after_event",
+          "exchange"
+        ],
+        "predicates": [
+          "predicate:build_room_or_renovate"
+        ],
+        "triggers": [
+          "new_trigger:after_event"
+        ]
+      }
+    },
+    {
+      "card_id": "B146",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B147",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B149",
+      "primitives": [
+        "animal_housing",
+        "existing:spend_resource",
+        "known:build_stable"
+      ],
+      "details": "other(remove_stables) -> animal_housing; existing op: spend_resource params={'good': 'wood', 'amount': 2}; known op: build_stable params={'count': 1}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:spend_resource"
+        ],
+        "known_operations": [
+          "known:build_stable"
+        ],
+        "new_primitives": [
+          "animal_housing"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B150",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B151",
+      "primitives": [
+        "card_play",
+        "existing:gain_resource"
+      ],
+      "details": "existing op: gain_resource params={'good': 'stone', 'amount': 1}; other(ignore_occupation) -> card_play",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "card_play"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B152",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B153",
+      "primitives": [
+        "new_trigger:final_scoring",
+        "scoring"
+      ],
+      "details": "new trigger: final_scoring; other(score_major_improvements) -> scoring",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "scoring",
+          "new_trigger:final_scoring"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:final_scoring"
+        ]
+      }
+    },
+    {
+      "card_id": "B155",
+      "primitives": [
+        "action_order",
+        "existing:gain_resource",
+        "new_trigger:pay_occupation_cost"
+      ],
+      "details": "existing op: gain_resource params={'good': 'wood', 'amount': 1}; existing op: gain_resource params={'good': 'reed', 'amount': 1}; new trigger: pay_occupation_cost; other(use_cumulative_space_food) -> action_order",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "action_order",
+          "new_trigger:pay_occupation_cost"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:pay_occupation_cost"
+        ]
+      }
+    },
+    {
+      "card_id": "B156",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B157",
+      "primitives": [
+        "exchange",
+        "marker_placement",
+        "new_trigger:anytime"
+      ],
+      "details": "new trigger: anytime; other(pay_animal) -> exchange; other(place_food_on_future_rounds) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:anytime",
+          "marker_placement",
+          "exchange"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:anytime"
+        ]
+      }
+    },
+    {
+      "card_id": "B159",
+      "primitives": [
+        "conditional_gain",
+        "new_trigger:other_player_action",
+        "predicate:player_places_adjacent_field"
+      ],
+      "details": "new trigger: other_player_action; other(gain_from_common_stock) -> conditional_gain; predicate:player_places_adjacent_field params={}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "conditional_gain",
+          "new_trigger:other_player_action",
+          "predicate:player_places_adjacent_field"
+        ],
+        "predicates": [
+          "predicate:player_places_adjacent_field"
+        ],
+        "triggers": [
+          "new_trigger:other_player_action"
+        ]
+      }
+    },
+    {
+      "card_id": "B162",
+      "primitives": [
+        "conditional_gain",
+        "new_trigger:store_from_cumulative_space",
+        "predicate:stored_exact_wood"
+      ],
+      "details": "new trigger: store_from_cumulative_space; other(bonus_for_stored_wood) -> conditional_gain; predicate:stored_exact_wood params={'amounts': [2, 3, 4]}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:store_from_cumulative_space",
+          "conditional_gain",
+          "predicate:stored_exact_wood"
+        ],
+        "predicates": [
+          "predicate:stored_exact_wood"
+        ],
+        "triggers": [
+          "new_trigger:store_from_cumulative_space"
+        ]
+      }
+    },
+    {
+      "card_id": "B164",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_sheep_on_future_rounds) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B165",
+      "primitives": [
+        "choice",
+        "new_trigger:before_harvest"
+      ],
+      "details": "new trigger: before_harvest; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "new_trigger:before_harvest"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:before_harvest"
+        ]
+      }
+    },
+    {
+      "card_id": "B166",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B167",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "B168",
+      "primitives": [
+        "conditional_gain",
+        "existing:gain_resource",
+        "new_trigger:renovate"
+      ],
+      "details": "new trigger: renovate; existing op: gain_resource params={'good': 'food', 'amount': 2}; other(gain_animals_in_stabled_pastures) -> conditional_gain",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:renovate",
+          "conditional_gain"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:renovate"
+        ]
+      }
+    },
+    {
+      "card_id": "C001",
+      "primitives": [
+        "build",
+        "pass_to_left"
+      ],
+      "details": "other(rebuild_fences) -> build; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "build"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C003",
+      "primitives": [
+        "copy_move",
+        "pass_to_left"
+      ],
+      "details": "other(place_unplaced_person) -> copy_move; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "copy_move"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C006",
+      "primitives": [
+        "field_mod",
+        "pass_to_left"
+      ],
+      "details": "other(add_good_to_empty_fields) -> field_mod; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "field_mod"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C007",
+      "primitives": [
+        "choice",
+        "pass_to_left"
+      ],
+      "details": "other(choice) -> choice; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C008",
+      "primitives": [
+        "field_mod",
+        "pass_to_left"
+      ],
+      "details": "other(add_good_to_single_good_fields) -> field_mod; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "field_mod"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C009",
+      "primitives": [
+        "exchange",
+        "pass_to_left"
+      ],
+      "details": "other(buy_animal) -> exchange; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "exchange"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C014",
+      "primitives": [
+        "exchange"
+      ],
+      "details": "other(ignore_cost) -> exchange",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "exchange"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C016",
+      "primitives": [
+        "build"
+      ],
+      "details": "other(build_fences_now) -> build",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "build"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C018",
+      "primitives": [
+        "field_mod",
+        "predicate:cultivated_fields_at_least"
+      ],
+      "details": "other(discard_field_goods_plow_one) -> field_mod; predicate:cultivated_fields_at_least params={'n': 3}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "field_mod",
+          "predicate:cultivated_fields_at_least"
+        ],
+        "predicates": [
+          "predicate:cultivated_fields_at_least"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C019",
+      "primitives": [
+        "accumulate",
+        "known:plow_field"
+      ],
+      "details": "other(stack_field_tiles_on_card) -> accumulate; known op: plow_field params={'amount': {'op': 'min', 'args': [{'op': 'count', 'args': ['field_tiles_on_card']}, 2]}}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [
+          "known:plow_field"
+        ],
+        "new_primitives": [
+          "accumulate"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C022",
+      "primitives": [
+        "copy_move"
+      ],
+      "details": "other(recall_first_placed_person) -> copy_move",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "copy_move"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C023",
+      "primitives": [
+        "copy_move"
+      ],
+      "details": "other(use_two_spaces_one_person) -> copy_move",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "copy_move"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C027",
+      "primitives": [
+        "card_play",
+        "existing:discount_cost",
+        "new_trigger:when_buying"
+      ],
+      "details": "other(buy_major_via_minor_action) -> card_play; new trigger: when_buying; existing op: discount_cost params={'good': 'stone', 'amount': 1, 'scope': 'joinery,pottery,basketmakers_workshop'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:discount_cost"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "card_play",
+          "new_trigger:when_buying"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:when_buying"
+        ]
+      }
+    },
+    {
+      "card_id": "C046",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C051",
+      "primitives": [
+        "grant_action"
+      ],
+      "details": "other(tax_space_use) -> grant_action",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "grant_action"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C056",
+      "primitives": [
+        "build",
+        "existing:gain_resource",
+        "new_trigger:after_stable_built"
+      ],
+      "details": "new trigger: after_stable_built; existing op: gain_resource params={'good': 'food', 'amount': 1}; other(build_stable_alternate_cost) -> build",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:after_stable_built",
+          "build"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:after_stable_built"
+        ]
+      }
+    },
+    {
+      "card_id": "C058",
+      "primitives": [
+        "conditional_gain"
+      ],
+      "details": "other(conditional_gain_after_use) -> conditional_gain",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "conditional_gain"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C060",
+      "primitives": [
+        "build",
+        "existing:gain_resource"
+      ],
+      "details": "existing op: gain_resource params={'good': 'food', 'amount': 5}; other(build_improvement) -> build",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "build"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C062",
+      "primitives": [
+        "cook_bake",
+        "new_trigger:harvest_feeding"
+      ],
+      "details": "new trigger: harvest_feeding; other(cooking_double_food) -> cook_bake",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:harvest_feeding",
+          "cook_bake"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_feeding"
+        ]
+      }
+    },
+    {
+      "card_id": "C064",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C065",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C069",
+      "primitives": [
+        "exchange",
+        "new_trigger:anytime"
+      ],
+      "details": "new trigger: anytime; other(field_internal_exchange) -> exchange",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:anytime",
+          "exchange"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:anytime"
+        ]
+      }
+    },
+    {
+      "card_id": "C070",
+      "primitives": [
+        "existing:exchange",
+        "field_mod",
+        "new_trigger:harvest_field",
+        "predicate:harvested_from"
+      ],
+      "details": "other(become_vegetable_field) -> field_mod; new trigger: harvest_field; existing op: exchange params={'give': [{'good': 'vegetable', 'amount': 1}], 'receive': [{'good': 'food', 'amount': 4}]}; predicate:harvested_from params={'source': 'card_field'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:exchange"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:harvest_field",
+          "field_mod",
+          "predicate:harvested_from"
+        ],
+        "predicates": [
+          "predicate:harvested_from"
+        ],
+        "triggers": [
+          "new_trigger:harvest_field"
+        ]
+      }
+    },
+    {
+      "card_id": "C095",
+      "primitives": [
+        "build"
+      ],
+      "details": "other(build_improvement) -> build",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "build"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C124",
+      "primitives": [
+        "exchange",
+        "predicate:harvest_number"
+      ],
+      "details": "other(pay_for_resource) -> exchange; predicate:harvest_number params={'n': 1}; other(pay_for_resource) -> exchange; predicate:harvest_number params={'n': 2}; other(pay_for_resource) -> exchange; predicate:harvest_number params={'n': 3}; other(pay_for_resource) -> exchange; predicate:harvest_number params={'n': 4}; other(pay_for_resource) -> exchange; predicate:harvest_number params={'n': 5}; other(pay_for_resource) -> exchange; predicate:harvest_number params={'n': 6}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:harvest_number",
+          "exchange"
+        ],
+        "predicates": [
+          "predicate:harvest_number"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C125",
+      "primitives": [
+        "other:place_worker_on_accumulation_space"
+      ],
+      "details": "other(place_worker_on_accumulation_space) -> other:place_worker_on_accumulation_space",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:place_worker_on_accumulation_space"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C126",
+      "primitives": [
+        "exchange",
+        "existing:gain_resource",
+        "predicate:action_space_used"
+      ],
+      "details": "existing op: gain_resource params={'good': 'wood', 'amount': 1}; existing op: gain_resource params={'good': 'clay', 'amount': 1}; predicate:action_space_used params={'space': 'day_laborer'}; other(pay_for_resource) -> exchange; predicate:action_space_used params={'space': 'day_laborer'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "exchange",
+          "predicate:action_space_used"
+        ],
+        "predicates": [
+          "predicate:action_space_used"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C127",
+      "primitives": [
+        "animal_housing"
+      ],
+      "details": "other(family_growth_without_room) -> animal_housing",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "animal_housing"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C129",
+      "primitives": [
+        "animal_housing",
+        "copy_move"
+      ],
+      "details": "other(family_growth_without_room) -> animal_housing; other(use_action_space_even_if_occupied) -> copy_move",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "copy_move",
+          "animal_housing"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C131",
+      "primitives": [
+        "card_play",
+        "predicate:action_space_occupied",
+        "predicate:action_space_used"
+      ],
+      "details": "other(play_occupation_from_hand_free) -> card_play; predicate:action_space_occupied params={'space': 'lesson'}; predicate:action_space_used params={'space': 'grain_seeds'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "card_play",
+          "predicate:action_space_used",
+          "predicate:action_space_occupied"
+        ],
+        "predicates": [
+          "predicate:action_space_used",
+          "predicate:action_space_occupied"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C132",
+      "primitives": [
+        "accumulate",
+        "existing:gain_points",
+        "predicate:renovation_to_stone_house"
+      ],
+      "details": "other(place_wood_from_supply_on_rooms) -> accumulate; predicate:renovation_to_stone_house params={}; existing op: gain_points params={'source': 'stone_house_rooms', 'points_per_room': 1}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_points"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "predicate:renovation_to_stone_house"
+        ],
+        "predicates": [
+          "predicate:renovation_to_stone_house"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C138",
+      "primitives": [
+        "choice",
+        "new_trigger:on_use_day_laborer"
+      ],
+      "details": "new trigger: on_use_day_laborer; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "new_trigger:on_use_day_laborer"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:on_use_day_laborer"
+        ]
+      }
+    },
+    {
+      "card_id": "C140",
+      "primitives": [
+        "copy_move",
+        "existing:gain_resource",
+        "new_trigger:on_use_minor_improvement_space"
+      ],
+      "details": "existing op: gain_resource params={'good': 'grain', 'amount': 1}; new trigger: on_use_minor_improvement_space; other(substitute_action) -> copy_move",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "copy_move",
+          "new_trigger:on_use_minor_improvement_space"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:on_use_minor_improvement_space"
+        ]
+      }
+    },
+    {
+      "card_id": "C143",
+      "primitives": [
+        "exchange",
+        "existing:exchange"
+      ],
+      "details": "existing op: exchange params={'give': [{'good': 'food', 'amount': 1}], 'receive': [{'good': 'stone', 'amount': 2}], 'exactly': True}; other(buy_stone) -> exchange",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:exchange"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "exchange"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "C146",
+      "primitives": [
+        "exchange",
+        "new_trigger:after_renovation",
+        "other:place_resource_pairs_on_improvements"
+      ],
+      "details": "other(place_resource_pairs_on_improvements) -> other:place_resource_pairs_on_improvements; new trigger: after_renovation; other(move_resource_pair_to_supply) -> exchange",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:place_resource_pairs_on_improvements",
+          "exchange",
+          "new_trigger:after_renovation"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:after_renovation"
+        ]
+      }
+    },
+    {
+      "card_id": "C148",
+      "primitives": [
+        "accumulate",
+        "existing:exchange",
+        "new_trigger:card_clay_reaches",
+        "predicate:card_clay_at_least",
+        "predicate:is_cumulative_space"
+      ],
+      "details": "other(stack_goods_on_card) -> accumulate; predicate:is_cumulative_space params={'any': True}; new trigger: card_clay_reaches; existing op: exchange params={'give': [{'good': 'clay', 'amount': 4, 'source': 'card'}], 'receive': [{'good': 'wild_boar', 'amount': 1, 'destination': 'card'}]}; predicate:card_clay_at_least params={'n': 4}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:exchange"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "predicate:is_cumulative_space",
+          "predicate:card_clay_at_least",
+          "new_trigger:card_clay_reaches"
+        ],
+        "predicates": [
+          "predicate:is_cumulative_space",
+          "predicate:card_clay_at_least"
+        ],
+        "triggers": [
+          "new_trigger:card_clay_reaches"
+        ]
+      }
+    },
+    {
+      "card_id": "C149",
+      "primitives": [
+        "build",
+        "existing:spend_resource",
+        "new_trigger:after_renovation",
+        "predicate:room_type_is"
+      ],
+      "details": "new trigger: after_renovation; existing op: spend_resource params={'good': 'food', 'amount': 2}; other(build_room_with_discount) -> build; predicate:room_type_is params={'type': 'stone', 'scope': 'renovating_player'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:spend_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:room_type_is",
+          "build",
+          "new_trigger:after_renovation"
+        ],
+        "predicates": [
+          "predicate:room_type_is"
+        ],
+        "triggers": [
+          "new_trigger:after_renovation"
+        ]
+      }
+    },
+    {
+      "card_id": "C150",
+      "primitives": [
+        "action_order",
+        "existing:spend_resource",
+        "new_trigger:your_turn_in_work_phase",
+        "predicate:right_neighbor_last_used"
+      ],
+      "details": "new trigger: your_turn_in_work_phase; existing op: spend_resource params={'good': 'grain', 'amount': 1, 'destination': 'general_supply'}; other(reuse_neighbor_used_space) -> action_order; predicate:right_neighbor_last_used params={}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:spend_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:right_neighbor_last_used",
+          "action_order",
+          "new_trigger:your_turn_in_work_phase"
+        ],
+        "predicates": [
+          "predicate:right_neighbor_last_used"
+        ],
+        "triggers": [
+          "new_trigger:your_turn_in_work_phase"
+        ]
+      }
+    },
+    {
+      "card_id": "D006",
+      "primitives": [
+        "choice",
+        "pass_to_left"
+      ],
+      "details": "other(choice) -> choice; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D012",
+      "primitives": [
+        "animal_housing",
+        "existing:gain_resource",
+        "new_trigger:harvest_feeding"
+      ],
+      "details": "new trigger: harvest_feeding; existing op: gain_resource params={'good': 'food', 'amount': 1}; other(forbid_house_animals) -> animal_housing",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "animal_housing",
+          "new_trigger:harvest_feeding"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_feeding"
+        ]
+      }
+    },
+    {
+      "card_id": "D026",
+      "primitives": [
+        "card_play"
+      ],
+      "details": "other(allow_major_via_minor) -> card_play",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "card_play"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D043",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D047",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D057",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D062",
+      "primitives": [
+        "choice",
+        "existing:gain_resource",
+        "new_trigger:harvest_feeding"
+      ],
+      "details": "existing op: gain_resource params={'good': 'food', 'amount': 2}; new trigger: harvest_feeding; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "new_trigger:harvest_feeding"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_feeding"
+        ]
+      }
+    },
+    {
+      "card_id": "D070",
+      "primitives": [
+        "choice",
+        "pass_to_left"
+      ],
+      "details": "other(choice) -> choice; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D071",
+      "primitives": [
+        "choice",
+        "pass_to_left",
+        "predicate:raw_text"
+      ],
+      "details": "other(choice) -> choice; predicate:raw_text params={'text': 'harvest resulted in a field with exactly 1 good remaining'}; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "predicate:raw_text",
+          "choice"
+        ],
+        "predicates": [
+          "predicate:raw_text"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D073",
+      "primitives": [
+        "choice",
+        "pass_to_left"
+      ],
+      "details": "other(choice) -> choice; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D074",
+      "primitives": [
+        "conditional_discount"
+      ],
+      "details": "other(discount_cost) -> conditional_discount",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "conditional_discount"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D075",
+      "primitives": [
+        "other:count_as_field"
+      ],
+      "details": "other(count_as_field) -> other:count_as_field",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:count_as_field"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D078",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D082",
+      "primitives": [
+        "exchange"
+      ],
+      "details": "other(substitute_cost) -> exchange; other(substitute_cost) -> exchange",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "exchange"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D085",
+      "primitives": [
+        "animal_housing",
+        "predicate:occupation_count"
+      ],
+      "details": "other(grant_residence_slot) -> animal_housing; predicate:occupation_count params={'min': 6}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:occupation_count",
+          "animal_housing"
+        ],
+        "predicates": [
+          "predicate:occupation_count"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D086",
+      "primitives": [
+        "modify_capacity"
+      ],
+      "details": "other(capacity) -> modify_capacity",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "modify_capacity"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D087",
+      "primitives": [
+        "grant_action",
+        "predicate:room_count_in"
+      ],
+      "details": "other(grant_action) -> grant_action; predicate:room_count_in params={'values': [5, 6, 7, 8, 9, 10]}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:room_count_in",
+          "grant_action"
+        ],
+        "predicates": [
+          "predicate:room_count_in"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D088",
+      "primitives": [
+        "exchange",
+        "existing:gain_resource"
+      ],
+      "details": "existing op: gain_resource params={'good': 'grain', 'amount': 1}; other(substitute_cost) -> exchange",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "exchange"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D090",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D091",
+      "primitives": [
+        "choice",
+        "copy_move",
+        "marker_placement",
+        "predicate:round_space_has_marker"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement; other(choice) -> choice; other(move_all_goods_on_card_to_supply) -> copy_move; predicate:round_space_has_marker params={'kind': 'plow_reservation'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "copy_move",
+          "marker_placement",
+          "predicate:round_space_has_marker"
+        ],
+        "predicates": [
+          "predicate:round_space_has_marker"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D092",
+      "primitives": [
+        "action_order",
+        "existing:gain_points",
+        "predicate:has_empty_room",
+        "predicate:round_number"
+      ],
+      "details": "other(allow_family_member_to_act) -> action_order; existing op: gain_points params={'points': -2}; predicate:round_number params={'min': 5}; predicate:has_empty_room params={}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_points"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "action_order",
+          "predicate:has_empty_room",
+          "predicate:round_number"
+        ],
+        "predicates": [
+          "predicate:has_empty_room",
+          "predicate:round_number"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D093",
+      "primitives": [
+        "choice",
+        "new_trigger:after_work_phase"
+      ],
+      "details": "new trigger: after_work_phase; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "new_trigger:after_work_phase"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:after_work_phase"
+        ]
+      }
+    },
+    {
+      "card_id": "D094",
+      "primitives": [
+        "copy_move",
+        "new_trigger:after_room_construction",
+        "predicate:worker_on_space"
+      ],
+      "details": "new trigger: after_room_construction; other(place_unplaced_person) -> copy_move; predicate:worker_on_space params={'space': 'second_person_this_round'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:worker_on_space",
+          "copy_move",
+          "new_trigger:after_room_construction"
+        ],
+        "predicates": [
+          "predicate:worker_on_space"
+        ],
+        "triggers": [
+          "new_trigger:after_room_construction"
+        ]
+      }
+    },
+    {
+      "card_id": "D095",
+      "primitives": [
+        "build",
+        "exchange"
+      ],
+      "details": "other(build_improvement) -> build; other(substitute_cost) -> exchange",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "exchange",
+          "build"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D097",
+      "primitives": [
+        "choice",
+        "existing:gain_resource",
+        "new_trigger:harvest_start"
+      ],
+      "details": "existing op: gain_resource params={'good': 'food', 'amount': 1}; new trigger: harvest_start; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "new_trigger:harvest_start"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_start"
+        ]
+      }
+    },
+    {
+      "card_id": "D098",
+      "primitives": [
+        "accumulate",
+        "new_trigger:before_final_harvest"
+      ],
+      "details": "new trigger: before_final_harvest; other(take_from_accumulations) -> accumulate",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "new_trigger:before_final_harvest"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:before_final_harvest"
+        ]
+      }
+    },
+    {
+      "card_id": "D099",
+      "primitives": [
+        "accumulate",
+        "existing:gain_points",
+        "existing:spend_resource",
+        "new_trigger:after_final_harvest",
+        "predicate:round_number"
+      ],
+      "details": "other(stack_goods_on_card) -> accumulate; predicate:round_number params={'max': 4}; new trigger: after_final_harvest; existing op: gain_points params={'points': {'custom': ['threshold_table', 'people', {'1': 1, '2': 2, '3': 3, '4': 4, '5': 5}]}}; existing op: spend_resource params={'good': 'clay', 'amount': {'custom': ['count', 'person']}}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:spend_resource",
+          "existing:gain_points"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "new_trigger:after_final_harvest",
+          "predicate:round_number"
+        ],
+        "predicates": [
+          "predicate:round_number"
+        ],
+        "triggers": [
+          "new_trigger:after_final_harvest"
+        ]
+      }
+    },
+    {
+      "card_id": "D100",
+      "primitives": [
+        "scoring"
+      ],
+      "details": "other(gain_points_per_max_category) -> scoring",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "scoring"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D101",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D102",
+      "primitives": [
+        "choice",
+        "new_trigger:returning_home_phase"
+      ],
+      "details": "new trigger: returning_home_phase; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "new_trigger:returning_home_phase"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:returning_home_phase"
+        ]
+      }
+    },
+    {
+      "card_id": "D103",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D107",
+      "primitives": [
+        "choice",
+        "new_trigger:returning_home_phase"
+      ],
+      "details": "new trigger: returning_home_phase; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "new_trigger:returning_home_phase"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:returning_home_phase"
+        ]
+      }
+    },
+    {
+      "card_id": "D111",
+      "primitives": [
+        "marker_placement",
+        "new_trigger:after_renovation"
+      ],
+      "details": "new trigger: after_renovation; other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement",
+          "new_trigger:after_renovation"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:after_renovation"
+        ]
+      }
+    },
+    {
+      "card_id": "D113",
+      "primitives": [
+        "choice",
+        "predicate:grain_harvested_at_least"
+      ],
+      "details": "other(choice) -> choice; predicate:grain_harvested_at_least params={'n': 1}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:grain_harvested_at_least",
+          "choice"
+        ],
+        "predicates": [
+          "predicate:grain_harvested_at_least"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D115",
+      "primitives": [
+        "choice",
+        "new_trigger:harvest_start"
+      ],
+      "details": "new trigger: harvest_start; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "new_trigger:harvest_start"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_start"
+        ]
+      }
+    },
+    {
+      "card_id": "D116",
+      "primitives": [
+        "copy_move",
+        "new_trigger:stone_accumulation_space_revealed"
+      ],
+      "details": "new trigger: stone_accumulation_space_revealed; other(move_all_goods_on_card_to_supply) -> copy_move",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "copy_move",
+          "new_trigger:stone_accumulation_space_revealed"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:stone_accumulation_space_revealed"
+        ]
+      }
+    },
+    {
+      "card_id": "D117",
+      "primitives": [
+        "exchange",
+        "existing:gain_resource",
+        "new_trigger:when_buying",
+        "predicate:improvement_played_from_hand"
+      ],
+      "details": "existing op: gain_resource params={'good': 'wood', 'amount': 2}; new trigger: when_buying; other(substitute_cost) -> exchange; predicate:improvement_played_from_hand params={'via_major_or_minor_action': True}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:improvement_played_from_hand",
+          "new_trigger:when_buying",
+          "exchange"
+        ],
+        "predicates": [
+          "predicate:improvement_played_from_hand"
+        ],
+        "triggers": [
+          "new_trigger:when_buying"
+        ]
+      }
+    },
+    {
+      "card_id": "D118",
+      "primitives": [
+        "accumulate",
+        "new_trigger:after_improvement",
+        "predicate:improvement_played_from_hand"
+      ],
+      "details": "other(stack_goods_on_card) -> accumulate; new trigger: after_improvement; other(take_top_good_from_card) -> accumulate; predicate:improvement_played_from_hand params={'via_major_or_minor_action': True, 'include_this_card': True}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "new_trigger:after_improvement",
+          "predicate:improvement_played_from_hand"
+        ],
+        "predicates": [
+          "predicate:improvement_played_from_hand"
+        ],
+        "triggers": [
+          "new_trigger:after_improvement"
+        ]
+      }
+    },
+    {
+      "card_id": "D119",
+      "primitives": [
+        "choice",
+        "new_trigger:before_worker_space"
+      ],
+      "details": "new trigger: before_worker_space; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:before_worker_space",
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:before_worker_space"
+        ]
+      }
+    },
+    {
+      "card_id": "D120",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "D121",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D122",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D123",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D124",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D125",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D126",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D127",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D128",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D129",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D130",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D131",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D132",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D133",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D134",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D135",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D136",
+      "primitives": [
+        "new_trigger:ongoing",
+        "other:unknown"
+      ],
+      "details": "new trigger: ongoing; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:ongoing"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:ongoing"
+        ]
+      }
+    },
+    {
+      "card_id": "D147",
+      "primitives": [
+        "new_trigger:on_action_use",
+        "other:unknown",
+        "predicate:action_space_name"
+      ],
+      "details": "new trigger: on_action_use; other: unknown kind; predicate:action_space_name params={'name': 'day_laborer'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:on_action_use",
+          "predicate:action_space_name"
+        ],
+        "predicates": [
+          "predicate:action_space_name"
+        ],
+        "triggers": [
+          "new_trigger:on_action_use"
+        ]
+      }
+    },
+    {
+      "card_id": "D150",
+      "primitives": [
+        "new_trigger:on_action_use",
+        "other:unknown",
+        "predicate:action_type",
+        "predicate:person_is_second_placed_this_round"
+      ],
+      "details": "new trigger: on_action_use; other: unknown kind; predicate:action_type params={'type': 'family_growth'}; predicate:person_is_second_placed_this_round params={}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:person_is_second_placed_this_round",
+          "other:unknown",
+          "new_trigger:on_action_use",
+          "predicate:action_type"
+        ],
+        "predicates": [
+          "predicate:person_is_second_placed_this_round",
+          "predicate:action_type"
+        ],
+        "triggers": [
+          "new_trigger:on_action_use"
+        ]
+      }
+    },
+    {
+      "card_id": "D151",
+      "primitives": [
+        "new_trigger:on_action_use",
+        "other:unknown",
+        "predicate:action_space_name"
+      ],
+      "details": "new trigger: on_action_use; other: unknown kind; predicate:action_space_name params={'name': 'small_theater'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:on_action_use",
+          "predicate:action_space_name"
+        ],
+        "predicates": [
+          "predicate:action_space_name"
+        ],
+        "triggers": [
+          "new_trigger:on_action_use"
+        ]
+      }
+    },
+    {
+      "card_id": "E003",
+      "primitives": [
+        "copy_move",
+        "pass_to_left"
+      ],
+      "details": "other(return_person_from_space) -> copy_move; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "copy_move"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E004",
+      "primitives": [
+        "field_mod",
+        "pass_to_left"
+      ],
+      "details": "other(discard_field_grain) -> field_mod; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "field_mod"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E005",
+      "primitives": [
+        "accumulate",
+        "pass_to_left"
+      ],
+      "details": "other(take_from_accumulations) -> accumulate; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "pass_to_left"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E006",
+      "primitives": [
+        "conditional_gain",
+        "pass_to_left"
+      ],
+      "details": "other(gain_each_with_at_least) -> conditional_gain; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "conditional_gain",
+          "pass_to_left"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E009",
+      "primitives": [
+        "choice",
+        "pass_to_left"
+      ],
+      "details": "other(choice) -> choice; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E010",
+      "primitives": [
+        "copy_move",
+        "new_trigger:after_work_phase",
+        "predicate:worker_on_space"
+      ],
+      "details": "new trigger: after_work_phase; other(move_person_to_unoccupied_space_and_act) -> copy_move; predicate:worker_on_space params={'space': 'farmland'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "copy_move",
+          "predicate:worker_on_space",
+          "new_trigger:after_work_phase"
+        ],
+        "predicates": [
+          "predicate:worker_on_space"
+        ],
+        "triggers": [
+          "new_trigger:after_work_phase"
+        ]
+      }
+    },
+    {
+      "card_id": "E016",
+      "primitives": [
+        "build"
+      ],
+      "details": "other(free_outer_edge_fences) -> build",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "build"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E017",
+      "primitives": [
+        "field_mod",
+        "known:plow_field",
+        "new_trigger:before_sow"
+      ],
+      "details": "known op: plow_field params={'amount': 2, 'replaces_default': 1}; new trigger: before_sow; other(reduce_sown_goods) -> field_mod",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [
+          "known:plow_field"
+        ],
+        "new_primitives": [
+          "new_trigger:before_sow",
+          "field_mod"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:before_sow"
+        ]
+      }
+    },
+    {
+      "card_id": "E021",
+      "primitives": [
+        "card_play"
+      ],
+      "details": "other(ignore_occupation) -> card_play",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "card_play"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E022",
+      "primitives": [
+        "accumulate",
+        "existing:spend_resource",
+        "known:grant_action",
+        "new_trigger:round_end"
+      ],
+      "details": "other(place_food_on_card) -> accumulate; new trigger: round_end; existing op: spend_resource params={'good': 'food', 'amount': 1, 'source': 'card'}; known op: grant_action params={'action': 'place_person'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:spend_resource"
+        ],
+        "known_operations": [
+          "known:grant_action"
+        ],
+        "new_primitives": [
+          "accumulate",
+          "new_trigger:round_end"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:round_end"
+        ]
+      }
+    },
+    {
+      "card_id": "E024",
+      "primitives": [
+        "card_play"
+      ],
+      "details": "other(allow_major_via_minor) -> card_play",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "card_play"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E025",
+      "primitives": [
+        "cook_bake"
+      ],
+      "details": "other(run_field_phase) -> cook_bake",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "cook_bake"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E027",
+      "primitives": [
+        "accumulate",
+        "known:grant_action",
+        "new_trigger:after_work_phase",
+        "new_trigger:any_time",
+        "other:discard_food_from_card",
+        "predicate:card_food_at_least"
+      ],
+      "details": "new trigger: after_work_phase; other(stack_goods_on_card) -> accumulate; new trigger: any_time; other(discard_food_from_card) -> other:discard_food_from_card; known op: grant_action params={'action': 'major_improvement', 'free': True}; predicate:card_food_at_least params={'n': 6}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [
+          "known:grant_action"
+        ],
+        "new_primitives": [
+          "accumulate",
+          "new_trigger:any_time",
+          "other:discard_food_from_card",
+          "predicate:card_food_at_least",
+          "new_trigger:after_work_phase"
+        ],
+        "predicates": [
+          "predicate:card_food_at_least"
+        ],
+        "triggers": [
+          "new_trigger:any_time",
+          "new_trigger:after_work_phase"
+        ]
+      }
+    },
+    {
+      "card_id": "E028",
+      "primitives": [
+        "known:grant_action",
+        "marker_placement",
+        "predicate:round_space_has_marker"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement; known op: grant_action params={'action': 'play_occupation', 'free': True}; predicate:round_space_has_marker params={'kind': 'occupation_marker'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [
+          "known:grant_action"
+        ],
+        "new_primitives": [
+          "marker_placement",
+          "predicate:round_space_has_marker"
+        ],
+        "predicates": [
+          "predicate:round_space_has_marker"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E030",
+      "primitives": [
+        "animal_housing",
+        "new_trigger:harvest_feeding"
+      ],
+      "details": "new trigger: harvest_feeding; other(newborn_food_requirement) -> animal_housing",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "animal_housing",
+          "new_trigger:harvest_feeding"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_feeding"
+        ]
+      }
+    },
+    {
+      "card_id": "E031",
+      "primitives": [
+        "new_trigger:after_improvement",
+        "scoring"
+      ],
+      "details": "new trigger: after_improvement; other(place_reed_for_point) -> scoring",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:after_improvement",
+          "scoring"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:after_improvement"
+        ]
+      }
+    },
+    {
+      "card_id": "E033",
+      "primitives": [
+        "animal_housing",
+        "existing:gain_points"
+      ],
+      "details": "other(disable_one_stable_pasture) -> animal_housing; existing op: gain_points params={'points': 1}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_points"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "animal_housing"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E036",
+      "primitives": [
+        "animal_housing"
+      ],
+      "details": "other(require_empty_pasture) -> animal_housing",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "animal_housing"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E038",
+      "primitives": [
+        "existing:gain_points",
+        "other:place_up_to_two_wood_on_card"
+      ],
+      "details": "other(place_up_to_two_wood_on_card) -> other:place_up_to_two_wood_on_card; existing op: gain_points params={'points': {'op': 'custom', 'args': ['wood_points_excluding_1_4_7_10', {'op': 'count', 'args': ['wood_on_card']}]}}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_points"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "other:place_up_to_two_wood_on_card"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E039",
+      "primitives": [
+        "choice",
+        "new_trigger:harvest_start"
+      ],
+      "details": "new trigger: harvest_start; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice",
+          "new_trigger:harvest_start"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_start"
+        ]
+      }
+    },
+    {
+      "card_id": "E040",
+      "primitives": [
+        "accumulate"
+      ],
+      "details": "other(stack_goods_on_card) -> accumulate; other(take_top_good_from_card) -> accumulate",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E041",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement; other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E042",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E043",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E044",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E045",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E046",
+      "primitives": [
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E047",
+      "primitives": [
+        "existing:gain_resource",
+        "marker_placement",
+        "new_trigger:after_wood_gain",
+        "predicate:round_space_has_placed_good"
+      ],
+      "details": "new trigger: after_wood_gain; other(place_on_round_spaces) -> marker_placement; existing op: gain_resource params={'good': 'food', 'amount': 1, 'source': 'round_space'}; predicate:round_space_has_placed_good params={'good': 'food', 'placed_by': 'owner'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "marker_placement",
+          "predicate:round_space_has_placed_good",
+          "new_trigger:after_wood_gain"
+        ],
+        "predicates": [
+          "predicate:round_space_has_placed_good"
+        ],
+        "triggers": [
+          "new_trigger:after_wood_gain"
+        ]
+      }
+    },
+    {
+      "card_id": "E051",
+      "primitives": [
+        "accumulate",
+        "existing:gain_resource",
+        "new_trigger:on_play_occupation"
+      ],
+      "details": "other(stack_goods_on_card) -> accumulate; new trigger: on_play_occupation; existing op: gain_resource params={'good': 'food', 'amount': {'op': 'count', 'args': ['food_on_card']}, 'source': 'card'}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "new_trigger:on_play_occupation"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:on_play_occupation"
+        ]
+      }
+    },
+    {
+      "card_id": "E058",
+      "primitives": [
+        "cook_bake",
+        "new_trigger:harvest_start"
+      ],
+      "details": "new trigger: harvest_start; other(skip_field_and_breeding_for_food) -> cook_bake",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:harvest_start",
+          "cook_bake"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_start"
+        ]
+      }
+    },
+    {
+      "card_id": "E070",
+      "primitives": [
+        "new_trigger:when_last_crop_removed_from_card",
+        "other:unknown"
+      ],
+      "details": "other: unknown kind; new trigger: when_last_crop_removed_from_card; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:when_last_crop_removed_from_card",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:when_last_crop_removed_from_card"
+        ]
+      }
+    },
+    {
+      "card_id": "E072",
+      "primitives": [
+        "existing:gain_resource",
+        "other:unknown",
+        "predicate:harvested_this_card_at_least"
+      ],
+      "details": "other: unknown kind; existing op: gain_resource params={'good': 'food', 'amount': 1}; predicate:harvested_this_card_at_least params={'n': 1}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "predicate:harvested_this_card_at_least"
+        ],
+        "predicates": [
+          "predicate:harvested_this_card_at_least"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E073",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E074",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E075",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E076",
+      "primitives": [
+        "other:unknown",
+        "pass_to_left"
+      ],
+      "details": "other: unknown kind; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E078",
+      "primitives": [
+        "other:unknown",
+        "pass_to_left"
+      ],
+      "details": "other: unknown kind; post_play: pass to left neighbor",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "pass_to_left",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E080",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E081",
+      "primitives": [
+        "new_trigger:on_use_this_card",
+        "other:unknown",
+        "predicate:user_is_not_owner"
+      ],
+      "details": "new trigger: on_use_this_card; other: unknown kind; new trigger: on_use_this_card; other: unknown kind; predicate:user_is_not_owner params={}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:on_use_this_card",
+          "other:unknown",
+          "predicate:user_is_not_owner"
+        ],
+        "predicates": [
+          "predicate:user_is_not_owner"
+        ],
+        "triggers": [
+          "new_trigger:on_use_this_card"
+        ]
+      }
+    },
+    {
+      "card_id": "E084",
+      "primitives": [
+        "new_trigger:harvest_breeding",
+        "other:unknown"
+      ],
+      "details": "new trigger: harvest_breeding; other: unknown kind; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:harvest_breeding"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_breeding"
+        ]
+      }
+    },
+    {
+      "card_id": "E085",
+      "primitives": [
+        "new_trigger:check_card_becomes_room",
+        "new_trigger:convert_animal_to_food",
+        "other:unknown",
+        "predicate:animal_is"
+      ],
+      "details": "new trigger: convert_animal_to_food; other: unknown kind; predicate:animal_is params={'type': 'boar'}; new trigger: convert_animal_to_food; other: unknown kind; predicate:animal_is params={'type': 'cattle'}; new trigger: check_card_becomes_room; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:check_card_becomes_room",
+          "other:unknown",
+          "new_trigger:convert_animal_to_food",
+          "predicate:animal_is"
+        ],
+        "predicates": [
+          "predicate:animal_is"
+        ],
+        "triggers": [
+          "new_trigger:check_card_becomes_room",
+          "new_trigger:convert_animal_to_food"
+        ]
+      }
+    },
+    {
+      "card_id": "E086",
+      "primitives": [
+        "new_trigger:any_time",
+        "other:unknown"
+      ],
+      "details": "new trigger: any_time; other: unknown kind; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:any_time"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:any_time"
+        ]
+      }
+    },
+    {
+      "card_id": "E088",
+      "primitives": [
+        "other:unknown"
+      ],
+      "details": "other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E090",
+      "primitives": [
+        "new_trigger:breeding",
+        "other:unknown",
+        "predicate:offspring_at_least"
+      ],
+      "details": "new trigger: breeding; other: unknown kind; predicate:offspring_at_least params={'n': 2}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:offspring_at_least",
+          "other:unknown",
+          "new_trigger:breeding"
+        ],
+        "predicates": [
+          "predicate:offspring_at_least"
+        ],
+        "triggers": [
+          "new_trigger:breeding"
+        ]
+      }
+    },
+    {
+      "card_id": "E091",
+      "primitives": [
+        "new_trigger:harvest_use_joinery",
+        "new_trigger:play_minor_improvement",
+        "other:unknown",
+        "predicate:improvement_is"
+      ],
+      "details": "new trigger: play_minor_improvement; other: unknown kind; predicate:improvement_is params={'name': 'joinery'}; new trigger: harvest_use_joinery; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:harvest_use_joinery",
+          "other:unknown",
+          "predicate:improvement_is",
+          "new_trigger:play_minor_improvement"
+        ],
+        "predicates": [
+          "predicate:improvement_is"
+        ],
+        "triggers": [
+          "new_trigger:harvest_use_joinery",
+          "new_trigger:play_minor_improvement"
+        ]
+      }
+    },
+    {
+      "card_id": "E092",
+      "primitives": [
+        "new_trigger:use_family_growth",
+        "other:unknown",
+        "predicate:house_has_exactly_2_rooms",
+        "predicate:house_surrounded_by_4_fields"
+      ],
+      "details": "new trigger: use_family_growth; other: unknown kind; predicate:house_has_exactly_2_rooms params={}; predicate:house_surrounded_by_4_fields params={}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:use_family_growth",
+          "other:unknown",
+          "predicate:house_surrounded_by_4_fields",
+          "predicate:house_has_exactly_2_rooms"
+        ],
+        "predicates": [
+          "predicate:house_surrounded_by_4_fields",
+          "predicate:house_has_exactly_2_rooms"
+        ],
+        "triggers": [
+          "new_trigger:use_family_growth"
+        ]
+      }
+    },
+    {
+      "card_id": "E093",
+      "primitives": [
+        "new_trigger:first_turn_of_round",
+        "other:unknown",
+        "predicate:no_unused_farm_spaces"
+      ],
+      "details": "new trigger: first_turn_of_round; other: unknown kind; predicate:no_unused_farm_spaces params={}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:first_turn_of_round",
+          "predicate:no_unused_farm_spaces"
+        ],
+        "predicates": [
+          "predicate:no_unused_farm_spaces"
+        ],
+        "triggers": [
+          "new_trigger:first_turn_of_round"
+        ]
+      }
+    },
+    {
+      "card_id": "E094",
+      "primitives": [
+        "known:renovate",
+        "other:unknown"
+      ],
+      "details": "known op: renovate params={'normal_cost': True}; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [
+          "known:renovate"
+        ],
+        "new_primitives": [
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E095",
+      "primitives": [
+        "known:grant_action",
+        "new_trigger:other_player_uses_grain_seeds",
+        "other:unknown"
+      ],
+      "details": "other: unknown kind; new trigger: other_player_uses_grain_seeds; known op: grant_action params={'action': 'bake_bread'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [
+          "known:grant_action"
+        ],
+        "new_primitives": [
+          "other:unknown",
+          "new_trigger:other_player_uses_grain_seeds"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:other_player_uses_grain_seeds"
+        ]
+      }
+    },
+    {
+      "card_id": "E096",
+      "primitives": [
+        "new_trigger:round_1_work_phase_start",
+        "other:unknown"
+      ],
+      "details": "new trigger: round_1_work_phase_start; other: unknown kind",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:round_1_work_phase_start",
+          "other:unknown"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:round_1_work_phase_start"
+        ]
+      }
+    },
+    {
+      "card_id": "E097",
+      "primitives": [
+        "other:unknown",
+        "predicate:occupation_count_is"
+      ],
+      "details": "other: unknown kind; other: unknown kind; predicate:occupation_count_is params={'n': 3}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "other:unknown",
+          "predicate:occupation_count_is"
+        ],
+        "predicates": [
+          "predicate:occupation_count_is"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E110",
+      "primitives": [
+        "accumulate",
+        "existing:gain_resource",
+        "new_trigger:feeding_phase",
+        "new_trigger:harvest_start"
+      ],
+      "details": "new trigger: harvest_start; other(stack_goods_on_card) -> accumulate; new trigger: feeding_phase; existing op: gain_resource params={'good': 'food', 'amount': {'op': 'custom', 'args': ['count', 'wood_on_card']}}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "new_trigger:feeding_phase",
+          "new_trigger:harvest_start"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:feeding_phase",
+          "new_trigger:harvest_start"
+        ]
+      }
+    },
+    {
+      "card_id": "E112",
+      "primitives": [
+        "field_mod"
+      ],
+      "details": "other(harvest_grain_without_removing_field_goods) -> field_mod",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "field_mod"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E119",
+      "primitives": [
+        "accumulate",
+        "marker_placement",
+        "predicate:round_number"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement; other(place_on_round_spaces) -> marker_placement; predicate:round_number params={'max': 4}; other(take_all_goods_from_round_space) -> accumulate; other(take_all_goods_from_round_space) -> accumulate; predicate:round_number params={'n': 9}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "marker_placement",
+          "predicate:round_number"
+        ],
+        "predicates": [
+          "predicate:round_number"
+        ],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E120",
+      "primitives": [
+        "accumulate",
+        "marker_placement"
+      ],
+      "details": "other(place_on_round_spaces) -> marker_placement; other(take_all_goods_from_round_space) -> accumulate",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "accumulate",
+          "marker_placement"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E123",
+      "primitives": [
+        "copy_move",
+        "new_trigger:on_build_room_or_play_improvement_or_renovate"
+      ],
+      "details": "new trigger: on_build_room_or_play_improvement_or_renovate; other(use_resource_from_card) -> copy_move",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:on_build_room_or_play_improvement_or_renovate",
+          "copy_move"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:on_build_room_or_play_improvement_or_renovate"
+        ]
+      }
+    },
+    {
+      "card_id": "E129",
+      "primitives": [
+        "copy_move",
+        "new_trigger:on_action_space_used",
+        "predicate:action_space_not_accumulating",
+        "predicate:round_in_range"
+      ],
+      "details": "new trigger: on_action_space_used; other(use_action_space) -> copy_move; predicate:round_in_range params={'min': 1, 'max': 9}; predicate:action_space_not_accumulating params={}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:on_action_space_used",
+          "predicate:action_space_not_accumulating",
+          "copy_move",
+          "predicate:round_in_range"
+        ],
+        "predicates": [
+          "predicate:action_space_not_accumulating",
+          "predicate:round_in_range"
+        ],
+        "triggers": [
+          "new_trigger:on_action_space_used"
+        ]
+      }
+    },
+    {
+      "card_id": "E130",
+      "primitives": [
+        "card_play",
+        "new_trigger:on_action_space_used",
+        "predicate:action_space_name"
+      ],
+      "details": "new trigger: on_action_space_used; other(play_or_build_improvement) -> card_play; predicate:action_space_name params={'name': '子供がほしい'}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "new_trigger:on_action_space_used",
+          "card_play",
+          "predicate:action_space_name"
+        ],
+        "predicates": [
+          "predicate:action_space_name"
+        ],
+        "triggers": [
+          "new_trigger:on_action_space_used"
+        ]
+      }
+    },
+    {
+      "card_id": "E134",
+      "primitives": [
+        "existing:gain_points",
+        "new_trigger:end_game_scoring",
+        "new_trigger:harvest",
+        "other:place_harvested_on_card"
+      ],
+      "details": "new trigger: harvest; other(place_harvested_on_card) -> other:place_harvested_on_card; new trigger: end_game_scoring; existing op: gain_points params={'conversion': {'distinct_types_on_card': [2, 3, 4, 5], 'points': [3, 5, 7, 9]}}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_points"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "other:place_harvested_on_card",
+          "new_trigger:end_game_scoring",
+          "new_trigger:harvest"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:end_game_scoring",
+          "new_trigger:harvest"
+        ]
+      }
+    },
+    {
+      "card_id": "E155",
+      "primitives": [
+        "existing:gain_resource",
+        "forbid_family_growth"
+      ],
+      "details": "existing op: gain_resource params={'good': 'stone', 'amount': 1}; existing op: gain_resource params={'good': 'vegetable', 'amount': 1}; existing op: gain_resource params={'good': 'wild_boar', 'amount': 2}; other(forbid_family_growth) -> forbid_family_growth",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "forbid_family_growth"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E159",
+      "primitives": [
+        "feeding_mod",
+        "new_trigger:harvest_feeding",
+        "scoring"
+      ],
+      "details": "new trigger: harvest_feeding; other(feeding_requirement_modifier) -> feeding_mod; other(family_score_override) -> scoring",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "feeding_mod",
+          "scoring",
+          "new_trigger:harvest_feeding"
+        ],
+        "predicates": [],
+        "triggers": [
+          "new_trigger:harvest_feeding"
+        ]
+      }
+    },
+    {
+      "card_id": "E161",
+      "primitives": [
+        "card_play",
+        "existing:gain_resource",
+        "grant_action"
+      ],
+      "details": "other(grant_private_action_space) -> grant_action; existing op: gain_resource params={'good': 'grain', 'amount': 3}; other(allow_major_via_minor) -> card_play",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "card_play",
+          "grant_action"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E162",
+      "primitives": [
+        "choice"
+      ],
+      "details": "other(choice) -> choice; other(choice) -> choice",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    },
+    {
+      "card_id": "E163",
+      "primitives": [
+        "choice",
+        "new_trigger:after_occupation",
+        "predicate:occupation_played_from_hand"
+      ],
+      "details": "new trigger: after_occupation; other(choice) -> choice; predicate:occupation_played_from_hand params={'after_this_card': True, 'owner_only': True}",
+      "existing_coverage": {
+        "existing_operations": [],
+        "known_operations": [],
+        "new_primitives": [
+          "predicate:occupation_played_from_hand",
+          "choice",
+          "new_trigger:after_occupation"
+        ],
+        "predicates": [
+          "predicate:occupation_played_from_hand"
+        ],
+        "triggers": [
+          "new_trigger:after_occupation"
+        ]
+      }
+    },
+    {
+      "card_id": "E167",
+      "primitives": [
+        "choice",
+        "existing:gain_resource"
+      ],
+      "details": "other(choice) -> choice; other(choice) -> choice; existing op: gain_resource params={'good': 'cattle', 'amount': 1}",
+      "existing_coverage": {
+        "existing_operations": [
+          "existing:gain_resource"
+        ],
+        "known_operations": [],
+        "new_primitives": [
+          "choice"
+        ],
+        "predicates": [],
+        "triggers": []
+      }
+    }
+  ]
+}
