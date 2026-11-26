@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "card_id": "E115",
+  "cases": [
+    {
+      "id": "E115-grain-seeds-grants-bake",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "grain_seeds"
+      },
+      "expected": {
+        "granted_actions": [
+          "bake_bread"
+        ]
+      },
+      "notes": "Using Grain Seeds space grants a Bake Bread action."
+    },
+    {
+      "id": "E115-vegetable-seeds-grants-sow",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "vegetable_seeds"
+      },
+      "expected": {
+        "granted_actions": [
+          "sow"
+        ]
+      },
+      "notes": "Using Vegetable Seeds space grants a Sow action."
+    },
+    {
+      "id": "E115-not-triggered-on-other-seed-spaces",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "sow"
+      },
+      "expected": {
+        "granted_actions": []
+      },
+      "notes": "Regular Sow space does not trigger the effect; only Grain Seeds and Vegetable Seeds."
+    }
+  ]
+}

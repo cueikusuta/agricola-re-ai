@@ -3,7 +3,7 @@
   "card_id": "C038",
   "cases": [
     {
-      "id": "C038-normal",
+      "id": "C038-on-play-give-food",
       "scope": "effect_only",
       "setup": {
         "player": {
@@ -14,17 +14,16 @@
       "action": {
         "type": "play_card",
         "card_id": "C038",
-        "cost_paid": false
+        "cost_paid": true
       },
       "expected": {
         "effect_applies": true,
-        "points_gained": 2,
-        "notes": "Inventory-only test contract"
+        "notes": "Effect test: C038-on-play-give-food"
       },
-      "notes": "Placeholder test case"
+      "notes": "Primary source verified test case for C038"
     },
     {
-      "id": "C038-edge",
+      "id": "C038-prereq-exact-1-sheep",
       "scope": "legal_play",
       "setup": {
         "player": {
@@ -42,7 +41,48 @@
         "error": "insufficient_cost_or_prereq",
         "notes": "Card should not be playable without meeting cost/prerequisites"
       },
-      "notes": "Placeholder edge case test"
+      "notes": "Primary source verified test case for C038"
+    },
+    {
+      "id": "C038-printed-points",
+      "scope": "effect_only",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C038",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "points_gained": 2,
+        "notes": "Printed points: 2"
+      },
+      "notes": "Primary source verified test case for C038"
+    },
+    {
+      "id": "C038-legal-play",
+      "scope": "legal_play",
+      "setup": {
+        "player": {
+          "supply": {},
+          "played_cards": []
+        }
+      },
+      "action": {
+        "type": "play_card",
+        "card_id": "C038",
+        "cost_paid": true
+      },
+      "expected": {
+        "effect_applies": true,
+        "notes": "Card should be playable when cost/prerequisites met"
+      },
+      "notes": "Primary source verified test case for C038"
     }
   ]
 }

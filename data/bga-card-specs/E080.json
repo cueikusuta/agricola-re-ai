@@ -20,14 +20,14 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2673",
         "language": "ja",
-        "checked_on": "2026-11-19",
-        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+        "checked_on": "2026-11-24",
+        "note": "third-party BGA wiki card page; re-checked 2026-11-24 (page rev. 2024/10/10). Confirmed: no cost (コスト: ー), no prerequisite (条件 blank), points none (勝利点: ー), effect = 'このカードには石だけを植えられる。このカードは畑1であるが、畑3であるかのように石材を植えられる。このカードの石は野菜のように種まきし、収穫する。' (only stone can be planted; considered 1 field but stone may be planted as if 3 fields; stone is sown and harvested as vegetables)."
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-19",
-        "note": "English list page row used to cross-check the card id, name and effect text"
+        "checked_on": "2026-11-24",
+        "note": "English list page row re-checked 2026-11-24 (list rev. 2026/06/12). Confirmed effect text: 'You can only plant stone on this card. Plant as though it were 3 fields, but it is considered 1 field. Sow and harvest stone on this card as you would vegetables.'"
       }
     ]
   },
@@ -73,8 +73,7 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects: card-as-field modeling is not covered by the vocabulary (R-C1)",
-      "effects.0.granularity: 'counts as 1 field but plants like 3 fields' — how many stone tokens per sow/harvest and how the field is counted are undecided (BQ-8, same class as D075)"
+      "effects: card-as-field modeling ('this card is a field') is not covered by the effect vocabulary (R-C1). Re-checked 2026-11-24: JA p=2673 + EN list confirm 'このカードは畑1である / considered 1 field', '石だけを植えられる / only plant stone', and '畑3であるかのように石材を植えられる / plant as though it were 3 fields'; counts_as_fields=1, plants_as_fields=3, sown_like/harvested_like=vegetable are source-confirmed, but how the engine represents a card-field that counts as 1 field yet sows as 3 remains an engine-design question."
     ],
     "test_case_ids": [
       "E080-sow-stone",
@@ -82,8 +81,8 @@
       "E080-harvest-stone"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-19",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "This card is a field (1 field) on which only stone can be planted, planted and harvested as vegetables, Behaving as 3 fields for planting."
+    "notes": "Cost: none (JA table: コスト=ー). Prerequisite: none (JA table: 条件 blank). Printed points: none/0 (JA table: 勝利点=ー). Effect: only stone can be planted on this card; it is considered 1 field but stone may be planted as if it were 3 fields; stone is sown and harvested as vegetables — already encoded (counts_as_fields=1, plants_as_fields=3, sown_like/harvested_like=vegetable). Sources: JA p=2673 (rev. 2024/10/10), EN cardlist_en/ (rev. 2026/06/12), both re-checked 2026-11-24. Third-party BGA wiki cross-check only; not official Lookout verification. Token-per-sow (=3 stone) and field count (=1) are source-confirmed; the residual gap is card-as-field engine modeling — see unresolved_fields. status stays needs_resolution."
   }
 }
