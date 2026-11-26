@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "card_id": "E118",
+  "cases": [
+    {
+      "id": "E118-wood-from-day-laborer",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "day_laborer",
+        "food_gained": 1
+      },
+      "expected": {
+        "gains": {
+          "wood": 1
+        }
+      },
+      "notes": "Day Laborer provides food; gain 1 additional wood."
+    },
+    {
+      "id": "E118-wood-from-fishing",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "fishing",
+        "food_gained": 2
+      },
+      "expected": {
+        "gains": {
+          "wood": 1
+        }
+      },
+      "notes": "Fishing provides food; gain 1 additional wood regardless of food amount."
+    },
+    {
+      "id": "E118-wood-from-resource-market",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "resource_market",
+        "food_gained": 1
+      },
+      "expected": {
+        "gains": {
+          "wood": 1
+        }
+      },
+      "notes": "Resource Market (when taking food) provides food; gain 1 additional wood."
+    },
+    {
+      "id": "E118-no-wood-from-non-food-space",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "wood_accumulation"
+      },
+      "expected": {
+        "gains": {}
+      },
+      "notes": "Wood accumulation space does not provide food; no additional wood."
+    }
+  ]
+}

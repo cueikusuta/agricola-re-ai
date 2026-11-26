@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "card_id": "E111",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "世捨て人",
+    "name_en": "Recluse"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2642",
+        "language": "ja",
+        "checked_on": "2026-11-24",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-24",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "round_start",
+      "conditions": [
+        {
+          "predicate": "minor_improvement_count",
+          "params": {
+            "n": 0
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "food",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "If you have no minor improvements in front of you, gain 1 food at the start of each round."
+    },
+    {
+      "trigger": "harvest_start",
+      "conditions": [
+        {
+          "predicate": "minor_improvement_count",
+          "params": {
+            "n": 0
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 1,
+      "decision_owner": "owner",
+      "notes": "If you have no minor improvements in front of you, gain 1 wood at the start of each harvest."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects[0].conditions: predicate 'minor_improvement_count' is not in the vocabulary; no existing predicate expresses 'no minor improvements in front of the owner' ('improvement_count' counts minor+major together) and the at-least convention of count predicates would make {n:0} trivially true, inverting the intended condition; the engine implements the check directly (StartRoundGainIfNoMinorPlayed), so the effect is confirmed and only the spec-side predicate is undefined",
+      "effects[1].conditions: same for the harvest-start trigger (engine: HarvestFieldGainIfNoMinorPlayed)"
+    ],
+    "test_case_ids": [
+      "E111-food-at-round-start",
+      "E111-wood-at-harvest-start",
+      "E111-no-trigger-with-minor-improvement"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-24",
+    "implementation_status": "not_started",
+    "notes": "While you have no minor improvements, gain 1 food at each round start and 1 wood at each harvest start. Minor improvements passed to left neighbor no longer count as 'in front of you'."
+  }
+}
