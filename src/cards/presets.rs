@@ -2702,7 +2702,11 @@ pub fn verified_exchange_cards() -> Vec<CardDefinition> {
                 receive: vec![ExchangeResource::Points],
                 give_is_cost: false,
                 optional: true,
-                cap: None, // Cap is dynamic (completed_harvests); handler uses player state
+                // The cap is dynamic (completed harvests at play time), so it
+                // stays None here: the handler derives it from
+                // DispatchContext.round + model::HARVEST_ROUNDS
+                // (card_events::handle_on_play_exchange) — no new saved field.
+                cap: None,
             }],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
         },
@@ -2761,6 +2765,14 @@ mod verified_exchange_card_tests {
         play_card("A036", &mut player).unwrap();
         // Cost: 2 clay
         assert_eq!(player.supply.clay, 0);
+        // Legacy projection: this hand-less path resolves exactly ONE exchange
+        // unit and cannot see the dispatch round, so neither the variable
+        // amount nor the dynamic completed-harvest cap applies here. The real
+        // amounts (round 14 -> 5, round 8 -> 2, round 2 -> 0) are pinned on
+        // the production dispatcher path in tests/ch06_onplay_exchange.rs
+        // (Round 1 review P1-2).
+        assert_eq!(player.supply.food, 4, "food_delta -1 (legacy: one unit)");
+        assert_eq!(player.card_points, 1, "points_delta +1 (legacy: one unit)");
         assert_eq!(player.played_cards, vec!["A036"]);
     }
 
@@ -2777,8 +2789,9 @@ mod verified_exchange_card_tests {
     fn d009_exchanges_sheep_for_boar_and_cattle() {
         let mut player = Player::new(0, 0);
         // 2 sheep in a real pasture; two empty stables receive the boar and
-        // cattle. Placed through the canonical animal-placement vocabulary,
-        // never Player::add_animal (it manufactures cell-less pastures).
+        // cattle. Animals are placed through the canonical placement vocabulary
+        // (auto_animal_plan + engine::place_animals), never by manufacturing a
+        // cell-less pasture (Round 1 review P2).
         player.pastures.push(crate::model::Pasture {
             id: 1,
             cells: vec![0, 1],
@@ -2803,5 +2816,16 @@ mod verified_exchange_card_tests {
         let old = player.clone();
         assert!(play_card("D009", &mut player).is_err());
         assert_eq!(player, old);
+    }
+
+    /// Task constraint: the exchange cards live in their own pool and stay OUT
+    /// of `verified_basic_card_set` (the 2-player preset), so the preset card
+    /// count and the MCTS content-hash digest are unchanged by this PR.
+    #[test]
+    fn exchange_cards_are_absent_from_the_two_player_preset() {
+        let preset = verified_basic_card_set(2).unwrap();
+        assert!(preset.definition("A036").is_none());
+        assert!(preset.definition("D009").is_none());
+        assert!(verified_basic_card_set(3).is_err());
     }
 }

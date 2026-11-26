@@ -288,9 +288,8 @@ fn d009_with_four_sheep_exchanges_twice() {
 }
 
 /// The gained animals are placed through the canonical placement vocabulary
-/// (`auto_animal_plan` + `engine::place_animals`), never through
-/// `Player::add_animal` — a received animal must never manufacture a pasture
-/// with no farm cells (capacity 0), see Round 1 P2.
+/// (`auto_animal_plan` + `engine::place_animals`) — a received animal must never
+/// manufacture a pasture with no farm cells (capacity 0), see Round 1 P2.
 #[test]
 fn d009_gained_animals_land_in_real_pastures() {
     let set = exchange_set();

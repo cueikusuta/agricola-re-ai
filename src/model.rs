@@ -294,36 +294,6 @@ impl Player {
                 .count() as u32
             + u32::from(self.pet == Some(kind))
     }
-    /// Add an animal to the player's pastures. Creates a new pasture if needed.
-    pub fn add_animal(&mut self, kind: Animal) -> Result<(), String> {
-        // Try to find an existing pasture with the same animal type and capacity
-        // First pass: check capacities without mutable borrow
-        let mut target_index: Option<usize> = None;
-        for (i, pasture) in self.pastures.iter().enumerate() {
-            if pasture.animal == Some(kind) {
-                let capacity = self.pasture_capacity(pasture);
-                if pasture.quantity < capacity {
-                    target_index = Some(i);
-                    break;
-                }
-            }
-        }
-        if let Some(i) = target_index {
-            self.pastures[i].quantity += 1;
-            return Ok(());
-        }
-        // No existing pasture with space, create a new one
-        // For simplicity, create a 1-cell pasture (capacity 2)
-        // In a real implementation, this would need a proper pasture placement
-        let new_id = self.pastures.iter().map(|p| p.id).max().unwrap_or(0) + 1;
-        self.pastures.push(Pasture {
-            id: new_id,
-            cells: vec![], // Empty cells - would need proper placement in real game
-            animal: Some(kind),
-            quantity: 1,
-        });
-        Ok(())
-    }
     /// Remove animals from the player's pastures.
     pub fn remove_animals(&mut self, kind: Animal, count: u32) -> Result<(), String> {
         let mut remaining = count;

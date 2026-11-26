@@ -2257,9 +2257,9 @@ fn handle_on_play_exchange(
             crate::cards::ExchangeResource::Animal(a) => {
                 // Place through the canonical animal-placement vocabulary
                 // (auto_animal_plan + engine::place_animals, the same route as
-                // OnPlayGainAnimal / the animal market). Player::add_animal
-                // manufactures a cell-less pasture (capacity 0) for every
-                // animal, violating the pasture invariant (Round 1 review P2).
+                // OnPlayGainAnimal / the animal market): a received animal must
+                // never manufacture a pasture with no farm cells (capacity 0),
+                // which would violate the pasture invariant (Round 1 review P2).
                 let plan = crate::card_events::auto_animal_plan(p, *a, total_receive);
                 crate::engine::place_animals(p, &plan, total_receive)
                     .map_err(|e| format!("on-play exchange animal placement failed: {e}"))?;
