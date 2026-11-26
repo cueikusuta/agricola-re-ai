@@ -7,7 +7,9 @@
 //! - `CardSet` compat adapter — preserves existing API for saves/replays/observations
 
 use crate::card_pool::{CardReview, Eligibility, ReviewStatus};
-use crate::cards::{CardDefinition, CardKind, CardSet};
+use crate::cards::{
+    post_play_is_played_area, CardDefinition, CardKind, CardSet, PostPlayDestination,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -102,13 +104,19 @@ pub struct RegisteredCard {
     /// unlimited. Preserved losslessly through `to_card_definition`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_limit: Option<u32>,
+    /// Where the card goes after being played (pass-left support). Preserved
+    /// losslessly through `to_card_definition` so pool-derived card sets keep
+    /// the printed "pass left" behaviour.
+    #[serde(default, skip_serializing_if = "post_play_is_played_area")]
+    pub post_play: PostPlayDestination,
     /// Review metadata (official verification status, player-count eligibility)
     pub review: CardReview,
 }
 
 impl RegisteredCard {
     /// Convert to the legacy CardDefinition for compat adapter.
-    /// Preserves `use_limit` so registry -> CardSet conversion is lossless.
+    /// Preserves `use_limit` and `post_play` so registry -> CardSet conversion
+    /// is lossless.
     pub fn to_card_definition(&self) -> CardDefinition {
         CardDefinition {
             use_limit: self.use_limit,
@@ -117,6 +125,7 @@ impl RegisteredCard {
             cost: self.cost.clone(),
             points: self.points,
             effects: self.effects.clone(),
+            post_play: self.post_play,
         }
     }
 
@@ -131,6 +140,9 @@ impl RegisteredCard {
             cost: self.cost.clone(),
             points: self.points,
             effects: filtered_effects,
+            // Preserve the printed destination: only the effects are filtered
+            // here, the card's post-play zone is not player-count dependent.
+            post_play: self.post_play,
         }
     }
 }
@@ -272,6 +284,7 @@ impl CardRegistryBuilder {
         points: i32,
         effects: Vec<crate::cards::CardEffect>,
         use_limit: Option<u32>,
+        post_play: PostPlayDestination,
         review: CardReview,
     ) -> Result<Self, RegistryBuildError> {
         // Validate external ID is known
@@ -307,6 +320,7 @@ impl CardRegistryBuilder {
             points,
             effects,
             use_limit,
+            post_play,
             review,
         };
 
@@ -324,7 +338,19 @@ impl CardRegistryBuilder {
                 | crate::cards::CardEffect::OnPlayGainIfHouse { .. }
                 | crate::cards::CardEffect::OnPlayGainIfRoomCount { .. }
                 | crate::cards::CardEffect::OnPlayGainPerImprovementPlayed { .. }
-                | crate::cards::CardEffect::OnPlayGainPerCount { .. } => EventKind::CardPlayed,
+                | crate::cards::CardEffect::OnPlayGainPerCount { .. }
+                // B-deck on-play chapter 1
+                | crate::cards::CardEffect::OnPlayBuildPasture { .. }
+                | crate::cards::CardEffect::OnPlayDrawPlayOrPassOccupation { .. }
+                | crate::cards::CardEffect::OnPlayGainByHandOccupationCount { .. }
+                | crate::cards::CardEffect::OnPlayExchangeGain { .. }
+                | crate::cards::CardEffect::OnPlayGainOrExchangeAnimal { .. }
+                | crate::cards::CardEffect::OnPlayGainEachWithAtLeast { .. }
+                | crate::cards::CardEffect::OnPlayChoiceGain { .. }
+                | crate::cards::CardEffect::OnPlayAddStoneToEmptyFields { .. }
+                | crate::cards::CardEffect::PostPlayPassLeft => {
+                    EventKind::CardPlayed
+                }
                 crate::cards::CardEffect::AfterImprovementPlayedGain { .. } => {
                     EventKind::ImprovementPlayed
                 }
@@ -338,6 +364,7 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms { .. }
                 | crate::cards::CardEffect::StartRoundGainIfLessonsOccupants { .. }
                 | crate::cards::CardEffect::StartRoundGainIfAccumulationGrew { .. }
+                | crate::cards::CardEffect::StartRoundGainIfAccumulationAtLeast { .. }
                 | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals { .. } => {
                     EventKind::RoundStart
                 }
@@ -368,13 +395,24 @@ impl CardRegistryBuilder {
                 crate::cards::CardEffect::AfterHarvestBakeGain { .. } => EventKind::Bake,
                 crate::cards::CardEffect::AfterWorkerGainIfUsed { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::OnPlayGainAnimal { .. } => EventKind::CardPlayed,
+                // A001/C002/E001: free stable builds fire at play time.
+                crate::cards::CardEffect::OnPlayBuildStable { .. } => EventKind::CardPlayed,
                 crate::cards::CardEffect::AfterWorkerGainAnimal { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerGain { .. } => EventKind::WorkerPlaced,
                 crate::cards::CardEffect::AfterAnyWorkerOthersGain { .. } => {
                     EventKind::WorkerPlaced
                 }
+                crate::cards::CardEffect::AfterAnyWorkerGainByCountIfNotActor { .. } => {
+                    EventKind::WorkerPlaced
+                }
                 // A140 ショベル運搬人: after-worker dynamic-count effect.
                 crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { .. } => {
+                    EventKind::WorkerPlaced
+                }
+                crate::cards::CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast { .. } => {
                     EventKind::WorkerPlaced
                 }
                 crate::cards::CardEffect::HarvestStartGainIfFields { .. } => EventKind::Harvest,
@@ -402,7 +440,9 @@ impl CardRegistryBuilder {
                 }
                 crate::cards::CardEffect::Passive { .. }
                 | crate::cards::CardEffect::Prerequisite { .. }
-                | crate::cards::CardEffect::EndGameBonus { .. } => continue,
+                | crate::cards::CardEffect::EndGameBonus { .. }
+                | crate::cards::CardEffect::HarvestFeedingGain { .. }
+                | crate::cards::CardEffect::HarvestFeedingOptionalExchange { .. } => continue,
                 #[cfg(test)]
                 crate::cards::CardEffect::PendingProbe { .. } => continue,
             };
@@ -478,6 +518,7 @@ impl CardRegistryBuilder {
                         crate::cards::CardEffect::OnPlayGainPerStored { amount, .. }
                         | crate::cards::CardEffect::OnPlayGainIfHouse { amount, .. }
                         | crate::cards::CardEffect::OnPlayGainIfRoomCount { amount, .. }
+                        | crate::cards::CardEffect::OnPlayGainEachWithAtLeast { amount, .. }
                         | crate::cards::CardEffect::StartRoundGain { amount, .. }
                         | crate::cards::CardEffect::StartRoundGainIfFoodAtLeastRound {
                             amount,
@@ -503,6 +544,11 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterOccupationGain { amount, .. }
                         | crate::cards::CardEffect::HarvestFieldGain { amount, .. }
                         | crate::cards::CardEffect::AfterWorkerGainIfUsed { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainIfOwnsAnimal { amount, .. }
+                        | crate::cards::CardEffect::AfterWorkerGainIfAnimalAccumulationAtLeast {
+                            amount,
+                            ..
+                        } => *amount,
                         | crate::cards::CardEffect::AfterClayConstructionGain { amount, .. }
                         | crate::cards::CardEffect::AfterHarvestBakeGain { amount }
                         | crate::cards::CardEffect::OnPlayGainPerCount { amount, .. }
@@ -523,6 +569,9 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterWorkerGainAnimal { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerGain { amount, .. }
                         | crate::cards::CardEffect::AfterAnyWorkerOthersGain { amount, .. }
+                        | crate::cards::CardEffect::AfterAnyWorkerGainByCountIfNotActor {
+                            base_amount: amount, ..
+                        }
                         | crate::cards::CardEffect::HarvestStartGainIfFields { amount, .. }
                         | crate::cards::CardEffect::StartRoundGainIfFamilyAndRooms {
                             amount, ..
@@ -535,6 +584,10 @@ impl CardRegistryBuilder {
                             amount,
                             ..
                         }
+                        | crate::cards::CardEffect::StartRoundGainIfAccumulationAtLeast {
+                            amount,
+                            ..
+                        }
                         | crate::cards::CardEffect::StartRoundGainIfNoHarvestAndAnimals {
                             amount,
                             ..
@@ -542,11 +595,37 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::AfterImprovementPlayedGain { amount, .. } => {
                             *amount
                         }
+                        crate::cards::CardEffect::OnPlayBuildPasture { .. } => 1,
+                        crate::cards::CardEffect::OnPlayDrawPlayOrPassOccupation { food_cost } => {
+                            *food_cost
+                        }
+                        crate::cards::CardEffect::OnPlayGainByHandOccupationCount { .. } => 1,
+                        crate::cards::CardEffect::OnPlayExchangeGain {
+                            give_amount,
+                            receive_amount,
+                            ..
+                        } => (*give_amount).max(*receive_amount),
+                        crate::cards::CardEffect::OnPlayGainOrExchangeAnimal {
+                            gain_amount,
+                            pay_amount,
+                            ..
+                        } => (*gain_amount).max(*pay_amount),
+                        crate::cards::CardEffect::OnPlayAddStoneToEmptyFields {
+                            amount, ..
+                        } => *amount,
+                        crate::cards::CardEffect::OnPlayChoiceGain { options } => {
+                            options.iter().map(|o| o.amount).max().unwrap_or(1)
+                        }
+                        // Zone-move metadata carries no gain amount.
+                        crate::cards::CardEffect::PostPlayPassLeft => 1,
+                        // A001/C002/E001: the on-play stable build carries its
+                        // stable amount in the effect params.
+                        crate::cards::CardEffect::OnPlayBuildStable { amount, .. } => *amount,
                         // A140: the amount is read from the public
-                                                // accumulations at resolution time, not fixed here.
-                                                crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
-                                                // Chapter 1 round-start cards: no direct resource amount to validate
-                                                | crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
+                        // accumulations at resolution time, not fixed here.
+                        crate::cards::CardEffect::AfterWorkerGainOtherAccumulationFood { .. }
+                        // Chapter 1 round-start cards: no direct resource amount to validate
+                        | crate::cards::CardEffect::StartRoundPlowFieldIfHouse { .. }
                         | crate::cards::CardEffect::StartRoundCopyUnusedRoundSpace { .. }
                         | crate::cards::CardEffect::StartRoundPlayOccupationIfLessonsUnderused {
                             ..
@@ -557,8 +636,16 @@ impl CardRegistryBuilder {
                         | crate::cards::CardEffect::StartRoundPlaceFoodOnNextRoundSpaces {
                             ..
                         } => 1,
-                    };
-                    amount == 0 || amount > 30
+                        | crate::cards::CardEffect::HarvestFeedingGain { amount, .. } => *amount,
+                                                | crate::cards::CardEffect::HarvestFeedingOptionalExchange { options, .. } => {
+                                                    options
+                                                        .iter()
+                                                        .map(|option| option.receive_food + if option.receive_animal { 1 } else { 0 })
+                                                        .max()
+                                                        .unwrap_or(1)
+                                                }
+                                            };
+                                            amount == 0 || amount > 30
                 })
                 || card.effects.iter().any(|effect| {
                     matches!(
@@ -919,6 +1006,12 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
         crate::cards::verified_band_e_cards(),
         crate::cards::verified_band_a_cards(),
         crate::cards::verified_band_b_cards(),
+        // on_play build_stable chapter (A001 雨除け / C002 厩 / E001 簡易納屋);
+        // review stays Unverified, so these cards join the experimental pool
+        // only and the A/B two-player preset is untouched.
+        crate::cards::verified_build_stable_cards(),
+        // B-deck chapter 1: on-play simple cards (B002/B003/B005/B008/B009).
+        crate::cards::verified_b_onplay_simple_cards(),
     ];
     for cards in independent_cards {
         for players in 2..=4 {
@@ -961,6 +1054,7 @@ pub fn build_default_registry() -> Result<Arc<CardRegistry>, RegistryBuildError>
             merged_card.points,
             merged_card.effects,
             merged_card.use_limit,
+            merged_card.post_play,
             review,
         )?;
     }
@@ -1094,6 +1188,7 @@ fn merge_card_variants(
             cost: base.cost,
             points: base.points,
             effects: merged_effects,
+            post_play: base.post_play,
         },
         eligible_players,
     )
@@ -1152,6 +1247,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap()
@@ -1176,6 +1272,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap_err();
@@ -1193,6 +1290,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review.clone(),
             )
             .unwrap()
@@ -1203,6 +1301,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap_err();
@@ -1220,6 +1319,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review.clone(),
             )
             .unwrap()
@@ -1233,6 +1333,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap()
@@ -1253,6 +1354,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review1,
             )
             .unwrap()
@@ -1266,6 +1368,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review2,
             )
             .unwrap()
@@ -1289,6 +1392,7 @@ mod tests {
                     amount: 1,
                 }],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap()
@@ -1327,6 +1431,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review_verified,
             )
             .unwrap()
@@ -1337,6 +1442,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review_unverified,
             )
             .unwrap()
@@ -1362,6 +1468,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap()
@@ -1427,6 +1534,7 @@ mod tests {
                 0,
                 vec![],
                 Some(3),
+                PostPlayDestination::PlayedArea,
                 review.clone(),
             )
             .unwrap()
@@ -1437,6 +1545,7 @@ mod tests {
                 0,
                 vec![],
                 None,
+                PostPlayDestination::PlayedArea,
                 review,
             )
             .unwrap()

@@ -20,14 +20,14 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2683",
         "language": "ja",
-        "checked_on": "2026-11-19",
-        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+        "checked_on": "2026-11-24",
+        "note": "third-party BGA wiki card page; re-checked 2026-11-24 (page rev. 2024/10/10). Confirmed: cost none (コスト: ー), prerequisite 1 occupation (条件: 職業1), points none (勝利点: ー), effect = 'このカードは畑である。このカードから最後の小麦か最後の野菜を取り除くたび、すぐにそれぞれ野菜か小麦をこのカードにまくことができる。' (this card is a field; when the last grain or vegetable is removed, immediately sow the opposite type). JA 寸評 notes removal is not limited to harvest (e.g. rotary-plow pull-out)."
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-19",
-        "note": "English list page row used to cross-check the card id, name and effect text"
+        "checked_on": "2026-11-24",
+        "note": "English list page row re-checked 2026-11-24 (list rev. 2026/06/12). Confirmed effect text: 'This card is a field. Each time you remove the last grain or vegetable from this card, you can immediately sow vegetable or grain on this card, respectively.' List row carries no cost/prereq/points columns."
       }
     ]
   },
@@ -99,8 +99,8 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects: card-as-field modeling is not covered by the vocabulary; whether and how a minor improvement acts as a farmyard field is undecided (BQ-7 / R-C1)",
-      "effects.1.trigger: the removal of the last grain/vegetable can happen outside the field phase (e.g. other cards); the trigger point and granularity of the auto-resow are undecided (BQ-7)"
+      "effects: card-as-field modeling ('this card is a field') is not covered by the effect vocabulary; whether/how a minor improvement acts as a farmyard field is an engine-design question, not decidable from literature (BQ-7 / R-C1). Re-checked 2026-11-24: JA p=2683 + EN list both confirm 'このカードは畑である / This card is a field'.",
+      "effects.1.trigger: source text confirms removal — not harvest — is the trigger ('最後の小麦か最後の野菜を取り除くたび / each time you remove the last grain or vegetable'; JA 寸評: 収穫に限定されてない). Remaining open question is the trigger point/granularity of the auto-resow in the engine (BQ-7)."
     ],
     "test_case_ids": [
       "E070-resow-on-empty",
@@ -108,8 +108,8 @@
       "E070-resow-vegetable-side"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-19",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "This card is a field. Each time the last grain or vegetable is removed from it, you may immediately sow the opposite crop type on it (grain removed -> may sow vegetables; vegetable removed -> may sow grain)."
+    "notes": "Cost: none (JA/EN co-confirmed; EN list row has no cost field). Prerequisite: 1 occupation (JA table: 条件=職業1). Printed points: none/0 (JA table: 勝利点=ー). Effect: this card is a field; whenever the last grain or last vegetable is removed from it, immediately sow the opposite type (vegetable or grain) on it — not harvest-limited per JA commentary. Sources: JA p=2683 (rev. 2024/10/10), EN cardlist_en/ (rev. 2026/06/12), both re-checked 2026-11-24. Third-party BGA wiki cross-check only; not official Lookout verification. Remaining gaps are engine modeling of card-as-field and of removal-trigger granularity — see unresolved_fields. status stays needs_resolution."
   }
 }

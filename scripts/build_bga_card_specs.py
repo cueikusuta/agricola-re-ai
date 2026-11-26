@@ -700,7 +700,7 @@ CARDS = {
                    optional=True, freq="every_use", dur="permanent", order=1,
                    decision="owner"),
         ],
-        "notes": "Gain 1 food on play; each renovation may add a stable without paying wood.",
+        "notes": "Gain 1 food on play; each renovation may add a stable without paying wood. Full implementation (after_renovation free-stable step) is delegated to PR #452 (m10/hermes-ch-renovation-followup, AfterRenovationGain); PR #454 drops the OnPlayGain definition here (restack ch02 4-card composition).",
         "tests": [
             case("B016-normal", {"food": 0}, {"play": "B016"}, {"food_delta": 1}),
             case("B016-renovate", {"stables": 0}, {"renovate": 1, "build_stable": True},
@@ -744,6 +744,11 @@ CARDS = {
         "post": "played_area",
         "effects": [effect("on_play", [gain("food", 1)])],
         "notes": "Gain 1 food on play; printed 3 points and requires 6 field tiles plus all animal types.",
+        "implementation_status": "tested",
+        "status": "partial",
+        "unresolved": [
+            "play 前提条件（field_count n=6 + all_animal_types）を CardRequirement 語彙が表現できないため未施行。語彙追加の後続 issue まで play は無 guard のまま（food 付与は1回のみ、tests/ch03_onplay_per_count.rs の b037_* テストで固定）。推測で前提条件を実装しない（AGENTS.md 第3項）"
+        ],
         "tests": [
             case("B037-normal", {"food": 0}, {"play": "B037"}, {"food_delta": 1}),
             case("B037-not-triggered", {"field_tiles": 5, "animal_types": 3},
@@ -758,7 +763,8 @@ CARDS = {
                    cond=[cond("sow_unconditional")],
                    freq="every_use", dur="permanent", order=1),
         ],
-        "notes": "Gain 2 food on play; after each unconditional Sow get 1 food per stable.",
+        "notes": "Gain 2 food on play; after each unconditional Sow get 1 food per stable. Chapter 1 (restack 2026-11-23): the on-play 2-food gain is implemented with the existing OnPlayGain variant; the after_sow per-stable half awaits its trigger chapter.",
+        "implementation_status": "in_progress",
         "tests": [
             case("B054-normal", {"food": 0}, {"play": "B054"}, {"food_delta": 2}),
             case("B054-sow", {"stables": 3}, {"sow": 1}, {"food_delta": 3}),
@@ -1074,7 +1080,8 @@ CARDS = {
                    cond=[cond("resource_greater_than", good="stone", than="clay")],
                    freq="every_round", dur="permanent", order=1),
         ],
-        "notes": "Gain 1 wood; after each work phase with more stone than clay in supply, gain 1 wood.",
+        "notes": "Gain 1 wood; after each work phase with more stone than clay in supply, gain 1 wood. Chapter 1 (restack 2026-11-23): the on-play 1-wood gain is implemented with the existing OnPlayGain variant; the after_work_phase half awaits its trigger chapter.",
+        "implementation_status": "in_progress",
         "tests": [
             case("B117-normal", {"wood": 0}, {"play": "B117"}, {"wood_delta": 1}),
             case("B117-work-phase", {"stone": 3, "clay": 2}, {"end_work_phase": True},
@@ -1131,7 +1138,8 @@ CARDS = {
                    cond=[cond("house_is", house="wood"), cond("room_count", n=2)],
                    freq="always", dur="permanent", snap="live_state", order=1),
         ],
-        "notes": "Gain 1 stone; while living in a 2-room wooden house all action spaces except Meeting Place count as unoccupied.",
+        "notes": "Gain 1 stone; while living in a 2-room wooden house all action spaces except Meeting Place count as unoccupied. Chapter 1 (restack 2026-11-23): the on-play 1-stone gain is implemented with the existing OnPlayGain variant behind a MinimumPlayers(4) guard; the passive space-occupancy half awaits its trigger chapter.",
+        "implementation_status": "in_progress",
         "tests": [
             case("B151-normal", {"stone": 0}, {"play": "B151"}, {"stone_delta": 1}),
             case("B151-passive", {"house": "wood", "rooms": 2, "space_occupied": True},
@@ -1176,6 +1184,7 @@ CARDS = {
         "post": "left_neighbor_hand",
         "effects": [effect("on_play", [stable(1, wood_cost=0)])],
         "notes": "Build 1 stable for free (the card cost is still paid); pass left.",
+        "implementation_status": "in_progress",
         "tests": [
             case("C002-normal", {"stables": 0, "wood": 0}, {"play": "C002"},
                  {"stables_delta": 1, "wood_delta": 0,
@@ -1409,15 +1418,16 @@ CARDS = {
         ],
     },
     "D012": {
-        "post": "played_area",
-        "effects": [
-            effect("harvest_feeding", [gain("food", 1)],
-                   freq="every_harvest", dur="permanent"),
-            effect("passive", [special("forbid_house_animals")],
-                   freq="always", dur="permanent", snap="live_state", order=1),
-        ],
-        "notes": "Gain 1 food in each feeding phase; may no longer keep animals in the house.",
-        "tests": [
+            "post": "played_area",
+            "effects": [
+                effect("harvest_feeding", [gain("food", 1)],
+                       freq="every_harvest", dur="permanent"),
+                effect("passive", [special("forbid_house_animals")],
+                       freq="always", dur="permanent", snap="live_state", order=1),
+            ],
+            "notes": "Gain 1 food in each feeding phase; may no longer keep animals in the house.",
+            "implementation_status": "in_progress",
+            "tests": [
             case("D012-normal", {"food": 0}, {"run_harvest": True}, {"food_delta": 1}),
             case("D012-house-animals", {"house_animal_slots": 1}, {"play": "D012"},
                  {"house_animal_slots": 0}),
@@ -1662,6 +1672,7 @@ CARDS = {
                    optional=True, decision="owner"),
         ],
         "notes": "Immediately build up to 3 stables for free; pass left.",
+        "implementation_status": "in_progress",
         "tests": [
             case("E001-normal", {"stables": 0, "wood": 0}, {"play": "E001", "build": 3},
                  {"stables_delta": 3, "wood_delta": 0}),
@@ -2068,27 +2079,28 @@ CARDS = {
         ],
     },
     "D062": {
-        "post": "played_area",
-        "effects": [
-            effect("on_play", [gain("food", 2)]),
-            effect("harvest_feeding",
-                   [choice(options=[
-                       {"kind": "exchange",
-                        "give": [{"good": "grain", "amount": 2}],
-                        "receive": [{"good": "food", "amount": 3}]},
-                       {"kind": "exchange",
-                        "give": [{"good": "grain", "amount": 3}],
-                        "receive": [{"good": "food", "amount": 6}]},
-                       {"kind": "exchange",
-                        "give": [{"good": "grain", "amount": 4}],
-                        "receive": [{"good": "food", "amount": 9}]},
-                   ], max_uses=1)],
-                   optional=True, freq="every_harvest", dur="permanent", order=1,
-                   decision="owner",
-                   notes="Select one linked amount pair, then validate grain payment before awarding food."),
-        ],
-        "notes": "Gain 2 food on play; in each feeding phase exchange exactly 2/3/4 grain for 3/6/9 food by one shared choice.",
-        "tests": [
+            "post": "played_area",
+            "effects": [
+                effect("on_play", [gain("food", 2)]),
+                effect("harvest_feeding",
+                       [choice(options=[
+                           {"kind": "exchange",
+                            "give": [{"good": "grain", "amount": 2}],
+                            "receive": [{"good": "food", "amount": 3}]},
+                           {"kind": "exchange",
+                            "give": [{"good": "grain", "amount": 3}],
+                            "receive": [{"good": "food", "amount": 6}]},
+                           {"kind": "exchange",
+                            "give": [{"good": "grain", "amount": 4}],
+                            "receive": [{"good": "food", "amount": 9}]},
+                       ], max_uses=1)],
+                       optional=True, freq="every_harvest", dur="permanent", order=1,
+                       decision="owner",
+                       notes="Select one linked amount pair, then validate grain payment before awarding food."),
+            ],
+            "notes": "Gain 2 food on play; in each feeding phase exchange exactly 2/3/4 grain for 3/6/9 food by one shared choice.",
+            "implementation_status": "in_progress",
+            "tests": [
             case("D062-normal", {"food": 0}, {"play": "D062"}, {"food_delta": 2}),
             case("D062-exchange-2", {"grain": 2}, {"run_harvest": True, "exchange": 2},
                  {"grain_delta": -2, "food_delta": 3}),
@@ -2214,17 +2226,18 @@ CARDS = {
         ],
     },
     "D084": {
-        "post": "played_area",
-        "effects": [
-            effect("on_play", [gain("sheep", 1)]),
-            effect("harvest_feeding",
-                   [exchange(give=[{"good": "vegetable", "amount": 1}],
-                             receive=[{"good": "animal_of_owned_type", "amount": 1}])],
-                   optional=True, freq="every_harvest", dur="permanent", order=1,
-                   decision="owner"),
-        ],
-        "notes": "Gain 1 sheep on play; each feeding phase may turn 1 vegetable into an animal of a type already owned.",
-        "tests": [
+            "post": "played_area",
+            "effects": [
+                effect("on_play", [gain("sheep", 1)]),
+                effect("harvest_feeding",
+                       [exchange(give=[{"good": "vegetable", "amount": 1}],
+                                 receive=[{"good": "animal_of_owned_type", "amount": 1}])],
+                       optional=True, freq="every_harvest", dur="permanent", order=1,
+                       decision="owner"),
+            ],
+            "notes": "Gain 1 sheep on play; each feeding phase may turn 1 vegetable into an animal of a type already owned.",
+            "implementation_status": "in_progress",
+            "tests": [
             case("D084-normal", {"sheep": 0}, {"play": "D084"}, {"sheep_delta": 1}),
             case("D084-exchange", {"vegetable": 1, "owned_animal_types": ["sheep"]},
                  {"run_harvest": True, "exchange": True},
@@ -2357,6 +2370,7 @@ CARDS = {
                    optional=True, decision="owner"),
         ],
         "notes": "May build 1 free stable only on the exact cell of a fenced one-cell pasture; pass left.",
+        "implementation_status": "in_progress",
         "tests": [
             case("A001-normal", {"pastures": [{"cells": [4]}], "stables": 0},
                  {"play": "A001", "build_stable_cell": 4},
@@ -3225,18 +3239,19 @@ CARDS = {
         ],
     },
     "A062": {
-        "post": "played_area",
-        "effects": [
-            effect("harvest_feeding",
-                   [exchange(give=[{"good": "grain",
-                                    "amount": table("exchange_grain", {"1": 1, "2": 2, "3": 3})}],
-                             receive=[{"good": "food", "amount": 3},
-                                      {"good": "points",
-                                       "amount": table("exchange_points", {"1": 0, "2": 1, "3": 2})}])],
-                   optional=True, freq="every_harvest", dur="permanent", decision="owner"),
-        ],
-        "notes": "Feeding phase: exchange 1/2/3 grain for exactly 3 food and 0/1/2 points.",
-        "tests": [
+            "post": "played_area",
+            "effects": [
+                effect("harvest_feeding",
+                       [exchange(give=[{"good": "grain",
+                                        "amount": table("exchange_grain", {"1": 1, "2": 2, "3": 3})}],
+                                 receive=[{"good": "food", "amount": 3},
+                                          {"good": "points",
+                                           "amount": table("exchange_points", {"1": 0, "2": 1, "3": 2})}])],
+                       optional=True, freq="every_harvest", dur="permanent", decision="owner"),
+            ],
+            "notes": "Feeding phase: exchange 1/2/3 grain for exactly 3 food and 0/1/2 points.",
+            "implementation_status": "in_progress",
+            "tests": [
             case("A062-one", {"grain": 1}, {"run_harvest": True, "exchange": 1},
                  {"grain_delta": -1, "food_delta": 3, "points_delta": 0}),
             case("A062-three", {"grain": 3}, {"run_harvest": True, "exchange": 3},
