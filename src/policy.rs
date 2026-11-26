@@ -675,12 +675,25 @@ fn card_priority(
                                     primary.max(upgrade) * horizon
                                 }
                                 // A118: the exchange is plan-driven and capped at 2 buys per
-                                // harvest, so value one purchase per remaining harvest at a
-                                // 50% discount (mirrors the sibling conditional arms).
-                                CardEffect::HarvestFieldOptionalExchange { gain, gain_amount, .. } => {
-                                    card_good_value(*gain) * i64::from(*gain_amount) * horizon / 2
-                                }
-                                // New variants for market followup cards (PR #393)
+                                                                // harvest, so value one purchase per remaining harvest at a
+                                                                // 50% discount (mirrors the sibling conditional arms).
+                                                                CardEffect::HarvestFieldOptionalExchange { gain, gain_amount, .. } => {
+                                                                                                                                    card_good_value(*gain) * i64::from(*gain_amount) * horizon / 2
+                                                                                                                                }
+                                                                                                                                // harvest_feeding automatic gains (D012): fixed per-harvest grant
+                                                                                                                                CardEffect::HarvestFeedingGain { good, amount, .. } => {
+                                                                                                                                    let good_val = good.map(card_good_value).unwrap_or(0);
+                                                                                                                                    good_val * i64::from(*amount) * horizon
+                                                                                                                                }
+                                                                                                                                // harvest_feeding optional exchanges (A062, C055, C059, C063, D062, D084): plan-driven, conditional
+                                                                CardEffect::HarvestFeedingOptionalExchange { options, .. } => {
+                                                                    let max_food = options.iter().map(|o| o.receive_food).max().unwrap_or(0);
+                                                                    let max_points = options.iter().map(|o| o.receive_points).max().unwrap_or(0);
+                                                                    let has_animal = options.iter().any(|o| o.receive_animal);
+                                                                    let animal_val = if has_animal { card_animal_value(Animal::Sheep) } else { 0 };
+                                                                    (card_good_value(Good::Food) * i64::from(max_food) + animal_val + i64::from(max_points)) * horizon / 2
+                                                                }
+                                                                // New variants for market followup cards (PR #393)
                                 CardEffect::AfterAnyWorkerGain { good, amount, .. }
                                 | CardEffect::AfterAnyWorkerOthersGain { good, amount, .. } => {
                                     // Fires on any player's use of the space; approximate with per-round expectation

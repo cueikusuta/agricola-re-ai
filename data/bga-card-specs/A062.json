@@ -111,7 +111,7 @@
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "in_progress",
     "notes": "Feeding phase: exchange 1/2/3 grain for exactly 3 food and 0/1/2 points."
   }
 }
