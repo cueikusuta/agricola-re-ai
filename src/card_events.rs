@@ -2111,6 +2111,9 @@ fn handle_passive(
         }
         crate::cards::PassiveRule::StoneDiscount(n) => p.stone_cost_discount += n,
         crate::cards::PassiveRule::HousingSpace(n) => p.extra_housing += n,
+        crate::cards::PassiveRule::FenceMaterialSubstitution => {
+            p.fence_material_substitution = true
+        }
     }
     Ok(EffectResult::Resolved)
 }
@@ -4469,6 +4472,9 @@ pub mod legacy {
                     }
                     crate::cards::PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                     crate::cards::PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                    crate::cards::PassiveRule::FenceMaterialSubstitution => {
+                        player.fence_material_substitution = true
+                    }
                 },
                 _ => {}
             }

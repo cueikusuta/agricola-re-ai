@@ -30,6 +30,23 @@
         "wood_spent": 0,
         "clay_spent": 4
       }
+    },
+    {
+      "id": "A016-free-fence-wood",
+      "scope": "effect_only",
+      "setup": {
+        "clay": 4,
+        "wood": 0,
+        "fence_segments": 6,
+        "free_fence_wood": 3
+      },
+      "action": {
+        "build_fences": 6
+      },
+      "expected": {
+        "wood_spent": 0,
+        "clay_spent": 3
+      }
     }
   ]
 }

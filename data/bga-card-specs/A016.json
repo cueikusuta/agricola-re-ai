@@ -89,11 +89,12 @@
     "unresolved_fields": [],
     "test_case_ids": [
       "A016-normal",
-      "A016-substitute"
+      "A016-substitute",
+      "A016-free-fence-wood"
     ],
     "checked_by": "AI source comparison",
     "checked_on": "2026-11-09",
-    "implementation_status": "not_started",
+    "implementation_status": "implemented",
     "notes": "Gain 1 clay on play; clay may replace wood when building fences."
   }
 }

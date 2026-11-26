@@ -346,10 +346,16 @@ fn fence(
         edges.extend(pasture_boundary(group));
     }
     let added = edges.difference(&p.fences).count() as u32;
-    p.supply.wood = p
-        .supply
-        .wood
-        .saturating_sub(added.saturating_sub(p.free_fence_wood));
+    // Same payment rule as engine::build_pastures: free fence wood first,
+    // then wood — or clay instead of wood while A016 踏み粘土 is played and
+    // clay can cover the whole due. Existing fences are never charged again
+    // and wood and clay are never both deducted for one payment.
+    let due = added.saturating_sub(p.free_fence_wood);
+    if p.fence_material_substitution && due <= p.supply.clay {
+        p.supply.clay = p.supply.clay.saturating_sub(due);
+    } else {
+        p.supply.wood = p.supply.wood.saturating_sub(due);
+    }
 
     let mut next_id = p
         .pastures

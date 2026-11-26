@@ -763,6 +763,16 @@ pub enum PassiveRule {
     MajorStoneDiscountByRooms,
     StoneDiscount(u32),
     HousingSpace(u8),
+    /// A016 踏み粘土 (Rammed Clay): while played, the owner may pay the
+    /// fence-building wood cost in clay instead (printed: "clay may replace
+    /// wood when building fences"). Stamped onto `Player` at play time by the
+    /// same passive paths as [`PassiveRule::FenceWoodDiscount`]; the engine,
+    /// evaluation and fence detail policies read the flag and apply the
+    /// substitution only to the NEW fence segments of one action, never to
+    /// existing fences, and never deducting from both wood and
+    /// clay. Appended at the enum tail so existing serde variants and
+    /// saved-game bytes are unchanged.
+    FenceMaterialSubstitution,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1847,6 +1857,7 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                 }
                 PassiveRule::StoneDiscount(n) => player.stone_cost_discount += n,
                 PassiveRule::HousingSpace(n) => player.extra_housing += n,
+                PassiveRule::FenceMaterialSubstitution => player.fence_material_substitution = true,
             },
             CardEffect::OnPlayAddStoneToEmptyFields { good: _, amount } => {
                 for cell in &mut player.farm {
@@ -7076,6 +7087,30 @@ pub fn verified_band_a_cards() -> Vec<CardDefinition> {
                 ],
             }],
             post_play: crate::cards::PostPlayDestination::PlayedArea,
+        },
+        // A016 踏み粘土 (Rammed Clay): cost none, no prerequisites, 0 points,
+        // post_play played_area. Spec: data/bga-card-specs/A016.json —
+        // on_play gain clay 1, plus a permanent "clay may replace wood when
+        // building fences" substitution. The immediate half reuses the existing
+        // OnPlayGain; the continuous half is PassiveRule::
+        // FenceMaterialSubstitution, consumed by engine::build_pastures /
+        // evaluation / the fence detail policies for the NEW segments of one
+        // fencing action only.
+        CardDefinition {
+            use_limit: None,
+            id: "A016".to_owned(),
+            kind: CardKind::MinorImprovement,
+            cost: vec![],
+            points: 0,
+            effects: vec![
+                CardEffect::OnPlayGain {
+                    good: Good::Clay,
+                    amount: 1,
+                },
+                CardEffect::Passive {
+                    rule: PassiveRule::FenceMaterialSubstitution,
+                },
+            ],
         },
     ]
 }

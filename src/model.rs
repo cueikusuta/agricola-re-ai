@@ -223,6 +223,13 @@ pub struct Player {
     pub stone_cost_discount: u32,
     #[serde(default)]
     pub extra_housing: u8,
+    /// A016 踏み粘土 (Rammed Clay), continuous half: the owner may pay the
+    /// fence-building wood cost in clay instead. Derived from the played-card
+    /// definitions (the passive flag is stamped when the card is played), so
+    /// it is deliberately NOT part of [`PlayerHashMaterialV5`]: v5
+    /// `state_hash` values stay identical and legacy saves load with `false`.
+    #[serde(default)]
+    pub fence_material_substitution: bool,
     pub begging: u32,
     /// Snapshot of total crop goods in fields at the end of the final harvest
     /// field phase. Used by D032 (木のくまで / Wood Rake) to award bonus points
@@ -260,6 +267,7 @@ impl Player {
             major_stone_discount_by_rooms: false,
             stone_cost_discount: 0,
             extra_housing: 0,
+            fence_material_substitution: false,
             begging: 0,
             field_goods_before_final_harvest: None,
         }
