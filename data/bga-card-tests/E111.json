@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "card_id": "E111",
+  "cases": [
+    {
+      "id": "E111-food-at-round-start",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "minor_improvements": 0
+      },
+      "action": {
+        "trigger": "round_start"
+      },
+      "expected": {
+        "gains": {
+          "food": 1
+        }
+      },
+      "notes": "With no minor improvements, gain 1 food at round start."
+    },
+    {
+      "id": "E111-wood-at-harvest-start",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "minor_improvements": 0
+      },
+      "action": {
+        "trigger": "harvest_start"
+      },
+      "expected": {
+        "gains": {
+          "wood": 1
+        }
+      },
+      "notes": "With no minor improvements, gain 1 wood at harvest start."
+    },
+    {
+      "id": "E111-no-trigger-with-minor-improvement",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "minor_improvements": 1
+      },
+      "action": {
+        "trigger": "round_start"
+      },
+      "expected": {
+        "gains": {}
+      },
+      "notes": "With a minor improvement in play, no food is gained at round start."
+    }
+  ]
+}

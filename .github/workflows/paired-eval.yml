@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'src/bin/paired_eval.rs'
-      - 'src/cards.rs'
       - 'scripts/paired_eval_stats.py'
       - 'tests/test_paired_eval_stats.py'
       - '.github/workflows/paired-eval.yml'

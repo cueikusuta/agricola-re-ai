@@ -257,17 +257,38 @@ fn next_house(h: House) -> Option<(House, Good)> {
         House::Stone => None,
     }
 }
+
+/// Renovation target and extra stone discount for `p`, honoring C013 Wood
+/// Slide Hammer: the first renovation from a wooden house with at least
+/// `min_wooden_rooms` rooms may go directly to stone, paying `discount` less
+/// stone. The condition (`house == Wood && rooms >= min_wooden_rooms`) is
+/// evaluated at renovation time and no longer holds after the renovation, so
+/// no use-count ledger is kept. `extra_discount` only applies when the
+/// effective target is stone (i.e. `direct_to_stone` fired).
+pub(crate) fn renovation_target(p: &Player) -> Option<(House, Good, u32)> {
+    let mut target = next_house(p.house)?;
+    let mut extra_discount = 0;
+    if p.house == House::Wood {
+        if let Some(sh) = p.first_renovation_stone {
+            if (p.rooms() as u32) >= sh.min_wooden_rooms && sh.direct_to_stone {
+                target = (House::Stone, Good::Stone);
+                extra_discount = sh.discount;
+            }
+        }
+    }
+    Some((target.0, target.1, extra_discount))
+}
 fn can_renovate(p: &Player) -> bool {
-    next_house(p.house)
-        .map(|(_, g)| {
-            let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
-                p.stone_cost_discount
-            } else {
-                0
-            });
-            p.supply.reed >= 1 && p.supply.get(g) >= cost
-        })
-        .unwrap_or(false)
+    let Some((_, g, extra_discount)) = renovation_target(p) else {
+        return false;
+    };
+    let mut cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
+        p.stone_cost_discount
+    } else {
+        0
+    });
+    cost = cost.saturating_sub(extra_discount);
+    p.supply.reed >= 1 && p.supply.get(g) >= cost
 }
 fn available_room(p: &Player) -> bool {
     p.farm.iter().enumerate().any(|(i, c)| {
@@ -1756,6 +1777,39 @@ impl Game {
                             .map_err(|e| e.to_string())?;
                         }
                     }
+                    Detail::Buy {
+                        improvement,
+                        instant_bake,
+                    } => {
+                        // D026 / E024 passive: a played AllowMajorViaMinor card
+                        // lets the owner build a major improvement with a Minor
+                        // Improvement (MeetingPlace) action. Queried from played
+                        // card definitions — no new Player state, and
+                        // buy_improvement's normal cost/market/exchange rules
+                        // are unchanged.
+                        if !major_improvement_allowed_via_minor(
+                            &self.card_set,
+                            &p.played_cards,
+                            *improvement,
+                        ) {
+                            return Err(format!(
+                                "{improvement:?} is not allowed on MeetingPlace without a matching played passive"
+                            ));
+                        }
+                        buy_improvement(
+                            p,
+                            &mut self.public.improvement_market,
+                            &mut self.delayed_well,
+                            &mut self.public.well_food_schedule,
+                            self.public.round,
+                            *improvement,
+                            PurchaseArgs {
+                                instant_bake: *instant_bake,
+                                allocation: None,
+                                mode: PurchaseMode::Auto,
+                            },
+                        )?;
+                    }
                     _ => return Err("invalid starting-player details".into()),
                 }
                 // Now handle the rest of the action
@@ -2466,12 +2520,13 @@ fn grow(p: &mut Player, room_only: bool) -> Result<()> {
     Ok(())
 }
 fn renovate(p: &mut Player) -> Result<()> {
-    let (new, g) = next_house(p.house).ok_or("stone is final house")?;
-    let cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
+    let (new, g, extra_discount) = renovation_target(p).ok_or("stone is final house")?;
+    let mut cost = (p.rooms() as u32).saturating_sub(if g == Good::Stone {
         p.stone_cost_discount
     } else {
         0
     });
+    cost = cost.saturating_sub(extra_discount);
     p.supply.pay(g, cost)?;
     p.supply.pay(Good::Reed, 1)?;
     p.house = new;
@@ -2578,6 +2633,39 @@ struct PurchaseArgs<'a> {
     allocation: Option<&'a [BakeAllocation]>,
     mode: PurchaseMode,
 }
+/// D026 / E024 passive: may a played card let the owner build `improvement`
+/// with a Minor Improvement (MeetingPlace) action? Queried from played card
+/// definitions only — no persistent Player state.
+/// D026 (`joinery_and_well_only = true`): Joinery and Well only.
+/// E024 (`joinery_and_well_only = false`): any major improvement.
+fn major_improvement_allowed_via_minor(
+    card_set: &crate::cards::CardSet,
+    played_cards: &[String],
+    improvement: Improvement,
+) -> bool {
+    played_cards.iter().any(|card_id| {
+        card_set.definition(card_id).is_some_and(|card| {
+            card.effects.iter().any(|e| {
+                if let crate::cards::CardEffect::Passive {
+                    rule:
+                        crate::cards::PassiveRule::AllowMajorViaMinor {
+                            joinery_and_well_only,
+                        },
+                } = e
+                {
+                    if *joinery_and_well_only {
+                        matches!(improvement, Improvement::Joinery | Improvement::Well)
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                }
+            })
+        })
+    })
+}
+
 fn buy_improvement(
     p: &mut Player,
     market: &mut Vec<Improvement>,

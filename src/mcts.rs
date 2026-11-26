@@ -1194,8 +1194,14 @@ mod tests {
         // preset (spec eligibility "2": "no"), pool size 38->37.
         // Updated: StartRoundGainIf* wave — B114/A049/C067/D054 joined the
         // two-player preset (A157 stays out, 4 players only), pool size 37->41.
+        // Updated: D026 大工の敷地 / E024 野心 added to the preset
+        // (PR #501, intentional pool change: 45 -> 47 total cards).
+        // Updated (PR #487 merge): C013 Wood Slide Hammer added to
+        // verified_passive_cards — it enters the two-player preset for all
+        // player counts (47 -> 48 total), shifting the sample_game
+        // distribution (intentional: C013 is implemented).
         assert_eq!(
-            digest, "e31ba91801966821cf0f7cab9b6dd90a912df4bb0516eb6b451e37484cdb4f2b",
+            digest, "7f7d7477436afbb250106ea803d92cd0010a8265ee77125849de5410130a847b",
             "sample_game distribution changed — update this test only if intentional"
         );
     }

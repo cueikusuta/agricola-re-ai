@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "card_id": "E117",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "パイプ喫煙家",
+    "name_en": "Pipe Smoker"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2636",
+        "language": "ja",
+        "checked_on": "2026-11-24",
+        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+      },
+      {
+        "url": "https://agricola.cloudfree.jp/cardlist_en/",
+        "language": "en",
+        "checked_on": "2026-11-24",
+        "note": "English list page row used to cross-check the card id, name and effect text"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_start",
+      "conditions": [
+        {
+          "predicate": "grain_field_count",
+          "params": {
+            "n": 1
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "gain_resource",
+          "target": "owner",
+          "params": {
+            "good": "wood",
+            "amount": 2
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "before_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "At start of each harvest, if you have at least 1 grain field, gain 2 wood."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E117-wood-at-harvest-with-grain-field",
+      "E117-no-wood-without-grain-field",
+      "E117-multiple-harvests"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-24",
+    "implementation_status": "not_started",
+    "notes": "At the start of each harvest, if you have at least 1 grain field, gain 2 wood. Classified as implemented in classification doc (stage outer per #375)."
+  }
+}

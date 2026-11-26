@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "card_id": "E114",
+  "cases": [
+    {
+      "id": "E114-first-stable-grain",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "stables_built": 0
+      },
+      "action": {
+        "trigger": "after_stable_construction",
+        "stable_number": 1
+      },
+      "expected": {
+        "gains": {
+          "grain": 1
+        }
+      },
+      "notes": "1st stable built grants 1 grain."
+    },
+    {
+      "id": "E114-second-stable-grain",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "stables_built": 1
+      },
+      "action": {
+        "trigger": "after_stable_construction",
+        "stable_number": 2
+      },
+      "expected": {
+        "gains": {
+          "grain": 1
+        }
+      },
+      "notes": "2nd stable built grants 1 grain."
+    },
+    {
+      "id": "E114-third-stable-vegetable",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "stables_built": 2
+      },
+      "action": {
+        "trigger": "after_stable_construction",
+        "stable_number": 3
+      },
+      "expected": {
+        "gains": {
+          "vegetable": 1
+        }
+      },
+      "notes": "3rd stable built grants 1 vegetable."
+    },
+    {
+      "id": "E114-fourth-stable-vegetable",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "stables_built": 3
+      },
+      "action": {
+        "trigger": "after_stable_construction",
+        "stable_number": 4
+      },
+      "expected": {
+        "gains": {
+          "vegetable": 1
+        }
+      },
+      "notes": "4th stable built grants 1 vegetable."
+    },
+    {
+      "id": "E114-preexisting-stables-ignored",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play",
+        "stables_built": 2
+      },
+      "action": {
+        "trigger": "after_stable_construction",
+        "stable_number": 3
+      },
+      "expected": {
+        "gains": {
+          "vegetable": 1
+        }
+      },
+      "notes": "Pre-existing stables don't count; only stables built after this card is played. 3rd stable built (1st after play) grants vegetable."
+    }
+  ]
+}
