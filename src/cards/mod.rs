@@ -1910,25 +1910,68 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
             // A036 ファサード彫刻 / D009 獲物の交換: on-play exchange (simplified
             // legacy path). For give_is_cost=true, the cost was already paid;
             // just grant receive. For give_is_cost=false, deduct give and
-            // grant receive (A036). Note: optional and cap are not fully
-            // handled in this simplified path; the full handler is in
-            // card_events.rs.
+            // grant receive (A036). This projection mirrors the production
+            // handler's unit arithmetic: the give bundle lists one entry per
+            // unit of each resource one exchange costs, so duplicate entries
+            // multiply the price (D009 pays [Sheep, Sheep] = 2 sheep per
+            // unit), and each distinct resource is paid once per unit.
+            // Optional exchanges with nothing to pay are skipped. `cap`
+            // limits the units when a static cap is printed; A036's completed-
+            // harvest cap needs the round, which this hand-less projection
+            // cannot see (the production path derives it from
+            // DispatchContext.round + HARVEST_ROUNDS), so a dynamic cap is
+            // treated as unbounded here — Round 1 P1-4 tail, dispatcher
+            // contract tests in tests/ch06_onplay_exchange.rs.
             CardEffect::OnPlayExchange {
                 give,
                 receive,
                 give_is_cost,
-                optional: _optional,
-                cap: _cap,
+                optional,
+                cap,
             } => {
+                // Units limited by every distinct give resource.
+                let mut units: u32 = 1;
+                let mut settled: Vec<ExchangeResource> = Vec::new();
+                for give_res in give {
+                    if settled.contains(give_res) {
+                        continue;
+                    }
+                    settled.push(*give_res);
+                    let per_unit = give.iter().filter(|other| *other == give_res).count() as u32;
+                    let available = match give_res {
+                        ExchangeResource::Good(g) => player.supply.get(*g),
+                        ExchangeResource::Animal(a) => player.animal_count(*a),
+                        ExchangeResource::Points => u32::MAX, // never held
+                    };
+                    units = units.min(available / per_unit.max(1));
+                }
+                if let Some(cap) = cap {
+                    units = units.min(*cap);
+                }
+                if units == 0 {
+                    if !optional {
+                        return Err("not enough resources to exchange".into());
+                    }
+                    continue;
+                }
                 if !give_is_cost {
-                    // Deduct give resources
+                    // Deduct give resources (each DISTINCT resource once — the
+                    // duplicate [Sheep, Sheep] entries are one 2-sheep price).
+                    let mut settled: Vec<ExchangeResource> = Vec::new();
                     for give_res in give {
+                        if settled.contains(give_res) {
+                            continue;
+                        }
+                        settled.push(*give_res);
+                        let per_unit =
+                            give.iter().filter(|other| *other == give_res).count() as u32;
+                        let total_give = per_unit.checked_mul(units).ok_or("exchange overflow")?;
                         match give_res {
                             ExchangeResource::Good(g) => {
-                                player.supply.pay(*g, 1)?;
+                                player.supply.pay(*g, total_give)?;
                             }
                             ExchangeResource::Animal(a) => {
-                                player.remove_animals(*a, 1)?;
+                                player.remove_animals(*a, total_give)?;
                             }
                             ExchangeResource::Points => {}
                         }
@@ -1941,17 +1984,20 @@ pub fn apply_on_play_effects(set: &CardSet, player: &mut Player, id: &str) -> Re
                             let next = player
                                 .supply
                                 .get(*g)
-                                .checked_add(1)
+                                .checked_add(units)
                                 .ok_or("resource overflow")?;
                             player.supply.set(*g, next);
                         }
                         ExchangeResource::Animal(a) => {
-                            player.add_animal(*a)?;
+                            let plan = crate::card_events::auto_animal_plan(player, *a, units);
+                            crate::engine::place_animals(player, &plan, units).map_err(|e| {
+                                format!("on-play exchange animal placement failed: {e}")
+                            })?;
                         }
                         ExchangeResource::Points => {
                             player.card_points = player
                                 .card_points
-                                .checked_add(1)
+                                .checked_add(units as i32)
                                 .ok_or("card points overflow")?;
                         }
                     }

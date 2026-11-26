@@ -2926,6 +2926,7 @@ CARDS = {
                    optional=True, decision="owner"),
         ],
         "notes": "Exchange any number of food for points, capped at the number of completed harvests.",
+        "implementation_status": "implemented",
         "tests": [
             case("A036-normal", {"food": 3, "completed_harvests": 5}, {"exchange": 3},
                  {"food_delta": -3, "points_delta": 3}),

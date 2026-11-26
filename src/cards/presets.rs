@@ -2776,12 +2776,20 @@ mod verified_exchange_card_tests {
     #[test]
     fn d009_exchanges_sheep_for_boar_and_cattle() {
         let mut player = Player::new(0, 0);
-        // Add 2 sheep to pastures
-        player.add_animal(Animal::Sheep).unwrap();
-        player.add_animal(Animal::Sheep).unwrap();
+        // 2 sheep in a real pasture; two empty stables receive the boar and
+        // cattle. Placed through the canonical animal-placement vocabulary,
+        // never Player::add_animal (it manufactures cell-less pastures).
+        player.pastures.push(crate::model::Pasture {
+            id: 1,
+            cells: vec![0, 1],
+            animal: Some(Animal::Sheep),
+            quantity: 2,
+        });
+        player.farm[2].stable = true;
+        player.farm[3].stable = true;
         assert_eq!(player.animal_count(Animal::Sheep), 2);
         play_card("D009", &mut player).unwrap();
-        // Prerequisite: 2 sheep (consumed by exchange)
+        // Prerequisite: 2 sheep (consumed by exchange, one 2-sheep price)
         assert_eq!(player.animal_count(Animal::Sheep), 0);
         // Receive: 1 boar + 1 cattle
         assert_eq!(player.animal_count(Animal::Boar), 1);
