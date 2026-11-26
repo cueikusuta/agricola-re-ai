@@ -3031,8 +3031,10 @@ fn handle_after_worker_pay_to_schedule_food(
 /// dispatches card effects only AFTER the core action resolves, so the
 /// exchange necessarily follows the Lessons occupation play/cost payment in
 /// this implementation. The pre-cost ordering — exchanged food paying the
-/// occupation cost — is tracked as an explicit unresolved item (AGENTS.md §3),
-/// not silently dropped.
+/// occupation cost — is recorded as an explicit unresolved item under
+/// AGENTS.md §3 (issue cueikusuta/agricola-re-ai#525: the engine's pause
+/// machinery is post-work-chain only, so a pre-cost pause inside the Lessons
+/// arm would break the one-shot apply/replay paths), not silently dropped.
 fn handle_after_worker_optional_exchange(
     ctx: &mut DispatchContext<'_>,
     space: &Space,
