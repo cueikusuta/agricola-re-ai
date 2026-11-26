@@ -187,7 +187,7 @@ def _skip_raw_string(code: str, pos: int) -> int | None:
 def _skip_char_or_lifetime(code: str, pos: int) -> int:
     n = len(code)
     if pos + 1 < n and code[pos + 1] == "\\":
-        end = code.find("'", pos + 2)
+        end = code.find("'", pos + 3)
         return pos + 1 if end == -1 else end + 1
     if pos + 2 < n and code[pos + 2] == "'":
         return pos + 3

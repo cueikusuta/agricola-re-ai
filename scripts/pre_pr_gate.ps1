@@ -22,7 +22,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-if ([string]::IsNullOrWhiteSpace($Target) -or $args.Count -gt 0) {
+if ([string]::IsNullOrWhiteSpace($Target)) {
     [Console]::Error.WriteLine("Usage: .\scripts\pre_pr_gate.ps1 <test_target_or_card_id>")
     exit 2
 }
@@ -69,9 +69,9 @@ function Invoke-GateStep {
     }
 }
 
-$pythonCmd = Resolve-Python
-$pythonExe = $pythonCmd[0]
-$pythonPrefix = if ($pythonCmd.Count -gt 1) { $pythonCmd[1..($pythonCmd.Count - 1)] } else { @() }
+$pythonCmd = @(Resolve-Python)
+$pythonExe = [string]$pythonCmd[0]
+$pythonPrefix = if ($pythonCmd.Count -gt 1) { @($pythonCmd[1..($pythonCmd.Count - 1)]) } else { @() }
 $pythonDisplay = ($pythonCmd -join " ")
 
 Invoke-GateStep "[1/6] cargo fmt --all -- --check" "cargo" @("fmt", "--all", "--", "--check")
