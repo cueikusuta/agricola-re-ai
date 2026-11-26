@@ -7,7 +7,9 @@
 //! 3. `state_hash` は v5 契約どおり集約欄 (`well_food_schedule`, `card_uses`) の
 //!    値を含まず、`integrity_hash` がそれらを検出する。
 
-use agricola_re_ai::cards::{verified_basic_card_set, CardDefinition, CardEffect, CardKind};
+use agricola_re_ai::cards::{
+    verified_basic_card_set, CardDefinition, CardEffect, CardKind, PostPlayDestination,
+};
 use agricola_re_ai::mcts::sample_game;
 use agricola_re_ai::model::{Config, Game, Good, Space};
 use agricola_re_ai::policy::{CardChoiceDetails, DetailPolicy, RandomPolicy, SpacePolicy};
@@ -235,6 +237,7 @@ fn use_limit_ledger_survives_save_load_as_canonical_state() {
             amount: 1,
         }],
         use_limit: Some(1),
+        post_play: PostPlayDestination::PlayedArea,
     });
     // 明示手配で TEST_LIMITED を player 0 の手札に置き、実際のエンジン経路で
     // カードをプレイしてから DayLaborer で使用する (Lessons → 相手が別枠 →
@@ -292,7 +295,10 @@ fn use_limit_ledger_survives_save_load_as_canonical_state() {
     })
     .unwrap_or_else(|e| panic!("day laborer must be playable at start: {e}"));
     assert_eq!(
-        game.public.card_uses.get("TEST_LIMITED"),
+        game.public.card_uses.get(&format!(
+            "TEST_LIMITED:{:?}",
+            agricola_re_ai::registry::EventKind::WorkerPlaced
+        )),
         Some(&1),
         "use_limit カードの使用が正本台帳に記録される"
     );
@@ -307,7 +313,13 @@ fn use_limit_ledger_survives_save_load_as_canonical_state() {
 
     // 観測射影にも台帳が乗り、再構築ゲームで一致する。
     let obs = game.observation(0).unwrap();
-    assert_eq!(obs.public.card_uses.get("TEST_LIMITED"), Some(&1));
+    assert_eq!(
+        obs.public.card_uses.get(&format!(
+            "TEST_LIMITED:{:?}",
+            agricola_re_ai::registry::EventKind::WorkerPlaced
+        )),
+        Some(&1)
+    );
     let mut rng = ChaCha8Rng::seed_from_u64(0xBEEF);
     let reconstructed = sample_game(&obs, &mut rng).expect("reconstruction must succeed");
     assert_eq!(reconstructed.public.card_uses, game.public.card_uses);

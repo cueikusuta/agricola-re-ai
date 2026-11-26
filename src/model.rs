@@ -620,6 +620,8 @@ pub struct PublicState {
     /// Per-card use counts in the current round. Card plays are public
     /// actions, so the ledger is public state. Cleared at each round
     /// boundary; `serde(default)` keeps pre-aggregation saves loading.
+    /// Key format: "card_id:EventKind" (e.g., "TEST_LIMITED:WorkerPlaced"),
+    /// allowing per-(card, event_kind) limits within the same round period.
     #[serde(default)]
     pub card_uses: BTreeMap<String, u32>,
     /// Per-card resource accumulations on played cards. Cards that place
@@ -1866,6 +1868,7 @@ impl Game {
                             round,
                             used_spaces: &used_spaces,
                             accumulations: None,
+                            animal_accumulations: None,
                             event_budget: &mut event_budget,
                             card_uses: &mut card_uses,
                             card_use_limits: &card_use_limits,
@@ -2002,6 +2005,7 @@ impl Game {
                         delayed_well: &mut delayed_well,
                         round,
                         accumulations: None,
+                        animal_accumulations: None,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
                         card_uses: &mut card_uses,
@@ -2117,6 +2121,7 @@ impl Game {
                         // the core action's take, so the current public map is
                         // exactly what the original dispatch saw.
                         accumulations: Some(&next.public.accumulations),
+                        animal_accumulations: Some(&next.public.animal_accumulations),
                         round,
                         used_spaces: &used_spaces,
                         event_budget: &mut event_budget,
@@ -2131,7 +2136,10 @@ impl Game {
                         space: Some(completion.action.space),
                         improvement: None,
                         baked: false,
-                        previous_player: None,
+                        // A068 counts fences built by THIS action, so the
+                        // resumed post-worker trigger needs the same
+                        // pre-action snapshot the original dispatch used.
+                        previous_player: Some(completion.previous_player.clone()),
                         used_spaces: used_spaces.clone(),
                         site: crate::registry::EventKind::WorkerPlaced,
                         event_kind: crate::registry::EventKind::WorkerPlaced,
@@ -2474,6 +2482,7 @@ impl Game {
                     // the core action's take, so the current public map holds
                     // exactly the amounts the original scan saw.
                     accumulations: Some(&self.public.accumulations),
+                    animal_accumulations: Some(&self.public.animal_accumulations),
                     event_budget: &mut self.event_budget,
                     card_uses: &mut self.public.card_uses,
                     card_use_limits: &self.card_use_limits,

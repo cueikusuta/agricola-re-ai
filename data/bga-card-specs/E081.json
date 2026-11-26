@@ -20,14 +20,14 @@
       {
         "url": "https://agricola.cloudfree.jp/?p=2672",
         "language": "ja",
-        "checked_on": "2026-11-19",
-        "note": "third-party BGA wiki card page; cost, prerequisite, points and effect"
+        "checked_on": "2026-11-24",
+        "note": "third-party BGA wiki card page; re-checked 2026-11-24 (page rev. 2024/10/10). Confirmed: no cost (コスト: ー), prerequisite 3 occupations (条件: 職業3), points 1 (勝利点: 1), effect = 'このカードは全員が使えるアクションスペースとなる。使ったプレイヤーはすでにストックにある種類の建築資材を1つずつ得る。ほかのプレイヤーが使うときは、まずあなたに食料1を渡さなければならない。' (this card is an action space usable by everyone; the user gets 1 building resource of each type already in stock; another player using it must first pay the owner 1 food)."
       },
       {
         "url": "https://agricola.cloudfree.jp/cardlist_en/",
         "language": "en",
-        "checked_on": "2026-11-19",
-        "note": "English list page row used to cross-check the card id, name and effect text"
+        "checked_on": "2026-11-24",
+        "note": "English list page row re-checked 2026-11-24 (list rev. 2026/06/12). Confirmed effect text: 'This card is an action space for all. A player who uses it gets 1 building resource of each type they already have. If another player uses it, they must first pay you 1 food.'"
       }
     ]
   },
@@ -108,8 +108,8 @@
   "review": {
     "status": "needs_resolution",
     "unresolved_fields": [
-      "effects: no established modeling for a card acting as a universal action space usable by every player (not a farmyard space)",
-      "effects.1: whether a non-owner user who cannot pay 1 food may still use the card (or the payment is waived) is undecided (BQ-13, same class as #370 H-1b)"
+      "effects: no established modeling for a card acting as a universal action space usable by every player (not a farmyard space). Source rule text confirmed by JA p=2672 + EN list on the 2026-11-24 re-check; encoding is a design question.",
+      "effects.1: source confirms non-owner users 'must first pay you 1 food' (mandatory payment, no waiver stated), but neither JA nor EN states what happens when the user cannot pay — use illegal or payment waived is undecided (BQ-13)."
     ],
     "test_case_ids": [
       "E081-owner-use",
@@ -117,8 +117,8 @@
       "E081-other-cannot-pay"
     ],
     "checked_by": "AI source comparison",
-    "checked_on": "2026-11-19",
+    "checked_on": "2026-11-24",
     "implementation_status": "not_started",
-    "notes": "This card is an action space usable by everyone. The user gets 1 building resource of each type they already have; a non-owner user must first pay the card owner 1 food."
+    "notes": "Cost: none (JA table: コスト=ー). Prerequisite: 3 occupations (JA table: 職業3). Printed points: 1 (JA table: 勝利点: 1). Effect: this card is an action space usable by everyone; the user gets 1 building resource of each type they already have; a non-owner user must first pay the card owner 1 food. Sources: JA p=2672 (rev. 2024/10/10), EN cardlist_en/ (rev. 2026/06/12), both re-checked 2026-11-24. Third-party BGA wiki cross-check only; not official Lookout verification. status stays needs_resolution."
   }
 }

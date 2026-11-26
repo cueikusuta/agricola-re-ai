@@ -912,6 +912,7 @@ mod projection_tests {
                 good: Good::Wood,
                 amount: 2,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         obs.hand.push("sample_occ".into());
         let original = &obs.public.players[obs.player_id];
@@ -980,6 +981,7 @@ mod projection_tests {
             effects: vec![CardEffect::EndGameBonus {
                 rule: ScoreBonusRule::HouseMaterial,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         obs.hand.push("bonus".into());
         let value = action_value_with_details(&obs, Space::Lessons, &SimpleDetails).unwrap();
@@ -1003,6 +1005,7 @@ mod projection_tests {
                 good: Good::Food,
                 amount: 2,
             }],
+            post_play: crate::cards::PostPlayDestination::PlayedArea,
         });
         let action = Action {
             space: Space::GrainSeeds,

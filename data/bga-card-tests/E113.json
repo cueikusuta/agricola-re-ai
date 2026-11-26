@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "card_id": "E113",
+  "cases": [
+    {
+      "id": "E113-vegetable-on-family-growth",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "family_growth"
+      },
+      "expected": {
+        "gains": {
+          "vegetable": 1
+        }
+      },
+      "notes": "Using Family Growth action grants 1 vegetable."
+    },
+    {
+      "id": "E113-multiple-family-growth",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "family_growth",
+        "repeat": 2
+      },
+      "expected": {
+        "gains": {
+          "vegetable": 2
+        }
+      },
+      "notes": "Two Family Growth actions grant 2 vegetables total."
+    },
+    {
+      "id": "E113-not-triggered-on-other-spaces",
+      "scope": "effect_only",
+      "setup": {
+        "this_card": "in_play"
+      },
+      "action": {
+        "trigger": "after_worker_space",
+        "space": "day_laborer"
+      },
+      "expected": {
+        "gains": {}
+      },
+      "notes": "Only Family Growth spaces trigger the effect."
+    }
+  ]
+}
