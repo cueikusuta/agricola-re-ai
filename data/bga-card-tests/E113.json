@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "card_id": "E113",
+  "cases": [
+    {
+      "id": "E113-family-growth",
+      "scope": "effect_only",
+      "setup": {
+        "family": 2
+      },
+      "action": {
+        "play": "E113",
+        "family_growth": true
+      },
+      "expected": {
+        "vegetable_delta": 1
+      },
+      "notes": "A family-growth action gives 1 vegetable."
+    },
+    {
+      "id": "E113-no-growth",
+      "scope": "effect_only",
+      "setup": {
+        "family": 2
+      },
+      "action": {
+        "play": "E113",
+        "action": "plow_field"
+      },
+      "expected": {
+        "vegetable_delta": 0
+      },
+      "notes": "Other actions do not trigger the gain."
+    },
+    {
+      "id": "E113-two-growths",
+      "scope": "effect_only",
+      "setup": {
+        "family": 2
+      },
+      "action": {
+        "play": "E113",
+        "family_growth": true,
+        "repeat": 2
+      },
+      "expected": {
+        "vegetable_delta": 2
+      },
+      "notes": "The effect repeats for every family-growth action."
+    }
+  ]
+}

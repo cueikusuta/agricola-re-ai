@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "card_id": "E120",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "くず回収者",
+    "name_en": "Scrap Collector"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2633",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "on_play",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "card",
+          "params": {
+            "kind": "place_on_round_spaces",
+            "amounts": [
+              {
+                "good": "wood",
+                "amount": 1
+              },
+              {
+                "good": "clay",
+                "amount": 1
+              },
+              {
+                "good": "wood",
+                "amount": 1
+              },
+              {
+                "good": "clay",
+                "amount": 1
+              },
+              {
+                "good": "wood",
+                "amount": 1
+              },
+              {
+                "good": "clay",
+                "amount": 1
+              }
+            ],
+            "rounds": "next_6_after_current",
+            "first_good": "wood"
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "once_per_play",
+      "duration": "instant",
+      "snapshot": "after_event",
+      "order": 0,
+      "decision_owner": "none",
+      "notes": "Place wood and clay alternately, starting with wood, on the six round spaces that follow the current round."
+    },
+    {
+      "trigger": "round_start",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "take_all_goods_from_round_space",
+            "source": "this_card_round_markers",
+            "consume_markers": true
+          }
+        }
+      ],
+      "optional": false,
+      "frequency": "every_round",
+      "duration": "permanent",
+      "snapshot": "after_event",
+      "order": 1,
+      "decision_owner": "none",
+      "notes": "At the start of each round the owner takes the resource this card placed on that space."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "needs_resolution",
+    "unresolved_fields": [
+      "effects.0.steps.0.params.rounds: when played so late that fewer than six rounds remain, the wiki does not say whether the surplus markers are dropped or the card cannot be played (Q-4)"
+    ],
+    "test_case_ids": [
+      "E120-placed-from-round-1",
+      "E120-collect-wood",
+      "E120-collect-clay"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "Place wood/clay alternately on the next six round spaces; collect each at its round start. The late-play edge is left to Q-4."
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "card_id": "E115",
+  "cases": [
+    {
+      "id": "E115-grain-seeds",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E115",
+        "use_space": "grain_seeds"
+      },
+      "expected": {
+        "granted_actions": [
+          "bake_bread"
+        ]
+      },
+      "notes": "Grain Seeds grants Bake Bread."
+    },
+    {
+      "id": "E115-vegetable-seeds",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E115",
+        "use_space": "vegetable_seeds"
+      },
+      "expected": {
+        "granted_actions": [
+          "sow"
+        ]
+      },
+      "notes": "Vegetable Seeds grants Sow."
+    },
+    {
+      "id": "E115-other-space",
+      "scope": "effect_only",
+      "setup": {},
+      "action": {
+        "play": "E115",
+        "use_space": "forest"
+      },
+      "expected": {
+        "granted_actions": []
+      },
+      "notes": "Other spaces grant nothing."
+    }
+  ]
+}

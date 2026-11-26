@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "card_id": "E112",
+  "identity": {
+    "kind": "occupation",
+    "name_ja": "穀物泥棒",
+    "name_en": "Grain Thief"
+  },
+  "bga": {
+    "listed": "yes",
+    "playable": "yes",
+    "ban_status": "none",
+    "base_2016": "no",
+    "eligibility": {
+      "2": "unknown",
+      "3": "unknown",
+      "4": "unknown"
+    },
+    "references": [
+      {
+        "url": "https://agricola.cloudfree.jp/?p=2641",
+        "language": "ja",
+        "checked_on": "2026-11-21",
+        "note": "third-party BGA wiki card page; cost, prerequisite, printed points and effect"
+      }
+    ]
+  },
+  "play": {
+    "action": "occupation",
+    "cost": [],
+    "prerequisites": [],
+    "printed_points": 0
+  },
+  "effects": [
+    {
+      "trigger": "harvest_field_phase",
+      "conditions": [],
+      "steps": [
+        {
+          "operation": "other",
+          "target": "owner",
+          "params": {
+            "kind": "harvest_grain_without_removing_field_goods",
+            "good": "grain",
+            "per_field": true,
+            "amount": 1
+          }
+        }
+      ],
+      "optional": true,
+      "frequency": "every_harvest",
+      "duration": "permanent",
+      "snapshot": "before_effect",
+      "order": 0,
+      "decision_owner": "owner",
+      "notes": "For each grain field harvested in the field phase, the owner may leave the grain on that field and take 1 grain from the general supply instead."
+    }
+  ],
+  "post_play": {
+    "destination": "played_area"
+  },
+  "review": {
+    "status": "bga_checked",
+    "unresolved_fields": [],
+    "test_case_ids": [
+      "E112-keep-grain",
+      "E112-normal-harvest",
+      "E112-two-fields"
+    ],
+    "checked_by": "AI source comparison",
+    "checked_on": "2026-11-21",
+    "implementation_status": "not_started",
+    "notes": "At the field phase, each harvested grain field may keep its grain while the owner takes 1 grain from the supply; the choice is per field."
+  }
+}
