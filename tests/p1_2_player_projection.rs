@@ -66,6 +66,7 @@ fn raw_a155_definition() -> CardDefinition {
             gain(Space::TravelingPlayers, Good::Wood, 1),
             gain(Space::TravelingPlayers, Good::Grain, 1),
         ],
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     }
 }
 
@@ -337,11 +338,11 @@ fn normal_entry_pool_excludes_a155_at_two_players() {
 
 #[test]
 fn minor_improvement_deal_minimum_boundary_is_pinned() {
-    // The implemented catalog currently exposes 37 minor improvements on this
-    // tree (main merged new minor cards after the 65-card era this fix's
-    // intake described — the 28/27 boundary this card cites was the intake-time
-    // count). Pin the CURRENT boundary honestly: users of the boundary are the
-    // 7-per-seat deal minimums 14/21/28 for 2/3/4 players.
+    // The implemented catalog currently exposes many minor improvements on
+    // this tree (main merged new minor cards after the 65-card era this
+    // fix's intake described — the 28/27 boundary this card cites was the
+    // intake-time count). Pin the CURRENT boundary honestly: users of the
+    // boundary are the 7-per-seat deal minimums 14/21/28 for 2/3/4 players.
     let registry = build_default_registry().expect("registry");
     let minors: Vec<CardDefinition> = registry
         .iter()
@@ -365,6 +366,7 @@ fn minor_improvement_deal_minimum_boundary_is_pinned() {
             cost: vec![],
             points: 0,
             effects: vec![],
+            post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
         })
         .collect();
 
@@ -377,17 +379,34 @@ fn minor_improvement_deal_minimum_boundary_is_pinned() {
             .chain(filler_occupations.clone())
             .collect(),
     };
+    // The RAW catalog is rejected at every player count: D035 is the first
+    // minor improvement whose merged form carries raw Minimum/MaximumPlayers
+    // guard runs, and `CardSet::validate` by design (PR #368) rejects an
+    // unprojected set (B102/A133 are occupations, so this minor-only test
+    // never met that shape before D035). Pin the regression cause so the
+    // projection below stays necessary.
     for players in [2usize, 3, 4] {
         assert!(
-            with_all.validate(players).is_ok(),
+            with_all.validate(players).is_err(),
+            "raw unprojected catalog must be rejected at {players} players (D035 player guards)"
+        );
+    }
+    // Every game entry projects exactly once (PR #368); the deal minimum is
+    // judged on the PROJECTED set, which keeps the 7-per-seat intent above.
+    for players in [2usize, 3, 4] {
+        let projected = with_all
+            .projected_for_players(players)
+            .expect("full minor catalog must project at every player count");
+        assert!(
+            projected.validate(players).is_ok(),
             "{current_minors} minors + 28 occupations must validate at {players} players"
         );
     }
 
     // One minor short of the 4-player minimum: with the current catalog the
     // deal minimum fails exactly when the minor count drops below 28.
-    // (At 37 minors the transmission case needs the count reduced to 27, so
-    // remove down to 27 and confirm 4p fails while 2p/3p pass.)
+    // (The transmission case needs the count reduced to 27, so remove down
+    // to 27 and confirm 4p fails while 2p/3p pass.)
     let mut with_27 = with_all;
     while with_27
         .definitions
@@ -411,16 +430,29 @@ fn minor_improvement_deal_minimum_boundary_is_pinned() {
             .count(),
         27
     );
+    // The 28/27 boundary is judged on the PROJECTED set at each player
+    // count, exactly like the full-catalog check above (validate alone sees
+    // D035's raw player-count guard runs and rejects before reaching the
+    // deal minimum).
+    let projected_27_4p = with_27
+        .projected_for_players(4)
+        .expect("27 minors must project at 4 players");
     assert!(
-        with_27.validate(4).is_err(),
+        projected_27_4p.validate(4).is_err(),
         "27 minors must fail 4 players (28 needed)"
     );
+    let projected_27_3p = with_27
+        .projected_for_players(3)
+        .expect("27 minors must project at 3 players");
     assert!(
-        with_27.validate(3).is_ok(),
+        projected_27_3p.validate(3).is_ok(),
         "27 minors pass 3 players (21 needed)"
     );
+    let projected_27_2p = with_27
+        .projected_for_players(2)
+        .expect("27 minors must project at 2 players");
     assert!(
-        with_27.validate(2).is_ok(),
+        projected_27_2p.validate(2).is_ok(),
         "27 minors pass 2 players (14 needed)"
     );
 }

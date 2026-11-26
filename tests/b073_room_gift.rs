@@ -41,6 +41,7 @@ fn occ_def(id: &str) -> CardDefinition {
         cost: vec![],
         points: 0,
         effects: vec![],
+        post_play: agricola_re_ai::cards::PostPlayDestination::PlayedArea,
     }
 }
 
